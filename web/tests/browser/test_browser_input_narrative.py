@@ -698,6 +698,107 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0, "the preview dispatches no ui_action")
         page.close()
 
+    # ---- webclient-full-log-frame ----
+
+    def _log_scroll_state(self, page):
+        return page.evaluate(
+            """() => {
+              const scroll = document.querySelector('[data-testid="fulllog-scroll"]');
+              const lines = scroll.querySelectorAll('.narrative-line');
+              const last = lines[lines.length - 1].getBoundingClientRect();
+              const box = scroll.getBoundingClientRect();
+              return {
+                top: scroll.scrollTop,
+                atEnd: scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4,
+                lastInside: last.top >= box.top - 1 && last.bottom <= box.bottom + 1,
+                focused: document.activeElement === scroll,
+              };
+            }"""
+        )
+
+    @covers_requirement("webclient-input-narrative::the-full-log-is-framed-without-changing-retained-content")
+    @covers_requirement(
+        "webclient-input-narrative::log-readers-can-return-to-latest-without-losing-their-place-involuntarily"
+    )
+    def test_full_log_frame_returns_to_latest_without_touching_the_reader(self):
+        page = self.logged_in_page(viewport=(1280, 720))
+        install_outbound_recorder(page)
+        wait_for_presentation_settled(page)
+        wait_for_narrative_settled(page, 0)
+        page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              for (let r = 1; r <= 10; r++) {
+                store.appendText('in', `look ${r}`);
+                store.appendText('out', `第 ${r} 則回應：鐘樓敲過第七聲，河面的霧氣沿著石階慢慢爬上廣場。`);
+              }
+            }"""
+        )
+        # The live reader sits on page 1 of a multi-page response, so a log
+        # control that moved the reading position would show as a changed page.
+        _append_multipage_response(page)
+        before = self._live_reader(page)
+        self.assertEqual(before["page"], "1")
+
+        page.locator('[data-testid="message-log-open"]').click()
+        page.wait_for_selector('[data-testid="fulllog-scroll"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="fulllog__title"]').inner_text(), "日誌")
+        self.assertEqual(page.get_by_role("dialog", name="日誌").count(), 1)
+        state = self._log_scroll_state(page)
+        self.assertTrue(state["atEnd"] and state["lastInside"] and state["focused"], state)
+        self.assertEqual(page.locator('[data-testid="fulllog-latest"]').count(), 0)
+        # Every echo appears once, in order, as its response's heading.
+        echoes = page.locator('[data-testid="fulllog-scroll"] .narrative-line.inp').all_inner_texts()
+        # (The multi-page response's own echo comes last.)
+        self.assertEqual(echoes[-11:-1], [f"look {r}" for r in range(1, 11)])
+
+        # A click on the scrim neither closes the log nor lets focus escape it.
+        page.mouse.click(640, 700)
+        self.assertEqual(page.locator('[data-testid="fulllog-overlay"]').count(), 1)
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('[data-testid=\"fulllog-overlay\"]').contains(document.activeElement)"
+            )
+        )
+
+        # Scrolled up, an arrival leaves the reader where they are and marks 新內容.
+        page.evaluate("() => { document.querySelector('[data-testid=\"fulllog-scroll\"]').scrollTop = 0; }")
+        page.wait_for_selector('[data-testid="fulllog-latest"]', timeout=15000)
+        page.evaluate("() => window.__elosernBridge.store.appendText('out', '一陣急促的鐘聲從港口傳來。')")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"fulllog-latest\"]').getAttribute('data-fresh') === 'true'",
+            timeout=15000,
+        )
+        self.assertEqual(self._log_scroll_state(page)["top"], 0)
+        self.assertIn("新內容", page.locator('[data-testid="fulllog-latest"]').inner_text())
+        # The control sits in the footer, below the text, never over it.
+        rects = page.evaluate(
+            """() => {
+              const r = (s) => document.querySelector(s).getBoundingClientRect();
+              return { scroll: r('[data-testid="fulllog-scroll"]').bottom,
+                       latest: r('[data-testid="fulllog-latest"]').top };
+            }"""
+        )
+        self.assertGreaterEqual(rects["latest"], rects["scroll"])
+
+        page.locator('[data-testid="fulllog-latest"]').click()
+        page.wait_for_selector('[data-testid="fulllog-latest"]', state="detached", timeout=15000)
+        state = self._log_scroll_state(page)
+        self.assertTrue(state["atEnd"] and state["lastInside"] and state["focused"], state)
+
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[data-testid="fulllog-overlay"]', state="detached", timeout=15000)
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement === document.querySelector('[data-testid=\"message-log-open\"]')"
+            )
+        )
+        after = self._live_reader(page)
+        self.assertEqual(after["page"], before["page"], "the log never moves the message window's reader")
+        self.assertEqual(after["text"], before["text"])
+        self.assertEqual(sent_action_count(page), 0, "the log dispatches no ui_action")
+        page.close()
+
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )

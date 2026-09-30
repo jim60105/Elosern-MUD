@@ -67,6 +67,8 @@ export const GLYPHS = {
   gallery: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M7 8.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0 M21 15l-5-5L5 21",
   help: "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0 M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-.7 1.3-.7 2.3M12 16h.01",
   shop: "M4 9h16l-1.6-5H5.6L4 9Z M4 9c0 1.7 1.8 2.5 4 2.5S12 10.7 12 9c0 1.7 1.8 2.5 4 2.5S20 10.7 20 9 M5 11.3V20h14v-8.7 M10 20v-5h4v5",
+  // The full log's header medallion: a ruled page.
+  log: "M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M8.5 8h7M8.5 12h7M8.5 16h4.5",
   // The drawer chrome's close glyph (the reference's `.closebtn` X,
   // docs/design/elosern-redesign/index.html).
   close: "M6 6l12 12M18 6 6 18",
@@ -83,6 +85,7 @@ const STROKE_ATTRS = {
   flee: { "stroke-linecap": "round" },
   // The close X must render with rounded caps, matching the reference.
   close: { "stroke-linecap": "round" },
+  log: { "stroke-linecap": "round", "stroke-linejoin": "round" },
   lineage: { "stroke-linecap": "round" },
   lore: { "stroke-linecap": "round" },
   codex: { "stroke-linecap": "round", "stroke-linejoin": "round" },
