@@ -312,6 +312,8 @@ var CREATION_MAX_SEX_OPTIONS = 8;
 // draft `sex` member (namegen-creation-ui).
 // v5 renames the `custom.adult` descriptor block to `custom.age` and drops
 // the advertised minimums to 0 (age-range-0-10000).
+// v6 adds required display_name_zh to custom.races options and requires preset
+// cards to resolve to custom.races (webclient-creation-display-labels).
 var CREATION_SCHEMA_VERSION = 6;
 // Affinity picker bounds (mirror of web.webclient.presentation.creation and
 // the deterministic max_affinity_elements mapping). The race maxima are

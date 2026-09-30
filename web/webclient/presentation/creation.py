@@ -67,7 +67,9 @@ from world.rules.creation_wizard import (
 # Bumped to 5 for the age-bounds custom descriptor (age-range-0-10000): the
 # descriptor block renames ``custom.adult`` -> ``custom.age``, the advertised
 # minimums drop to 0, and the mirrored JS validator moves together; a stale
-# v4 panel or draft is rejected by the exact-schema gate on both ends.
+# v4/v5 panel or draft is rejected by the exact-schema gate on both ends.
+# v6 adds canonical race display_name_zh to custom.races options and requires
+# preset cards to resolve to custom.races (webclient-creation-display-labels).
 CREATION_SCHEMA_VERSION = 6
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
