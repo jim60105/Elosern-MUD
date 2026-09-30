@@ -419,11 +419,22 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                       return {
                         vitals: fit('[data-anchor="vitals"]'),
                         map: fit('[data-anchor="map"]'),
+                        islands: Object.fromEntries(
+                          vitalsIslands.concat(mapIslands).map((s) => [s, rect(s)])
+                        ),
+                        blockers,
                         intersections: found,
                       };
                     }"""
                 )
-                self.assertEqual(geo["intersections"], [], f"island intersections at {viewport}")
+                # The full measurement rides the failure message: the anchors
+                # clip (`overflow-y: auto`), so an intersection report alone
+                # cannot say which stack outgrew its box by how much.
+                self.assertEqual(
+                    geo["intersections"],
+                    [],
+                    f"island intersections at {viewport}: {geo}",
+                )
                 for anchor in ("vitals", "map"):
                     # The +1 absorbs sub-pixel rounding of scrollHeight.
                     self.assertLessEqual(
