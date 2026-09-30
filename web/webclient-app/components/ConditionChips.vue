@@ -355,8 +355,12 @@ function onChipKeydown(event) {
 }
 
 /* Short viewports (webclient-avg-stage-hud-anchors design D6): smaller
-   chips and a tighter island, so the vitals stack fits its anchor. */
-@media (max-height: 820px) {
+   chips and a tighter island, so the vitals stack fits its anchor. The
+   940px bound (kept in step with app-shell.css) also covers 900px-class
+   viewports, where the localized chip flow sits within one wrapped row of
+   the anchor budget: the bounded two-row chip scroll box makes the island
+   height insensitive to the environment's text metrics. */
+@media (max-height: 940px) {
   .conditions {
     padding: calc(7px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(9px * var(--ui-scale));
   }
