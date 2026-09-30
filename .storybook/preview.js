@@ -1,7 +1,7 @@
 import { h } from "vue";
 import "../web/webclient-app/styles/tokens.css";
 import "../web/webclient-app/styles/fonts.css";
-import "../web/webclient-app/styles/fonts-hack.css";
+import "../web/webclient-app/styles/fonts-mono.css";
 import "../web/webclient-app/styles/app-shell.css";
 import "../web/static/webclient/css/ansi_palette.css";
 import { installUiScale } from "../web/webclient-app/lib/ui_scale.js";

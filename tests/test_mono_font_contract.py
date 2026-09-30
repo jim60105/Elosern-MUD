@@ -32,6 +32,7 @@ CJK_COUNT = 13283
 ARROWS = set(range(0x2190, 0x2194))
 ASCII = set(range(0x20, 0x7F))
 PRIVATE_USE = ((0xE000, 0xF8FF), (0xF0000, 0x10FFFF))
+MONO_STACK = '"Jim Mono TC", "Noto Sans TC", monospace'
 
 
 def _ranges(value: str) -> set[int]:
@@ -162,6 +163,10 @@ class MonoFontContractTest(unittest.TestCase):
         self.assertIn("Version 1.1", licence)
         self.assertTrue((FONT_DIR / "licenses" / "NOTICE.md").is_file())
         self.assertIn("Bitstream Vera", (FONT_DIR / "licenses" / "Hack-LICENSE.txt").read_text(encoding="utf-8"))
+
+    def test_monospace_token_names_only_the_bundled_faces(self):
+        match = re.search(r"--f-mono:\s*([^;]+);", TOKENS_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(match.group(1).strip(), MONO_STACK)
 
 
 if __name__ == "__main__":

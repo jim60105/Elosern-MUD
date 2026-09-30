@@ -1,22 +1,22 @@
 ## 1. Preconditions, import, and baseline
 
-- [ ] 1.1 Confirm `web/webclient-app/lib/mono_cells.js` exists on master (`webclient-map-label-cell-budget` merged) and the upstream Jim Mono TC release is published with a `-web.zip` in its `SHA256SUMS.txt`. Download it to the session scratchpad and check it against D0: group names, every file ≤ 65,536 bytes, `licenses/LICENSE` present. Verify: all hold. If the release is missing or breaks D0, stop and report to the owner; do not cut fonts here.
-- [ ] 1.2 Build the unmodified app and Storybook. Capture the D9 before-set with agent-browser (headless, throwaway Chromium) at 1440×900 and 1280×720 into the session scratchpad, and record CDP's rendered family for a `kbd` and a map-art line. Verify: every D9 surface has a before-shot at both viewports, and `agent-browser close` has run.
-- [ ] 1.3 Add `tools/import_mono_font.py` per D1 with the release URL and SHA-256 pinned, and `tests/test_mono_font_import_tool.py`. Verify:
+- [x] 1.1 Confirm `web/webclient-app/lib/mono_cells.js` exists on master (`webclient-map-label-cell-budget` merged) and the upstream Jim Mono TC release is published with a `-web.zip` in its `SHA256SUMS.txt`. Download it to the session scratchpad and check it against D0: group names, every file ≤ 65,536 bytes, `licenses/LICENSE` present. Verify: all hold. If the release is missing or breaks D0, stop and report to the owner; do not cut fonts here.
+- [x] 1.2 Build the unmodified app and Storybook. Capture the D9 before-set with agent-browser (headless, throwaway Chromium) at 1440×900 and 1280×720 into the session scratchpad, and record CDP's rendered family for a `kbd` and a map-art line. Verify: every D9 surface has a before-shot at both viewports, and `agent-browser close` has run.
+- [x] 1.3 Add `tools/import_mono_font.py` per D1 with the release URL and SHA-256 pinned, and `tests/test_mono_font_import_tool.py`. Verify:
   - `uv run --locked python -m unittest tests.test_mono_font_import_tool` passes without network access;
   - flipping one byte of the pinned SHA-256 makes the tool exit non-zero without touching the worktree.
-- [ ] 1.4 Run the tool and commit `web/webclient-app/fonts/jimmonotc/**` and `web/webclient-app/styles/fonts-mono.css`. Add `tests/test_mono_font_contract.py` per D1 (no `@covers_requirement` yet, D8). Verify:
+- [x] 1.4 Run the tool and commit `web/webclient-app/fonts/jimmonotc/**` and `web/webclient-app/styles/fonts-mono.css`. Add `tests/test_mono_font_contract.py` per D1 (no `@covers_requirement` yet, D8). Verify:
   - a second run leaves `git status` clean;
   - `uv run --locked python -m unittest tests.test_mono_font_contract` passes;
   - deleting one slice, adding an overlapping range, changing one `cjk.bold` entry, or removing `licenses/LICENSE` makes it fail.
 
 ## 2. Wire the face and remove Hack
 
-- [ ] 2.1 Replace the `fonts-hack.css` imports in `web/webclient-app/main.js` and `.storybook/preview.js` with `fonts-mono.css`, and set `--f-mono: "Jim Mono TC", "Noto Sans TC", monospace;` with its comment in `styles/tokens.css` (D2). Verify:
+- [x] 2.1 Replace the `fonts-hack.css` imports in `web/webclient-app/main.js` and `.storybook/preview.js` with `fonts-mono.css`, and set `--f-mono: "Jim Mono TC", "Noto Sans TC", monospace;` with its comment in `styles/tokens.css` (D2). Verify:
   - `pnpm run build` succeeds;
   - `dist/index.css` has Jim Mono TC rules for weights 400 and 700;
   - every non-data URL points at an existing `dist/assets/JimMonoTC-*.woff2`.
-- [ ] 2.2 Repoint `tools/gen_mono_cells.py` to `fonts/jimmonotc/codepoints.json` (`regular`) and regenerate `mono_cells.js` (D3). Verify:
+- [x] 2.2 Repoint `tools/gen_mono_cells.py` to `fonts/jimmonotc/codepoints.json` (`regular`) and regenerate `mono_cells.js` (D3). Verify:
   - `uv run --locked python -m unittest tests.test_mono_cells_table` passes;
   - `CI=true pnpm exec vitest run web/webclient-app/tests/world` passes;
   - the helper still reports `中` = 2, `…` = 1, `─` = 1.

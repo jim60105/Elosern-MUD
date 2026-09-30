@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # The bundled monospace face's slice manifest; a font change repoints this.
-MANIFEST_PATH = REPO_ROOT / "web/webclient-app/fonts/hack/codepoints.json"
+MANIFEST_PATH = REPO_ROOT / "web/webclient-app/fonts/jimmonotc/codepoints.json"
 MANIFEST_KEY = "regular"
 OUTPUT_PATH = REPO_ROOT / "web/webclient-app/lib/mono_cells.js"
 
