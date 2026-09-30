@@ -24,16 +24,22 @@ describe("conditionLabel", () => {
     expect(conditionLabel(condition({ remaining_seconds: null }))).toBe("烈風");
   });
 
-  it("appends every derived modifier pair in insertion order", () => {
-    expect(conditionLabel(condition({ modifiers: { atk: "+3" } }))).toBe("烈風，atk +3");
-    expect(conditionLabel(condition({ modifiers: { atk: "+3", def: "-2" } }))).toBe(
-      "烈風，atk +3，def -2",
-    );
+  it("names known modifier keys, gives unknown keys a neutral name, and keeps every value verbatim", () => {
+    // Known rulebook keys read in the game's stat vocabulary; an unknown key
+    // (or one that only exists on Object.prototype) keeps its value under the
+    // neutral 其他修正, and no sign, unit or digit is added or dropped.
+    expect(
+      conditionLabel(
+        condition({
+          modifiers: { agility: "-10%", accuracy: -15, actions_per_turn: 0, t_unknown: 0.25, constructor: "+1" },
+        }),
+      ),
+    ).toBe("烈風，敏捷 -10%，準度 -15，每回合行動 0，其他修正 0.25，其他修正 +1");
   });
 
   it("joins the label, duration, and modifier parts with the `，` separator", () => {
-    expect(conditionLabel(condition({ remaining_seconds: 5, modifiers: { spd: "×2" } }))).toBe(
-      "烈風，剩 5 秒，spd ×2",
+    expect(conditionLabel(condition({ remaining_seconds: 5, modifiers: { heal_gain: "+10%" } }))).toBe(
+      "烈風，剩 5 秒，治療量 +10%",
     );
   });
 });

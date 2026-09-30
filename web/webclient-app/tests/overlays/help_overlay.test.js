@@ -11,6 +11,10 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     document.body.innerHTML = "";
   });
 
+  function rowText(id) {
+    return wrapper.get(`[data-testid="help-controls-row-${id}"]`).text();
+  }
+
   it("renders the client's own control reference", () => {
     // The body is a plain block (task 6.1): no dialog role / aria-modal /
     // close control — those belong to the OverlayHost.
@@ -19,20 +23,38 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(overlay.attributes("role")).toBeUndefined();
     expect(overlay.attributes("aria-modal")).toBeUndefined();
     const controls = wrapper.get('[data-testid="help-controls"]');
-    expect(controls.exists()).toBe(true);
-    const rows = controls.findAll('[data-testid^="help-controls-row-"]');
-    expect(rows.length).toBeGreaterThan(0);
-    const controlsText = controls.text();
-    expect(controlsText).toContain("Open the command line");
-    expect(controlsText).toContain("Expands the collapsed line and focuses its field; no literal slash is inserted.");
-    expect(controlsText).toContain("a successful send collapses the line and returns to the dock");
-    expect(controlsText).toContain(
-      "Enter or Space on the focused message window first shows a typing page in full, then advances a page.",
-    );
-    expect(controlsText).toContain("Opens the complete log at its latest line.");
-    expect(controlsText).toContain("open overlay → open drawer → focused command field (collapses the line) → dock menu level");
-    const gameHelp = wrapper.get('[data-testid="help-controls-gamehelp"]').text();
-    expect(gameHelp).toMatch(/help/i);
+    expect(controls.findAll('[data-testid^="help-controls-row-"]').length).toBeGreaterThan(0);
+    // `/` and the ⌨ toggle expand the command line; Escape and a successful
+    // send collapse it (the help-surface contract).
+    expect(rowText("slash")).toContain("展開收合中的指令列");
+    expect(rowText("keyboard-toggle")).toContain("⌨");
+    expect(rowText("keyboard-toggle")).toContain("再按一次則收合");
+    expect(rowText("send")).toContain("送出成功後指令列收合");
+    expect(rowText("collapse")).toContain("收合指令列");
+    expect(rowText("log")).toContain("停在最新一行");
+    const gameHelp = wrapper.get('[data-testid="help-controls-gamehelp"]');
+    expect(gameHelp.get("code").text()).toBe("help");
+    expect(gameHelp.text()).not.toContain("`");
+  });
+
+  it("names the dock's real positional picks (1–9), not a stale range", () => {
+    // The dock digit handler accepts 1–9 (stores/elosern/interaction.js).
+    wrapper = mount(HelpOverlay);
+    const digits = wrapper.get('[data-testid="help-controls-row-digits"]');
+    expect(digits.findAll("kbd").map((key) => key.text())).toEqual(["1", "9"]);
+    expect(digits.text()).toContain("第 1 至 9 項");
+    expect(wrapper.text()).not.toContain("1-4");
+  });
+
+  it("reads in Traditional Chinese apart from literal key names and command syntax", () => {
+    wrapper = mount(HelpOverlay);
+    const prose = wrapper
+      .findAll(".help-controls__label, .help-controls__detail, .help-controls__title")
+      .map((node) => node.text())
+      .join(" ");
+    const latinWords = prose.match(/[A-Za-z]{2,}/g) ?? [];
+    const keyNames = new Set(["Enter", "Shift", "Tab", "Esc", "Space", "PageUp", "PageDown", "Home", "End"]);
+    expect(latinWords.filter((word) => !keyNames.has(word))).toEqual([]);
   });
 
   it("renders no authored game-help sections", () => {

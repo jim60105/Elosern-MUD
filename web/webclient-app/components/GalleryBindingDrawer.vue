@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import HudDrawer from "./HudDrawer.vue";
-import { GALLERY_SLOTS } from "./gallery-copy.js";
+import { GALLERY_SLOTS, galleryCardName, galleryDate } from "./gallery-copy.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -13,6 +13,13 @@ const props = defineProps({
 const emit = defineEmits(["close", "submit", "select-card", "log"]);
 // v1 does not expose the stored mask; an unchecked draft makes no false claim.
 const slots = ref([]);
+// A warning names its card by the shared label; the card's own created_at
+// (looked up by image id, never parsed from the label) tells warnings apart.
+function warningDate(warning) {
+  const row = (props.model.cards || []).find((entry) => entry.image_id === warning.image_id);
+  const date = galleryDate(row?.created_at);
+  return date.exact ?? date.relative;
+}
 </script>
 
 <template>
@@ -21,8 +28,8 @@ const slots = ref([]);
       <p class="gallery-muted">僅符合指定的裝備條件時，將自動顯示此角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
-      <img v-if="card.url" :src="card.url" :alt="card.label" class="gallery-editor-portrait">
-      <p>{{ card.label }}</p>
+      <img v-if="card.url" :src="card.url" :alt="galleryCardName(card)" class="gallery-editor-portrait">
+      <p>{{ card.label }}<br><span class="gallery-muted">{{ galleryDate(card.created_at).exact ?? galleryDate(card.created_at).relative }}</span></p>
       </aside>
       <div>
       <h4>裝備條件設定</h4>
@@ -53,6 +60,7 @@ const slots = ref([]);
         <p class="gallery-muted">以下為伺服器提供、符合目前裝備的肖像。</p>
         <article v-for="warning in model.binding_warnings" :key="warning.image_id" class="gallery-section">
           <strong>{{ warning.label }}</strong>
+          <span class="gallery-muted">{{ warningDate(warning) }}</span>
           <ul><li v-for="line in warning.conditions" :key="line">{{ line }}</li></ul>
           <button @click="emit('select-card', warning.image_id)">查看</button>
         </article>

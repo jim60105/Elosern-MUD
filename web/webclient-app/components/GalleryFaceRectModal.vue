@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
 import { clampFaceRect, faceCropStyle, moveFaceRect, resizeFaceRect } from "./face-rect-edit.js";
-import { galleryTimestamp } from "./gallery-copy.js";
+import { galleryCardName, galleryDate } from "./gallery-copy.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -73,7 +73,7 @@ function imageLoaded() {
         <section>
           <h4>原始圖片<span class="gallery-muted">（可拖曳調整框選範圍）</span></h4>
           <div class="gallery-face__original">
-            <img ref="image" :src="card.url" :alt="card.label" draggable="false" @load="imageLoaded" @error="loaded = false">
+            <img ref="image" :src="card.url" :alt="galleryCardName(card)" draggable="false" @load="imageLoaded" @error="loaded = false">
             <div v-if="loaded" class="gallery-face__rect" :style="rectStyle" @pointerdown="start($event)" @pointermove="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">
               <span class="gallery-face__cross"></span>
               <button class="gallery-face__resize" aria-label="拖曳調整框選大小" :disabled="disabled" @pointerdown.stop="start($event, true)" @pointermove.stop="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">↘</button>
@@ -83,7 +83,7 @@ function imageLoaded() {
         <section>
           <h4>圖片資訊</h4>
           <strong>{{ card.label }}</strong>
-          <p class="gallery-muted gallery-face__identity">{{ card.image_id }}<br>{{ galleryTimestamp(card.created_at) }}</p>
+          <p class="gallery-muted gallery-face__identity">{{ card.image_id }}<br>{{ galleryDate(card.created_at).exact ?? galleryDate(card.created_at).relative }}</p>
           <p class="gallery-note">拖曳左側框選範圍，或使用下方數值調整。儲存的只有框選座標，不會建立另一張圖片。</p>
           <div class="gallery-face__numbers">
             <label v-for="(label, field) in { x: '水平位置', y: '垂直位置', w: '寬度', h: '高度' }" :key="field">
@@ -91,7 +91,7 @@ function imageLoaded() {
             </label>
           </div>
           <h4>方形裁切預覽（1:1）</h4>
-          <div class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="card.url" :alt="`${card.label}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
+          <div class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="card.url" :alt="`${galleryCardName(card)}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
           <p class="gallery-muted">完整呈現框選範圍，保留原始比例。</p>
           <p v-if="!loaded" class="gallery-muted">圖片尚未載入，可使用數值調整框選。</p>
           <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，框選已保留。<button @click="emit('log')">查看伺服器訊息</button></p>

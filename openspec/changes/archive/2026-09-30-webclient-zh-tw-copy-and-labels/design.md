@@ -20,6 +20,18 @@ Codex race titles come from the server registry at the read-model serialization 
 
 Gallery already carries created_at separately but the server label repeats a UTC timestamp. Remove only the generated timestamp from generated card labels at presentation time; preserve status/reason text. Render local relative time from created_at in the client with an exact localized date/time available via tooltip/accessibility. Future timestamps use a localized future-relative form, invalid/out-of-calendar finite epochs use a neutral unavailable-date label and retain status. Refresh relative time at most once per minute while the gallery is open and tear it down on close; do not rename persistent records or parse labels to infer dates.
 
+## Applied decisions (implementation)
+
+- Help: `lib/controls-reference.js` becomes three groups (指令列 / 指令面板 / 閱讀與對話) of `{id, keys, label, detail}` rows, rendered as key caps; it adds the ⌨ toggle the main spec already required, corrects the stale `1-4` to the real 1–9 picks, and states the game-help path with `help` as code. The help overlay's subtitle was the fallback 「分類 → 條目 → 子主題」 (the deferred game-help browser's structure); it now reads 按鍵、指令列與閱讀操作.
+- Conditions: a closed `MODIFIER_LABELS` dictionary covers every adjustment key in `combat_modifiers.yaml` (攻擊 / 敏捷 / 防禦 / 準度 as the character panel and the condition labels already name them); values print verbatim; unknown → 其他修正. Chips become pills (glyph, name ellipsised at the island width, `N秒` badge); cap 6, `+N` overflow and the focus/hover detail line are kept.
+- Skill enums: `lib/skill_labels.js` holds the target-type names (moved from SkillBook) and the element names (the element registry's own 火 / 水 / …, suffixed 屬性); the detail pane previously also printed the raw element key.
+- Codex: `RaceProfile.display_name_zh` (人類 / 獸人 / 精靈) is a registry field; `GuildRank.display_name_zh` (`F 級`) and `Nation.capital_name_zh` (the capital anchor's display name) are derived properties; race, guild and nation cards lead with those names, so the existing title rule yields names and no card value is an opaque key. The drawer names card fields through `lib/codex_field_label.js` (名稱 / 描述 / 首都 / 地貌 / 例證, unknown → 資料) while `data-field` keeps the identifier.
+- Gallery: the presenter labels every card 「肖像」 (pending 「肖像（生成中）」). The client renders `created_at` through `galleryDate` (Intl `zh-TW` relative + exact local instant, injectable time zone, 日期不詳 for impossible values) with one 60 s clock owned by `GalleryPanel`; image and card accessible names are the label plus the exact instant, so same-label cards stay distinguishable.
+- Drift guard: a repository contract asserts the three client vocabularies cover every modifier key, target spec, element and codex card field the server can ship.
+- Residual (out of scope, lore data authoring): the codex fixes titles, field names and key-valued fields, not registry prose. The `description` prose of the element, magic, anchor, guild and monster-tier registries (and nation notes and static-tier descriptions, which the codex does not show) is still English authoring data and needs its own content change; creation race names belong to `webclient-creation-display-labels`.
+- The `lore` text command lists entries as 名稱（key）, keeping the key the show form takes.
+- The keyboard bridge now claims digits 1–9 (it listed only 1–4), matching the dock's picks and the help reference.
+
 ## Risks / Trade-offs
 
 - Longer localized strings and raised type sizes can exceed fixed boxes. Use bounded internal scrolling and preserve keyboard focus/complete text; exercise 1280x720, 1440x900 and 1920x1080 instead of shrinking text until it disappears.

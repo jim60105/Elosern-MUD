@@ -700,7 +700,7 @@ function creationPanelFixture(overrides = {}) {
   return {
     schema_version: 1,
     available: true,
-    presets: [{ key: "sword", display_name: "見習劍士", race_description: "人類", emphasis: "力量", background: "商隊護衛" }],
+    presets: [{ key: "sword", display_name: "見習劍士", race_description: "平原族", emphasis: "力量", background: "商隊護衛" }],
     custom: { races: [], affinity_elements: [], point_pool: 0 },
     draft: null,
     ...overrides,

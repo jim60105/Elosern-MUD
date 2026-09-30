@@ -207,7 +207,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # prose, not an empty stub): the aggregate control and both entries.
         body_text = page.locator('[data-testid="lore-codex-drawer"]').inner_text()
         self.assertIn("全部", body_text, "the aggregate control renders")
-        self.assertIn("人類", body_text, "the discovered race entry renders")
+        self.assertIn("平原族", body_text, "the discovered race entry renders")
         self.assertIn("霧骨渡口", body_text, "the discovered anchor entry renders")
         self.assertEqual(
             stage.get_attribute("data-menu-open"),

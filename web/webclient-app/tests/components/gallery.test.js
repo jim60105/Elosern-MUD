@@ -7,6 +7,7 @@ import GalleryGenerateDrawer from "../../components/GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "../../components/GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
 import { faceCropStyle, moveFaceRect, resizeFaceRect } from "../../components/face-rect-edit.js";
+import { GALLERY_DATE_UNAVAILABLE, galleryCardName, galleryDate } from "../../components/gallery-copy.js";
 import { GALLERY_EMPTY, GALLERY_MONSTER, GALLERY_SAMPLE } from "../../stories/gallery-fixtures.js";
 
 const wrappers = [];
@@ -133,6 +134,68 @@ describe("gallery panel facts and request settlement", () => {
     await nextTick();
     expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
     expect(document.activeElement).toBe(button(wrapper, "生成新圖").element);
+  });
+});
+
+describe("gallery card dates", () => {
+  const NOW = Date.UTC(2026, 8, 30, 12, 0, 0);
+  const TZ = { timeZone: "Asia/Taipei" };
+  const exact = (seconds) =>
+    new Intl.DateTimeFormat("zh-TW", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Taipei" }).format(new Date(seconds * 1000));
+
+  it("reads a structured created_at as local relative time with the exact local instant", () => {
+    const at = NOW / 1000 - 3 * 3600;
+    expect(galleryDate(at, NOW, TZ)).toEqual({
+      relative: new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" }).format(-3, "hour"),
+      exact: exact(at),
+      iso: new Date(at * 1000).toISOString(),
+    });
+    // Seconds of clock skew either way read 剛剛, never "in one minute".
+    expect(galleryDate(NOW / 1000 + 5, NOW, TZ).relative).toBe("剛剛");
+    expect(galleryDate(NOW / 1000 - 30, NOW, TZ).relative).toBe("剛剛");
+  });
+
+  it("gives a future instant a future-relative form and an impossible one the neutral unavailable label", () => {
+    expect(galleryDate(NOW / 1000 + 2 * 60, NOW, TZ).relative).toBe(
+      new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" }).format(2, "minute"),
+    );
+    // Finite but outside the ECMAScript calendar (> 8.64e15 ms), non-finite
+    // and non-numeric values: no date is invented.
+    for (const value of [8.64e12 + 1, -8.64e12 - 1, Number.POSITIVE_INFINITY, Number.NaN, "1700000000", null]) {
+      expect(galleryDate(value, NOW, TZ)).toEqual({ relative: GALLERY_DATE_UNAVAILABLE, exact: null, iso: null });
+    }
+  });
+
+  it("tells same-label cards apart by their own created_at, never the label text", () => {
+    const [first, second] = GALLERY_SAMPLE.cards;
+    expect(first.label).toBe(second.label);
+    expect(galleryCardName(first, TZ)).toBe(`${first.label}，${exact(first.created_at)}`);
+    expect(galleryCardName(second, TZ)).not.toBe(galleryCardName(first, TZ));
+    expect(galleryCardName({ label: "肖像", created_at: Number.NaN })).toBe("肖像");
+  });
+
+  it("refreshes relative dates once a minute while open and stops the clock on close", async () => {
+    vi.useFakeTimers({ now: NOW });
+    try {
+      const created = NOW / 1000 - 30;
+      const model = { ...GALLERY_SAMPLE, cards: [{ ...GALLERY_SAMPLE.cards[0], created_at: created }], binding_warnings: [] };
+      const timersBefore = vi.getTimerCount();
+      const wrapper = mountSurface(GalleryPanel, { model });
+      const date = () => wrapper.get(".gallery-card__date");
+      expect(date().text()).toContain("剛剛");
+      expect(date().attributes("datetime")).toBe(new Date(created * 1000).toISOString());
+      vi.advanceTimersByTime(60_000);
+      await nextTick();
+      expect(date().text()).toContain(new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" }).format(-1, "minute"));
+      const clearSpy = vi.spyOn(globalThis, "clearInterval");
+      wrapper.unmount();
+      wrappers.splice(wrappers.indexOf(wrapper), 1);
+      expect(clearSpy).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(timersBefore);
+      clearSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

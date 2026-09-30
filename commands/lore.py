@@ -24,6 +24,20 @@ _UNAVAILABLE = "你的知識圖鑑暫時無法閱讀。"
 _EMPTY = "你的知識圖鑑還是空的。"
 
 
+def _listed_name(category: str, key: str) -> str:
+    """One listing row: the entry's name with the key the show form takes.
+
+    The key stays visible because it is the command identifier
+    (``lore <category> <key>``); an entry whose card no longer renders is
+    listed by its key alone.
+    """
+    try:
+        name = lore_card(category, key).get("display_name_zh")
+    except (LoreCategoryError, LoreKeyError):
+        name = None
+    return f"{name}（{key}）" if name and name != key else key
+
+
 class CmdLore(Command):
     """Browse the knowledge codex of discovered lore entries."""
 
@@ -60,7 +74,7 @@ class CmdLore(Command):
             if category != current:
                 lines.append(f"◆ {CATEGORY_LABELS.get(category, category)}")
                 current = category
-            lines.append(f"　{key}")
+            lines.append(f"　{_listed_name(category, key)}")
         self.caller.msg("\n".join(lines))
 
     def _show(self, category: str, key: str) -> None:

@@ -12,6 +12,7 @@
 // opened from the command line's utility strip (not from the quest drawer).
 import { computed, ref } from "vue";
 import EmptyState from "./EmptyState.vue";
+import { codexFieldLabel } from "../lib/codex_field_label.js";
 
 const props = defineProps({
   // The committed `lore_codex` panel payload. Null (never committed) renders
@@ -174,7 +175,8 @@ const selectedEntry = computed(
       </div>
 
       <!-- The selected entry's card: exactly the panel's card fields, in the
-           panel's order, unmodified. -->
+           panel's order, values unmodified; each field is named by its
+           readable label (the raw identifier stays on data-field). -->
       <dl v-if="selectedEntry" class="lore-codex-drawer__card" data-testid="lore-codex-drawer__card">
         <dt class="lore-codex-drawer__card-title" data-testid="lore-codex-drawer__card-title">
           {{ selectedEntry.title }}
@@ -185,7 +187,7 @@ const selectedEntry = computed(
           class="lore-codex-drawer__card-field"
           :data-field="field.name"
         >
-          <dt class="lore-codex-drawer__card-field-name">{{ field.name }}</dt>
+          <dt class="lore-codex-drawer__card-field-name">{{ codexFieldLabel(field.name) }}</dt>
           <dd class="lore-codex-drawer__card-field-value">{{ field.value }}</dd>
         </div>
       </dl>

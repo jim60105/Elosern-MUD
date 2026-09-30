@@ -321,8 +321,8 @@ test("creation.custom resolves to character create", () => {
 
 test("creation.concept resolves to the character concept command", () => {
   assert.strictEqual(
-    Echo.commandLine("creation.concept", { concept: "流浪的精靈劍士" }, {}),
-    "character concept 流浪的精靈劍士"
+    Echo.commandLine("creation.concept", { concept: "流浪的林語族劍士" }, {}),
+    "character concept 流浪的林語族劍士"
   );
   assert.strictEqual(Echo.commandLine("creation.concept", { concept: "" }, {}), null);
 });
@@ -575,9 +575,9 @@ test("combat.cast echoes explicit multi-target labels in payload order (D3b)", (
   const line = Echo.commandLine(
     "combat.cast",
     { skill_key: T_AREA, target_ids: ["goblin_1", "orc_2"] },
-    { skillLabel: T_AREA_LABEL, targetLabels: ["哥布林", "獸人"] }
+    { skillLabel: T_AREA_LABEL, targetLabels: ["哥布林", "岩牙族"] }
   );
-  assert.strictEqual(line, `cast ${T_AREA_LABEL}=哥布林、獸人`);
+  assert.strictEqual(line, `cast ${T_AREA_LABEL}=哥布林、岩牙族`);
 });
 
 test("combat.cast bounds multi-target labels and prefers shorthand over them", () => {

@@ -371,7 +371,7 @@ function onInviteCurrentNpc() {
       <div class="objs">
         <div class="o">玩家越過出口時自動帶走同室同伴，無時鐘成本、靜音。</div>
         <div class="o">跟丟時顯示「你跟丟了…。」，同伴保留羈絆。</div>
-        <div class="o">affinity 低於門檻會自動離隊。</div>
+        <div class="o">羈絆低於門檻時，同伴會自動離隊。</div>
       </div>
     </div>
     </template>

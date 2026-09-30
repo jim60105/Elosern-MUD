@@ -4,8 +4,9 @@ import ConditionChips from "../../components/ConditionChips.vue";
 import { STATUS_PANEL_SAMPLE } from "../../stories/fixtures.js";
 
 // H2 (webclient-hud-02-status-islands), design D6/D7/D8: the conditions
-// island. One 34×34 icon chip per committed condition, pairing a
-// per-severity shape glyph with an accessible name carrying the label, the
+// island. One chip per committed condition, pairing a per-severity shape
+// glyph with the readable condition name (webclient-zh-tw-copy-and-labels)
+// and an accessible name carrying the label, the
 // remaining duration (only when the payload supplies it, verbatim — never
 // counted down client-side) and every derived modifier. Visible chips are
 // capped at 6; the remainder stays reachable through the `+N` overflow
@@ -66,8 +67,8 @@ describe("ConditionChips (H2 conditions island)", () => {
     const harmful = w.get('[data-testid="status-panel__condition--shame_exposure"]');
     const harmfulName = harmful.attributes("aria-label");
     expect(harmfulName).toContain("高露出");
-    expect(harmfulName).toContain("defense -15");
-    expect(harmfulName).toContain("agility -10");
+    expect(harmfulName).toContain("防禦 -15");
+    expect(harmfulName).toContain("敏捷 -10");
   });
 
   it("renders the duration badge only when the payload supplies remaining_seconds", () => {
@@ -124,6 +125,45 @@ describe("ConditionChips (H2 conditions island)", () => {
     await overflow.trigger("click");
     expect(w.get('[data-testid="status-panel__condition-disclosure"]').exists()).toBe(true);
     expect(w.findAll(".disclosure-row")).toHaveLength(2);
+  });
+
+  it("shows each visible chip's readable name and keeps long names complete for assistive technology", async () => {
+    // Six long server labels plus one overflow: every visible chip shows its
+    // own name (ellipsised by CSS, never abbreviated), the accessible name
+    // and the focus detail carry the whole label and localized modifiers, and
+    // the overflow row reaches the seventh.
+    const long = [
+      "高度興奮敏捷與準度減損",
+      "精準魔力控制魔力消耗降低",
+      "魔法陣理解施法準度提升",
+      "隨從武藝訓練攻擊提升",
+      "靜電麻痺微階鎖定行動",
+      "轉生祝福·悠花敏捷提升",
+      "連閃麻痺微階鎖定行動",
+    ].map((label, i) => ({
+      code: `long_${i}`,
+      label,
+      severity: "harmful",
+      ...(i === 1 ? { modifiers: { mp_cost: "-10%" } } : {}),
+      ...(i === 6 ? { modifiers: { actions_per_turn: 0, chance: 30 } } : {}),
+    }));
+    const w = mountChips({ conditions: long });
+    const chips = w.findAll("button.chip:not(.more)");
+    expect(chips).toHaveLength(6);
+    chips.forEach((chip, i) => {
+      expect(chip.get(".name").text()).toBe(long[i].label);
+      expect(chip.attributes("aria-label")).toContain(long[i].label);
+    });
+    expect(chips[1].attributes("aria-label")).toBe("精準魔力控制魔力消耗降低，魔力消耗 -10%");
+    await chips[1].trigger("focus");
+    expect(w.get('[data-testid="status-panel__condition-detail"]').text()).toBe(
+      "精準魔力控制魔力消耗降低，魔力消耗 -10%",
+    );
+    await w.get('[data-testid="status-panel__condition-overflow"]').trigger("click");
+    const row = w.get('[data-testid="status-panel__condition-disclosure"] [data-testid="status-panel__condition--long_6"]');
+    expect(row.text()).toContain("連閃麻痺微階鎖定行動");
+    expect(row.get('[data-testid="status-panel__condition-mod--actions_per_turn"]').text()).toBe("每回合行動 0");
+    expect(row.get('[data-testid="status-panel__condition-mod--chance"]').text()).toBe("觸發機率 30");
   });
 
   it("renders no condition island when the committed list is empty", () => {

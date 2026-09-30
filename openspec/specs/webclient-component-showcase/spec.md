@@ -169,7 +169,8 @@ Status and health information SHALL never be conveyed by color alone: gauges SHA
 text label with an explicit current/maximum numeric value, each counter and static trait SHALL render
 its numeric value, and each condition SHALL pair a non-color severity glyph — one distinct glyph shape
 per severity, so two severities are never separated by color alone — with its label plus every numeric
-or derived-modifier value the payload provides. Where a condition renders as an icon-only chip, that
+or derived-modifier value the payload provides. A condition chip SHALL show the condition's
+readable name (whole or ellipsised at the island width) beside its glyph and duration badge; its full
 label, duration, and modifier text SHALL be carried in the chip's accessible name and SHALL also be
 presented visibly when the chip is focused or hovered, and any bounded overflow SHALL keep every
 committed condition reachable in one action. A gauge's trailing damage indicator SHALL be decorative,
@@ -198,8 +199,8 @@ field (the intimate/adult block has no backing field and is not built).
 - **THEN** it renders the vitals and the conditions as separate HUD islands composed from `VitalsTrack` and `ConditionChips`, not as one boxed column card, and renders no identity card and no wallet
 
 #### Scenario: An icon-only condition chip keeps its text reachable
-- **WHEN** a condition renders as an icon-only chip with a duration badge
-- **THEN** its label, remaining duration, and every derived modifier are in its accessible name and are shown visibly when the chip is focused or hovered, and any hidden overflow is reachable in one action
+- **WHEN** a condition renders as a chip whose name is ellipsised, with a duration badge
+- **THEN** its full label, remaining duration, and every derived modifier are in its accessible name and are shown visibly when the chip is focused or hovered, and any hidden overflow is reachable in one action
 
 #### Scenario: The trailing damage indicator carries no information of its own
 - **WHEN** a gauge's trailing damage indicator renders

@@ -14,10 +14,10 @@ export const LORE_CODEX_PANEL_SAMPLE = Object.freeze({
     LORE_CODEX_CATEGORY("race", "種族", [
       Object.freeze({
         key: "human",
-        title: "人類",
+        title: "平原族",
         card: Object.freeze([
-          Object.freeze({ name: "代號", value: "human" }),
-          Object.freeze({ name: "描述", value: "適應力最強的短命種，遍布灰河沿岸。" }),
+          Object.freeze({ name: "display_name_zh", value: "平原族" }),
+          Object.freeze({ name: "description", value: "適應力最強的短命種，遍布灰河沿岸。" }),
         ]),
       }),
     ]),
@@ -27,8 +27,8 @@ export const LORE_CODEX_PANEL_SAMPLE = Object.freeze({
         key: "grey_river",
         title: "灰河",
         card: Object.freeze([
-          Object.freeze({ name: "名稱", value: "灰河" }),
-          Object.freeze({ name: "地貌", value: "終年起霧的寬緩河流，渡口夜燈明滅。" }),
+          Object.freeze({ name: "display_name_zh", value: "灰河" }),
+          Object.freeze({ name: "terrain_flavor_zh", value: "終年起霧的寬緩河流，渡口夜燈明滅。" }),
         ]),
       }),
     ]),
@@ -37,9 +37,9 @@ export const LORE_CODEX_PANEL_SAMPLE = Object.freeze({
         key: "mist_wolf",
         title: "霧骨狼",
         card: Object.freeze([
-          Object.freeze({ name: "名稱", value: "霧骨狼" }),
-          Object.freeze({ name: "描述", value: "群棲於霧中的中型獸，骨白如霧。" }),
-          Object.freeze({ name: "例證", value: "霧骨狼·頭狼" }),
+          Object.freeze({ name: "display_name_zh", value: "霧骨狼" }),
+          Object.freeze({ name: "description", value: "群棲於霧中的中型獸，骨白如霧。" }),
+          Object.freeze({ name: "example_monsters_zh", value: "霧骨狼·頭狼" }),
         ]),
       }),
     ]),
@@ -50,8 +50,8 @@ export const LORE_CODEX_PANEL_SAMPLE = Object.freeze({
         key: "misty_ford",
         title: "霧骨渡口",
         card: Object.freeze([
-          Object.freeze({ name: "名稱", value: "霧骨渡口" }),
-          Object.freeze({ name: "描述", value: "灰河上的主要渡口，旅人與貨物的集散地。" }),
+          Object.freeze({ name: "display_name_zh", value: "霧骨渡口" }),
+          Object.freeze({ name: "description", value: "灰河上的主要渡口，旅人與貨物的集散地。" }),
         ]),
       }),
     ]),

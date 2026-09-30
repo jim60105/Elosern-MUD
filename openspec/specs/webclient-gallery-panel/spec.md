@@ -93,9 +93,9 @@ a gallery record, card, or job.
 
 Each entry of `cards` SHALL contain exactly `image_id`, `status` (`"card"`,
 `"pending"`, or `"failed"`), `label` (the server-authored zh-TW display line for
-the row — stored cards carry no name, so the label is derived from the row's
-timestamp/sequence by the presenter; a pending row's label carries the
-「生成中」 suffix), `url` or null, `face_rect` or null, `is_default`,
+the row — stored cards carry no name, so a card row reads 「肖像」 and a pending
+row 「肖像（生成中）」; the label SHALL NOT embed a timestamp, because
+`created_at` already carries the instant and the client presents it), `url` or null, `face_rect` or null, `is_default`,
 `chips`, `requested_fields`, `binding_present`, and `created_at`. Card rows come
 only from the tolerant card read; a media URL SHALL be built only from a card's
 stored identity validated against the subject's own gallery prefix, the closed
@@ -118,6 +118,11 @@ newest-first by `created_at` with append order as the stable tiebreaker.
 
 - **WHEN** any card row is rendered by any client
 - **THEN** every chip string was present in the committed payload; the client composes none
+
+#### Scenario: Cards minted at different times share the label and keep their instants
+- **WHEN** two stored cards with different `created_at` values and one pending job are projected
+- **THEN** both card rows read 「肖像」, the pending row reads 「肖像（生成中）」, no label contains a
+  timestamp, each row carries its own `created_at`, and no stored record is renamed
 
 ### Requirement: Pending jobs and the recorded error render as truthful synthetic rows
 

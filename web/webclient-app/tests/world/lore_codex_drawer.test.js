@@ -43,7 +43,7 @@ describe("LoreCodexDrawer (webclient-lore-codex-drawer)", () => {
   it("lists every discovered entry across every category under the aggregate control", () => {
     const w = mountDrawer();
     const titles = w.findAll('[data-testid^="lore-codex-drawer__entry--"]').map((row) => row.text());
-    expect(titles.some((t) => t.includes("人類"))).toBe(true);
+    expect(titles.some((t) => t.includes("平原族"))).toBe(true);
     expect(titles.some((t) => t.includes("灰河"))).toBe(true);
     expect(titles.some((t) => t.includes("霧骨狼"))).toBe(true);
     expect(titles.some((t) => t.includes("霧骨渡口"))).toBe(true);
@@ -75,9 +75,27 @@ describe("LoreCodexDrawer (webclient-lore-codex-drawer)", () => {
     expect(card.get('[data-testid="lore-codex-drawer__card-title"]').text()).toBe("霧骨狼");
     const names = card.findAll(".lore-codex-drawer__card-field-name").map((n) => n.text());
     const values = card.findAll(".lore-codex-drawer__card-field-value").map((v) => v.text());
-    // The panel's card fields, in the panel's order, unmodified.
+    // The panel's card fields, in the panel's order, values unmodified;
+    // each field is named by its readable label while the raw identifier
+    // stays the hook (webclient-zh-tw-copy-and-labels).
     expect(names).toEqual(["名稱", "描述", "例證"]);
     expect(values).toEqual(["霧骨狼", "群棲於霧中的中型獸，骨白如霧。", "霧骨狼·頭狼"]);
+    expect(card.findAll(".lore-codex-drawer__card-field").map((f) => f.attributes("data-field"))).toEqual([
+      "display_name_zh",
+      "description",
+      "example_monsters_zh",
+    ]);
+  });
+
+  it("names an undeclared card field neutrally instead of printing its identifier", async () => {
+    const codex = structuredClone(LORE_CODEX_PANEL_SAMPLE);
+    codex.categories.find((group) => group.key === "monster").entries[0].card.push({ name: "t_new_field", value: "新欄位的值" });
+    wrapper = mount(LoreCodexDrawer, { props: { codex } });
+    await wrapper.get('[data-testid="lore-codex-drawer__entry--monster-mist_wolf"]').trigger("click");
+    const field = wrapper.get('[data-field="t_new_field"]');
+    expect(field.get(".lore-codex-drawer__card-field-name").text()).toBe("資料");
+    expect(field.get(".lore-codex-drawer__card-field-value").text()).toBe("新欄位的值");
+    expect(wrapper.get('[data-testid="lore-codex-drawer__card"]').text()).not.toContain("t_new_field");
   });
 
   it("navigation dispatches nothing: no event of any kind is emitted", async () => {

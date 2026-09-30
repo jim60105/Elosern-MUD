@@ -21,6 +21,11 @@ class GuildRank:
     examiner_name: str
     examiner_title: str
 
+    @property
+    def display_name_zh(self) -> str:
+        """The player-facing rank name (the codex title), e.g. ``F 級``."""
+        return f"{self.key} 級"
+
 
 @dataclass(frozen=True)
 class GuildBranch:

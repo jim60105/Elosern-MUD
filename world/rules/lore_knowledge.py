@@ -75,8 +75,8 @@ class CodexCategory:
 
 
 CODE_CATEGORIES: dict[str, CodexCategory] = {
-    "race": CodexCategory(RACE_REGISTRY, ("key", "description")),
-    "nation": CodexCategory(NATION_REGISTRY, ("display_name_zh", "capital_anchor_key")),
+    "race": CodexCategory(RACE_REGISTRY, ("display_name_zh", "description")),
+    "nation": CodexCategory(NATION_REGISTRY, ("display_name_zh", "capital_name_zh")),
     "region": CodexCategory(
         WILDERNESS_REGION_REGISTRY, ("display_name_zh", "terrain_flavor_zh")
     ),
@@ -86,7 +86,7 @@ CODE_CATEGORIES: dict[str, CodexCategory] = {
     "element": CodexCategory(ELEMENT_REGISTRY, ("display_name_zh", "description")),
     "magic": CodexCategory(MAGIC_TIER_REGISTRY, ("display_name_zh", "description")),
     "anchor": CodexCategory(ANCHOR_REGISTRY, ("display_name_zh", "description")),
-    "guild": CodexCategory(GUILD_RANK_REGISTRY, ("key", "description")),
+    "guild": CodexCategory(GUILD_RANK_REGISTRY, ("display_name_zh", "description")),
 }
 
 
