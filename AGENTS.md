@@ -180,6 +180,10 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   with `MUD_TEST_SETTINGS=1` passed through the Bash tool's `env` input (an
   inline `MUD_TEST_SETTINGS=1 ...` prefix is rejected by the Evennia test
   guard).
+- Before handoff or archive, run `uv run --locked python -m tools.contract_gate`
+  (traceability, the two lints, shard manifests, and the shard-ownership and
+  frozen-audit contracts; seconds). It is not a test run to skip; CI preflight
+  reuses it.
 - The full non-browser Evennia suite is allowed once only when needed, under 10
   minutes, and run with `--parallel 16 --noinput`; never run it serially.
 - The full managed browser suite and `tools.spec_traceability verify --evidence`

@@ -303,10 +303,15 @@ class TestOwnershipContractTests(unittest.TestCase):
                     )
                     shard_owned |= resolved
                 owned |= shard_owned
+        # Pasteable manifest labels: web.tests.browser.<file>.<Class>.<method>.
+        unowned = sorted("web.tests.browser." + ".".join(method) for method in discovered - owned)
+        stale = sorted("web.tests.browser." + ".".join(method) for method in owned - discovered)
         self.assertEqual(
-            owned,
-            discovered,
-            "every discovered browser test method must be in exactly one process list",
+            (unowned, stale),
+            ([], []),
+            "every discovered browser test method must be in exactly one process list. "
+            f"Add each unowned method (or its class/module label) to one shard's files_a or "
+            f"files_b in .github/browser-shards.json: {unowned}; remove stale labels: {stale}",
         )
 
         workflow = yaml.safe_load(
@@ -363,10 +368,14 @@ class TestOwnershipContractTests(unittest.TestCase):
                 )
                 shard_owned |= resolved
             owned |= shard_owned
+        unowned = sorted(discovered - owned)
+        stale = sorted(owned - discovered)
         self.assertEqual(
-            owned,
-            discovered,
-            "every discovered non-browser test module must be in exactly one shard",
+            (unowned, stale),
+            ([], []),
+            "every discovered non-browser test module must be in exactly one shard. "
+            f"Add each unowned module to one shard's labels in .github/evennia-shards.json: "
+            f"{unowned}; remove stale labels: {stale}",
         )
 
 

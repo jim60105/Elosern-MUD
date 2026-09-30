@@ -432,7 +432,9 @@ class WebClientFrozenContractAudit(unittest.TestCase):
                 self.assertTrue(
                     covered,
                     f"browser-suite target #{identifier} is not in the renewed "
-                    "frozen audit §2.3 list (or an explicit exemption)",
+                    "frozen audit §2.3 list (or an explicit exemption). Register it in a "
+                    "REMAP-TO-TESTID row of docs/development/webclient-vue-frozen-contract-audit.md "
+                    "§2.3 (a class hook goes in the CSS class hooks table), naming the change that added it",
                 )
 
     def test_renewed_identifier_list_is_complete_and_non_overlapping(self):

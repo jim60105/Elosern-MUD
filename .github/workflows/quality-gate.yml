@@ -56,39 +56,10 @@ jobs:
         run: node --test web/static/webclient/js/tests/*.test.js
 
       - name: Validate execution shard manifests
-        run: |
-          uv run --locked python - <<'PY'
-          import json
-          import sys
-          for name in ("evennia-shards", "browser-shards"):
-              manifest = json.load(open(f".github/{name}.json"))
-              shards = manifest.get("shards")
-              if not shards:
-                  print(f"{name}: manifest declares no shards")
-                  sys.exit(1)
-              indices = [shard["index"] for shard in shards]
-              if indices != sorted(indices) or len(indices) != len(set(indices)):
-                  print(f"{name}: shard indices must be unique and sorted")
-                  sys.exit(1)
-              for shard in shards:
-                  if name == "browser-shards":
-                      files_a = shard.get("files_a") or []
-                      files_b = shard.get("files_b") or []
-                      if not files_a or not files_b:
-                          print(
-                              f"{name}: shard {shard.get('index')} must declare "
-                              "non-empty files_a and files_b"
-                          )
-                          sys.exit(1)
-                      items = [*files_a, *files_b]
-                  else:
-                      items = shard.get("labels") or shard.get("files")
-                  if not items or not all(
-                      isinstance(item, str) and item for item in items
-                  ):
-                      print(f"{name}: shard {shard.get('index')} must declare non-empty string labels/files")
-                      sys.exit(1)
-          PY
+        # The repository contract gate (tools/contract_gate.py): shard manifest
+        # structure plus the shard-ownership and frozen-audit contracts. The
+        # traceability and lint gates it also bundles run in their own steps.
+        run: uv run --locked python -m tools.contract_gate manifests contracts
 
       - name: Compute browser shard matrix
         id: shards
