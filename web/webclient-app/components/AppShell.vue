@@ -572,12 +572,12 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
    (webclient-band-material-pass). */
 .elosern-app-shell .message-log-open {
   position: absolute;
-  right: 58px;
-  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - 30px) / 2);
-  height: 30px;
+  right: calc(58px * var(--ui-scale));
+  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - calc(30px * var(--ui-scale))) / 2);
+  height: calc(30px * var(--ui-scale));
   z-index: 1;
   box-sizing: border-box;
-  padding: 0 10px;
+  padding: 0 calc(10px * var(--ui-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -600,10 +600,10 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
 
 .elosern-app-shell .command-line-toggle {
   position: absolute;
-  right: 22px;
-  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - 30px) / 2);
-  width: 30px;
-  height: 30px;
+  right: calc(22px * var(--ui-scale));
+  bottom: calc(var(--band-pad-bottom) + (var(--band-strip-h) - calc(30px * var(--ui-scale))) / 2);
+  width: calc(30px * var(--ui-scale));
+  height: calc(30px * var(--ui-scale));
   z-index: 1;
   box-sizing: border-box;
   padding: 0;
@@ -627,8 +627,8 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
 .elosern-app-shell .elosern-live {
   min-height: 0;
   color: var(--paper-100);
-  border-left: 3px solid var(--seal-500);
-  padding-left: 0.5rem;
+  border-left: calc(3px * var(--ui-scale)) solid var(--seal-500);
+  padding-left: calc(8px * var(--ui-scale));
   font-size: var(--text-sm);
   /* Announcement-only: never intercepts pointer events. */
   pointer-events: none;
@@ -647,7 +647,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
   color: var(--paper-100);
   font-family: var(--f-sans);
   text-align: center;
-  padding: 2rem;
+  padding: calc(32px * var(--ui-scale));
 }
 
 .elosern-app-shell #elosern-offline-overlay[data-visible="true"] {
@@ -657,7 +657,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
 .elosern-app-shell #elosern-offline-overlay .offline-title {
   margin-top: 18vh;
   font-family: var(--f-display);
-  font-size: 1.4rem;
+  font-size: calc(22px * var(--ui-scale));
   font-weight: 600;
   color: var(--seal-400);
 }

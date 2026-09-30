@@ -110,15 +110,15 @@ function onActivate() {
 /* Shared island chrome */
 .hud {
   background: var(--panel);
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(9px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
 .comps {
-  padding: 9px 12px 11px;
+  padding: calc(9px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(11px * var(--ui-scale));
   font-family: var(--f-sans);
   cursor: pointer;
   user-select: none;
@@ -133,7 +133,7 @@ function onActivate() {
   font-size: var(--text-xs);
   letter-spacing: 0.14em;
   color: var(--paper-500);
-  margin-bottom: 8px;
+  margin-bottom: calc(8px * var(--ui-scale));
   display: flex;
   align-items: center;
 }
@@ -149,16 +149,16 @@ function onActivate() {
    one row even in the 184px anchor at 1280x720 (design D3). */
 .comprow {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 40px));
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, calc(40px * var(--ui-scale))));
+  gap: calc(6px * var(--ui-scale));
 }
 
 .comp {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  border-radius: 8px;
+  gap: calc(4px * var(--ui-scale));
+  border-radius: var(--radius);
 }
 
 .comp:focus-visible {
@@ -173,7 +173,7 @@ function onActivate() {
   display: grid;
   place-items: center;
   border: 1px solid var(--ink-600);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: linear-gradient(160deg, #2a2431, #16131b);
   font-family: var(--f-display);
   font-size: var(--text-lg);
@@ -195,7 +195,7 @@ function onActivate() {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 7px;
+  border-radius: var(--radius);
 }
 
 .av-glyph {
@@ -206,11 +206,11 @@ function onActivate() {
 /* The joined combat token as a corner badge on the avatar. */
 .comp .tk {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  padding: 1px 3px;
+  top: calc(-5px * var(--ui-scale));
+  right: calc(-5px * var(--ui-scale));
+  padding: 1px calc(3px * var(--ui-scale));
   border: 1px solid var(--vit-mp);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--ink-950);
   font-family: var(--f-mono);
   font-size: var(--text-xs);
@@ -220,8 +220,8 @@ function onActivate() {
 }
 
 .cbar {
-  height: 3px;
-  border-radius: 99px;
+  height: calc(3px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   background: var(--ink-780);
   overflow: hidden;
 }
@@ -229,18 +229,18 @@ function onActivate() {
 .cbar .f {
   height: 100%;
   background: var(--vit-hp);
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   transition: width var(--motion-base) var(--ease-standard);
 }
 
 /* Short viewports (webclient-avg-stage-hud-anchors design D6). */
 @media (max-height: 820px) {
   .comps {
-    padding: 7px 12px 9px;
+    padding: calc(7px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(9px * var(--ui-scale));
   }
 
   .comps .clab {
-    margin-bottom: 5px;
+    margin-bottom: calc(5px * var(--ui-scale));
     line-height: 1.2;
   }
 }

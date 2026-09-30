@@ -318,7 +318,7 @@ describe("SkillBook (B3 data family)", () => {
     const pill = w.get('[data-testid="skill-book__ooc"]');
     expect(pill.text()).toBe("combat");
     const cs = window.getComputedStyle(pill.element);
-    expect(cs.borderRadius).toBe("4px");
+    expect(cs.borderRadius).toBe("var(--radius-sm)");
     expect(cs.color).toContain("var(--ok)");
   });
 

@@ -163,7 +163,7 @@ function onPaneActivate(payload) {
    fills the band's command region and paints nothing. */
 .action-dock {
   position: relative;
-  max-width: 1180px;
+  max-width: calc(1180px * var(--ui-scale));
   margin: 0 auto;
   height: 100%;
   display: flex;
@@ -188,16 +188,16 @@ function onPaneActivate(payload) {
 .action-dock::after {
   content: "";
   position: absolute;
-  inset: -4px 0 -4px -2px;
+  inset: calc(-4px * var(--ui-scale)) 0 calc(-4px * var(--ui-scale)) -2px;
   border-radius: var(--radius-sm);
   pointer-events: none;
   opacity: 0;
   border: 1px solid var(--dock-focus-rule);
   background:
-    linear-gradient(var(--gold-400), var(--gold-400)) top left / 12px 2px no-repeat,
-    linear-gradient(var(--gold-400), var(--gold-400)) top left / 2px 12px no-repeat,
-    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / 12px 2px no-repeat,
-    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / 2px 12px no-repeat;
+    linear-gradient(var(--gold-400), var(--gold-400)) top left / calc(12px * var(--ui-scale)) 2px no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) top left / 2px calc(12px * var(--ui-scale)) no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / calc(12px * var(--ui-scale)) 2px no-repeat,
+    linear-gradient(var(--gold-400), var(--gold-400)) bottom right / 2px calc(12px * var(--ui-scale)) no-repeat;
   transition: opacity var(--motion-fast) var(--ease-standard);
 }
 
@@ -236,8 +236,8 @@ function onPaneActivate(payload) {
   align-content: center;
   justify-content: center;
   align-items: center;
-  column-gap: 16px;
-  row-gap: 10px;
+  column-gap: calc(16px * var(--ui-scale));
+  row-gap: calc(10px * var(--ui-scale));
   background: radial-gradient(70% 90% at 50% 50%, rgba(10, 11, 14, 0.9), rgba(10, 11, 14, 0.62));
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
@@ -256,10 +256,10 @@ function onPaneActivate(payload) {
   color: var(--paper-500);
 }
 .action-dock__playback-skip {
-  padding: 5px 14px;
+  padding: calc(5px * var(--ui-scale)) calc(14px * var(--ui-scale));
   background: var(--gold-glow);
   border: 1px solid var(--gold-600);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--gold-400);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
@@ -305,7 +305,7 @@ function onPaneActivate(payload) {
   box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
-  padding: 6px 8px 8px;
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale)) calc(8px * var(--ui-scale));
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -313,11 +313,11 @@ function onPaneActivate(payload) {
 
 
 .action-dock__pane::-webkit-scrollbar {
-  width: 6px;
+  width: calc(6px * var(--ui-scale));
 }
 .action-dock__pane::-webkit-scrollbar-thumb {
   background: var(--ink-700);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* The shortcut-legend strip: one line pinned below the scrolling body, so it
@@ -331,7 +331,7 @@ function onPaneActivate(payload) {
   box-sizing: border-box;
   height: var(--band-strip-h);
   margin: 0;
-  padding: 0 8px;
+  padding: 0 calc(8px * var(--ui-scale));
   border-top: 1px solid rgba(85, 82, 75, 0.45);
   font-size: var(--text-xs);
   color: var(--paper-500);
@@ -356,8 +356,8 @@ function onPaneActivate(payload) {
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  padding: 0 calc(4px * var(--ui-scale));
   color: var(--paper-300);
 }
 </style>

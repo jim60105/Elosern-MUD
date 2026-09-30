@@ -104,7 +104,7 @@ function onImageError() {
   inset: 0;
   display: grid;
   place-content: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   background: linear-gradient(160deg, #1a1d20, #101214);
   mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
 }
@@ -122,20 +122,20 @@ function onImageError() {
 }
 .reference-artwork figcaption {
   position: absolute;
-  bottom: 18px;
-  left: 16px;
-  right: 16px;
+  bottom: calc(18px * var(--ui-scale));
+  left: calc(16px * var(--ui-scale));
+  right: calc(16px * var(--ui-scale));
   color: var(--paper-300);
   font-size: var(--text-xs);
   letter-spacing: .08em;
   text-align: center;
-  text-shadow: 0 1px 4px #000;
+  text-shadow: 0 1px calc(4px * var(--ui-scale)) #000;
 }
 .reference-artwork--stage { height: 100%; overflow: visible; }
 .reference-artwork--stage img {
   object-fit: contain;
   mask-image: none;
-  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, .55));
+  filter: drop-shadow(0 calc(5px * var(--ui-scale)) calc(9px * var(--ui-scale)) rgba(0, 0, 0, .55));
 }
 .reference-artwork__ground {
   position: absolute;
@@ -152,7 +152,7 @@ function onImageError() {
   fill: #17191f;
   stroke: rgba(185, 154, 96, .3);
   stroke-width: 1;
-  filter: drop-shadow(0 3px 7px #07070b);
+  filter: drop-shadow(0 calc(3px * var(--ui-scale)) calc(7px * var(--ui-scale)) #07070b);
 }
 .reference-artwork__chest {
   position: absolute;
@@ -160,11 +160,11 @@ function onImageError() {
   left: var(--actor-label-left, 18%);
   right: 12%;
   display: grid;
-  gap: 5px;
+  gap: calc(5px * var(--ui-scale));
   text-align: center;
   overflow-wrap: anywhere;
   color: var(--paper-100);
-  text-shadow: 0 1px 4px #000;
+  text-shadow: 0 1px calc(4px * var(--ui-scale)) #000;
 }
 .reference-artwork__identity { font-size: var(--text-md); }
 .reference-artwork__chest .reference-artwork__placeholder-glyph { font-size: var(--text-initial); }

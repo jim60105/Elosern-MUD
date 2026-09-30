@@ -375,17 +375,17 @@ export default {
    viewport bottom, a fully opaque ink panel with the fine gold frame. */
 .fulllog-overlay__panel {
   position: absolute;
-  top: calc(var(--header-h) + 12px);
-  left: 16px;
-  right: 16px;
+  top: calc(var(--header-h) + 12px * var(--ui-scale));
+  left: calc(16px * var(--ui-scale));
+  right: calc(16px * var(--ui-scale));
   bottom: var(--workspace-bottom);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #bca57966;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--surface-panel);
-  box-shadow: 0 16px 64px #000a, inset 0 1px 0 #e8d8aa14;
+  box-shadow: 0 calc(16px * var(--ui-scale)) calc(64px * var(--ui-scale)) #000a, inset 0 1px 0 #e8d8aa14;
 }
 
 .fulllog-overlay__scroll {
@@ -418,7 +418,7 @@ export default {
   box-sizing: content-box;
   max-width: 42em;
   margin: 0 auto;
-  padding: 28px 32px 48px;
+  padding: calc(28px * var(--ui-scale)) calc(32px * var(--ui-scale)) calc(48px * var(--ui-scale));
   color: var(--paper-100);
   font-family: var(--f-serif);
   font-size: calc(var(--log-text) * var(--prose-scale));
@@ -452,7 +452,7 @@ export default {
    begins: the quiet sans label seated on a small lozenge. */
 .fulllog-overlay .narrative-line.inp {
   position: relative;
-  padding-left: 20px;
+  padding-left: calc(20px * var(--ui-scale));
   font-family: var(--f-sans);
   font-size: calc(var(--text-md) * var(--prose-scale));
   line-height: 1.5;
@@ -463,10 +463,10 @@ export default {
 .fulllog-overlay .narrative-line.inp::before {
   content: "";
   position: absolute;
-  left: 3px;
-  top: calc(0.75em - 4px);
-  width: 7px;
-  height: 7px;
+  left: calc(3px * var(--ui-scale));
+  top: calc(0.75em - 4px * var(--ui-scale));
+  width: calc(7px * var(--ui-scale));
+  height: calc(7px * var(--ui-scale));
   box-sizing: border-box;
   border: 1px solid var(--gold-400);
   background: var(--ink-900);
@@ -529,10 +529,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  height: 44px;
+  gap: calc(16px * var(--ui-scale));
+  height: calc(44px * var(--ui-scale));
   box-sizing: border-box;
-  padding: 0 12px 0 20px;
+  padding: 0 calc(12px * var(--ui-scale)) 0 calc(20px * var(--ui-scale));
   border-top: 1px solid var(--ink-700);
   background: linear-gradient(180deg, #121418, #0e1013);
 }
@@ -548,9 +548,9 @@ export default {
 .fulllog-overlay__latest {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 12px 0 14px;
+  gap: calc(8px * var(--ui-scale));
+  height: calc(30px * var(--ui-scale));
+  padding: 0 calc(12px * var(--ui-scale)) 0 calc(14px * var(--ui-scale));
   color: var(--paper-100);
   background: var(--ink-780);
   border: 1px solid #cfb37866;
@@ -576,17 +576,17 @@ export default {
 .fulllog-overlay__fresh {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding-right: 8px;
+  gap: calc(6px * var(--ui-scale));
+  padding-right: calc(8px * var(--ui-scale));
   border-right: 1px solid var(--ink-600);
   color: var(--gold-400);
 }
 
 .fulllog-overlay__pip {
-  width: 6px;
-  height: 6px;
+  width: calc(6px * var(--ui-scale));
+  height: calc(6px * var(--ui-scale));
   border-radius: 50%;
   background: var(--gold-400);
-  box-shadow: 0 0 6px var(--gold-glow);
+  box-shadow: 0 0 calc(6px * var(--ui-scale)) var(--gold-glow);
 }
 </style>

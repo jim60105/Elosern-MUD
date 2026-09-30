@@ -310,12 +310,11 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     expect(w.get('[data-testid="inventory-panel__items-count"]').text()).toBe("9");
     // No panel-card wrapper: the body paints no `--panel` background of its
     // own (the sections sit directly on the transparent drawer body).
-    const source = readFileSync(
-      join(process.cwd(), "web/webclient-app/components/InventoryPanel.vue"),
-      "utf-8",
-    );
-    expect(source).not.toContain("background: var(--panel);");
-    expect(source).not.toContain("border-radius: var(--radius);");
+    for (const el of [w.element, items, wallet]) {
+      const cs = window.getComputedStyle(el);
+      expect(cs.backgroundColor + cs.background).not.toContain("var(--panel)");
+      expect(cs.borderRadius).toBe("");
+    }
   });
 
   it("renders the 金錢 section row with the grouped integer copper wallet", () => {

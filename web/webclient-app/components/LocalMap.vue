@@ -269,8 +269,8 @@ function onIslandClick(event) {
   align-self: flex-end;
   padding: var(--sp-1);
   background: var(--panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -343,7 +343,7 @@ function onIslandClick(event) {
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
   color: var(--paper-500);
-  margin-bottom: 4px;
+  margin-bottom: calc(4px * var(--ui-scale));
 }
 
 /* The one elastic item in the row, and the only localization-safe container
@@ -364,8 +364,8 @@ function onIslandClick(event) {
 
 .local-map__expand-icon {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
   color: var(--gold-400);
 }
 
@@ -444,14 +444,14 @@ function onIslandClick(event) {
      place, terrain or visibility and never cover a marker or name. */
   --corner: linear-gradient(var(--gold-600), var(--gold-600));
   background:
-    var(--corner) top left / 10px 1px no-repeat,
-    var(--corner) top left / 1px 10px no-repeat,
-    var(--corner) top right / 10px 1px no-repeat,
-    var(--corner) top right / 1px 10px no-repeat,
-    var(--corner) bottom left / 10px 1px no-repeat,
-    var(--corner) bottom left / 1px 10px no-repeat,
-    var(--corner) bottom right / 10px 1px no-repeat,
-    var(--corner) bottom right / 1px 10px no-repeat,
+    var(--corner) top left / calc(10px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) top left / 1px calc(10px * var(--ui-scale)) no-repeat,
+    var(--corner) top right / calc(10px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) top right / 1px calc(10px * var(--ui-scale)) no-repeat,
+    var(--corner) bottom left / calc(10px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) bottom left / 1px calc(10px * var(--ui-scale)) no-repeat,
+    var(--corner) bottom right / calc(10px * var(--ui-scale)) 1px no-repeat,
+    var(--corner) bottom right / 1px calc(10px * var(--ui-scale)) no-repeat,
     var(--ink-860);
   /* A drawing larger than the legibility floor is windowed around the
      current node (ISLAND_MIN_SCALE); clip it to the fixed square so the

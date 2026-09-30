@@ -87,7 +87,7 @@ function onActivate() {
   gap: var(--sp-1);
   box-sizing: border-box;
   min-width: 0;
-  min-height: 38px;
+  min-height: calc(38px * var(--ui-scale));
   padding: var(--sp-2) var(--sp-3);
   color: var(--paper-100);
   background: var(--ink-860);

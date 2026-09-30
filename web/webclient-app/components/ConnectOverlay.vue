@@ -54,7 +54,7 @@ defineProps({
   justify-content: center;
   gap: var(--sp-4);
   box-sizing: border-box;
-  padding: 32px;
+  padding: calc(32px * var(--ui-scale));
   text-align: center;
   background: radial-gradient(ellipse at 50% 40%, var(--ink-780), var(--ink-950) 70%);
   color: var(--paper-100);
@@ -63,15 +63,15 @@ defineProps({
 .connect-overlay::before,
 .connect-overlay::after {
   content: "";
-  width: min(320px, 80%);
+  width: min(320px * var(--ui-scale), 80%);
   height: 1px;
-  margin: 20px 0;
+  margin: calc(20px * var(--ui-scale)) 0;
   background: linear-gradient(90deg, transparent, var(--gold-500), transparent);
 }
 
 .connect-overlay__wordmark {
   color: var(--gold-400);
-  font: clamp(32px, 6vw, 68px)/1.2 var(--f-serif);
+  font: clamp(32px * var(--ui-scale), 6vw, 68px * var(--ui-scale))/1.2 var(--f-serif);
   letter-spacing: 0.18em;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -87,11 +87,11 @@ defineProps({
 .connect-overlay__status {
   font-family: var(--f-sans);
   font-size: var(--text-base);
-  margin-top: 24px;
+  margin-top: calc(24px * var(--ui-scale));
   color: var(--gold-400);
   border: var(--line);
   border-radius: var(--radius-sm);
-  padding: 12px 24px;
+  padding: calc(12px * var(--ui-scale)) calc(24px * var(--ui-scale));
   background: var(--panel);
 }
 

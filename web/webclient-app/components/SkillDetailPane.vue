@@ -90,13 +90,13 @@ function onScale(entry) {
 .skill-detail-pane {
   background: var(--panel);
   border: var(--line);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: var(--radius);
+  padding: calc(12px * var(--ui-scale));
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   color: var(--paper-100);
-  flex: 1 1 260px;
-  min-width: 220px;
+  flex: 1 1 calc(260px * var(--ui-scale));
+  min-width: calc(220px * var(--ui-scale));
   overflow-y: auto;
 }
 
@@ -106,7 +106,7 @@ function onScale(entry) {
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
 }
 
 .skill-detail-pane__rank {
@@ -119,7 +119,7 @@ function onScale(entry) {
 .skill-detail-pane__desc {
   font-size: var(--text-xs);
   color: var(--paper-500);
-  margin: 6px 0 11px;
+  margin: calc(6px * var(--ui-scale)) 0 calc(11px * var(--ui-scale));
   line-height: 1.5;
 }
 
@@ -128,34 +128,34 @@ function onScale(entry) {
   font-size: var(--text-xs);
   letter-spacing: 0.1em;
   color: var(--paper-500);
-  margin-bottom: 6px;
+  margin-bottom: calc(6px * var(--ui-scale));
 }
 
 .skill-detail-pane__cost,
 .skill-detail-pane__target {
   font-size: var(--text-xs);
   color: var(--paper-300);
-  margin-bottom: 8px;
+  margin-bottom: calc(8px * var(--ui-scale));
 }
 
 .skill-detail-pane__disabled {
   color: var(--warn);
   font-size: var(--text-xs);
-  margin-top: 8px;
+  margin-top: calc(8px * var(--ui-scale));
 }
 
 .skill-detail-pane__scales {
   display: flex;
-  gap: 6px;
-  margin-top: 10px;
+  gap: calc(6px * var(--ui-scale));
+  margin-top: calc(10px * var(--ui-scale));
 }
 
 .skill-detail-pane__scale {
   flex: 1;
   font-family: var(--f-num);
   font-size: var(--text-xs);
-  padding: 7px;
-  border-radius: 8px;
+  padding: calc(7px * var(--ui-scale));
+  border-radius: var(--radius);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   color: var(--paper-300);

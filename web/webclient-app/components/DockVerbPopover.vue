@@ -125,26 +125,26 @@ function onLayerPress(event) {
 
 .verb-popover {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  max-height: calc(100% - 16px);
+  left: calc(8px * var(--ui-scale));
+  right: calc(8px * var(--ui-scale));
+  bottom: calc(8px * var(--ui-scale));
+  max-height: calc(100% - 16px * var(--ui-scale));
   box-sizing: border-box;
   overflow-y: auto;
-  padding: 10px 12px 12px;
+  padding: calc(10px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(12px * var(--ui-scale));
   /* Fully opaque (webclient-band-material-pass): no chip text shows through. */
   background: linear-gradient(180deg, #1d1b1a, var(--panel-solid) 70%);
   border: 1px solid var(--gold-600);
   border-top-color: var(--gold-500);
   border-radius: var(--radius);
-  box-shadow: 0 -12px 30px -14px #000, inset 0 1px 0 rgba(228, 200, 142, 0.08);
+  box-shadow: 0 calc(-12px * var(--ui-scale)) calc(30px * var(--ui-scale)) calc(-14px * var(--ui-scale)) #000, inset 0 1px 0 rgba(228, 200, 142, 0.08);
   scrollbar-width: thin;
   scrollbar-color: var(--ink-600) transparent;
 }
 
 .verb-popover__head {
-  margin: 0 0 8px;
-  padding-bottom: 6px;
+  margin: 0 0 calc(8px * var(--ui-scale));
+  padding-bottom: calc(6px * var(--ui-scale));
   border-bottom: 1px solid var(--ink-700);
   color: var(--gold-400);
   font: var(--text-base)/1.4 var(--f-serif);
@@ -154,14 +154,14 @@ function onLayerPress(event) {
 
 .verb-popover__list {
   display: grid;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   outline: none;
 }
 
 .verb-popover .verb-popover__row {
   justify-content: flex-start;
   width: 100%;
-  min-height: 34px;
+  min-height: calc(34px * var(--ui-scale));
   text-align: left;
 }
 </style>

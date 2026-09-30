@@ -382,7 +382,7 @@ function declineBallot() {
   background: transparent;
   color: var(--paper-500);
   border: 1px solid var(--ink-600);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -505,7 +505,7 @@ function declineBallot() {
 /* 移除 is destructive: the seal danger treatment, at the row's trailing edge. */
 .codex-epithet__remove {
   margin-left: auto;
-  min-height: 26px;
+  min-height: calc(26px * var(--ui-scale));
   padding: 2px var(--sp-3);
   background: transparent;
   color: var(--seal-400);
@@ -553,7 +553,7 @@ function declineBallot() {
   gap: var(--sp-2);
 }
 .codex-removal-card__buttons button {
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-4);
   background: var(--ink-780);
   color: var(--paper-100);
@@ -601,7 +601,7 @@ function declineBallot() {
 }
 .codex-ballot__row button,
 .codex-ballot__decline {
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-scale));
   padding: var(--sp-1) var(--sp-4);
   background: var(--ink-780);
   color: var(--paper-100);

@@ -8,7 +8,8 @@ content, §5.4; revised 2026-09-30 with the A12 map legibility, §11, and the
 A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4;
 revised 2026-09-30 with the A14 settings reading preview and switches, §6.4,
 and the A15 full-log frame and return-to-latest control, §6.3; revised 2026-09-30
-with the A16 zh-TW copy and labels, §5.3 and §5.4)
+with the A16 zh-TW copy and labels, §5.3 and §5.4; revised 2026-09-30
+with the A19 proportional chrome scale, §5.1)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -185,6 +186,15 @@ the name in the switcher.
   above the backdrop and below the band), `choices` (dialogue only, centred),
   and `command-line`. The old `hud-left` / `hud-right` / `feed` / `dock` /
   `objectives` anchors are gone.
+- Proportional chrome (A19, `webclient-proportional-ui-scale`): one factor
+  `S = clamp(1, min(viewport height / 1080, viewport width / 1920), 1.4)`,
+  written once to the root as
+  `--ui-scale` by a resize owner, multiplies every fixed CSS-pixel chrome
+  dimension (type, spacing, radii, bar and island sizes, the minimap's outer
+  square, icons). 2560×1440 renders the reference at 4/3; 1440×900 and
+  1280×720 keep S = 1. The vh-derived band, page text and portrait terms are
+  never multiplied again (only their px bounds carry S), and there is no CSS
+  zoom or root transform.
 - The band height is `--band-h: clamp(260px, 27.8vh, 400px)` (300px at the
   reference size). It never depends on content, frame, or mode. `--dock-h`,
   `--stage-content-bottom`, and every frame-adaptive band rule are deleted.

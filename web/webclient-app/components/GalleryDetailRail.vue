@@ -65,13 +65,13 @@ function confirmDelete() {
 </template>
 
 <style scoped>
-.gallery-detail { min-width: 0; padding: 18px; border-left: 1px solid #bca57955; background: linear-gradient(150deg, #1d1e2520, #0a0e15); }
-.gallery-detail h3 { padding-right: 36px; }
-.gallery-detail__image { width: 100%; height: clamp(190px, 32vh, 360px); object-fit: cover; border: 1px solid #bca57988; border-radius: 5px; margin-bottom: 12px; }
-.gallery-detail h4 { overflow-wrap: anywhere; margin-bottom: 6px; }
-.gallery-detail ul { padding-left: 18px; }
-.gallery-detail__default, .gallery-detail__generate { width: 100%; margin-bottom: 10px; }
-.gallery-detail__generate { margin-top: 18px; }
-.gallery-detail__confirm { margin-top: 14px; }
-.gallery-detail .gallery-actions button { padding: 7px; font-size: var(--text-xs); }
+.gallery-detail { min-width: 0; padding: calc(18px * var(--ui-scale)); border-left: 1px solid #bca57955; background: linear-gradient(150deg, #1d1e2520, #0a0e15); }
+.gallery-detail h3 { padding-right: calc(36px * var(--ui-scale)); }
+.gallery-detail__image { width: 100%; height: clamp(190px * var(--ui-scale), 32vh, 360px * var(--ui-scale)); object-fit: cover; border: 1px solid #bca57988; border-radius: var(--radius-sm); margin-bottom: calc(12px * var(--ui-scale)); }
+.gallery-detail h4 { overflow-wrap: anywhere; margin-bottom: calc(6px * var(--ui-scale)); }
+.gallery-detail ul { padding-left: calc(18px * var(--ui-scale)); }
+.gallery-detail__default, .gallery-detail__generate { width: 100%; margin-bottom: calc(10px * var(--ui-scale)); }
+.gallery-detail__generate { margin-top: calc(18px * var(--ui-scale)); }
+.gallery-detail__confirm { margin-top: calc(14px * var(--ui-scale)); }
+.gallery-detail .gallery-actions button { padding: calc(7px * var(--ui-scale)); font-size: var(--text-xs); }
 </style>

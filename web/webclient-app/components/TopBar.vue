@@ -73,41 +73,41 @@ defineEmits({
    so nothing overlaps it. */
 .topbar-brand {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: calc(16px * var(--ui-scale));
+  left: calc(16px * var(--ui-scale));
   z-index: 4;
   font-family: var(--f-display);
   font-size: var(--text-xl);
   letter-spacing: 0.18em;
   color: var(--paper-50);
   background: var(--panel);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 6px var(--sp-4);
+  padding: calc(6px * var(--ui-scale)) var(--sp-4);
 }
 
 .topbar-right {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: calc(16px * var(--ui-scale));
+  right: calc(16px * var(--ui-scale));
   z-index: 4;
   display: flex;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   align-items: center;
-  max-width: calc(100vw - 160px);
+  max-width: calc(100vw - 160px * var(--ui-scale));
 }
 
 .topbar-meta {
   display: flex;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   align-items: center;
   background: var(--panel);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
-  border-radius: 999px;
-  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  padding: calc(6px * var(--ui-scale)) calc(13px * var(--ui-scale));
   box-shadow: var(--shadow);
   font-size: var(--text-xs);
   color: var(--paper-300);
@@ -133,10 +133,10 @@ defineEmits({
 .topbar-possession-banner {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale));
   background: rgba(142, 68, 173, 0.25);
   border: 1px solid rgba(175, 122, 197, 0.6);
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm, calc(4px * var(--ui-scale)));
   color: #e8daef;
   font-size: var(--text-sm);
   font-weight: 500;

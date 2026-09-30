@@ -180,22 +180,22 @@ onBeforeUnmount(() => {
    tier) so the gallery's teleported nested editors stack above it. */
 .overlay-host {
   position: fixed;
-  inset: calc(var(--header-h) + 12px) 16px var(--workspace-bottom);
+  inset: calc(var(--header-h) + 12px * var(--ui-scale)) calc(16px * var(--ui-scale)) var(--workspace-bottom);
   z-index: 92;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #bca57966;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--surface-panel);
-  box-shadow: 0 16px 64px #000a, inset 0 1px 0 #e8d8aa14;
+  box-shadow: 0 calc(16px * var(--ui-scale)) calc(64px * var(--ui-scale)) #000a, inset 0 1px 0 #e8d8aa14;
 }
 
 .overlay-host__body {
   flex: 1;
   box-sizing: border-box;
-  padding: 28px;
-  max-width: 1180px;
+  padding: calc(28px * var(--ui-scale));
+  max-width: calc(1180px * var(--ui-scale));
   width: 100%;
   margin: 0 auto;
   min-height: 0;
@@ -211,6 +211,6 @@ onBeforeUnmount(() => {
 .overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
 
 @media (max-width: 700px) {
-  .overlay-host__body { padding: 16px; }
+  .overlay-host__body { padding: calc(16px * var(--ui-scale)); }
 }
 </style>

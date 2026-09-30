@@ -87,7 +87,7 @@ describe("PlaceCard", () => {
     const shell = readFileSync(join(APP_ROOT, "components/AppShell.vue"), "utf8");
     expect(shell).toMatch(/creation: "\[data-anchor='place'\]/);
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
-    expect(tokens).toContain("--place-h: 68px;");
-    expect(tokens).toContain("--header-h: 48px;");
+    expect(tokens).toContain("--place-h: calc(68px * var(--ui-scale));");
+    expect(tokens).toContain("--header-h: calc(48px * var(--ui-scale));");
   });
 });

@@ -247,7 +247,7 @@ const selectedEntry = computed(
   color: var(--paper-500);
   background: transparent;
   border: 1px solid var(--ink-600);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -281,7 +281,7 @@ const selectedEntry = computed(
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: min(42vh, 360px);
+  max-height: min(42vh, 360px * var(--ui-scale));
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--ink-600) transparent;

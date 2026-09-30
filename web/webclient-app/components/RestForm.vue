@@ -51,10 +51,10 @@ function onKeyDown(event) {
 </template>
 
 <style scoped>
-.exploration-rest-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--panel-hi); border: var(--line); border-radius: var(--radius-sm); color: var(--paper-100); }
-.exploration-rest-label { display: grid; gap: 8px; color: var(--paper-300); }
-input { width: 100%; box-sizing: border-box; min-width: 0; padding: 8px; color: var(--gold-400); background: #101214; border: 1px solid var(--gold-600); font-size: var(--text-xl); }
-button { padding: 10px; color: var(--gold-400); background: var(--gold-glow); border: 1px solid var(--gold-500); border-radius: 4px; cursor: pointer; }
+.exploration-rest-form { display: flex; flex-direction: column; gap: calc(10px * var(--ui-scale)); padding: calc(14px * var(--ui-scale)); background: var(--panel-hi); border: var(--line); border-radius: var(--radius-sm); color: var(--paper-100); }
+.exploration-rest-label { display: grid; gap: calc(8px * var(--ui-scale)); color: var(--paper-300); }
+input { width: 100%; box-sizing: border-box; min-width: 0; padding: calc(8px * var(--ui-scale)); color: var(--gold-400); background: #101214; border: 1px solid var(--gold-600); font-size: var(--text-xl); }
+button { padding: calc(10px * var(--ui-scale)); color: var(--gold-400); background: var(--gold-glow); border: 1px solid var(--gold-500); border-radius: var(--radius-sm); cursor: pointer; }
 input:focus-visible, button:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 small { color: var(--paper-400); }

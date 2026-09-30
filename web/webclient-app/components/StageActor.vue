@@ -192,11 +192,11 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
   line-height: 1;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  -webkit-text-stroke: 4px rgba(14, 8, 10, 0.92);
+  -webkit-text-stroke: calc(4px * var(--ui-scale)) rgba(14, 8, 10, 0.92);
   paint-order: stroke fill;
   text-shadow:
-    0 2px 12px rgba(10, 6, 8, 0.9),
-    0 0 26px var(--seal-glow);
+    0 2px calc(12px * var(--ui-scale)) rgba(10, 6, 8, 0.9),
+    0 0 calc(26px * var(--ui-scale)) var(--seal-glow);
   pointer-events: none;
   animation: elosern-beat-float var(--motion-beat-float) var(--ease-exit) 1 forwards;
 }

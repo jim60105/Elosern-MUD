@@ -159,20 +159,20 @@ function onChipKeydown(event) {
    design tokens only. */
 .hud {
   background: var(--panel);
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(9px * var(--ui-scale)));
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
 .conditions {
-  padding: 9px 12px 11px;
+  padding: calc(9px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(11px * var(--ui-scale));
   font-family: var(--f-sans);
 }
 
 .clab {
-  margin: 0 0 7px;
+  margin: 0 0 calc(7px * var(--ui-scale));
   font-size: var(--text-xs);
   letter-spacing: 0.14em;
   color: var(--paper-500);
@@ -187,7 +187,7 @@ function onChipKeydown(event) {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
 }
 
 /* The named chips; one flow with the `+N` chip except at short viewports. */
@@ -203,12 +203,12 @@ function onChipKeydown(event) {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(6px * var(--ui-scale));
   max-width: 100%;
   min-width: 0;
-  height: 30px;
-  padding: 0 9px 0 7px;
-  border-radius: 7px;
+  height: calc(30px * var(--ui-scale));
+  padding: 0 calc(9px * var(--ui-scale)) 0 calc(7px * var(--ui-scale));
+  border-radius: var(--radius);
   border: 1px solid var(--ink-600);
   background: transparent;
   cursor: default;
@@ -271,8 +271,8 @@ function onChipKeydown(event) {
   line-height: 1;
   background: var(--ink-900);
   border: 1px solid var(--ink-600);
-  border-radius: 99px;
-  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  padding: 2px calc(6px * var(--ui-scale));
   color: var(--paper-300);
   font-variant-numeric: tabular-nums lining-nums;
 }
@@ -283,19 +283,19 @@ function onChipKeydown(event) {
   content: "秒";
   margin-left: 1px;
   font-family: var(--f-sans);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-scale));
   color: var(--paper-500);
 }
 
 /* The `+N` overflow chip opens a bounded, scrollable disclosure inside the
    island (design D7); re-activation or Escape collapses it. */
 .chip.more {
-  min-width: 34px;
+  min-width: calc(34px * var(--ui-scale));
   justify-content: center;
   background: var(--ink-780);
   color: var(--paper-300);
   font-size: var(--text-xs);
-  padding: 0 8px;
+  padding: 0 calc(8px * var(--ui-scale));
   cursor: pointer;
 }
 
@@ -306,20 +306,20 @@ function onChipKeydown(event) {
 }
 
 .disclosure {
-  margin-top: 6px;
-  max-height: 96px;
+  margin-top: calc(6px * var(--ui-scale));
+  max-height: calc(96px * var(--ui-scale));
   overflow-y: auto;
   border: var(--line);
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
 }
 
 .disclosure-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 3px 0;
+  gap: calc(4px * var(--ui-scale));
+  padding: calc(3px * var(--ui-scale)) 0;
   font-size: var(--text-xs);
   color: var(--paper-100);
 }
@@ -345,8 +345,8 @@ function onChipKeydown(event) {
    icon-only chips move into their accessible name, kept reachable by
    pointer and keyboard. */
 .detail {
-  margin: 6px 0 0;
-  padding: 4px 8px;
+  margin: calc(6px * var(--ui-scale)) 0 0;
+  padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
   color: var(--paper-300);
   border: var(--line);
   border-radius: var(--radius-sm);
@@ -358,11 +358,11 @@ function onChipKeydown(event) {
    chips and a tighter island, so the vitals stack fits its anchor. */
 @media (max-height: 820px) {
   .conditions {
-    padding: 7px 12px 9px;
+    padding: calc(7px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(9px * var(--ui-scale));
   }
 
   .clab {
-    margin-bottom: 4px;
+    margin-bottom: calc(4px * var(--ui-scale));
     line-height: 1.2;
   }
 
@@ -374,7 +374,7 @@ function onChipKeydown(event) {
   .chips {
     flex-wrap: nowrap;
     align-items: flex-start;
-    gap: 5px;
+    gap: calc(5px * var(--ui-scale));
   }
 
   .chip-rows {
@@ -382,17 +382,17 @@ function onChipKeydown(event) {
     flex-wrap: wrap;
     flex: 1;
     min-width: 0;
-    gap: 5px;
-    max-height: 57px;
+    gap: calc(5px * var(--ui-scale));
+    max-height: calc(57px * var(--ui-scale));
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #55524b transparent;
   }
 
   .chip {
-    height: 26px;
-    gap: 5px;
-    padding: 0 7px 0 6px;
+    height: calc(26px * var(--ui-scale));
+    gap: calc(5px * var(--ui-scale));
+    padding: 0 calc(7px * var(--ui-scale)) 0 calc(6px * var(--ui-scale));
   }
 
   .chip .glyph {
@@ -404,13 +404,13 @@ function onChipKeydown(event) {
   }
 
   .chip.more {
-    min-width: 26px;
-    padding: 0 6px;
+    min-width: calc(26px * var(--ui-scale));
+    padding: 0 calc(6px * var(--ui-scale));
   }
 
   .disclosure {
-    max-height: 64px;
-    padding: 4px 8px;
+    max-height: calc(64px * var(--ui-scale));
+    padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
   }
 
   .disclosure-row {

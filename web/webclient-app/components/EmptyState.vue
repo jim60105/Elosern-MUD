@@ -52,8 +52,8 @@ defineProps({
 .empty-state .empty-state__glyph {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: calc(44px * var(--ui-scale));
+  height: calc(44px * var(--ui-scale));
   margin-bottom: var(--sp-1);
   border-radius: 50%;
   color: var(--gold-600);
@@ -84,5 +84,12 @@ defineProps({
   justify-content: center;
   gap: var(--sp-2);
   margin-top: var(--sp-2);
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.empty-state__glyph svg {
+  width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
 }
 </style>

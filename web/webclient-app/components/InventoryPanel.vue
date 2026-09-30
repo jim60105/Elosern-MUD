@@ -489,7 +489,7 @@ watch(confirming, (open) => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: calc(18px * var(--ui-scale));
   box-sizing: border-box;
   font-family: var(--f-sans);
 }
@@ -502,10 +502,10 @@ watch(confirming, (open) => {
 /* The mock's `section.block h4`: small tracked heading with the tag riding
    at the right. */
 .inventory-panel__heading {
-  margin: 0 0 9px;
+  margin: 0 0 calc(9px * var(--ui-scale));
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   color: var(--paper-500);
   font-size: var(--text-xs);
   font-weight: 500;
@@ -525,11 +525,11 @@ watch(confirming, (open) => {
 .inventory-panel__statrow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
   background: var(--ink-820);
   border: 1px solid var(--ink-700);
-  border-radius: 9px;
-  padding: 9px 12px;
+  border-radius: var(--radius);
+  padding: calc(9px * var(--ui-scale)) calc(12px * var(--ui-scale));
 }
 
 .inventory-panel__statrow-label {
@@ -539,7 +539,7 @@ watch(confirming, (open) => {
 
 .inventory-panel__statrow-unit {
   color: var(--paper-700);
-  margin-left: 6px;
+  margin-left: calc(6px * var(--ui-scale));
   font-size: var(--text-xs);
 }
 
@@ -569,7 +569,7 @@ watch(confirming, (open) => {
    square cells of at least 70px on a recessed well. */
 .inventory-panel__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(70px * var(--ui-scale)), 1fr));
   gap: var(--sp-2);
   margin-bottom: var(--sp-3);
   padding: var(--sp-3);
@@ -588,7 +588,7 @@ watch(confirming, (open) => {
   border-radius: var(--radius-sm);
   border: 1px solid #666055;
   background: radial-gradient(ellipse at 50% 80%, #60523a40, #121519 80%);
-  box-shadow: inset 0 0 14px var(--rarity-tint);
+  box-shadow: inset 0 0 calc(14px * var(--ui-scale)) var(--rarity-tint);
   display: grid;
   place-items: center;
   position: relative;
@@ -606,20 +606,20 @@ watch(confirming, (open) => {
 .inventory-panel__tile:focus-visible {
   outline: 2px solid var(--gold-400);
   outline-offset: 2px;
-  box-shadow: inset 0 0 14px var(--rarity-tint), 0 0 12px var(--gold-glow);
+  box-shadow: inset 0 0 calc(14px * var(--ui-scale)) var(--rarity-tint), 0 0 calc(12px * var(--ui-scale)) var(--gold-glow);
 }
 
 .inventory-panel__icon {
-  width: 36px;
-  height: 36px;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
   color: #e5d2a4;
-  filter: drop-shadow(0 2px 5px #000);
+  filter: drop-shadow(0 2px calc(5px * var(--ui-scale)) #000);
 }
 
 .inventory-panel__count {
   position: absolute;
   bottom: 2px;
-  right: 5px;
+  right: calc(5px * var(--ui-scale));
   font-family: var(--f-num);
   font-size: var(--text-xs);
   color: var(--paper-300);
@@ -629,10 +629,10 @@ watch(confirming, (open) => {
 /* The non-colour equipped state: a check glyph, not a colour cue. */
 .inventory-panel__equipped {
   position: absolute;
-  top: 3px;
-  left: 5px;
-  width: 10px;
-  height: 10px;
+  top: calc(3px * var(--ui-scale));
+  left: calc(5px * var(--ui-scale));
+  width: calc(10px * var(--ui-scale));
+  height: calc(10px * var(--ui-scale));
   color: var(--gold-400);
 }
 
@@ -642,12 +642,12 @@ watch(confirming, (open) => {
    complete) never sit on top of it. */
 .inventory-panel__tile[data-unknown="true"] {
   place-items: start center;
-  padding-top: 18px;
+  padding-top: calc(18px * var(--ui-scale));
 }
 
 .inventory-panel__tile[data-unknown="true"] .inventory-panel__icon {
-  width: 22px;
-  height: 22px;
+  width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
   color: var(--paper-500);
   filter: none;
 }
@@ -655,16 +655,16 @@ watch(confirming, (open) => {
 .inventory-panel__unknown {
   position: absolute;
   top: 2px;
-  right: 5px;
+  right: calc(5px * var(--ui-scale));
   font-size: var(--text-xs);
   color: var(--paper-500);
 }
 
 .inventory-panel__name {
   position: absolute;
-  bottom: 3px;
-  left: 5px;
-  right: 18px;
+  bottom: calc(3px * var(--ui-scale));
+  left: calc(5px * var(--ui-scale));
+  right: calc(18px * var(--ui-scale));
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -696,11 +696,11 @@ watch(confirming, (open) => {
 }
 .inventory-panel__tile[data-rarity="epic"] {
   --rarity-tint: #a46ad03d;
-  border: 3px double #b27fdb;
+  border: calc(3px * var(--ui-scale)) double #b27fdb;
 }
 .inventory-panel__tile[data-rarity="legendary"] {
   --rarity-tint: #cfa45c47;
-  border: 3px ridge var(--gold-500);
+  border: calc(3px * var(--ui-scale)) ridge var(--gold-500);
 }
 
 .inventory-panel__ceiling {
@@ -715,9 +715,9 @@ watch(confirming, (open) => {
   width: auto;
   background: var(--panel-solid);
   border: 1px solid var(--ink-600);
-  border-radius: 11px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 13px 15px;
+  padding: calc(13px * var(--ui-scale)) calc(15px * var(--ui-scale));
   font-size: var(--text-sm);
   pointer-events: none;
   animation: inventory-inspector-in var(--motion-fast) var(--ease-standard);
@@ -772,13 +772,13 @@ watch(confirming, (open) => {
 .inventory-panel__inspector-kind {
   font-size: var(--text-xs);
   color: var(--paper-500);
-  margin-bottom: 7px;
+  margin-bottom: calc(7px * var(--ui-scale));
 }
 
 .inventory-panel__inspector-summary {
   color: var(--paper-300);
   line-height: 1.5;
-  margin-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
 }
 
 /* The verbatim server-generated adjustment line, joined on item_key
@@ -788,7 +788,7 @@ watch(confirming, (open) => {
   color: var(--paper-500);
   font-size: var(--text-xs);
   line-height: 1.5;
-  margin-top: 4px;
+  margin-top: calc(4px * var(--ui-scale));
   overflow-wrap: anywhere;
 }
 
@@ -798,13 +798,13 @@ watch(confirming, (open) => {
   color: var(--paper-300);
   font-family: var(--f-sans);
   font-size: var(--text-xs);
-  margin-top: 3px;
+  margin-top: calc(3px * var(--ui-scale));
 }
 
 .inventory-panel__inspector-reason {
   color: var(--gold-400);
   font-size: var(--text-xs);
-  margin-top: 5px;
+  margin-top: calc(5px * var(--ui-scale));
 }
 
 /* The item-use confirmation modal (teleported to the document body).
@@ -828,23 +828,23 @@ watch(confirming, (open) => {
 
 .inventory-confirm__dialog {
   position: relative;
-  width: min(320px, calc(100vw - 32px));
+  width: min(320px * var(--ui-scale), calc(100vw - 32px * var(--ui-scale)));
   background: var(--panel-solid);
   border: 1px solid var(--ink-600);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 18px 20px;
+  padding: calc(18px * var(--ui-scale)) calc(20px * var(--ui-scale));
 }
 
 .inventory-confirm__title {
-  margin: 0 0 8px;
+  margin: 0 0 calc(8px * var(--ui-scale));
   color: var(--paper-50);
   font-size: var(--text-base);
   font-weight: 600;
 }
 
 .inventory-confirm__text {
-  margin: 0 0 16px;
+  margin: 0 0 calc(16px * var(--ui-scale));
   color: var(--paper-300);
   font-size: var(--text-sm);
   line-height: 1.6;
@@ -853,13 +853,13 @@ watch(confirming, (open) => {
 .inventory-confirm__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale));
 }
 
 .inventory-confirm__cancel,
 .inventory-confirm__ok {
-  border-radius: 8px;
-  padding: 7px 16px;
+  border-radius: var(--radius);
+  padding: calc(7px * var(--ui-scale)) calc(16px * var(--ui-scale));
   font-size: var(--text-sm);
   cursor: pointer;
 }
@@ -875,5 +875,12 @@ watch(confirming, (open) => {
   border: 1px solid var(--gold-500);
   color: var(--ink-900);
   font-weight: 600;
+}
+
+/* The icon's width/height attributes are its reference size; the chrome
+   factor scales the drawn box with its control (webclient-proportional-ui-scale). */
+.inventory-panel__equipped svg {
+  width: calc(10px * var(--ui-scale));
+  height: calc(10px * var(--ui-scale));
 }
 </style>

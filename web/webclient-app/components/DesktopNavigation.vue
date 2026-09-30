@@ -171,7 +171,7 @@ function activateTool(tool) {
 
 <style>
 .desktop-navigation {
-  --nav-pad: 14px;
+  --nav-pad: calc(14px * var(--ui-scale));
   position: absolute;
   left: var(--left-column);
   top: 0;
@@ -192,7 +192,7 @@ function activateTool(tool) {
   display: flex;
   justify-content: flex-end;
   align-items: stretch;
-  width: calc(12 * 1.08em + 5 * (2 * var(--nav-pad) + 27px));
+  width: calc(12 * 1.08em + 5 * (2 * var(--nav-pad) + calc(27px * var(--ui-scale))));
 }
 .desktop-navigation button {
   white-space: nowrap;
@@ -200,12 +200,12 @@ function activateTool(tool) {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: calc(7px * var(--ui-scale));
   padding: 0 var(--nav-pad);
   border: 0;
   border-inline: 1px solid transparent;
   border-bottom: 2px solid transparent;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 var(--radius) var(--radius);
   background: transparent;
   color: var(--paper-500);
   font: inherit;
@@ -215,7 +215,7 @@ function activateTool(tool) {
 .desktop-navigation__primary button {
   flex: none;
   box-sizing: border-box;
-  width: calc(var(--nav-glyphs) * 1.08em + 2 * var(--nav-pad) + 27px);
+  width: calc(var(--nav-glyphs) * 1.08em + 2 * var(--nav-pad) + 27px * var(--ui-scale));
   overflow: hidden;
 }
 .desktop-navigation__primary button span {
@@ -224,8 +224,8 @@ function activateTool(tool) {
   text-overflow: ellipsis;
 }
 .desktop-navigation svg {
-  width: 18px;
-  height: 18px;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
   flex: none;
   fill: none;
   stroke: currentColor;
@@ -237,15 +237,15 @@ function activateTool(tool) {
   border-inline-color: #cbb78524;
   border-bottom-color: var(--gold-400);
   background: linear-gradient(0deg, #d8bb7833, transparent 75%);
-  box-shadow: 0 9px 18px -15px var(--gold-400);
+  box-shadow: 0 calc(9px * var(--ui-scale)) calc(18px * var(--ui-scale)) calc(-15px * var(--ui-scale)) var(--gold-400);
 }
-.desktop-navigation button:focus-visible { outline: 2px solid var(--gold-400); outline-offset: -4px; }
+.desktop-navigation button:focus-visible { outline: 2px solid var(--gold-400); outline-offset: calc(-4px * var(--ui-scale)); }
 .desktop-navigation button:disabled { opacity: .45; cursor: not-allowed; }
 .desktop-navigation__tools {
   display: flex;
   align-items: stretch;
-  margin-left: 4px;
-  padding-left: 4px;
+  margin-left: calc(4px * var(--ui-scale));
+  padding-left: calc(4px * var(--ui-scale));
   border-left: var(--line);
 }
 .desktop-navigation__tool {
@@ -253,7 +253,7 @@ function activateTool(tool) {
   display: flex;
 }
 .desktop-navigation__tools button {
-  width: 38px;
+  width: calc(38px * var(--ui-scale));
   padding: 0;
 }
 /* The shared tool tooltip: a small ink plate hung under the control from a
@@ -264,11 +264,11 @@ function activateTool(tool) {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  padding: 7px 11px 6px;
+  padding: calc(7px * var(--ui-scale)) calc(11px * var(--ui-scale)) calc(6px * var(--ui-scale));
   border: 1px solid #bda47759;
   border-radius: var(--radius-sm);
   background: var(--surface-panel, #121418);
-  box-shadow: 0 8px 22px #000b;
+  box-shadow: 0 calc(8px * var(--ui-scale)) calc(22px * var(--ui-scale)) #000b;
   color: var(--paper-100);
   font: var(--text-sm)/1.2 var(--f-serif);
   letter-spacing: .08em;
@@ -280,7 +280,7 @@ function activateTool(tool) {
   position: absolute;
   top: -1px;
   left: 50%;
-  width: 14px;
+  width: calc(14px * var(--ui-scale));
   height: 1px;
   transform: translateX(-50%);
   background: var(--gold-400);
@@ -290,6 +290,6 @@ function activateTool(tool) {
 }
 @media (max-width: 1350px) {
   /* Compact padding keeps the region clear of the character switcher. */
-  .desktop-navigation { --nav-pad: 10px; }
+  .desktop-navigation { --nav-pad: calc(10px * var(--ui-scale)); }
 }
 </style>

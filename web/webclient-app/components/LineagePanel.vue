@@ -221,11 +221,11 @@ function nodeMeter(node) {
    The identity column is shared by every row, so the meters align. */
 .lineage-chain__head {
   display: grid;
-  grid-template-columns: 14px minmax(0, 13em) minmax(96px, 320px) auto;
+  grid-template-columns: calc(14px * var(--ui-scale)) minmax(0, 13em) minmax(calc(96px * var(--ui-scale)), calc(320px * var(--ui-scale))) auto;
   align-items: center;
   column-gap: var(--sp-3);
   width: 100%;
-  min-height: 56px;
+  min-height: calc(56px * var(--ui-scale));
   box-sizing: border-box;
   padding: var(--sp-2) var(--sp-4);
   color: var(--paper-100);
@@ -247,8 +247,8 @@ function nodeMeter(node) {
 
 .lineage-chain__chevron {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
   color: var(--paper-500);
   transition: transform var(--motion-fast) ease;
 }
@@ -294,8 +294,8 @@ function nodeMeter(node) {
 
 .lineage-chain__meter {
   display: block;
-  height: 6px;
-  border-radius: 999px;
+  height: calc(6px * var(--ui-scale));
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
@@ -303,13 +303,13 @@ function nodeMeter(node) {
 .lineage-chain__meter-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
 }
 
 .lineage-chain__nodes {
   margin: 0;
-  padding: 0 var(--sp-4) var(--sp-4) 42px;
+  padding: 0 var(--sp-4) var(--sp-4) calc(42px * var(--ui-scale));
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -324,7 +324,7 @@ function nodeMeter(node) {
   border-left: 2px solid var(--gold-500);
   background: var(--ink-900);
   overflow-wrap: anywhere;
-  gap: 6px var(--sp-3);
+  gap: calc(6px * var(--ui-scale)) var(--sp-3);
   font-size: var(--text-sm);
 }
 

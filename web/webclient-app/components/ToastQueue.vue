@@ -58,27 +58,27 @@ defineEmits(["dismiss"]);
    `elosern-toast-in`. */
 .toasts {
   position: fixed;
-  top: calc(var(--header-h) + 12px);
-  right: 16px;
-  width: min(320px, calc(100vw - 32px));
+  top: calc(var(--header-h) + 12px * var(--ui-scale));
+  right: calc(16px * var(--ui-scale));
+  width: min(320px * var(--ui-scale), calc(100vw - 32px * var(--ui-scale)));
   /* Bounded above the bottom band and its command-line row, so a tall stack
      never covers the dock or the message window (webclient-avg-stage-shell). */
-  max-height: calc(100dvh - var(--header-h) - var(--stage-content-bottom) - 24px);
+  max-height: calc(100dvh - var(--header-h) - var(--stage-content-bottom) - 24px * var(--ui-scale));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   pointer-events: none;
   z-index: calc(var(--z-surface-modal) + 100);
 }
 .toast {
   position: relative;
   background: var(--panel);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(calc(8px * var(--ui-scale)));
   border: var(--line);
-  border-left: 3px solid var(--gold-500);
-  border-radius: 9px;
-  padding: 14px 42px 14px 16px;
+  border-left: calc(3px * var(--ui-scale)) solid var(--gold-500);
+  border-radius: var(--radius);
+  padding: calc(14px * var(--ui-scale)) calc(42px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(16px * var(--ui-scale));
   box-shadow: var(--shadow);
   font-size: var(--text-xs);
   pointer-events: auto;
@@ -90,14 +90,14 @@ defineEmits(["dismiss"]);
   font-weight: 600;
   color: var(--paper-50);
   display: flex;
-  gap: 8px;
+  gap: calc(8px * var(--ui-scale));
   align-items: center;
   margin-bottom: 2px;
 }
 .toast .tt .ic {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
   color: var(--gold-400);
 }
 .toast .ts {
@@ -117,10 +117,10 @@ defineEmits(["dismiss"]);
 
 .toast__dismiss {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 30px;
-  height: 30px;
+  top: calc(6px * var(--ui-scale));
+  right: calc(6px * var(--ui-scale));
+  width: calc(30px * var(--ui-scale));
+  height: calc(30px * var(--ui-scale));
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
