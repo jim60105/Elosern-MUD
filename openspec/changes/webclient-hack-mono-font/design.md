@@ -41,6 +41,8 @@ Research measurements (Hack v3.003, taken during the proposal from the upstream 
 Hack is derived from DejaVu Sans Mono and keeps its advance and vertical metrics, so a machine that
 already rendered DejaVu Sans Mono sees nearly no geometry change. The measured 1–2 px line-box drop came
 from the developer machine, where the current stack resolved to a different installed monospace family.
+The baseline CDP check (task 1.1) confirmed this: on the developer machine the old stack rendered the
+`kbd`, the prompt, and map art with the locally installed JetBrains Mono (`isCustomFont` false).
 
 ## Goals / Non-Goals
 
@@ -98,7 +100,7 @@ collapsed into runs.
 | Slice | Claim window (not the declared range) | Hinted size R / B (research) |
 | --- | --- | --- |
 | `latin` | U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201F, U+2022, U+2026, U+2039-203A, U+20AC, U+2122, U+2190-2193, U+FFFD | 23.0 / 23.5 KB |
-| `latin-ext` | U+0100-036F, U+1E00-1EFF, U+2000-218F | 26.0 / 28.3 KB |
+| `latin-ext` | U+0100-036F, U+0E3F, U+1E00-1EFF, U+2000-218F, U+2C60-2C7F | 26.0 / 28.3 KB |
 | `greek-cyrillic` | U+0370-03FF, U+0400-058F, U+10A0-10FF, U+1F00-1FFF | 28.2 / 26.8 KB |
 | `box` | U+2500-259F | 8.8 / 8.8 KB |
 | `symbols` | U+2190-23FF, U+25A0-2BFF, U+2E00-2E7F, U+E000-F8FF | 33.2 / 33.2 KB |
@@ -109,9 +111,14 @@ collapsed into runs.
 - **Size.** About 250 KB in total. The largest slice is 33 KB, under the 40 KB ceiling in the spec.
   No slice is under 4 KB, so Vite emits every slice as its own file and inlines none.
 
+Three cmap entries are excluded on purpose: U+0000, U+000D, and U+FEFF (the byte-order mark, a
+default-ignorable format character that needs no glyph). The generator and the contract test share
+this exclusion set. U+0E3F (฿) and the Bold-only U+2C7D sit outside the first-draft windows and are
+claimed by `latin-ext`, so every drawable Hack glyph lands in a slice.
+
 The slice-contract test checks two things. The declared ranges are pairwise disjoint per weight. Their
-union equals Hack's cmap minus the control code points U+0000 and U+000D, so no glyph is silently
-dropped.
+union equals Hack's cmap minus the exclusion set, so no glyph is silently dropped. The Regular and Bold
+cmaps differ (1548 and 1624 entries), so the manifest is kept per weight.
 
 *Alternative:* one file per weight (106 KB). Rejected because it breaks the small-file requirement.
 
@@ -182,12 +189,19 @@ that entry point. The helpers can therefore be unit-tested without network acces
   Storybook populated-HUD story).
   - **CDP sequence.** The method runs after `document.fonts.ready`, then `DOM.enable`, `CSS.enable`,
     `DOM.getDocument`, `DOM.querySelector` and `CSS.getPlatformFontsForNode`.
-  - **Nodes checked.** Three nodes must report `familyName` Hack with `isCustomFont`:
+  - **Nodes checked.** Three nodes must report a font whose `familyName` starts with `Hack` and whose
+    `isCustomFont` is true. CDP reports name-table names (the baseline reported "Noto Sans TC Thin"
+    for a Noto slice), so the check is a prefix match. `isCustomFont` is what separates the bundled
+    web font from a locally installed Hack or Hack Nerd Font.
     - the first `kbd`;
     - the command-line prompt (`.cmdfield__prompt`, `›` U+203A, in `latin`);
-    - `#inputfield` after typing `look 42`. Blink walks the layout tree, so an input holding text
-      reports fonts; an empty input reports none.
-  - **CJK node.** A CJK node in a monospace surface must report Noto Sans TC as a custom font.
+    - `#inputfield` after typing `look 42 看看`. The field is a `<textarea>`. CDP reports no fonts for
+      the element itself, but its user-agent shadow root `DIV` does (verified on the baseline). The
+      test therefore takes a fresh `DOM.getDocument({depth: -1, pierce: true})` after typing and after
+      `document.fonts.ready`, because typing replaces the shadow text node and old node IDs go stale.
+      It then reads the fonts of the shadow `DIV` and its text child.
+  - **CJK node.** The same input text holds `看看`, so the shadow `DIV` must also report a custom font
+    whose `familyName` starts with `Noto Sans TC`.
   - **Failure policy.** A missing CDP method fails the test instead of skipping it, because the suite
     runs only on Chromium. The existing `assertIn("monospace", …)` checks stay.
   - **Stale build.** `setUpClass` reuses `.storybook-out` whenever `index.json` exists. The implementer
@@ -199,18 +213,23 @@ that entry point. The helpers can therefore be unit-tested without network acces
   1. Make monospace ASCII text visible. Use the dock legend `<kbd>` (`ActionDock.vue:147`) if the live
      state renders it. Otherwise open the command line (`›` prompt).
   2. Wait for `document.fonts.ready` and for a loaded `FontFace` with family `Hack`.
-  3. Positive assertion: an origin response matches `/assets/hack-regular.latin-*.woff2`.
-  4. Negative assertion: no `hack-*.greek-cyrillic-*` and no `hack-*.latin-ext-*` response.
+  3. Positive assertion: an origin response whose slice name is exactly `hack-regular.latin`. The test
+     strips Vite's `-<8-character hash>` suffix before comparing, because `latin-` is a prefix of
+     `latin-ext-` and a glob would match both.
+  4. Negative assertion: no response whose slice name is `hack-*.greek-cyrillic` or `hack-*.latin-ext`.
+     On failure the message lists the code points in Hack-styled elements that fall outside the
+     `latin` slice, so a harmless copy change is easy to diagnose.
 
   The negative assertion holds because the fixture puts no Greek, Cyrillic or extended-Latin text in a
   monospace surface. The spec scenario is worded around that fixture.
 - **Slice contract** (new `tests/test_hack_font_slices_contract.py`; Python, no browser). It reads
   `fonts-hack.css` and `fonts/hack/`, then checks:
   - every `url()` resolves to a file, and every file is referenced;
-  - every file starts with `wOF2` and is at most 40960 bytes;
+  - every file starts with `wOF2`, is at most 40960 bytes, and is at least 4096 bytes (Vite's
+    `assetsInlineLimit`, so no slice is silently inlined as a data URI);
   - declared ranges are pairwise disjoint per weight;
-  - their union equals Hack's cmap minus U+0000 and U+000D, read from a committed code-point manifest
-    that the generator writes beside the slices;
+  - their union equals Hack's cmap minus the exclusion set (U+0000, U+000D, U+FEFF), read from a
+    committed per-weight code-point manifest that the generator writes beside the slices;
   - U+2190–U+2193 appear only in `latin`;
   - no declared range enters the CJK blocks (U+2E80–U+9FFF, U+F900–U+FAFF, U+20000 and above);
   - weights 400 and 700 are both declared;

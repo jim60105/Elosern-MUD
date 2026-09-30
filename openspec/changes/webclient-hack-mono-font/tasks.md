@@ -1,10 +1,10 @@
 ## 1. Baseline capture (before any edit)
 
-- [ ] 1.1 On an unmodified checkout, in the environment that will also run the after-set, run `pnpm run build`. Capture the D8 surface set with agent-browser (headless, throwaway Chromium) at 1440×900 and 1280×720 into the session scratchpad, and note which monospace family CDP reports for a `kbd` today. Verify: every D8 surface has a before-screenshot at both viewports, the old rendered family is recorded, and `agent-browser close` has been run.
+- [x] 1.1 On an unmodified checkout, in the environment that will also run the after-set, run `pnpm run build`. Capture the D8 surface set with agent-browser (headless, throwaway Chromium) at 1440×900 and 1280×720 into the session scratchpad, and note which monospace family CDP reports for a `kbd` today. Verify: every D8 surface has a before-screenshot at both viewports, the old rendered family is recorded, and `agent-browser close` has been run.
 
 ## 2. Slice generator and vendored assets
 
-- [ ] 2.1 Add `tools/gen_hack_font_slices.py` as described in D6. Verify: `uv run --script tools/gen_hack_font_slices.py` exits 0 and prints 10 slices, each ≤ 40960 bytes.
+- [x] 2.1 Add `tools/gen_hack_font_slices.py` as described in D6. Verify: `uv run --script tools/gen_hack_font_slices.py` exits 0 and prints 10 slices, each ≤ 40960 bytes.
   - PEP 723 inline metadata pinning `fonttools==4.66.1` and `brotli==1.2.0`.
   - Pure helpers, importable without fontTools:
     - the D2 claim-window table;
@@ -16,13 +16,13 @@
     2. Open the TTFs with `TTFont(..., recalcTimestamp=False)`.
     3. Subset with hints kept, `TTFA` dropped, name IDs 0–6/13/14, and `font.flavor = "woff2"` before save.
     4. Slice twice and fail if the bytes differ.
-    5. Write the slices, `LICENSE.md`, and a code-point manifest (`fonts/hack/codepoints.json`: Hack's cmap code points minus U+0000/U+000D, per weight).
-    6. Print a size table and fail if any slice exceeds 40960 bytes.
-- [ ] 2.2 Add `tests/test_hack_font_slices_tool.py`. Verify: `uv run --locked python -m unittest tests.test_hack_font_slices_tool` passes in the project env, which does not have fontTools. It covers:
+    5. Write the slices, `LICENSE.md`, and a code-point manifest (`fonts/hack/codepoints.json`: Hack's cmap code points minus the exclusion set U+0000/U+000D/U+FEFF, per weight). Fail if any manifest code point is unclaimed or if the declared ranges of one weight overlap.
+    6. Print a size table and fail if any slice exceeds 40960 bytes or is under 4096 bytes.
+- [x] 2.2 Add `tests/test_hack_font_slices_tool.py`. Verify: `uv run --locked python -m unittest tests.test_hack_font_slices_tool` passes in the project env, which does not have fontTools. It covers:
   - run collapsing (adjacent, single, gapped);
   - first-claim assignment: U+2190–2193 land in `latin` only; code points outside every window are dropped;
   - CSS rendering: declared ranges come only from claimed code points, stay disjoint, and never include U+2328 or U+2715.
-- [ ] 2.3 Run the generator and commit its outputs:
+- [x] 2.3 Run the generator and commit its outputs:
   - `web/webclient-app/fonts/hack/hack-{regular,bold}.{latin,latin-ext,greek-cyrillic,box,symbols}.woff2`
   - `web/webclient-app/fonts/hack/LICENSE.md`
   - `web/webclient-app/fonts/hack/codepoints.json`
@@ -35,9 +35,9 @@
 
 ## 3. Wire the face into the app
 
-- [ ] 3.1 Import `./styles/fonts-hack.css` in `web/webclient-app/main.js` right after `fonts.css`. In `.storybook/preview.js`, import `../web/webclient-app/styles/fonts-hack.css` right after its `fonts.css` import. Verify: `pnpm run build` succeeds, and `web/static/webclient/app/dist/index.css` has 10 Hack `@font-face` rules whose URLs point at existing `/static/webclient/app/dist/assets/hack-*.woff2` files.
-- [ ] 3.2 In `web/webclient-app/styles/tokens.css`, set `--f-mono: "Hack", "Noto Sans TC", monospace;` and update the neighbouring comment: a bundled Latin/box face plus a bundled CJK fallback, with no machine font ahead of them. Verify: `grep -- '--f-mono' web/webclient-app/styles/tokens.css` shows exactly that stack.
-- [ ] 3.3 Update the comments that describe the monospace token as full-width CJK only, so they state that CJK is drawn by Noto Sans TC at 1 em, ASCII by Hack at 0.602 em, and the one-em-per-code-point bound still holds. No numbers change. Verify: `git diff` on these files changes comments only. Files and comments:
+- [x] 3.1 Import `./styles/fonts-hack.css` in `web/webclient-app/main.js` right after `fonts.css`. In `.storybook/preview.js`, import `../web/webclient-app/styles/fonts-hack.css` right after its `fonts.css` import. Verify: `pnpm run build` succeeds, and `web/static/webclient/app/dist/index.css` has 10 Hack `@font-face` rules whose URLs point at existing `/static/webclient/app/dist/assets/hack-*.woff2` files.
+- [x] 3.2 In `web/webclient-app/styles/tokens.css`, set `--f-mono: "Hack", "Noto Sans TC", monospace;` and update the neighbouring comment: a bundled Latin/box face plus a bundled CJK fallback, with no machine font ahead of them. Verify: `grep -- '--f-mono' web/webclient-app/styles/tokens.css` shows exactly that stack.
+- [x] 3.3 Update the comments that describe the monospace token as full-width CJK only, so they state that CJK is drawn by Noto Sans TC at 1 em, ASCII by Hack at 0.602 em, and the one-em-per-code-point bound still holds. No numbers change. Verify: `git diff` on these files changes comments only. Files and comments:
   - `composables/use-map-lattice-geometry.js`: the label-clearance note;
   - `components/MapLattice.vue`: the `markerNameFont` note;
   - `composables/use-map-lattice-render.js`: the marker-ascent note;
@@ -46,9 +46,9 @@
 
 ## 4. Tests
 
-- [ ] 4.1 Add `tests/test_hack_font_slices_contract.py` for the D7 slice contract. It checks:
+- [x] 4.1 Add `tests/test_hack_font_slices_contract.py` for the D7 slice contract. It checks:
   - every URL resolves, and every file is referenced;
-  - each file has the `wOF2` magic and is ≤ 40960 bytes;
+  - each file has the `wOF2` magic and is between 4096 and 40960 bytes;
   - declared ranges are pairwise disjoint per weight;
   - their union equals `codepoints.json`;
   - arrows appear only in `latin`;
@@ -60,17 +60,17 @@
   Verify: `uv run --locked python -m unittest tests.test_hack_font_slices_contract` passes. Temporarily deleting one slice or adding an overlapping range makes it fail.
 - [ ] 4.2 Extend `web/tests/browser/test_vue_typography.py::VueTypographyBrowserTest::test_keycaps_and_command_input_keep_monospace` with the D7 CDP check:
   - run after `document.fonts.ready`, then `DOM.enable`, `CSS.enable`, `DOM.getDocument`, `DOM.querySelector`, `CSS.getPlatformFontsForNode`;
-  - the first `kbd`, `.cmdfield__prompt`, and `#inputfield` (after typing `look 42`) report `familyName` Hack with `isCustomFont`;
-  - a CJK node in a monospace surface reports Noto Sans TC as a custom font;
+  - the first `kbd`, `.cmdfield__prompt`, and `#inputfield` report a font whose `familyName` starts with `Hack` and has `isCustomFont`. For `#inputfield` (a `<textarea>`), type `look 42 看看`, take a fresh `DOM.getDocument({depth: -1, pierce: true})`, and read its user-agent shadow `DIV` and that DIV's text child;
+  - the same shadow `DIV` also reports a custom font whose `familyName` starts with `Noto Sans TC` (the CJK scenario);
   - a missing CDP method fails the test rather than skipping it;
   - confirm the reported `familyName` string once;
   
-  Verify: `rm -rf .storybook-out`, then run the method alone with `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_keycaps_and_command_input_keep_monospace`. It passes. Temporarily reverting `--f-mono` to the old stack, rebuilding Storybook, and re-running makes it fail.
+  Verify: as a shell step before the run (not inside the test), `rm -rf .storybook-out`; then run the method alone with `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_keycaps_and_command_input_keep_monospace`. It passes. Temporarily reverting `--f-mono` to the old stack, rebuilding Storybook, and re-running makes it fail.
 - [ ] 4.3 Extend `web/tests/browser/test_vue_foundation.py::VueFoundationBrowserTest::test_vue_bundle_loads_from_origin_offline` with the D7 ordering:
   1. make monospace ASCII text visible: the dock legend `kbd` if it is rendered, otherwise open the command line;
   2. wait for `document.fonts.ready` and for a loaded `FontFace` whose family is Hack;
-  3. assert the positive case: an origin `hack-regular.latin-*.woff2` response;
-  4. assert the negative case: no `hack-*.greek-cyrillic-*` and no `hack-*.latin-ext-*` response.
+  3. assert the positive case: an origin response whose slice name, with Vite's `-<hash>` suffix stripped, is exactly `hack-regular.latin`;
+  4. assert the negative case: no response whose slice name is `hack-*.greek-cyrillic` or `hack-*.latin-ext`. On failure, list the Hack-styled code points outside `latin`.
 
   Verify: running the method alone through the unittest driver passes.
 - [ ] 4.4 If 4.2 or 4.3 added a new browser test method or class instead of extending an existing one, register it in `.github/browser-shards.json` in the same commit. Do not add the new requirement ID to any `@covers_requirement` decorator yet (see group 7). Verify: `uv run --locked python -m tools.contract_gate manifests contracts` passes.

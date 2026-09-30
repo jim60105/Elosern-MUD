@@ -98,7 +98,7 @@ export function useMapLatticeGeometry(props) {
 
   // Node labels are bounded and truncated (the full label stays reachable
   // through the node's accessible name); a truncated label appends "…"
-  // (labelMax + 1 glyphs in the declared label step, full-width CJK).
+  // (labelMax + 1 glyphs in the declared label step, at most 1em each).
   function visibleNodeLabel(node) {
     if (labelSuppressed(node)) return "";
     return truncatedLabel(node.label);
@@ -111,8 +111,8 @@ export function useMapLatticeGeometry(props) {
   // as two names rather than one run-on phrase:
   // `(glyphs(a) + glyphs(b)) / 2 * labelFont + labelFont / 2`, each code point of the
   // visible (truncated) label counted as one full-width em — the bound for
-  // the full-width CJK labels in the shared monospace token (ASCII is
-  // narrower). Two maximal labels (`labelMax + 1` glyphs) need at least the
+  // the shared monospace token, whose CJK draws in Noto Sans TC at 1em and
+  // whose ASCII draws in Hack at 0.602em. Two maximal labels (`labelMax + 1` glyphs) need at least the
   // old worst-case term `(labelMax + 1) * labelFont + 3`, so the bound never
   // loosens.
   const labelClearancePitch = computed(() => {
