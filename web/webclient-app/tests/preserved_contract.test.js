@@ -78,7 +78,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
   // protocol validator accepts — a slotless panel carries no proposal key).
   function creationPanel() {
     return {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "creation",
       draft: null,
@@ -102,9 +102,9 @@ describe("H1 preserved DOM contract (design D6)", () => {
           apparent_age_maximum: 10000,
         },
         races: [
-          { key: "human", description: "平原族", subraces: null },
-          { key: T_RACE_BEAST, description: "獸族", subraces: null },
-          { key: "elf", description: "林語族", subraces: null },
+          { key: "human", display_name_zh: "平原族民", description: "平原族", subraces: null },
+          { key: T_RACE_BEAST, display_name_zh: "荒野獸民", description: "獸族", subraces: null },
+          { key: "elf", display_name_zh: "森生林語族", description: "林語族", subraces: null },
         ],
         subraces: {},
         profiles: [
@@ -119,7 +119,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
               { axis: "atk_phys", label: "攻擊", explanation: "物理攻擊", minimum: 0, maximum: 100 },
               { axis: "agility", label: "敏捷", explanation: "敏捷", minimum: 0, maximum: 100 },
               { axis: "defense", label: "防禦", explanation: "防禦力", minimum: 0, maximum: 100 },
-              { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 100 },
+              { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害", minimum: 0, maximum: 100 },
             ],
           },
         ],

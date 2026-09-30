@@ -20,7 +20,7 @@ const ELEMENTS = [
 ];
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: true,
   kind: "creation",
   draft: null,
@@ -64,16 +64,19 @@ export const CREATION_PANEL_SAMPLE = {
     races: [
       {
         key: "human",
+        display_name_zh: "人類",
         description: "人族：均衡、勤奮，商貿立族。",
         subraces: null,
       },
       {
         key: "beastfolk",
+        display_name_zh: "獸人",
         description: "獸民：堅韌、忠實，戰技立族。",
         subraces: ["subrace_wolf", "subrace_bear"],
       },
       {
         key: "elf",
+        display_name_zh: "精靈",
         description: "精靈：長壽、敏銳，學藝立族。",
         subraces: null,
       },
@@ -102,7 +105,7 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 4 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
         ],
       },
       {
@@ -116,7 +119,7 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 5 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
         ],
       },
       {
@@ -130,7 +133,7 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 3 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 5 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
         ],
       },
     ],
@@ -227,7 +230,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

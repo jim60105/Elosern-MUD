@@ -53,6 +53,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(cards.length).toBe(3);
     const names = wrapper.findAll('[data-testid="creation-preset-name"]').map((el) => el.text());
     expect(names).toEqual(["流浪劍客", "燈下學士", "碼頭腳夫"]);
+    const races = wrapper.findAll('.creation-preset-card__race').map((el) => el.text());
+    expect(races.length).toBe(3);
   });
 
   it("activating a preset card emits creation.preset with the exact payload", () => {

@@ -225,9 +225,10 @@
 
   function raceItem(panel, option, index) {
     var subraceCount = option.subraces === null ? 0 : option.subraces.length;
+    var name = option.display_name_zh || option.key;
     return {
       key: "race-" + index,
-      label: option.key + (subraceCount > 0 ? "（子種族 " + subraceCount + "）" : ""),
+      label: name + (subraceCount > 0 ? "（子種族 " + subraceCount + "）" : ""),
       enabled: true,
       actionId: null,
       payload: null,

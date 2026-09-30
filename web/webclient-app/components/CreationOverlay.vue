@@ -73,6 +73,7 @@ const {
   minimumAge,
   minimumApparentAge,
   races,
+  raceDisplayName,
   raceInfo,
   hasSubraces,
   subraceOptions,
@@ -195,7 +196,7 @@ const {
             <span class="creation-preset-card__name" data-testid="creation-preset-name">
               {{ card.display_name }}
             </span>
-            <span class="creation-preset-card__race">{{ card.race }}</span>
+            <span class="creation-preset-card__race">{{ raceDisplayName(card.race) }}</span>
             <span class="creation-preset-card__emphasis">{{ card.emphasis }}</span>
             <span class="creation-preset-card__background">{{ card.background }}</span>
           </button>
@@ -259,7 +260,7 @@ const {
           <label class="creation-overlay__field">
             <span>種族</span>
             <select v-model="race" data-testid="creation-race" @change="onRaceChange">
-              <option v-for="r in races" :key="r.key" :value="r.key">{{ r.key }}</option>
+              <option v-for="r in races" :key="r.key" :value="r.key">{{ r.display_name_zh || r.key }}</option>
             </select>
           </label>
           <p v-if="raceInfo?.description" class="creation-race-description" data-testid="creation-race-description">

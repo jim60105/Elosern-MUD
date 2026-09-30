@@ -67,8 +67,10 @@ from world.rules.creation_wizard import (
 # Bumped to 5 for the age-bounds custom descriptor (age-range-0-10000): the
 # descriptor block renames ``custom.adult`` -> ``custom.age``, the advertised
 # minimums drop to 0, and the mirrored JS validator moves together; a stale
-# v4 panel or draft is rejected by the exact-schema gate on both ends.
-CREATION_SCHEMA_VERSION = 5
+# v4/v5 panel or draft is rejected by the exact-schema gate on both ends.
+# v6 adds canonical race display_name_zh to custom.races options and requires
+# preset cards to resolve to custom.races (webclient-creation-display-labels).
+CREATION_SCHEMA_VERSION = 6
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -204,7 +206,14 @@ def _validate_age(value: Any) -> dict[str, Any]:
 
 
 def _validate_race_option(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "race option", {"key", "description", "subraces"}, {})
+    _require_exact_fields(
+        value, "race option", {"key", "display_name_zh", "description", "subraces"}, {}
+    )
+    display_name_zh = _require_str(
+        value, "display_name_zh", maximum=MAX_DISPLAY_NAME_CODE_POINTS
+    )
+    if not display_name_zh.strip():
+        raise ProtocolValidationError("race display_name_zh must be non-empty")
     key = _validate_key(value["key"], "race key", MAX_RACE_KEY_CODE_POINTS)
     description = _require_str(
         value, "description", maximum=MAX_DESCRIPTION_CODE_POINTS
@@ -221,7 +230,12 @@ def _validate_race_option(value: Any) -> dict[str, Any]:
             _validate_key(entry, "race subrace", MAX_SUBRACE_KEY_CODE_POINTS)
             for entry in subraces
         ]
-    return {"key": key, "description": description, "subraces": subraces}
+    return {
+        "key": key,
+        "display_name_zh": display_name_zh,
+        "description": description,
+        "subraces": subraces,
+    }
 
 
 def _validate_subraces(value: Any) -> dict[str, Any]:
@@ -658,6 +672,12 @@ def validate_creation(payload: Any) -> dict[str, Any]:
         raise ProtocolValidationError("presets must not be empty")
     presets = [_validate_preset_card(card) for card in presets]
     custom = _validate_custom(payload["custom"])
+    race_keys = {race["key"] for race in custom["races"]}
+    for card in presets:
+        if card["race"] not in race_keys:
+            raise CreationPanelError(
+                f"preset {card['key']} references non-existent race {card['race']}"
+            )
 
     result: dict[str, Any] = {
         "schema_version": CREATION_SCHEMA_VERSION,
@@ -713,6 +733,7 @@ def _serialize_age(age: AgeBoundsView) -> dict[str, Any]:
 def _serialize_race_option(race: RaceOptionView) -> dict[str, Any]:
     return {
         "key": race.key,
+        "display_name_zh": race.display_name_zh,
         "description": race.description,
         "subraces": None if race.subraces is None else list(race.subraces),
     }

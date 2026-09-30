@@ -27,6 +27,8 @@ const T_EL_LIGHTNING = ["light", "ning"].join("");
 const T_PRESET_B = { key: "t_umbra_fern", display: "影蕨" };
 const T_SR_ROYAL = "t_crown_born";
 const T_SR_COMMONER = "t_hearth_born";
+const T_RACE_HUMAN_ZH = "平原族民";
+const T_RACE_ELF_ZH = "森生林語族";
 const T_SR_LEAF = "t_umbra_leaf";
 const T_SR_GALE = "t_gale_kin";
 const T_SR_ROYAL_ZH = "王冠裔";
@@ -48,13 +50,13 @@ function validPanel(overrides) {
     atk_phys: { axis: "atk_phys", label: "物理攻擊", explanation: "影響傷害", minimum: 0, maximum: 21 },
     agility: { axis: "agility", label: "敏捷", explanation: "命中迴避", minimum: 0, maximum: 21 },
     defense: { axis: "defense", label: "防禦", explanation: "減免傷害", minimum: 0, maximum: 85 },
-    magic_power: { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 85 },
+    magic_power: { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 85 },
   };
   const humanAxes = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"].map((k) =>
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "creation",
     draft: null,
@@ -87,8 +89,8 @@ function validPanel(overrides) {
         apparent_age_maximum: 10000,
       },
       races: [
-        { key: "human", description: "平原族", subraces: [T_SR_ROYAL, T_SR_COMMONER] },
-        { key: "elf", description: "林語族", subraces: [T_SR_LEAF, T_SR_GALE] },
+        { key: "human", display_name_zh: T_RACE_HUMAN_ZH, description: "平原族", subraces: [T_SR_ROYAL, T_SR_COMMONER] },
+        { key: "elf", display_name_zh: T_RACE_ELF_ZH, description: "林語族", subraces: [T_SR_LEAF, T_SR_GALE] },
       ],
       subraces: {
         [T_SR_ROYAL]: { display_name_zh: T_SR_ROYAL_ZH, common_name_zh: T_SR_ROYAL_COMMON_ZH, specialty: "教育" },
@@ -178,6 +180,10 @@ test("race and subrace geometry derive from the descriptor", () => {
   assert.equal(items.length, 2);
   assert.equal(items[0].subraceKey, T_SR_LEAF);
   assert.equal(items[1].subraceKey, T_SR_GALE);
+
+  const raceItem = CreationMenu.raceItem(panel, panel.custom.races[0], 0);
+  assert.equal(raceItem.raceKey, "human");
+  assert.equal(raceItem.label, `${T_RACE_HUMAN_ZH}（子種族 2）`);
 });
 
 test("axis fields and budget follow the active profile", () => {

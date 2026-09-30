@@ -90,7 +90,7 @@ ALLOCATION_AXIS_LABELS: dict[str, str] = {
     "atk_phys": "物理攻擊",
     "agility": "敏捷",
     "defense": "防禦",
-    "magic_power": "魔力",
+    "magic_power": "魔法攻擊",
 }
 ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "hp": "生命值，決定你能承受多少傷害",
@@ -99,7 +99,7 @@ ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "atk_phys": "物理攻擊，影響造成的傷害",
     "agility": "敏捷，影響命中與迴避",
     "defense": "防禦，減免受到的傷害",
-    "magic_power": "魔力，決定魔法傷害與治療強度",
+    "magic_power": "魔法攻擊，決定魔法傷害與治療強度",
 }
 
 
@@ -143,6 +143,7 @@ class RaceOptionView:
     """
 
     key: str
+    display_name_zh: str
     description: str
     subraces: tuple[str, ...] | None
 
@@ -292,6 +293,7 @@ def _race_option(race_key: str) -> RaceOptionView:
     )
     return RaceOptionView(
         key=race.key,
+        display_name_zh=race.display_name_zh,
         description=race.description,
         subraces=subrace_keys if subrace_keys else None,
     )

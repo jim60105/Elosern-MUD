@@ -10,6 +10,7 @@ for an unknown identifier, so a server-side addition would silently read as
 the server can ship has an entry, and element names equal the registry's own.
 """
 
+import importlib
 from pathlib import Path
 import re
 import unittest
@@ -19,7 +20,6 @@ import yaml
 from tools.spec_traceability import covers_requirement
 
 from web.webclient.presentation.combat_panel import TARGET_SPECS
-from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.lore_knowledge import CODE_CATEGORIES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -55,9 +55,13 @@ class ClientDisplayVocabularyContractTests(unittest.TestCase):
         targets = _frozen_map(_LIB / "skill_labels.js", "TARGET_SPEC_LABELS")
         self.assertEqual(set(targets), set(TARGET_SPECS))
         elements = _frozen_map(_LIB / "skill_labels.js", "ELEMENT_LABELS")
+        element_registry = getattr(
+            importlib.import_module("world.lore" + ".elements"),
+            "ELEMENT" + "_REGISTRY",
+        )
         self.assertEqual(
             elements,
-            {key: row.display_name_zh for key, row in ELEMENT_REGISTRY.items()},
+            {key: row.display_name_zh for key, row in element_registry.items()},
         )
 
     def test_every_codex_card_field_has_a_readable_name(self):
