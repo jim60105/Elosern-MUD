@@ -96,3 +96,8 @@
 - **Ligatures.** `->` draws as a ligature only where ASCII forms it (`a->b` in the probe). The run keeps its two cells.
 - **Cold cache (throttled at 200 KB/s, cache disabled).** Box strokes join on first paint because the `box` slice is inlined. Latin and CJK swap in with `font-display: swap`. This is acceptable.
 - **Task 7.1** lands with the archive (D8), so it stays open on this branch.
+- **Post-implementation review.**
+  - The write path now renames the old font tree aside, swaps the staged one in, and replaces the sheet through a temporary file. A failure leaves the old outputs and no staging leftovers, and a test covers it.
+  - The tool now rejects duplicate zip members.
+  - The contract test pins the Regular-only one-cell code points (U+03F6, U+2215, U+2219), so a release that drops more from Bold gets reviewed.
+  - The two-cell overestimate for fallback glyphs is already documented in the header of `mono_cells.js`.

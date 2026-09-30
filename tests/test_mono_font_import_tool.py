@@ -200,6 +200,9 @@ class RejectTest(unittest.TestCase):
     def test_licence_member_escaping_the_tree(self):
         self.assertRejected(make_zip(extra=[(f"{ROOT}/licenses/../../evil.txt", b"x")]), "unsafe")
 
+    def test_duplicate_member(self):
+        self.assertRejected(make_zip(extra=[(f"{ROOT}/JimMonoTC-Bold.box.woff2", WOFF2)]), "duplicate")
+
     def test_symbolic_link_member(self):
         info = zipfile.ZipInfo(f"{ROOT}/licenses/link")
         info.external_attr = (0o120777 << 16)
@@ -254,10 +257,25 @@ class MainTest(unittest.TestCase):
         self.assertNotIn("app/fonts/jimmonotc/old.woff2", first)
         self.assertIn("app/fonts/jimmonotc/codepoints.json", first)
         self.assertIn("app/styles/fonts-mono.css", first)
-        self.assertFalse((self.root / "app/fonts/jimmonotc.tmp").exists())
+        for leftover in ("fonts/jimmonotc.tmp", "fonts/jimmonotc.old", "styles/fonts-mono.css.tmp"):
+            self.assertFalse((self.root / "app" / leftover).exists(), leftover)
         with mock.patch("sys.stdout", io.StringIO()):
             self.assertEqual(tool.main([str(self.archive)]), 0)
         self.assertEqual({p: (self.root / p).read_bytes() for p in self.tree()}, first)
+
+    def test_a_failed_staging_leaves_the_old_tree_and_no_leftovers(self):
+        before = self.tree()
+        real = Path.write_bytes
+
+        def flaky(path, data):
+            if path.name == "codepoints.json":
+                raise OSError("disk full")
+            return real(path, data)
+
+        with mock.patch.object(Path, "write_bytes", flaky), self.assertRaises(OSError):
+            tool.main([str(self.archive)])
+        self.assertEqual(self.tree(), before)
+        self.assertFalse((self.root / "app/fonts/jimmonotc.tmp").exists())
 
 
 if __name__ == "__main__":

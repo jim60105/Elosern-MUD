@@ -219,11 +219,15 @@ def read_release(archive: bytes) -> tuple[str, dict[str, bytes], dict[str, bytes
     css = None
     files: dict[str, bytes] = {}
     licenses: dict[str, bytes] = {}
+    seen: set[str] = set()
     with zipfile.ZipFile(io.BytesIO(archive)) as zf:
         for info in zf.infolist():
             if info.is_dir():
                 continue
             _root, _, rel = info.filename.partition("/")
+            if rel in seen:
+                raise ReleaseContractError(f"duplicate member {info.filename}")
+            seen.add(rel)
             if stat.S_ISLNK(info.external_attr >> 16):
                 raise ReleaseContractError(f"{info.filename} is a symbolic link")
             if rel == "JimMonoTC.css":
@@ -267,21 +271,36 @@ def fetch(source: str | None) -> bytes:
 
 
 def write(outputs: dict[str, bytes]) -> None:
-    """Stage the font tree beside FONT_DIR, swap it in, then write the sheet."""
+    """Stage the font tree and the sheet beside their targets, then swap them in.
+
+    The old tree is renamed aside (not deleted) before the new one takes its
+    place and only removed afterwards, and the sheet is replaced atomically
+    last, so an interrupted run leaves either the old or the new outputs in
+    place plus, at worst, an untracked ``.tmp`` / ``.old`` sibling.
+    """
     staging = FONT_DIR.with_name(FONT_DIR.name + ".tmp")
-    shutil.rmtree(staging, ignore_errors=True)
+    retired = FONT_DIR.with_name(FONT_DIR.name + ".old")
+    css_staging = CSS_PATH.with_name(CSS_PATH.name + ".tmp")
     prefix = "fonts/jimmonotc/"
-    for rel, data in sorted(outputs.items()):
-        if rel.startswith(prefix):
-            path = staging / rel.removeprefix(prefix)
-            if not path.resolve().is_relative_to(staging.resolve()):
-                raise SystemExit(f"refusing to write outside {FONT_DIR}: {rel}")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
-    shutil.rmtree(FONT_DIR, ignore_errors=True)
-    os.replace(staging, FONT_DIR)
-    # The stylesheet goes last, so it never references a tree not yet in place.
-    CSS_PATH.write_bytes(outputs["styles/fonts-mono.css"])
+    shutil.rmtree(staging, ignore_errors=True)
+    shutil.rmtree(retired, ignore_errors=True)
+    try:
+        for rel, data in sorted(outputs.items()):
+            if rel.startswith(prefix):
+                path = staging / rel.removeprefix(prefix)
+                if not path.resolve().is_relative_to(staging.resolve()):
+                    raise SystemExit(f"refusing to write outside {FONT_DIR}: {rel}")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+        css_staging.write_bytes(outputs["styles/fonts-mono.css"])
+        if FONT_DIR.exists():
+            os.replace(FONT_DIR, retired)
+        os.replace(staging, FONT_DIR)
+        os.replace(css_staging, CSS_PATH)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+        css_staging.unlink(missing_ok=True)
+    shutil.rmtree(retired, ignore_errors=True)
 
 
 def main(argv: list[str]) -> int:

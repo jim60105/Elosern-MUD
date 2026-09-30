@@ -124,6 +124,14 @@ class MonoFontContractTest(unittest.TestCase):
                 self.assertEqual(one, set(self.manifest[key]))
                 self.assertEqual(cjk, set(self.manifest["cjk"][key]))
 
+    def test_the_weights_differ_only_in_the_known_one_cell_extras(self):
+        # The map cell table uses the Regular set; Bold draws the same one-cell
+        # characters except these three, plus extra latin-ext glyphs. A new
+        # release that drops more from Bold (bold HTML would then fall back to
+        # Noto Sans TC off the cell grid) fails here and must be reviewed.
+        regular, bold = set(self.manifest["regular"]), set(self.manifest["bold"])
+        self.assertEqual(regular - bold, {0x03F6, 0x2215, 0x2219})
+
     def test_both_weights_declare_the_same_cjk(self):
         cjk = self.manifest["cjk"]
         self.assertEqual(cjk["regular"], cjk["bold"])
