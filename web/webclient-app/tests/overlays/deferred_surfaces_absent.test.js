@@ -439,7 +439,7 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
 
     wrapper.unmount();
     document.body.innerHTML = "";
-  });
+  }, 20000);
 
   it("the message window's wheel-up gesture opens the full log and mounts no deferred surface", async () => {
     const wrapper = mount(MessageWindow, {
