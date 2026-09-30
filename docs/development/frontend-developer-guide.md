@@ -37,8 +37,10 @@ web/webclient-app/
   lib/*.js                                      封裝 js/elosern/* 的 ESM 包裝器 (CJS 互通)
   styles/tokens.css                             設計系統 tokens (D6)
   styles/fonts.css                              自我代管的 @font-face (D6)
+  styles/fonts-hack.css                         Hack 等寬字體的 @font-face（由產生器輸出，勿手動編輯）
   styles/app-shell.css                          存根頁面外觀樣式
   fonts/{iansui,notosans,notoserif}/*.woff2     擷取自設計稿的子集化字型
+  fonts/hack/*.woff2 + LICENSE.md               Hack 等寬字體的 unicode-range 切片與授權
   component-manifest.json                       必要 Story 清單 (B1 植入初始值，B5 凍結)
   tests/*.test.js                               Vitest 元件閘門
   stories/**                                    Storybook stories (自 B 波次起)
@@ -61,6 +63,18 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 3. **不得引入執行期 npm 或 pnpm 相依套件。** `package.json` 必須維持僅有 `devDependencies` 的結構；Node 閘門保持無外部相依。
 4. **執行瀏覽器測試前必須先建置 dist。** 受管瀏覽器套件會直接從工作樹提供靜態檔案；未執行 `pnpm run build` 會導致 Vue 分支檢查失敗（CI 會在兩個工作區中自動建置）。
 5. **XOR 旗標採互斥載入。** 每個頁面只啟用一種檢視堆疊，`webclient_vue_enabled`（脈絡變數）會挑選 Vue 組合包**或**舊版復原分支（D10 原生文字主控台，無檢視程式碼）。正式環境預設為 **Vue 組合包**（於 C4 切換）；舊版分支僅能透過復原機制進入。`?__vue=1` 可強制切換至 Vue 分支以供審查或離線載入檢查；`ELOSERN_BROWSER_VUE_CLIENT=1`（瀏覽器測試設定）為 C3 使用的測試設定開關。
+
+## 等寬字體（Hack）
+
+`--f-mono` 為 `"Hack", "Noto Sans TC", monospace`：拉丁字母、數字、箭頭與框線字元由自我代管的 Hack 繪製，CJK 由自我代管的 Noto Sans TC 繪製，不依賴玩家電腦安裝的字型。Hack v3.003 以常規與粗體各五個 unicode-range `.woff2` 切片（`latin`、`latin-ext`、`greek-cyrillic`、`box`、`symbols`，每個介於 4 KB 與 40 KB 之間）提供，頁面只下載實際繪製到的切片。
+
+切片、`LICENSE.md`、`codepoints.json` 與 `styles/fonts-hack.css` 皆由產生器輸出並提交至版本庫，請勿手動編輯。需要重新產生時執行：
+
+```sh
+uv run --script tools/gen_hack_font_slices.py
+```
+
+產生器會下載上游 release 並驗證釘選的 SHA-256，輸出的位元組可重現（重新執行後 `git status` 應保持乾淨）。`tests/test_hack_font_slices_contract.py` 檢查切片大小、範圍互不重疊且涵蓋 Hack 全部字元。
 
 ## 瀏覽器（受管執行期）測試
 

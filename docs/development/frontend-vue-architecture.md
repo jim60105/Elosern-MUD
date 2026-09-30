@@ -37,7 +37,7 @@ Vite 會輸出**穩定、非雜湊的進入點名稱**（`webclient/app/dist/ind
 Vue 應用程式保留 OOB 與瀏覽器契約已相依的識別碼（可聚焦的 `#action-dock`、`action-` 與 `target-` 項目鍵、戰鬥列 id 模式、必要的面板外觀 id）；其他所有外觀均提供穩定的 `data-testid`。這可維持現有的 Playwright 切片及其可追溯性測試正常運作，直到 C4 重新對應其餘部分。
 
 ### D6 — 設計稿為具約束力的視覺與 IA 參考
-經過驗證的單畫面設計稿（`docs/design/elosern-redesign/`，`index.html` + `REDESIGN.md`）是客戶端視覺語言與資訊架構的**具約束力**參考，不只是設計系統的來源。其 tokens 位於 `web/webclient-app/styles/tokens.css`（墨夜色盤、單一印紅強調色、金色焦點、排版級距、間距、動態效果），自我代管的子集化 `.woff2` 字型（Iansui、Noto Serif TC、Noto Sans TC unicode 範圍切片）位於 `web/webclient-app/fonts/`。`prefers-reduced-motion` 與非純顏色的狀態標記在 token 與工具類別層級強制執行（`.status-marker--*`），維持其可測試性。
+經過驗證的單畫面設計稿（`docs/design/elosern-redesign/`，`index.html` + `REDESIGN.md`）是客戶端視覺語言與資訊架構的**具約束力**參考，不只是設計系統的來源。其 tokens 位於 `web/webclient-app/styles/tokens.css`（墨夜色盤、單一印紅強調色、金色焦點、排版級距、間距、動態效果），自我代管的子集化 `.woff2` 字型（Iansui、Noto Serif TC、Noto Sans TC unicode 範圍切片，以及作為等寬字體的 Hack 切片）位於 `web/webclient-app/fonts/`。`prefers-reduced-motion` 與非純顏色的狀態標記在 token 與工具類別層級強制執行（`.status-marker--*`），維持其可測試性。
 
 ### D7 — 測試策略：四道閘門
 - **Node 閘門（維持不變，邏輯）：** `node --test web/static/webclient/js/tests/*.test.js`，無相依套件。

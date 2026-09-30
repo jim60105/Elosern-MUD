@@ -14,7 +14,7 @@
   - Entry point steps:
     1. Download `Hack-v3.003-ttf.tar.xz` and the tag's `LICENSE.md` and verify both D1 SHA-256 values.
     2. Open the TTFs with `TTFont(..., recalcTimestamp=False)`.
-    3. Subset with hints kept, `TTFA` dropped, name IDs 0–6/13/14, and `font.flavor = "woff2"` before save.
+    3. Subset with hinting stripped (D3), `TTFA` dropped, name IDs 0–6/13/14, and `font.flavor = "woff2"` before save.
     4. Slice twice and fail if the bytes differ.
     5. Write the slices, `LICENSE.md`, and a code-point manifest (`fonts/hack/codepoints.json`: Hack's cmap code points minus the exclusion set U+0000/U+000D/U+FEFF, per weight). Fail if any manifest code point is unclaimed or if the declared ranges of one weight overlap.
     6. Print a size table and fail if any slice exceeds 40960 bytes or is under 4096 bytes.
@@ -78,7 +78,7 @@
 
 ## 5. Map and layout re-verification (no 跑版)
 
-- [ ] 5.1 Re-run the map geometry oracle as focused methods, one method per command (never a whole file; each within the 10-minute cap). Verify: every method passes and no assertion was loosened.
+- [x] 5.1 Re-run the map geometry oracle as focused methods, one method per command (never a whole file; each within the 10-minute cap). Verify: every method passes and no assertion was loosened.
   - `test_browser_local_map_lattice`:
     - `test_densely_populated_lattice_scales_down_without_reintroducing_overlap`
     - `test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas`
@@ -88,17 +88,17 @@
     - `test_island_type_ladder_stays_under_its_own_chrome_step`
   - `test_browser_map_legibility`: each of its three methods.
   - `test_browser_local_map_layout_variants.test_walked_instance_layer_renders_radial_on_both_surfaces`
-- [ ] 5.2 Re-run the text-height-sensitive tests as focused single methods. Verify: all pass.
+- [x] 5.2 Re-run the text-height-sensitive tests as focused single methods. Verify: all pass.
   - `test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports`
   - the command-line tests in `test_browser_shell_command_line`
   - the `test_browser_contextual_hud_stage` method that renders the `┌───┬───┐` grid
   - the remaining `test_vue_typography` methods, after a fresh Storybook build. This covers the stories that set `--f-mono` directly: `ActionDock.stories.js`, `HudDrawer.stories.js`, `MessageWindow.stories.js`.
-- [ ] 5.3 Update the docs:
+- [x] 5.3 Update the docs:
   - `docs/development/frontend-developer-guide.md`: the tree lists `fonts/{iansui,notosans,notoserif,hack}/*.woff2` and `styles/fonts-hack.css`, and the guide explains how to regenerate the fonts with `uv run --script tools/gen_hack_font_slices.py`.
   - `docs/development/frontend-vue-architecture.md`: the self-hosted-font sentence names Hack as the monospace face.
 
   Verify: `git grep -n -i "hack" docs/development` shows both updates.
-- [ ] 5.4 Capture the D8 after-screenshots with agent-browser at both viewports, plus the cold-cache box-grid load, and compare each against its 1.1 baseline. Surfaces:
+- [x] 5.4 Capture the D8 after-screenshots with agent-browser at both viewports, plus the cold-cache box-grid load, and compare each against its 1.1 baseline. Surfaces:
   - keycaps and the dock legend;
   - the command line with `look north 看看 42`;
   - the help overlay, including the arrow rows;
@@ -116,7 +116,7 @@
 
 ## 6. Gates
 
-- [ ] 6.1 Run the full gates. Verify: all green.
+- [x] 6.1 Run the full gates. Verify: all green.
   - `CI=true pnpm test`
   - `uv run --locked python -m unittest discover -s tests -t .`
   - `uv run --locked python -m tools.contract_gate manifests contracts`

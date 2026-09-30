@@ -171,7 +171,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         legend = page.locator(".action-dock__legend kbd").first
         if not (legend.count() and legend.is_visible()):
             page.get_by_test_id("command-line-toggle").click()
-            page.locator(".cmdfield__prompt").first.wait_for(state="visible")
+            page.locator("#inputfield").wait_for(state="visible")
         page.wait_for_function(
             "() => document.fonts.ready.then(() => [...document.fonts].some("
             "f => f.family.replace(/[\"']/g, '') === 'Hack' && f.status === 'loaded'))",

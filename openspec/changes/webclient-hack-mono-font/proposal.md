@@ -48,7 +48,7 @@ license) as the monospace face.
 
 ## Impact
 
-- **Assets**: new `web/webclient-app/fonts/hack/` (10 woff2 slices, about 250 KB total, plus
+- **Assets**: new `web/webclient-app/fonts/hack/` (10 woff2 slices, about 152 KB total, plus
   `LICENSE.md`); the Vite build copies them into `web/static/webclient/app/dist/assets/` like the
   existing slices.
 - **Styles**: `web/webclient-app/styles/tokens.css` (`--f-mono`), a new generated

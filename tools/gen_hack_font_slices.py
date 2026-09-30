@@ -17,7 +17,7 @@ produce them (openspec change ``webclient-hack-mono-font``, design D1-D6):
 1. download the upstream v3.003 TTF release and the tag's ``LICENSE.md`` and
    verify both pinned SHA-256 digests;
 2. assign each Hack code point to the first slice whose claim window holds it;
-3. subset each (weight, slice) with fontTools, keeping the TrueType hinting,
+3. subset each (weight, slice) with fontTools, without TrueType hinting,
    into woff2 with the upstream ``head.modified`` timestamp kept, twice, and
    fail if the two byte streams differ;
 4. write the slices, the license, a per-weight code-point manifest, and the
@@ -184,7 +184,10 @@ def _subset(ttf: bytes, codepoints: list[int]) -> bytes:
     options.name_languages = [0x409]
     options.glyph_names = False
     options.notdef_outline = True
-    options.hinting = True
+    # Hack's ttfautohint instructions snap box-drawing strokes to different
+    # pixel rows under a full-hinting rasterizer, so grid maps stop joining;
+    # unhinted outlines render the same everywhere (and are ~40% smaller).
+    options.hinting = False
     options.drop_tables = [*options.drop_tables, "TTFA"]
     subsetter = subset.Subsetter(options)
     subsetter.populate(unicodes=codepoints)

@@ -97,19 +97,20 @@ Browsers resolve overlapping `unicode-range` declarations by last-declared-wins,
 *declared* ranges therefore must never overlap. The generator emits them from the disjoint claimed sets,
 collapsed into runs.
 
-| Slice | Claim window (not the declared range) | Hinted size R / B (research) |
+| Slice | Claim window (not the declared range) | Unhinted size R / B |
 | --- | --- | --- |
-| `latin` | U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201F, U+2022, U+2026, U+2039-203A, U+20AC, U+2122, U+2190-2193, U+FFFD | 23.0 / 23.5 KB |
-| `latin-ext` | U+0100-036F, U+0E3F, U+1E00-1EFF, U+2000-218F, U+2C60-2C7F | 26.0 / 28.3 KB |
-| `greek-cyrillic` | U+0370-03FF, U+0400-058F, U+10A0-10FF, U+1F00-1FFF | 28.2 / 26.8 KB |
-| `box` | U+2500-259F | 8.8 / 8.8 KB |
-| `symbols` | U+2190-23FF, U+25A0-2BFF, U+2E00-2E7F, U+E000-F8FF | 33.2 / 33.2 KB |
+| `latin` | U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201F, U+2022, U+2026, U+2039-203A, U+20AC, U+2122, U+2190-2193, U+FFFD | 13.6 / 13.9 KB |
+| `latin-ext` | U+0100-036F, U+0E3F, U+1E00-1EFF, U+2000-218F, U+2C60-2C7F | 14.6 / 16.3 KB |
+| `greek-cyrillic` | U+0370-03FF, U+0400-058F, U+10A0-10FF, U+1F00-1FFF | 20.4 / 20.8 KB |
+| `box` | U+2500-259F | 4.1 / 4.1 KB |
+| `symbols` | U+2190-23FF, U+25A0-2BFF, U+2E00-2E7F, U+E000-F8FF | 20.4 / 20.2 KB |
 
 - **Arrows in `latin`.** Keycaps show ←↑→↓ on first paint, so the hot path fetches only one file.
 - **Fallback for missing glyphs.** A slice declares only code points it actually contains. Code points
   Hack lacks, such as ⌨ and ✕, therefore fall through to Noto Sans TC.
-- **Size.** About 250 KB in total. The largest slice is 33 KB, under the 40 KB ceiling in the spec.
-  No slice is under 4 KB, so Vite emits every slice as its own file and inlines none.
+- **Size.** About 152 KB in total, unhinted (D3). The largest slice is 21 KB, under the 40 KB ceiling
+  in the spec. No slice is under 4096 bytes, so Vite emits every slice as its own file and inlines
+  none.
 
 Three cmap entries are excluded on purpose: U+0000, U+000D, and U+FEFF (the byte-order mark, a
 default-ignorable format character that needs no glyph). The generator and the contract test share
@@ -125,15 +126,21 @@ cmaps differ (1548 and 1624 entries), so the manifest is kept per weight.
 *Alternative:* a Google-style split into ~100 tiny slices. Rejected. Hack has only 1548 code points, so
 that many slices would add request overhead with no gain.
 
-### D3. Keep Hack's TrueType hinting
+### D3. Strip Hack's TrueType hinting
 
-Hack ships ttfautohint instructions tuned for code at 10–13 px. That is our monospace range
-(`--text-xs`/`--text-sm`, 11 px map labels).
+Hack ships ttfautohint instructions tuned for code at 10–13 px. The research plan kept them. The
+implementation's visual check reversed that decision. Under a full-hinting rasterizer (Playwright's
+headless Chromium shell on Linux), the hinted box slice snaps `─`, `┬`, `┼`, and `│` to different pixel
+rows and columns, so the message-page box grid stops joining: horizontal strokes break at every
+junction. The same page with unhinted slices joins cleanly in both that shell and desktop Chrome.
+Platforms that ignore most horizontal hinting (DirectWrite, Core Text, slight-hinting FreeType) render
+unhinted outlines the same way, so dropping the hints trades nothing visible for consistent grids.
 
-Stripping the hints makes each slice about 40% smaller (latin 14 KB, box 4.3 KB). The cost is worse
-rendering on Windows' hinted rasterizer, and every slice already fits under the ceiling with hints kept.
+Unhinted slices are also about 40% smaller: about 152 KB for all ten, the latin slice 14 KB, the
+largest 21 KB, and the box slice about 4.2 KB. The box slice sits just above Vite's 4096-byte inline
+limit, and the slice-contract test's lower bound catches it if it ever drops below.
 
-The generator drops:
+The generator also drops:
 
 - the `TTFA` table (ttfautohint's parameter record, not used at runtime);
 - glyph names.
@@ -168,8 +175,8 @@ reach it.
 
 1. **Download.** Fetches the archive and the license (D1) into a temporary directory and verifies both
    checksums.
-2. **Slice.** Cuts each slice with `fontTools.subset` (`layout_features=['*']`, hinting kept,
-   `notdef_outline`). It sets `font.flavor = "woff2"` before saving; in the research run the subsetter
+2. **Slice.** Cuts each slice with `fontTools.subset` (`layout_features=['*']`,
+   `notdef_outline`, hinting stripped per D3). It sets `font.flavor = "woff2"` before saving; in the research run the subsetter
    option alone did not produce woff2.
 3. **Pin timestamps.** Opens fonts with `TTFont(path, recalcTimestamp=False)` so `head.modified` keeps
    the upstream value. By default fontTools rewrites it to the current time on every save, and every
@@ -312,7 +319,7 @@ only indexes `openspec/specs/`, so a decorator naming the ID before the delta is
 - **[Fallback text flashes while a slice loads (`font-display: swap`)]**
   - Until a slice arrives, monospace Latin draws with Noto Sans TC, which is proportional, so box art
     can be briefly misaligned on a cold cache.
-  - Slices come from the same origin, are cached immutably by hash, and are at most 33 KB.
+  - Slices come from the same origin, are cached immutably by hash, and are at most 21 KB.
   - Mitigation: judge the D8 cold-cache capture by eye. If the flash is objectionable, set
     `font-display: block` on the `box` slice only. Preload stays a Non-Goal.
 - **[A UI glyph Hack lacks (⌨ U+2328, ✕ U+2715, 「」) now falls back differently]**
