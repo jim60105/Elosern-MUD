@@ -76,6 +76,7 @@ OVERLAYS_STORY_IDS = {
     "overlays-creationoverlay--custom-sex-roll",
     "overlays-creationoverlay--proposal",
     "overlays-creationoverlay--unavailable",
+    "overlays-creationoverlay--storyboard",
     "overlays-partydrawer--two-companions",
     "overlays-partydrawer--empty-party",
     "overlays-partydrawer--full-party",
