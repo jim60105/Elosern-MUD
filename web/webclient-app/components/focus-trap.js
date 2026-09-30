@@ -91,9 +91,14 @@ export function createFocusTrap(containerEl, options = {}) {
       return;
     }
     const activeIndex = focusables.indexOf(document.activeElement);
-    const next = event.shiftKey
-      ? focusables[(activeIndex - 1 + focusables.length) % focusables.length]
-      : focusables[(activeIndex + 1) % focusables.length];
+    // Focus on a non-member (the surface itself after a click on its chrome)
+    // enters at the first control forward and the last backward.
+    const next =
+      activeIndex === -1
+        ? focusables[event.shiftKey ? focusables.length - 1 : 0]
+        : event.shiftKey
+          ? focusables[(activeIndex - 1 + focusables.length) % focusables.length]
+          : focusables[(activeIndex + 1) % focusables.length];
     next.focus();
   }
 

@@ -109,6 +109,11 @@
       page, so capacity follows these values rather than a line count. */
    --message-line-height: 1.5;
    --message-paragraph-gap: 0.45em;
+   /* The full log's reading size (webclient-full-log-frame): a reference
+      surface read at 20px at 1080, below the 28px page, on the same 42em
+      measure. The log multiplies it by `--prose-scale`; its header, footer
+      and 回到最新 control are chrome and never scale. */
+   --log-text: clamp(17px, 1.852vh, 26px);
    --message-controls-h: 36px;
    /* The bottom band's shared control strip (webclient-band-material-pass):
       the message window's marker / 日誌 / ⌨ row and the dock's shortcut

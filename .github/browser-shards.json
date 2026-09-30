@@ -131,6 +131,7 @@
         "web.tests.browser.test_browser_art.ArtImageLoadFailureTest.test_image_load_failure_shows_fallback_without_refetch",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_catalog_echo_never_alters_the_ui_action_envelope",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_first_log_line_needs_no_divider",
+        "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_full_log_frame_returns_to_latest_without_touching_the_reader",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_markup_like_labels_render_as_literal_text",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_page_types_and_completes",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_message_window_repages_on_resize",

@@ -1348,10 +1348,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
 
-        # Assert scrollTop + clientHeight >= scrollHeight - 1
+        # The log's scroll region is at its end: scrollTop + clientHeight >= scrollHeight - 1
         scroll_status = page.evaluate(
             """() => {
-              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              const el = document.querySelector('[data-testid="fulllog-scroll"]');
               const lines = el.querySelectorAll('.narrative-line');
               const lastLine = lines[lines.length - 1];
               const overlayBox = el.getBoundingClientRect();
@@ -1370,7 +1370,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # Scroll to top
         page.evaluate(
             """() => {
-              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              const el = document.querySelector('[data-testid="fulllog-scroll"]');
               el.scrollTop = 0;
             }"""
         )
@@ -1381,7 +1381,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         # Assert scrollTop is unchanged
-        st = page.evaluate("() => document.querySelector('[data-testid=\"fulllog-overlay\"]').scrollTop")
+        st = page.evaluate("() => document.querySelector('[data-testid=\"fulllog-scroll\"]').scrollTop")
         self.assertEqual(st, 0, "appending a line while open must leave scroll position unchanged")
 
         # Close log
@@ -1393,7 +1393,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector('[data-testid="fulllog-overlay"]', timeout=15000)
         at_bottom_again = page.evaluate(
             """() => {
-              const el = document.querySelector('[data-testid="fulllog-overlay"]');
+              const el = document.querySelector('[data-testid="fulllog-scroll"]');
               return el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
             }"""
         )

@@ -23,6 +23,9 @@ defineProps({
   // A host kept mounted while closed takes its close control out of the
   // tab order.
   closeTabindex: { type: Number, default: 0 },
+  // An optional id for the title, so the host dialog can be labelled by it
+  // (`aria-labelledby`).
+  titleId: { type: String, default: null },
 });
 const emit = defineEmits(["close"]);
 
@@ -39,7 +42,7 @@ defineExpose({ closeButton });
         <path :d="glyphPath(icon)" stroke="currentColor" stroke-width="1.7" v-bind="glyphAttrs(icon)" />
       </svg>
     </span>
-    <h3 class="drawer-header__title" :data-testid="`${surface}__title`">{{ title }}</h3>
+    <h3 :id="titleId" class="drawer-header__title" :data-testid="`${surface}__title`">{{ title }}</h3>
     <p v-if="subtitle" class="drawer-header__subtitle" :title="subtitle">{{ subtitle }}</p>
     <button
       ref="closeButton"

@@ -6,7 +6,8 @@ line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
 follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
 content, §5.4; revised 2026-09-30 with the A12 map legibility, §11, and the
 A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4;
-revised 2026-09-30 with the A14 settings reading preview and switches, §6.4)
+revised 2026-09-30 with the A14 settings reading preview and switches, §6.4,
+and the A15 full-log frame and return-to-latest control, §6.3)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -230,7 +231,7 @@ the name in the switcher.
 | `DialogueChoices` (new) | The centred dialogue choice list (§8.2). |
 | `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
 | `CommandLine` | Collapsible (§5.5). |
-| `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay and gallery editor: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
+| `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay, gallery editor and (A15) the full log: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
 | `EmptyState` (new, A11 `webclient-drawer-content-polish`) | The one presentational body of an available but empty drawer list (quest book, codex, bag items, party): decorative registry glyph, headline, one guidance line in a solid ink frame; no control of its own. An unavailable panel keeps its registry reason instead. |
 | `ReadingSample` (new, A14 `webclient-settings-reading-preview`) | The settings overlay's local reading preview: one fixed line in the page face, size and leading at the chosen prose scale, typed through its own `useTypewriter` at the shared `effectiveCps` rule, with a caption and 重播; it reaches no store, log or reader, and unmounting stops its clock. |
 
@@ -401,6 +402,18 @@ never mutates the log and never reaches the server.
 - **Log:** the `日誌` button, or scrolling up when the page has nothing left to
   scroll, opens the full log, which opens scrolled to its latest line. New lines
   arriving while the log is open do not move the reader.
+  Frame (A15, `webclient-full-log-frame`): the log sits in the shared
+  reference workspace under `DrawerHeader` (the `log` glyph, 日誌), over a
+  whole-viewport scrim that absorbs pointer input without closing; it keeps
+  its own focus trap, Escape and opener restore, and its one scroll region
+  takes the initial focus. The lines read as one centred 42em column at
+  `--log-text` (20px at 1080, times the prose scale), with the message
+  window's prose styling; each input echo is styled in place as its
+  response's heading after the divider hairline, and wide maps scroll inside
+  their own block. While the reader is above the end, a footer strip outside
+  the text offers 回到最新 — reading 新內容 once a line has arrived (keyed on
+  the newest line's `seq`, which survives the 500-line trim) — which scrolls
+  the log only.
 - **Acting while reading:** any action is accepted immediately. As soon as the
   action is out (its mark), typing stops and the previous response's last page
   shows complete; the new response starts on page 1 when its lines arrive.
