@@ -30,7 +30,7 @@
   - as a shell step, `rm -rf .storybook-out` and rebuild;
   - the method passes alone through `web.tests.browser.unittest_driver`;
   - with `--f-mono` temporarily reverted to the Hack stack, it fails.
-- [ ] 3.2 Add `test_monospace_cells_are_exact` (D5) and register it in `.github/browser-shards.json`. Verify: it passes alone, and `uv run --locked python -m unittest tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract` passes.
+- [ ] 3.2 Add `test_monospace_cells_are_exact` (D5); `.github/browser-shards.json` owns it through the existing `VueTypographyBrowserTest` class label. Verify: it passes alone, and `uv run --locked python -m unittest tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract` passes.
 - [ ] 3.3 Update `test_vue_foundation` to `_assert_only_needed_mono_slices` with the D5 names and family. Verify: `test_vue_bundle_loads_from_origin_offline` passes alone.
 - [ ] 3.4 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate` on the branch. The Hack ID stays on the kept tests (D8). Verify: both pass.
 

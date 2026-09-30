@@ -94,7 +94,8 @@ Rejected by the owner: the font's own release should serve the web directly.
 
 - **Inputs.** Module constants pin the release URL and SHA-256 (from `SHA256SUMS.txt`). Standard
   library only (`urllib`, `hashlib`, `zipfile`, `re`, `json`, `unicodedata`), run as
-  `uv run --locked python -m tools.import_mono_font`. Network access is needed only to regenerate.
+  `uv run --locked python -m tools.import_mono_font`. Network access is needed only to regenerate; a local copy of the
+  asset may be passed as the only argument instead, and its SHA-256 is verified the same way.
 - **Selection.** Styles `Regular` (400) and `Bold` (700). Groups `latin`, `latin-ext`,
   `greek-cyrillic`, `box`, `symbols`, and `cjk-<N>` with a numeric `N`. `icons-*` and `cjk-x*` are
   dropped. File names are kept verbatim.
@@ -123,8 +124,9 @@ Rejected by the owner: the font's own release should serve the web directly.
   - `tests/test_mono_font_contract.py` (committed files): URLs resolve and every file is referenced;
     `wOF2` magic and the 64 KB bound; disjoint ranges per weight whose union equals one-cell ∪ `cjk`;
     `cjk.regular == cjk.bold`, with the count pinned to the imported value; the CJK union equals the
-    Noto weight-400 coverage intersected with (`cjk` ∪ `noto_wide_missing`); no private-use code point
-    declared; the licence files; and the exact `--f-mono` stack (D6).
+    East Asian Wide/Fullwidth code points of the Noto weight-400 coverage minus `noto_wide_missing`
+    (so every declared CJK code point lies in that coverage, and `noto_wide_missing` is disjoint from
+    `cjk`); no private-use code point declared; the licence files; and the exact `--f-mono` stack (D6).
 
 ### D2. Wiring and stack
 
@@ -165,8 +167,9 @@ The browser tests' Hack names change with D5.
 
   The input reports no non-custom font and no `Noto Sans TC`. `rendered_fonts` preloads
   `16px "Jim Mono TC"` instead of Hack.
-- **Cell advances**, a new method `test_monospace_cells_are_exact` registered in
-  `.github/browser-shards.json` under the class's shard.
+- **Cell advances**, a new method `test_monospace_cells_are_exact`. `.github/browser-shards.json`
+  already owns `VueTypographyBrowserTest` by its class label, so the new method is owned without an
+  edit (a method label would overlap the class label and fail the ownership contract).
   - It renders the populated-HUD story and appends a probe `<span>` to `#storybook-root` with
     `font: 20px/1 var(--f-mono); white-space: pre`, once at `font-weight: 400` and once at `700`.
   - After `document.fonts.load` of `20px "Jim Mono TC"` with the probe text in each weight, it measures

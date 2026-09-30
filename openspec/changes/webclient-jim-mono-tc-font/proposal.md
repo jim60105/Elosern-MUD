@@ -88,7 +88,7 @@ release. This change imports that release; it does not cut fonts itself.
   constant; deletes `tools/gen_hack_font_slices.py`.
 - **Tests**:
   - new: `tests/test_mono_font_import_tool.py` and `tests/test_mono_font_contract.py`;
-  - `web/tests/browser/test_vue_typography.py` (plus a new method registered in
+  - `web/tests/browser/test_vue_typography.py` (plus a new method, already owned by the class's label in
     `.github/browser-shards.json`);
   - `web/tests/browser/test_vue_foundation.py`;
   - `tests/test_mono_cells_table.py`, regenerated;
