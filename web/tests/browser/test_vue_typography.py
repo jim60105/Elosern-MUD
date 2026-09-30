@@ -112,13 +112,67 @@ class VueTypographyBrowserTest(unittest.TestCase):
             for index in (1, 2):
                 self.assertAlmostEqual(before["vitals"][index]["width"], after["vitals"][index]["width"], delta=0.5)
 
+    def rendered_fonts(self, selector):
+        """CDP platform fonts drawing `selector`'s text, as (familyName, isCustomFont).
+
+        A fresh pierced document is taken on every call: typing replaces the
+        text node inside a textarea's user-agent shadow root, so older node
+        ids go stale. A form control reports no fonts itself; its UA shadow
+        DIV and that DIV's text child do. A missing CDP method raises, so the
+        check fails rather than skipping (the suite is Chromium-only).
+        """
+        self.page.evaluate("document.fonts.ready")
+        cdp = self.page.context.new_cdp_session(self.page)
+        cdp.send("DOM.enable")
+        cdp.send("CSS.enable")
+        root = cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})["root"]
+        node_id = cdp.send("DOM.querySelector", {"nodeId": root["nodeId"], "selector": selector})["nodeId"]
+        self.assertTrue(node_id, selector)
+
+        def find(node):
+            if node["nodeId"] == node_id:
+                return node
+            for child in node.get("children", []) + node.get("shadowRoots", []):
+                found = find(child)
+                if found:
+                    return found
+            return None
+
+        nodes = [find(root)]
+        for shadow in nodes[0].get("shadowRoots", []):
+            if shadow.get("shadowRootType") == "user-agent":
+                for child in shadow.get("children", []):
+                    nodes += [child, *child.get("children", [])]
+        fonts = set()
+        for node in nodes:
+            for font in cdp.send("CSS.getPlatformFontsForNode", {"nodeId": node["nodeId"]})["fonts"]:
+                fonts.add((font["familyName"], font["isCustomFont"]))
+        cdp.detach()
+        return fonts
+
+    def assertBundledFace(self, fonts, family):
+        """Some bundled web font (not a machine font) named `family*` draws the text."""
+        self.assertTrue(
+            any(name.startswith(family) and custom for name, custom in fonts),
+            f"no bundled {family} face in {sorted(fonts)}",
+        )
+
     def test_keycaps_and_command_input_keep_monospace(self):
         self.story("core-appshell--populated-hud", ".vitals")
         self.assertIn("monospace", self.page.locator("kbd").first.evaluate("e => getComputedStyle(e).fontFamily"))
+        self.assertBundledFace(self.rendered_fonts("kbd"), "Hack")
         self.page.get_by_role("button", name="指令列", exact=True).click()
         field = self.page.locator("#inputfield")
         field.wait_for(state="visible")
         self.assertIn("monospace", field.evaluate("e => getComputedStyle(e).fontFamily"))
         self.assertTrue(field.evaluate("e => e === document.activeElement"))
+        self.assertBundledFace(self.rendered_fonts(".cmdfield__prompt"), "Hack")
+        # Latin draws in the bundled Hack slices and CJK in the bundled Noto
+        # Sans TC slices; no machine-installed monospace family is used.
+        self.page.keyboard.type("look 42 看看")
+        typed = self.rendered_fonts("#inputfield")
+        self.assertBundledFace(typed, "Hack")
+        self.assertBundledFace(typed, "Noto Sans TC")
+        self.assertEqual({name for name, custom in typed if not custom}, set())
         self.page.keyboard.press("Escape")
         self.assertTrue(self.page.locator("#action-dock").evaluate("e => e === document.activeElement"))

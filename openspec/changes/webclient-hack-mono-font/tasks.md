@@ -58,7 +58,7 @@
   - `--f-mono` equals the D5 stack.
 
   Verify: `uv run --locked python -m unittest tests.test_hack_font_slices_contract` passes. Temporarily deleting one slice or adding an overlapping range makes it fail.
-- [ ] 4.2 Extend `web/tests/browser/test_vue_typography.py::VueTypographyBrowserTest::test_keycaps_and_command_input_keep_monospace` with the D7 CDP check:
+- [x] 4.2 Extend `web/tests/browser/test_vue_typography.py::VueTypographyBrowserTest::test_keycaps_and_command_input_keep_monospace` with the D7 CDP check:
   - run after `document.fonts.ready`, then `DOM.enable`, `CSS.enable`, `DOM.getDocument`, `DOM.querySelector`, `CSS.getPlatformFontsForNode`;
   - the first `kbd`, `.cmdfield__prompt`, and `#inputfield` report a font whose `familyName` starts with `Hack` and has `isCustomFont`. For `#inputfield` (a `<textarea>`), type `look 42 看看`, take a fresh `DOM.getDocument({depth: -1, pierce: true})`, and read its user-agent shadow `DIV` and that DIV's text child;
   - the same shadow `DIV` also reports a custom font whose `familyName` starts with `Noto Sans TC` (the CJK scenario);
@@ -66,15 +66,15 @@
   - confirm the reported `familyName` string once;
   
   Verify: as a shell step before the run (not inside the test), `rm -rf .storybook-out`; then run the method alone with `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_vue_typography.VueTypographyBrowserTest.test_keycaps_and_command_input_keep_monospace`. It passes. Temporarily reverting `--f-mono` to the old stack, rebuilding Storybook, and re-running makes it fail.
-- [ ] 4.3 Extend `web/tests/browser/test_vue_foundation.py::VueFoundationBrowserTest::test_vue_bundle_loads_from_origin_offline` with the D7 ordering:
+- [x] 4.3 Extend `web/tests/browser/test_vue_foundation.py::VueFoundationBrowserTest::test_vue_bundle_loads_from_origin_offline` with the D7 ordering:
   1. make monospace ASCII text visible: the dock legend `kbd` if it is rendered, otherwise open the command line;
   2. wait for `document.fonts.ready` and for a loaded `FontFace` whose family is Hack;
   3. assert the positive case: an origin response whose slice name, with Vite's `-<hash>` suffix stripped, is exactly `hack-regular.latin`;
   4. assert the negative case: no response whose slice name is `hack-*.greek-cyrillic` or `hack-*.latin-ext`. On failure, list the Hack-styled code points outside `latin`.
 
   Verify: running the method alone through the unittest driver passes.
-- [ ] 4.4 If 4.2 or 4.3 added a new browser test method or class instead of extending an existing one, register it in `.github/browser-shards.json` in the same commit. Do not add the new requirement ID to any `@covers_requirement` decorator yet (see group 7). Verify: `uv run --locked python -m tools.contract_gate manifests contracts` passes.
-- [ ] 4.5 Run `openspec validate webclient-hack-mono-font --strict` now that tests reference the requirement. Verify: valid.
+- [x] 4.4 If 4.2 or 4.3 added a new browser test method or class instead of extending an existing one, register it in `.github/browser-shards.json` in the same commit. Do not add the new requirement ID to any `@covers_requirement` decorator yet (see group 7). Verify: `uv run --locked python -m tools.contract_gate manifests contracts` passes.
+- [x] 4.5 Run `openspec validate webclient-hack-mono-font --strict` now that tests reference the requirement. Verify: valid.
 
 ## 5. Map and layout re-verification (no 跑版)
 

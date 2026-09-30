@@ -159,6 +159,48 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         )
         return page, responses
 
+    def _assert_only_needed_hack_slices(self, page, responses, origin_prefix) -> None:
+        """The monospace Hack face loads lazily, one unicode-range slice at a time.
+
+        Slices are fetched after layout, so the check first puts monospace
+        ASCII on screen (the dock legend keycaps, else the command-line
+        prompt), waits for a loaded Hack FontFace, and only then asserts the
+        origin served the Latin slice and neither the Greek-Cyrillic nor the
+        extended-Latin slice (the live fixture draws no such monospace text).
+        """
+        legend = page.locator(".action-dock__legend kbd").first
+        if not (legend.count() and legend.is_visible()):
+            page.get_by_test_id("command-line-toggle").click()
+            page.locator(".cmdfield__prompt").first.wait_for(state="visible")
+        page.wait_for_function(
+            "() => document.fonts.ready.then(() => [...document.fonts].some("
+            "f => f.family.replace(/[\"']/g, '') === 'Hack' && f.status === 'loaded'))",
+            timeout=15000,
+        )
+        # Vite names a slice `<source stem>-<8-char hash>.woff2`; strip the
+        # hash so `latin` can never match `latin-ext-<hash>`.
+        hack_slices = {
+            re.sub(r"-[\w-]{8}\.woff2$", "", response.url.rsplit("/", 1)[-1])
+            for response in responses
+            if response.status == 200
+            and response.url.startswith(f"{origin_prefix}/static/webclient/app/dist/assets/hack-")
+        }
+        self.assertIn("hack-regular.latin", hack_slices, f"Hack slices served: {sorted(hack_slices)}")
+        unexpected = {
+            name for name in hack_slices
+            if name.endswith((".greek-cyrillic", ".latin-ext"))
+        }
+        if unexpected:
+            drawn = page.evaluate(
+                """() => [...new Set([...document.querySelectorAll('body *')]
+                  .filter(e => /(^|,)\\s*["']?Hack/.test(getComputedStyle(e).fontFamily))
+                  .flatMap(e => [...e.childNodes].filter(n => n.nodeType === 3)
+                    .flatMap(n => [...n.textContent]))
+                  .filter(c => c.codePointAt(0) > 0xff))]
+                  .map(c => c + ' U+' + c.codePointAt(0).toString(16))"""
+            )
+            self.fail(f"unneeded Hack slices {sorted(unexpected)}; non-Latin-1 monospace text: {drawn}")
+
     @covers_requirement(
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps",
         "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa",
@@ -199,6 +241,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             ),
             "no self-hosted woff2 font slice was served from the project origin",
         )
+        self._assert_only_needed_hack_slices(page, responses, origin_prefix)
         self.assertEqual(
             page.get_attribute(VUE_ROOT, "data-elosern-stage"),
             "contextual-hud",
