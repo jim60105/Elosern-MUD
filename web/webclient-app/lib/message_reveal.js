@@ -24,6 +24,17 @@ export function cpsFor(speed) {
     : Infinity;
 }
 
+// The typing rate the reader actually uses: an effective motion level other
+// than `full` shows pages at once whatever the chosen speed, and a speed
+// outside `TEXT_SPEEDS` reads as `normal`. The message window and the
+// settings overlay's reading sample share this one rule.
+export function effectiveCps(motionLevel, textSpeed) {
+  if (motionLevel !== "full") {
+    return Infinity;
+  }
+  return cpsFor(TEXT_SPEEDS.includes(textSpeed) ? textSpeed : "normal");
+}
+
 function fragmentsOf(page) {
   return page && Array.isArray(page.blocks) ? page.blocks : [];
 }

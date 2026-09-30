@@ -153,6 +153,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
+                # The settings overlay's reading preview joined with
+                # webclient-settings-reading-preview.
+                "Overlays/ReadingSample",
                 "Overlays/OverlayHost",
                 "Overlays/PartyStrip",
                 "Overlays/PartyDrawer",

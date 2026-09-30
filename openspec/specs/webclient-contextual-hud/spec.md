@@ -1791,8 +1791,8 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
 The client SHALL expose a narrative prose scale with three steps, selectable from the settings surface,
 whose current step is marked by an indicator that does not rely on colour alone. The scale SHALL apply
-to narrative and dialogue prose only — the message window's page text, the complete-log surface's lines
-and the prompt line — and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text, so the
+to narrative and dialogue prose only — the message window's page text, the complete-log surface's lines,
+the prompt line and the settings surface's reading sample, which previews the page text — and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text, so the
 stage's measured anchor geometry is unaffected at either supported viewport.
 
 The prose scale and every other setting the surface offers SHALL be client-local presentation state. No
@@ -1811,7 +1811,7 @@ The settings surface SHALL offer no control it does not implement.
 
 #### Scenario: The prose scale moves prose and nothing else
 - **WHEN** the player selects the largest prose scale
-- **THEN** the message window's page text, the complete-log surface's lines and the prompt line render larger, every HUD, dock and overlay label is unchanged, and no stage anchor's rendered box intersects another's at 1440x900 or 1280x720
+- **THEN** the message window's page text, the complete-log surface's lines, the prompt line and the settings surface's reading sample render larger, every other HUD, dock and overlay label is unchanged, and no stage anchor's rendered box intersects another's at 1440x900 or 1280x720
 
 #### Scenario: No setting dispatches an action
 - **WHEN** the player changes every control the settings surface offers

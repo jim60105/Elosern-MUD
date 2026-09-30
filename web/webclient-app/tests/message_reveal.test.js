@@ -8,6 +8,7 @@ import {
   autoAdvanceAllowed,
   autoAdvanceDelayMs,
   cpsFor,
+  effectiveCps,
   fragmentReveal,
   offsetAtUnits,
   pageUnits,
@@ -35,6 +36,23 @@ describe("speeds", () => {
     expect(cpsFor("normal")).toBe(45);
     expect(cpsFor("instant")).toBe(Infinity);
   });
+
+// The one typing-rate rule the message window and the settings reading
+// sample share (webclient-settings-reading-preview).
+describe("effectiveCps", () => {
+  it("types at the chosen speed only at the full motion level", () => {
+    expect(effectiveCps("full", "slow")).toBe(20);
+    expect(effectiveCps("full", "fast")).toBe(90);
+    expect(effectiveCps("full", "instant")).toBe(Infinity);
+    expect(effectiveCps("reduced", "slow")).toBe(Infinity);
+    expect(effectiveCps("off", "normal")).toBe(Infinity);
+  });
+
+  it("reads an unknown speed as normal", () => {
+    expect(effectiveCps("full", "warp")).toBe(45);
+    expect(effectiveCps("reduced", "warp")).toBe(Infinity);
+  });
+});
 });
 
 describe("units", () => {

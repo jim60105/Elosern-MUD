@@ -45,6 +45,8 @@ const renderHost = (args) => ({
                   textToHtml: true,
                   motionLevel: "full",
                   colorblind: false,
+                  textSpeed: "normal",
+                  autoAdvance: false,
                 });
               }
               return h(HelpOverlay, { guide: {} });

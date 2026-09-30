@@ -91,9 +91,10 @@
    --lh-narrative: 1.82;
    --lh-dialog: 1.78;
    /* H5 (webclient-hud-05-overlays-and-command-line, design D13): the
-      narrative prose scale. Multiplied into the three prose targets only —
-      the narrative caption's lines, the full-log surface's lines and the
-      command-line prompt line — never into `--text-sm` / `--text-base` or
+      narrative prose scale. Multiplied into the prose targets only — the
+      message window's page text, the full-log surface's lines, the
+      command-line prompt line and the settings reading sample that
+      previews the page text — never into `--text-sm` / `--text-base` or
       any HUD, dock, drawer or overlay chrome. */
    --prose-scale: 1;
    /* The AVG message window's page text (design §5.1/§6.2;
