@@ -30,6 +30,21 @@ describe("PlaceCard", () => {
     expect(wrapper.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 · 12:00");
   });
 
+  it("sets the heading and the time on two levels with a decorative rule and no leading separator", () => {
+    wrapper = mount(PlaceCard, {
+      props: { locationLabel: "測試起點", timeLabel: "春季 3 日 · 12:00" },
+    });
+    const children = [...wrapper.element.querySelectorAll("[data-testid]")].map((el) => el.dataset.testid);
+    expect(children).toEqual(["place-card__location", "place-card__rule", "place-card__time"]);
+    const rule = wrapper.get('[data-testid="place-card__rule"]');
+    expect(rule.attributes("aria-hidden")).toBe("true");
+    expect(rule.text()).toBe("");
+    // The time line renders the committed label verbatim, from its first value.
+    expect(wrapper.get('[data-testid="place-card__time"]').element.textContent).toBe("春季 3 日 · 12:00");
+    const css = readFileSync(join(APP_ROOT, "components/PlaceCard.vue"), "utf8");
+    expect(css).not.toMatch(/place-card__time::before/);
+  });
+
   it("falls back to its placeholders when nothing is committed", () => {
     wrapper = mount(PlaceCard, { props: { locationLabel: null, timeLabel: null } });
     expect(wrapper.get('[data-testid="place-card__location"]').text()).toBe("位置：--");

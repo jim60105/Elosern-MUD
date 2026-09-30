@@ -16,6 +16,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
 import DrawerHeader from "./DrawerHeader.vue";
+import { toolLabel } from "./nav-tools.js";
 
 const props = defineProps({
   // The single open-overlay name (design D8): map | settings | help | lineage | codex.
@@ -38,16 +39,15 @@ let trap = null;
 
 // Per-overlay header copy from the binding design draft (docs/design/
 // elosern-redesign/index.html). The map title carries the committed
-// location label as a suffix; the other titles are static.
+// location label as a suffix; a 工具 overlay's title is its opener's label
+// from the shared tool model, so the header, the opener's accessible name
+// and its tooltip read the same words.
 function titleFor(name) {
   if (name === "map") {
     return props.locationLabel ? `地圖 · ${props.locationLabel}` : "地圖";
   }
   if (name === "settings") return "設定";
-  if (name === "lineage") return "技能系譜";
-  if (name === "codex") return "稱號冊";
-  if (name === "gallery") return "角色肖像圖庫";
-  return "說明";
+  return toolLabel(name) ?? toolLabel("help");
 }
 
 // The header glyph is the registry key of the navigation control that opens

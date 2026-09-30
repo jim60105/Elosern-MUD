@@ -18,11 +18,12 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 
 ### Modified Capabilities
 
-- `webclient-contextual-hud`: Add bounded observable presentation requirements.
+- `webclient-desktop-shell`: Add the stable top-navigation placement and shared tool-tooltip requirement; the tool-group requirement names the visible tooltip and the shared tool model.
+- `webclient-contextual-hud`: The place-card requirement gains its two-level hierarchy (gold rule, no leading separator, tabular numeral-face time).
 
 ## Impact
 
-- Application-time edit surface: `DesktopNavigation.vue, TopBar.vue, PlaceCard.vue, dock-icons.js, styles/app-shell.css`.
+- Application-time edit surface: `DesktopNavigation.vue`, new `nav-tools.js` (the shared tool model, also read by `OverlayHost.vue`), `PlaceCard.vue`, `styles/app-shell.css` (brand), stories and tests. `TopBar.vue` markup and `dock-icons.js` glyph keys are unchanged (A10 already shares the glyph keys with DrawerHeader).
 - No application code, assets, generation, migrations, compatibility layers or main-spec edits are part of proposing this change.
 - Source and report evidence, scope exclusions and runtime verification are in `design.md` and `tasks.md`.
 

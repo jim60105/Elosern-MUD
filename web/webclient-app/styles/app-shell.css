@@ -53,24 +53,35 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-direction: row;
+  /* The bilingual brand reads as one line: the wordmark and the tagline
+     share a baseline, and that line sits optically centred in the band
+     (webclient-chrome-navigation-polish): one wrapping flex line, centred
+     by `align-content`, whose items align on their baselines. */
+  flex-wrap: wrap;
+  align-content: center;
   align-items: baseline;
   gap: 12px;
-  padding: 14px 24px 0;
+  padding: 0 24px;
   background: none;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   backdrop-filter: none;
 }
+/* Tracking is trimmed after the last letter (the negative end margin equals
+   the letter spacing), so the gap between the two words is the flex gap
+   alone rather than gap plus a dangling letter space. */
 .topbar-wordmark {
   font: var(--text-xl)/1 Georgia, var(--f-serif);
-  letter-spacing: .28em;
+  letter-spacing: .18em;
+  margin-right: -.18em;
   color: #ead8b9;
   white-space: nowrap;
 }
 .topbar-tagline {
   font: var(--text-xs)/1 var(--f-serif);
-  letter-spacing: .18em;
+  letter-spacing: .12em;
+  margin-right: -.12em;
   color: var(--paper-500);
   white-space: nowrap;
 }
@@ -340,7 +351,7 @@ body {
      218px minimap card (webclient-avg-stage-hud-anchors design D1). */
   :root { --left-column: 216px; --right-column: 246px; }
   /* The brand row fits the 216px column (design D1). */
-  .topbar-wordmark { font-size: var(--text-base); letter-spacing: .2em; }
+  .topbar-wordmark { font-size: var(--text-base); letter-spacing: .14em; margin-right: -.14em; }
   .elosern-root .topbar-brand { padding-inline: 16px; gap: 10px; }
   .elosern-root .inventory-panel { grid-template-columns: 120px minmax(170px, 1fr) minmax(200px, .9fr); gap: 12px; }
   .inventory-panel__details { padding: 12px; }
