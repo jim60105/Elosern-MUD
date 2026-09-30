@@ -11,9 +11,20 @@ the server can ship has an entry, and element names equal the registry's own.
 """
 
 import importlib
+import os
 from pathlib import Path
 import re
 import unittest
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
+
+import django
+
+django.setup()
+
+import evennia
+
+evennia._init()
 
 import yaml
 
