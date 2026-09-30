@@ -146,6 +146,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/HelpOverlay",
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
+    # The settings overlay's reading preview joined with
+    # webclient-settings-reading-preview.
+    "Overlays/ReadingSample",
     "Overlays/OverlayHost",
     # The client-local action-feedback toast queue joined the frozen set
     # when add-action-feedback-toasts refroze the manifest at 42.

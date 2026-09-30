@@ -187,6 +187,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Core/CharacterSwitcher",
      "Overlays/MapOverlay",
      "Overlays/SettingsOverlay",
+     // The settings overlay's reading preview (webclient-settings-reading-preview).
+     "Overlays/ReadingSample",
      "Overlays/HelpOverlay",
      "Overlays/OverlayHost",
      "Overlays/CreationOverlay",

@@ -189,19 +189,24 @@ PREVIOUS_MANIFEST_KEYS = {
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",
+    # The settings overlay's local reading preview
+    # (webclient-settings-reading-preview).
+    "Overlays/ReadingSample",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
 # lineage and title-codex big windows joined the frozen manifest with the
 # obsidian-gold wave, and the three gallery overlay drawers joined with the
-# gallery refreeze at 56. The story-count partition below asserts the family
-# files plus exactly these.
+# gallery refreeze at 56; the settings reading preview joined with
+# webclient-settings-reading-preview. The story-count partition below asserts
+# the family files plus exactly these.
 OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",
+    "Overlays/ReadingSample",
 )
 
 

@@ -612,6 +612,92 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page), 0)
         page.close()
 
+    # ---- webclient-settings-reading-preview ----
+
+    def _live_reader(self, page):
+        """The live reader's observable state: log length, page, typed text."""
+        return page.evaluate(
+            """() => {
+              const store = window.__elosernBridge.store;
+              const page = document.querySelector('[data-testid="message-page"]');
+              return {
+                narrative: store.narrative.length,
+                page: page ? page.getAttribute('data-page') : null,
+                pages: page ? page.getAttribute('data-pages') : null,
+                text: page ? page.textContent : null,
+              };
+            }"""
+        )
+
+    def _sample_typing(self, page):
+        return page.locator('[data-testid="settings-sample"]').get_attribute("data-typing")
+
+    @covers_requirement("webclient-desktop-shell::reading-settings-preview-preferences-without-touching-play")
+    @covers_requirement("webclient-desktop-shell::settings-switches-preserve-native-accessible-operation")
+    def test_reading_sample_previews_preferences_without_touching_play(self):
+        # Full motion, so the sample genuinely types.
+        page = self.logged_in_page(motion_level="full")
+        install_outbound_recorder(page)
+        wait_for_presentation_settled(page)
+        wait_for_narrative_settled(page, 0)
+        # The live reader sits on page 1 of a multi-page response (the helper
+        # pins the reader to 瞬間), so a preview that moved the reading
+        # position would show as a changed page.
+        _append_multipage_response(page)
+        self._open_settings(page)
+        self.assertEqual(self._sample_typing(page), "false")
+        self.assertIn("瞬間", page.locator('[data-testid="settings-sample-caption"]').inner_text())
+
+        # A speed change restarts the sample at that speed.
+        page.locator('[data-testid="settings-overlay-text-speed-slow"]').click()
+        self.assertEqual(self._sample_typing(page), "true")
+        self.assertIn("每秒 20 字", page.locator('[data-testid="settings-sample-caption"]').inner_text())
+
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-sample\"]').getAttribute('data-typing') === 'false'",
+            timeout=15000,
+        )
+
+        # A scale change restarts the sample, set at the live page's own size
+        # for that scale. The scale itself legitimately re-pages the live
+        # window, so the reader baseline is taken after it.
+        page.locator('[data-testid="settings-overlay-scale-A+"]').click()
+        self.assertEqual(self._sample_typing(page), "true")
+        sizes = page.evaluate(
+            """() => ({
+              sample: getComputedStyle(document.querySelector('[data-testid="settings-sample-page"]')).fontSize,
+              live: getComputedStyle(document.querySelector('[data-testid="message-page"]')).fontSize,
+            })"""
+        )
+        self.assertEqual(sizes["sample"], sizes["live"])
+        page.wait_for_timeout(300)
+        before = self._live_reader(page)
+
+        # The switches are native checkboxes exposed as switches: Space on the
+        # focused 色盲配色 switch changes exactly one preference.
+        switch = page.get_by_role("switch", name="色盲配色")
+        self.assertFalse(switch.is_checked())
+        switch.focus()
+        page.keyboard.press("Space")
+        page.wait_for_function("() => window.__elosernBridge.store.view.colorblind === true", timeout=15000)
+        self.assertTrue(page.get_by_role("switch", name="色盲配色", checked=True).is_visible())
+        self.assertIs(page.evaluate("() => window.__elosernBridge.store.view.textToHtml"), True)
+        self.assertIs(page.evaluate("() => window.__elosernBridge.store.view.autoAdvance"), False)
+
+        # Replay, then close mid-type: the preview stops and nothing of it
+        # reaches the live reader.
+        page.locator('[data-testid="settings-sample-replay"]').click()
+        self.assertEqual(self._sample_typing(page), "true")
+        page.locator('[data-testid="overlay-host-close"]').click()
+        page.wait_for_selector('[data-testid="settings-overlay"]', state="detached", timeout=15000)
+        page.wait_for_timeout(600)
+        self.assertEqual(page.locator('[data-testid="settings-sample"]').count(), 0)
+        after = self._live_reader(page)
+        self.assertEqual(after, before)
+        self.assertEqual(after["page"], "1", "the reader stays on page 1 of the multi-page response")
+        self.assertEqual(sent_action_count(page), 0, "the preview dispatches no ui_action")
+        page.close()
+
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )

@@ -45,6 +45,7 @@
     "World/MapLattice",
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
+    "Overlays/ReadingSample",
     "Overlays/HelpOverlay",
     "Overlays/TitleCodexPanel",
     "Overlays/LineagePanel",

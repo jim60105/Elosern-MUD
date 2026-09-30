@@ -23,7 +23,7 @@ import {
   TEXT_SPEEDS,
   autoAdvanceAllowed,
   autoAdvanceDelayMs,
-  cpsFor,
+  effectiveCps,
   fragmentReveal,
   offsetAtUnits,
   pageUnits,
@@ -264,15 +264,11 @@ export default {
     const clearKey = ref(0);
 
     const currentPage = () => pages.value[pageIndex.value] || null;
-    const effectiveCps = computed(() =>
-      props.motionLevel !== "full"
-        ? Infinity
-        : cpsFor(TEXT_SPEEDS.includes(props.textSpeed) ? props.textSpeed : "normal"),
-    );
+    const typingCps = computed(() => effectiveCps(props.motionLevel, props.textSpeed));
     const typewriter = useTypewriter({
       units: () => pageUnits(currentPage()),
       snap: (n) => snapUnits(currentPage(), n),
-      cps: () => effectiveCps.value,
+      cps: () => typingCps.value,
       held: () => props.held,
     });
     const typing = typewriter.typing;
@@ -603,7 +599,7 @@ export default {
 
     // A switch to `instant`, or away from the `full` motion level, completes
     // the typing page; any other speed change applies from the next page.
-    watch(effectiveCps, (cps) => {
+    watch(typingCps, (cps) => {
       if (cps === Infinity) {
         typewriter.complete();
       }

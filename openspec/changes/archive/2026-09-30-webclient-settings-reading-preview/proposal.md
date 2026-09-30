@@ -19,10 +19,11 @@ None; extend the existing main capabilities rather than create a parallel UI spe
 ### Modified Capabilities
 
 - `webclient-desktop-shell`: Add bounded observable presentation requirements.
+- `webclient-contextual-hud`: The prose scale also governs the settings surface's reading sample, which previews the page text.
 
 ## Impact
 
-- Application-time edit surface: `SettingsOverlay.vue, existing reader/typewriter helper, settings stories/tests`.
+- Application-time edit surface: `SettingsOverlay.vue`, a new presentational `ReadingSample.vue` (manifest, story), the existing reader/typewriter helper (`effectiveCps` shared with `MessageWindow.vue`), settings stories/tests.
 - No application code, assets, generation, migrations, compatibility layers or main-spec edits are part of proposing this change.
 - Source and report evidence, scope exclusions and runtime verification are in `design.md` and `tasks.md`.
 

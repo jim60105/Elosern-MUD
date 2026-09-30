@@ -5,7 +5,8 @@ the OpenSpec proposals, §15; revised 2026-09-27 with the C13a shipped foe
 line-up geometry, §10.2; revised 2026-09-28 with the proposed aesthetic
 follow-up series, §16; revised 2026-09-29 with the A10/A11 drawer framing and
 content, §5.4; revised 2026-09-30 with the A12 map legibility, §11, and the
-A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4)
+A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4;
+revised 2026-09-30 with the A14 settings reading preview and switches, §6.4)
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -231,6 +232,7 @@ the name in the switcher.
 | `CommandLine` | Collapsible (§5.5). |
 | `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay and gallery editor: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
 | `EmptyState` (new, A11 `webclient-drawer-content-polish`) | The one presentational body of an available but empty drawer list (quest book, codex, bag items, party): decorative registry glyph, headline, one guidance line in a solid ink frame; no control of its own. An unavailable panel keeps its registry reason instead. |
+| `ReadingSample` (new, A14 `webclient-settings-reading-preview`) | The settings overlay's local reading preview: one fixed line in the page face, size and leading at the chosen prose scale, typed through its own `useTypewriter` at the shared `effectiveCps` rule, with a caption and 重播; it reaches no store, log or reader, and unmounting stops its clock. |
 
 This series is a governed redesign wave: every component added or deleted
 updates `component-manifest.json`, its Storybook story, and the
@@ -421,6 +423,20 @@ settings overlay's 閱讀設定 section:
   advances past an oversize or map page, and pauses while any drawer, overlay,
   or the full log is open.
 - Typing is instant whenever the motion level is not `full` (§9.1).
+
+Settings surface (A14, `webclient-settings-reading-preview`): a
+`ReadingSample` spans the settings body above both cards. It sets one fixed
+line like a page at the chosen prose scale (the fourth prose-scale target)
+and types it at the rate the message window would use — `effectiveCps`, now
+shared by both, so it shows at once for 瞬間 and whenever the motion level is
+not 完整 — with a caption naming that rule. It plays once on open, restarts
+once per scale, speed or motion change, replays on 重播, never loops, keeps
+its whole line laid out, reads the complete line to assistive technology,
+and stops with the overlay. The toggles stay native checkboxes exposed as
+switches (named by their label, described by their help, knob position and
+gold fill both marking the state); the segments are one framed strip; the
+cards share equal tracks at their own content height, with help copy at
+`--text-md`.
 
 Reveal technique: the page is always rendered in full; the unrevealed tail is
 hidden with `visibility: hidden` and `aria-hidden` (whole later lines get an
