@@ -84,7 +84,10 @@
   --f-display: "Iansui", "Noto Serif TC", serif;
   --f-serif: "Noto Serif TC", "Iansui", serif;
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
-  --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
+  /* Monospace: the bundled Hack slices (styles/fonts-hack.css) draw Latin,
+     digits, arrows, and box drawing; the bundled Noto Sans TC draws CJK. No
+     machine-installed family sits ahead of them. */
+  --f-mono: "Hack", "Noto Sans TC", monospace;
   --f-num: var(--f-sans);
   --text-xs: calc(12px * var(--ui-scale));
   --text-sm: calc(13px * var(--ui-scale));

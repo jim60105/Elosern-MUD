@@ -8,6 +8,7 @@ import LayoutStore from "./lib/layout_store.js";
 import { installUiScale } from "./lib/ui_scale.js";
 import "./styles/tokens.css";
 import "./styles/fonts.css";
+import "./styles/fonts-hack.css";
 import "./styles/app-shell.css";
 
 // C3 (webclient-vue-09-wire-transport-mount): the store-bound live renderers

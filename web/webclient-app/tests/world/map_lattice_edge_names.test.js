@@ -85,7 +85,8 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const tspans = textEl.findAll("tspan");
     expect(tspans.length).toBeGreaterThan(0);
     // Every tspan has the same x coordinate within band's depth, and the line
-    // step is one type step (full-width CJK in a monospace token).
+    // step is one type step (full-width Noto Sans TC CJK in the monospace
+    // token; its Hack ASCII is narrower).
     const reach = Math.SQRT2 * 9;
     const expectedX = -(reach + 9);
     tspans.forEach((tspan, i) => {

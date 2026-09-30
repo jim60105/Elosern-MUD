@@ -161,8 +161,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       "grid:altoria:0:2": { x1: centers["grid:altoria:0:2"].x - VISITED_HALF, y1: centers["grid:altoria:0:2"].y - VISITED_HALF, x2: centers["grid:altoria:0:2"].x + VISITED_HALF, y2: centers["grid:altoria:0:2"].y + VISITED_HALF },
     };
     // Node labels: baseline at the scaled offset (13×4.83 + 13 ≈ 75.8px
-    // below the node origin); the 11px monospace line box extends 10.5px
-    // above and 3px below the baseline. CJK glyphs are full-width (11px);
+    // below the node origin); the 11px monospace line box is modelled as
+    // 10.5px above and 3px below the baseline. CJK glyphs (Noto Sans TC)
+    // are full-width (11px) and Hack ASCII is narrower (0.602em);
     // a truncated label appends "…" (labelMax + 1 glyphs worst case).
     const LABEL_ASCENT = 10.5;
     const LABEL_DESCENT = 3;
