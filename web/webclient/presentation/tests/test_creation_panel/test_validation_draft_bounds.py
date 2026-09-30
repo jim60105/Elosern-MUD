@@ -196,6 +196,7 @@ class CreationPanelValidationTests(unittest.TestCase):
         }
         race = {
             "key": "r" * MAX_RACE_KEY_CODE_POINTS,
+            "display_name_zh": huge(MAX_DISPLAY_NAME_CODE_POINTS),
             "description": huge(MAX_DESCRIPTION_CODE_POINTS),
             "subraces": ["s" * MAX_SUBRACE_KEY_CODE_POINTS] * MAX_SUBRACES,
         }

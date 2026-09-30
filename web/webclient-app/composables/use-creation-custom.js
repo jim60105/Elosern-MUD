@@ -34,6 +34,11 @@ export function useCreationCustom(props, form, emit) {
 
   const races = computed(() => (Array.isArray(custom.value?.races) ? custom.value.races : []));
 
+  function raceDisplayName(raceKey) {
+    const found = races.value.find((r) => r.key === raceKey);
+    return found?.display_name_zh ?? raceKey;
+  }
+
   const raceInfo = computed(() => races.value.find((r) => r.key === race.value));
   const hasSubraces = computed(() => Array.isArray(raceInfo.value?.subraces));
   // The gender select renders the server descriptor verbatim; no label literal
@@ -196,6 +201,7 @@ export function useCreationCustom(props, form, emit) {
     minimumAge,
     minimumApparentAge,
     races,
+    raceDisplayName,
     raceInfo,
     hasSubraces,
     sexOptions,

@@ -60,6 +60,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             # v3 is the pre-sex version; the exact gate must reject it on both
             # ends (namegen-creation-ui "A stale schema version is rejected").
             (lambda p: p.update(schema_version=3), "legacy schema_version 3"),
+            (lambda p: p.update(schema_version=5), "legacy schema_version 5"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -73,7 +74,7 @@ class CreationPanelValidationTests(unittest.TestCase):
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_custom_descriptor_ships_server_labelled_sex_options(self):
         payload = validate_creation(_valid_payload())
-        self.assertEqual(payload["schema_version"], 5)
+        self.assertEqual(payload["schema_version"], 6)
         self.assertEqual(
             payload["custom"]["sex"],
             [
@@ -162,6 +163,30 @@ class CreationPanelValidationTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_creation(payload)
 
+
+    def test_preset_card_race_must_exist_in_custom_races(self):
+        payload = _valid_payload()
+        payload["presets"][0]["race"] = "unknown_race"
+        with self.assertRaises(CreationPanelError):
+            validate_creation(payload)
+
+    def test_race_option_display_name_zh_validation(self):
+        payload = _valid_payload()
+        with self.subTest("missing display_name_zh"):
+            bad = deepcopy(payload)
+            del bad["custom"]["races"][0]["display_name_zh"]
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("blank display_name_zh"):
+            bad = deepcopy(payload)
+            bad["custom"]["races"][0]["display_name_zh"] = "   "
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("overlong display_name_zh"):
+            bad = deepcopy(payload)
+            bad["custom"]["races"][0]["display_name_zh"] = "x" * (MAX_DISPLAY_NAME_CODE_POINTS + 1)
+            with self.assertRaises(Exception):
+                validate_creation(bad)
 
     def test_preset_card_empty_prose_and_subrace_bound_are_rejected(self):
         base = _valid_payload()

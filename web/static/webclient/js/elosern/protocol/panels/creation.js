@@ -125,7 +125,11 @@ function validateCreationAge(value) {
 }
 
 function validateCreationRaceOption(value) {
-  requireExactFields(value, "race option", ["key", "description", "subraces"], []);
+  requireExactFields(value, "race option", ["key", "display_name_zh", "description", "subraces"], []);
+  var displayNameZh = requireString(value.display_name_zh, "display_name_zh", CREATION_MAX_DISPLAY_NAME);
+  if (!displayNameZh.trim()) {
+    throw new Error("race display_name_zh must be non-empty");
+  }
   var key = validateIdentifier(value.key, "race key");
   if (codePoints(key) > CREATION_MAX_RACE_KEY) {
     throw new Error("race key exceeds its bound");
@@ -587,8 +591,18 @@ function validateCreationPanel(payload) {
   if (!Array.isArray(payload.presets) || payload.presets.length === 0 || payload.presets.length > CREATION_MAX_PRESETS) {
     throw new Error("presets must be a non-empty list within its bound");
   }
-  payload.presets.forEach(validateCreationPresetCard);
   validateCreationCustom(payload.custom);
+  payload.presets.forEach(validateCreationPresetCard);
+  var raceKeys = {};
+  (payload.custom.races || []).forEach(function (r) {
+    raceKeys[r.key] = true;
+  });
+  for (var i = 0; i < payload.presets.length; i++) {
+    var card = payload.presets[i];
+    if (!raceKeys[card.race]) {
+      throw new Error("preset " + card.key + " references non-existent race " + card.race);
+    }
+  }
   var draft = validateCreationDraft(payload.draft);
   var result = {
     schema_version: CREATION_SCHEMA_VERSION,
