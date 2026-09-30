@@ -30,9 +30,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
   it("anti-ambiguity rule enforces across distinct edges", () => {
     // Marker on top and marker on bottom, different original labels, fitting to same string.
     // On a 1-col lattice (cols=1) the horizontal span is 58, so the budget is
-    // floor(58 / markerNameFont) = floor(58 / 10) = 5 glyphs. These two labels
+    // floor(58 / (CELL_EM × 10)) = 9 monospace cells. These two labels
     // differ in their MIDDLE (北關 / 南關), which the head-and-tail ellipsis
-    // allocates away first — tail 3 = 關隘道, head 1 = 灰 — so both fit to
+    // allocates away first — head 灰 (2) + … (1) + tail 關隘道 (6) — so both fit to
     // 灰…關隘道 while their payload labels differ. That is exactly the case the
     // invariant exists for, and no tail-distinguished pair can reach it.
     const crossEdgePayload = {
@@ -85,8 +85,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const tspans = textEl.findAll("tspan");
     expect(tspans.length).toBeGreaterThan(0);
     // Every tspan has the same x coordinate within band's depth, and the line
-    // step is one type step (full-width Noto Sans TC CJK in the monospace
-    // token; its Hack ASCII is narrower).
+    // step is one type step per stacked glyph, whatever its cell width.
     const reach = Math.SQRT2 * 9;
     const expectedX = -(reach + 9);
     tspans.forEach((tspan, i) => {
@@ -116,8 +115,8 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
   });
 
   it("Task 2.1: fits lone marker whole and truncates two markers to their span allocating tail first", () => {
-    // Lone marker on top edge: span = 174, budget = floor(174 / 10) = 17.
-    // Label length 11 <= 17 -> draws whole.
+    // Lone marker on top edge: span = 174, budget = floor(174 / (CELL_EM × 10))
+    // = 28 cells. The label is 11 wide glyphs = 22 cells <= 28 -> draws whole.
     const lonePayload = {
       schema_version: 1,
       available: true,
@@ -133,9 +132,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const northMarker = wLone.get('[data-testid="local-map__edge-marker--r:north"]');
     expect(northMarker.find("text").text()).toBe("西部丘陵與谷地（南門）");
 
-    // Two markers on top edge: span = 174/2 = 87, budget = floor(87 / 10) = 8.
-    // Tail is （南門） (4 chars). Head budget = 8 - 1 - 4 = 3 ('西部丘').
-    // Fitted: 西部丘…（南門）.
+    // Two markers on top edge: span = 174/2 = 87, budget = floor(87 / (CELL_EM
+    // × 10)) = 14 cells. The qualifier （南門） is 8 cells and … is 1, so the
+    // head keeps 14 - 1 - 8 = 5 cells, two wide glyphs ('西部').
+    // Fitted: 西部…（南門）.
     const twoPayload = {
       schema_version: 1,
       available: true,
@@ -151,14 +151,14 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const wTwo = mountLattice({ localMap: localMapModelFor(twoPayload), markerNames: true });
     const n1 = wTwo.get('[data-testid="local-map__edge-marker--r:north1"]');
     const n2 = wTwo.get('[data-testid="local-map__edge-marker--r:north2"]');
-    expect(n1.find("text").text()).toBe("西部丘…（南門）");
+    expect(n1.find("text").text()).toBe("西部…（南門）");
     expect(n2.find("text").text()).toBe("聖潔王都");
   });
 
   it("Task 2.2 & 2.3: anti-ambiguity drops names when differing labels truncate identically; preserves title", () => {
-    // Three markers on top edge: span = 174/3 = 58, budget = floor(58 / 10) = 5.
+    // Three markers on top edge: span = 174/3 = 58, budget = 9 cells.
     // The two gate labels differ only in their middle (北關 / 南關), which the
-    // head-and-tail fit allocates away first: tail 3 = 關隘道, head 1 = 灰, so
+    // head-and-tail fit allocates away first: tail 關隘道 (6), head 灰 (2), so
     // both would be drawn as 灰…關隘道 while their payload labels differ.
     // Anti-ambiguity rule MUST omit both visible names while keeping diamonds and titles.
     const crowdedPayload = {
@@ -234,7 +234,8 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(marker.find("text").text()).toBe("𠮷野市（新門）");
 
     // Budget < 3 drops the visible name safely (drops name, keeps diamond/title)
-    // 1-col lattice with 3 markers on top edge: span = 58/3 = 19.33 -> budget = floor(19.33/10) = 1 (< 3)
+    // 1-col lattice with 3 markers on top edge: span = 58/3 = 19.33 -> budget = 3 cells, too few for
+    // a wide head, "…" and a wide tail (5 cells)
     const lowBudgetPayload = {
       schema_version: 1,
       available: true,

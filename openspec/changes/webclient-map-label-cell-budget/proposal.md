@@ -18,16 +18,19 @@ has to measure text the way a monospace font draws it, in cells, before the font
   (`fonts/hack/codepoints.json`) by a small tool, and a test byte-compares it, like the ANSI palette.
 - Lattice label term: two adjacent labels need `(cells(a) + cells(b)) / 2 × cellEm × labelFont +
   labelFont / 2` instead of `(glyphs(a) + glyphs(b)) / 2 × labelFont + …`. The worst truncated label
-  (four wide glyphs plus the narrow `…`) is 9 cells, or 5.418 em instead of 5 em. ASCII labels now
+  on the island (four wide glyphs plus the narrow `…`) is 9 cells, or 5.418 em instead of 5 em; on the
+  overlay (`labelMax` 10) it is 21 cells, 12.643 em instead of 11 em. ASCII labels now
   ask for less room than before.
 - Edge-marker names: the horizontal fit budget along an edge, and the overlay's outward name box,
-  are measured in integer cells. The outward box is declared as `(labelMax + 1) × 2` = 10 cells,
-  keeping its capacity of five wide glyphs, and the overlay gutter grows with it.
+  are measured in integer cells. The outward box is declared as `(labelMax + 1) × 2` cells (22 on
+  the overlay), keeping its capacity of `labelMax + 1` wide glyphs, and the overlay gutter grows with
+  it.
 - Radial (graph) placement contract in `web/static/webclient/js/elosern/local_map.js`: the worst label
-  box widens from 58 to 63 units on the contract's 11-unit basis, which raises `ARC` from 67 to 72 and
-  `R0`/`G` from 72 to 77 under the contract's own derivation (`ceil(diagonal) + 4`, `ARC + 5`). On a
-  12-unit basis the numbers are 69, 77 and 82, and the task confirms which basis applies. The Node
-  tests pin these numbers and tie them to the helper.
+  box is recomputed in cells at the 12-unit label step the island actually draws (the old basis was
+  11), so it widens from 58 to 69 units, which raises `ARC` from 67 to 77 and `R0`/`G` from 72 to 82
+  under the contract's own derivation (`ceil(diagonal) + 4`, `ARC + 5`). The Node tests pin these
+  numbers and tie them to the helper. The overlay's radial labels (`labelMax` 10 at an unscaled 14)
+  already exceed the scaled contract box today; that pre-existing gap is left to a follow-up.
 - The monospace-token comments in the map code describe the cell model instead of naming a font, so
   the font switch that follows touches no map file.
 - The map geometry browser tests and Vitest renderer tests are re-run. Tests whose fixtures encode
@@ -62,9 +65,10 @@ has to measure text the way a monospace font draws it, in cells, before the font
   tests.
 - **Layout**, in both directions:
   - All-CJK labels need more room: the island's worst label term goes from 66 to 72 units (+9%), and
-    the overlay's from 77 to 83.
+    the overlay's (`labelMax` 10) from 161 to 185.
   - All-ASCII labels need less: five ASCII glyphs on the island go from 66 to 43.
-  - The overlay's name gutter and the radial rings grow by about 7–14%.
+  - The overlay's name gutter grows by about 20% (outward box 121 → 146 units) and the radial rings
+    by about 14%.
   - Dense CJK lattices scale down slightly sooner, and the island's 0.75 floor is unchanged.
   - With the current Hack stack the new budget is conservative for every fallback character, because
     CJK and the symbols Hack lacks draw at about 1 em, which is at most 2 cells.

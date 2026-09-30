@@ -252,8 +252,8 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 - **THEN** the first draws at its natural 80 × 2574 size with no width bound, no maximum height, and no inline size at all; the island draws it inside its 208px square at a uniform scale below 1; and the full-map surface opens it fitted inside its body through its fitted view — so no surface spends a height budget as a width bound, and the renderer offers no cap for any surface to pass
 
 #### Scenario: A graph payload is cropped to its footprint and never magnified
-- **WHEN** the island renders, in turn, an interior payload whose current node has one ring of neighbours (a 244-unit radial canvas) and an interior payload carrying only its current node (a 100-unit radial canvas)
-- **THEN** the first draws its drawn footprint plus the 8px inset — a 212-unit square — at a uniform scale of 208 / 212 ≈ 0.98 rather than the 208 / 244 ≈ 0.85 its padded canvas would force, and the second draws its single node at scale 1 in the centre of the 208px square with its label at 12 CSS px, not magnified to fill the square
+- **WHEN** the island renders, in turn, an interior payload whose current node has one ring of neighbours (a 264-unit radial canvas) and an interior payload carrying only its current node (a 100-unit radial canvas)
+- **THEN** the first draws its drawn footprint plus the 8px inset — a 232-unit square — at a uniform scale of 208 / 232 ≈ 0.90 rather than the 208 / 264 ≈ 0.79 its padded canvas would force, and the second draws its single node at scale 1 in the centre of the 208px square with its label at 12 CSS px, not magnified to fill the square
 
 #### Scenario: The overlay keeps its geometry and gains only the coordinate field
 - **WHEN** the same committed payload renders in the full-map overlay, which declares neither a fixed square canvas nor an axis

@@ -67,11 +67,12 @@ const props = defineProps({
   // drawn CSS px size. A marker name annotates the drawing's rim rather than
   // naming a drawn place, so the island keeps it at 10 units, below its 12px
   // chrome step and its 12-unit node labels. The number also drives
-  // the along-edge fit budget and the stacked-column line step below: the
-  // shared monospace token draws CJK in Noto Sans TC at 1em and ASCII in Hack
-  // at 0.602em, so one glyph advances at most one type step on either axis, and a divisor that
-  // disagreed with the drawn size would either overflow the marker's slot or
-  // truncate names that had room to spare.
+  // the along-edge fit budget and the stacked-column line step below: a
+  // horizontal name is budgeted in monospace cells of CELL_EM × this size
+  // (lib/mono_cells.js: one cell for a glyph the monospace face draws narrow,
+  // two for any other), and a stacked column advances one type step per
+  // glyph, so a divisor that disagreed with the drawn size would either
+  // overflow the marker's slot or truncate names that had room to spare.
   markerNameFont: { type: Number, default: 10 },
   // Fixed square canvas size (CSS px, design D1): when set, the canvas
   // renders as a fixed square of exactly this size and its viewBox side is at

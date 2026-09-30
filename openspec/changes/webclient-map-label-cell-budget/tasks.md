@@ -11,17 +11,18 @@
   - declare `outwardNameCells = (labelMax + 1) × 2` and derive the unit `outwardNameBox` from it per D3;
   - rewrite the neighbouring comments per D5.
 
-  Verify with Vitest cases: labels `霧骨渡口…` / `霧骨渡口…` yield 72 at `labelFont` 12 and 83 at 14; five-ASCII-glyph labels yield 43 at 12.
+  Verify with Vitest cases: labels `霧骨渡口…` / `霧骨渡口…` yield 72 at `labelFont` 12; ten-CJK-plus-`…` labels yield 185 at 14 with `labelMax` 10; five-ASCII-glyph labels yield 43 at 12.
 - [ ] 2.2 In `use-map-lattice-render.js`, give `fitMarkerName` a measure argument and cell-aware greedy head/tail growth. Use `codePointCells` for horizontal names (top/bottom on every surface, left/right on the overlay) and a unit measure for the island's left/right vertical stack. Budget terms follow D3, with integer cells and the `1e-9` guard. Verify with Vitest cases:
   - a mixed name (`北門 Gate`), a `（qualifier）` name, and an all-CJK name each fit their exact cell budget;
-  - the overlay's outward box holds five CJK glyphs, and six are truncated;
+  - the overlay's outward box (`labelMax` 10) holds eleven CJK glyphs, and twelve are truncated;
+  - a qualifier-only name, a budget equal to the total and one below it, and an all-CJK `2g`-cell budget matching the old `g`-glyph result;
   - the island vertical-stack result is unchanged for existing fixtures.
 - [ ] 2.3 Update the comments in `MapLattice.vue` (`markerNameFont`) and `use-map-lattice-render.js` (`MARKER_NAME_ASCENT`) to the cell model, with no font names (D5). Verify: `git grep -n "Hack\|Noto Sans TC" web/webclient-app/composables web/webclient-app/components/MapLattice.vue` finds nothing.
 
 ## 3. Radial contract
 
-- [ ] 3.1 Confirm the radial label type size actually drawn (the 11-unit basis in the contract comment against the surfaces' `labelFont`). In `web/static/webclient/js/elosern/local_map.js`, update the radial contract comment and `RADIAL_GEOMETRY` to the D4 numbers for that basis: 63 × 23, `ARC = 72`, `R0 = G = 77` at 11, or 69 × 23, 77 and 82 at 12. Verify: `node --test web/static/webclient/js/tests/local_map.test.js` passes after 3.2.
-- [ ] 3.2 Update `web/static/webclient/js/tests/local_map.test.js`: the `ARC` pin, the chord-sweep threshold, `arcMin`, and any `R0`/`G`-derived expectations. Extend the footprint sweep to use the new label box. Add a check that dynamically imports `web/webclient-app/lib/mono_cells.js` and asserts the declared box width equals `ceil(textCells("霧骨渡口…") × CELL_EM × basis) + 3`. Verify: `node --test web/static/webclient/js/tests/*.test.js` passes.
+- [ ] 3.1 The island draws radial labels at 12 units (scale 1), so the basis is 12 (D4). In `web/static/webclient/js/elosern/local_map.js`, update the radial contract comment and `RADIAL_GEOMETRY` to 69 × 23, `ARC = 77`, `R0 = G = 82`, naming both effects (cell measure and basis correction). Verify: `node --test web/static/webclient/js/tests/local_map.test.js` passes after 3.2.
+- [ ] 3.2 Update `web/static/webclient/js/tests/local_map.test.js`: the `ARC` pin, the chord-sweep threshold, `arcMin`, and any `R0`/`G`-derived expectations. Extend the footprint sweep to use the new label box, and update the overlay `nameWidth` fixture (121 → the 22-cell width). Add a check that dynamically imports `web/webclient-app/lib/mono_cells.js` and asserts the declared box width equals `ceil(textCells("霧骨渡口…") × CELL_EM × basis) + 3`. Verify: `node --test web/static/webclient/js/tests/*.test.js` passes.
 
 ## 4. Test fixtures and geometry oracle
 

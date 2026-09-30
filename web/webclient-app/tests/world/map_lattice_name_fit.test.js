@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import MapLattice from "../../components/MapLattice.vue";
 import { localMapModelFor } from "../../stories/fixtures.js";
+import { CELL_EM } from "../../lib/mono_cells.js";
 import { REPORTED_WILDERNESS_PAYLOAD } from "./map_lattice_support.js";
 
 describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webclient-minimap-07-overlay-marker-name-fit)", () => {
@@ -35,8 +36,10 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     const viewBox = svg.attributes("viewBox");
 
     // Core lattice: 3 cols × 280 = 840; 3 rows × 212 = 636 + 14 = 650.
-    // Model gutterMin for overlay: 2 * reach + 1 + namePad
-    const expectedOverlayGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 123;
+    // Model gutterMin for overlay: 2 * reach + 1 + namePad, where namePad is
+    // the outward name box, (labelMax + 1) × 2 = 22 monospace cells at 11,
+    // plus 2.
+    const expectedOverlayGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 11 + 2;
     expect(svgWidth).toBeCloseTo(840 + 2 * expectedOverlayGutter, 5);
     expect(svgHeight).toBeCloseTo(650 + 2 * expectedOverlayGutter, 5);
     expect(viewBox).toBe(`0 0 ${svgWidth} ${svgHeight}`);
@@ -87,7 +90,8 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
-    // Span on left edge: 134. budget = floor(134 / 10) = 13. Label is 11 chars -> fits whole!
+    // Span on left edge: 134. The island stacks left names one glyph per line,
+    // so budget = floor(134 / 10) = 13 steps. Label is 11 glyphs -> fits whole!
     expect(westText.text()).toBe("西部丘陵與谷地（南門）");
     const tspans = westText.findAll("tspan");
     expect(tspans).toHaveLength(11);
@@ -139,12 +143,13 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         ...OVERLAY_CONFIG,
       },
     });
-    // Default overlay markerNameFont is 11, labelMax is 10: outwardBox = (10 + 1) * 11 = 121
+    // Default overlay markerNameFont is 11, labelMax is 10: the outward box is
+    // (10 + 1) × 2 = 22 monospace cells, 22 × CELL_EM × 11 ≈ 145.7 units.
     const svg11 = wOverlay.get("svg.local-map__lattice");
     const width11 = Number(svg11.attributes("width"));
 
-    // Re-render with markerNameFont = 12: outwardBox = (10 + 1) * 12 = 132 (+11 user units)
-    // namePad increases by 11, so gutter increases by 11, and svgWidth increases by 2 * 11 = 22
+    // Re-render with markerNameFont = 12: the box grows by 22 × CELL_EM ≈ 13.2
+    // units, so namePad and each gutter grow by that and svgWidth by twice it.
     const wOverlay12 = mount(MapLattice, {
       props: {
         localMap: localMapModelFor(REPORTED_WILDERNESS_PAYLOAD),
@@ -154,12 +159,12 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     });
     const svg12 = wOverlay12.get("svg.local-map__lattice");
     const width12 = Number(svg12.attributes("width"));
-    expect(width12 - width11).toBeCloseTo(22, 5);
+    expect(width12 - width11).toBeCloseTo(2 * 22 * CELL_EM, 5);
   });
 
   it("Task 4.3: fits 14-glyph label to 11 on lone overlay left and draws whole on lone overlay top", () => {
     // 14-glyph label on lone overlay left marker:
-    // span is 650, but outwardBox (121) binds: budget = min(floor(650 / 11), 11) = 11.
+    // span is 650, but the outward box binds: budget = min(floor(650 / (CELL_EM × 11)), 22) = 22 cells.
     const leftPayload = {
       schema_version: 1,
       available: true,
@@ -179,12 +184,13 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     });
     const leftMarker = wLeft.get('[data-testid="local-map__edge-marker--r:west_long"]');
     const leftText = leftMarker.get("text.local-map__edge-marker-name");
-    // 14 chars fitted to budget 11: tail 9 ('一南關隘道前哨站營'), head 1 ('灰'), with '…'
+    // 14 wide glyphs fitted to 22 cells: head '灰' (2) + '…' (1) + tail 9 wide
+    // glyphs ('一南關隘道前哨站營', 18) = 21; one more wide glyph would not fit.
     expect(leftText.text()).toBe("灰…一南關隘道前哨站營");
     expect(Array.from(leftText.text())).toHaveLength(11);
 
     // 14-glyph label on lone overlay top marker:
-    // span is 840. Not drawsOutward (top edge draws along): budget = floor(840 / 11) = 76.
+    // span is 840. Not drawsOutward (top edge draws along): budget = floor(840 / (CELL_EM × 11)) = 126 cells.
     // Label fits whole!
     const topPayload = {
       schema_version: 1,
