@@ -1121,11 +1121,15 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         clamp = small.evaluate(
             """() => {
               const a = document.querySelector('[data-testid="anchor-actor-left"]').getBoundingClientRect();
-              const header = getComputedStyle(document.documentElement).getPropertyValue('--header-h');
-              return { top: a.top, header: parseFloat(header) };
+              const header = document.querySelector('.desktop-navigation').getBoundingClientRect();
+              return { top: a.top, headerBottom: header.bottom };
             }"""
         )
-        self.assertGreaterEqual(clamp["top"] + 1, clamp["header"], "the portrait never passes under the top bar")
+        self.assertGreaterEqual(
+            clamp["top"] + 1,
+            clamp["headerBottom"],
+            "the portrait never passes under the top bar",
+        )
 
     @covers_requirement(
         "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode"
