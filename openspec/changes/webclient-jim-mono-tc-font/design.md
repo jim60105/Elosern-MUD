@@ -170,17 +170,21 @@ The browser tests' Hack names change with D5.
 - **Cell advances**, a new method `test_monospace_cells_are_exact`. `.github/browser-shards.json`
   already owns `VueTypographyBrowserTest` by its class label, so the new method is owned without an
   edit (a method label would overlap the class label and fail the ownership contract).
-  - It renders the populated-HUD story and appends a probe `<span>` to `#storybook-root` with
-    `font: 20px/1 var(--f-mono); white-space: pre`, once at `font-weight: 400` and once at `700`.
-  - After `document.fonts.load` of `20px "Jim Mono TC"` with the probe text in each weight, it measures
-    `Range.getBoundingClientRect` widths.
+  - It renders the populated-HUD story and appends one probe `<span>` per run to `document.body` with
+    `font: <weight> 20px/1 var(--f-mono); white-space: pre; font-kerning: none; font-synthesis: none`,
+    once at weight 400 and once at 700. Synthesis is off so a missing bold face cannot pass as bold.
+  - After `document.fonts.load` of `<weight> 20px "Jim Mono TC"` with all probe text, it measures each
+    span's whole `getBoundingClientRect` width (never a sub-range inside a ligature) and requires a
+    loaded Jim Mono TC `FontFace` at that weight.
   - It asserts, within 0.5 px:
+    - `MMMM` = 4 × 1233/2048 × 20 px;
     - `看看看看` = 2 × `MMMM`;
     - `……──` = `MMMM`;
     - `->==` = `MMMM`, the ligature run.
-  - CDP reports Jim Mono TC (custom) for the probe in both weights.
-  - The probe is appended through `page.evaluate` (a CDP-free DOM insert) and is not a `.locator()`
-    class hook, so the frozen-contract scan is unaffected.
+  - CDP reports only Jim Mono TC (custom) for every probe in both weights.
+  - The probe goes on `document.body` through `page.evaluate`, not on `#storybook-root` or through a
+    `.locator()` hook: the frozen-contract scan flags any selector literal in browser tests, and the
+    tokens resolve from `:root` anyway.
 - **Offline slices** (`test_vue_bundle_loads_from_origin_offline`).
   - The helper becomes `_assert_only_needed_mono_slices`.
   - The expected names are `JimMonoTC-Regular.latin`, `JimMonoTC-*.greek-cyrillic` and

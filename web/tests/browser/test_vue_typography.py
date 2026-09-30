@@ -130,7 +130,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
               e.getBoundingClientRect();
               const text = e.value ?? e.textContent;
               return Promise.all([
-                document.fonts.load('16px "Hack"', text),
+                document.fonts.load('16px "Jim Mono TC"', text),
                 document.fonts.load('16px "Noto Sans TC"', text),
               ]).then(() => document.fonts.ready);
             }""",
@@ -175,7 +175,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
     def test_keycaps_and_command_input_keep_monospace(self):
         self.story("core-appshell--populated-hud", ".vitals")
         self.assertIn("monospace", self.page.locator("kbd").first.evaluate("e => getComputedStyle(e).fontFamily"))
-        self.assertBundledFace(self.rendered_fonts("kbd"), "Hack")
+        self.assertBundledFace(self.rendered_fonts("kbd"), "Jim Mono TC")
         self.page.get_by_role("button", name="指令列", exact=True).click()
         field = self.page.locator("#inputfield")
         field.wait_for(state="visible")
@@ -183,13 +183,57 @@ class VueTypographyBrowserTest(unittest.TestCase):
         self.assertTrue(field.evaluate("e => e === document.activeElement"))
         # CDP resolves this selector itself (not a `.locator()` hook), so it
         # stays outside the frozen managed-browser target list on purpose.
-        self.assertBundledFace(self.rendered_fonts(".cmdfield__prompt"), "Hack")
-        # Latin draws in the bundled Hack slices and CJK in the bundled Noto
-        # Sans TC slices; no machine-installed monospace family is used.
+        self.assertBundledFace(self.rendered_fonts(".cmdfield__prompt"), "Jim Mono TC")
+        # Latin and CJK both draw in the bundled Jim Mono TC slices; neither
+        # the Noto Sans TC fallback nor a machine-installed family is used.
         self.page.keyboard.type("look 42 看看")
         typed = self.rendered_fonts("#inputfield")
-        self.assertBundledFace(typed, "Hack")
-        self.assertBundledFace(typed, "Noto Sans TC")
+        self.assertBundledFace(typed, "Jim Mono TC")
+        self.assertFalse([name for name, _custom in typed if name.startswith("Noto Sans TC")], sorted(typed))
         self.assertEqual({name for name, custom in typed if not custom}, set(), sorted(typed))
         self.page.keyboard.press("Escape")
         self.assertTrue(self.page.locator("#action-dock").evaluate("e => e === document.activeElement"))
+
+    def test_monospace_cells_are_exact(self):
+        """CJK advances two Latin cells, `…`, `─`, and a ligature run one each, in both weights."""
+        self.story("core-appshell--populated-hud", ".vitals")
+        probes = {"latin": "MMMM", "cjk": "看看看看", "narrow": "……──", "ligature": "->=="}
+        for weight in (400, 700):
+            with self.subTest(weight=weight):
+                # A CDP-free DOM insert (not a `.locator()` hook). Kerning and
+                # synthesis are off, so a missing bold face cannot pass as bold
+                # and no pair adjustment can change a run's advance.
+                widths = self.page.evaluate(
+                    """([weight, probes]) => {
+                      const root = document.body;
+                      const spans = {};
+                      for (const [key, text] of Object.entries(probes)) {
+                        const span = document.createElement('span');
+                        span.className = `mono-probe mono-probe--${key}-${weight}`;
+                        span.style.cssText = `font: ${weight} 20px/1 var(--f-mono); white-space: pre;`
+                          + ' font-kerning: none; font-synthesis: none; position: absolute; left: 0; top: 0;';
+                        span.textContent = text;
+                        root.append(span);
+                        spans[key] = span;
+                      }
+                      const all = Object.values(probes).join('');
+                      return document.fonts.load(`${weight} 20px "Jim Mono TC"`, all)
+                        .then(() => document.fonts.ready)
+                        .then(() => ({
+                          widths: Object.fromEntries(Object.entries(spans).map(([k, s]) => [k, s.getBoundingClientRect().width])),
+                          loaded: [...document.fonts].some(f => f.family.replace(/["']/g, '') === 'Jim Mono TC'
+                            && f.weight === String(weight) && f.status === 'loaded'),
+                        }));
+                    }""",
+                    [weight, probes],
+                )
+                self.assertTrue(widths["loaded"], f"no loaded Jim Mono TC face at {weight}")
+                cells = widths["widths"]
+                self.assertAlmostEqual(cells["latin"], 4 * 20 * 1233 / 2048, delta=0.5)
+                self.assertAlmostEqual(cells["cjk"], 2 * cells["latin"], delta=0.5)
+                self.assertAlmostEqual(cells["narrow"], cells["latin"], delta=0.5)
+                self.assertAlmostEqual(cells["ligature"], cells["latin"], delta=0.5)
+                for key in probes:
+                    fonts = self.rendered_fonts(f".mono-probe--{key}-{weight}")
+                    self.assertBundledFace(fonts, "Jim Mono TC")
+                    self.assertEqual({name for name, custom in fonts if not custom or not name.startswith("Jim Mono TC")}, set(), sorted(fonts))
