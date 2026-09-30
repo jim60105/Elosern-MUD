@@ -296,12 +296,14 @@ test("exitLabelFor ignores non-traversable edges and stays silent without data",
 const { RADIAL_GEOMETRY, variantForLayer, remoteDirection, edgeMarkersFor } = LocalMap;
 
 // Renderer-true footprint boxes from design D1: marker x±9, y±9 and label
-// 58x23 spanning y in [+3, +26] under the node origin. A pair overlaps when
-// both axis overlaps are strict; >=1-unit separation is the contract.
+// 69x23 spanning y in [+3, +26] under the node origin (the worst truncated
+// label in monospace cells at the island's 12-unit step). A pair overlaps
+// when both axis overlaps are strict; >=1-unit separation is the contract.
+const LABEL_W = 69;
 const FOOTPRINTS = [
   { name: "marker/marker", dx: 9, dy: 9 },
-  { name: "marker/label", dx: 29, dy: 17.5 },
-  { name: "label/label", dx: 58, dy: 23 },
+  { name: "marker/label", dx: LABEL_W / 2, dy: 17.5 },
+  { name: "label/label", dx: LABEL_W, dy: 23 },
 ];
 
 function radialFor(counts) {
@@ -620,7 +622,9 @@ test("edge marker packing clears every legal input at both surfaces", () => {
   const surfaces = [
     { name: "island", cw: 90, ch: 58, mh: 9, nw: 0, nh: 0 },
     { name: "island_with_names", cw: 90, ch: 58, mh: 9, nw: 0, nh: 16 },
-    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 121, nh: 16 },
+    // The overlay's outward name box: (labelMax 10 + 1) × 2 monospace cells
+    // of 1233/2048 em at its 11-unit marker-name step.
+    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 22 * (1233 / 2048) * 11, nh: 16 },
   ];
   for (const s of surfaces) {
     const reach = Math.SQRT2 * s.mh;
@@ -760,9 +764,11 @@ test("edge marker packing clears every legal input at both surfaces", () => {
 
 test("radial geometry contract survives every shape the 64-node payload yields", () => {
   // Pins the D1 recurrence directly (the contract the model implements).
-  assert.equal(RADIAL_GEOMETRY.ARC, 67);
-  assert.equal(RADIAL_GEOMETRY.R0, 72);
-  assert.equal(RADIAL_GEOMETRY.G, 72);
+  assert.equal(RADIAL_GEOMETRY.ARC, 77);
+  assert.equal(RADIAL_GEOMETRY.R0, 82);
+  assert.equal(RADIAL_GEOMETRY.G, 82);
+  assert.equal(RADIAL_GEOMETRY.ARC, Math.ceil(Math.hypot(LABEL_W, 23)) + 4);
+  assert.equal(RADIAL_GEOMETRY.R0, RADIAL_GEOMETRY.ARC + 5);
   assert.equal(RADIAL_GEOMETRY.LABEL_BOTTOM, 26);
   assert.equal(RADIAL_GEOMETRY.PAD, 24);
 
@@ -775,7 +781,7 @@ test("radial geometry contract survives every shape the 64-node payload yields",
     for (let i = 1; i < m; i += 1) {
       const distance = Math.hypot(ring[i].x - ring[i - 1].x, ring[i].y - ring[i - 1].y);
       assert.ok(
-        distance >= 67 - 1e-6,
+        distance >= RADIAL_GEOMETRY.ARC - 1e-6,
         `m=${m} slot ${i - 1}~${i} chord ${distance.toFixed(3)} < ARC`
       );
     }
@@ -802,7 +808,7 @@ test("radial geometry contract survives every shape the 64-node payload yields",
   // composition of totals 1..13 into <=8 parts exhaustively (7,098 layouts —
   // the dense regime where rings nearly touch), plus 40,000 deterministic
   // pseudo-random large compositions (totals 14..63, 2..8 rings), where the
-  // G = 72 radial growth makes overlap structurally impossible.
+  // G = 82 radial growth makes overlap structurally impossible.
   let swept = 0;
   const compositionsAt = (remaining, rings, prefix) => {
     if (remaining === 0) {
@@ -850,14 +856,24 @@ test("radial geometry contract survives every shape the 64-node payload yields",
   // (d) adversarial stress shapes: the 63-ring hop-chain and the dense ring.
   const chain = radialFor(new Array(63).fill(1));
   assert.deepEqual(footprintsViolating(chain), []);
-  assert.ok(chain.width > 9000 && chain.width < 9300, `chain side ${chain.width}`);
+  // 63 hop rings at G = 82 each, plus the label bottom and padding per side.
+  const chainSide = 2 * (63 * RADIAL_GEOMETRY.G + RADIAL_GEOMETRY.LABEL_BOTTOM + RADIAL_GEOMETRY.PAD);
+  assert.ok(Math.abs(chain.width - chainSide) < 1e-6, `chain side ${chain.width}`);
   const dense = radialFor([63]);
   assert.deepEqual(footprintsViolating(dense), []);
 });
 
+test("radial label box width is the worst truncated label in monospace cells", async () => {
+  // The contract's label width must not drift from the map's cell measure:
+  // four wide glyphs plus "…" at the island's 12-unit label step, plus 3.
+  const { CELL_EM, textCells } = await import("../../../../webclient-app/lib/mono_cells.js");
+  assert.equal(textCells("霧骨渡口…"), 9);
+  assert.equal(LABEL_W, Math.ceil(textCells("霧骨渡口…") * CELL_EM * 12) + 3);
+});
+
 test("radial canvas size follows the D1 recurrence", () => {
   const layout = radialFor([8, 12]);
-  const arcMin = (m) => 67 / (2 * Math.sin(Math.PI / m));
+  const arcMin = (m) => RADIAL_GEOMETRY.ARC / (2 * Math.sin(Math.PI / m));
   const r1 = Math.max(RADIAL_GEOMETRY.R0, arcMin(8));
   const r2 = Math.max(r1 + RADIAL_GEOMETRY.G, arcMin(12));
   const expected = 2 * (r2 + RADIAL_GEOMETRY.LABEL_BOTTOM + RADIAL_GEOMETRY.PAD);

@@ -9,6 +9,7 @@
 // watchers, no emit.
 import { computed } from "vue";
 import LocalMap from "../lib/local_map.js";
+import { CELL_EM, textCells } from "../lib/mono_cells.js";
 
 // Every lattice marker's base geometry in pre-scale units, multiplied by
 // the `markerScale` prop so all states scale uniformly (draft ladder,
@@ -30,6 +31,13 @@ export const HALO_R = 10;
 export const MARKER_CURRENT_RING_R = 10.5;
 
 const LABEL_BAND = 14;
+
+// The label term for two horizontally adjacent drawn labels (see
+// `labelClearancePitch`): half of each centred label box, measured in
+// monospace cells, plus a half-em word gap.
+export function labelPairPitch(labelA, labelB, labelFont) {
+  return ((textCells(labelA) + textCells(labelB)) / 2 * CELL_EM + 0.5) * labelFont;
+}
 
 // The island's legibility floor (design §11: "keeps the current node centred
 // when the box exceeds the minimap"): a square drawing that would have to be
@@ -97,8 +105,8 @@ export function useMapLatticeGeometry(props) {
   }
 
   // Node labels are bounded and truncated (the full label stays reachable
-  // through the node's accessible name); a truncated label appends "…"
-  // (labelMax + 1 glyphs in the declared label step, at most 1em each).
+  // through the node's accessible name); a truncated label appends the
+  // one-cell "…", so it spans at most 2 × labelMax + 1 monospace cells.
   function visibleNodeLabel(node) {
     if (labelSuppressed(node)) return "";
     return truncatedLabel(node.label);
@@ -109,23 +117,24 @@ export function useMapLatticeGeometry(props) {
   // horizontally adjacent pair of drawn nodes that BOTH show label text needs
   // half of each centred label box plus a half-em word gap, so two names read
   // as two names rather than one run-on phrase:
-  // `(glyphs(a) + glyphs(b)) / 2 * labelFont + labelFont / 2`, each code point of the
-  // visible (truncated) label counted as one full-width em — the bound for
-  // the shared monospace token, whose CJK draws in Noto Sans TC at 1em and
-  // whose ASCII draws in Hack at 0.602em. Two maximal labels (`labelMax + 1` glyphs) need at least the
-  // old worst-case term `(labelMax + 1) * labelFont + 3`, so the bound never
-  // loosens.
+  // `(cells(a) + cells(b)) / 2 * CELL_EM * labelFont + labelFont / 2`, the
+  // visible (truncated) label measured in monospace cells (lib/mono_cells.js):
+  // one cell for a code point the bundled monospace face draws narrow, two
+  // for every other code point, whether the face draws it two cells wide or
+  // it falls back to a roughly 1em face. Two maximal labels (`labelMax` wide
+  // glyphs plus the narrow "…") need at least the old worst-case term
+  // `(labelMax + 1) * labelFont + 3`, so the bound never loosens for them.
   const labelClearancePitch = computed(() => {
     const labeled = drawnNodes.value
-      .map((node) => ({ node, glyphs: Array.from(visibleNodeLabel(node)).length }))
-      .filter((entry) => entry.glyphs > 0);
+      .map((node) => ({ node, label: visibleNodeLabel(node) }))
+      .filter((entry) => entry.label.length > 0);
     let need = 0;
     for (let i = 0; i < labeled.length; i++) {
       for (let j = i + 1; j < labeled.length; j++) {
         const a = labeled[i];
         const b = labeled[j];
         if (a.node.row === b.node.row && Math.abs(a.node.col - b.node.col) === 1) {
-          need = Math.max(need, ((a.glyphs + b.glyphs) / 2 + 0.5) * props.labelFont);
+          need = Math.max(need, labelPairPitch(a.label, b.label, props.labelFont));
         }
       }
     }
@@ -170,9 +179,13 @@ export function useMapLatticeGeometry(props) {
     };
   }
 
-  const outwardNameBox = computed(() =>
-    props.overlayChrome ? (props.labelMax + 1) * props.markerNameFont : 0,
+  // The overlay's outward name box is declared in whole monospace cells, room
+  // for `labelMax + 1` wide glyphs; the fit budget reads the cell count
+  // directly, and the model receives its width in user units.
+  const outwardNameCells = computed(() =>
+    props.overlayChrome ? (props.labelMax + 1) * 2 : 0,
   );
+  const outwardNameBox = computed(() => outwardNameCells.value * CELL_EM * props.markerNameFont);
 
   const layoutGeometry = computed(() => {
     if (isGraph.value) {
@@ -555,6 +568,7 @@ export function useMapLatticeGeometry(props) {
     latticeStyle,
     currentPos,
     activeEdgeMarkers,
+    outwardNameCells,
     outwardNameBox,
     isGraph,
     truncatedLabel,

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
+import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
@@ -485,13 +486,20 @@ describe("LocalMap (B4 world family)", () => {
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
 
-    // With canvasSize 208: pitch fits to 60.
+    // With canvasSize 208 the label term binds: the adjacent 霧骨渡口 (8 cells)
+    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 12 → 68,
+    // above the 60-unit fill cap. Three columns and two rows of 68 centre in
+    // the 208 square at margins 2 (x) and 29 (y, with the 14-unit label band).
+    const P = 68;
+    const col = (c) => c * P + P / 2 + 2;
+    const row = (r) => (1 - r) * P + P / 2 + 29;
     const centers = {
-      "grid:altoria:1:1": { x: 104, y: 127 },
-      "grid:altoria:2:1": { x: 164, y: 127 },
-      "grid:altoria:1:2": { x: 104, y: 67 },
-      "grid:altoria:0:1": { x: 44, y: 127 },
+      "grid:altoria:1:1": { x: col(1), y: row(0) },
+      "grid:altoria:2:1": { x: col(2), y: row(0) },
+      "grid:altoria:1:2": { x: col(1), y: row(1) },
+      "grid:altoria:0:1": { x: col(0), y: row(0) },
     };
+    expect(centers["grid:altoria:1:1"]).toEqual({ x: 104, y: 131 });
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
@@ -503,20 +511,27 @@ describe("LocalMap (B4 world family)", () => {
       expect(label.attributes("y")).toBe("25");
     }
 
-    const markerBoxes = {
-      "grid:altoria:1:1": { x1: 95, y1: 118, x2: 113, y2: 136 },
-      "grid:altoria:2:1": { x1: 158.5, y1: 121.5, x2: 169.5, y2: 132.5 },
-      "grid:altoria:1:2": { x1: 98.5, y1: 61.5, x2: 109.5, y2: 72.5 },
-      "grid:altoria:0:1": { x1: 38.5, y1: 121.5, x2: 49.5, y2: 132.5 },
-    };
+    // Current seal half-extent 9; visited/unvisited dots 5.5.
+    const half = { "grid:altoria:1:1": 9, "grid:altoria:2:1": 5.5, "grid:altoria:1:2": 5.5, "grid:altoria:0:1": 5.5 };
+    const markerBoxes = {};
+    for (const [id, c] of Object.entries(centers)) {
+      markerBoxes[id] = { x1: c.x - half[id], y1: c.y - half[id], x2: c.x + half[id], y2: c.y + half[id] };
+    }
 
-    // Label boxes: font 12, 5 full-width glyphs (60 wide), ascent 11.4, descent 5.4 around y=25
-    const labelBoxes = {
-      "grid:altoria:1:1": { x1: 74, y1: 140.6, x2: 134, y2: 157.4 },
-      "grid:altoria:2:1": { x1: 134, y1: 140.6, x2: 194, y2: 157.4 },
-      "grid:altoria:1:2": { x1: 74, y1: 80.6, x2: 134, y2: 97.4 },
-      "grid:altoria:0:1": { x1: 14, y1: 140.6, x2: 74, y2: 157.4 },
-    };
+    // Label boxes: the drawn (truncated) label measured in monospace cells at
+    // font 12, ascent 11.4 and descent 5.4 around the baseline y = 25.
+    const labelBoxes = {};
+    for (const [id, c] of Object.entries(centers)) {
+      // The drawn text only: the element also holds the full name's <title>.
+      const el = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`).element;
+      const text = Array.from(el.childNodes)
+        .filter((n) => n.nodeType === Node.TEXT_NODE)
+        .map((n) => n.textContent)
+        .join("")
+        .trim();
+      const width = textCells(text) * CELL_EM * 12;
+      labelBoxes[id] = { x1: c.x - width / 2, y1: c.y + 13.6, x2: c.x + width / 2, y2: c.y + 30.4 };
+    }
 
     function separated(a, b) {
       return (
@@ -546,19 +561,20 @@ describe("LocalMap (B4 world family)", () => {
       }
     }
     everyPair(markerBoxes);
+    everyPair(labelBoxes);
 
     const e0 = w.get('[data-testid="local-map__edge--0"]');
     expect(e0.attributes("x1")).toBe("104");
-    expect(e0.attributes("y1")).toBe("127");
-    expect(e0.attributes("x2")).toBe("164");
-    expect(e0.attributes("y2")).toBe("127");
-    expect(60 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e0.attributes("y1")).toBe("131");
+    expect(e0.attributes("x2")).toBe("172");
+    expect(e0.attributes("y2")).toBe("131");
+    expect(P - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
     expect(e1.attributes("x1")).toBe("104");
-    expect(e1.attributes("y1")).toBe("127");
+    expect(e1.attributes("y1")).toBe("131");
     expect(e1.attributes("x2")).toBe("104");
-    expect(e1.attributes("y2")).toBe("67");
-    expect(60 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e1.attributes("y2")).toBe("63");
+    expect(P - 9 - 5.5).toBeGreaterThan(0);
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {

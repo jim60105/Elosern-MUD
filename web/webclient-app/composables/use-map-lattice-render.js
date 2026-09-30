@@ -7,28 +7,58 @@
 // passed through from the SFC.
 import { computed } from "vue";
 import { MARKER_DIAMOND_HALF } from "./use-map-lattice-geometry.js";
+import { CELL_EM, charCells } from "../lib/mono_cells.js";
+
+// One line step per glyph: the island's left/right names stack one glyph per
+// line, so each glyph costs one type step however wide it draws.
+const oneStep = () => 1;
+
+function measureOf(chars, measure) {
+  let total = 0;
+  for (const ch of chars) total += measure(ch);
+  return total;
+}
+
+// Fit an edge-marker name into `budget` units of `measure` (monospace cells
+// for a horizontal line, line steps for a vertical stack; "…" costs 1 in
+// both). The whole name when it fits; else the head truncated before a kept
+// `（qualifier）`; else one head glyph, "…", and the longest tail that fits,
+// with any room left growing the head. Returns "" when no head-and-tail form
+// fits, so the diamond and its title stand alone.
+export function fitMarkerName(label, budget, measure = charCells) {
+  if (!label || budget < 3) return "";
+  const chars = Array.from(label);
+  if (measureOf(chars, measure) <= budget) return label;
+  const ellipsis = measure("…");
+  const parenIdx = label.lastIndexOf("（");
+  if (parenIdx > 0 && label.endsWith("）") && parenIdx < label.length - 1) {
+    const qualifier = label.slice(parenIdx);
+    let used = measureOf(Array.from(qualifier), measure) + ellipsis;
+    let head = "";
+    for (const ch of Array.from(label.slice(0, parenIdx))) {
+      if (used + measure(ch) > budget) break;
+      used += measure(ch);
+      head += ch;
+    }
+    if (head) return head + "…" + qualifier;
+  }
+  let headLen = 1;
+  let used = measure(chars[0]) + ellipsis;
+  let tailLen = 0;
+  while (tailLen < chars.length - 2 && used + measure(chars[chars.length - 1 - tailLen]) <= budget) {
+    used += measure(chars[chars.length - 1 - tailLen]);
+    tailLen += 1;
+  }
+  if (tailLen === 0) return "";
+  while (headLen + tailLen < chars.length - 1 && used + measure(chars[headLen]) <= budget) {
+    used += measure(chars[headLen]);
+    headLen += 1;
+  }
+  return chars.slice(0, headLen).join("") + "…" + chars.slice(chars.length - tailLen).join("");
+}
 
 export function useMapLatticeRender(props, emit, geometry) {
-  const { activeEdgeMarkers, outwardNameBox } = geometry;
-
-  function fitMarkerName(label, budget) {
-    if (!label || budget < 3) return "";
-    const chars = Array.from(label);
-    if (chars.length <= budget) return label;
-    const parenIdx = label.lastIndexOf("（");
-    if (parenIdx !== -1 && label.endsWith("）") && parenIdx < label.length - 1) {
-      const qualifier = label.slice(parenIdx);
-      const qualifierChars = Array.from(qualifier);
-      if (budget >= 2 + qualifierChars.length) {
-        const headBudget = budget - 1 - qualifierChars.length;
-        const headChars = Array.from(label.slice(0, parenIdx)).slice(0, headBudget);
-        return headChars.join("") + "…" + qualifier;
-      }
-    }
-    const tailLen = Math.min(chars.length - 2, budget - 2);
-    const headLen = Math.max(1, budget - 1 - tailLen);
-    return chars.slice(0, headLen).join("") + "…" + chars.slice(chars.length - tailLen).join("");
-  }
+  const { activeEdgeMarkers, outwardNameCells } = geometry;
 
   const fittedEdgeMarkers = computed(() => {
     const markers = activeEdgeMarkers.value.markers || [];
@@ -42,16 +72,20 @@ export function useMapLatticeRender(props, emit, geometry) {
 
     const fittedList = markers.map((m) => {
       const span = m.span || 0;
-      const drawsOutward =
-        outwardNameBox.value > 0 && (m.side === "left" || m.side === "right");
-      const maxBoxGlyphs = drawsOutward
-        ? Math.floor(outwardNameBox.value / props.markerNameFont)
-        : Infinity;
-      const budget = Math.min(
-        Math.floor(span / props.markerNameFont),
-        maxBoxGlyphs,
-      );
-      const fitted = fitMarkerName(m.name, budget);
+      const sideways = m.side === "left" || m.side === "right";
+      // The island stacks left/right names one glyph per line, so their
+      // budget is in type steps; every other name is one horizontal line
+      // budgeted in whole monospace cells (the epsilon keeps an exact fit
+      // from flooring one cell short).
+      const stacked = sideways && !props.overlayChrome;
+      const drawsOutward = outwardNameCells.value > 0 && sideways;
+      const budget = stacked
+        ? Math.floor(span / props.markerNameFont)
+        : Math.min(
+            Math.floor(span / (CELL_EM * props.markerNameFont) + 1e-9),
+            drawsOutward ? outwardNameCells.value : Infinity,
+          );
+      const fitted = fitMarkerName(m.name, budget, stacked ? oneStep : charCells);
       return {
         ...m,
         visibleName: fitted,
@@ -139,7 +173,7 @@ export function useMapLatticeRender(props, emit, geometry) {
 
   // Edge-marker name placement (map-02 D4 wording): the name box is drawn
   // OUTWARD from the diamond's outer tip — never toward the canvas. The
-  // 11px monospace glyph line (Hack ASCII, Noto Sans TC CJK) does not scale with the markers (same policy
+  // 11px monospace glyph line does not scale with the markers (same policy
   // as the node labels), so the offset is the scaled rotated-diamond axial
   // reach plus the 2-unit model margin and an 11px ascent to the baseline.
   const MARKER_NAME_ASCENT = 11;

@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import MapLattice from "../../components/MapLattice.vue";
 import LocalMapModel from "../../lib/local_map.js";
+import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 import {
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
@@ -59,10 +60,11 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const w = mountLattice(OVERLAY_PROPS);
     const svg = w.find("svg.local-map__lattice");
     // The natural canvas is 3 × 280px wide, 1 × 212px row pitch + 14px
-    // label band; the edge-marker gutter (model value 246.9517… at the
-    // overlay's name-bearing geometry) grows it on every side (map-02 D3b).
-    expect(Number(svg.attributes("width"))).toBeCloseTo(1333.9034542254337, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(719.9034542254337, 6);
+    // label band; the edge-marker gutter (model value 271.6480… at the
+    // overlay's name-bearing geometry, whose outward name box is 22
+    // monospace cells at 11) grows it on every side (map-02 D3b).
+    expect(Number(svg.attributes("width"))).toBeCloseTo(1383.2960323504337, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(769.2960323504337, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
     // webclient-full-map-fit-view D6: an overlay-scale mount without
@@ -129,7 +131,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
         canvasHeight: 212 + 14,
         current: { x: 420, y: 106 },
         markerHalf: 9 * 4.83,
-        nameWidth: 11 * 11,
+        nameWidth: 22 * CELL_EM * 11,
         nameHeight: 16,
       },
     ).gutter;
@@ -162,19 +164,23 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     };
     // Node labels: baseline at the scaled offset (13×4.83 + 13 ≈ 75.8px
     // below the node origin); the 11px monospace line box is modelled as
-    // 10.5px above and 3px below the baseline. CJK glyphs (Noto Sans TC)
-    // are full-width (11px) and Hack ASCII is narrower (0.602em);
-    // a truncated label appends "…" (labelMax + 1 glyphs worst case).
+    // 10.5px above and 3px below the baseline. The drawn label is measured
+    // in monospace cells of CELL_EM × 11 (a wide glyph is two cells, the
+    // truncation "…" one).
     const LABEL_ASCENT = 10.5;
     const LABEL_DESCENT = 3;
-    const GLYPH_W = 11;
     const labelY = 13 * 4.83 + 13;
     function labelBox(id) {
       const center = centers[id];
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
-      const textEl = node.find(".local-map__node-label");
-      const label = textEl.text();
-      const width = label.length * GLYPH_W;
+      // The drawn text only: the element also holds the full name's <title>.
+      const textEl = node.find(".local-map__node-label").element;
+      const label = Array.from(textEl.childNodes)
+        .filter((n) => n.nodeType === Node.TEXT_NODE)
+        .map((n) => n.textContent)
+        .join("")
+        .trim();
+      const width = textCells(label) * CELL_EM * 11;
       return {
         x1: center.x - width / 2,
         y1: center.y + labelY - LABEL_ASCENT,

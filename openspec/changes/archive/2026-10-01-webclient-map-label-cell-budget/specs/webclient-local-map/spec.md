@@ -240,7 +240,7 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 
 #### Scenario: The island's name band is reserved as band depth, not as an outward box
 - **WHEN** the reported wilderness shape renders on the island with named edge markers — a three-column by three-row in-view lattice whose node core is 120 × 134 user units at the island's square 40-unit minimum pitch
-- **THEN** the island's declared name geometry reserves only the band's depth, so the marker gutter is 44.46 user units rather than the 83.46 that an outward, edge-perpendicular name box of the overlay's width would demand; the gutter replaces the 8px inset, the pitch stays at its 40-unit minimum because a larger one would not fit, the square side becomes 222.91 user units, and the whole drawing renders at a uniform scale of 208 / 222.91 ≈ 0.933, so the node core keeps about 112 of the 120 CSS px it would occupy with no names at all instead of collapsing to 86.2 CSS px, and each marker name renders at the island's declared 10-unit marker-name step scaled by that same factor, while each node label drawn there renders at 12 × 208 / 222.91 ≈ 11.2 CSS px
+- **THEN** the island's declared name geometry reserves only the band's depth, so the marker gutter is 44.46 user units rather than the much wider gutter that an outward, edge-perpendicular name box of `labelMax + 1` wide glyphs would demand; the gutter replaces the 8px inset, the pitch stays at its 40-unit minimum because a larger one would not fit, the square side becomes 222.91 user units, and the whole drawing renders at a uniform scale of 208 / 222.91 ≈ 0.933, so the node core keeps about 112 of the 120 CSS px it would occupy with no names at all instead of collapsing to 86.2 CSS px, and each marker name renders at the island's declared 10-unit marker-name step scaled by that same factor, while each node label drawn there renders at 12 × 208 / 222.91 ≈ 11.2 CSS px
 
 #### Scenario: A sparse payload reads airy rather than magnified
 - **WHEN** the committed payload contains a single node and renders on the island
@@ -252,8 +252,8 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 - **THEN** the first draws at its natural 80 × 2574 size with no width bound, no maximum height, and no inline size at all; the island draws it inside its 208px square at a uniform scale below 1; and the full-map surface opens it fitted inside its body through its fitted view — so no surface spends a height budget as a width bound, and the renderer offers no cap for any surface to pass
 
 #### Scenario: A graph payload is cropped to its footprint and never magnified
-- **WHEN** the island renders, in turn, an interior payload whose current node has one ring of neighbours (a 244-unit radial canvas) and an interior payload carrying only its current node (a 100-unit radial canvas)
-- **THEN** the first draws its drawn footprint plus the 8px inset — a 212-unit square — at a uniform scale of 208 / 212 ≈ 0.98 rather than the 208 / 244 ≈ 0.85 its padded canvas would force, and the second draws its single node at scale 1 in the centre of the 208px square with its label at 12 CSS px, not magnified to fill the square
+- **WHEN** the island renders, in turn, an interior payload whose current node has one ring of neighbours (a 264-unit radial canvas) and an interior payload carrying only its current node (a 100-unit radial canvas)
+- **THEN** the first draws its drawn footprint plus the 8px inset — a 232-unit square — at a uniform scale of 208 / 232 ≈ 0.90 rather than the 208 / 264 ≈ 0.79 its padded canvas would force, and the second draws its single node at scale 1 in the centre of the 208px square with its label at 12 CSS px, not magnified to fill the square
 
 #### Scenario: The overlay keeps its geometry and gains only the coordinate field
 - **WHEN** the same committed payload renders in the full-map overlay, which declares neither a fixed square canvas nor an axis

@@ -14,11 +14,14 @@ Jim Mono TC v0.1.0 OTFs (upem 2048, Latin advance 1233, CJK advance 2466) and th
 | `elosern/local_map.js` `RADIAL_GEOMETRY` | label box 58 × 23 = `5 × 11 + 3`, so `ARC = 67` and `R0 = G = 72` | horizontal |
 | `elosern/local_map.js` `edgeMarkersFor` | consumes `nameWidth` and `nameHeight` from the surface | — |
 
-- **Label type sizes.** The island uses `labelFont` 12 (`LocalMap.vue:194`) and the overlay uses 14
-  (`MapOverlay.vue:170`). `markerNameFont` defaults to 10.
+- **Label type sizes.** The island uses `labelFont` 12 (`LocalMap.vue:194`), `labelMax` 4 (the
+  default), `markerNameFont` 10 and `markerScale` 1. The overlay uses `labelFont` 14, `labelMax` 10,
+  `markerNameFont` 11 and `markerScale` 2.2 (`MapOverlay.vue:162–176`). Both surfaces render either
+  variant.
 - **Surface orientation.** Island names on left/right edges stack vertically, one glyph per `tspan` with
   `dy = markerNameFont`. Every other marker name and every node label is one horizontal line.
-- **Truncation.** `truncatedLabel` keeps at most `labelMax` (4) code points plus `…` (U+2026). Both Hack
+- **Truncation.** `truncatedLabel` keeps at most `labelMax` code points (4 on the island, 10 on the
+  overlay) plus `…` (U+2026). Both Hack
   and Jim Mono TC draw `…` one cell wide.
 - **Vertical budgets.** The row pitch, `LABEL_BAND`, `MARKER_NAME_ASCENT`, the label baseline, and the
   vertical-stack step budget the line height, not the advance. Jim Mono TC keeps Hack's vertical
@@ -44,6 +47,11 @@ Jim Mono TC v0.1.0 OTFs (upem 2048, Latin advance 1233, CJK advance 2466) and th
 - Budgeting non-map monospace surfaces (command line, keycaps, message art). They flow in CSS boxes.
 - Emoji. A system emoji font may be wider than 2 cells, 1.204 em. Place names carry no emoji, and the
   limit is documented here.
+- The overlay's radial labels. The radial contract is declared in unscaled units and the overlay
+  scales positions by 2.2 but draws its 14-unit labels unscaled with `labelMax` 10, so its worst label
+  (21 cells ≈ 177 units) already exceeds the scaled contract box today (11 × 14 = 154 against
+  58 × 2.2 = 127.6) and still does after this change (about 152). No test covers it. It is a
+  pre-existing gap for a follow-up change, not something this change introduces.
 
 ## Decisions
 
@@ -83,17 +91,18 @@ with the font.
 ### D2. The lattice label term in cells
 
 `labelClearancePitch` computes `((textCells(a) + textCells(b)) / 2 × CELL_EM + 0.5) × labelFont`, rounded
-up. The worst case is two truncated labels of four CJK glyphs plus `…`, which is 9 cells each:
+up. The worst case is two truncated labels of `labelMax` CJK glyphs plus `…`: 9 cells on the island, 21
+on the overlay.
 
-| Surface (`labelFont`) | Old worst term | New worst term | Five-ASCII-glyph pair, new |
+| Surface (`labelFont`, `labelMax`) | Old worst term | New worst term | Five-ASCII-glyph pair, new |
 | --- | --- | --- | --- |
-| island (12) | 66 | 72 (+9%) | 43 (was 66) |
-| overlay (14) | 77 | 83 | 50 |
+| island (12, 4) | 66 | 72 (+9%) | 43 (was 66) |
+| overlay (14, 10) | 161 | 185 (+15%) | 50 (was 77) |
 
 The spec's floor, never less than `(labelMax + 1) × labelFont + 3`, still holds. ASCII and short names
 now ask for less room. Fixtures whose adjacent labels are ASCII therefore get a smaller derived pitch,
-while all-CJK fixtures get a larger one. The overlay term stays far below its declared pitches, so the
-overlay scenario's "never binds" still holds.
+while all-CJK fixtures get a larger one. The overlay term (185) stays below its declared column pitch (280),
+so the overlay scenario's "never binds" still holds.
 
 ### D3. Marker-name fitting in cells
 
@@ -105,8 +114,9 @@ overlay scenario's "never binds" still holds.
   uses the measure. Head and tail grow greedily one code point at a time while they fit. `…` costs 1
   under either measure.
 - **Integer budgets.** Budgets are integers computed without floating-point rounding traps:
-  - The outward box is declared in cells: `outwardNameCells = (labelMax + 1) × 2`, which is 10 cells,
-    room for five wide glyphs, the same capacity as today. The unit width passed as `nameWidth` to
+  - The outward box is declared in cells: `outwardNameCells = (labelMax + 1) × 2`, room for
+    `labelMax + 1` wide glyphs, the same capacity as today. On the overlay that is 22 cells (11 wide
+    glyphs); the unit width grows from 11 × 11 = 121 to 22 × CELL_EM × 11 ≈ 145.7. The unit width passed as `nameWidth` to
     `edgeMarkersFor` is `outwardNameCells × CELL_EM × markerNameFont`. The overlay's gutter and
     `slotMinH` widen through the existing closed-form packing.
   - The span term for horizontal names is `floor(span / (CELL_EM × markerNameFont) + 1e-9)` cells.
@@ -120,15 +130,19 @@ the requirement says shorter names ask only for the room they occupy.
 ### D4. The radial contract numbers
 
 `elosern/local_map.js` declares a worst-case label box instead of reading label text. Its documented
-basis is `5 × 11 + 3 = 58`, the 11-unit label step. Recomputed from the cell measure on the same basis:
+basis is `5 × 11 + 3 = 58`, an 11-unit label step. The island, which draws the radial at scale 1,
+actually draws labels at 12 units, so the basis moves to 12 in the same edit. Recomputed from the cell
+measure at 12:
 
-- width `ceil(9 × CELL_EM × 11) + 3 = 63`; height 23 is unchanged;
-- diagonal `sqrt(63² + 23²) = 67.07`, so `ARC = ceil + 4 = 72`;
-- `R0 = G = ARC + 5 = 77`.
+- width `ceil(9 × CELL_EM × 12) + 3 = 69`; height 23 is unchanged;
+- diagonal `sqrt(69² + 23²) = 72.73`, so `ARC = ceil + 4 = 77`;
+- `R0 = G = ARC + 5 = 82`.
 
-Task 3.1 first confirms the basis against the radial label size actually drawn. If the radial variant
-draws labels at 12 units, the same derivation gives 69 × 23, `ARC = 77`, and `R0 = G = 82`, and the
-larger set is used.
+Two effects combine: the cell measure alone (at the old 11 basis: 63, 72, 77) and the basis correction
+(11 → 12). Radial rings and the radial canvas grow by about 14%. The only consumers of these numbers
+are `radialArcMin`, the ring recurrence and canvas side in the model, the renderer's `PAD` read, and
+the pins in `local_map.test.js`; the island fits the radial canvas into its square by scaling, and the
+browser radial test compares positions against the model's own placement.
 
 `local_map.test.js` pins the result. It also imports `mono_cells.js` through dynamic `import()`, since
 the helper is an ES module, and asserts that the declared width equals
@@ -155,8 +169,10 @@ change then touches no map file.
   Fixtures that shrink (ASCII labels) and fixtures that grow (CJK labels) are both named in the task
   notes.
 - **Marker-fit tests.** They are extended with a mixed name (`北門 Gate`), a `（qualifier）` name, and a
-  check that the overlay's outward box fits exactly 10 cells: five CJK glyphs fit, and six are
-  truncated.
+  check that the overlay's outward box fits exactly 22 cells: eleven CJK glyphs fit, and twelve are
+  truncated. Also: a qualifier-only name (`（南門）`), odd budgets with mixed names, a budget equal to
+  the total and one below it, and an all-CJK budget of `2g` cells giving the old `g`-glyph result
+  (head 1, tail `g − 2`).
 - **Browser geometry oracle.** It is re-run as focused single methods (tasks group 4). No assertion is
   loosened.
 
@@ -169,8 +185,13 @@ change then touches no map file.
 - **[ASCII-labelled fixtures get tighter pitches]**
   - Mitigation: the bare term, the marker footprints and the connector clearance are unchanged, so
     only the label term shrinks. The overlap assertions prove it.
-- **[Radial rings grow about 7–14%]**
-  - Mitigation: the radial Node sweep and `test_walked_instance_layer_renders_radial_on_both_surfaces`.
+- **[Radial rings grow about 14%]**
+  - The island crops a one-ring interior to its footprint: the square grows from 212 to 232 units, so
+    the drawing scales at 208 / 232 ≈ 0.90 instead of 0.98 and its labels draw at about 10.8 CSS px
+    instead of 11.8. The legibility requirement's 11 px floor names only lattice fixtures; radial
+    labels stay above its 9 px lower bound.
+  - Mitigation: the radial Node sweep, the updated crop scenario, and
+    `test_walked_instance_layer_renders_radial_on_both_surfaces`.
 - **[A long edge-marker name no longer fits]**
   - The scenario "A lone gateway on an edge carries its whole authored name" (`西部丘陵與谷地（南門）`,
     22 cells = 132 units at 10) needs a horizontal span of at least 132 units.
