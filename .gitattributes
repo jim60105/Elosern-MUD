@@ -1,0 +1,3 @@
+# Vendored upstream licence texts stay byte-identical to the Jim Mono TC release
+# (tools/import_mono_font.py); some use CRLF line endings.
+web/webclient-app/fonts/jimmonotc/licenses/** -text
