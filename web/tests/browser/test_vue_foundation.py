@@ -208,7 +208,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps",
         "webclient-vue-application::the-webclient-loads-a-self-contained-offline-vue-spa",
         "webclient-vue-application::the-design-system-carries-over-from-the-design-draft-and-stays-offline",
-        "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face",
+        "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face",
     )
     def test_vue_bundle_loads_from_origin_offline(self):
         """The built page makes no remote runtime request (delta scenario)."""

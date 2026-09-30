@@ -17,6 +17,8 @@ import re
 import unicodedata
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = REPO_ROOT / "web" / "webclient-app"
 FONT_DIR = APP_ROOT / "fonts" / "jimmonotc"
@@ -83,6 +85,7 @@ class MonoFontContractTest(unittest.TestCase):
         cls.faces = _faces()
         cls.manifest = json.loads((FONT_DIR / "codepoints.json").read_text(encoding="utf-8"))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_every_url_resolves_and_every_slice_is_referenced(self):
         referenced = [(CSS_PATH.parent / face["src"]).resolve() for face in self.faces]
         self.assertEqual(len(referenced), len(set(referenced)), "a slice is declared twice")
@@ -90,6 +93,7 @@ class MonoFontContractTest(unittest.TestCase):
             self.assertTrue(path.is_file(), path)
         self.assertEqual(set(referenced), {path.resolve() for path in FONT_DIR.glob("*.woff2")})
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_every_face_is_the_jim_mono_tc_family_at_its_weight(self):
         for face in self.faces:
             with self.subTest(src=face["src"]):
@@ -99,11 +103,13 @@ class MonoFontContractTest(unittest.TestCase):
                 self.assertEqual(WEIGHTS[face["weight"]], face["file_style"].lower())
                 self.assertTrue(face["group"] in ONE_CELL_GROUPS or _is_cjk_group(face["group"]), face["group"])
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_both_weights_ship_every_one_cell_group(self):
         for weight in WEIGHTS:
             groups = sorted(face["group"] for face in self.faces if face["weight"] == weight and not _is_cjk_group(face["group"]))
             self.assertEqual(groups, sorted(ONE_CELL_GROUPS))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_every_slice_is_woff2_within_the_small_file_bound(self):
         slices = sorted(FONT_DIR.glob("*.woff2"))
         self.assertTrue(slices)
@@ -113,6 +119,7 @@ class MonoFontContractTest(unittest.TestCase):
                 self.assertEqual(data[:4], b"wOF2")
                 self.assertLessEqual(len(data), MAX_BYTES)
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_declared_ranges_are_disjoint_and_match_the_manifest(self):
         for weight, key in WEIGHTS.items():
             with self.subTest(weight=weight):
@@ -124,6 +131,7 @@ class MonoFontContractTest(unittest.TestCase):
                 self.assertEqual(one, set(self.manifest[key]))
                 self.assertEqual(cjk, set(self.manifest["cjk"][key]))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_the_weights_differ_only_in_the_known_one_cell_extras(self):
         # The map cell table uses the Regular set; Bold draws the same one-cell
         # characters except these three, plus extra latin-ext glyphs. A new
@@ -132,17 +140,20 @@ class MonoFontContractTest(unittest.TestCase):
         regular, bold = set(self.manifest["regular"]), set(self.manifest["bold"])
         self.assertEqual(regular - bold, {0x03F6, 0x2215, 0x2219})
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_both_weights_declare_the_same_cjk(self):
         cjk = self.manifest["cjk"]
         self.assertEqual(cjk["regular"], cjk["bold"])
         self.assertEqual(len(cjk["regular"]), CJK_COUNT)
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_cjk_is_the_bundled_noto_wide_coverage_minus_the_recorded_gaps(self):
         cjk = set(self.manifest["cjk"]["regular"])
         missing = set(self.manifest["noto_wide_missing"])
         self.assertFalse(cjk & missing)
         self.assertEqual(cjk, _noto_wide() - missing)
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_key_code_points_land_in_the_right_cell_class(self):
         one = set(self.manifest["regular"])
         cjk = set(self.manifest["cjk"]["regular"])
@@ -152,6 +163,7 @@ class MonoFontContractTest(unittest.TestCase):
             self.assertIn(cp, cjk, hex(cp))
             self.assertNotIn(cp, one, hex(cp))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_ascii_and_arrows_ship_only_in_the_latin_slice(self):
         for face in self.faces:
             with self.subTest(weight=face["weight"], group=face["group"]):
@@ -160,11 +172,13 @@ class MonoFontContractTest(unittest.TestCase):
                 else:
                     self.assertFalse((ASCII | ARROWS) & face["codepoints"])
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_no_private_use_code_point_is_declared(self):
         for face in self.faces:
             for lo, hi in PRIVATE_USE:
                 self.assertFalse(any(lo <= cp <= hi for cp in face["codepoints"]), face["src"])
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_licences_ship_beside_the_font_files(self):
         licence = (FONT_DIR / "licenses" / "LICENSE").read_text(encoding="utf-8")
         self.assertIn("SIL OPEN FONT LICENSE", licence.upper())
@@ -172,6 +186,7 @@ class MonoFontContractTest(unittest.TestCase):
         self.assertTrue((FONT_DIR / "licenses" / "NOTICE.md").is_file())
         self.assertIn("Bitstream Vera", (FONT_DIR / "licenses" / "Hack-LICENSE.txt").read_text(encoding="utf-8"))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_monospace_token_names_only_the_bundled_faces(self):
         match = re.search(r"--f-mono:\s*([^;]+);", TOKENS_PATH.read_text(encoding="utf-8"))
         self.assertEqual(match.group(1).strip(), MONO_STACK)

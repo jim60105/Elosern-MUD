@@ -77,7 +77,7 @@
 
 ## 7. Requirement traceability (lands with archive)
 
-- [ ] 7.1 After the spec sync (archive), confirm with `uv run --locked python -m tools.spec_traceability list` that `webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face` exists and the Hack ID is gone. Apply D8 (IDs as string literals). Verify: `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate` pass, and the sync and decorators land in one commit.
+- [x] 7.1 After the spec sync (archive), confirm with `uv run --locked python -m tools.spec_traceability list` that `webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face` exists and the Hack ID is gone. Apply D8 (IDs as string literals). Verify: `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate` pass, and the sync and decorators land in one commit.
 
 ## Apply notes
 

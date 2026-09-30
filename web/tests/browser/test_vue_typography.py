@@ -171,7 +171,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             f"no bundled {family} face in {sorted(fonts)}",
         )
 
-    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_keycaps_and_command_input_keep_monospace(self):
         self.story("core-appshell--populated-hud", ".vitals")
         self.assertIn("monospace", self.page.locator("kbd").first.evaluate("e => getComputedStyle(e).fontFamily"))
@@ -194,6 +194,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
         self.page.keyboard.press("Escape")
         self.assertTrue(self.page.locator("#action-dock").evaluate("e => e === document.activeElement"))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_monospace_cells_are_exact(self):
         """CJK advances two Latin cells, `…`, `─`, and a ligature run one each, in both weights."""
         self.story("core-appshell--populated-hud", ".vitals")
