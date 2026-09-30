@@ -128,7 +128,7 @@
 names the new ID before the delta is synced fails CI with `unknown-requirement-id`. So this group runs
 when the user asks for archive, in the same commit as the spec sync.
 
-- [ ] 7.1 After `openspec archive` (or `openspec-sync-specs`) has merged the delta into `openspec/specs/webclient-vue-application/spec.md`, confirm the ID with `uv run --locked python -m tools.spec_traceability list`: it must be `webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face`. Add the ID to `@covers_requirement` on every test in the D9 table:
+- [x] 7.1 After `openspec archive` (or `openspec-sync-specs`) has merged the delta into `openspec/specs/webclient-vue-application/spec.md`, confirm the ID with `uv run --locked python -m tools.spec_traceability list`: it must be `webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face`. Add the ID to `@covers_requirement` on every test in the D9 table:
   - `tests/test_hack_font_slices_contract.py`, on its test method(s);
   - `test_vue_typography.VueTypographyBrowserTest.test_keycaps_and_command_input_keep_monospace`, which gets a new decorator;
   - `test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline`, appended to its existing list;

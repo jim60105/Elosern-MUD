@@ -17,6 +17,8 @@ from pathlib import Path
 import re
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = REPO_ROOT / "web" / "webclient-app"
 FONT_DIR = APP_ROOT / "fonts" / "hack"
@@ -61,6 +63,7 @@ class HackFontSlicesContractTest(unittest.TestCase):
         cls.faces = _faces()
         cls.manifest = json.loads((FONT_DIR / "codepoints.json").read_text(encoding="utf-8"))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_every_url_resolves_and_every_slice_is_referenced(self):
         referenced = {(CSS_PATH.parent / face["src"]).resolve() for face in self.faces}
         for path in referenced:
@@ -70,6 +73,7 @@ class HackFontSlicesContractTest(unittest.TestCase):
             self.assertEqual(face["family"], "'Hack'")
             self.assertEqual(face["style"], "normal")
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_every_slice_is_woff2_between_the_inline_limit_and_the_ceiling(self):
         slices = sorted(FONT_DIR.glob("*.woff2"))
         self.assertEqual(len(slices), len(WEIGHTS) * len(SLICE_NAMES))
@@ -80,6 +84,7 @@ class HackFontSlicesContractTest(unittest.TestCase):
                 self.assertGreaterEqual(len(data), MIN_BYTES)
                 self.assertLessEqual(len(data), MAX_BYTES)
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_both_weights_declare_every_slice_once(self):
         for weight, name in WEIGHTS.items():
             faces = [face for face in self.faces if face["weight"] == weight]
@@ -87,6 +92,7 @@ class HackFontSlicesContractTest(unittest.TestCase):
             for face in faces:
                 self.assertIn(f"/hack-{name}.", face["src"])
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_declared_ranges_are_disjoint_and_cover_the_hack_cmap(self):
         for weight, name in WEIGHTS.items():
             with self.subTest(weight=weight):
@@ -96,6 +102,7 @@ class HackFontSlicesContractTest(unittest.TestCase):
                 self.assertEqual(union, set(self.manifest[name]))
                 self.assertFalse(union & {0x0000, 0x000D, 0xFEFF})
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_arrows_ship_in_the_latin_slice_and_no_range_enters_cjk(self):
         for face in self.faces:
             with self.subTest(weight=face["weight"], slice=face["slice"]):
@@ -106,11 +113,13 @@ class HackFontSlicesContractTest(unittest.TestCase):
                 for lo, hi in CJK_BLOCKS:
                     self.assertFalse(any(lo <= cp <= hi for cp in face["codepoints"]))
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_license_ships_beside_the_font_files(self):
         text = (FONT_DIR / "LICENSE.md").read_text(encoding="utf-8")
         self.assertIn("MIT", text)
         self.assertIn("Bitstream Vera", text)
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_monospace_token_names_only_the_bundled_faces(self):
         match = re.search(r"--f-mono:\s*([^;]+);", TOKENS_PATH.read_text(encoding="utf-8"))
         self.assertEqual(match.group(1).strip(), MONO_STACK)

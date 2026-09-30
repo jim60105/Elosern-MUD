@@ -142,7 +142,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             panel,
         )
 
-    @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face",
+    )
     def test_densely_populated_lattice_scales_down_without_reintroducing_overlap(self):
         # A densely populated lattice (2 cols × 64 rows) must scale the
         # canvas down to fit the island's bounded height — pre-scale
@@ -356,7 +359,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement(
-        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone",
+        "webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face",
     )
     def test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas(self):
         """Task 5.1: crowded remembered gateways on overlay edge keep names apart and outside canvas."""

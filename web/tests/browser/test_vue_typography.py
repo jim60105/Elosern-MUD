@@ -171,6 +171,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             f"no bundled {family} face in {sorted(fonts)}",
         )
 
+    @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-hack-face")
     def test_keycaps_and_command_input_keep_monospace(self):
         self.story("core-appshell--populated-hud", ".vitals")
         self.assertIn("monospace", self.page.locator("kbd").first.evaluate("e => getComputedStyle(e).fontFamily"))
