@@ -95,6 +95,27 @@ const {
   confirmCurrent,
   cancelConfirm,
 } = creation;
+
+// Presentation-only stepping: invalid direct entry is never repaired here.
+// Budget admission and server validation remain in the existing form pipeline.
+function canStep(axis, direction) {
+  const value = allocations[axis.axis];
+  return Number.isInteger(value)
+    && value >= axis.minimum && value <= axis.maximum
+    && value + direction >= axis.minimum && value + direction <= axis.maximum;
+}
+
+function stepAllocation(axis, direction) {
+  if (canStep(axis, direction)) allocations[axis.axis] += direction;
+}
+
+function allocationFraction(axis) {
+  const value = allocations[axis.axis];
+  const span = axis.maximum - axis.minimum;
+  return Number.isFinite(value) && span > 0
+    ? Math.max(0, Math.min(1, (value - axis.minimum) / span))
+    : 0;
+}
 </script>
 
 <template>
@@ -109,7 +130,11 @@ const {
     :data-mode="mode"
   >
     <header class="creation-overlay__header">
-      <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
+      <div>
+        <p class="creation-overlay__eyebrow">ELOSERN · 伊洛瑟恩</p>
+        <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
+      </div>
+      <p class="creation-overlay__intro">選擇起點，寫下你的故事。</p>
     </header>
 
     <div class="creation-overlay__body" data-testid="creation-body">
@@ -184,40 +209,36 @@ const {
 
         <div v-if="mode === 'preset'" class="creation-overlay__presets">
           <button
-            v-for="card in presets"
+            v-for="(card, index) in presets"
             :key="card.key"
             type="button"
             class="creation-preset-card"
             data-testid="creation-preset-card"
             :data-preset-key="card.key"
             :data-selected="selectedPresetKey === card.key ? 'true' : 'false'"
+            :aria-pressed="selectedPresetKey === card.key"
+            :aria-current="selectedPresetKey === card.key ? 'true' : undefined"
             @click="selectPreset(card)"
           >
+            <span class="creation-preset-card__ornament" aria-hidden="true">
+              <span>{{ String(index + 1).padStart(2, "0") }}</span>
+            </span>
             <span class="creation-preset-card__name" data-testid="creation-preset-name">
               {{ card.display_name }}
             </span>
             <span class="creation-preset-card__race">{{ raceDisplayName(card.race) }}</span>
             <span class="creation-preset-card__emphasis">{{ card.emphasis }}</span>
             <span class="creation-preset-card__background">{{ card.background }}</span>
+            <span class="creation-preset-card__choose">{{ selectedPresetKey === card.key ? "已選擇" : "選擇此角色" }}</span>
           </button>
-          <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
         </div>
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
-          <p v-if="reviewPrompt" class="creation-proposal-review" role="status" data-testid="creation-proposal-review">
-            {{ reviewPrompt }}
-          </p>
-          <p
-            v-if="budgetBriefing"
-            class="creation-budget-briefing"
-            data-testid="creation-budget-briefing"
-          >
-            {{ budgetBriefing }}
-          </p>
-
+          <section class="creation-region creation-identity" aria-labelledby="creation-identity-title">
+          <h3 id="creation-identity-title" class="creation-region__title"><span aria-hidden="true">01</span> 身分</h3>
           <div class="creation-overlay__field">
-            <label class="creation-overlay__name-line" for="creation-name-input">
-              <span>名稱</span>
+            <div class="creation-overlay__name-line">
+              <label for="creation-name-input">名稱</label>
               <span class="creation-overlay__name-row">
                 <input
                   id="creation-name-input"
@@ -238,7 +259,7 @@ const {
                   🎲
                 </button>
               </span>
-            </label>
+            </div>
           </div>
 
           <label class="creation-overlay__field">
@@ -273,23 +294,14 @@ const {
               <option v-for="o in subraceOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
             </select>
           </label>
+          </section>
 
-          <div class="creation-allocations">
-            <label v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-overlay__field">
-              <span>{{ ax.label }}（{{ ax.explanation }}）</span>
-              <input
-                type="number"
-                :min="ax.minimum"
-                :max="ax.maximum"
-                v-model.number="allocations[ax.axis]"
-                :data-testid="`creation-field-${ax.axis}`"
-              />
-            </label>
-          </div>
-           <p v-if="currentProfile" class="creation-allocation-total" data-testid="creation-allocation-total">
-             已配置點數：{{ allocationTotal }} / {{ currentProfile.budget }}
-           </p>
-
+          <section class="creation-region creation-persona" aria-labelledby="creation-persona-title">
+          <h3 id="creation-persona-title" class="creation-region__title"><span aria-hidden="true">02</span> 角色故事</h3>
+          <p v-if="reviewPrompt" class="creation-proposal-review" role="status" data-testid="creation-proposal-review">
+            {{ reviewPrompt }}
+          </p>
+          <p class="creation-region__hint">背景可留空；個性、生平與習慣請全部填寫，或全部留空。</p>
           <fieldset v-if="affinityMax > 0" class="creation-affinity" data-testid="creation-affinity">
             <legend>元素親和（上限 {{ affinityMax }}）</legend>
             <label v-for="el in affinityElements" :key="el.key" class="creation-affinity-item">
@@ -337,10 +349,41 @@ const {
             ></textarea>
           </label>
 
-          <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
+          </section>
+
+          <section class="creation-region creation-attributes" aria-labelledby="creation-attributes-title">
+            <h3 id="creation-attributes-title" class="creation-region__title"><span aria-hidden="true">03</span> 能力配置</h3>
+            <p v-if="budgetBriefing" class="creation-budget-briefing" data-testid="creation-budget-briefing">{{ budgetBriefing }}</p>
+            <p v-else class="creation-region__hint">目前尚無對應的能力配置資料。</p>
+            <p v-if="currentProfile" class="creation-allocation-total" data-testid="creation-allocation-total">
+              已配置點數：{{ allocationTotal }} / {{ currentProfile.budget }}
+            </p>
+            <div class="creation-allocations">
+              <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
+                <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
+                <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} · {{ ax.minimum }}–{{ ax.maximum }}</p>
+                <div class="creation-stepper creation-overlay__field">
+                  <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
+                    :data-testid="`creation-step-${ax.axis}-down`" :disabled="!canStep(ax, -1)" @click="stepAllocation(ax, -1)">−</button>
+                  <input :id="`creation-allocation-${ax.axis}`" type="number" :min="ax.minimum" :max="ax.maximum"
+                    :aria-describedby="`creation-axis-help-${ax.axis}`"
+                    v-model.number="allocations[ax.axis]" :data-testid="`creation-field-${ax.axis}`" />
+                  <button type="button" class="ui-icon-btn" :aria-label="`增加${ax.label}`"
+                    :data-testid="`creation-step-${ax.axis}-up`" :disabled="!canStep(ax, 1)" @click="stepAllocation(ax, 1)">+</button>
+                </div>
+                <div class="creation-allocation__bar" aria-hidden="true"><span :style="{ transform: `scaleX(${allocationFraction(ax)})` }"></span></div>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div v-else class="creation-overlay__concept">
+          <div class="creation-concept-context">
+            <p class="creation-overlay__eyebrow">角色構想</p>
+            <h3 class="creation-region__title">從一段描述開始</h3>
+            <p class="creation-region__hint">寫下角色的經歷或性格。套用概念後，仍可在自訂表單中檢視與修改，再確認角色。</p>
+          </div>
+          <div class="creation-concept-editor">
           <label class="creation-overlay__field">
             <span>角色概念</span>
             <textarea
@@ -359,13 +402,11 @@ const {
             <span class="creation-concept-spinner" aria-hidden="true"></span>
             <p class="creation-concept-loading-text">概念生成中，請稍候…</p>
           </div>
+          </div>
         </div>
 
-        <!-- One action bar for the whole wizard (never a bare stretched
-             button inside the form column): the destructive reset sits at the
-             leading edge, the mode's single decisive action at the trailing
-             edge, and the bar sticks to the bottom of the scrolling body so
-             the primary action is reachable from any scroll position. -->
+        <p v-if="formMessage" class="creation-form-message" role="alert" data-testid="creation-form-message">{{ formMessage }}</p>
+        <!-- Outside the scrolling regions: errors and actions stay reachable. -->
         <footer class="creation-overlay__footer">
           <button
             type="button"

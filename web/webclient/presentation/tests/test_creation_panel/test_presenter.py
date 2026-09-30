@@ -71,6 +71,24 @@ class CreationPanelPresenterTests(EvenniaTest):
             self.assertEqual(set(option), {"key", "label"})
 
 
+    @covers_requirement("webclient-character-creation-ui::creation-resource-and-offense-labels-are-distinguishable")
+    def test_creation_profile_axes_distinguish_resource_and_offense_labels(self):
+        payload = self._render()
+        for profile in payload["custom"]["profiles"]:
+            axes_by_key = {ax["axis"]: ax for ax in profile["axes"]}
+            if "mp" in axes_by_key and "magic_power" in axes_by_key:
+                self.assertTrue(axes_by_key["mp"]["label"].strip())
+                self.assertTrue(axes_by_key["magic_power"]["label"].strip())
+                self.assertNotEqual(
+                    axes_by_key["mp"]["label"],
+                    axes_by_key["magic_power"]["label"],
+                )
+                self.assertNotEqual(
+                    axes_by_key["mp"]["explanation"],
+                    axes_by_key["magic_power"]["explanation"],
+                )
+
+
     @covers_requirement("webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft")
     def test_saved_draft_sex_renders_in_the_panel(self):
         from world.rules.character_creation import CharacterCreationRequest

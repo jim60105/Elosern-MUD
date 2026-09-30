@@ -1,4 +1,4 @@
-import { h, nextTick, onMounted } from "vue";
+import { h, nextTick, onMounted, ref, toRaw } from "vue";
 import CreationOverlay from "../../components/CreationOverlay.vue";
 import {
   CREATION_PANEL_SAMPLE,
@@ -168,4 +168,104 @@ export const RejectedResult = {
 export const Unavailable = {
   render: renderOverlay,
   args: { creation: CREATION_PANEL_UNAVAILABLE_SAMPLE },
+};
+
+// An explicit publication desk, not a server emulator: nothing settles on a
+// timer. Every frame mounts the production wizard and uses synthetic panels.
+export const Storyboard = {
+  render: () => ({
+    setup() {
+      const panel = ref(structuredClone(CREATION_PANEL_SAMPLE));
+      const stage = ref({ stage: "root" });
+      const result = ref(null);
+      const dispatchState = ref({ inFlight: null, submittedRequestId: null });
+      const intent = ref(null);
+      const notice = ref("展示資料，所有發布操作僅供故事展示。");
+      const mountKey = ref(0);
+      let sequence = 0;
+      let proposalRevision = 0;
+      let previousStage = "root";
+      function dispatch(action) {
+        if (dispatchState.value.inFlight !== null) return null;
+        const requestId = `creation-story-${++sequence}`;
+        intent.value = structuredClone(action);
+        result.value = null;
+        dispatchState.value = { inFlight: requestId, submittedRequestId: requestId };
+        notice.value = "已記錄操作意圖，請選擇發布成功或發布拒絕。";
+        return requestId;
+      }
+      function publish(success) {
+        if (!intent.value || dispatchState.value.inFlight === null) return;
+        const { action_id: actionId, payload } = toRaw(intent.value);
+        result.value = {
+          requestId: dispatchState.value.submittedRequestId,
+          outcome: success ? "success" : "rejected",
+          message: success ? "" : "展示拒絕：資料未通過驗證，請檢查後重試。",
+          ...(actionId === "creation.roll_name" && success
+            ? { data: { display_name: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft.display_name } } : {}),
+        };
+        if (success && actionId === "creation.concept") {
+          panel.value = {
+            ...panel.value,
+            proposal: { ...structuredClone(CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE.proposal), revision: ++proposalRevision },
+          };
+        } else if (success && ["creation.preset", "creation.custom"].includes(actionId)) {
+          const draft = actionId === "creation.preset"
+            ? { mode: "preset", stage: "preset_selected", preset_key: payload.preset_key }
+            : { ...payload, mode: "custom", stage: "custom_filled" };
+          panel.value = { ...panel.value, draft };
+          previousStage = actionId === "creation.preset" ? "presets" : "custom";
+          stage.value = { stage: "confirm", confirmAction: "creation.activate", confirmLabel: "確認以這份草稿建立角色？" };
+        } else if (success && actionId === "creation.reset") {
+          panel.value = structuredClone(CREATION_PANEL_SAMPLE);
+          stage.value = { stage: "root" };
+          mountKey.value++;
+        }
+        notice.value = success && actionId === "creation.activate"
+          ? "已發布啟用成功。正式遊戲接續探索畫面；此展示保留建角工作區。"
+          : success ? "已發布成功。" : "已發布拒絕，保留目前輸入。";
+        dispatchState.value = { ...dispatchState.value, inFlight: null };
+      }
+      function reconnect() {
+        panel.value = { ...structuredClone(toRaw(panel.value)), proposal: undefined };
+        stage.value = { stage: panel.value.draft?.mode === "custom" ? "custom" : "root" };
+        result.value = null;
+        dispatchState.value = { inFlight: null, submittedRequestId: null };
+        mountKey.value++;
+        notice.value = "已重新掛載，僅恢復已發布的草稿。";
+      }
+      const button = (text, handler, disabled = false) =>
+        h("button", { class: "ui-btn", type: "button", onClick: handler, disabled }, text);
+      return () => h("div", { class: "elosern", style: "position:absolute;inset:0;display:flex;flex-direction:column;background:var(--ink-950)" }, [
+        h("div", { "aria-label": "故事發布控制", style: "padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--gold-500)" }, [
+          h("span", { style: "color:var(--gold-400);font-size:13px" }, "故事發布控制"),
+          button("發布成功", () => publish(true), dispatchState.value.inFlight === null),
+          button("發布拒絕", () => publish(false), dispatchState.value.inFlight === null),
+          button("重新連線", reconnect),
+          button("發布自訂草稿", () => {
+            panel.value = structuredClone(CREATION_PANEL_CUSTOM_DRAFT_SAMPLE);
+            reconnect();
+          }),
+          h("details", [
+            h("summary", { style: "cursor:pointer;color:var(--paper-300)" }, "檢視操作意圖"),
+            h("pre", { style: "max-height:160px;overflow:auto;color:var(--paper-100)" }, JSON.stringify(intent.value, null, 2)),
+          ]),
+        ]),
+        h("p", { role: "status", style: "margin:0;padding:4px 16px;color:var(--paper-400);font-size:13px" }, notice.value),
+        h("div", { style: "position:relative;flex:1;min-height:0" }, [
+          h(CreationOverlay, {
+            key: mountKey.value, creation: panel.value, stage: stage.value,
+            result: result.value, dispatchState: dispatchState.value, dispatch,
+            onAction: dispatch,
+            onRequestReset: () => {
+              previousStage = panel.value.draft?.mode === "custom" ? "custom" : "root";
+              stage.value = { stage: "confirm", confirmAction: "creation.reset", confirmLabel: "確認清除草稿並重新開始？" };
+            },
+            onCancelConfirm: () => { stage.value = { stage: previousStage }; },
+            pushToast: ({ title }) => { notice.value = title; },
+          }),
+        ]),
+      ]);
+    },
+  }),
 };

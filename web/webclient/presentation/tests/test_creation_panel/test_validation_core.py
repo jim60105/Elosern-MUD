@@ -164,12 +164,14 @@ class CreationPanelValidationTests(unittest.TestCase):
             validate_creation(payload)
 
 
+    @covers_requirement("webclient-character-creation-ui::creation-race-display-names-travel-with-opaque-keys")
     def test_preset_card_race_must_exist_in_custom_races(self):
         payload = _valid_payload()
         payload["presets"][0]["race"] = "unknown_race"
         with self.assertRaises(CreationPanelError):
             validate_creation(payload)
 
+    @covers_requirement("webclient-character-creation-ui::creation-race-display-names-travel-with-opaque-keys")
     def test_race_option_display_name_zh_validation(self):
         payload = _valid_payload()
         with self.subTest("missing display_name_zh"):

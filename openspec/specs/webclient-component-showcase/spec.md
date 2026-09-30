@@ -284,6 +284,10 @@ manifest-listed overlay that nothing imports is not complete. The map, settings,
 each be opened from a real control in the live surface tree; the creation overlay SHALL instead be mounted
 by the running client on the committed `creation` panel's availability predicate, because creation mode is
 entered by the server's snapshot rather than by a player-operated trigger.
+The `Overlays/CreationOverlay` stories mount the same three-region creation
+workspace as the live client. Its `Storyboard` supplies an explicitly labelled,
+offline publication desk for save/confirmation, concept success/rejection and
+draft reconnect; these controls are story-only and never ship as game controls.
 The settings overlay SHALL expose the narrative prose scale, the motion level (`完整` / `減少` / `關閉`),
 the text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local presentation
 state**. It SHALL NOT dispatch a `ui_action` for any of them: `options.dismiss` — the suggestions
