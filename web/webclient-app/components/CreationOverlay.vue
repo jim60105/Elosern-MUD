@@ -217,6 +217,7 @@ function allocationFraction(axis) {
             :data-preset-key="card.key"
             :data-selected="selectedPresetKey === card.key ? 'true' : 'false'"
             :aria-pressed="selectedPresetKey === card.key"
+            :aria-current="selectedPresetKey === card.key ? 'true' : undefined"
             @click="selectPreset(card)"
           >
             <span class="creation-preset-card__ornament" aria-hidden="true">
