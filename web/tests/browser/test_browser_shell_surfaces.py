@@ -371,6 +371,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 self.assertEqual(overflow.count(), 1, f"the +N overflow chip renders at {viewport}")
                 overflow.click()
                 page.wait_for_selector('[data-testid="status-panel__condition-disclosure"]', timeout=5000)
+                # Island height is text-driven (CJK chip labels from the
+                # bundled web-font subsets), so geometry is only stable once
+                # the font swap has settled (the convention the chrome-nav,
+                # typography, and proportional-scale browser tests already
+                # use before measuring).
+                page.evaluate("document.fonts.ready")
                 # Park the pointer off the islands so no hover detail line is open.
                 page.mouse.move(viewport[0] // 2, viewport[1] // 2)
                 page.wait_for_timeout(200)
