@@ -406,8 +406,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             + combat_modifier_condition_rule_id()
             + '"]'
         ).get_attribute("aria-label")
-        self.assertIn("agility", chip_label)
-        self.assertIn("-10%", chip_label)
+        # The chip's aria-label carries the localized modifier (label +
+        # modifier text joined by the condition label seam), so assert the
+        # modifier value beside its zh-TW stat name, not the raw key.
+        self.assertIn("敏捷 -10%", chip_label)
         # Action controls stay usable and disabled entries explain themselves.
         # Navigate into the skill frame so the skill pane's action controls
         # are visible.

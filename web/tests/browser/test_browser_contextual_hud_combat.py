@@ -195,7 +195,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertIn("護盾術", detail_text, "the detail pane names the focused skill")
         self.assertIn("MP 8", detail_text, "the detail pane shows the skill's cost")
         self.assertIn("防禦", detail_text, "the detail pane shows the skill's description")
-        self.assertIn("self", detail_text, "the detail pane shows the skill's target requirement")
+        self.assertIn("目標類型\n自身", detail_text, "the detail pane shows the skill's target requirement")
 
     @covers_requirement(
         "webclient-contextual-hud::destructive-combat-confirmation-renders-as-an-explicit-two-step-panel"
