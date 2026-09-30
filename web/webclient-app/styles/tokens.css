@@ -84,10 +84,11 @@
   --f-display: "Iansui", "Noto Serif TC", serif;
   --f-serif: "Noto Serif TC", "Iansui", serif;
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
-  /* Monospace: the bundled Hack slices (styles/fonts-hack.css) draw Latin,
-     digits, arrows, and box drawing; the bundled Noto Sans TC draws CJK. No
-     machine-installed family sits ahead of them. */
-  --f-mono: "Hack", "Noto Sans TC", monospace;
+  /* Monospace: the bundled Jim Mono TC slices (styles/fonts-mono.css) draw
+     Latin, digits, arrows, box drawing, and CJK, every CJK character exactly
+     two Latin cells wide. The bundled Noto Sans TC only draws CJK outside
+     that coverage (at 1em). No machine-installed family sits ahead of them. */
+  --f-mono: "Jim Mono TC", "Noto Sans TC", monospace;
   --f-num: var(--f-sans);
   --text-xs: calc(12px * var(--ui-scale));
   --text-sm: calc(13px * var(--ui-scale));
