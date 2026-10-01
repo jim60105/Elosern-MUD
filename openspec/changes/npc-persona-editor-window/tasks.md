@@ -17,8 +17,8 @@ Apply on branch `feat/npc-persona-editor-window` in worktree `.worktrees/npc-per
 
 ## 4. Browser evidence
 
-- [ ] 4.1 Add a seed fixture placing the browser actor beside an NPC with a card initialized through the persona service (and a second NPC for departure/correlation cases); verify the seed runs through the existing seed runner.
-- [ ] 4.2 Write `web/tests/browser/test_browser_npc_persona_editor.py` and `test_browser_npc_persona_editor_edges.py` per design D7 and register every new method in `.github/browser-shards.json`; run each method once locally in its own command; verify `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract` (with `MUD_TEST_SETTINGS=1` via the Bash tool's `env` input) and `tests.test_webclient_frozen_contract` pass.
+- [ ] 4.1 Add a seed fixture placing the browser actor beside an NPC with a card initialized through the persona service; verify the seed runs through the existing seed runner.
+- [ ] 4.2 Write `web/tests/browser/test_browser_npc_persona_editor.py` per design D7 and register every new method in `.github/browser-shards.json`; run each method once locally in its own command; verify `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract` (with `MUD_TEST_SETTINGS=1` via the Bash tool's `env` input) and `tests.test_webclient_frozen_contract` pass.
 
 ## 5. Docs and gates
 

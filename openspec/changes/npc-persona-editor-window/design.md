@@ -36,10 +36,10 @@ The drawer root is `role="dialog"` `aria-modal="true"` with `aria-labelledby` on
 
 ### D7. Evidence
 
-Vitest: state machine, correlation, conflict, departure, dirty-close, storage. Storybook: `Overlays/NpcPersonaEditor` stories for loading, clean, dirty with budget overflow, saving, field rejection, conflict, unavailable, narrow viewport. Browser (two modules so each file stays under the five-minute CI bound): `test_browser_npc_persona_editor.py` (open/save/reopen persistence on an NPC seeded with an initialized card, keyboard-only round trip, Escape/backdrop dirty-close confirmation, field error retention, typing does not move) and `test_browser_npc_persona_editor_edges.py` (late-read correlation, target departure, puppet change clears, two-page cross-tab conflict and reload). Each method is registered in `.github/browser-shards.json`; local runs use one method per command through `web.tests.browser.unittest_driver`.
+Vitest: state machine, correlation, conflict, departure, dirty-close, storage. Storybook: `Overlays/NpcPersonaEditor` stories for loading, clean, dirty with budget overflow, saving, field rejection, conflict, unavailable, narrow viewport. Browser: `test_browser_npc_persona_editor.py` (open/save/reopen persistence on an NPC seeded with an initialized card, keyboard-only round trip, Escape/backdrop dirty-close confirmation, field error retention, typing does not move). The slower multi-page and multi-entity edge journeys (late-read correlation, target departure, puppet change, cross-tab conflict) are `npc-persona-editor-browser-edges`; this change proves those behaviors with Vitest. Each method is registered in `.github/browser-shards.json`; local runs use one method per command through `web.tests.browser.unittest_driver`.
 
 ## Risks / Trade-offs
 
 - [`.elosern-root` overrides hide live regressions in Storybook] → grep `app-shell.css` for every reused class and verify geometry in the live-client browser test, not only Storybook.
-- [Two-page browser tests are slow] → keep the cross-tab case to one method with bounded deterministic waits.
+- [Two-page browser tests are slow] → moved to `npc-persona-editor-browser-edges`.
 - [Disabled entries before the cutover confuse players] → the server reason text explains it; user docs mention it.

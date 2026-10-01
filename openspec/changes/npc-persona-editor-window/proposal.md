@@ -8,7 +8,7 @@
 - Add `Overlays/NpcPersonaEditor` (Vue SFC on the existing drawer frame and focus trap) and a `use-npc-persona-editor` composable implementing the loading / ready-clean / ready-dirty / saving / rejected-unavailable / conflict state machine, request correlation, reconnect re-read, target-departure and session-change handling, dirty-close confirmation, and focus return; budgets come from the browser card-contract mirror.
 - Exclude `npc.persona.*` from action echo and narrative output; keep editor state out of persistent browser storage.
 - Storybook story with deterministic args for every state, manifest entry, Vitest component tests, and the component-showcase governance amendment for an action-result-backed component.
-- Focused browser journeys (registered in `.github/browser-shards.json`): open/save/reopen persistence on a real NPC, keyboard-only operation, dirty-close confirmation, field-error retention, stale-result correlation, target departure, puppet change, and cross-tab conflict.
+- Focused browser journeys (registered in `.github/browser-shards.json`): open/save/reopen persistence on a real NPC, keyboard-only operation, dirty-close confirmation, and field-error retention; correlation, departure, puppet-change, and conflict behavior are proven here with Vitest and in the real browser by `npc-persona-editor-browser-edges`.
 - Player documentation `docs/game/npc-persona-editor.md` (Traditional Chinese) and its sidebar entry.
 
 ## Capabilities
@@ -24,11 +24,11 @@
 ## Impact
 
 - Code: `web/webclient-app/components/NpcPersonaEditor.vue` (new), `web/webclient-app/composables/use-npc-persona-editor.js` (new), `web/webclient-app/lib/npc_persona_card.js` (wrapper over the static mirror), `web/webclient-app/composables/use-dock.js`, `web/webclient-app/composables/use-drawers.js`, `web/webclient-app/AppClient.vue`, `web/webclient-app/stores/elosern*`, `web/static/webclient/js/elosern/exploration_menu.js`, `web/static/webclient/js/elosern/command_echo.js`, `web/webclient-app/styles/app-shell.css` (only if `.elosern-root` overrides apply), `web/webclient-app/component-manifest.json`, `web/webclient-app/stories/Overlays/`.
-- Tests: Vitest under `web/webclient-app/tests/`, Node tests for `exploration_menu.js` routing, new browser modules under `web/tests/browser/` with `.github/browser-shards.json` registration, browser fixture support for an NPC with an initialized card.
+- Tests: Vitest under `web/webclient-app/tests/`, Node tests for `exploration_menu.js` routing, one new browser module under `web/tests/browser/` with `.github/browser-shards.json` registration, browser fixture support for an NPC with an initialized card.
 - Docs: `docs/game/npc-persona-editor.md`, `docs/_sidebar.md`.
 
 ## Batch:
 
 depends-on: npc-persona-editor-actions
 
-Code-conflict notes: sole editor in this batch of the UI router and shell files (`AppClient.vue`, `use-dock.js`, `use-drawers.js`, `exploration_menu.js`, `command_echo.js`, stores) and of `component-manifest.json` / `.github/browser-shards.json` within this batch. No other NPC persona change edits webclient-app files, so it can run in parallel with every content, producer, and cutover change once the actions change is applied. Its browser fixture initializes a card through the persona service directly, so it does not wait for producers or the cutover; shipped NPCs become editable as soon as their cards exist.
+Code-conflict notes: sole editor in this batch of the UI router and shell files (`AppClient.vue`, `use-dock.js`, `use-drawers.js`, `exploration_menu.js`, `command_echo.js`, stores) and of `component-manifest.json` / `.github/browser-shards.json` within this batch. No other NPC persona change edits webclient-app files, so it can run in parallel with every content, producer, and cutover change once the actions change is applied. Prerequisite of `npc-persona-editor-browser-edges`. Its browser fixture initializes a card through the persona service directly, so it does not wait for producers or the cutover; shipped NPCs become editable as soon as their cards exist.
