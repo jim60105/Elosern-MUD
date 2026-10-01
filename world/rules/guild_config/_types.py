@@ -91,3 +91,4 @@ class ServiceHostRow:
     anchor_room: str
     service_id: str
     authored_kwargs: "Mapping[str, str]"
+    profile_key: str

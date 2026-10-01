@@ -83,6 +83,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(
             guild_event.kwargs["context"]["profession"], _guild_row().profession.key
         )
+        self.assertEqual(guild_event.kwargs["context"]["profile"], GUILD_SERVICE_ID)
         # The merchant hosts follow the roster order (PLACE_REGISTRY terrace-
         # slice order); every merchant reports its authored shop identity.
         merchant_service_ids = [
@@ -139,6 +140,58 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(late), 25)
 
+    def test_created_host_carries_profile_card_at_version_1(self):
+        from world.rules.npc_persona import read_npc_persona, current_persona_version, provenance_profile_key
+        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+
+        sync_service_content()
+        host = self._guild_host()
+        self.assertIsNotNone(host)
+        self.assertEqual(current_persona_version(host), 1)
+        self.assertEqual(provenance_profile_key(host), GUILD_SERVICE_ID)
+        profile = NPC_PROFILE_REGISTRY[GUILD_SERVICE_ID]
+        self.assertEqual(read_npc_persona(host).card, profile.card)
+
+    def test_resync_after_profile_edit_leaves_version_2_card_unchanged(self):
+        from world.rules.npc_persona import update_npc_persona, current_persona_version, read_npc_persona
+        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+
+        sync_service_content()
+        host = self._guild_host()
+        orig_card = read_npc_persona(host)
+        card_v2 = orig_card.card.to_record()
+        card_v2["appearance"] = "換上了特別的長袍。"
+        res = update_npc_persona(host, card_v2, expected_version=1)
+        self.assertEqual(res.status, "updated")
+        self.assertEqual(res.version, 2)
+        self.assertEqual(current_persona_version(host), 2)
+
+        # Re-sync after simulating profile changes or plain re-sync
+        sync_service_content()
+        host.refresh_from_db()
+        self.assertEqual(current_persona_version(host), 2)
+        self.assertEqual(read_npc_persona(host).card.appearance, "換上了特別的長袍。")
+
+    def test_reused_host_without_metadata_gets_no_write(self):
+        from world.rules.npc_persona import current_persona_version
+
+        legacy = self._anchored_legacy_host("舊公會無卡管理人")
+        self.assertIsNone(current_persona_version(legacy))
+        sync_service_content()
+        legacy.refresh_from_db()
+        self.assertIsNone(current_persona_version(legacy))
+        self.assertIsNone(getattr(legacy.db, "persona", None))
+        self.assertIsNone(getattr(legacy.db, "npc_persona_meta", None))
+
+    def test_injected_initializer_failure_leaves_no_host(self):
+        from unittest.mock import patch as inner_patch
+
+        with inner_patch("world.rules.guild_economy.initialize_npc_persona", side_effect=RuntimeError("injected init error")):
+            with self.assertRaises(RuntimeError):
+                sync_service_content()
+        self.assertIsNone(self._guild_host())
+        self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 0)
+
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):
         sync_service_content()
@@ -153,6 +206,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             anchor_room=_guild_row().anchor_room,
             service_id=GUILD_SERVICE_ID,
             authored_kwargs=dict(_guild_row().authored_kwargs),
+            profile_key=_guild_row().profile_key,
         )
         rows = tuple(
             renamed_row if row.service_id == GUILD_SERVICE_ID else row
@@ -553,6 +607,7 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
                 "no_such_room_tag",
                 row.service_id,
                 row.authored_kwargs,
+                row.profile_key,
             )
             if row.service_id == MERCHANT_SERVICE_ID
             else row

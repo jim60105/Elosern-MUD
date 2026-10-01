@@ -61,6 +61,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
         anchor_room = _require_text(place.key, f"{what}.key (anchor room tag)")
         service_id = _require_text(place.service_id, f"{what}.service_id")
         profession_key = _require_text(place.profession, f"{what}.profession")
+        profile_key = _require_text(place.host_profile_key, f"{what}.host_profile_key")
         if service_id in seen_service_ids:
             raise _error(
                 f"duplicate service_id {service_id!r} in the place registry; "
@@ -133,6 +134,7 @@ def validate_service_hosts() -> tuple[ServiceHostRow, ...]:
                 anchor_room=anchor_room,
                 service_id=service_id,
                 authored_kwargs=authored,
+                profile_key=profile_key,
             )
         )
     return tuple(rows)
