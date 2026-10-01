@@ -104,14 +104,15 @@ def _restore_places_snapshot(snapshot: dict) -> None:
     places.clear()
     places.update(snapshot)
 
-GUILD_SERVICE_ID = "altoria_guild_master"
-
-MERCHANT_SERVICE_ID = "altoria_merchant"
-
 # Interior room tags are the place keys (place-driven-service-sync): the
 # registry row is the single source, no bootstrap constant is named — and the
 # rows themselves are resolved BY KIND from the live registry, never by a
-# shipped key.
+# shipped key. The service ids are resolved the same way: a shipped service
+# id is also a shipped NPC profile key (npc-profile-registry).
+GUILD_SERVICE_ID = _place_by_kind("guild_hall").service_id
+
+MERCHANT_SERVICE_ID = _place_by_kind("general_store").service_id
+
 GUILD_HALL_TAG = _place_by_kind("guild_hall").key
 
 GENERAL_STORE_TAG = _place_by_kind("general_store").key

@@ -45,8 +45,9 @@ GENERAL_STORE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "行頭",
         "「第一次出城？好，照我說的帶。燈一定要帶，迷宮裡黑到看不見自己的手。"
-        "羅盤防迷路，探照符照遠的地方，露營魔導具一打開就是個小帳篷，風雨蟲子"
-        "都進不來。通訊法螺留著走散的時候吹。嗯，大概就這些。」",
+        "羅盤防迷路，探照符撕開能把四周照亮一小段時間，露營魔導具一打開就是個"
+        "小帳篷，風雨蟲子都進不來。通訊法螺留著走散的時候喊人用。嗯，大概就這"
+        "些。」",
     ),
     KeywordResponse(
         "飾品藥水",
@@ -102,9 +103,10 @@ TAILOR_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "禮服",
-        "「上城的貴族小姐常來訂禮服，大神殿那邊也會送修女聖袍、聖女聖袍的單子"
-        "來，這兩件我縫得最仔細呢。還有……咳，那套誘蠱蕾絲內衣嘛，有客人特地"
-        "來問過，想看我就拿出來，不用不好意思喲。」",
+        "「上城的貴族小姐常來訂禮服，大神殿那邊會送修女聖袍的單子來，那件我縫"
+        "得最仔細呢。聖女聖袍聽說最早是聖女親手繡，我這幾件照老樣子仿，可不敢"
+        "說一模一樣喲。還有……咳，那套誘蠱蕾絲內衣嘛，有客人特地來問過，想看"
+        "我就拿出來，不用不好意思喲。」",
     ),
     KeywordResponse(
         "收衣",
@@ -115,15 +117,15 @@ TAILOR_RESPONSES: tuple[KeywordResponse, ...] = (
 )
 
 # 艾蓮娜·鴉丘 — the jeweller. Slow, soft and exacting; addresses the
-# visitor as 「您」 and starts from whatever they are already wearing.
+# visitor plainly with few particles and starts from whatever they are already wearing.
 # capital_adornments is her glass case: everyday pieces, the blessed and
 # hunter's work, and the two rare enchanted carry-alls.
 JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "飾品",
         "「這一櫃全是隨身戴的飾品。銀髮簪是平原的老手藝，狼牙項鍊是獸王國部族"
-        "的樣式，朝聖者銅符呢，走聖階的人幾乎都戴一枚。防禦戒指樣子樸素，戴著"
-        "安心。身上別掛太多，挑幾件真用得上的就好。」",
+        "的樣式，朝聖者銅符，走聖階的信眾幾乎都戴一枚。防禦戒指鑲著一顆結晶，"
+        "難得一見。身上別掛太多，挑幾件真用得上的就好。」",
     ),
     KeywordResponse(
         "鑲工",
@@ -135,12 +137,12 @@ JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
         "奇物",
         "「儲物袋是帝國那邊的空間魔法，袋子不大，裡頭卻比看起來大得多。滑翔斗"
         "篷用蛛絲織成，從高處跳下去能托住人。這兩件都難得，價錢在櫃上的小牌子"
-        "，我就不唸了吧。」",
+        "，我就不唸了。」",
     ),
     KeywordResponse(
         "收飾",
         "「舊飾件可以拿來，我櫃上有的樣式都收。缺爪、斷鏈也請先說一聲。藥師珠"
-        "串、迷情絲頸環這類有點來歷，我會多問兩句從哪裡來，別介意呢。」",
+        "串、迷情絲頸環這類有點來歷，我會多問兩句從哪裡來，別介意。」",
     ),
 )
 
@@ -162,8 +164,8 @@ ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "特殊",
         "「迷情藥？有。不過我得先問，要用在誰身上，對方知道嗎？藥效不強，意志"
-        "硬一點的人壓得住。想清楚了再來跟我說。還有，紅標那排別自己伸手拿喔。"
-        "」",
+        "硬一點的人抵擋得住。想清楚了再來跟我說。還有，紅標那排別自己伸手拿喔"
+        "。」",
     ),
     KeywordResponse(
         "聖水",
@@ -182,20 +184,21 @@ ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
 MERCHANT_HALL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "商隊",
-        "「本季出城的商隊都記在牆上那張路線圖旁，哪一隊載什麼、走哪條路、預計"
-        "何時回城，書記每天核對。閣下若想隨隊同行，請直接與該隊的隊長商量。公"
-        "所只負責登錄與協調，不替任何人擔保貨物。」",
+        "「本季出城的商隊，書記會用粉筆把隊名寫在牆上路線圖的旁邊，只記哪一隊"
+        "出發、哪一隊回城。公所負責登錄與協調，不安排旁人同行，也不替任何人擔"
+        "保貨物。」",
     ),
     KeywordResponse(
         "商路",
         "「王都的大宗貨物多半從東門出城，沿官道往東。東市原是舊城牆邊發展起來"
-        "的貨棧街，糧食、玻璃器、布匹與礦材都在這裡集散；工匠巷的鐵器走市場街"
-        "，鍊金坊的藥材多從東門進城。閣下若要問路，城門的衛兵比本人清楚。」",
+        "的貨棧街，穀物與玻璃都在這裡集散，外國的錢幣也從這裡流進城；工匠巷的"
+        "鐵器走市場街，鍊金坊的藥材多從東門進城。閣下若要問路，城門的衛兵比本"
+        "人清楚。」",
     ),
     KeywordResponse(
         "委託",
         "「公所的牆上沒有委託，門邊也沒有名單。商隊確實需要護衛，但這類工作目"
-        "前沒有正式的安排，本人不能讓閣下接下一件無從交代的差事。若想找事做，"
+        "前沒有正式的安排，本人不能讓閣下去做一件沒有著落的差事。若想找事做，"
         "請到公會前的冒險者公會大廳，看他們的任務板。」",
     ),
     KeywordResponse(
