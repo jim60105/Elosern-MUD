@@ -78,12 +78,20 @@ prerequisite-ownership closure of what the record declared, prerequisite profici
 exactly the edge value, the whole normalization runs before schema range validation, and an explicit
 imported `skill_proficiency` entry always beats the seed), and SHALL store `inventory` into
 `entity.db.inventory` using Evennia's attribute store directly (no seam attribute declaration
-required from any other change).
+required from any other change). For an NPC target, the validated persona is the normalized compact
+card, and the loader SHALL write it through the deterministic NPC persona initializer with `import`
+provenance naming the record key, inside the batch transaction, so the NPC also carries persona
+metadata at version 1; the stored card SHALL equal the validated card exactly. For a non-NPC
+target, the persona SHALL be stored verbatim.
 
 #### Scenario: persona is stored without inspection
-- **WHEN** a valid character record's `persona` object contains arbitrary nested structure
+- **WHEN** a valid character record loaded against `PlayerCharacter` carries a `persona` object with arbitrary nested structure
 - **THEN** the constructed entity's `entity.db.persona` equals that object exactly, unmodified,
   leaving the bare `entity.persona` name free for the `PersonaStore` handler to mount on
+
+#### Scenario: An NPC import persists its validated card with metadata
+- **WHEN** a valid NPC-target record is loaded
+- **THEN** the NPC's persona equals the validated normalized card, its persona metadata is at version 1 with `import` provenance naming the record key, and a later failure in the same batch rolls back both
 
 #### Scenario: sexual_baseline is stored as a raw dict, not converted into a state-machine object
 - **WHEN** a valid character record's `sexual_baseline` is `{"arousal": "微興奮", "virgin": true,
