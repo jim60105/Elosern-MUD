@@ -5,6 +5,10 @@
       "reason": "player command docs parity contract"
     },
     {
+      "path": "world/lore/tests/test_dialogue_assembly.py",
+      "reason": "Altoria dialogue terrace split preserves tables and terrace alignment"
+    },
+    {
       "path": "tests/test_preset_authoring_docs_contract.py",
       "reason": "authoring docs contract"
     },
@@ -59,6 +63,10 @@
     {
       "path": "world/lore/tests/test_nations.py",
       "reason": "nation data contract"
+    },
+    {
+      "path": "world/lore/tests/test_npc_profile_inventory.py",
+      "reason": "shipped NPC source inventory data contract"
     },
     {
       "path": "world/lore/tests/test_npc_tiers.py",

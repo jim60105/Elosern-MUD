@@ -110,6 +110,12 @@ class PlaceDefinition:
     # shop identity may declare neither.
     extra_item_keys: tuple[str, ...] = ()
     excluded_item_keys: tuple[str, ...] = ()
+    # The optional authored reference to this place's host's NPC persona
+    # profile, by profile key (npc-persona-profile-registry D2). Resolving it
+    # is mandatory only once every owning slice has filled its rows
+    # (npc-persona-host-examiner-producers adds that rule); this field counts
+    # as host material, so a hostless place carrying one is never hostless.
+    host_profile_key: str | None = None
 
 
 def _authored_kwargs_map(place: PlaceDefinition) -> dict[str, str]:
@@ -159,12 +165,15 @@ def place_is_hostless(place: PlaceDefinition) -> bool:
     validator and the roster derivation so the two never drift. A partially
     authored host is NOT hostless — malformed material must fall through to
     validation, never to a silently empty room. A stray component-kwargs
-    tuple on an otherwise host-less row is likewise not hostless.
+    tuple on an otherwise host-less row is likewise not hostless, and so is a
+    stray ``host_profile_key`` (npc-persona-profile-registry D2): naming a
+    host profile is host material, even alone.
     """
     return (
         all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS)
         and place.host_subrace is None
         and place.authored_kwargs == ()
+        and place.host_profile_key is None
     )
 
 
@@ -208,6 +217,10 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
     the failure mode it replaces is a ``None`` profession key reaching
     ``get_profession`` several layers away.
 
+    A named ``host_profile_key`` (npc-persona-profile-registry D2) is
+    rejected on a hostless place, and otherwise must resolve in the NPC
+    profile registry.
+
     The record loop is followed by one cross-record rule (altoria-place-slices,
     born with the replan's shared exteriors): two places MAY share an exterior
     — a craft alley with a forge and a tailor on it is one street with two
@@ -223,6 +236,23 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
                 f"place {place.key!r} names unknown settlement {place.settlement_key!r}"
             )
         hostless = place_is_hostless(place)
+        if place.host_profile_key is not None:
+            if all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS):
+                raise ValueError(
+                    f"place {place.key!r} names host_profile_key "
+                    f"{place.host_profile_key!r} but authors no host (a hostless "
+                    "place cannot name a host profile)"
+                )
+            # Function-local import keeps lore import order acyclic (the
+            # guild.py validate_guild_npc_identities precedent).
+            from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+
+            if place.host_profile_key not in NPC_PROFILE_REGISTRY:
+                raise ValueError(
+                    f"place {place.key!r} names host_profile_key "
+                    f"{place.host_profile_key!r} which is absent from the NPC "
+                    "profile registry"
+                )
         if not hostless:
             _validate_host_group(place)
         # Per-field host validation is reachable only for an authored host:

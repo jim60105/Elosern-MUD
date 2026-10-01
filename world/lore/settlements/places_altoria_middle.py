@@ -20,7 +20,7 @@ so its rows reach the derived roster between them.
 Merchant rows carry a ``dialogue_key`` beside their ``shop_key``: the merchant
 blueprint answers as well as trades (merchant-dialogue), and a merchant place
 without the kwarg fails load naming the place. The tables live in
-``world/lore/dialogue/altoria.py`` under the same keys.
+``world/lore/dialogue/altoria_middle.py`` under the same keys.
 
 altoria-learning-and-exchange appends the capital's last two middle-terrace
 rooms: 聖潔王都商會公所 off 東市 — the document's designated future source

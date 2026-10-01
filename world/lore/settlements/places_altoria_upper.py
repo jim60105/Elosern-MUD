@@ -31,7 +31,7 @@ so its rows reach the derived roster after them and before the village's.
 
 Merchant rows here carry a ``dialogue_key`` beside their ``shop_key``
 like every other capital merchant (merchant-dialogue); the tables live in
-``world/lore/dialogue/altoria.py`` under the same keys. The 主祭's row is the
+``world/lore/dialogue/altoria_upper.py`` under the same keys. The 主祭's row is the
 capital's first ``clergy`` host (implement-church-foundation): an attendant
 blueprint plus the ChurchHost ministry capability, authored through the
 ``church`` venue kwarg and the ``initial_arousal`` spawn-data seed — her

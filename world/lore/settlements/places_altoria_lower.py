@@ -16,7 +16,7 @@ derived roster before the middle terrace's.
 Merchant rows carry a ``dialogue_key`` beside their ``shop_key``: the merchant
 blueprint answers as well as trades (merchant-dialogue), and a merchant place
 without the kwarg fails load naming the place. The tables live in
-``world/lore/dialogue/altoria.py`` under the same keys.
+``world/lore/dialogue/altoria_lower.py`` under the same keys.
 
 altoria-crown-and-watch adds this terrace's 衛兵駐所 off 南門 — the gates
 already existed and the guardhouse behind them did not. Its captain is the
