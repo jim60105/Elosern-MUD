@@ -234,6 +234,15 @@ class ValidLoadTests(unittest.TestCase):
         thinking = render_prompt("npc.thinking", name="甲")
         self.assertEqual(thinking, "（甲 沉思片刻……）")
 
+    @covers_requirement("prompt-library::the-npc-persona-frame-key-is-registered-with-exactly-the-block-placeholder")
+    def test_npc_dialogue_persona_frame_key_loads_and_renders(self):
+        load_prompt_library(str(REPO_PROMPTS))
+        rendered = render_prompt("npc_dialogue.persona_frame", block="性格：忠誠")
+        self.assertIn("以下是你目前的人物設定", rendered)
+        self.assertIn("性格：忠誠", rendered)
+        self.assertTrue(rendered.endswith("\n"))
+        self.assertNotIn("{block}", rendered)
+
 
 class ValidationFailureTests(PromptFixture):
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")

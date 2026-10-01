@@ -29,6 +29,7 @@ from world.rules.npc_persona import (
     _raw_meta_value,
     current_persona_version,
     initialize_npc_persona,
+    provenance_profile_key,
     read_npc_persona,
     update_npc_persona,
 )
@@ -288,6 +289,38 @@ class NpcPersonaServiceTest(EvenniaTest):
                 self.npc.db.npc_persona_meta = bad
                 self.assertIsNone(current_persona_version(self.npc))
                 # Verify raw attribute is not repaired or overwritten
+                self.assertEqual(self.npc.db.npc_persona_meta, bad)
+
+    def test_provenance_profile_key_reads_profile_provenance_only(self) -> None:
+        """provenance_profile_key returns profile key for kind 'profile' and None for others."""
+        self.assertIsNone(provenance_profile_key(None))
+        self.assertIsNone(provenance_profile_key(self.char1))
+        self.assertIsNone(provenance_profile_key(self.npc))
+
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        self.assertEqual(provenance_profile_key(self.npc), "guard_01")
+
+        # Companion provenance returns None
+        self.npc.db.npc_persona_meta = {
+            "format": 1,
+            "generation": 1,
+            "persona_version": 1,
+            "provenance": {"kind": "companion", "profile": "partner_scout", "owner": 1},
+        }
+        self.assertIsNone(provenance_profile_key(self.npc))
+
+        # Malformed metadata yields None without writing or repairing
+        bad_metas = (
+            "corrupt",
+            {"provenance": "corrupt"},
+            {"provenance": {"kind": "profile", "profile": ""}},
+            {"provenance": {"kind": "profile", "profile": True}},
+            {"provenance": {"kind": "profile", "profile": None}},
+        )
+        for bad in bad_metas:
+            with self.subTest(bad=bad):
+                self.npc.db.npc_persona_meta = bad
+                self.assertIsNone(provenance_profile_key(self.npc))
                 self.assertEqual(self.npc.db.npc_persona_meta, bad)
 
 

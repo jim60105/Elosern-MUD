@@ -15,7 +15,7 @@ from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
     dialogue_key_for,
-    greeting_for,
+    offline_greeting_for,
     is_dialogue_host,
     open_or_refresh_dialogue,
     run_scripted_talk,
@@ -122,11 +122,16 @@ class CmdsTalk(Command):
             return
 
         if is_dialogue_host(npc):
-            greeting = greeting_for(npc)
+            greeting = offline_greeting_for(npc)
             if greeting is not None:
                 self.caller.msg(f"{npc.key}說：{greeting}\n{_USAGE}")
                 return
             self.caller.msg(_NO_RESPONSE)
+            return
+
+        greeting = offline_greeting_for(npc)
+        if greeting is not None:
+            self.caller.msg(f"{npc.key}說：{greeting}")
             return
 
         self.caller.msg(_NO_RESPONSE)

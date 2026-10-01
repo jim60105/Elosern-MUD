@@ -23,6 +23,8 @@ from world.rules.dialogue import (
     dialogue_response,
     greeting_for,
     is_dialogue_host,
+    misunderstood_line_for,
+    offline_greeting_for,
     opens_dialogue,
     resolve_dialogue_component,
     run_scripted_talk,
@@ -413,6 +415,148 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self.call(CmdsTalk(), f"{self.guild_master.key} 謎語", caller=self.char1)
         self.call(CmdsTalk(), self.guild_master.key, caller=self.char1)
         self.assertEqual(self._player_state(), before)
+
+
+class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
+    """Voice routing and offline greeting resolution tests (design D3)."""
+
+    def setUp(self):
+        super().setUp()
+        self.npc = create_object(NPC, key="語音測試NPC", location=self.room1)
+        self.char1.location = self.room1
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_profiled_host_misunderstands_in_its_own_voice(self):
+        from unittest.mock import patch
+        from world.lore.npc_card import NpcCard, NpcCardIdentity
+        from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+        profile = NpcProfile(
+            key="t_voice_test_01",
+            card=NpcCard(
+                identity=NpcCardIdentity(public="公會接待", hidden=""),
+                appearance="外觀",
+                personality="性格",
+                speech_style="語氣",
+                life_story="經歷",
+                habit="習慣",
+                social_connection="",
+            ),
+            voice=NpcVoiceLines(
+                greeting="你好呀，旅行者！",
+                misunderstood="哎呀，這我不清楚呢。",
+            ),
+        )
+        self.npc.db.npc_persona_meta = {
+            "format": 1,
+            "generation": 1,
+            "persona_version": 1,
+            "provenance": {"kind": "profile", "profile": "t_voice_test_01"},
+        }
+        with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_voice_test_01": profile}):
+            line = misunderstood_line_for(self.npc)
+            self.assertEqual(line, "哎呀，這我不清楚呢。")
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_unprofiled_host_uses_shared_misunderstanding_line(self):
+        self.assertEqual(misunderstood_line_for(self.npc), NO_UNDERSTANDING_LINE)
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_dangling_profile_reference_emits_error_and_returns_shared_line(self):
+        from unittest.mock import patch
+        self.npc.db.npc_persona_meta = {
+            "format": 1,
+            "generation": 1,
+            "persona_version": 1,
+            "provenance": {"kind": "profile", "profile": "dangling_profile_key"},
+        }
+        with patch("world.rules.dialogue.log_error") as mock_log_error:
+            line = misunderstood_line_for(self.npc)
+            self.assertEqual(line, NO_UNDERSTANDING_LINE)
+            mock_log_error.assert_called_once_with(
+                "npc_voice_profile_missing",
+                context={"npc": str(self.npc.pk), "profile": "dangling_profile_key"},
+            )
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_offline_greeting_field_wins_over_table_and_profile(self):
+        from unittest.mock import patch
+        from world.lore.npc_card import NpcCard, NpcCardIdentity
+        from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+        profile = NpcProfile(
+            key="t_voice_test_02",
+            card=NpcCard(
+                identity=NpcCardIdentity(public="守衛", hidden=""),
+                appearance="外觀",
+                personality="性格",
+                speech_style="語氣",
+                life_story="經歷",
+                habit="習慣",
+                social_connection="",
+            ),
+            voice=NpcVoiceLines(greeting="Profile問候語"),
+        )
+        self.npc.db.npc_persona_meta = {
+            "format": 1,
+            "generation": 1,
+            "persona_version": 1,
+            "provenance": {"kind": "profile", "profile": "t_voice_test_02"},
+        }
+        self.npc.components.add(ScriptedDialogue.create(self.npc, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+        self.npc.db.npc_offline_greeting = "自訂覆寫問候語！"
+
+        with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_voice_test_02": profile}):
+            greeting = offline_greeting_for(self.npc)
+            self.assertEqual(greeting, "自訂覆寫問候語！")
+
+            # Clear field -> falls back to table greeting
+            self.npc.db.npc_offline_greeting = ""
+            table_greeting = offline_greeting_for(self.npc)
+            self.assertEqual(table_greeting, greeting_for(self.npc))
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_profile_greeting_when_no_table_and_field_empty(self):
+        from unittest.mock import patch
+        from world.lore.npc_card import NpcCard, NpcCardIdentity
+        from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+        profile = NpcProfile(
+            key="t_voice_test_03",
+            card=NpcCard(
+                identity=NpcCardIdentity(public="測試者", hidden=""),
+                appearance="外觀",
+                personality="性格",
+                speech_style="語氣",
+                life_story="經歷",
+                habit="習慣",
+                social_connection="",
+            ),
+            voice=NpcVoiceLines(greeting="來自Profile的問候。"),
+        )
+        self.npc.db.npc_persona_meta = {
+            "format": 1,
+            "generation": 1,
+            "persona_version": 1,
+            "provenance": {"kind": "profile", "profile": "t_voice_test_03"},
+        }
+        with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_voice_test_03": profile}):
+            self.assertEqual(offline_greeting_for(self.npc), "來自Profile的問候。")
+
+    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
+    def test_talk_command_no_keyword_speaks_offline_greeting_field_even_without_dialogue_component(self):
+        from commands.talk import CmdsTalk
+
+        # NPC without ScriptedDialogue component
+        plain_npc = create_object(NPC, key="普通NPC", location=self.room1)
+        plain_npc.db.npc_offline_greeting = "你好，我是普通路人。"
+        output = self.call(CmdsTalk(), plain_npc.key, caller=self.char1)
+        self.assertIn("你好，我是普通路人。", output)
+
+        # Plain NPC without offline greeting field gives no response
+        plain_npc.db.npc_offline_greeting = ""
+        output = self.call(CmdsTalk(), plain_npc.key, caller=self.char1)
+        self.assertIn("對方沒有理會你", output)
 
 
 class DialogueTableImmutabilityTests(unittest.TestCase):

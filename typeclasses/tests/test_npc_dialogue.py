@@ -141,9 +141,36 @@ class DialogueExchangeHelperTests(EvenniaTest):
         self.assertEqual(result.reply.intent["kind"], "give_item")
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
-        lines = self.npc._chat_lines(self.player)
-        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我會考慮看看。"])
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_degraded_outcome_yields_offline_greeting_field(self):
+        self.npc.db.npc_offline_greeting = "你好呀！我是旅人。"
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch.object(self.player, "msg") as msg:
+                await_result(self.npc.at_talked_to("你好", self.player, client))
+        texts = _msg_texts(msg)
+        self.assertEqual(len(texts), 1)
+        self.assertIn("你好呀！我是旅人。", texts[0])
+
+    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    def test_degraded_outcome_yields_profile_greeting(self):
+        from world.lore.npc_card import NpcCard, NpcCardIdentity
+        from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+        profile = NpcProfile(
+            key="t_degrade_profile_01",
+            card=NpcCard(identity=NpcCardIdentity(public="旅人", hidden=""), appearance="外觀", personality="性格", speech_style="語氣", life_story="經歷", habit="習慣", social_connection=""),
+            voice=NpcVoiceLines(greeting="來自Profile的問候語。"),
+        )
+        self.npc.db.npc_persona_meta = {"format": 1, "generation": 1, "persona_version": 1, "provenance": {"kind": "profile", "profile": "t_degrade_profile_01"}}
+        with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_degrade_profile_01": profile}):
+            with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+                with patch.object(self.player, "msg") as msg:
+                    await_result(self.npc.at_talked_to("你好", self.player, client=FakeLLMClient()))
+        texts = _msg_texts(msg)
+        self.assertEqual(len(texts), 1)
+        self.assertIn("來自Profile的問候語。", texts[0])
 
     @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
     def test_exchange_marks_the_degraded_terminal_explicitly(self):

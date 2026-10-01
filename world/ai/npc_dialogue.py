@@ -86,14 +86,9 @@ MAX_IDENTITY_ENTRIES = 5
 # ``typeclasses/npcs.py::_persona_block`` imports and applies these constants
 # directly, and builds the player block from ``PersonaStore.public_view()`` so
 # identity.hidden is excluded by construction.
-NPC_PERSONA_FIELDS: tuple[str, ...] = (
-    "personality",
-    "life_story",
-    "habit",
-    "identity",
-    "appearance",
-    "social_connection",
-)
+from world.lore.npc_card import NPC_CARD_RENDER_ORDER
+
+NPC_PERSONA_FIELDS: tuple[str, ...] = NPC_CARD_RENDER_ORDER
 PLAYER_PERSONA_FIELDS: tuple[str, ...] = ("identity", "appearance", "social_connection")
 
 # The eight whitelisted intent kinds (design §7.4).
@@ -495,12 +490,19 @@ def _system_message(
     name = _cap_string(str(npc_context.get("name", "")))
     desc = _cap_string(str(npc_context.get("desc", "")))
     location = _cap_string(str(npc_context.get("location", "")))
+    if npc_persona:
+        try:
+            framed_persona = render_prompt("npc_dialogue.persona_frame", block=npc_persona)
+        except PromptUnavailableError:
+            framed_persona = npc_persona
+    else:
+        framed_persona = ""
     return render_prompt(
         "npc_dialogue.system",
         name=name,
         desc=desc,
         location=location,
-        persona=npc_persona or "",
+        persona=framed_persona,
     )
 
 

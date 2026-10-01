@@ -44,7 +44,7 @@ from typeclasses.components import ScriptedDialogue
 
 from world.lore.dialogue import DIALOGUE_ROWS
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
-from world.observability import log_info
+from world.observability import log_error, log_info
 
 GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
 GUILD_STAFF_TURNIN_KEYWORD = "回報"
@@ -92,7 +92,7 @@ def dialogue_key_for(npc: Any) -> str | None:
     return getattr(component, "dialogue_key", None)
 
 
-def table_response(dialogue_key: str, keyword: str) -> str:
+def table_response(dialogue_key: str, keyword: str, npc: Any = None) -> str:
     """Return the authored response for one keyword, or the no-understanding line."""
     definition = DIALOGUE_TABLE.get(dialogue_key)
     if definition is None:
@@ -100,6 +100,8 @@ def table_response(dialogue_key: str, keyword: str) -> str:
     for entry in definition.responses:
         if entry.keyword == keyword:
             return entry.response
+    if npc is not None:
+        return misunderstood_line_for(npc)
     return NO_UNDERSTANDING_LINE
 
 
@@ -131,7 +133,7 @@ def dialogue_response(npc: Any, actor: Any, keyword: str) -> str | None:
         summary = reportable_quest_summary(actor, npc)
         if summary is not None:
             return summary
-    return table_response(key, keyword)
+    return table_response(key, keyword, npc=npc)
 
 
 def greeting_for(npc: Any) -> str | None:
@@ -147,6 +149,56 @@ def greeting_for(npc: Any) -> str | None:
     if definition is None:
         return None
     return definition.greeting
+
+
+def misunderstood_line_for(npc: Any) -> str:
+    """Return the misunderstood voice line for an NPC (design D3).
+
+    If the host carries profile provenance, resolves that profile's misunderstood
+    line. If the profile key cannot be resolved, logs an integrity error and
+    falls back to the shared line. Never consults the instance field (instance
+    fields answer greetings, not keywords).
+    """
+    from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+    from world.rules.npc_persona import provenance_profile_key
+
+    key = provenance_profile_key(npc)
+    if key is None:
+        return NO_UNDERSTANDING_LINE
+    profile = NPC_PROFILE_REGISTRY.get(key)
+    if profile is None:
+        # observability: ignore R3: dangling profile reference is a non-exception integrity event
+        log_error("npc_voice_profile_missing", context={"npc": str(getattr(npc, "pk", npc)), "profile": key})
+        return NO_UNDERSTANDING_LINE
+    return profile.voice.misunderstood or NO_UNDERSTANDING_LINE
+
+
+def offline_greeting_for(npc: Any) -> str | None:
+    """Resolve the single greeting for no-keyword and degraded presentation paths (design D3).
+
+    Precedence:
+    1. db.npc_offline_greeting (plain text, non-empty, verbatim)
+    2. Dialogue table greeting via greeting_for(npc)
+    3. Profile greeting via provenance_profile_key(npc)
+    """
+    from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+    from world.rules.npc_persona import provenance_profile_key
+
+    field = getattr(getattr(npc, "db", None), "npc_offline_greeting", None)
+    if isinstance(field, str) and field:
+        return field
+    table_greeting = greeting_for(npc)
+    if table_greeting is not None:
+        return table_greeting
+    key = provenance_profile_key(npc)
+    if key is None:
+        return None
+    profile = NPC_PROFILE_REGISTRY.get(key)
+    if profile is None:
+        # observability: ignore R3: dangling profile reference is a non-exception integrity event
+        log_error("npc_voice_profile_missing", context={"npc": str(getattr(npc, "pk", npc)), "profile": key})
+        return None
+    return profile.voice.greeting or None
 
 
 def opens_dialogue(npc: Any) -> bool:
