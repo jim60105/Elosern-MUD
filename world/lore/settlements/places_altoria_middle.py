@@ -81,6 +81,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="other",
         profession="merchant",
         service_id="altoria_merchant",
+        host_profile_key="altoria_merchant",
         # The 58-item monolith split along the specialist axis
         # (commerce-assortment-registry): the general store keeps the
         # sundries shelf, the specialists take weapons, food and armour.
@@ -109,6 +110,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="male",
         profession="merchant",
         service_id="altoria_blacksmith",
+        host_profile_key="altoria_blacksmith",
         assortment_keys=("common_arms",),
         authored_kwargs=(
             ("shop_key", "altoria_forge"),
@@ -133,6 +135,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="altoria_tailor",
+        host_profile_key="altoria_tailor",
         assortment_keys=("common_outfits",),
         authored_kwargs=(
             ("shop_key", "altoria_tailor"),
@@ -161,6 +164,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="altoria_jeweller",
+        host_profile_key="altoria_jeweller",
         assortment_keys=("capital_adornments",),
         authored_kwargs=(
             ("shop_key", "altoria_jeweller"),
@@ -185,6 +189,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="altoria_alchemist",
+        host_profile_key="altoria_alchemist",
         assortment_keys=("capital_remedies",),
         authored_kwargs=(
             ("shop_key", "altoria_alchemist"),
@@ -219,6 +224,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="male",
         profession="attendant",
         service_id="altoria_merchant_master",
+        host_profile_key="altoria_merchant_master",
         assortment_keys=(),
         authored_kwargs=(("dialogue_key", "altoria_merchant_hall"),),
     ),

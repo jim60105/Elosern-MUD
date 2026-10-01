@@ -118,14 +118,18 @@ class PlaceRegistryTests(unittest.TestCase):
             '阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。',
             (2, 3), '雜貨店', ('general store', 'store', 'shop'), '瑪爾特·金秤', '阿爾托利亞雜貨商店老闆', 'human', None,
             'other', 'merchant', 'altoria_merchant', ('general_sundries',),
-            (('shop_key', 'altoria_general_store'), ('dialogue_key', 'altoria_general_store')), (), (), None
+            (('shop_key', 'altoria_general_store'), ('dialogue_key', 'altoria_general_store')), (), (),
+            # npc-persona-content-altoria-trade names the host's own profile.
+            'altoria_merchant'
         ),
         "altoria_forge": (
             'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
             "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。",
             (1, 3), '鍛造鋪', ('forge', 'smithy'), '維爾登·黑潭', '聖潔王都鍛造鋪鐵匠', 'human', 'human_plains', 'male',
             'merchant', 'altoria_blacksmith', ('common_arms',),
-            (('shop_key', 'altoria_forge'), ('dialogue_key', 'altoria_forge')), (), (), None
+            (('shop_key', 'altoria_forge'), ('dialogue_key', 'altoria_forge')), (), (),
+            # npc-persona-content-altoria-trade names the host's own profile.
+            'altoria_blacksmith'
         ),
         "altoria_eatery": (
             'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
@@ -141,7 +145,9 @@ class PlaceRegistryTests(unittest.TestCase):
             "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。",
             (1, 3), '裁縫坊', ('tailor', 'tailor shop'), '妮絲塔·狐溪', '聖潔王都裁縫坊坊主', 'human', 'human_plains',
             'female', 'merchant', 'altoria_tailor', ('common_outfits',),
-            (('shop_key', 'altoria_tailor'), ('dialogue_key', 'altoria_tailor')), (), (), None
+            (('shop_key', 'altoria_tailor'), ('dialogue_key', 'altoria_tailor')), (), (),
+            # npc-persona-content-altoria-trade names the host's own profile.
+            'altoria_tailor'
         ),
         "ciaran_hailiel_home": (
             'ciaran_hailiel_home', 'village_ciaran', PlaceKind.HOME, '海莉爾的家',

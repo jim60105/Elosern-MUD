@@ -23,10 +23,10 @@ key, name or keyword is named statically where a kind resolves it):
 - the two refusals, inspected concretely (the crown-watch suite's shape): the
   academy host and the hall host each lack the quest-issuer, guild-staff,
   examiner and merchant offices, each room's whole non-exit contents is its
-  one attendant, the academy's 拜師 answer and the hall's 委託 answer carry
-  the refusals in the hosts' own words, and every backticked command token in
-  both tables resolves to a REAL mounted command key or alias (tasks 4.1,
-  4.2);
+  one attendant, the academy's 拜師 answer carries the refusal in the dean's
+  own words, the hall's table names no command at all (its host speaks in
+  character), and every backticked command token in both tables resolves to
+  a REAL mounted command key or alias (tasks 4.1, 4.2);
 - the three rows are lifted out of the live world and only then are the
   command set and the persisted attribute vocabulary taken; the rooms arrive
   through the real synchronisation and neither surface may have gained
@@ -485,7 +485,6 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
     def test_the_two_tables_refuse_in_the_hosts_own_words_and_tell_no_lies(self):
         # The refusals spoken as prose (the crown-watch honesty pins' shape):
         # the dean's 拜師 answer really refuses a skill-by-mentorship path,
-        # the guild master's 委託 answer really says the hall posts nothing,
         # neither attendant table carries a trade verb or a 賣 claim (they
         # sell nothing), and every backticked command token across both
         # tables resolves to a REAL mounted command — the tables teach what
@@ -522,16 +521,10 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         for verb in ("`rest`", "`practice`", "`guild exam`", "`lore`"):
             self.assertIn(verb, dean_text, "the dean's table lost a real command")
         guild_text = _table_text(_merchant_hall())
-        self.assertIn(
-            "牆上無單", guild_text, "the guild master is posting commissions again"
-        )
-        # `guild request` really is a mounted command, and it really is the
-        # closed door the table sends enquirers to.
-        self.assertIn("guild request", surface)
-        # And the hall sends route-seekers to a command the player can ACTUALLY
-        # run (`前往`), not to the builder-gated `地圖`.
-        self.assertIn("`前往`", guild_text)
-        self.assertNotIn("`地圖`", guild_text)
+        # The guild master speaks in character and names no command
+        # (npc-persona-content-altoria-trade): the hall's refusal is proven by
+        # the absent offices above, never by pinned prose.
+        self.assertNotIn("`", guild_text)
 
     @covers_requirement(
         "altoria-learning-and-exchange::neither-location-implements-the-system-it-is-the-future-home-of"

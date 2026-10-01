@@ -604,6 +604,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             host_sex=None,
             profession=None,
             service_id=None,
+            host_profile_key=None,
             assortment_keys=(),
             authored_kwargs=(),
         )
