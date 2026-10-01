@@ -24,6 +24,11 @@ LEAF_LIMIT: int = 600
 IDENTITY_SECTION_LIMIT: int = 600
 CARD_BLOCK_LIMIT: int = 2000
 
+# The per-instance offline greeting (``db.npc_offline_greeting``): one
+# single-paragraph plain-text line, bounded like an authored voice line. It is
+# not a card leaf and never counts toward ``CARD_BLOCK_LIMIT``.
+OFFLINE_GREETING_LIMIT: int = 300
+
 # Top-level storage key set
 NPC_CARD_FIELDS: frozenset[str] = frozenset({
     "identity",
@@ -314,6 +319,23 @@ def normalize_card(raw: Any) -> NpcCard:
         raise NpcCardError("card_too_long", None)
 
     return card
+
+
+def normalize_offline_greeting(raw: Any) -> str:
+    """Validate and normalize an editor-submitted offline greeting.
+
+    The text is normalized exactly like a card leaf (CRLF/CR to LF, outer
+    whitespace trimmed). The empty string is valid and means "no override".
+    Non-text input, a normalized value longer than ``OFFLINE_GREETING_LIMIT``
+    code points, or one that still contains a newline (more than one
+    paragraph) raises ``NpcCardError("greeting_invalid", "offline_greeting")``.
+    """
+    if not isinstance(raw, str) or isinstance(raw, bool):
+        raise NpcCardError("greeting_invalid", "offline_greeting")
+    normalized = _CRLF_RE.sub("\n", raw).strip()
+    if "\n" in normalized or len(normalized) > OFFLINE_GREETING_LIMIT:
+        raise NpcCardError("greeting_invalid", "offline_greeting")
+    return normalized
 
 
 def validate_provenance(provenance: Any) -> dict[str, Any]:

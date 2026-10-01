@@ -178,15 +178,27 @@ def offline_greeting_for(npc: Any) -> str | None:
 
     Precedence:
     1. db.npc_offline_greeting (plain text, non-empty, verbatim)
-    2. Dialogue table greeting via greeting_for(npc)
-    3. Profile greeting via provenance_profile_key(npc)
+    2. The authored default (``authored_greeting_for``): the dialogue table
+       greeting, else the profile greeting
+    """
+    field = getattr(getattr(npc, "db", None), "npc_offline_greeting", None)
+    if isinstance(field, str) and field:
+        return field
+    return authored_greeting_for(npc)
+
+
+def authored_greeting_for(npc: Any) -> str | None:
+    """Resolve the authored greeting below the editable instance field.
+
+    The dialogue table greeting via ``greeting_for(npc)``, else the greeting of
+    the profile named by the NPC's provenance, else ``None``. Never reads the
+    instance field, so it is exactly what ``offline_greeting_for`` answers once
+    the field is cleared; the author editor previews it as the default.
+    Read-only.
     """
     from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
     from world.rules.npc_persona import provenance_profile_key
 
-    field = getattr(getattr(npc, "db", None), "npc_offline_greeting", None)
-    if isinstance(field, str) and field:
-        return field
     table_greeting = greeting_for(npc)
     if table_greeting is not None:
         return table_greeting

@@ -65,6 +65,19 @@ class NpcPersonaActionValidatorsTest(unittest.TestCase):
         self.assertEqual(result["expected_persona_version"], 3)
         self.assertEqual(result["persona"], _valid_card_dict())
 
+    def test_validate_update_payload_offline_greeting_is_optional_text(self):
+        base = {"npc_id": 10, "expected_persona_version": 3, "persona": _valid_card_dict()}
+        self.assertEqual(validate_update_payload(base)["offline_greeting"], "")
+        self.assertEqual(
+            validate_update_payload({**base, "offline_greeting": "「你好。」"})["offline_greeting"], "「你好。」"
+        )
+        for bad in (42, None, True, ["x"], "字" * 2049):
+            with self.subTest(bad=bad):
+                with self.assertRaises(NpcPersonaActionError):
+                    validate_update_payload({**base, "offline_greeting": bad})
+        with self.assertRaises(NpcPersonaActionError):
+            validate_update_payload({**base, "greeting": "x"})
+
     def test_validate_update_payload_rejects_non_dict_or_bad_envelope_keys(self):
         with self.assertRaises(NpcPersonaActionError):
             validate_update_payload(None)

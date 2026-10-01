@@ -54,8 +54,8 @@ class _FakeSession:
         self.sent.append(kwargs)
 
 
-class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
-    """Tests for admission, reads, updates, and deduplication of NPC persona actions."""
+class _NpcPersonaActionsFixture:
+    """Shared room/actor/NPC setup and dispatch helpers (no test methods)."""
 
     def setUp(self):
         super().setUp()
@@ -108,6 +108,10 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         )
         results = [call for call in session.sent if "ui_action_result" in call]
         return results[-1]["ui_action_result"][0][0]
+
+
+class NpcPersonaActionsAdmissionAndMutationTest(_NpcPersonaActionsFixture, EvenniaTest):
+    """Tests for admission, reads, updates, and deduplication of NPC persona actions."""
 
     @covers_requirement("npc-persona-editor::author-editing-admits-only-a-co-located-npc-for-the-session-s-own-active-character")
     def test_read_success_in_exploration_mode(self):
@@ -233,7 +237,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertEqual(res_del["outcome"], "rejected")
         self.assertEqual(res_del["code"], CODE_NO_TARGET)
 
-    @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot")
+    @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
     def test_uninitialized_npc_is_unavailable(self):
         session, coordinator = self._session_and_coordinator()
         uninit_npc = create_object(NPC, key="未初始化NPC")
@@ -282,7 +286,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertEqual(res["outcome"], "rejected")
         self.assertEqual(res["code"], "malformed_payload")
 
-    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-whole-card-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_update_advances_version_and_touches_only_selected_npc(self):
         session, coordinator = self._session_and_coordinator()
 
@@ -324,7 +328,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         # Clock untouched
         self.assertEqual(get_world_clock().tick, clock_before)
 
-    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-whole-card-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_identical_card_update_returns_success_unchanged(self):
         session, coordinator = self._session_and_coordinator()
         res = self._dispatch(
@@ -338,7 +342,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertEqual(res["data"]["persona_version"], 1)
         self.assertEqual(res["message"], "設定未變更。")
 
-    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-whole-card-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_version_conflict_rejection(self):
         session, coordinator = self._session_and_coordinator()
         res = self._dispatch(
@@ -353,7 +357,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertIn("目前第 1 版", res["message"])
         self.assertNotIn("data", res)
 
-    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-whole-card-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_field_violation_maps_to_field_specific_code(self):
         session, coordinator = self._session_and_coordinator()
 
@@ -412,7 +416,7 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertEqual(res["outcome"], "rejected")
         self.assertEqual(res["code"], "npc_persona.card_too_long")
 
-    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-whole-card-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_deduplicated_request_id_returns_cached_result_without_second_write(self):
         session, coordinator = self._session_and_coordinator()
         changed_card = _valid_card_dict()
@@ -440,3 +444,156 @@ class NpcPersonaActionsAdmissionAndMutationTest(EvenniaTest):
         self.assertEqual(res2["data"]["persona_version"], 2)
         # Version remained 2, no second write occurred
         self.assertEqual(read_npc_persona(self.npc).version, 2)
+
+
+def _t_profile(key: str, greeting: str | None):
+    """A file-local synthetic profile whose voice carries ``greeting``."""
+    from world.lore.npc_card import NpcCard, NpcCardIdentity
+    from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+    return NpcProfile(
+        key=key,
+        card=NpcCard(
+            identity=NpcCardIdentity(public="測試者", hidden=""),
+            appearance="外觀",
+            personality="性格",
+            speech_style="語氣",
+            life_story="經歷",
+            habit="習慣",
+            social_connection="",
+        ),
+        voice=NpcVoiceLines(greeting=greeting),
+    )
+
+
+class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTest):
+    """The offline-greeting extension of the editor transport (window change, design §13a)."""
+
+    def setUp(self):
+        super().setUp()
+        # Every greeting test resolves the profile provenance against a
+        # file-local synthetic registry entry (no shipped content).
+        self._registry_patch = patch(
+            "world.lore.npc_profiles.NPC_PROFILE_REGISTRY",
+            {"alice_waitress": _t_profile("alice_waitress", "「歡迎來到公會。」")},
+        )
+        self._registry_patch.start()
+        self.addCleanup(self._registry_patch.stop)
+
+    def _update(self, session, coordinator, version, card=None, greeting=None, request_id="g-up"):
+        payload = {
+            "npc_id": self.npc.id,
+            "expected_persona_version": version,
+            "persona": card or _valid_card_dict(),
+        }
+        if greeting is not None:
+            payload["offline_greeting"] = greeting
+        return self._dispatch(session, coordinator, "npc.persona.update", payload, request_id=request_id)
+
+    @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
+    def test_read_returns_exactly_seven_keys_with_field_and_profile_default(self):
+        self.npc.db.npc_offline_greeting = "自訂開場白。"
+        session, coordinator = self._session_and_coordinator()
+        result = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id})
+        self.assertEqual(result["outcome"], "success")
+        data = result["data"]
+        self.assertEqual(
+            set(data),
+            {"npc_id", "display_name", "npc_title", "persona_version", "persona", "offline_greeting", "default_greeting"},
+        )
+        self.assertEqual(data["offline_greeting"], "自訂開場白。")
+        self.assertEqual(data["default_greeting"], "「歡迎來到公會。」")
+        # Reading wrote nothing: the default never lands in the field.
+        self.assertEqual(self.npc.db.npc_offline_greeting, "自訂開場白。")
+
+    @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
+    def test_table_greeting_wins_the_default_and_is_never_projected(self):
+        session, coordinator = self._session_and_coordinator()
+        with patch("world.rules.dialogue.greeting_for", return_value="「表格裡的問候。」"):
+            result = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id})
+        data = result["data"]
+        self.assertEqual(data["default_greeting"], "「表格裡的問候。」")
+        self.assertEqual(data["offline_greeting"], "")
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+    @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
+    def test_free_form_npc_reads_two_empty_greetings(self):
+        free = create_object(NPC, key="無名旅人")
+        free.location = self.room
+        initialize_npc_persona(free, _valid_card_dict(), {"kind": "import", "record": "t_free_form"})
+        session, coordinator = self._session_and_coordinator()
+        result = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": free.id})
+        self.assertEqual(result["data"]["offline_greeting"], "")
+        self.assertEqual(result["data"]["default_greeting"], "")
+        self.assertFalse(free.attributes.has("npc_offline_greeting"))
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_greeting_only_save_advances_once_and_clearing_restores_the_default(self):
+        from world.rules.dialogue import offline_greeting_for
+
+        session, coordinator = self._session_and_coordinator()
+        res = self._update(session, coordinator, 1, greeting="  「今天也辛苦了。」\r\n", request_id="g-1")
+        self.assertEqual(res["outcome"], "success")
+        self.assertEqual(res["code"], "updated")
+        self.assertEqual(res["data"]["persona_version"], 2)
+        self.assertEqual(res["data"]["offline_greeting"], "「今天也辛苦了。」")
+        self.assertEqual(offline_greeting_for(self.npc), "「今天也辛苦了。」")
+        self.assertEqual(read_npc_persona(self.npc).card.to_record(), normalize_card(_valid_card_dict()).to_record())
+
+        # The identical card and greeting is a no-op at the same version.
+        same = self._update(session, coordinator, 2, greeting="「今天也辛苦了。」", request_id="g-2")
+        self.assertEqual(same["code"], "unchanged")
+        self.assertEqual(same["data"]["persona_version"], 2)
+
+        # Clearing removes the override; the authored default answers again.
+        cleared = self._update(session, coordinator, 2, greeting="", request_id="g-3")
+        self.assertEqual(cleared["data"]["persona_version"], 3)
+        self.assertEqual(cleared["data"]["offline_greeting"], "")
+        self.assertEqual(cleared["data"]["default_greeting"], "「歡迎來到公會。」")
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+        self.assertEqual(offline_greeting_for(self.npc), "「歡迎來到公會。」")
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_card_and_greeting_change_together_advances_once(self):
+        session, coordinator = self._session_and_coordinator()
+        card = _valid_card_dict()
+        card["habit"] = "閒暇時替盆栽澆水。"
+        res = self._update(session, coordinator, 1, card=card, greeting="「有事嗎？」")
+        self.assertEqual(res["data"]["persona_version"], 2)
+        self.assertEqual(res["data"]["persona"]["habit"], "閒暇時替盆栽澆水。")
+        self.assertEqual(res["data"]["offline_greeting"], "「有事嗎？」")
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_invalid_greeting_is_rejected_without_writing(self):
+        session, coordinator = self._session_and_coordinator()
+        card = _valid_card_dict()
+        card["habit"] = "改過的習慣。"
+        for index, greeting in enumerate(("問" * 301, "第一段。\n第二段。")):
+            with self.subTest(index=index):
+                res = self._update(session, coordinator, 1, card=card, greeting=greeting, request_id=f"g-bad-{index}")
+                self.assertEqual(res["outcome"], "rejected")
+                self.assertEqual(res["code"], "npc_persona.greeting_invalid")
+                self.assertIn("離線問候語", res["message"])
+                self.assertNotIn("data", res)
+        snapshot = read_npc_persona(self.npc)
+        self.assertEqual(snapshot.version, 1)
+        self.assertEqual(snapshot.card.habit, _valid_card_dict()["habit"])
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_non_text_greeting_is_a_malformed_payload(self):
+        session, coordinator = self._session_and_coordinator()
+        with patch("web.webclient.actions.npc_persona_actions.update_npc_persona") as service:
+            res = self._update(session, coordinator, 1, greeting=42, request_id="g-num")
+        self.assertEqual(res["code"], "malformed_payload")
+        service.assert_not_called()
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_greeting_edit_affects_only_the_selected_npc(self):
+        npc2 = create_object(NPC, key="接待員鮑勃")
+        npc2.location = self.room
+        initialize_npc_persona(npc2, _valid_card_dict(), {"kind": "profile", "profile": "alice_waitress"})
+        session, coordinator = self._session_and_coordinator()
+        self._update(session, coordinator, 1, greeting="「只對愛麗絲。」")
+        self.assertEqual(read_npc_persona(npc2).version, 1)
+        self.assertFalse(npc2.attributes.has("npc_offline_greeting"))

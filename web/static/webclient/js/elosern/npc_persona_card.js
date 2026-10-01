@@ -19,6 +19,9 @@
   var LEAF_LIMIT = 600;
   var IDENTITY_SECTION_LIMIT = 600;
   var CARD_BLOCK_LIMIT = 2000;
+  // The per-instance offline greeting (world.lore.npc_card.OFFLINE_GREETING_LIMIT):
+  // one single-paragraph line, never part of the card total.
+  var OFFLINE_GREETING_LIMIT = 300;
 
   var NPC_CARD_FIELDS = [
     "identity",
@@ -59,13 +62,23 @@
     appearance: "外觀：",
     personality: "性格：",
     speech_style: "說話風格：",
-    life_story: "生平：",
+    life_story: "人生經歷：",
     habit: "習慣：",
-    social_connection: "人際關係：",
+    social_connection: "人脈：",
   };
 
-  var IDENTITY_PUBLIC_LABEL = "公開：";
-  var IDENTITY_HIDDEN_LABEL = "隱秘：";
+  // The identity sub-labels exactly as world.lore.npc_card renders them
+  // ("公開身分：<public>" / "隱秘身分：<hidden>", one line each, no indent).
+  var IDENTITY_PUBLIC_LABEL = "公開身分：";
+  var IDENTITY_HIDDEN_LABEL = "隱秘身分：";
+
+  function renderIdentitySection(publicText, hiddenText) {
+    var section = CARD_FIELD_LABELS.identity + "\n" + IDENTITY_PUBLIC_LABEL + publicText;
+    if (hiddenText && hiddenText.length > 0) {
+      section += "\n" + IDENTITY_HIDDEN_LABEL + hiddenText;
+    }
+    return section;
+  }
 
   var CRLF_REGEX = /\r\n|\r/g;
 
@@ -179,10 +192,7 @@
     }
 
     // Check identity section total rendered length
-    var renderedId = CARD_FIELD_LABELS.identity + "\n  " + IDENTITY_PUBLIC_LABEL + normPublic;
-    if (normHidden.length > 0) {
-      renderedId += "\n  " + IDENTITY_HIDDEN_LABEL + normHidden;
-    }
+    var renderedId = renderIdentitySection(normPublic, normHidden);
     if (countCodePoints(renderedId) > IDENTITY_SECTION_LIMIT) {
       var idSecLimit = new Error("identity_section_too_long: identity");
       idSecLimit.code = "identity_section_too_long";
@@ -236,12 +246,7 @@
   }
 
   function renderCardBlock(card) {
-    var lines = [];
-    lines.push(CARD_FIELD_LABELS.identity);
-    lines.push("  " + IDENTITY_PUBLIC_LABEL + card.identity.public);
-    if (card.identity.hidden && card.identity.hidden.length > 0) {
-      lines.push("  " + IDENTITY_HIDDEN_LABEL + card.identity.hidden);
-    }
+    var lines = [renderIdentitySection(card.identity.public, card.identity.hidden)];
 
     for (var i = 0; i < NPC_CARD_RENDER_ORDER.length; i++) {
       var key = NPC_CARD_RENDER_ORDER[i];
@@ -266,10 +271,7 @@
       social_connection: countCodePoints(card.social_connection),
     };
 
-    var renderedId = CARD_FIELD_LABELS.identity + "\n  " + IDENTITY_PUBLIC_LABEL + card.identity.public;
-    if (card.identity.hidden.length > 0) {
-      renderedId += "\n  " + IDENTITY_HIDDEN_LABEL + card.identity.hidden;
-    }
+    var renderedId = renderIdentitySection(card.identity.public, card.identity.hidden);
     var idTotal = countCodePoints(renderedId);
 
     var rendered = renderCardBlock(card);
@@ -284,12 +286,35 @@
     };
   }
 
+  // Mirror of world.lore.npc_card.normalize_offline_greeting: the card's text
+  // normalization, then at most OFFLINE_GREETING_LIMIT code points and no
+  // newline. "" is valid (no override).
+  function normalizeOfflineGreeting(raw) {
+    if (typeof raw !== "string") {
+      var notText = new Error("greeting_invalid: offline_greeting");
+      notText.code = "greeting_invalid";
+      notText.field = "offline_greeting";
+      throw notText;
+    }
+    var normalized = normalizeText(raw);
+    if (normalized.indexOf("\n") !== -1 || countCodePoints(normalized) > OFFLINE_GREETING_LIMIT) {
+      var invalid = new Error("greeting_invalid: offline_greeting");
+      invalid.code = "greeting_invalid";
+      invalid.field = "offline_greeting";
+      throw invalid;
+    }
+    return normalized;
+  }
+
   return {
     NPC_CARD_FORMAT: NPC_CARD_FORMAT,
     NPC_PERSONA_CONTENT_GENERATION: NPC_PERSONA_CONTENT_GENERATION,
     LEAF_LIMIT: LEAF_LIMIT,
     IDENTITY_SECTION_LIMIT: IDENTITY_SECTION_LIMIT,
     CARD_BLOCK_LIMIT: CARD_BLOCK_LIMIT,
+    OFFLINE_GREETING_LIMIT: OFFLINE_GREETING_LIMIT,
+    IDENTITY_PUBLIC_LABEL: IDENTITY_PUBLIC_LABEL,
+    IDENTITY_HIDDEN_LABEL: IDENTITY_HIDDEN_LABEL,
     NPC_CARD_FIELDS: NPC_CARD_FIELDS,
     NPC_CARD_RENDER_ORDER: NPC_CARD_RENDER_ORDER,
     REQUIRED_TEXT_LEAVES: REQUIRED_TEXT_LEAVES,
@@ -298,6 +323,8 @@
     countCodePoints: countCodePoints,
     normalizeText: normalizeText,
     normalizeCard: normalizeCard,
+    normalizeOfflineGreeting: normalizeOfflineGreeting,
+    renderIdentitySection: renderIdentitySection,
     renderCardBlock: renderCardBlock,
     cardBudget: cardBudget,
   };
