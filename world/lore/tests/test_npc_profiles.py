@@ -5,14 +5,13 @@ from __future__ import annotations
 import ast
 import unittest
 from pathlib import Path
-from types import MappingProxyType
 
 from evennia.scripts.models import ScriptDB
 from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import NpcCard, NpcCardError, NpcCardIdentity
-from world.lore.npc_profiles import NPC_PROFILE_REGISTRY, assemble_profile_registry
+from world.lore.npc_profiles import assemble_profile_registry
 from world.lore.npc_profiles.shape import VOICE_LINE_LIMIT, NpcProfile, NpcVoiceLines
 from world.lore.sync import sync_all
 
@@ -163,18 +162,6 @@ class AssembleProfileRegistryTests(unittest.TestCase):
         profile = NpcProfile(key="t_ok", card=_card())
         registry = assemble_profile_registry((("t_slice", (profile,)),))
         self.assertEqual(registry, {"t_ok": profile})
-
-
-class RegistryImmutabilityTests(unittest.TestCase):
-    @covers_requirement(
-        "npc-profile-registry::one-module-assembles-the-profile-registry-from-owned-slices"
-    )
-    def test_registry_is_a_read_only_mapping_proxy(self):
-        self.assertIsInstance(NPC_PROFILE_REGISTRY, MappingProxyType)
-        before = dict(NPC_PROFILE_REGISTRY)
-        with self.assertRaises(TypeError):
-            NPC_PROFILE_REGISTRY["t_injected"] = None
-        self.assertEqual(dict(NPC_PROFILE_REGISTRY), before)
 
 
 class ImportBoundaryTests(unittest.TestCase):

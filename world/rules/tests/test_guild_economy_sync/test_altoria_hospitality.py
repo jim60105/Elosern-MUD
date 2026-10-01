@@ -372,17 +372,12 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                 # Reached through the rules API, exactly as talk reaches it.
                 self.assertEqual(dialogue_key_for(host), _authored(place)["dialogue_key"])
                 self.assertIsNotNone(greeting_for(host))
-        # The innkeeper names the three verbs the inn exists to host.
-        for verb in ("`rest`", "`sleep`", "`practice`"):
-            self.assertIn(verb, _table_text(inn), "the inn's table lost a verb")
-        # The tavern keeper names conversation and party invitation.
-        for verb in ("`talk`", "`invite`"):
-            self.assertIn(verb, _table_text(tavern), "the tavern's table lost a verb")
-        # The bathhouse keeper explains the separated sides — the room's
-        # whole authored rule.
-        bath_table = _table_text(bathhouse)
-        self.assertIn("男", bath_table)
-        self.assertIn("女", bath_table)
+        # The hosts speak in character (npc-persona-content-altoria-lower
+        # D5): no line names a command. The prose itself is authored content
+        # and is never pinned here, so rewording a line breaks no test.
+        for place in (tavern, inn, bathhouse):
+            with self.subTest(in_character=place.kind):
+                self.assertNotIn("`", _table_text(place), place.kind)
         # Every authored keyword answers through the table API (a keyword
         # the panel could press but the rules could not answer is a bug).
         table = _dialogue_table()
