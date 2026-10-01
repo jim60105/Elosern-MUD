@@ -186,13 +186,30 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNone(getattr(legacy.db, "npc_persona_meta", None))
 
     def test_injected_initializer_failure_leaves_no_host(self):
-        from unittest.mock import patch as inner_patch
+        from unittest.mock import patch as inner_patch, MagicMock
 
-        with inner_patch("world.rules.guild_economy.initialize_npc_persona", side_effect=RuntimeError("injected init error")):
+        def _fail_guild(npc, card_raw, provenance):
+            if provenance.get("profile") == GUILD_SERVICE_ID:
+                raise RuntimeError("injected guild init error")
+            from world.rules.npc_persona import initialize_npc_persona as real_init
+            return real_init(npc, card_raw, provenance)
+
+        with inner_patch("world.rules.guild_economy.initialize_npc_persona", side_effect=_fail_guild):
             with self.assertRaises(RuntimeError):
                 sync_service_content()
         self.assertIsNone(self._guild_host())
         self.assertEqual(NPC.objects.filter(db_key=_guild_host_name()).count(), 0)
+
+    def test_unresolved_profile_fails_sync_before_any_write(self):
+        catalog = get_catalog()
+        broken_row = dataclasses.replace(
+            _guild_row(),
+            profile_key="t_unresolved_profile_key",
+        )
+        patched = tuple(broken_row if r.service_id == GUILD_SERVICE_ID else r for r in catalog.service_hosts)
+        self._patch_roster(patched)
+        with self.assertRaises(ServiceAnchorIntegrityError):
+            sync_service_content()
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_resync_never_renames_or_duplicates(self):
