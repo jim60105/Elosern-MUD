@@ -7,6 +7,7 @@ from typing import Any
 from evennia.typeclasses.attributes import AttributeProperty
 from twisted.internet import defer
 
+from world.observability import log_info
 from .entities import LivingEntity
 
 # Trait keys whose true current values become no-leak secrets when the NPC
@@ -42,12 +43,19 @@ class DialogueExchangeResult:
     ``degraded=True`` means the guarded layer resolved to its public ``None``
     marker and ``reply`` is ``None``; the caller decides the fallback behavior
     (the authored greeting or the party-invite threshold). A degraded outcome
-    is never silently treated as a declined intent. ``reply`` is typed loosely
+    is never silently treated as a declined intent. ``stale_persona=True`` means
+    the NPC's persona version changed mid-flight; speech, memory append, and
+    intent application are discarded. ``reply`` is typed loosely
     so this module needs no module-scope generative import.
     """
 
     degraded: bool
     reply: Any | None
+    stale_persona: bool = False
+
+
+# Sentinel returned by at_talked_to when a mid-flight persona edit discards the reply.
+STALE_PERSONA = object()
 
 
 class NPC(LivingEntity):
@@ -385,7 +393,7 @@ class LLMNPC(NPC):
                 try:
                     displayed = int(disguised[key])
                     true_value = int(trait.value)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError):  # observability: ignore R2: non-numeric disguise traits are skipped
                     continue
                 if displayed != true_value:
                     secrets.add(str(true_value))
@@ -406,12 +414,19 @@ class LLMNPC(NPC):
 
         try:
             return render_prompt("npc.thinking", name=self.key)
-        except PromptUnavailableError:
+        except PromptUnavailableError:  # observability: ignore R2: fallback to empty echo when thinking key missing
             return ""
 
     @defer.inlineCallbacks
     def run_npc_exchange(
-        self, speech: str, character: Any, client: Any, *, reactor=None, identity_detail: bool = False
+        self,
+        speech: str,
+        character: Any,
+        client: Any,
+        *,
+        reactor=None,
+        identity_detail: bool = False,
+        path: str = "exchange",
     ):
         """Run one guarded dialogue exchange without applying anything.
 
@@ -469,6 +484,9 @@ class LLMNPC(NPC):
 
         self._append_memory(character, character, speech)
 
+        from world.rules.npc_persona import current_persona_version
+
+        captured_version = current_persona_version(self)
         npc_persona, player_persona = self._persona_block(character)
 
         try:
@@ -486,13 +504,37 @@ class LLMNPC(NPC):
             if thinking_defer is not None and not thinking_defer.called:
                 thinking_defer.cancel()
 
+        current_version = current_persona_version(self)
+        if current_version != captured_version:
+            log_info(
+                "npc_dialogue_stale_persona",
+                context={
+                    "npc": str(getattr(self, "pk", self)),
+                    "char": str(getattr(character, "pk", character)),
+                    "version_from": captured_version,
+                    "version_to": current_version,
+                    "path": path,
+                },
+            )
+            return DialogueExchangeResult(degraded=False, reply=None, stale_persona=True)
+
         if reply is None:
             return DialogueExchangeResult(degraded=True, reply=None)
         self._append_memory(character, self, reply.speech)
         return DialogueExchangeResult(degraded=False, reply=reply)
 
     @defer.inlineCallbacks
-    def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None, settled_line=None):
+    def at_talked_to(
+        self,
+        speech: str,
+        character: Any,
+        client: Any,
+        *,
+        reactor=None,
+        settled_line=None,
+        notify_stale: bool = True,
+        path: str = "talk",
+    ):
         """Handle a player addressing this NPC through the guarded dialogue seam.
 
         Before any prompt construction or transport work, the seam consults
@@ -529,8 +571,9 @@ class LLMNPC(NPC):
             The resolution value is the applied :class:`IntentOutcome` when a
             reply was presented -- including the completion gate's stale
             marker when the exchange settled after the pair separated or the
-            NPC stopped allowing talk -- and ``None`` on a blocked or degraded
-            seam.
+            NPC stopped allowing talk -- ``STALE_PERSONA`` when a mid-flight
+            persona edit discarded the response, and ``None`` on a blocked or
+            degraded seam.
         """
         from world.ai.npc_dialogue import NPCDialogueClientRequiredError
         from world.rules.npc_intents import (
@@ -558,8 +601,15 @@ class LLMNPC(NPC):
             )
 
         result = yield self.run_npc_exchange(
-            speech, character, client, reactor=reactor, identity_detail=True
+            speech, character, client, reactor=reactor, identity_detail=True, path=path
         )
+        if result.stale_persona:
+            if notify_stale:
+                from world.rules.player_messages import STALE_PERSONA_NOTE
+
+                character.msg(STALE_PERSONA_NOTE)
+            return STALE_PERSONA
+
         if result.degraded:
             from world.rules.dialogue import greeting_for
 

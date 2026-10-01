@@ -50,11 +50,14 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
 )
+from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
+from world.rules.player_messages import STALE_PERSONA_NOTE
 from django.test import override_settings
 from unittest.mock import patch
 from world.ai.npc_dialogue import register_npc_dialogue
 import unittest
 from ._support import (
+    _HeldClient,
     _T_SKILL,
     _T_SKILL_ROW,
     _raw,
@@ -222,6 +225,81 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
         self.assertFalse(is_companion(npc, self.player))
         self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_party_invite_discarded_on_mid_flight_persona_edit(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        card = {
+            "identity": {"public": "精靈侍者", "hidden": ""},
+            "appearance": "銀髮碧眼。",
+            "personality": "優雅溫和。",
+            "speech_style": "輕聲細語。",
+            "life_story": "居於森林。",
+            "habit": "微笑聆聽。",
+            "social_connection": "",
+        }
+        initialize_npc_persona(npc, card, {"kind": "profile", "profile": "elf_01"})
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+        from world.rules.party import is_companion
+
+        apply_affinity_change(npc, self.player, AffinitySource.QUEST_COMPLETION, 70)
+        client = _HeldClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            deferred = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": "一起冒險吧"}
+            )
+            card2 = dict(card)
+            card2["habit"] = "整理茶具。"
+            update_npc_persona(npc, card2, expected_version=1)
+            client.deferred.callback(
+                _reply_text(
+                    speech="好的，我加入。",
+                    intent={"kind": "party_invite", "accept": True},
+                )
+            )
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "stale_persona")
+        self.assertEqual(result["message"], STALE_PERSONA_NOTE)
+        self.assertFalse(is_companion(npc, self.player))
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_party_invite_degraded_offline_after_mid_flight_persona_edit_runs_no_threshold(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        card = {
+            "identity": {"public": "精靈侍者", "hidden": ""},
+            "appearance": "銀髮碧眼。",
+            "personality": "優雅溫和。",
+            "speech_style": "輕聲細語。",
+            "life_story": "居於森林。",
+            "habit": "微笑聆聽。",
+            "social_connection": "",
+        }
+        initialize_npc_persona(npc, card, {"kind": "profile", "profile": "elf_01"})
+        from world.rules.affinity import AffinitySource, apply_affinity_change
+        from world.rules.party import is_companion
+
+        apply_affinity_change(npc, self.player, AffinitySource.QUEST_COMPLETION, 70)
+        client = _HeldClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            deferred = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": ""}
+            )
+            card2 = dict(card)
+            card2["habit"] = "整理茶具。"
+            update_npc_persona(npc, card2, expected_version=1)
+            client.deferred.callback(None)
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "stale_persona")
+        self.assertEqual(result["message"], STALE_PERSONA_NOTE)
+        self.assertFalse(is_companion(npc, self.player))
 
 
     @covers_requirement("webclient-exploration-menu::explore-party-invite-proposes-a-party-through-the-guarded-dialogue-seam")

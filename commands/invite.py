@@ -13,6 +13,7 @@ from commands.command import Command
 
 from commands.talk import _resolve_npc
 from typeclasses.npcs import LLMNPC
+from world.rules.player_messages import STALE_PERSONA_NOTE
 from world.rules.party import (
     ALREADY_COMPANION_MESSAGE,
     DEGRADED_ACCEPT_MESSAGE,
@@ -71,7 +72,7 @@ class CmdInvite(Command):
         from web.webclient.actions.dialogue_composition import build_dialogue_client
 
         client = build_dialogue_client()
-        deferred = npc.run_npc_exchange(message, self.caller, client)
+        deferred = npc.run_npc_exchange(message, self.caller, client, path="invite")
         deferred.addCallback(self._render_outcome, npc)
         deferred.addErrback(self._render_failure)
         return deferred
@@ -79,6 +80,9 @@ class CmdInvite(Command):
     def _render_outcome(self, result, npc: LLMNPC) -> None:
         """Render one structured exchange: the threshold or the reply+intent."""
         caller = self.caller
+        if getattr(result, "stale_persona", False):
+            caller.msg(STALE_PERSONA_NOTE)
+            return
         if result.degraded:
             self._render_degraded(npc)
             return

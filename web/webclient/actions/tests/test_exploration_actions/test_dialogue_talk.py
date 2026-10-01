@@ -8,6 +8,8 @@ from world.rules.dialogue import (
     DialogueDefinition,
     KeywordResponse,
 )
+from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
+from world.rules.player_messages import STALE_PERSONA_NOTE
 from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room, TerrainRoom
@@ -382,6 +384,49 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("離開" in text for text in texts))
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_freeform_reply_discarded_on_mid_flight_persona_edit(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        card = {
+            "identity": {"public": "精靈侍者", "hidden": ""},
+            "appearance": "銀髮碧眼。",
+            "personality": "優雅溫和。",
+            "speech_style": "輕聲細語。",
+            "life_story": "居於森林。",
+            "habit": "微笑聆聽。",
+            "social_connection": "",
+        }
+        initialize_npc_persona(npc, card, {"kind": "profile", "profile": "elf_01"})
+        npc.db.inventory = [_T_ITEM]
+        client = _HeldClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(self.player, "msg") as msg:
+            deferred = _talk_freeform_adapter(
+                self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+            )
+            card2 = dict(card)
+            card2["habit"] = "整理茶具。"
+            update_npc_persona(npc, card2, expected_version=1)
+            client.deferred.callback(
+                _reply_text(
+                    speech="我給你一瓶藥水。",
+                    intent={"kind": "give_item", "item_key": _T_ITEM, "qty": 1},
+                )
+            )
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "stale_persona")
+        self.assertEqual(result["message"], STALE_PERSONA_NOTE)
+        self.assertEqual(npc._chat_lines(self.player), [f"{self.player.key}: 你好"])
+        self.assertEqual(list(self.player.db.inventory or []), [])
+        self.assertEqual(list(npc.db.inventory or []), [_T_ITEM])
+        texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
+        self.assertNotIn("我給你一瓶藥水。", " ".join(texts))
+        # Single-surfacing: adapter returned rejected result; direct actor.msg was suppressed
+        self.assertNotIn(STALE_PERSONA_NOTE, texts)
 
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")

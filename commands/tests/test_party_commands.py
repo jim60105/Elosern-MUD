@@ -14,6 +14,7 @@ from unittest.mock import patch
 import unittest
 
 from django.test import override_settings
+from twisted.internet import defer
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
@@ -30,6 +31,8 @@ from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.npc_intents import STALE_CONTEXT_NOTE
+from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
+from world.rules.player_messages import STALE_PERSONA_NOTE
 from world.rules.party import (
     ALREADY_COMPANION_MESSAGE,
     DEGRADED_ACCEPT_MESSAGE,
@@ -68,6 +71,24 @@ def _reply_text(speech="我會考慮看看。", intent=None):
     )
 
 
+class _HeldClient:
+    """Test double whose response is a Deferred the test resolves manually."""
+
+    def __init__(self):
+        self.deferred = defer.Deferred()
+        self.calls = []
+
+    def get_response(self, descriptor):
+        self.calls.append(descriptor)
+        return self.deferred
+
+
+def await_result(d):
+    result = d.result
+    d.addErrback(lambda f: None)
+    return result
+
+
 class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         # Race baselines resolve through the patched kit catalogs (the class
@@ -93,6 +114,16 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.npc = create_object(LLMNPC, key="艾洛希雅", location=self.hall)
+        self.valid_card = {
+            "identity": {"public": "同行測試者", "hidden": ""},
+            "appearance": "翠綠眼眸。",
+            "personality": "沉靜溫和。",
+            "speech_style": "從容不迫。",
+            "life_story": "守護森林。",
+            "habit": "傾聽風聲。",
+            "social_connection": "",
+        }
+        initialize_npc_persona(self.npc, self.valid_card, {"kind": "profile", "profile": "elf_01"})
 
     def tearDown(self):
         _reset_all()
@@ -222,6 +253,52 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn(JOINED_MESSAGE, output)
         self.assertFalse(is_companion(self.npc, self.char1))
         self.assertEqual(len(client.calls), 0)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_invite_command_stale_persona_prints_explanation_and_runs_no_join_or_threshold(self):
+        self._bind(90)
+        client = _HeldClient()
+        with self._patch_client(client), patch.object(self.char1, "msg") as msg:
+            cmd = CmdInvite()
+            cmd.caller = self.char1
+            cmd.args = "艾洛希雅"
+            d = cmd.func()
+            card2 = dict(self.valid_card)
+            card2["habit"] = "觀察落葉。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+            client.deferred.callback(
+                _reply_text(
+                    speech="我願意與你同行。",
+                    intent={"kind": "party_invite", "accept": True},
+                )
+            )
+            await_result(d)
+        texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
+        self.assertIn(STALE_PERSONA_NOTE, texts)
+        self.assertNotIn(JOINED_MESSAGE, texts)
+        self.assertNotIn("我願意與你同行。", " ".join(texts))
+        self.assertFalse(is_companion(self.npc, self.char1))
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_invite_command_degraded_then_stale_prints_explanation_and_runs_no_threshold(self):
+        self._bind(70)
+        client = _HeldClient()
+        with self._patch_client(client), patch.object(self.char1, "msg") as msg:
+            cmd = CmdInvite()
+            cmd.caller = self.char1
+            cmd.args = "艾洛希雅"
+            d = cmd.func()
+            card2 = dict(self.valid_card)
+            card2["habit"] = "觀察落葉。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+            client.deferred.callback(None)
+            await_result(d)
+        texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
+        self.assertIn(STALE_PERSONA_NOTE, texts)
+        self.assertNotIn(DEGRADED_ACCEPT_MESSAGE, texts)
+        self.assertNotIn(JOINED_MESSAGE, texts)
+        self.assertNotIn(DEGRADED_REJECT_MESSAGE, texts)
+        self.assertFalse(is_companion(self.npc, self.char1))
 
     @covers_requirement("party-system::the-invite-command-proposes-a-party-through-the-ai-judged-dialogue-seam")
     def test_already_companion_rejected_before_any_dialogue_call(self):

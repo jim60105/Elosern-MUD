@@ -184,6 +184,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |
 | `npc_persona_update_rejected` | `npc`、`char`、`reason`（拒絕原因，可帶版本） |
 | `npc_persona_unavailable` | `npc`、`reason`（warn 級；不可用原因） |
+| `npc_dialogue_stale_persona` | `npc`、`char`、`version_from`、`version_to`、`path` |
 
 ### 4.3 AI／外部服務邊界
 

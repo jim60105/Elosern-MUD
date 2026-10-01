@@ -27,7 +27,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.accounts import Account
 from typeclasses.components import ScriptedDialogue
-from typeclasses.npcs import LLMNPC
+from typeclasses.npcs import LLMNPC, STALE_PERSONA, DialogueExchangeResult
 from world.ai import guardrail
 from world.ai.fake_client import FakeLLMClient
 from world.ai.npc_dialogue import (
@@ -43,6 +43,8 @@ from world.rules.character_creation import (
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY, greeting_for
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
+from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
+from world.rules.player_messages import STALE_PERSONA_NOTE
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_PRESETS
 
 # Kit item key used as an invented transfer token in intent tests (the
@@ -984,6 +986,211 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         self.assertEqual(_system_message(titled), baseline)
         self.assertEqual(_system_message(untitled), baseline)
         self.assertNotIn("南門守衛", _system_message(titled))
+
+
+class DialogueVersionGateTests(EvenniaTest):
+    """Tests for the persona-version completion gate (D1/D2)."""
+
+    def setUp(self):
+        super().setUp()
+        _reset_all()
+        register_npc_dialogue()
+        self.player = create_object(PlayerCharacter, key="test player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.npc = create_object(LLMNPC, key="守衛NPC", location=self.room1)
+        self.valid_card = {
+            "identity": {"public": "城門守衛", "hidden": ""},
+            "appearance": "高大強壯。",
+            "personality": "嚴謹認真。",
+            "speech_style": "簡短有力。",
+            "life_story": "在王都長大。",
+            "habit": "站姿筆挺。",
+            "social_connection": "",
+        }
+        self.provenance = {"kind": "profile", "profile": "guard_01"}
+        initialize_npc_persona(self.npc, self.valid_card, self.provenance)
+
+    def tearDown(self):
+        _reset_all()
+        super().tearDown()
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_one_leaf_edit_mid_flight_discards_reply_and_sends_stale_note(self):
+        """A one-leaf edit mid-flight discards speech, intent, and session line."""
+        from twisted.internet import task
+
+        clock = task.Clock()
+        client = _HeldClient()
+        settled = []
+        self.npc.db.inventory = [_GIFT_KEY]
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to(
+                "你好", self.player, client, reactor=clock, settled_line=settled.append
+            )
+            card2 = dict(self.valid_card)
+            card2["habit"] = "經常擦拭配劍。"
+            res = update_npc_persona(self.npc, card2, expected_version=1)
+            self.assertEqual(res.status, "updated")
+            self.assertEqual(res.version, 2)
+
+            client.deferred.callback(
+                _reply_text(
+                    speech="請出示通行證。",
+                    intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
+                )
+            )
+            outcome = await_result(d)
+
+        self.assertIs(outcome, STALE_PERSONA)
+        self.assertEqual(settled, [])
+        self.assertEqual(_inventory(self.player), [])
+        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        texts = _msg_texts(msg)
+        self.assertIn(STALE_PERSONA_NOTE, texts)
+        self.assertNotIn("請出示通行證。", " ".join(texts))
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_change_and_revert_mid_flight_discards(self):
+        """Changing a leaf and reverting it still bumps version and discards."""
+        from twisted.internet import task
+
+        clock = task.Clock()
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client, reactor=clock)
+            card2 = dict(self.valid_card)
+            card2["habit"] = "東張西望。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+            update_npc_persona(self.npc, self.valid_card, expected_version=2)
+            self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 3)
+
+            client.deferred.callback(_reply_text(speech="你好冒險者。"))
+            outcome = await_result(d)
+
+        self.assertIs(outcome, STALE_PERSONA)
+        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        texts = _msg_texts(msg)
+        self.assertIn(STALE_PERSONA_NOTE, texts)
+        self.assertNotIn("你好冒險者。", " ".join(texts))
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_noop_save_mid_flight_presents_and_applies(self):
+        """Saving an identical card mid-flight does not advance version and settles normally."""
+        from twisted.internet import task
+
+        clock = task.Clock()
+        client = _HeldClient()
+        settled = []
+        self.npc.db.inventory = [_GIFT_KEY]
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to(
+                "你好", self.player, client, reactor=clock, settled_line=settled.append
+            )
+            res = update_npc_persona(self.npc, self.valid_card, expected_version=1)
+            self.assertEqual(res.status, "unchanged")
+            self.assertEqual(res.version, 1)
+
+            client.deferred.callback(
+                _reply_text(
+                    speech="這給你。",
+                    intent={"kind": "give_item", "item_key": _GIFT_KEY, "qty": 1},
+                )
+            )
+            outcome = await_result(d)
+
+        self.assertIsNot(outcome, STALE_PERSONA)
+        self.assertEqual(settled, ["這給你。"])
+        self.assertEqual(_inventory(self.player), [_GIFT_KEY])
+        self.assertIn("這給你。", self.npc._chat_lines(self.player)[1])
+        texts = _msg_texts(msg)
+        self.assertIn("守衛NPC說：這給你。", texts)
+        self.assertNotIn(STALE_PERSONA_NOTE, texts)
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_degraded_then_stale_returns_stale_not_degraded(self):
+        """An exchange that degrades after an edit settles as stale_persona, not degraded."""
+        client = _HeldClient()
+        with patch.object(self.player, "msg"):
+            d = self.npc.run_npc_exchange("你好", self.player, client)
+            card2 = dict(self.valid_card)
+            card2["personality"] = "冷淡疏離。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+
+            client.deferred.callback(None)
+            result = await_result(d)
+
+        self.assertTrue(result.stale_persona)
+        self.assertFalse(result.degraded)
+        self.assertIsNone(result.reply)
+        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_thinking_timer_cancelled_on_stale_settlement(self):
+        """The thinking timer is cancelled on stale settlement with no extra echo or retry."""
+        from twisted.internet import task
+
+        clock = task.Clock()
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client, reactor=clock)
+            clock.advance(float(self.npc.thinking_timeout) / 2)
+            card2 = dict(self.valid_card)
+            card2["habit"] = "新習慣。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+
+            client.deferred.callback(_reply_text(speech="遲來的回應。"))
+            await_result(d)
+            clock.advance(float(self.npc.thinking_timeout))
+
+        texts = _msg_texts(msg)
+        self.assertNotIn(self.npc._thinking_text(), texts)
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_at_talked_to_notify_stale_false_suppresses_message(self):
+        """notify_stale=False suppresses direct message for single-surfacing in web adapters."""
+        client = _HeldClient()
+        with patch.object(self.player, "msg") as msg:
+            d = self.npc.at_talked_to("你好", self.player, client, notify_stale=False)
+            card2 = dict(self.valid_card)
+            card2["habit"] = "新習慣。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+
+            client.deferred.callback(_reply_text(speech="回應。"))
+            outcome = await_result(d)
+
+        self.assertIs(outcome, STALE_PERSONA)
+        texts = _msg_texts(msg)
+        self.assertNotIn(STALE_PERSONA_NOTE, texts)
+
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
+    def test_stale_persona_emits_observability_event(self):
+        """A stale persona settlement emits npc_dialogue_stale_persona with context."""
+        client = _HeldClient()
+        with patch("typeclasses.npcs.log_info") as log_mock:
+            d = self.npc.run_npc_exchange("你好", self.player, client, path="custom_path")
+            card2 = dict(self.valid_card)
+            card2["habit"] = "新習慣。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+            client.deferred.callback(_reply_text(speech="回應。"))
+            await_result(d)
+
+        log_mock.assert_called_once_with(
+            "npc_dialogue_stale_persona",
+            context={
+                "npc": str(self.npc.pk),
+                "char": str(self.player.pk),
+                "version_from": 1,
+                "version_to": 2,
+                "path": "custom_path",
+            },
+        )
 
 
 if __name__ == "__main__":
