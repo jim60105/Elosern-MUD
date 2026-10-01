@@ -31,5 +31,6 @@ None.
 ## Batch:
 
 depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: sole editor in this batch of `typeclasses/npcs.py`, `world/ai/npc_dialogue.py`, `prompts/npc_dialogue.yaml`, `world/prompts/registry.py`, `world/rules/dialogue.py`, and `commands/invite.py`. `web/webclient/actions/exploration_actions.py` is edited here only (the editor change puts its adapters in a new module and only imports the shared presence resolver). `world/rules/npc_persona.py` gains two read-only helpers here and the cutover's writer suspension later — distinct functions, mechanical rebase at most. Voice lines become observable on shipped NPCs only once producers and the cutover write profile provenance; behavior tests use synthetic profiles and do not wait for content. Shared append-only: observability catalog, `.github/evennia-shards.json` (only for a new `world/rules/tests` module).

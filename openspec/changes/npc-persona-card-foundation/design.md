@@ -6,17 +6,15 @@ See proposal.md for motivation. The authoritative product design is `docs/superp
 - Persona writers today: the import loader, `starting_companions`, `persona_edit` (player only), `character_creation` (player only), and the scene builder. Service hosts (`guild_economy._sync_service_host`) and exam opponents (`guild_exams._spawn_opponent`) write no persona.
 - `world/lore/` must never import `world/rules/` (registry-only), while `world/rules/`, `world/ai/`, `world/quests/`, and `web/` all may import `world/lore/`.
 - `world/rules/surfaces.py` provides `attribute_snapshot` / `restore_attribute_best_effort` for Evennia attribute-cache restoration after rollback.
-- The dialogue assembly lists three slices; `world/lore/dialogue/altoria.py` alone holds all 16 capital tables, so four parallel content changes would edit one file.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - One pure contract that producers (lore, rules, quests, ai, imports) and the browser mirror can all apply identically.
 - A persistence writer whose version semantics are correct under two browser sessions and a concurrent import process.
-- A profile vocabulary and slice layout that lets six content changes and the companion change run in parallel without touching shared files.
 
 **Non-Goals:**
-- Authoring any profile, switching any creation path to the writer, prompt changes, voice routing, the editor, or the cutover (owned by later changes; see the batch matrix in each proposal).
+- The profile vocabulary, inventory, place reference, and dialogue split (`npc-persona-profile-registry`); authoring any profile, switching any creation path to the writer, prompt changes, voice routing, the editor, or the cutover (later changes).
 - Restricting the persona shape of player characters, monsters, or any non-NPC living entity.
 
 ## Decisions
@@ -49,46 +47,21 @@ Normalization: `\r\n` and lone `\r` become `\n`, outer whitespace is stripped fr
 `world/rules/npc_persona.py`:
 - `read_npc_persona(npc) -> NpcPersonaSnapshot | NpcPersonaUnavailable` — never writes; NPC family only; unavailable reasons `not_npc`, `missing_card`, `missing_meta`, `corrupt_card`, `corrupt_meta`, each emitting `npc_persona_unavailable` (warn) with `npc` and `reason`.
 - `initialize_npc_persona(npc, card, provenance)` — used by every creation path in later changes. Normalizes and validates before writing; writes card + meta (`persona_version = 1`, current generation) atomically; if the NPC already carries a meta record with the current generation it returns the existing snapshot unchanged (repeated spawn/reuse never overwrites). Returns the snapshot.
-- `update_npc_persona(npc, card, expected_version, *, actor)` — the editor writer. Rejects booleans/non-integers for the version. Outcome is one of `updated(new_version)`, `unchanged(version)` (exact equality of the complete normalized card, still version-checked), `version_conflict(current_version)`, `invalid(NpcCardError)`, `unavailable(reason)`.
+- `update_npc_persona(npc, card, expected_version, *, actor)` — the editor writer. Rejects booleans/non-integers for the version. Outcome is one of `updated(new_version)`, `unchanged(version)` (exact equality of the complete normalized card, still version-checked), `version_conflict(current_version)`, `invalid(NpcCardError)`, `unavailable(reason)`, `storage_unavailable`.
 
-All three share `_write_card(npc, card, meta)`. Writes run inside `transaction.atomic()`; the version comparison reads the persisted meta from the database (the `Attribute` row, not the Evennia attribute cache) after the transaction has taken the database write lock with a guarded no-op `UPDATE` of the NPC's `ObjectDB` row. This serializes the editor (server process) against a concurrent import run through `evennia shell` (separate process) on SQLite, and is a row lock elsewhere. Alternative rejected: an in-process lock (does not cover the import CLI process) and check-then-assign (explicitly forbidden). On any exception the caller's snapshots of `persona` and `npc_persona_meta` are restored with `restore_attribute_best_effort` before re-raising, so no reader observes an uncommitted card.
+All three share `_write_card(npc, card, meta)`. Writes run inside `transaction.atomic()`; the version comparison reads the persisted meta from the database (the `Attribute` row, not the Evennia attribute cache) after the transaction has taken the database write lock with a guarded no-op `UPDATE` of the NPC's `ObjectDB` row. This serializes the editor (server process) against a concurrent import run through `evennia shell` (separate process) on SQLite, and is a row lock elsewhere. The re-read MUST bypass Evennia's idmapper (`SharedMemoryModel` returns cached `Attribute` instances): read the value with a query that does not materialize the cached instance (`values_list("db_value", flat=True)`) or `refresh_from_db()` on the instance, never `Attribute.objects.get()` alone. The guarded `UPDATE` is the first statement of the write path, before any read, so a caller's outer atomic block that has not yet written does not hold a snapshot that SQLite cannot upgrade; an `OperationalError` (database locked/busy) is caught at the writer boundary, the caches are restored, an event is emitted, and the outcome is `storage_unavailable` (never a raw exception to the editor; initializers re-raise it as `NpcPersonaStorageError` so the caller's all-or-nothing transaction fails). Alternative rejected: an in-process lock (does not cover the import CLI process) and check-then-assign (explicitly forbidden). On any exception the caller's snapshots of `persona` and `npc_persona_meta` are restored with `restore_attribute_best_effort` before re-raising, so no reader observes an uncommitted card.
 
 ### D5. Commit-bound events, no prose
 
 `npc_persona_initialized` (info: `npc`, `source` = provenance kind, `profile` when present, `version`), `npc_persona_updated` (info: `npc`, `char` = acting character, `version_from`, `version_to`), `npc_persona_update_rejected` (info: `npc`, `char`, `reason`), `npc_persona_unavailable` (warn: `npc`, `reason`). Success events are registered with `transaction.on_commit`. No card text, hidden identity, or dialogue ever enters context. The four rows are added to the catalog in `docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4.2.
 
-### D6. Profile vocabulary and slice ownership
-
-`world/lore/npc_profiles/shape.py`: `NpcVoiceLines(greeting: str | None = None, misunderstood: str | None = None)` (each ≤ 300 code points, single paragraph plain text, normalized like card leaves) and `NpcProfile(key, card: NpcCard, voice: NpcVoiceLines)`. Profile keys are lowercase ASCII snake identifiers ≤ 64 characters. Convention (enforced by later slice tests, not by the vocabulary): a host profile key equals its place `service_id`; examiners use `guild_examiner_<rank lowercase>`; companions use `companion_<partner preset key>`.
-
-`world/lore/npc_profiles/__init__.py` assembles `NPC_PROFILE_REGISTRY` (a `MappingProxyType`) from the slices in fixed order: `altoria_lower`, `altoria_trade`, `altoria_guild`, `altoria_upper`, `ciaran_homes_a`, `ciaran_homes_b`, `companions`. Each slice exports `ROWS: tuple[NpcProfile, ...] = ()` and is owned by exactly one later change. Assembly rejects a duplicate key naming both slices and rejects any profile whose card fails the contract, naming the profile key and slice. The registry is not mirrored into lore Scripts (like dialogue rows): it holds hidden identities and is consumed only through code.
-
-`inventory.py` declares `NPC_SOURCE_INVENTORY`: frozen `NpcSource(kind, key, owner)` rows. Kinds: `place_host` (keyed by `service_id`), `dialogue_table` (keyed by `dialogue_key`), `guild_examiner` (rank key), `starting_companion` (`<declaring preset>:<partner preset>`), `quest_template_occupant` (`<template name>:<stage>:<position>`), `import_example` (example file stem). `owner` is the owning change's slice label. The data-contract test derives the actual sources from `PLACE_REGISTRY`, `DIALOGUE_ROWS`, `GUILD_RANK_REGISTRY`, `PLAYER_PRESET_REGISTRY`, `QUEST_TEMPLATE_POOL`, and `world/imports/examples/*.json`, and asserts set equality with the inventory, so a source added later without an owner fails. Expected size at this baseline: 25 hosts, 25 tables, 7 examiners, 4 companion declarations, 1 template occupant, 1 import example.
-
-Owner assignment (binding for the content changes):
-- `altoria_lower`: services `altoria_eatery_owner`, `altoria_tavern_keeper`, `altoria_innkeeper`, `altoria_bathhouse_keeper`, `altoria_guard_captain` and their five tables.
-- `altoria_trade`: `altoria_merchant`, `altoria_blacksmith`, `altoria_tailor`, `altoria_jeweller`, `altoria_alchemist`, `altoria_merchant_master` and their six tables.
-- `altoria_guild`: `altoria_guild_master`, the `guild_staff` table, and the seven guild examiners.
-- `altoria_upper`: `altoria_high_priestess`, `altoria_sanctum_deacon`, `altoria_noble_watch_captain`, `altoria_drill_instructor`, `altoria_academy_dean` and their five tables.
-- `ciaran_homes_a`: `ciaran_elenis`, `ciaran_gwenaera`, `ciaran_hailiel`, `ciaran_lareneth` and their tables.
-- `ciaran_homes_b`: `ciaran_nireth`, `ciaran_teliel`, `ciaran_valwyn`, `ciaran_vethiel` and their tables.
-- `companions`: the four starting-companion declarations.
-- `generated_quest_cards`: the template occupant; `import_cards`: the import example.
-
-### D7. Optional place reference now, mandatory later
-
-`PlaceDefinition.host_profile_key: str | None = None` is appended after the existing defaulted fields. `validate_place_registry` rejects a set key on a hostless place and a key absent from `NPC_PROFILE_REGISTRY`, naming the place. It is not yet in `HOST_IDENTITY_FIELDS`; `npc-persona-host-examiner-producers` adds the mandatory rule once every slice has filled its rows. `place_is_hostless` treats a set `host_profile_key` as host material so a stray key is never silently ignored.
-
-### D8. Altoria dialogue split is a pure move
-
-Rows move verbatim into `altoria_lower.py`, `altoria_middle.py`, `altoria_upper.py` according to the terrace of the place that authors each `dialogue_key`; `world/lore/dialogue/__init__.py` assembles `GUILD_STAFF_ROWS, ALTORIA_LOWER_ROWS, ALTORIA_MIDDLE_ROWS, ALTORIA_UPPER_ROWS, CIARAN_ROWS`. A test asserts the assembled key order and every definition are identical to the pre-split table (captured from `git show HEAD:world/lore/dialogue/altoria.py` during apply, then asserted structurally: each key's terrace matches its place row). `altoria.py` is deleted, with every import site updated (no re-export shim).
-
 ## Risks / Trade-offs
+
+- [Stale idmapper read defeats the cross-process check] → mandated non-cached re-read plus a test that changes the meta row behind the cache with a queryset `.update()` and expects a conflict.
+- [A refactor moves the read before the lock] → an ordering test with `CaptureQueriesContext` asserts the guarded `UPDATE` precedes the meta `SELECT` inside the atomic block.
 
 - [Rendering drift between contract and `PersonaStore`] → parity test over the shared boundary fixture; any `PersonaStore` rendering change fails it.
 - [Guarded `UPDATE` adds a write to read-only no-op saves] → acceptable: editor saves are rare and the lock is what makes the no-op version check correct.
-- [Empty slices could be mistaken for completed content] → the inventory test names owners; the full-roster gate in `npc-persona-roster-cutover` requires every inventory source to resolve to a complete profile, so empty slices cannot pass activation.
-- [The dialogue split touches imports in tests] → enumerate with `rg "world.lore.dialogue.altoria"` and update every site in this change.
 
 ## Migration Plan
 

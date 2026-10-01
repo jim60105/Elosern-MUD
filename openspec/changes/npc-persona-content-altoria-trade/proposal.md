@@ -1,6 +1,6 @@
 ## Why
 
-The 6 聖潔王都 (`capital_altoria`) middle-terrace trade hosts (瑪爾特·金秤、維爾登·黑潭、妮絲塔·狐溪、艾蓮娜·鴉丘、希碧拉·灰沼、尤斯汀·柯德溫) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The foundation inventory assigns exactly these sources to the `altoria_trade` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
+The 6 聖潔王都 (`capital_altoria`) middle-terrace trade hosts (瑪爾特·金秤、維爾登·黑潭、妮絲塔·狐溪、艾蓮娜·鴉丘、希碧拉·灰沼、尤斯汀·柯德溫) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The `npc-persona-profile-registry` inventory assigns exactly these sources to the `altoria_trade` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
 
 ## What Changes
 
@@ -20,7 +20,7 @@ None.
 
 ### Modified Capabilities
 
-- `npc-profile-registry` (introduced by `npc-persona-card-foundation`): ADDED requirement "Altoria middle-terrace trade hosts carry individual authored profiles and rewritten dialogue".
+- `npc-profile-registry` (introduced by `npc-persona-profile-registry`): ADDED requirement "Altoria middle-terrace trade hosts carry individual authored profiles and rewritten dialogue".
 
 ## Impact
 
@@ -30,6 +30,6 @@ None.
 
 ## Batch:
 
-depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: `world/lore/settlements/places_altoria_middle.py` is also edited by `npc-persona-content-altoria-guild` (only the guild-hall row); the two slices touch different rows, so a rebase conflict, if any, is mechanical. `world/lore/dialogue/altoria_middle.py` and `world/lore/npc_profiles/altoria_trade.py` are owned by this slice alone. Every content slice appends to `tools/test_data_freeze.json` (adjacent-line rebase conflicts only). This slice is a prerequisite of `npc-persona-host-examiner-producers` and `npc-persona-roster-cutover`; it is independent of every other content slice.

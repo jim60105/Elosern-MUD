@@ -125,11 +125,23 @@ Every persona update SHALL compare the submitted expected version with the persi
 - **THEN** the version has advanced by two
 
 ### Requirement: Persona writes are atomic, serialized, and restore caches on rollback
-Every NPC persona write SHALL validate before persistence, SHALL perform its version read and its card and metadata writes in one database transaction that is serialized against concurrent writers in other processes by a database-held lock rather than a read-then-assign, and on any failure SHALL restore the in-memory attribute cache of both records to their pre-write values before any other reader can observe them.
+Every NPC persona write SHALL validate before persistence, SHALL perform its version read and its card and metadata writes in one database transaction that is serialized against concurrent writers in other processes by a database-held lock rather than a read-then-assign, SHALL take that lock before reading the persisted version, SHALL read the persisted version from the database rather than from any in-process object cache, and on any failure SHALL restore the in-memory attribute cache of both records to their pre-write values before any other reader can observe them. A database lock or busy failure SHALL surface as a stable storage-unavailable outcome (for an update) or a named storage error that fails the caller's all-or-nothing transaction (for an initialization), never as an unhandled database exception.
 
 #### Scenario: A failure mid-write leaves no partial state
 - **WHEN** the metadata write raises after the card write inside one update
 - **THEN** the transaction rolls back, both the stored records and the attribute cache equal their prior values, and the exception propagates or is reported with its stable reason
+
+#### Scenario: A change written behind the cache is detected
+- **WHEN** another writer advances the persisted metadata version directly in the database without updating this process's object cache, and an update then submits the old version
+- **THEN** the update is rejected as a version conflict
+
+#### Scenario: The lock is taken before the version is read
+- **WHEN** the statements executed by one update are captured
+- **THEN** the lock-taking write precedes the metadata read inside the same transaction
+
+#### Scenario: A locked database is a storage outcome
+- **WHEN** the database reports that it is locked during an update
+- **THEN** the update returns the storage-unavailable outcome, nothing is written, and both attribute caches equal their prior values
 
 #### Scenario: Two writers cannot both win the same version
 - **WHEN** two updates submit the same expected version in sequence without re-reading

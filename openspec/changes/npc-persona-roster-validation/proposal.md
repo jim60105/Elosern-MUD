@@ -6,7 +6,7 @@ After the content slices, companion profiles, producers, import cards, generated
 
 - Add `world/rules/npc_roster_validation.py`: derives the shipped NPC sources from the live registries (places, dialogue rows, guild ranks, preset companion declarations, the offline quest template pool, shipped import examples) and checks, naming the source and profile on failure: inventory equality in both directions; every source resolves to a complete valid card (place host and examiner profiles, companion profiles, template occupant cards, import example cards validated against the NPC target); every dialogue table is answered by exactly one profiled host; capability-aware voice coverage (every profile behind a scripted host authors a misunderstanding reply; every companion profile authors a greeting); no orphan profile that no source references.
 - Run it as a fail-loud boot step `npc_persona_roster_validation` after `state_reaction_rules` and before `sync_all`, so a server never starts with an incomplete roster.
-- Replace the foundation's test-local source derivation with this module's function.
+- Replace the profile-registry inventory test's local source derivation with this module's function.
 - Record the roster-wide editorial review in `docs/lore/npc-persona-roster-review.md` (cross-slice same-profession comparisons, coverage, and honest model-review status), and update `docs/development/adding-npcs.md` with the complete NPC authoring flow (profiles, slice ownership, references, inventory, voice lines, validation, the editor's no-regeneration note).
 
 ## Capabilities
@@ -17,7 +17,7 @@ None.
 
 ### Modified Capabilities
 
-- `npc-profile-registry` (introduced by `npc-persona-card-foundation`): ADDED requirement that the shipped roster is validated as complete before the game starts.
+- `npc-profile-registry` (introduced by `npc-persona-profile-registry`): ADDED requirement that the shipped roster is validated as complete before the game starts.
 
 ## Impact
 

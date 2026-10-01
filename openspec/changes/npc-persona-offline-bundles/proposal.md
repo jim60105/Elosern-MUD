@@ -28,6 +28,6 @@ None.
 
 ## Batch:
 
-depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: creates `world/lore/npc_profiles/bundles.py` alone and does not edit `world/lore/npc_profiles/__init__.py` (bundles are a separate registry imported directly). Shared append-only file: `tools/test_data_freeze.json`. Prerequisite of `npc-persona-roster-cutover`; independent of every other change.

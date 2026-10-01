@@ -1,6 +1,6 @@
 ## Why
 
-The 4 暗影谷村 (`village_ciaran`) second four homes hosts (妮瑞斯·米斯特瓦勒、泰莉爾·菲溫德、瓦爾溫·斯蒂爾瓦特爾、維特希爾·威爾德布瑞亞爾) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The foundation inventory assigns exactly these sources to the `ciaran_homes_b` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
+The 4 暗影谷村 (`village_ciaran`) second four homes hosts (妮瑞斯·米斯特瓦勒、泰莉爾·菲溫德、瓦爾溫·斯蒂爾瓦特爾、維特希爾·威爾德布瑞亞爾) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The `npc-persona-profile-registry` inventory assigns exactly these sources to the `ciaran_homes_b` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
 
 ## What Changes
 
@@ -20,7 +20,7 @@ None.
 
 ### Modified Capabilities
 
-- `npc-profile-registry` (introduced by `npc-persona-card-foundation`): ADDED requirement "Village Ciaran second-home hosts carry individual authored profiles and rewritten dialogue".
+- `npc-profile-registry` (introduced by `npc-persona-profile-registry`): ADDED requirement "Village Ciaran second-home hosts carry individual authored profiles and rewritten dialogue".
 
 ## Impact
 
@@ -30,6 +30,6 @@ None.
 
 ## Batch:
 
-depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: `world/lore/settlements/places_ciaran.py` and `world/lore/dialogue/ciaran.py` are also edited by `npc-persona-content-ciaran-homes-a` (disjoint rows: this slice owns the 妮瑞斯, 泰莉爾, 瓦爾溫 and 維特希爾 rows). `world/lore/npc_profiles/ciaran_homes_b.py` is owned by this slice alone. Every content slice appends to `tools/test_data_freeze.json` (adjacent-line rebase conflicts only). This slice is a prerequisite of `npc-persona-host-examiner-producers` and `npc-persona-roster-cutover`; it is independent of every other content slice.

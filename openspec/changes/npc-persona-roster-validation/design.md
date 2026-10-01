@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation. The foundation inventory (`world/lore/npc_profiles/inventory.py`) lists every shipped source and its owner; each content slice proved its own rows; the producers made host and examiner references mandatory; the companion change made `npc_profile_key` mandatory; the quest and import changes made template occupants and the reference example carry cards. Boot steps run in `STARTUP_STEP_ORDER` through `_startup_step`, fail-loud by default; `starting_companion_validation` is the precedent of a registry-validation boot step.
+See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`world/lore/npc_profiles/inventory.py`) lists every shipped source and its owner; each content slice proved its own rows; the producers made host and examiner references mandatory; the companion change made `npc_profile_key` mandatory; the quest and import changes made template occupants and the reference example carry cards. Boot steps run in `STARTUP_STEP_ORDER` through `_startup_step`, fail-loud by default; `starting_companion_validation` is the precedent of a registry-validation boot step.
 
 ## Goals / Non-Goals
 
@@ -12,7 +12,7 @@ See proposal.md for motivation. The foundation inventory (`world/lore/npc_profil
 
 ### D1. Derivation lives rules-side
 
-`derive_shipped_sources()` needs `QUEST_TEMPLATE_POOL` (`world/ai`) and the example files, which lore must not import; it lives in `world/rules/npc_roster_validation.py` and returns frozen `NpcSource` keys identical to the inventory's. The foundation's data-contract test switches to it.
+`derive_shipped_sources()` needs `QUEST_TEMPLATE_POOL` (`world/ai`) and the example files, which lore must not import; it lives in `world/rules/npc_roster_validation.py` and returns frozen `NpcSource` keys identical to the inventory's. The profile-registry inventory data-contract test switches to it.
 
 ### D2. Checks and error reporting
 

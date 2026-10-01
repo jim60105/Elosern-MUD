@@ -28,5 +28,6 @@ None.
 ## Batch:
 
 depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: owns `world/lore/npc_profiles/companions.py`, `world/lore/player_presets/*`, and `world/rules/starting_companions.py` alone in this batch. `npc-persona-roster-cutover` later reads the companion profile and owner rule to replace already-built companions, and `npc-persona-dialogue-consumption` routes the `greeting` line; neither edits these files. Shared append-only files: `tools/test_data_freeze.json`, `.github/evennia-shards.json` (only if a new rules test module is added), the observability catalog. Independent of all content slices.

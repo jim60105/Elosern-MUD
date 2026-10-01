@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation. The slice's sources (from the foundation inventory, owner `altoria_upper`):
+See proposal.md for motivation. The slice's sources (from the `npc-persona-profile-registry` inventory, owner `altoria_upper`):
 
 | Service / profile key | Host | Title | Race | Sex | Profession | Table | Keyword identifiers (unchanged) |
 |---|---|---|---|---|---|---|---|

@@ -2,7 +2,7 @@ Apply on branch `feat/npc-persona-content-ciaran-homes-a` in worktree `.worktree
 
 ## 1. Inventory and grounding
 
-- [ ] 1.1 Confirm the foundation inventory rows owned by `ciaran_homes_a` equal the sources listed in design.md, and record each host's grounding facts (place row, settlement-document passage, spec requirements, what each keyword currently teaches) as a short brief in this task's completion note; verify the brief covers every host and every keyword.
+- [ ] 1.1 Confirm the `npc-persona-profile-registry` inventory rows owned by `ciaran_homes_a` equal the sources listed in design.md, and record each host's grounding facts (place row, settlement-document passage, spec requirements, what each keyword currently teaches) as a short brief in this task's completion note; verify the brief covers every host and every keyword.
 - [ ] 1.2 Capture SHA-256 digests of every current greeting and response of the owned tables (from the pre-change file) for the D4 test, and `rg` each line's distinctive phrases across `world`, `web`, `commands`, and `tests` to list every test that pins the provisional prose; verify the list is recorded in this task's note.
 
 ## 2. Author cards and references

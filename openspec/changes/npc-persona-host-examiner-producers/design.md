@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation. `validate_place_registry` enforces an all-or-nothing host group (`HOST_IDENTITY_FIELDS`); the foundation added an optional, validated-when-set `host_profile_key`. `world/rules/guild_config/_hosts.py` derives the service-host roster from places; `sync_service_content` creates or reuses hosts by component `service_id` inside the startup transaction and never renames or retitles a reused host. `_spawn_opponent` builds a plain `NPC` inside `start_guild_exam`'s atomic block with a delete-compensation `except`. The guild content slice added a required `GuildRank.examiner_profile_key`.
+See proposal.md for motivation. `validate_place_registry` enforces an all-or-nothing host group (`HOST_IDENTITY_FIELDS`); `npc-persona-profile-registry` added an optional, validated-when-named `host_profile_key`. `world/rules/guild_config/_hosts.py` derives the service-host roster from places; `sync_service_content` creates or reuses hosts by component `service_id` inside the startup transaction and never renames or retitles a reused host. `_spawn_opponent` builds a plain `NPC` inside `start_guild_exam`'s atomic block with a delete-compensation `except`. The guild content slice added a required `GuildRank.examiner_profile_key`.
 
 ## Goals / Non-Goals
 
@@ -12,7 +12,7 @@ See proposal.md for motivation. `validate_place_registry` enforces an all-or-not
 
 ### D1. The profile key joins the host group
 
-`host_profile_key` is appended to `HOST_IDENTITY_FIELDS`. The partial-host error lists it like any other missing field, so a hosted place without a profile fails load naming the place, and the foundation's hostless-with-key rejection still applies. Alternative rejected: a separate "hosted places must have a profile" pass — duplicating the group logic is exactly what the single group predicate exists to prevent.
+`host_profile_key` is appended to `HOST_IDENTITY_FIELDS`. The partial-host error lists it like any other missing field, so a hosted place without a profile fails load naming the place, and the profile-registry hostless-with-key rejection still applies. Alternative rejected: a separate "hosted places must have a profile" pass — duplicating the group logic is exactly what the single group predicate exists to prevent.
 
 ### D2. Initialize on creation only
 

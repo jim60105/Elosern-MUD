@@ -31,6 +31,7 @@ None.
 ## Batch:
 
 depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 depends-on: npc-persona-content-altoria-lower
 depends-on: npc-persona-content-altoria-trade
 depends-on: npc-persona-content-altoria-guild
@@ -38,4 +39,4 @@ depends-on: npc-persona-content-altoria-upper
 depends-on: npc-persona-content-ciaran-homes-a
 depends-on: npc-persona-content-ciaran-homes-b
 
-Code-conflict notes: second and last editor of `world/lore/settlements/places.py` (after the foundation). Sole editor in this batch of `world/rules/guild_economy.py`, `world/rules/guild_exams.py`, and `world/rules/guild_config/_hosts.py`. Requirements become satisfiable only after all six content slices: making the reference mandatory earlier would fail load on unfilled rows, and no placeholder profile may be added to bridge the gap. Shared append-only files: `.github/evennia-shards.json` (only if a new rules test module is created), the observability catalog. Prerequisite of `npc-persona-roster-cutover`.
+Code-conflict notes: second and last editor of `world/lore/settlements/places.py` (after `npc-persona-profile-registry`). Sole editor in this batch of `world/rules/guild_economy.py`, `world/rules/guild_exams.py`, and `world/rules/guild_config/_hosts.py`. Requirements become satisfiable only after all six content slices: making the reference mandatory earlier would fail load on unfilled rows, and no placeholder profile may be added to bridge the gap. Shared append-only files: `.github/evennia-shards.json` (only if a new rules test module is created), the observability catalog. Prerequisite of `npc-persona-roster-cutover`.

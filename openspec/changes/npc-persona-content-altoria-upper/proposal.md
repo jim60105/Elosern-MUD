@@ -1,6 +1,6 @@
 ## Why
 
-The 5 聖潔王都 (`capital_altoria`) upper-terrace hosts (艾莉安娜·寒水、羅海西亞·芬威克、古利安·鷹守、伊沃·高丘、奧德溫·薩契) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The foundation inventory assigns exactly these sources to the `altoria_upper` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
+The 5 聖潔王都 (`capital_altoria`) upper-terrace hosts (艾莉安娜·寒水、羅海西亞·芬威克、古利安·鷹守、伊沃·高丘、奧德溫·薩契) carry no NPC persona today and answer from provisional dialogue tables written before the compact card existed. The approved design (`docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §1, §5.2–5.3) requires every listed NPC's card and all corresponding authored dialogue to be rewritten — not sampled, not preserved, not filled only where empty. The `npc-persona-profile-registry` inventory assigns exactly these sources to the `altoria_upper` owner, so this slice can be written and reviewed in one workday in parallel with the other content slices.
 
 ## What Changes
 
@@ -20,7 +20,7 @@ None.
 
 ### Modified Capabilities
 
-- `npc-profile-registry` (introduced by `npc-persona-card-foundation`): ADDED requirement "Altoria upper-terrace hosts carry individual authored profiles and rewritten dialogue".
+- `npc-profile-registry` (introduced by `npc-persona-profile-registry`): ADDED requirement "Altoria upper-terrace hosts carry individual authored profiles and rewritten dialogue".
 
 ## Impact
 
@@ -30,6 +30,6 @@ None.
 
 ## Batch:
 
-depends-on: npc-persona-card-foundation
+depends-on: npc-persona-profile-registry
 
 Code-conflict notes: `world/lore/settlements/places_altoria_upper.py`, `world/lore/dialogue/altoria_upper.py`, and `world/lore/npc_profiles/altoria_upper.py` are owned by this slice alone. Every content slice appends to `tools/test_data_freeze.json` (adjacent-line rebase conflicts only). This slice is a prerequisite of `npc-persona-host-examiner-producers` and `npc-persona-roster-cutover`; it is independent of every other content slice.

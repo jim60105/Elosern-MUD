@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation. The slice's sources (from the foundation inventory, owner `ciaran_homes_b`):
+See proposal.md for motivation. The slice's sources (from the `npc-persona-profile-registry` inventory, owner `ciaran_homes_b`):
 
 | Service / profile key | Host | Title | Race | Sex | Profession | Table | Keyword identifiers (unchanged) |
 |---|---|---|---|---|---|---|---|
