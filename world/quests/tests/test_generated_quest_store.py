@@ -77,6 +77,7 @@ from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 from ._compile_helpers import _anchor_key, _archetype_key, _issuer_key
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 #: The restart-cast class fights on the kit's spell row.
 _T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
@@ -133,6 +134,7 @@ def _characterized_payload(**overrides):
             "disposition": None,
             "display_name": "黑鬍",
             "title": "林間盜匪首領",
+            "persona": occupant_card_record(),
             "age": 35,
             "apparent_age": 35,
             "portrait": {"stable_key": "forest_bandit_chief"},
@@ -351,6 +353,40 @@ class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTestCase):
         payload["requirements"][0]["objective_kind"] = "acquire"
         append_payload(payload)
         self._restore_raises(payload)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_pre_change_occupant_shapes_fail_restore_naming_the_occupant(self):
+        def prose_block(characterization):
+            characterization["persona"] = [
+                ["personality", "沉穩"],
+                ["life_story", "守護森林多年"],
+            ]
+            characterization["background"] = "來自邊境的嚮導"
+
+        def no_card(characterization):
+            del characterization["persona"]
+
+        def null_card(characterization):
+            characterization["persona"] = None
+
+        def partial_card(characterization):
+            del characterization["persona"]["speech_style"]
+
+        for mutate in (prose_block, no_card, null_card, partial_card):
+            with self.subTest(shape=mutate.__name__):
+                clear()
+                compiled = compile_quest_blueprint(_characterized_payload())
+                payload = _compiled_to_payload(compiled)
+                mutate(payload["requirements"][0]["characterizations"][0])
+                append_payload(payload)
+                key = compiled.definition.key
+                with self.assertRaisesRegex(
+                    QuestCompileError,
+                    rf"stored quest '{key}' stage 0 occupant 0",
+                ):
+                    restore_generated_quests()
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+                self.assertEqual(scene_requirements_for(key), ())
 
     def test_conflicting_existing_requirements_are_rejected(self):
         compiled = compile_quest_blueprint(_defeat_payload())

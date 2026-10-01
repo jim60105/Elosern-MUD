@@ -10,6 +10,7 @@ import importlib
 from world.ai.profiles import default_profiles
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.quests.tests._card_fixtures import occupant_card_record
 
 
 #: The payload builders below are debt-area shared helpers.  They resolve
@@ -141,6 +142,7 @@ def _characterized_payload(**overrides):
             "disposition": None,
             "display_name": "黑鬍",
             "title": "林間盜匪首領",
+            "persona": occupant_card_record(),
             "age": 35,
             "apparent_age": 35,
             "portrait": {"stable_key": "forest_bandit_chief"},

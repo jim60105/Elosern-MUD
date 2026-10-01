@@ -35,6 +35,7 @@ from world.quests.tests._compile_helpers import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime")
@@ -115,6 +116,7 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
                 "disposition": "frightened",
                 "display_name": "受驚旅人",
                 "title": "邊境商隊腳伕",
+                "persona": occupant_card_record(),
             }
         ]
         compiled = compile_quest_blueprint(payload)
@@ -683,11 +685,12 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
             "age": payload["age"],
             "apparent_age": payload["apparent_age"],
             "portrait_stable_key": payload["portrait"]["stable_key"],
-            "background": None,
-            "persona": [],
+            "persona": payload["persona"],
         }
         with self.assertRaisesRegex(QuestCompileError, "title"):
-            _characterization_from_payload(stored)
+            _characterization_from_payload(
+                stored, quest="ai_stored", stage=0, occupant=0
+            )
 
     @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
@@ -736,6 +739,7 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
                 "disposition": None,
                 "display_name": "另一個人",
                 "title": "林間盜匪副手",
+                "persona": occupant_card_record(),
                 "age": 40,
                 "apparent_age": 40,
                 "portrait": {"stable_key": "forest_bandit_chief"},

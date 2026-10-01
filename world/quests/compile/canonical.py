@@ -81,10 +81,8 @@ def _npc_req_canonical(
             canonical["portrait"] = {
                 "stable_key": characterization.portrait_stable_key
             }
-        if characterization.background is not None:
-            canonical["background"] = characterization.background
-        if characterization.persona:
-            canonical["persona"] = dict(characterization.persona)
+        if characterization.persona is not None:
+            canonical["persona"] = characterization.persona.to_record()
         if characterization.combat_traits:
             canonical["combat_traits"] = list(characterization.combat_traits)
     return canonical

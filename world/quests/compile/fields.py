@@ -13,6 +13,7 @@ from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.quests.characterization import (
@@ -159,28 +160,25 @@ def _compile_location(location_payload: Any) -> RoomLocator:
 
 def _compile_characterization(
     requirement: dict[str, Any],
-) -> StageNpcCharacterization | None:
+) -> StageNpcCharacterization:
     """Build one occupant's frozen characterization value from a raw entry.
 
-    Every accepted entry carries the required authored identity (the shared
-    helper rejected a missing ``display_name``/``title`` before this point), so
-    the result is never ``None`` (npc-title-authored-identities D5). The
-    optional authored persona/background flavor is preserved in deterministic
-    field order (fix-custom-creation-information-and-background D7).
+    Every accepted entry carries the required authored identity and the
+    complete compact card (the shared helper rejected a missing field before
+    this point), so the result is never ``None``. The card is stored in its
+    normalized ``NpcCard`` form (npc-persona-generated-quest-cards D1/D4); a
+    card that still fails the contract here raises ``QuestCompileError``.
     """
     portrait = requirement.get("portrait")
     stable_key = None
     if isinstance(portrait, dict):
         stable_key = portrait.get("stable_key")
-    background = requirement.get("background")
-    persona = requirement.get("persona")
-    persona_prose = ()
-    if isinstance(persona, dict):
-        persona_prose = tuple(
-            (field, persona[field])
-            for field in ("personality", "life_story", "habit")
-            if isinstance(persona.get(field), str) and persona[field].strip()
-        )
+    try:
+        persona = normalize_card(requirement.get("persona"))
+    except NpcCardError as error:
+        raise QuestCompileError(
+            f"invalid persona card in characterization: {error}"
+        ) from error
     raw_combat_traits = requirement.get("combat_traits")
     combat_traits: tuple[str, ...] = ()
     if raw_combat_traits is not None:
@@ -198,8 +196,7 @@ def _compile_characterization(
         age=requirement.get("age"),
         apparent_age=requirement.get("apparent_age"),
         portrait_stable_key=stable_key,
-        background=background if isinstance(background, str) else None,
-        persona=persona_prose,
+        persona=persona,
         combat_traits=combat_traits,
     )
 
@@ -213,7 +210,7 @@ def _validate_scene_fields(
     str | None,
     str | None,
     tuple[tuple[str, str, str | None], ...],
-    tuple[StageNpcCharacterization | None, ...],
+    tuple[StageNpcCharacterization, ...],
 ]:
     """Validate archetype, anchor hint, scene sentence, and NPC requirements."""
     archetype = None
@@ -246,7 +243,7 @@ def _validate_scene_fields(
     if not isinstance(npc_req_payload, list):
         _reject(f"stage {stage_index} npc_req must be an array")
     npc_reqs: list[tuple[str, str, str | None]] = []
-    characterizations: list[StageNpcCharacterization | None] = []
+    characterizations: list[StageNpcCharacterization] = []
     for position, requirement in enumerate(npc_req_payload):
         requirement = _require_mapping(
             requirement, f"stage {stage_index} npc_req[{position}]"
