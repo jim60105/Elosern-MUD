@@ -68,8 +68,8 @@ GWENAERA_RESPONSES: tuple[KeywordResponse, ...] = (
 HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "鍛刀",
-        "「谷底的鐵砂性子烈，要反覆鍛打，打到鋼性均勻才叫暗影鋼。砧邊那幾把暗"
-        "影鋼刀已經完成，族人要用就來拿；你想帶一對走，拿銅幣來換也行。」",
+        "「谷底的鐵砂性子烈，要反覆鍛打，打到鋼性均勻才叫暗影鋼。砧邊那對暗影"
+        "鋼刀剛完成。外人難得來，你要是真用得上，拿銅幣來換，我也肯割愛。」",
     ),
     KeywordResponse(
         "影刀",
@@ -275,8 +275,8 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         DialogueDefinition(
             greeting=(
                 "海莉爾·斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下"
-                "你的手：「來看刀吧。砧邊那幾把已經打好，可以拿起來試。先讓我瞧一下你"
-                "平常怎麼握刀。」"
+                "你的手：「來看刀吧。砧邊那對剛打好，可以拿起來試。先讓我瞧一下你平常"
+                "怎麼握刀。」"
             ),
             responses=HAILIEL_RESPONSES,
         ),
