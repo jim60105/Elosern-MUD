@@ -1,7 +1,8 @@
-"""Tests for offline persona bundle vocabulary, validation, and selector.
+"""Data-contract test: offline persona bundle data contract
 
-Tests synthetic pools for malformed bundles, wrong-race bundles, one-bundle
-pools, duplicate personality/speech style, tier vs race resolution, selector
+Behavior and contract tests for offline persona bundle vocabulary, validation,
+and selector: malformed bundles, wrong-race bundles, one-bundle pools,
+duplicate personality/speech style, tier vs race resolution, selector
 determinism across calls and subprocess interpreters, distinct seed coverage,
 and lack of state writes.
 """
