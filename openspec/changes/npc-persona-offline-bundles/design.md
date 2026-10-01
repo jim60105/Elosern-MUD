@@ -12,7 +12,7 @@ See proposal.md for motivation. `world/lore/npc_tiers.py` defines ten role tiers
 
 ### D1. Bundles are whole cards, name- and title-agnostic
 
-Each bundle is a complete compact card written for its role and race: `identity.public` describes the role without naming anyone; `social_connection` and `identity.hidden` are empty (a bundle cannot know real relationships or secrets); appearance, personality, speech style, life story, and habit form one coherent person. Alternative rejected: composing cards from independent adjective/history/speech lists — explicitly forbidden by the product design because it yields contradictions.
+Each bundle is a complete compact card written for its role and race: `identity.public` describes the role without naming anyone; `social_connection` and `identity.hidden` are empty (a bundle cannot know real relationships or secrets); prose makes no sex, age, or named-person claim, because selection is by tier/race only and an NPC of any sex or age may receive it; appearance, personality, speech style, life story, and habit form one coherent person. Alternative rejected: composing cards from independent adjective/history/speech lists — explicitly forbidden by the product design because it yields contradictions.
 
 ### D2. Pool resolution prefers the tier, falls back to the race
 

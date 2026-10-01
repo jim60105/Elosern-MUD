@@ -24,7 +24,7 @@ At server start, before generated-quest restore, the system SHALL plan a replace
 - **THEN** it receives the beastfolk generic pool bundle selected by its database id, with `offline_bundle` provenance
 
 ### Requirement: The cutover is one exclusive, all-or-nothing transaction
-The cutover SHALL compute and validate every replacement before any write and SHALL apply all instance cards, metadata, rewritten payloads, and the persistent cutover marker in one database transaction. Any failure SHALL leave the prior state intact, restore every affected attribute cache, emit a failure event naming the source or entity, and abort startup so no player is admitted to a partly rewritten world. While the cutover runs, every other NPC persona writer — editor update, import, and spawn initialization — SHALL be rejected with a stable reason, and a re-entrant or concurrent cutover attempt SHALL be refused without waiting or retrying.
+The cutover SHALL compute and validate every replacement before any write and SHALL apply all instance cards, metadata, rewritten payloads, and the persistent cutover marker in one database transaction. Any failure SHALL leave the prior state intact, restore every affected attribute cache, emit a failure event naming the source or entity, and abort startup so no player is admitted to a partly rewritten world. While the cutover runs, every other NPC persona writer — editor update, import, and spawn initialization — SHALL be rejected with a stable reason, and a re-entrant or concurrent cutover attempt SHALL be refused without waiting or retrying. The cutover SHALL run as one synchronous startup step that never yields to the event loop, so no session action can interleave with it.
 
 #### Scenario: A failure rolls everything back
 - **WHEN** the write for the tenth planned NPC raises during apply
@@ -34,12 +34,16 @@ The cutover SHALL compute and validate every replacement before any write and SH
 - **WHEN** an editor update, an NPC import, and a spawn initialization are attempted while the cutover is running
 - **THEN** each is rejected with the stable suspension reason and writes nothing
 
+#### Scenario: The cutover step is synchronous
+- **WHEN** the startup step runs
+- **THEN** it completes and returns a plain result without yielding a deferred, before any session is synchronized
+
 #### Scenario: A second cutover is refused
 - **WHEN** a cutover is started while another is running in the same process
 - **THEN** the second attempt is refused immediately with a named error
 
 ### Requirement: The cutover preserves gameplay state and is idempotent
-The cutover SHALL change only NPC persona records, persona metadata, and durable occupant characterization fields, preserving object ids, keys, titles, locations, components, traits, inventory, party and quest bindings, schedules, affinity, chat memory, dialogue sessions, and every other payload field. A rerun SHALL skip every marked instance and every valid payload and write nothing, so a routine restart, registry reload, or profile text edit never overwrites an effective card, including optional leaves a player deliberately cleared. Instances created after the cutover SHALL be marked by their normal initializers.
+The cutover SHALL change only NPC persona records, persona metadata, and durable occupant characterization fields, preserving every stored quest definition key and object ids, keys, titles, locations, components, traits, inventory, party and quest bindings, schedules, affinity, chat memory, dialogue sessions, and every other payload field. A rerun SHALL skip every marked instance and every valid payload and write nothing, so a routine restart, registry reload, or profile text edit never overwrites an effective card, including optional leaves a player deliberately cleared. Instances created after the cutover SHALL be marked by their normal initializers.
 
 #### Scenario: Gameplay state is unchanged
 - **WHEN** full attribute snapshots of every NPC and the quest store are compared before and after a successful cutover
@@ -48,6 +52,10 @@ The cutover SHALL change only NPC persona records, persona metadata, and durable
 #### Scenario: Edits survive restart
 - **WHEN** after a successful cutover a player clears an NPC's `social_connection` and edits its `habit`, and the server restarts
 - **THEN** the cutover writes nothing, and the NPC keeps the empty social connection, the edited habit, and its advanced version
+
+#### Scenario: Old payloads are rewritten without a legacy decoder
+- **WHEN** a frozen pre-change payload fixture is planned and applied
+- **THEN** its occupants carry new cards, no old `persona` or `background` text remains, its definition key is unchanged, and the strict codec decodes it
 
 #### Scenario: Restore succeeds after the cutover
 - **WHEN** the server restarts after a cutover that rewrote old-shape payloads

@@ -34,7 +34,13 @@ Both adapters: (1) possession → `not_allowed`; (2) `in_exploration_mode` false
 
 `web/static/webclient/js/elosern/protocol/*` accepts `npc_persona` as a navigation surface (exact descriptor fields unchanged). `web/static/webclient/js/elosern/npc_persona_card.js` exports the field order, labels, bounds, `normalizeCard`, `cardBudget`, and reason codes; code points are counted with `Array.from(str).length`. `web/static/webclient/js/tests/npc_persona_card.test.js` reads `world/lore/tests/fixtures/npc_card_boundary_cases.json` (the foundation's shared fixture) and asserts identical decisions, codes, and leaves.
 
+### D7. Scope of the new surface
+
+The `npc_persona` navigation surface exists only on the `exploration` panel's `interact` targets; the `context_actions` panel and the `exploration-affordances` vocabulary keep their `guild`/`shop` navigation sets unchanged, which is why their main specs are not modified. `_present_by_id` is imported from `exploration_actions.py` by name; `npc-persona-dialogue-version-gate` edits that module and must keep the helper's name and signature.
+
 ## Risks / Trade-offs
+
+- [One more descriptor per NPC target can push a crowded room over the panel's list or byte ceiling and make `exploration` unavailable] → a maximal fixture (32 NPC targets × 8 affordances with maximal names/labels) passes the server panel validator and the Node mirror; `is_card_available` stays a cheap attribute read plus contract check.
 
 - [Pre-cutover shipped NPCs show a disabled editor] → intended gating; the disabled reason explains it; no editor is activated against missing cards.
 - [Dispatcher request-id cache holds card data in memory] → per-session, bounded, server-side only, retired with the session epoch (existing rules).

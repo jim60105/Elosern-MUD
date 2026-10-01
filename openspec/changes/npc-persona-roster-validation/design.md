@@ -6,7 +6,7 @@ See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`w
 
 **Goals:** one authoritative, deterministic completeness check over the whole shipped roster, run at boot and in tests; a written roster-wide review.
 
-**Non-Goals:** touching persisted instances (cutover); judging prose quality automatically; checking dynamic (generated/imported-at-runtime) NPCs, which are validated by their own creation paths.
+**Non-Goals:** touching persisted instances (cutover); judging prose quality automatically; checking dynamic (generated/imported-at-runtime) NPCs, which are validated by their own creation paths. Staff-created NPCs made with Evennia builder commands (`create`/`spawn` of `typeclasses.npcs.NPC`) bypass every initializer; they are not shipped sources, receive a card only from the cutover if they predate it, and otherwise show the editor entry disabled as `npc_persona.unavailable` — documented in the authoring guide.
 
 ## Decisions
 
@@ -16,7 +16,7 @@ See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`w
 
 ### D2. Checks and error reporting
 
-`validate_npc_roster()` raises `NpcRosterError` listing every violation (not just the first), each naming the source kind/key and profile key: inventory mismatch (missing or stale rows); unresolved or invalid card; a dialogue table referenced by zero or several hosted places; a scripted host profile without `misunderstood`; a companion profile without `greeting`; an orphan profile (in `NPC_PROFILE_REGISTRY` but referenced by no place, rank, or declaration). Import examples are validated with `validate_character(record, NPC)`; template occupants through the shared characterization helper.
+`validate_npc_roster()` raises `NpcRosterError` listing every violation (not just the first), each naming the source kind/key and profile key: inventory mismatch (missing or stale rows); unresolved or invalid card; a dialogue table referenced by zero or several hosted places; a scripted host profile without `misunderstood`; a companion profile without `greeting`; an orphan profile (in `NPC_PROFILE_REGISTRY` but referenced by no place, rank, or declaration); a profile behind a scripted host that authors a `greeting` (the table greeting is the single source for hosts, so the two cannot drift). Import examples are validated with `validate_character(record, NPC)`; template occupants through the shared characterization helper.
 
 ### D3. Boot placement
 

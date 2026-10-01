@@ -14,7 +14,7 @@ Apply on branch `feat/npc-persona-editor-actions` in worktree `.worktrees/npc-pe
 
 ## 3. Entry affordance
 
-- [ ] 3.1 Add the silent `is_card_available` predicate to `world/rules/npc_persona.py` and the 編輯人物設定 `npc_persona` navigation per design D5 in `web/webclient/presentation/exploration.py`; verify presentation tests (new module under `web/webclient/presentation/tests/`): enabled for a valid card, disabled with `npc_persona.unavailable` for an uninitialized NPC, absent for a monster, possession reason for a possessed actor, last position and survival at the eight-descriptor bound, no unavailable event emitted per snapshot, and the version-3 validator accepting the new surface while rejecting extra descriptor fields.
+- [ ] 3.1 Add the silent `is_card_available` predicate to `world/rules/npc_persona.py` and the 編輯人物設定 `npc_persona` navigation per design D5 in `web/webclient/presentation/exploration.py`; verify presentation tests (new module under `web/webclient/presentation/tests/`): enabled for a valid card, disabled with `npc_persona.unavailable` for an uninitialized NPC, absent for a monster, possession reason for a possessed actor, last position and survival at the eight-descriptor bound, no unavailable event emitted per snapshot, and the version-3 validator accepting the new surface while rejecting extra descriptor fields; plus a maximal-room fixture (32 NPC targets × 8 affordances, maximal names) that passes the server panel validator and, exported as JSON, the Node protocol mirror.
 - [ ] 3.2 Register the new presentation test module in exactly one `webclient-presentation-*` shard of `.github/evennia-shards.json`; verify `tests.test_evennia_test_optimization_contract`.
 
 ## 4. Browser mirrors

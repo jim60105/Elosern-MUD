@@ -14,6 +14,12 @@ See proposal.md for motivation. Facts the plan relies on: hosts carry a componen
 
 `plan_cutover()` builds an in-memory list of `(target, new_card, provenance, version)` and `(payload_identity, rewritten_payload)` with no writes, validating every card through the contract and every rewritten payload through the strict codec from `npc-persona-generated-quest-cards`. Any plan failure raises `NpcPersonaCutoverError` naming the source (`kind:key`) or entity (`#dbref`) before a single write. `apply_cutover(plan)` snapshots `persona`/`npc_persona_meta` attribute caches for every target and the store's payload list, then in one `transaction.atomic()` writes each card and meta (`generation = NPC_PERSONA_CONTENT_GENERATION`; `persona_version = previous + 1` when meta exists, else `1`; provenance per D2), replaces the store payload list once, and sets the persistent marker (`ServerConfig` `npc_persona_cutover_generation`). On exception: rollback, restore every snapshot, emit `npc_persona_cutover_failed` with `exc=`, re-raise. Alternative rejected: batching per NPC (explicitly forbidden partial completion).
 
+### D1a. Old payloads are rewritten as raw JSON, never decoded
+
+The plan reads stored payloads as the raw JSON-safe dicts the store holds. For each occupant it reads only identity fields (definition key and name, issuer key, stage index, occupant position, `tier`, `display_name`, `title`) — never the old `persona`/`background` prose — deletes those two keys, writes the new card record under `persona`, and then validates the whole rewritten payload with the strict codec from `npc-persona-generated-quest-cards`. No legacy decoder exists anywhere. Tests use a true pre-change payload captured from the pre-change compiler output (`git show` of a compiled template payload at the commit before `npc-persona-generated-quest-cards`) as a frozen fixture.
+
+The stored `definition.key` is a digest over the pre-change canonical content; the cutover keeps every stored key unchanged so quest records, offers, and bindings keep resolving. Key-equals-digest is therefore not an invariant for rewritten payloads, and restore performs no such check. Consequence: a template quest compiled after the cutover receives a new key, so the board may show one pre-cutover template offer beside a newly generated one with identical mechanics; this is accepted for the single pre-release cutover and a test pins that both register without conflict.
+
 ### D2. Provenance classification order
 
 1. Service host (has a service component whose `service_id` is in the roster) → `profile` provenance, the place's profile card.
@@ -28,6 +34,10 @@ Every rule writes a complete new card; no rule copies old prose.
 ### D3. Exclusivity
 
 `npc_persona.py` gains `_WRITES_SUSPENDED` and a `suspended_writes()` context manager used only by the cutover. While set, `initialize_npc_persona` and `update_npc_persona` raise `NpcPersonaWritesSuspended` (import and spawn fail their all-or-nothing transactions; an editor request cannot occur because no session is served during `at_server_start`, and any in-process caller gets the exception through its normal failure path). Entering the context while already set raises `NpcPersonaCutoverError("cutover already running")`; there is no wait or retry. The cutover's own writes go through a private writer that bypasses the guard. Because the step runs during `at_server_start`, no session is served concurrently; the guard covers re-entrancy and any in-process caller.
+
+### D3a. Exclusivity depends on a synchronous step
+
+The step is a plain synchronous call that never yields to the reactor (no Deferred, no `inlineCallbacks`); Evennia runs `at_server_start` hooks before syncing portal sessions, so no session action can interleave. A separate process (an `evennia shell` import) is not covered by the in-process flag; it is serialized by the database write lock that the cutover's transaction holds once it starts writing, and its own persona writes use the foundation's lock-before-read protocol. A test asserts the step function returns a plain value (not a Deferred) and the startup wrapper calls it synchronously.
 
 ### D4. Boot placement and idempotence
 
