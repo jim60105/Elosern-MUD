@@ -132,7 +132,9 @@ class PlaceRegistryTests(unittest.TestCase):
             "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。",
             (3, 1), '餐館', ('eatery', 'restaurant', 'diner'), '西格瑪·庫柏', '聖潔王都餐館老闆', 'human', 'human_plains',
             'male', 'merchant', 'altoria_eatery_owner', ('staple_meals',),
-            (('shop_key', 'altoria_eatery'), ('dialogue_key', 'altoria_eatery')), (), (), None
+            (('shop_key', 'altoria_eatery'), ('dialogue_key', 'altoria_eatery')), (), (),
+            # npc-persona-content-altoria-lower names the host's own profile.
+            'altoria_eatery_owner'
         ),
         "altoria_tailor": (
             'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',

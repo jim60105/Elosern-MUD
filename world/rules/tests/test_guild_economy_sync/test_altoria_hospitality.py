@@ -16,10 +16,10 @@ key, name or keyword is named statically):
   identically inside the inn and outside it — same clock cost, same summary,
   same booked-practice growth, wallet untouched — and the command set and
   persisted attribute vocabulary are unchanged by the rooms (task 3.3, 3.4);
-- each host's authored table, reached through the rules dialogue API, names
-  the commands its location exists to host: the innkeeper's ``rest``/
-  ``sleep``/``practice``, the tavern keeper's ``talk``/``invite``, the
-  bathhouse keeper's separated sides (task 3.5).
+- each host's authored table, reached through the rules dialogue API, speaks
+  in character — greeting and keyword answers name no command and quote no
+  backticked token, and every authored keyword answers through the table
+  (task 3.5).
 """
 
 import unittest
@@ -361,7 +361,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "altoria-hospitality::each-host-s-dialogue-teaches-what-its-location-is-for"
     )
-    def test_each_host_s_table_names_the_commands_its_room_exists_to_host(self):
+    def test_each_host_s_table_speaks_in_character_without_command_tokens(self):
         tavern = _place_by_kind("tavern")
         inn = _place_by_kind("lodging")
         bathhouse = _place_by_kind("bathhouse")
@@ -372,17 +372,12 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                 # Reached through the rules API, exactly as talk reaches it.
                 self.assertEqual(dialogue_key_for(host), _authored(place)["dialogue_key"])
                 self.assertIsNotNone(greeting_for(host))
-        # The innkeeper names the three verbs the inn exists to host.
-        for verb in ("`rest`", "`sleep`", "`practice`"):
-            self.assertIn(verb, _table_text(inn), "the inn's table lost a verb")
-        # The tavern keeper names conversation and party invitation.
-        for verb in ("`talk`", "`invite`"):
-            self.assertIn(verb, _table_text(tavern), "the tavern's table lost a verb")
-        # The bathhouse keeper explains the separated sides — the room's
-        # whole authored rule.
-        bath_table = _table_text(bathhouse)
-        self.assertIn("男", bath_table)
-        self.assertIn("女", bath_table)
+        # The hosts speak in character (npc-persona-content-altoria-lower
+        # D5): no line names a command. The prose itself is authored content
+        # and is never pinned here, so rewording a line breaks no test.
+        for place in (tavern, inn, bathhouse):
+            with self.subTest(in_character=place.kind):
+                self.assertNotIn("`", _table_text(place), place.kind)
         # Every authored keyword answers through the table API (a keyword
         # the panel could press but the rules could not answer is a bug).
         table = _dialogue_table()

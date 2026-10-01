@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from types import MappingProxyType
 from tools.spec_traceability import covers_requirement
 
 import world.imports.examples as _examples_pkg
 from world.ai.director_templates import QUEST_TEMPLATE_POOL
 from world.lore.dialogue import DIALOGUE_ROWS
 from world.lore.guild import GUILD_RANK_REGISTRY
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.npc_profiles.inventory import NPC_SOURCE_INVENTORY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
@@ -126,3 +128,21 @@ class NpcSourceInventoryContractTests(unittest.TestCase):
         for row in NPC_SOURCE_INVENTORY:
             with self.subTest(kind=row.kind, key=row.key):
                 self.assertIn(row.kind, SOURCE_KINDS)
+
+
+class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
+    """The shipped, assembled profile registry is a read-only mapping.
+
+    Moved here from the behavior suite once content slices populated the
+    registry: a test that reads the shipped catalog is a data-contract test.
+    """
+
+    @covers_requirement(
+        "npc-profile-registry::one-module-assembles-the-profile-registry-from-owned-slices"
+    )
+    def test_registry_is_a_read_only_mapping_proxy(self):
+        self.assertIsInstance(NPC_PROFILE_REGISTRY, MappingProxyType)
+        before = dict(NPC_PROFILE_REGISTRY)
+        with self.assertRaises(TypeError):
+            NPC_PROFILE_REGISTRY["t_injected"] = None
+        self.assertEqual(dict(NPC_PROFILE_REGISTRY), before)
