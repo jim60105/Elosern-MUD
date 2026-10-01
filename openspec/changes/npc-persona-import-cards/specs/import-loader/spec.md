@@ -1,0 +1,55 @@
+## MODIFIED Requirements
+
+### Requirement: Non-trait record fields are stored verbatim into the seam attributes without interpretation
+`loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and
+`disguised_stats` into the corresponding `LivingEntity` attributes exactly as validated, without
+adding, removing, or transforming any content (the sole derived write is the lineage auto-seed —
+see `use-driven-skill-lineage`: `skills`/`passives` are extended with the transitive
+prerequisite-ownership closure of what the record declared, prerequisite proficiency is seeded to
+exactly the edge value, the whole normalization runs before schema range validation, and an explicit
+imported `skill_proficiency` entry always beats the seed), and SHALL store `inventory` into
+`entity.db.inventory` using Evennia's attribute store directly (no seam attribute declaration
+required from any other change). For an NPC target, the validated persona is the normalized compact
+card, and the loader SHALL write it through the deterministic NPC persona initializer with `import`
+provenance naming the record key, inside the batch transaction, so the NPC also carries persona
+metadata at version 1; the stored card SHALL equal the validated card exactly. For a non-NPC
+target, the persona SHALL be stored verbatim.
+
+#### Scenario: persona is stored without inspection
+- **WHEN** a valid character record loaded against `PlayerCharacter` carries a `persona` object with arbitrary nested structure
+- **THEN** the constructed entity's `entity.db.persona` equals that object exactly, unmodified,
+  leaving the bare `entity.persona` name free for the `PersonaStore` handler to mount on
+
+#### Scenario: An NPC import persists its validated card with metadata
+- **WHEN** a valid NPC-target record is loaded
+- **THEN** the NPC's persona equals the validated normalized card, its persona metadata is at version 1 with `import` provenance naming the record key, and a later failure in the same batch rolls back both
+
+#### Scenario: sexual_baseline is stored as a raw dict, not converted into a state-machine object
+- **WHEN** a valid character record's `sexual_baseline` is `{"arousal": "微興奮", "virgin": true,
+  "sensitivity": {}}`
+- **THEN** the constructed entity's `entity.db.sexual` equals that dict exactly, and no
+  `SexualState`-like object is constructed (that class does not exist yet), leaving the bare
+  `entity.sexual` name free for change 7's `SexualState` to mount on
+
+#### Scenario: Lineage auto-seed lands inside the same transaction
+- **WHEN** a valid record owns `firestorm` (prereq `scorching_wave >= 3`) with no explicit
+  `skill_proficiency` for its prerequisites
+- **THEN** the loaded entity OWNS the closed prerequisite chain, carries `scorching_wave` proficiency
+  seeded to exactly the edge value, and `can_use_skill` passes for `firestorm`; a record rejected by
+  schema validation persists nothing, seed and closure included
+
+#### Scenario: skills and passives are stored together as a raw structure
+- **WHEN** a valid character record has `"skills": ["fire_mastery"]` and `"passives":
+  ["defense_instinct"]`
+- **THEN** the constructed entity's `entity.db.skills` contains both lists, unmodified, with no
+  resolution against any skill registry performed by the loader itself, and the bare `entity.skills`
+  name is left free for change 5's `SkillHandler` to mount on
+
+#### Scenario: disguised_stats is stored using the storage convention entity-traits already declared
+- **WHEN** a valid character record has a non-empty `disguised_stats`
+- **THEN** the constructed entity's `entity.db.disguised_stats` equals that object exactly
+
+#### Scenario: inventory is stored without requiring any change to LivingEntity's declared attributes
+- **WHEN** a valid character record has a non-empty `inventory` array
+- **THEN** the constructed entity's `entity.db.inventory` equals that array exactly, and no
+  modification to `typeclasses/entities.py` is required for this to work
