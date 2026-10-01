@@ -352,16 +352,23 @@ class CompanionBuildTests(_BuilderCase):
         self.assertEqual(companion.db.age, shell.db.age)
         self.assertEqual(companion.db.apparent_age, shell.db.apparent_age)
         self.assertEqual(companion.db.disguised_stats, shell.db.disguised_stats)
-        # The persona is the card's record plus exactly the owner link.
+        # The persona is the compact card derived from the partner preset per D2.
+        from world.lore.player_presets import derive_companion_card
+        expected_card = derive_companion_card(
+            _live_presets()[_T_PARTNER], self.owner.key, _T_RELATIONSHIP
+        )
+        self.assertEqual(companion.db.persona, expected_card)
+        # Metadata is at version 1 with companion provenance naming preset and owner pk
+        meta = companion.db.npc_persona_meta
+        self.assertEqual(meta["persona_version"], 1)
         self.assertEqual(
-            companion.db.persona,
-            {
-                **shell.db.persona,
-                "social_connection": {
-                    **shell.db.persona["social_connection"],
-                    self.owner.key: "雙胞胎姊姊",
-                },
-            },
+            meta["provenance"],
+            {"kind": "companion", "profile": _T_PARTNER, "owner": self.owner.pk},
+        )
+        # Offline greeting is persisted verbatim from partner preset
+        self.assertEqual(
+            companion.db.npc_offline_greeting,
+            _live_presets()[_T_PARTNER].persona.greeting,
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
@@ -448,9 +455,10 @@ class CompanionBuildTests(_BuilderCase):
             self.owner,
             StartingCompanion(_T_TWIN, _T_DECLARED_AFFINITY2, _T_RELATIONSHIP2),
         )
-        self.assertEqual(
-            companion.db.persona["social_connection"][self.owner.key],
-            _T_RELATIONSHIP2,
+        self.assertTrue(
+            companion.db.persona["social_connection"].startswith(
+                f"{self.owner.key}：{_T_RELATIONSHIP2}"
+            )
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")

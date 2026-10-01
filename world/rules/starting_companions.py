@@ -49,6 +49,7 @@ from world.rules.character_creation import (
     resolve_preset_values,
     validate_affinity_seed,
 )
+from world.rules.npc_persona import initialize_npc_persona
 from world.rules.creation_wizard import NAME_MAX_LENGTH
 from world.rules.equipment import toggle_equipment
 from world.rules.party import PARTY_MAX_COMPANIONS, join_party
@@ -127,19 +128,6 @@ def _resolve_affinity_elements(preset: PlayerPreset) -> list[str]:
     return list(preset.affinity_elements)
 
 
-def _build_persona_record(preset: PlayerPreset, player: Any, declaration: StartingCompanion) -> dict[str, Any]:
-    """The partner preset's own persona record plus the owning-player link.
-
-    The record is ``PresetPersona.to_record()`` exactly as the player version
-    of the card would persist it, with one added ``social_connection`` entry
-    keyed by the owning player's name holding the declaration's relationship
-    label, so the companion knows on arrival whose twin it is.
-    """
-    record = preset.persona.to_record()
-    record["social_connection"][player.key] = declaration.relationship
-    return record
-
-
 def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLMNPC:
     """Build one declared companion as a live ``LLMNPC`` beside ``player``.
 
@@ -206,7 +194,18 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
         }
         npc.db.inventory = preset.inventory_list()
         npc.db.affinity_elements = _resolve_affinity_elements(preset)
-        npc.db.persona = _build_persona_record(preset, player, declaration)
+        card_dict = derive_companion_card(preset, player.key, declaration.relationship)
+        initialize_npc_persona(
+            npc,
+            card_dict,
+            {
+                "kind": "companion",
+                "profile": declaration.preset_key,
+                "owner": player.pk,
+            },
+        )
+        if preset.persona.greeting:
+            npc.db.npc_offline_greeting = preset.persona.greeting
         # Declared starting equipment is applied through the sole equipment
         # writer, after the inventory write (the toggle preflight requires
         # canonical inventory ownership), exactly like activation. A rejected
