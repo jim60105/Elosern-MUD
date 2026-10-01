@@ -7,7 +7,7 @@ Apply on branch `feat/npc-persona-host-examiner-producers` in worktree `.worktre
 ## 2. Service hosts
 
 - [x] 2.1 Carry `profile_key` on the derived roster row in `world/rules/guild_config/_hosts.py`, failing closed on an unresolved profile, and initialize only in `_sync_service_host`'s creation branch per design D2; extend the creation event context with `profile`; verify in `world/rules/tests/test_guild_economy_sync/`: created host carries the card at version 1 with provenance, re-sync after a synthetic profile edit leaves an edited version-2 card unchanged, a reused host without metadata gets no write, and an injected initializer failure leaves no host.
-- [ ] 2.2 Run `world.rules.tests.test_guild_economy_sync`, `world.rules.tests.test_guild_economy_scenarios`, `world.rules.tests.test_guild_economy_guards`, and `world.maps.tests.test_service_interiors`, each in its own command; verify green.
+- [x] 2.2 Run `world.rules.tests.test_guild_economy_sync`, `world.rules.tests.test_guild_economy_scenarios`, `world.rules.tests.test_guild_economy_guards`, and `world.maps.tests.test_service_interiors`, each in its own command; verify green.
 
 ## 3. Exam opponents
 
