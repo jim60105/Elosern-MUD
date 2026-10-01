@@ -178,12 +178,13 @@ class PersonaPromptTests(unittest.TestCase):
     @covers_requirement("persona-dialogue-injection::the-npc-s-own-persona-feeds-the-dialogue-system-message")
     @covers_requirement("prompt-library::the-npc-persona-frame-key-is-registered-with-exactly-the-block-placeholder")
     def test_compact_card_render_order_and_frame_in_system_prompt(self):
-        from world.lore.npc_card import NpcCard, NpcIdentity, render_card_block
+        from world.lore.npc_card import NpcCard, NpcCardIdentity, render_card_block
+        from types import SimpleNamespace
         from world.rules.persona import PersonaStore
         from world.ai.npc_dialogue import NPC_PERSONA_FIELDS
 
         card = NpcCard(
-            identity=NpcIdentity(public="公會守衛", hidden="王國密探"),
+            identity=NpcCardIdentity(public="公會守衛", hidden="王國密探"),
             appearance="高大挺拔，身披輕甲。",
             personality="嚴謹負責，不苟言笑。",
             speech_style="語氣沉穩，條理清晰。",
@@ -192,7 +193,7 @@ class PersonaPromptTests(unittest.TestCase):
             social_connection="與城門老兵熟識。",
         )
         card_block = render_card_block(card)
-        store = PersonaStore(card.to_record())
+        store = PersonaStore(SimpleNamespace(db=SimpleNamespace(persona=card.to_record())))
         flattened = store.flatten(NPC_PERSONA_FIELDS)
         self.assertEqual(flattened, card_block)
         self.assertNotIn("…", card_block)
