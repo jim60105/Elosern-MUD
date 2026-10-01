@@ -520,10 +520,11 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
         # The dean points at the acquisition path that really exists.
         for verb in ("`rest`", "`practice`", "`guild exam`", "`lore`"):
             self.assertIn(verb, dean_text, "the dean's table lost a real command")
+        guild_text = _table_text(_merchant_hall())
         # The guild master speaks in character and names no command
         # (npc-persona-content-altoria-trade): the hall's refusal is proven by
         # the absent offices above, never by pinned prose.
-        self.assertNotIn("`", _table_text(_merchant_hall()))
+        self.assertNotIn("`", guild_text)
 
     @covers_requirement(
         "altoria-learning-and-exchange::neither-location-implements-the-system-it-is-the-future-home-of"
