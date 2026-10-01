@@ -56,6 +56,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="other",
         profession="guild_staff",
         service_id="altoria_guild_master",
+        host_profile_key="altoria_guild_master",
         assortment_keys=(),
         authored_kwargs=(
             ("branch_key", "guild_branch_altoria"),
