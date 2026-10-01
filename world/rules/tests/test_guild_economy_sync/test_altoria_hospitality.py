@@ -16,10 +16,10 @@ key, name or keyword is named statically):
   identically inside the inn and outside it — same clock cost, same summary,
   same booked-practice growth, wallet untouched — and the command set and
   persisted attribute vocabulary are unchanged by the rooms (task 3.3, 3.4);
-- each host's authored table, reached through the rules dialogue API, names
-  the commands its location exists to host: the innkeeper's ``rest``/
-  ``sleep``/``practice``, the tavern keeper's ``talk``/``invite``, the
-  bathhouse keeper's separated sides (task 3.5).
+- each host's authored table, reached through the rules dialogue API, speaks
+  in character — greeting and keyword answers name no command and quote no
+  backticked token, and every authored keyword answers through the table
+  (task 3.5).
 """
 
 import unittest
@@ -361,7 +361,7 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement(
         "altoria-hospitality::each-host-s-dialogue-teaches-what-its-location-is-for"
     )
-    def test_each_host_s_table_names_the_commands_its_room_exists_to_host(self):
+    def test_each_host_s_table_speaks_in_character_without_command_tokens(self):
         tavern = _place_by_kind("tavern")
         inn = _place_by_kind("lodging")
         bathhouse = _place_by_kind("bathhouse")
