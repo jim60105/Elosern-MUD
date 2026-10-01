@@ -1016,6 +1016,7 @@ class DialogueVersionGateTests(EvenniaTest):
         _reset_all()
         super().tearDown()
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_one_leaf_edit_mid_flight_discards_reply_and_sends_stale_note(self):
         """A one-leaf edit mid-flight discards speech, intent, and session line."""
         from twisted.internet import task
@@ -1051,6 +1052,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertNotIn("請出示通行證。", " ".join(texts))
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_change_and_revert_mid_flight_discards(self):
         """Changing a leaf and reverting it still bumps version and discards."""
         from twisted.internet import task
@@ -1075,6 +1077,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertNotIn("你好冒險者。", " ".join(texts))
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_noop_save_mid_flight_presents_and_applies(self):
         """Saving an identical card mid-flight does not advance version and settles normally."""
         from twisted.internet import task
@@ -1108,6 +1111,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertNotIn(STALE_PERSONA_NOTE, texts)
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_degraded_then_stale_returns_stale_not_degraded(self):
         """An exchange that degrades after an edit settles as stale_persona, not degraded."""
         client = _HeldClient()
@@ -1126,6 +1130,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_thinking_timer_cancelled_on_stale_settlement(self):
         """The thinking timer is cancelled on stale settlement with no extra echo or retry."""
         from twisted.internet import task
@@ -1147,6 +1152,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertNotIn(self.npc._thinking_text(), texts)
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_at_talked_to_notify_stale_false_suppresses_message(self):
         """notify_stale=False suppresses direct message for single-surfacing in web adapters."""
         client = _HeldClient()
@@ -1163,6 +1169,7 @@ class DialogueVersionGateTests(EvenniaTest):
         texts = _msg_texts(msg)
         self.assertNotIn(STALE_PERSONA_NOTE, texts)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_stale_persona_emits_observability_event(self):
         """A stale persona settlement emits npc_dialogue_stale_persona with context."""
         client = _HeldClient()

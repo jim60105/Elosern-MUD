@@ -226,6 +226,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(is_companion(npc, self.player))
         self.assertEqual(len(client.calls), 0)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_party_invite_discarded_on_mid_flight_persona_edit(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
         card = {
@@ -265,6 +266,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["message"], STALE_PERSONA_NOTE)
         self.assertFalse(is_companion(npc, self.player))
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_party_invite_degraded_offline_after_mid_flight_persona_edit_runs_no_threshold(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
         card = {

@@ -385,6 +385,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("離開" in text for text in texts))
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_freeform_reply_discarded_on_mid_flight_persona_edit(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
         card = {

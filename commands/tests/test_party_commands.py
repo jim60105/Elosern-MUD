@@ -115,7 +115,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.apply_race_baseline()
         self.npc = create_object(LLMNPC, key="艾洛希雅", location=self.hall)
         self.valid_card = {
-            "identity": {"public": "森林精靈", "hidden": ""},
+            "identity": {"public": "同行測試者", "hidden": ""},
             "appearance": "翠綠眼眸。",
             "personality": "沉靜溫和。",
             "speech_style": "從容不迫。",
@@ -254,6 +254,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(is_companion(self.npc, self.char1))
         self.assertEqual(len(client.calls), 0)
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_invite_command_stale_persona_prints_explanation_and_runs_no_join_or_threshold(self):
         self._bind(90)
         client = _HeldClient()
@@ -278,6 +279,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("我願意與你同行。", " ".join(texts))
         self.assertFalse(is_companion(self.npc, self.char1))
 
+    @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
     def test_invite_command_degraded_then_stale_prints_explanation_and_runs_no_threshold(self):
         self._bind(70)
         client = _HeldClient()
