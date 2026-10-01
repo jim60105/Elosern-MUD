@@ -7,8 +7,9 @@ The 6 聖潔王都 (`capital_altoria`) middle-terrace trade hosts (瑪爾特·�
 - Author 6 `NpcProfile` rows in `world/lore/npc_profiles/altoria_trade.py`, one per host, keyed by the host's `service_id`, each with a complete compact card grounded in the host's established identity and world facts and a `misunderstood` voice line in that host's own voice; `greeting` stays `None` because each host's table authors its greeting.
 - Set `host_profile_key` on the 6 host rows in `world/lore/settlements/places_altoria_middle.py`.
 - Rewrite the greeting and every keyword response of the 6 tables in `world/lore/dialogue/altoria_middle.py` against the new cards, keeping each table's keyword identifiers, greeting presence, and every mechanical/service semantic its settlement specs require.
+- Write every greeting, response and voice line strictly in character: a host knows only its own world, so no line names a command, a game mechanic, or an interface element, and the shops speak in everyday colloquial register (only the merchant guild master, receiving callers in his office, speaks formally). The tables stop naming `shop stock`, `buy`, `sell`, `前往` and `guild request`; goods guidance stays in the world's terms (the shelf, the counter, the price board).
 - Replace incidental exact-wording test assertions on the old prose with behavior assertions; keep contract-pinned substrings.
-- Add a data-contract test for this slice: reference resolution, keyword-set preservation, voice-line coverage, no surviving provisional line, and within-slice voice distinctness.
+- Add no data-contract test and pin no prose: NPC lines are authored content, and rewording them must never break a test. Remove the existing pins that would (the pre-split dialogue digests in `test_dialogue_assembly`, the merchant hall's 「牆上無單」 and `` `前往` `` checks in `test_altoria_learning_exchange`). Completeness and voice quality are established by the recorded editorial review.
 
 No creation path writes these cards yet: `npc-persona-host-examiner-producers` initializes them on new hosts, `npc-persona-roster-cutover` replaces existing instances, and `npc-persona-dialogue-consumption` routes the `misunderstood` line. Until then the authored dialogue is live and the cards are inert lore.
 
@@ -25,11 +26,11 @@ None.
 ## Impact
 
 - Content: `world/lore/npc_profiles/altoria_trade.py`, `world/lore/settlements/places_altoria_middle.py` (6 rows gain `host_profile_key`), `world/lore/dialogue/altoria_middle.py` (6 tables rewritten).
-- Tests: a new data-contract module under `world/lore/tests/` (package-owned shard), its `tools/test_data_freeze.json` entry, and wording updates in existing tests that pinned provisional prose.
+- Tests: no new test module. `test_dialogue_assembly` drops its pre-split content digests; `test_altoria_learning_exchange` drops the merchant hall's exact-word pins for a no-command-token assertion on that table; the pinned place tuples of the general store, forge and tailor in `test_settlements` gain their `host_profile_key`; the shipped-registry immutability check moves from `test_npc_profiles` to the `test_npc_profile_inventory` data contract now that the registry is populated (the same move every content slice makes; identical hunks).
 - No mechanism, schema, prompt, or UI change; live stock, prices, quest listings, and command availability are untouched.
 
 ## Batch:
 
 depends-on: npc-persona-profile-registry
 
-Code-conflict notes: `world/lore/settlements/places_altoria_middle.py` is also edited by `npc-persona-content-altoria-guild` (only the guild-hall row); the two slices touch different rows, so a rebase conflict, if any, is mechanical. `world/lore/dialogue/altoria_middle.py` and `world/lore/npc_profiles/altoria_trade.py` are owned by this slice alone. Every content slice appends to `tools/test_data_freeze.json` (adjacent-line rebase conflicts only). This slice is a prerequisite of `npc-persona-host-examiner-producers` and `npc-persona-roster-cutover`; it is independent of every other content slice.
+Code-conflict notes: `world/lore/settlements/places_altoria_middle.py` is also edited by `npc-persona-content-altoria-guild` (only the guild-hall row); the two slices touch different rows, so a rebase conflict, if any, is mechanical. `world/lore/dialogue/altoria_middle.py` and `world/lore/npc_profiles/altoria_trade.py` are owned by this slice alone. The shared test edits (`test_dialogue_assembly`, the immutability move) are byte-identical across the content slices, so they merge cleanly. This slice is a prerequisite of `npc-persona-host-examiner-producers` and `npc-persona-roster-cutover`; it is independent of every other content slice.
