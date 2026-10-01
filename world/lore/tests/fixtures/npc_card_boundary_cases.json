@@ -1,0 +1,306 @@
+[
+  {
+    "name": "valid_minimal_card",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "金髮碧眼，身穿標準公會制服。",
+      "personality": "親切熱情，總是帶著微笑。",
+      "speech_style": "禮貌而清晰的公事語氣。",
+      "life_story": "在王都長大，畢業後便進入公會工作。",
+      "habit": "整理櫃檯上的文件。",
+      "social_connection": ""
+    },
+    "expected_valid": true
+  },
+  {
+    "name": "valid_astral_leaf_exact_600",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "金髮碧眼。",
+      "personality": "親切熱情。",
+      "speech_style": "禮貌語氣。",
+      "life_story": "長大。",
+      "habit": "整理。",
+      "social_connection": ""
+    },
+    "use_astral_600_field": "life_story",
+    "expected_valid": true
+  },
+  {
+    "name": "invalid_leaf_601",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "金髮碧眼。",
+      "personality": "親切熱情。",
+      "speech_style": "禮貌語氣。",
+      "life_story": "長大。",
+      "habit": "整理。",
+      "social_connection": ""
+    },
+    "use_leaf_601_field": "life_story",
+    "expected_valid": false,
+    "expected_code": "leaf_too_long",
+    "expected_field": "life_story"
+  },
+  {
+    "name": "invalid_identity_section_overflow_from_labels",
+    "card": {
+      "identity": {
+        "public": "公",
+        "hidden": "隱"
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "override_identity_overflow": true,
+    "expected_valid": false,
+    "expected_code": "identity_section_too_long",
+    "expected_field": "identity"
+  },
+  {
+    "name": "invalid_total_overflow_from_labels_and_separators",
+    "card": {
+      "identity": {
+        "public": "公開",
+        "hidden": "隱秘"
+      },
+      "appearance": "外觀",
+      "personality": "性格",
+      "speech_style": "風格",
+      "life_story": "經歷",
+      "habit": "習慣",
+      "social_connection": "人脈"
+    },
+    "override_total_overflow": true,
+    "expected_valid": false,
+    "expected_code": "card_too_long",
+    "expected_field": null
+  },
+  {
+    "name": "invalid_all_leaves_at_600",
+    "card": {
+      "identity": {
+        "public": "公",
+        "hidden": "隱"
+      },
+      "appearance": "外",
+      "personality": "性",
+      "speech_style": "風",
+      "life_story": "經",
+      "habit": "習",
+      "social_connection": "人"
+    },
+    "override_all_leaves_600": true,
+    "expected_valid": false,
+    "expected_code": "identity_section_too_long",
+    "expected_field": "identity"
+  },
+  {
+    "name": "valid_crlf_and_cr_normalization",
+    "card": {
+      "identity": {
+        "public": "  第一行\r\n第二行\r  ",
+        "hidden": "\r\n  第三行\r  "
+      },
+      "appearance": "\r\n  外觀第一行\r\n第二行  \r",
+      "personality": "  性格  ",
+      "speech_style": "  風格  ",
+      "life_story": "  經歷  ",
+      "habit": "  習慣  ",
+      "social_connection": "  \r\n  "
+    },
+    "expected_valid": true,
+    "expected_public": "第一行\n第二行",
+    "expected_hidden": "第三行",
+    "expected_appearance": "外觀第一行\n第二行",
+    "expected_social_connection": ""
+  },
+  {
+    "name": "invalid_unknown_top_level_key",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": "",
+      "background": "額外背景"
+    },
+    "expected_valid": false,
+    "expected_code": "unknown_field",
+    "expected_field": "background"
+  },
+  {
+    "name": "invalid_unknown_identity_key",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": "",
+        "secret": "秘密"
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "unknown_field",
+    "expected_field": "identity.secret"
+  },
+  {
+    "name": "invalid_missing_top_level_key",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "missing_field",
+    "expected_field": "speech_style"
+  },
+  {
+    "name": "invalid_missing_identity_key",
+    "card": {
+      "identity": {
+        "public": "公會接待員"
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "missing_field",
+    "expected_field": "identity.hidden"
+  },
+  {
+    "name": "invalid_non_text_leaf_number",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": 42,
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "not_text",
+    "expected_field": "habit"
+  },
+  {
+    "name": "invalid_non_text_leaf_boolean",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": true,
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "not_text",
+    "expected_field": "habit"
+  },
+  {
+    "name": "invalid_non_text_leaf_null",
+    "card": {
+      "identity": {
+        "public": "公會接待員",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": null,
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "not_text",
+    "expected_field": "habit"
+  },
+  {
+    "name": "invalid_identity_not_mapping",
+    "card": {
+      "identity": "身分字串",
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "not_text",
+    "expected_field": "identity"
+  },
+  {
+    "name": "invalid_required_empty",
+    "card": {
+      "identity": {
+        "public": "   \n\r  ",
+        "hidden": ""
+      },
+      "appearance": "外觀。",
+      "personality": "性格。",
+      "speech_style": "風格。",
+      "life_story": "經歷。",
+      "habit": "習慣。",
+      "social_connection": ""
+    },
+    "expected_valid": false,
+    "expected_code": "required_empty",
+    "expected_field": "identity.public"
+  },
+  {
+    "name": "valid_json_escape_heavy_and_template_text",
+    "card": {
+      "identity": {
+        "public": "「冒險者」{name} \\\"特殊\\\" & <標籤>",
+        "hidden": "{secret_code}: \\n \\t \\\\"
+      },
+      "appearance": "{appearance_var}: line1\\nline2",
+      "personality": "{personality}: \"quotes\" and 'single'",
+      "speech_style": "{speech}: %s %d {arg}",
+      "life_story": "Story with \\/ and \\b and \\f and {var}",
+      "habit": "Habit with \\\\ escape",
+      "social_connection": "Connection with <tag>{key}</tag>"
+    },
+    "expected_valid": true
+  }
+]
