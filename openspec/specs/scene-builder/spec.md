@@ -285,33 +285,33 @@ schedules nothing.
 - **THEN** `db.portrait_policy` is exactly `{"mode": "named", "stable_key": ...}` and canonical
   ages are present before the policy is set
 
-### Requirement: NPC characterization carries an optional authored persona block for look flavor
-The SceneBuilder's occupant characterization seam SHALL accept an optional bounded `background`
-text (and, when present, the optional import-card persona block with the prose fields
-`personality`, `life_story`, and `habit`) on a `StageSpawnRequirement`'s per-occupant
-characterization, validated by the shared `world.quests.characterization` helper against the
-persona field bound, and applied by `_apply_characterization` into the spawned NPC's
-`entity.db.persona` inside the same atomic materialization. The authored text is flavor content —
-it never feeds stored stats, and the anti-hallucination number ban is unchanged. The scenario
-director's `npc_req` guardrail SHALL validate the same fields through the shared helper so an AI-
-generated NPC can carry authored flavor text from spawn; an administrator-created NPC supplies the
-same persona record through the existing import loader (which writes the opaque persona verbatim).
+### Requirement: NPC characterization carries a complete compact card through compile, restore, and materialization
+Every occupant characterization on a `StageSpawnRequirement` SHALL carry a complete compact NPC
+card. The compiled requirement, the canonical payload, and the durable generated-quest payload SHALL
+store the normalized card, and decoding a durable payload SHALL reproduce it unchanged; a payload
+whose occupant card is missing or does not satisfy the card contract SHALL fail decoding with an
+error naming the quest, stage, and occupant, with no fallback decoder. Materialization SHALL
+revalidate the card through the shared characterization helper before any spawn and SHALL write it
+through the deterministic NPC persona initializer with `generated_quest` provenance naming the
+quest, stage, and occupant position, inside the same atomic materialization. Re-materializing a
+stage SHALL never overwrite an existing occupant's card. The card is characterization only and
+SHALL never influence stored stats.
 
-#### Scenario: A characterized NPC carries authored flavor text at spawn
-- **WHEN** a stage's `npc_req` characterization declares a bounded `background` and optional prose
-  fields
-- **THEN** the spawned NPC's `entity.db.persona` carries exactly those authored fields (alongside the
-  identity/portrait fields), the look appearance path renders them, and no stored stat was influenced
+#### Scenario: A card survives compile and restore unchanged
+- **WHEN** a blueprint occupant card is compiled, encoded into the durable store, decoded at restore, and materialized
+- **THEN** the spawned NPC's persona equals the normalized proposal card leaf for leaf and its metadata is at version 1 with `generated_quest` provenance
 
-#### Scenario: An NPC without a persona block carries none
-- **WHEN** a stage's `npc_req` characterization declares no persona or background fields
-- **THEN** the spawned NPC has no persona record (or an unchanged one) and look output is unchanged
+#### Scenario: A forged requirement cannot bypass validation
+- **WHEN** a `StageSpawnRequirement` is constructed directly with an occupant card that violates the contract and materialization runs
+- **THEN** materialization raises before any spawn and no room, NPC, or binding persists
 
-#### Scenario: An over-bound or non-text persona field is rejected
-- **WHEN** a stage's `npc_req` characterization declares a `background` beyond the persona field
-  bound or a non-text persona prose value
-- **THEN** the scenario-director guardrail and the compile boundary reject the requirement with a
-  named error before any spawn
+#### Scenario: A pre-change payload fails restore by name
+- **WHEN** the durable store holds a payload whose occupant carries the old optional prose block or no card
+- **THEN** restore raises naming the quest, stage, and occupant, and no partial registration remains
+
+#### Scenario: Re-materialization keeps an edited occupant card
+- **WHEN** an occupant's card was edited to version 2 and the same stage is materialized again idempotently
+- **THEN** the occupant's card and version 2 are unchanged
 
 ### Requirement: Scene materialization exposes deterministic flavor context for fresh instance scenes
 For a freshly spawned `instance`-layer scene (not an already-bound stage, not a permanent
