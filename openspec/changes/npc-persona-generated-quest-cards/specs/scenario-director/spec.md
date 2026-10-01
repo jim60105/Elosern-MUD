@@ -18,7 +18,9 @@ subject-key-valid. A payload whose tier is unknown, whose occupant is missing `d
 `title`, or `persona`, whose card violates the contract, whose ages are unpaired, non-integer,
 negative, or beyond the race lifespan, or whose portrait key is malformed SHALL be rejected and
 retried within the budget exactly like today's other semantic failures, and on budget exhaustion
-SHALL degrade to the offline template pool.
+SHALL degrade to the offline template pool. A blueprint SHALL declare at most three `npc_req`
+occupants in total across all of its stages, so its occupant cards fit one bounded model response;
+a blueprint exceeding that total SHALL be rejected and retried like any other semantic failure.
 
 #### Scenario: A valid named occupant with a title and ages passes validation
 - **WHEN** a blueprint's `npc_req` entry declares a known tier plus `display_name`, `title`, a
@@ -35,6 +37,10 @@ SHALL degrade to the offline template pool.
   `background` key, or carries a card whose rendered block exceeds the total bound
 - **THEN** the output is treated as a validation failure naming the persona leaf or budget, and the
   pipeline retries within the budget and then degrades to the template pool
+
+#### Scenario: Too many card-bearing occupants are rejected
+- **WHEN** a blueprint declares four `npc_req` entries across its stages
+- **THEN** the output is treated as a validation failure naming the occupant total and retried within the budget
 
 #### Scenario: An unpaired, negative, or non-integer declaration is rejected and retried
 - **WHEN** an `npc_req` entry declares `age` without `apparent_age`, either age negative, or any
@@ -63,7 +69,7 @@ SHALL degrade to the offline template pool.
 The `scenario_director.system` prompt-library text SHALL instruct the model to give every
 `npc_req` a `persona` object with the seven compact-card fields, SHALL state which leaves may be
 empty (`identity.hidden`, `social_connection`), that `speech_style` describes how the character
-talks, and the per-leaf and total bounds, and SHALL contain no shipped NPC's card prose. The
+talks, and the per-leaf and total bounds, SHALL ask for compact cards of roughly 800 code points each and at most three occupants per blueprint, and SHALL contain no shipped NPC's card prose. The
 `scenario_director` output schema SHALL require that object with exactly those keys at both levels
 and no `background` key.
 

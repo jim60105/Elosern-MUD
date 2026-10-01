@@ -4,7 +4,7 @@ Apply on branch `feat/npc-persona-generated-quest-cards` in worktree `.worktrees
 
 - [ ] 1.1 Replace `background` and the pair-tuple `persona` on `BlueprintNpcReq` with the frozen `BlueprintPersona` card (design D1), updating `to_payload`/`from_payload`; verify immutability and round-trip tests in `world/ai/tests/` for the scenario director.
 - [ ] 1.2 Update the `npc_req` output schema in `world/ai/scenario_director/validators.py` per design D3 and the `scenario_director.system` text in `prompts/scenario_director.yaml`; verify schema tests (missing `speech_style`, `background` key rejected) and a prompt test asserting the seven field names, optional-leaf marking, and bounds, plus `world.prompts` loader tests green.
-- [ ] 1.3 Add `SCENARIO_DIRECTOR_MAX_TOKENS = 4096` in `world/ai/profiles.py` per design D6; verify the profile-defaults test asserts all three per-layer exceptions.
+- [ ] 1.3 Add `SCENARIO_DIRECTOR_MAX_TOKENS = 8192` in `world/ai/profiles.py` and the three-occupant total cap to the semantic validators per design D6; verify the profile-defaults test asserts all three per-layer exceptions, a four-occupant blueprint is rejected naming the total, and the worked-budget sizing test passes.
 
 ## 2. Shared helper and compile chain
 

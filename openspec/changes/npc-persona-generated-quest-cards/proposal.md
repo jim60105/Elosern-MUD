@@ -8,7 +8,7 @@ Generated-quest NPCs (scene occupants) are a production creation path whose char
 - The shared characterization helper validates the card through the compact card contract (required, normalized, bounded); the guardrail, the compiler, and the scene materializer all call it, and the materializer revalidates so a forged internal requirement cannot bypass it.
 - The durable payload stores the normalized card; decoding requires it and rejects any other persona shape with a named error.
 - The materializer writes the occupant card through `initialize_npc_persona` with `generated_quest` provenance (quest key, stage index, occupant position) inside the atomic materialization; re-materializing an existing occupant never overwrites its card.
-- The `scenario_director.system` prompt asks for a complete card per `npc_req` with the field list, required/optional leaves, and budgets; the `scenario_director` default `max_tokens` rises from the 250-token generic default to 4,096 so a blueprint with occupant cards fits.
+- The `scenario_director.system` prompt asks for a complete card per `npc_req` with the field list, required/optional leaves, and budgets; the `scenario_director` default `max_tokens` rises from the 250-token generic default to 8,192 and a blueprint is capped at three occupants in total, so a blueprint with compact occupant cards fits one response (worked budget in design D6).
 - The NPC-bearing offline template (`討伐林間盜匪`, occupant 黑鬍) gets a fully authored card, so offline degradation supplies complete characterization.
 
 ## Capabilities
