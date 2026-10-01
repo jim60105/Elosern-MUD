@@ -680,6 +680,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "gallery.card.delete": null,
   "gallery.face_rect.update": null,
   "gallery.binding.save": null,
+  "npc.persona.read": null,
+  "npc.persona.update": null,
   "shop.buy": { payload: { item_key: SYNTH_ITEM.id, quantity: 2 }, display: { itemLabel: SYNTH_ITEM.display } },
   "shop.sell": { payload: { item_key: SYNTH_ITEM.id, quantity: 1 }, display: { itemLabel: SYNTH_ITEM.display } },
   "title.accept": { payload: { index: 2 }, display: {} },
