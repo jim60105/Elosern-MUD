@@ -69,6 +69,10 @@
       "reason": "shipped NPC source inventory data contract"
     },
     {
+      "path": "world/lore/tests/test_npc_profile_slice_content.py",
+      "reason": "per-slice authored NPC profiles and rewritten dialogue content contract"
+    },
+    {
       "path": "world/lore/tests/test_npc_tiers.py",
       "reason": "npc tier data contract"
     },
