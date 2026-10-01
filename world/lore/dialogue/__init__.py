@@ -6,7 +6,8 @@ identity, which the repo puts under ``world/lore/``. The rows move out of
 ``DialogueDefinition``/``KeywordResponse`` re-exports and the frozen
 ``DIALOGUE_TABLE`` read) and arrive already split by domain: ``shape.py`` owns
 the two dataclasses, ``guild.py`` carries the guild hall's row, and the
-per-settlement slices (``altoria.py``, ``ciaran.py``) carry the capital's and
+per-settlement slices (``altoria_lower.py``, ``altoria_middle.py``,
+``altoria_upper.py``, ``ciaran.py``) carry the capital's terraces and
 the village's hosts as the content changes land them.
 
 The assembly mirrors how ``world/lore/settlements/places.py`` assembles its
@@ -25,7 +26,9 @@ from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 # reads is deterministic regardless of import history, and the content changes
 # that each add tables never edit the same slice.
 from world.lore.dialogue.guild import ROWS as GUILD_STAFF_ROWS  # the guild hall counter
-from world.lore.dialogue.altoria import ROWS as ALTORIA_ROWS  # 聖潔王都's hosts
+from world.lore.dialogue.altoria_lower import ROWS as ALTORIA_LOWER_ROWS  # 聖潔王都 LOWER terrace hosts
+from world.lore.dialogue.altoria_middle import ROWS as ALTORIA_MIDDLE_ROWS  # 聖潔王都 MIDDLE terrace hosts
+from world.lore.dialogue.altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # 聖潔王都 UPPER terrace hosts
 from world.lore.dialogue.ciaran import ROWS as CIARAN_ROWS  # 暗影谷村's hosts
 
 # Authored identity is read-only at runtime (the scripted-dialogue registry
@@ -35,13 +38,21 @@ from world.lore.dialogue.ciaran import ROWS as CIARAN_ROWS  # 暗影谷村's hos
 DIALOGUE_ROWS: MappingProxyType = MappingProxyType(
     {
         key: definition
-        for rows in (GUILD_STAFF_ROWS, ALTORIA_ROWS, CIARAN_ROWS)
+        for rows in (
+            GUILD_STAFF_ROWS,
+            ALTORIA_LOWER_ROWS,
+            ALTORIA_MIDDLE_ROWS,
+            ALTORIA_UPPER_ROWS,
+            CIARAN_ROWS,
+        )
         for key, definition in rows
     }
 )
 
 __all__ = [
-    "ALTORIA_ROWS",
+    "ALTORIA_LOWER_ROWS",
+    "ALTORIA_MIDDLE_ROWS",
+    "ALTORIA_UPPER_ROWS",
     "CIARAN_ROWS",
     "DIALOGUE_ROWS",
     "DialogueDefinition",

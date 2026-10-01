@@ -46,7 +46,7 @@
    | `quest_issuer` | `quest_issuer` | person | 私人委託發包人；身分隨人走，**不得**釘房 |
    | `attendant` | `scripted_dialogue` | place | 對話即服務的管事（旅店老闆、衛兵隊長、教官）；職業在 `host_title` 與對話表裡，不另設列 |
 
-3. **需要劇本對話嗎？** `dialogue_key` 必須是 `world/lore/dialogue/`（`altoria.py`／`ciaran.py`／`guild.py` 依領域分檔）`DIALOGUE_ROWS` 已登錄的鍵；新對話要先加表列，見 Step 3。
+3. **需要劇本對話嗎？** `dialogue_key` 必須是 `world/lore/dialogue/`（`altoria_{lower,middle,upper}.py`／`ciaran.py`／`guild.py` 依領域分檔）`DIALOGUE_ROWS` 已登錄的鍵；新對話要先加表列，見 Step 3。
 4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入卡的職業藍圖只在列帶 `schedule_template` 時自動套排程（現行出貨列全為 `null`），其餘情況由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
 5. **數值來源在哪？** 設計文件與既有 rulebook。`stats` 是匯入卡路徑的字面基準值（永不預先乘技能倍率）；平衡數值由設計文件決定，卡作者不發明平衡表。
 
@@ -107,7 +107,7 @@ CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與�
 
 ### Step 3 — 劇本對話（需要時）
 
-對話是作者身份，表列住在 lore 封裝 `world/lore/dialogue/` 的領域分檔（`altoria.py`、`ciaran.py`、`guild.py`），由 `__init__.py` 組出不可變 `DIALOGUE_ROWS`。新增一表：
+對話是作者身份，表列住在 lore 封裝 `world/lore/dialogue/` 的領域分檔（`altoria_{lower,middle,upper}.py`、`ciaran.py`、`guild.py`），由 `__init__.py` 組出不可變 `DIALOGUE_ROWS`。新增一表：
 
 ```python
 # world/lore/dialogue/<domain>.py（領域名為範例；實際放進對應領域分檔）
