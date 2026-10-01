@@ -237,13 +237,10 @@ class AltoriaSanctumTests(ServiceContentIsolation, EvenniaTestCase):
                 verb, _table_text(temple),
                 "the priest's table quotes a command she lacks",
             )
-        self.assertTrue(
-            any(
-                verb in _table_text(sanctum)
-                for verb in ("`buy`", "`sell`", "`shop stock`")
-            ),
-            "the deacon's table sends visitors to a counter she does not keep",
-        )
+        # Both counters speak in character and name no command
+        # (npc-persona-content-altoria-upper); the deacon's goods are named by
+        # the merchant-dialogue suite, never pinned here.
+        self.assertNotIn("`", _table_text(sanctum))
         # One host per interior, correctly placed.
         for place, host in ((temple, priest), (sanctum, deacon)):
             with self.subTest(host=place.kind):

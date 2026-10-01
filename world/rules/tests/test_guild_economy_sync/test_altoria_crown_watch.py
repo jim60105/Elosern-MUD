@@ -517,19 +517,14 @@ class AltoriaCrownWatchTests(ServiceContentIsolation, EvenniaTestCase):
                     self.assertIn(
                         token, surface, f"{place.kind} names a command that is not"
                     )
-        # The instructor's table specifically names the practice and exam
-        # commands its room exists to teach.
-        instructor_text = _table_text(
-            next(place for place in _crown_watch_places() if place.kind == "training_ground")
-        )
-        for verb in ("`rest`", "`practice`", "`guild exam`"):
-            self.assertIn(verb, instructor_text, "the yard's table lost a verb")
-        # ...and pins the honesty of its combat line: `engage` fights a
-        # hostile monster wherever one stands (commands/combat.py), the yard
-        # has no opponent — the table must say so, not advertise sparring
-        # the room cannot provide (post-implementation review caught the
-        # shipped draft doing exactly that).
-        self.assertIn("沒有陪練", instructor_text, "the yard advertises sparring again")
+        # A host with an authored persona profile speaks in character (the
+        # npc-persona content slices): its table names no command, so the yard
+        # teaches practice in the world's terms and no prose is pinned here.
+        for place in _staffed_places():
+            if place.host_profile_key is None:
+                continue
+            with self.subTest(in_character=place.key):
+                self.assertNotIn("`", _table_text(place), place.kind)
 
 
 if __name__ == "__main__":

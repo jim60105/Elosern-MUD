@@ -516,10 +516,10 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                             f"{place.kind} advertises an unplayable command",
                         )
         dean_text = _table_text(_academy())
-        self.assertIn("沒有『拜師』這道門", dean_text, "the dean offers apprenticeship again")
-        # The dean points at the acquisition path that really exists.
-        for verb in ("`rest`", "`practice`", "`guild exam`", "`lore`"):
-            self.assertIn(verb, dean_text, "the dean's table lost a real command")
+        # The dean speaks in character and names no command
+        # (npc-persona-content-altoria-upper); the refusal is proven by the
+        # absent offices above, never by pinned prose.
+        self.assertNotIn("`", dean_text)
         guild_text = _table_text(_merchant_hall())
         # The guild master speaks in character and names no command
         # (npc-persona-content-altoria-trade): the hall's refusal is proven by
