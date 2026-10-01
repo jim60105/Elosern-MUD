@@ -93,9 +93,12 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
     def test_observability_and_actor_msg_contain_no_card_text(self):
         session, coordinator = self._session_and_coordinator()
 
-        # Capture log calls by patching log_info/log_warn in action and rules modules
-        with patch("world.observability.log_info") as mock_info, \
-             patch("world.observability.log_warn") as mock_warn:
+        # Capture log calls by patching the module bindings where log_info / log_warn are invoked
+        with patch("world.rules.npc_persona.log_info") as mock_rules_info, \
+             patch("world.rules.npc_persona.log_warn") as mock_rules_warn, \
+             patch("world.observability.log_info") as mock_obs_info, \
+             patch("world.observability.log_warn") as mock_obs_warn, \
+             self.captureOnCommitCallbacks(execute=True):
 
             # 1. Read
             res_read = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id}, request_id="priv-read")
@@ -114,19 +117,23 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
             self.assertEqual(res_up["outcome"], "success")
 
             # 3. Rejected update
-            bad_card = dict(self.card)
-            bad_card["speech_style"] = ""
+            # Version conflict rejected update inside update_npc_persona triggers log_info
             res_rej = self._dispatch(
                 session,
                 coordinator,
                 "npc.persona.update",
-                {"npc_id": self.npc.id, "expected_persona_version": 2, "persona": bad_card},
+                {"npc_id": self.npc.id, "expected_persona_version": 99, "persona": up_card},
                 request_id="priv-rej",
             )
             self.assertEqual(res_rej["outcome"], "rejected")
 
-            # Check all captured log calls across mock_info and mock_warn
-            for call in list(mock_info.call_args_list) + list(mock_warn.call_args_list):
+            all_calls = (
+                list(mock_rules_info.call_args_list)
+                + list(mock_rules_warn.call_args_list)
+                + list(mock_obs_info.call_args_list)
+                + list(mock_obs_warn.call_args_list)
+            )
+            for call in all_calls:
                 call_str = str(call)
                 self.assertNotIn(self.secret_text, call_str)
                 self.assertNotIn(self.hidden_text, call_str)
@@ -208,8 +215,8 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
         )
         self.assertEqual(res_esc["outcome"], "success")
 
-        # Validate envelope with server result validator
-        full_envelope = {
+        # Validate all envelopes with server result validator
+        envelope_cjk = {
             "protocol_version": 1,
             "presentation_epoch": coordinator.epoch,
             "request_id": "max-cjk",
@@ -219,6 +226,34 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
             "presentation_revision": coordinator.revision,
             "data": res_cjk["data"],
         }
-        validated = validate_ui_action_result(full_envelope)
-        self.assertEqual(validated["outcome"], "success")
-        self.assertEqual(validated["data"], res_cjk["data"])
+        v_cjk = validate_ui_action_result(envelope_cjk)
+        self.assertEqual(v_cjk["outcome"], "success")
+        self.assertEqual(v_cjk["data"], res_cjk["data"])
+
+        envelope_astral = {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": "max-astral",
+            "outcome": res_astral["outcome"],
+            "code": res_astral["code"],
+            "message": res_astral["message"],
+            "presentation_revision": coordinator.revision,
+            "data": res_astral["data"],
+        }
+        v_astral = validate_ui_action_result(envelope_astral)
+        self.assertEqual(v_astral["outcome"], "success")
+        self.assertEqual(v_astral["data"], res_astral["data"])
+
+        envelope_esc = {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": "max-escape",
+            "outcome": res_esc["outcome"],
+            "code": res_esc["code"],
+            "message": res_esc["message"],
+            "presentation_revision": coordinator.revision,
+            "data": res_esc["data"],
+        }
+        v_esc = validate_ui_action_result(envelope_esc)
+        self.assertEqual(v_esc["outcome"], "success")
+        self.assertEqual(v_esc["data"], res_esc["data"])
