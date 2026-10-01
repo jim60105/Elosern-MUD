@@ -3,7 +3,7 @@ Apply on branch `feat/npc-persona-content-ciaran-homes-b` in worktree `.worktree
 ## 1. Inventory and grounding
 
 - [ ] 1.1 Confirm the `npc-persona-profile-registry` inventory rows owned by `ciaran_homes_b` equal the sources listed in design.md, and record each host's grounding facts (place row, settlement-document passage, spec requirements, what each keyword currently teaches) as a short brief in this task's completion note; verify the brief covers every host and every keyword.
-- [ ] 1.2 Capture SHA-256 digests of every current greeting and response of the owned tables (from the pre-change file) for the D4 test, and `rg` each line's distinctive phrases across `world`, `web`, `commands`, and `tests` to list every test that pins the provisional prose; verify the list is recorded in this task's note.
+- [ ] 1.2 `rg` each current line's distinctive phrases across `world`, `web`, `commands`, and `tests` to list every test that pins the provisional prose; verify the list is recorded in this task's note.
 
 ## 2. Author cards and references
 
@@ -12,9 +12,9 @@ Apply on branch `feat/npc-persona-content-ciaran-homes-b` in worktree `.worktree
 
 ## 3. Rewrite dialogue and tests
 
-- [ ] 3.1 Rewrite the greeting and all keyword responses of the 4 owned tables in `world/lore/dialogue/ciaran.py` per design D1/D3; verify the labels `world.lore.tests.test_settlements`, `world.lore.tests.test_shops`, `world.rules.tests.test_dialogue`, `world.rules.tests.test_guild_config.test_service_host_roster`, `world.rules.tests.test_guild_config.test_item_offer_definitions` each pass in its own command.
-- [ ] 3.2 Convert every incidental exact-wording assertion found in task 1.2 into a behavior assertion (topic present, command named, no state change) or delete it when it only echoed prose; keep contract-pinned substrings; verify the affected labels pass and no browser test file is left asserting a removed line (`rg` the old phrases again, expecting no hit outside the digest test).
-- [ ] 3.3 Add `world/lore/tests/test_npc_profiles_ciaran_homes_b.py` implementing design D4 as a data-contract test, register it in `tools/test_data_freeze.json`; verify the label passes and `uv run --locked python -m tools.test_data_lint check` is clean.
+- [ ] 3.1 Rewrite the greeting and all keyword responses of the 4 owned tables in `world/lore/dialogue/ciaran.py` per design D1/D3/D5 (in character, colloquial, no command token, no proprietor vocabulary); verify the labels `world.lore.tests.test_settlements`, `world.lore.tests.test_shops`, `world.rules.tests.test_dialogue`, `world.rules.tests.test_guild_config.test_service_host_roster`, `world.rules.tests.test_guild_config.test_item_offer_definitions` each pass in its own command.
+- [ ] 3.2 Remove every test assertion that pins NPC prose per design D4 (the pre-split digests in `test_dialogue_assembly`, keeping a prose-free four-answer shape check); verify `test_service_host_merchant_dialogue` and `test_ciaran_village_commerce` pass and no test or browser test is left asserting a removed line (`rg` the old phrases again, expecting no hit).
+- [ ] 3.3 Add no new test module (design D4). Set the three trading homes' pinned place tuples in `test_settlements` to their new `host_profile_key` and move the shipped-registry immutability check from `test_npc_profiles` into the `test_npc_profile_inventory` data contract (identical hunks across the content slices); verify the labels pass and `uv run --locked python -m tools.test_data_lint check` is clean.
 
 ## 4. Editorial review
 
@@ -22,6 +22,6 @@ Apply on branch `feat/npc-persona-content-ciaran-homes-b` in worktree `.worktree
 
 ## 5. Gates and handoff
 
-- [ ] 5.1 Confirm no shard edit is needed (the new module is owned by the `world.lore` package label; listing it would double-own it); verify with `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
-- [ ] 5.2 If `npc-profile-registry` is already a main capability, sync this change's ADDED requirement into `openspec/specs/npc-profile-registry/spec.md` and annotate the D4 test with the literal ID from `uv run --locked python -m tools.spec_traceability list`; otherwise leave it unannotated for the archive workflow. Verify `uv run --locked python -m tools.spec_traceability check`.
+- [ ] 5.1 Confirm no shard edit is needed (no test module is added); verify with `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`.
+- [ ] 5.2 If `npc-profile-registry` is already a main capability, sync this change's ADDED requirement into `openspec/specs/npc-profile-registry/spec.md` and annotate the covering place-registry validation test with the literal ID from `uv run --locked python -m tools.spec_traceability list`; otherwise leave it unannotated for the archive workflow. Verify `uv run --locked python -m tools.spec_traceability check`.
 - [ ] 5.3 Run `uv run --locked python -m tools.contract_gate`, `git diff --check`, and `openspec validate npc-persona-content-ciaran-homes-b --strict`; record the results.
