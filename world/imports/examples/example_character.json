@@ -34,12 +34,15 @@
     }
   },
   "persona": {
-    "identity": "A reference human commoner.",
-    "personality": "Calm and observant.",
-    "life_story": "A placeholder history for import validation.",
-    "habit": "Keeps careful field notes.",
-    "appearance": "Practical traveling clothes and a short sword.",
-    "social_connection": "Maintains ties with the southern borderlands.",
-    "background": "A visiting scholar documenting the southern trade routes."
+    "identity": {
+      "public": "平原出身的見習劍士，在城郊驛站替商隊記錄路況。",
+      "hidden": ""
+    },
+    "appearance": "二十出頭的女子，栗色短髮紮在腦後，穿洗舊的旅行皮衣，腰間掛一柄短劍與一本磨毛邊的筆記。",
+    "personality": "沉穩、觀察入微，遇事先看再說；不輕易表態，但答應的事一定做完。",
+    "speech_style": "說話簡短平實，習慣先報地名與時辰再講重點；被追問時會停一下才回答，很少用誇飾的詞。",
+    "life_story": "生在平原農家，十五歲隨商隊離鄉，在驛站學會記帳與看路。三年前開始習劍，好在護送途中自保。",
+    "habit": "每到一處就在筆記上畫下路口與水源的位置，睡前把短劍擦過一遍才熄燈。",
+    "social_connection": "與南方邊境幾支常走的商隊保持往來，驛站管事會把難走的路況先告訴她。"
   }
 }

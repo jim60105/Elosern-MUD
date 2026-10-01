@@ -8,6 +8,7 @@ from unittest import TestCase
 
 from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from world.imports.validate import validate_batch
+from world.lore.npc_card import NPC_CARD_FIELDS, normalize_card
 from world.rules.npc_identity import validate_npc_title
 
 GM_CHARACTERS_DOC = (
@@ -16,7 +17,7 @@ GM_CHARACTERS_DOC = (
 
 
 class ReferenceExampleTests(TestCase):
-    @covers_requirement("import-reference-example::the-reference-example-demonstrates-the-base-value-stats-convention-correctly", "import-reference-example::the-reference-example-exercises-every-major-schema-branch-it-can-demonstrate-on-its-race")
+    @covers_requirement("import-reference-example::the-reference-example-demonstrates-the-base-value-stats-convention-correctly", "import-reference-example::the-reference-example-exercises-every-major-schema-branch-and-a-complete-npc-card")
     def test_reference_example_is_clean_and_exercises_contract(self):
         report = validate_batch([EXAMPLE_PATH])
         self.assertTrue(report.all_valid)
@@ -31,17 +32,20 @@ class ReferenceExampleTests(TestCase):
         self.assertFalse(record["disguised_stats"])
         self.assertTrue(record["skills"] and record["passives"])
         self.assertGreater(len(record["sexual_baseline"]), 3)
-        self.assertGreater(len(record["persona"]), 1)
+        normalize_card(record["persona"])
 
-    @covers_requirement("import-reference-example::the-reference-example-exercises-the-persona-block-with-a-background")
-    def test_reference_persona_demonstrates_the_background_key(self):
+    @covers_requirement("import-reference-example::the-reference-example-carries-a-complete-compact-npc-card")
+    def test_reference_persona_is_a_complete_normalized_card(self):
         report = validate_batch([EXAMPLE_PATH])
         self.assertTrue(report.all_valid)
-        record = example_record()
-        persona = record["persona"]
-        self.assertIsInstance(persona, dict)
-        self.assertIn("background", persona)
-        self.assertTrue(persona["background"].strip())
+        self.assertFalse(report.records[0].rejections)
+        self.assertFalse(report.records[0].warnings)
+        persona = example_record()["persona"]
+        self.assertEqual(set(persona), NPC_CARD_FIELDS)
+        self.assertNotIn("background", persona)
+        # Already in normalized form, so the validated card equals the file.
+        self.assertEqual(normalize_card(persona).to_record(), persona)
+        self.assertEqual(report.records[0].record["persona"], persona)
 
 
 class ReferenceTitleTests(TestCase):

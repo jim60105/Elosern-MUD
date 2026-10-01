@@ -15,10 +15,12 @@ from world.imports.validate import (
     validate_batch,
     validate_character,
 )
+from world.lore.npc_card import normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules import profession_config
 from world.rules.npc_identity import validate_npc_title
+from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import set_npc_schedule
 from world.rules.profession_assembly import (
     ProfessionAssemblyError,
@@ -306,6 +308,12 @@ def _instantiate_validated_character(
     title = (
         validate_npc_title(record["title"]) if issubclass(typeclass, NPC) else ""
     )
+    # The compact card's second, fail-closed gate also runs before
+    # construction (npc-persona-import-cards D3): an unvalidated NPC record
+    # with a non-card persona raises ``NpcCardError`` here instead of leaving
+    # a half-built NPC behind for a caller outside the batch transaction.
+    if issubclass(typeclass, NPC):
+        normalize_card(record["persona"])
     entity = create_object(typeclass, key=record["key"])
     entity.race = record["race"]
     entity.subrace = record.get("subrace")
@@ -320,7 +328,17 @@ def _instantiate_validated_character(
         )
     )
     entity.db.disguised_stats = record["disguised_stats"] or None
-    entity.db.persona = record["persona"]
+    if isinstance(entity, NPC):
+        # The shared deterministic persona writer (npc-persona-import-cards
+        # D3): the validated card plus versioned metadata with ``import``
+        # provenance, inside the caller's batch transaction so a later
+        # record's failure rolls both back with the batch.
+        initialize_npc_persona(
+            entity, record["persona"], {"kind": "import", "record": record["key"]}
+        )
+    else:
+        # Non-NPC targets keep the opaque persona contract: stored verbatim.
+        entity.db.persona = record["persona"]
     entity.db.sexual = record["sexual_baseline"]
     entity.db.skills = {
         "active": record["skills"],

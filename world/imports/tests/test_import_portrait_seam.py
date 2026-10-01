@@ -15,6 +15,26 @@ from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from tools.spec_traceability import covers_requirement
 
 
+def split_callbacks(callbacks):
+    """Partition registered on-commit callbacks into portrait and persona ones.
+
+    An NPC import registers the post-commit portrait ensure AND the persona
+    initializer's commit-bound ``npc_persona_initialized`` event. Every
+    callback must belong to exactly one group, so an unexpected registration
+    (or a renamed producer) fails loudly instead of being filtered away.
+    """
+    portrait, persona = [], []
+    for callback in callbacks:
+        name = callback.__qualname__
+        if name.startswith("schedule_portrait_ensure."):
+            portrait.append(callback)
+        elif name.startswith("initialize_npc_persona."):
+            persona.append(callback)
+        else:
+            raise AssertionError(f"unexpected on-commit callback {name!r}")
+    return portrait, persona
+
+
 class ImportPortraitSeamTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
@@ -51,7 +71,9 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             entities = load_batch(paths)
         self.assertEqual(len(entities), 2)
-        self.assertEqual(len(callbacks), 2)
+        portrait, persona = split_callbacks(callbacks)
+        self.assertEqual(len(portrait), 2)
+        self.assertEqual(len(persona), 2)
         for entity in entities:
             self.assertEqual(
                 entity.db.portrait_policy,
@@ -101,7 +123,9 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         ):
             entities = load_batch([path])
         self.assertEqual(len(entities), 1)
-        self.assertEqual(len(callbacks), 1)
+        portrait, persona = split_callbacks(callbacks)
+        self.assertEqual(len(portrait), 1)
+        self.assertEqual(len(persona), 1)
         self.assertTrue(
             NPC.objects.filter(db_key="human_reference").exists()
         )

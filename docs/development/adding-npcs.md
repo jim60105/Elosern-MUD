@@ -60,11 +60,12 @@
 
 ### Step 1 — 寫 JSON 角色卡
 
-複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的四條規則：
+複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的五條規則：
 
 - **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列與探索面板把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
 - **`title` 對 NPC 必填**，規則是 `world/rules/npc_identity.validate_npc_title` 的單一 validator 契約：去首尾空白後 1–32 碼點、無任何空白（含 U+3000）、無控制字元、無 `|`。落庫的是驗證器回傳的正規形（已去空白）。
 - **`age`／`apparent_age` 各自獨立**，0–10000 整數；匯入落庫後藝術系統讀這兩個持久欄，缺值由 `ensure_npc_canonical_age` 補 `NPC_DEFAULT_AGE`（18），既有值永不覆寫。
+- **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，不只是欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
 - **`disguised_stats` 非空時種族必須能用神之秘法**，同[新增角色模板指南](/development/adding-player-presets) §4 的不變式；`_check_disguised_stats_subset` 另要求偽裝鍵是 `stats` 子集。
 
 服務 NPC 再加選填的職業三欄：
@@ -102,7 +103,7 @@
 uv run --locked -m world.imports.validate content/characters/old_pike.json
 ```
 
-CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與資料庫既有 NPC 的重名由載入器把關**，CLI 不回報。批次全綠才進入載入。
+CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與資料庫既有 NPC 的重名由載入器把關**，CLI 不回報。批次全綠才進入載入。CLI 以 NPC 為目標，角色卡違規以 `persona.<欄位>` 加穩定原因碼（`missing_field`、`unknown_field`、`not_text`、`required_empty`、`leaf_too_long`、`identity_section_too_long`、`card_too_long`）回報；契約遇到第一個違規就停，一次只會看到一個角色卡問題。
 
 ### Step 3 — 劇本對話（需要時）
 
@@ -177,6 +178,7 @@ uv run --locked python -m tools.spec_traceability check
 |---|---|---|
 | `CHARACTER_SCHEMA_V1` 結構（必填欄、`additionalProperties: False`、`age`/`apparent_age` 0–10000、`stats` 封閉欄位） | CLI 驗證／`load_batch` 驗證階段 | 整批具名拒收 |
 | `title` 語意規則（單一 validator `validate_npc_title`） | 語意驗證＋構造前第二道 fail-closed 閘 | 拒收；構造前攔下不留半成品 |
+| NPC 目標的 `persona` 精簡角色卡契約（`normalize_card`；`PlayerCharacter` 目標不檢查） | 語意驗證＋構造前第二道 fail-closed 閘 | 整批具名拒收（`persona.<欄位>`＋原因碼）；構造前攔下不留半成品 |
 | 批次內重名 | CLI／驗證階段 | 整批拒收 |
 | 與資料庫既有 NPC 重名 | `load_batch`／`instantiate_character` 載入時（`_flag_existing_npc_names`） | 整批拒收，reason=`existing_npc_name` |
 | 未知 race／subrace／技能／物品、`magic_power` 超種族魔力帶、偽裝鍵非 `stats` 子集、無神性種族帶非空偽裝層 | 語意驗證 | 拒收（計量條超出合理帶僅警告） |
@@ -199,6 +201,7 @@ uv run --locked python -m tools.spec_traceability check
 | merchant 職業不寫 `dialogue_key` | 藍圖覆蓋檢查具名拒收。無問候語的店主是 `merchant-dialogue` 移除的缺陷，永不作為預設 |
 | 自創 `profession` 或元件型別 | 職業與元件型別都是閉合詞彙；新元件組屬規格驅動變更，見 §6 |
 | 並發跑兩個 `load_batch` 共用 NPC key 空間 | 名稱唯一性是 lookup-then-create，普通交易不串行 missing-row 檢查，後果是雙建；內容載入必須單一寫入者串行 |
+| 沿用舊的 `persona` 形狀（單行 `identity` 字串、`background` 欄、缺 `speech_style`） | NPC 匯入整批拒收，點名 `persona.<欄位>`；照參考範例卡寫滿七欄 |
 | 為過測試而捏造卡上登錄鍵 | 未知鍵由驗證器具名拒收；測試該用受控合成資料（`world/tests/synthetic_data`），勿修改出貨卡 |
 | 拿 `NPC` 型別期待 LLM 生成對話 | 生成管線掛在 `LLMNPC.at_talked_to`；`NPC` 只有劇本對話。匯入生成人物要顯式 `typeclass=LLMNPC` |
 | 直接寫 `npc.db.schedule` | 唯一寫入者是 `set_npc_schedule`（它同時記生效 tick 與 `schedule` tag）；旁路寫入的排程沒有生效事實 |

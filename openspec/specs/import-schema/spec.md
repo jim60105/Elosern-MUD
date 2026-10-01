@@ -119,26 +119,24 @@ express cleanly.
 - **THEN** `CHARACTER_SCHEMA_V1` structural validation alone does not reject this — the
   subset check is a semantic-layer concern, not a schema-layer one
 
-### Requirement: persona is validated as an object and nothing more
+### Requirement: persona is an object at the schema layer and NPC targets validate it semantically
 `CHARACTER_SCHEMA_V1`'s `persona` property SHALL be typed only as `{"type": "object"}`, with no
-required keys, no `additionalProperties: false`, and no nested type constraints of any kind. The
-schema's `description` for this property SHALL state that `persona` is opaque and its contents are
-never inspected beyond confirming it is an object.
+required keys, no `additionalProperties: false`, and no nested type constraints at the schema
+layer. The property's `description` SHALL state that the schema checks only that `persona` is an
+object, that an NPC-target import applies the compact NPC card contract during semantic validation,
+and that a non-NPC target's persona is opaque and never inspected.
 
-#### Scenario: A persona with arbitrary nested structure passes validation
-- **WHEN** a character record's `persona` field is any JSON object, regardless of what keys or
-  nested shapes it contains
-- **THEN** `CHARACTER_SCHEMA_V1` validation of the `persona` field passes, so long as it is an
-  object
+#### Scenario: A persona with arbitrary nested structure passes the schema layer
+- **WHEN** a character record's `persona` field is any JSON object
+- **THEN** `CHARACTER_SCHEMA_V1` validation of the `persona` field passes, so long as it is an object
 
 #### Scenario: A non-object persona fails validation
 - **WHEN** a character record's `persona` field is a string, array, or number instead of an object
 - **THEN** schema validation fails
 
-#### Scenario: persona's schema description states its contents are never inspected
+#### Scenario: persona's schema description names both rules
 - **WHEN** `CHARACTER_SCHEMA_V1["properties"]["persona"]["description"]` is inspected
-- **THEN** it states that persona is opaque and that its contents are never inspected, constrained,
-  or enumerated
+- **THEN** it states that the schema checks only for an object, that NPC-target imports apply the compact card contract semantically, and that non-NPC personas are opaque
 
 ### Requirement: sexual_baseline requires arousal, virgin, and sensitivity, with level fields constrained to the sexual-vocabulary registry
 `CHARACTER_SCHEMA_V1`'s `sexual_baseline` property SHALL require `arousal`, `virgin`, and

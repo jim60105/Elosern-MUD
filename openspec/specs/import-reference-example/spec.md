@@ -1,7 +1,7 @@
 # import-reference-example Specification
 
 ## Purpose
-Maintains one valid reference character card that satisfies CHARACTER_SCHEMA_V1 and every semantic rule with zero rejections, exercised by a permanent test. Requires the example to exercise every major schema branch, the persona block with a background, and the base-value stats convention.
+Maintains one valid reference character card that satisfies CHARACTER_SCHEMA_V1 and every semantic rule with zero rejections, exercised by a permanent test. Requires the example to exercise every major schema branch, a complete compact NPC card as its persona, and the base-value stats convention.
 
 ## Requirements
 
@@ -32,32 +32,20 @@ current schema and lore registries.
 - **THEN** both are integers inside the 0-10000 reasonable range (the authored card carries 22),
   so the reference reads as an ordinary character record rather than an edge-case demonstration
 
-### Requirement: The reference example exercises the persona block with a background
-`world/imports/examples/example_character.json` SHALL be a single character record that satisfies
-`CHARACTER_SCHEMA_V1` (including its required, registered, race-compatible `subrace`) and produces
-zero validation rejections and zero warnings, and its `persona`
-object SHALL include a `background` key with a non-empty text value alongside the existing
-identity/prose keys — demonstrating the opaque-persona shape (including the player- and NPC-facing
-`background` flavor text) that both the administrator-import path and the look appearance path
-consume.
+### Requirement: The reference example carries a complete compact NPC card
+`world/imports/examples/example_character.json`'s `persona` SHALL be a complete compact NPC card
+written in Traditional Chinese — `identity` with `public` and `hidden`, `appearance`,
+`personality`, `speech_style`, `life_story`, `habit`, and `social_connection` — that passes the
+card contract as validated against the NPC default target with zero rejections and zero warnings,
+and SHALL carry no `background` key.
 
-#### Scenario: The reference example sets the required record_type discriminator
-- **WHEN** `examples/example_character.json`'s `record_type` field is inspected
-- **THEN** it equals `"character"`, so the record routes to `CHARACTER_SCHEMA_V1` rather than being
-  guessed as a world entry
+#### Scenario: The reference persona is a valid compact card
+- **WHEN** the example is validated with `world.imports.validate` against the NPC default
+- **THEN** its persona passes the compact card contract and the report has zero rejections and zero warnings
 
-#### Scenario: The reference example produces zero rejections
-- **WHEN** `examples/example_character.json` is validated with `world.imports.validate`
-- **THEN** validation reports zero rejections
-
-#### Scenario: The reference example produces zero warnings
-- **WHEN** `examples/example_character.json` is validated with `world.imports.validate`
-- **THEN** validation reports zero warnings
-
-#### Scenario: The reference persona demonstrates the background key
-- **WHEN** `examples/example_character.json`'s `persona` object is inspected
-- **THEN** it is an object containing a non-empty `background` key in addition to its identity and
-  prose fields, showing the opaque shape the import and look paths consume
+#### Scenario: The reference persona has no background key
+- **WHEN** the example's `persona` object is inspected
+- **THEN** it has exactly the seven card fields and no `background` key
 
 ### Requirement: The reference example demonstrates the base-value stats convention correctly
 `examples/example_character.json` SHALL set at least one static stat (`atk_phys`, `agility`, or
@@ -71,13 +59,13 @@ convention (see the `import-schema` capability).
 - **THEN** the value falls within `RACE_REGISTRY["elf"].static_baseline.atk_phys` (70-95 or the
   open-ended prodigy range), not in the tens-of-thousands range a x1000 multiplier would produce
 
-### Requirement: The reference example exercises every major schema branch it can demonstrate on its race
+### Requirement: The reference example exercises every major schema branch and a complete NPC card
 `examples/example_character.json` SHALL set a `subrace` (exercising the race/subrace cross-check),
 a fully populated `stats` object (all eight keys), an empty `disguised_stats` object (the record's
 `human` race cannot use divine arts, so a non-empty layer would be rejected by the
 `disguised-stats-boundary` capability's race guard), non-empty `skills` and `passives` arrays, a
 `sexual_baseline` with `arousal`, `virgin`, `sensitivity`, and at least one additional optional level
-field set, and a non-empty, multi-key `persona` object.
+field set, and a `persona` that is a complete compact NPC card.
 
 #### Scenario: The example sets a subrace consistent with its race
 - **WHEN** `examples/example_character.json`'s `race` and `subrace` fields are inspected
@@ -98,7 +86,6 @@ field set, and a non-empty, multi-key `persona` object.
 - **THEN** it sets `arousal`, `virgin`, and `sensitivity` (the required fields) plus at least one of
   `wetness`, `shame`, `exposure`, or `climax_phase`
 
-#### Scenario: The example's persona is a non-trivial, multi-key opaque object
-- **WHEN** `examples/example_character.json`'s `persona` object is inspected
-- **THEN** it contains more than one top-level key, and no test anywhere inspects its nested content
-  beyond confirming it is an object
+#### Scenario: The example's persona is a complete compact card
+- **WHEN** `examples/example_character.json`'s `persona` object is inspected through the card contract
+- **THEN** it is a valid seven-field compact NPC card
