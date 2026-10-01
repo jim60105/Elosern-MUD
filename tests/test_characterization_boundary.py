@@ -183,6 +183,9 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
             "the shared name/title validators must be deferred-imported inside "
             f"{SHARED_VALIDATOR_MODULE.rsplit('.', 1)[-1]} functions",
         )
+        # The occupant card delegates to the pure compact-card contract
+        # (npc-persona-generated-quest-cards D2), a registry-only lore module.
+        self.assertIn("world.lore.npc_card", imported)
         for banned in ("typeclasses", "evennia.utils.create"):
             self.assertFalse(
                 any(module == banned or module.startswith(banned + ".") for module in imported),

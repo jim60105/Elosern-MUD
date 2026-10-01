@@ -38,7 +38,7 @@ from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
 from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
-from world.lore.npc_card import NpcCardError
+from world.lore.npc_card import NpcCard, NpcCardError
 from world.rules.npc_identity import validate_npc_name, validate_npc_title
 from world.rules.npc_persona import NpcPersonaStorageError, initialize_npc_persona
 from world.quests.compile import scene_requirements_for
@@ -160,8 +160,9 @@ def _revalidate_characterization(
     non-integer canonical age (a permanently portrait-ineligible NPC), a
     malformed policy, or an occupant WITHOUT the authored identity. Every
     occupant MUST carry a characterization with a valid ``display_name``,
-    ``title``, and complete compact ``persona`` card: re-running the same shared rules here keeps the age-bounds rule
-    and the authored-identity invariant hard floors on every spawn path
+    ``title``, and complete compact ``persona`` card: re-running the same
+    shared rules here keeps the age-bounds rule, the authored-identity
+    invariant, and the card contract hard floors on every spawn path
     (design D6).
     A missing or field-incomplete characterization raises
     ``SceneBuilderSpawnError`` and rolls the whole materialization back before
@@ -191,12 +192,7 @@ def _revalidate_characterization(
     if characterization.portrait_stable_key is not None:
         entry["portrait"] = {"stable_key": characterization.portrait_stable_key}
     if characterization.persona is not None:
-        persona = characterization.persona
-        # Revalidate the record form, never trust the carried value object:
-        # a forged requirement may hold any object in this slot.
-        entry["persona"] = (
-            persona.to_record() if hasattr(persona, "to_record") else persona
-        )
+        entry["persona"] = _card_record(characterization.persona)
     for message in characterize_errors(
         entry,
         lifespan_upper_bound=race_lifespan_upper_bound(tier_key),
@@ -204,6 +200,20 @@ def _revalidate_characterization(
         raise SceneBuilderSpawnError(
             f"invalid characterization for occupant {role!r}: {message}"
         )
+
+
+def _card_record(persona: Any) -> Any:
+    """Return the record form of a carried card without trusting its type.
+
+    Only a genuine frozen ``NpcCard`` is converted through ``to_record()``; a
+    forged requirement may hold any object in this slot, which is passed on
+    unchanged so the card contract rejects it by name. Revalidation and the
+    persona write both read through this one function, so what is validated
+    is exactly what is stored.
+    """
+    if isinstance(persona, NpcCard):
+        return persona.to_record()
+    return persona
 
 
 def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom:
@@ -277,7 +287,7 @@ def _apply_characterization(
     try:
         initialize_npc_persona(
             npc,
-            characterization.persona.to_record(),
+            _card_record(characterization.persona),
             {
                 "kind": "generated_quest",
                 "quest": quest_key,

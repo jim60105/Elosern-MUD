@@ -196,7 +196,9 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
             life_story="偽造經歷",
             habit="偽造習慣",
         )
-        for persona in (None, empty_speech, over_bound):
+        raw_partial = occupant_card_record()
+        del raw_partial["speech_style"]
+        for persona in (None, empty_speech, over_bound, raw_partial, "偽造字串"):
             with self.subTest(persona=persona):
                 forged = (
                     StageSpawnRequirement(
