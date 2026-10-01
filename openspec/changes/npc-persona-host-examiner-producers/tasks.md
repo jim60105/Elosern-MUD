@@ -2,7 +2,7 @@ Apply on branch `feat/npc-persona-host-examiner-producers` in worktree `.worktre
 
 ## 1. Mandatory host profile
 
-- [ ] 1.1 Add `host_profile_key` to `HOST_IDENTITY_FIELDS` in `world/lore/settlements/places.py` per design D1 and update every synthetic hosted `PlaceDefinition` in tests (`rg "PlaceDefinition\(" world web commands tests --glob "*tests*"`) to name a synthetic profile from a file-local or test-data-kit fixture; verify `world.lore.tests.test_settlements` (new missing-profile rejection case) and `world.rules.tests.test_guild_config` pass.
+- [x] 1.1 Add `host_profile_key` to `HOST_IDENTITY_FIELDS` in `world/lore/settlements/places.py` per design D1 and update every synthetic hosted `PlaceDefinition` in tests (`rg "PlaceDefinition\(" world web commands tests --glob "*tests*"`) to name a synthetic profile from a file-local or test-data-kit fixture; verify `world.lore.tests.test_settlements` (new missing-profile rejection case) and `world.rules.tests.test_guild_config` pass.
 
 ## 2. Service hosts
 
