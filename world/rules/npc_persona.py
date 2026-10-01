@@ -150,6 +150,30 @@ def read_npc_persona(npc: Any) -> NpcPersonaSnapshot | NpcPersonaUnavailable:
     )
 
 
+def current_persona_version(npc: Any) -> int | None:
+    """Read an NPC's current persona_version without writing or repairing.
+
+    Returns:
+        The integer persona_version (>= 1), or None if the entity is not an NPC,
+        the attribute is missing, or the metadata is malformed. Never writes.
+    """
+    if not isinstance(npc, NPC):
+        return None
+
+    if not getattr(npc, "attributes", None) or not npc.attributes.has("npc_persona_meta"):
+        return None
+
+    raw_meta = getattr(getattr(npc, "db", None), "npc_persona_meta", None)
+    if not isinstance(raw_meta, Mapping) or isinstance(raw_meta, (str, bytes)):
+        return None
+
+    version = raw_meta.get("persona_version")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        return None
+
+    return version
+
+
 def initialize_npc_persona(
     npc: Any,
     card_raw: Any,

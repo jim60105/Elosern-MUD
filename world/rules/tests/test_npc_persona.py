@@ -27,6 +27,7 @@ from world.rules.npc_persona import (
     NpcPersonaUnavailable,
     UpdateOutcome,
     _raw_meta_value,
+    current_persona_version,
     initialize_npc_persona,
     read_npc_persona,
     update_npc_persona,
@@ -256,6 +257,38 @@ class NpcPersonaServiceTest(EvenniaTest):
                 self.assertEqual(res.status, "invalid")
                 self.assertEqual(res.reason, "invalid_version")
                 self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 1)
+
+    def test_current_persona_version_valid_npc(self) -> None:
+        """Valid NPC metadata returns its integer persona_version."""
+        self.assertIsNone(current_persona_version(self.npc))
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        self.assertEqual(current_persona_version(self.npc), 1)
+
+    def test_current_persona_version_non_npc(self) -> None:
+        """Non-NPC or None returns None."""
+        self.assertIsNone(current_persona_version(None))
+        self.assertIsNone(current_persona_version(object()))
+
+    def test_current_persona_version_malformed_metadata_returns_none_and_never_writes(self) -> None:
+        """Malformed metadata yields None without writing or repairing."""
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        bad_metas = (
+            "not a dict",
+            123,
+            {},
+            {"persona_version": True},
+            {"persona_version": False},
+            {"persona_version": 0},
+            {"persona_version": -5},
+            {"persona_version": "1"},
+            {"persona_version": None},
+        )
+        for bad in bad_metas:
+            with self.subTest(meta=bad):
+                self.npc.db.npc_persona_meta = bad
+                self.assertIsNone(current_persona_version(self.npc))
+                # Verify raw attribute is not repaired or overwritten
+                self.assertEqual(self.npc.db.npc_persona_meta, bad)
 
 
 class NpcPersonaConcurrencyAndFailureTest(EvenniaTest):
