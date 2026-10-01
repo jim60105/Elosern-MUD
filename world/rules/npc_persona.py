@@ -160,10 +160,13 @@ def current_persona_version(npc: Any) -> int | None:
     if not isinstance(npc, NPC):
         return None
 
-    if not getattr(npc, "attributes", None) or not npc.attributes.has("npc_persona_meta"):
+    try:
+        if not getattr(npc, "attributes", None) or not npc.attributes.has("npc_persona_meta"):
+            return None
+        raw_meta = getattr(getattr(npc, "db", None), "npc_persona_meta", None)
+    except Exception:  # observability: ignore R2: deleted or inaccessible entities yield None
         return None
 
-    raw_meta = getattr(getattr(npc, "db", None), "npc_persona_meta", None)
     if not isinstance(raw_meta, Mapping) or isinstance(raw_meta, (str, bytes)):
         return None
 
