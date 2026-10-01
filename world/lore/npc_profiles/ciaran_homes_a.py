@@ -1,5 +1,193 @@
-"""NPC profiles owned by the ``ciaran_homes_a`` content slice (暗影谷村 homes, first half)."""
+"""NPC profiles owned by the ``ciaran_homes_a`` content slice (暗影谷村, first half).
 
-from world.lore.npc_profiles.shape import NpcProfile
+One profile per host, keyed by the host's ``service_id``: the elder, the
+adornment maker, the blade-smith and the fare-keeper. Each card is grounded
+in the place rows of ``world/lore/settlements/places_ciaran.py``, the elf
+passages of ``docs/lore/overview.md`` (lifespan 800 to 1200 years, the
+ciaran branch's love of the blade, no fixed trades) and the village
+passages of ``docs/lore/settlement-locations.md``. Every host's dialogue
+table authors its own greeting, so each profile authors only the
+``misunderstood`` voice line.
 
-ROWS: tuple[NpcProfile, ...] = ()
+The village has no commerce: the three makers share what they love making,
+so no card speaks of a shop, stock or business.
+"""
+
+from world.lore.npc_card import NpcCard, NpcCardIdentity
+from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+ROWS: tuple[NpcProfile, ...] = (
+    NpcProfile(
+        key="ciaran_elenis",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的長老，住在長老古樹下最老的一間屋子。族裡很少有需要"
+                    "長老決定的事，她平日做的是記住村子的往事，坐在樹下陪人說話。"
+                ),
+            ),
+            appearance=(
+                "看起來像四十出頭的黑暗精靈女性，實際年歲已近一千。銀灰色長髮"
+                "垂到腰際，眼角有很淺的笑紋。穿著寬鬆的墨黑短袍，赤著腳，膝上"
+                "常擱著一縷剛剝下的樹皮。"
+            ),
+            personality=(
+                "從容、溫和，帶著老人家的幽默，什麼事都不急。不喜歡被當成發號"
+                "施令的人，有人來求她做主，她會笑著把話題轉回對方自己身上。記性"
+                "極好，連幾百年前誰在哪棵樹下說過什麼都記得。"
+            ),
+            speech_style=(
+                "慢條斯理，句子之間常停頓，愛用「嗯……」「是啊」接話。不論對方"
+                "年紀，一律稱呼「小傢伙」。回答問題前習慣提一件相關的小事，"
+                "再繞回正題。很少說命令句，多用邀請的口氣。"
+            ),
+            life_story=(
+                "在這座谷裡出生，見過村子跟著古樹與溪水搬到現在的位置，也看著"
+                "好幾代族人長大。年輕時走遍中央山脈西側的林地，後來就不再離開"
+                "谷裡。族人請她坐到古樹下，她便一直坐到現在。"
+            ),
+            habit=(
+                "每天傍晚剝一縷樹皮，邊剝邊對著古樹哼一段沒有詞的老調子。孩子們"
+                "聚過來時，她會把剝好的樹皮分給他們編繩。"
+            ),
+            social_connection=(
+                "刀術導師泰莉爾·菲溫德小時候常在她膝邊聽故事，如今換成泰莉爾"
+                "帶著孩子來聽。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「嗯……這句我沒聽懂呢，小傢伙。不急，再說一次，我這裡有的是時間。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_gwenaera",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的綴飾者，住在銀葉坡頂。喜歡用銀絲、貝殼和晶砂做飾品，"
+                    "做好的三稜晶符和月牙耳環掛在窗邊，族人想要就拿去，外人來了"
+                    "也能換一件走。"
+                ),
+            ),
+            appearance=(
+                "看起來二十出頭的黑暗精靈女性，墨綠色短髮，耳上掛著好幾枚自己"
+                "做的小耳環，一轉頭就閃一下光。穿著輕薄的短袍，袖子捲到肩上，"
+                "指尖常沾著銀粉，手腕套著一圈銀絲。"
+            ),
+            personality=(
+                "熱情、好奇，對好看的東西毫無抵抗力。做飾品純粹因為喜歡，被人"
+                "誇一句能高興好幾天。有點完美主義，一朵絞花不順眼就整個拆掉重來。"
+                "東西壞了總想修好，覺得器物不該隨便丟掉。"
+            ),
+            speech_style=(
+                "口語、活潑，話說得快，常用「欸」「嘛」。稱呼對方「你」。見到人"
+                "第一件事是拿手上的作品問對方好不好看。講到手藝會比手畫腳，講到"
+                "換多少銅幣就含糊帶過。"
+            ),
+            life_story=(
+                "從小喜歡在溪邊撿會發光的碎石，幾百年前看著一位長輩絞銀絲，自己也學著絞，從此就在銀葉坡上做飾品。"
+                "村裡的孩子成年時，常會來討一枚三稜晶符"
+                "當紀念。"
+            ),
+            habit=(
+                "天氣好的午後把新做的綴飾曬在銀葉樹下，說要讓它們沾一點葉子的"
+                "銀光。"
+            ),
+            social_connection=(
+                "蒐羅者瓦爾溫·斯蒂爾瓦特爾常拿撿來的貝殼和晶砂跟她換飾品，兩人"
+                "耳上的月牙耳環出自同一批。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「欸？我沒聽懂耶。你是想看飾品，還是有東西要修？」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_hailiel",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的鑄刃者，家就在練刀場邊。用谷底的鐵砂鍛造暗影鋼刀，打刀是她最愛的事；難得有外人來，她也肯割愛一對。"
+                ),
+            ),
+            appearance=(
+                "看起來三十歲上下的黑暗精靈女性，肩臂結實，黑色長髮編成一條粗辮"
+                "甩在背後，額頭綁著防汗的布帶。穿著短袍與皮製圍裙，手臂上留著"
+                "幾道淡色的燙痕。"
+            ),
+            personality=(
+                "沉穩、講究，覺得一把刀合不合手比好不好看重要得多。不急著把刀"
+                "交出去，會先看對方的手和步伐，不合適就直說。很珍惜自己的作品，"
+                "送出去的每一把都記得名字。"
+            ),
+            speech_style=(
+                "說話低沉，句子不長，語氣平靜，偶爾帶一個「吧」。稱呼對方「你」。"
+                "開口前習慣先看對方的手，問對方平常用刀做什麼。講到鍛造會多說"
+                "幾句，其他事只用一兩句帶過。"
+            ),
+            life_story=(
+                "在練刀場邊長大，比起練刀，更喜歡看人打刀。看長輩打了兩百年，有一天手癢自己上了砧，從此爐邊就少不了她。"
+                "暗影鋼的主手刀與副手"
+                "影刀，她總是成對打，一次只做一對。"
+            ),
+            habit=(
+                "每天清晨淬第一把刀之前，先把雙手泡進溪水裡，說是讓手記住水的冷。"
+            ),
+            social_connection=(
+                "刀術導師泰莉爾·菲溫德的家和她同在練刀場邊，泰莉爾試刀時總會"
+                "找她來看。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood="「嗯？沒聽懂。你想說刀的事，還是別的？」",
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_lareneth",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的花饌好手，住在溪畔小徑旁。喜歡用花、蜜和谷裡的東西做點心，"
+                    "漬得最好的是精靈蜜漬花蕊，路過的人都能分到一口茶點，"
+                    "想帶走的也能換幾罐上路。"
+                ),
+            ),
+            appearance=(
+                "看起來二十五六歲的黑暗精靈女性，栗色長捲髮隨手挽在頸後，髮間"
+                "插著一朵曬乾的花。穿著淡色短袍，腰上繫著沾了蜜漬的圍布，身上"
+                "總帶著糖漬花的甜香。"
+            ),
+            personality=(
+                "溫柔、悠哉，對時間沒什麼概念，只對季節敏感。最大的樂趣是看別人"
+                "吃自己做的東西，對方吃得開心，她就心滿意足。對食材很挑剔，不新鮮"
+                "的東西絕不下鍋。"
+            ),
+            speech_style=(
+                "聲音輕柔，說話慢，句子裡常拖一個「……」，喜歡用季節和味道描述"
+                "事情。稱呼對方「遠來的客人」。一見面就先遞上茶點，等對方嚐過，才肯聊下去。"
+            ),
+            life_story=(
+                "從小跟著族裡的長輩採花採蜜，發現自己比起練刀，更愛守著灶火。"
+                "幾百年來把谷裡每一季的花都試過一遍，記下哪種花適合漬蜜、哪種"
+                "適合泡茶。村中廣場的共食棚辦大餐時，族人總會請她掌灶。"
+            ),
+            habit=(
+                "每年春末收花蕊那幾天，天沒亮就出門，回來時籃裡的花還帶著露水。"
+                "漬蜜的罐子都親手寫上收花的日子。"
+            ),
+            social_connection=(
+                "長老艾莉妮斯·達恩斯特瑞德爾愛喝她泡的花茶，她每隔幾天就送一壺"
+                "到古樹下。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「嗯……我沒聽懂呢。先喝口茶，再說一次吧？」"
+            ),
+        ),
+    ),
+)

@@ -51,6 +51,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="attendant",
         service_id="ciaran_elenis",
+        host_profile_key="ciaran_elenis",
         authored_kwargs=(("dialogue_key", "ciaran_elenis_home"),),
     ),
     PlaceDefinition(
@@ -73,6 +74,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="ciaran_gwenaera",
+        host_profile_key="ciaran_gwenaera",
         assortment_keys=("elven_adornments",),
         authored_kwargs=(
             ("shop_key", "ciaran_gwenaera_home"),
@@ -99,6 +101,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="ciaran_hailiel",
+        host_profile_key="ciaran_hailiel",
         assortment_keys=("elven_crafted_arms",),
         authored_kwargs=(
             ("shop_key", "ciaran_hailiel_home"),
@@ -124,6 +127,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_sex="female",
         profession="merchant",
         service_id="ciaran_lareneth",
+        host_profile_key="ciaran_lareneth",
         assortment_keys=("elven_fare",),
         authored_kwargs=(
             ("shop_key", "ciaran_lareneth_home"),

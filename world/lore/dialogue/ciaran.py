@@ -1,126 +1,118 @@
 """暗影谷村 (ciaran) authored dialogue rows.
 
 Each merchant place's ``dialogue_key`` must ship its table in the same change
-(load-time resolution rejects an authored host that cannot speak): the
-village's four homes arrive with the merchant-dialogue change, and every
-later Ciaran content change appends its rows to ``ROWS`` here.
+(load-time resolution rejects an authored host that cannot speak). Each table
+is written against its host's persona card in
+``world/lore/npc_profiles/ciaran_homes_a.py`` or ``ciaran_homes_b.py``.
 
 The register rule the settlement's premise establishes (merchant-dialogue
 design: 「對這位精靈而言這是分享興趣與互助，不是營業」) binds these tables:
 
-- No proprietor voice. The four are villagers sharing what they make, not
+- No proprietor voice. The makers are villagers sharing what they make, not
   shopkeepers running a business: no 「本店」, no quoted hours, no goods
   spoken of as stock.
-- Four keyword answers at most (the panel truncates); the commands a visitor
-  still needs — ``shop stock``, ``buy``, ``sell`` — ride inside what the
-  villager would say about their own craft, the way the guild clerk's row
-  folds guidance into character.
+- Every line is spoken in character: a villager knows only the village's
+  world, so no line names a command, a game mechanic or an interface
+  element. Villagers speak in everyday colloquial register.
+- Four keyword answers at most (the panel truncates).
 
 Host mapping (keys travel in the place rows; the slice assembles into
 DIALOGUE_ROWS unchanged): 海莉爾·斯塔爾法爾 forges the village's shadow
 steel; 拉瑞內斯·妮特布倫 keeps the candied blossom larder; 瓦爾溫·斯蒂爾瓦特爾
 is the collector whose kept things line the old tree's house; 維特希爾·
-威爾德布瑞亞爾 weaves at the loom on the slope.
-
-ciaran-village-crafts adds the two the document names: 格威娜拉·希爾維爾莉夫
-makes the village's ornaments on 銀葉坡, and 妮瑞斯·米斯特瓦勒 tends herbs
-and remedies by the 藥草園.
-
-ciaran-village-commons adds the two voices that converse without trading:
-泰莉爾·菲溫德, the village's sword instructor on 練刀場, whose table speaks
-of the branch's blade culture and points training at `rest` and `practice`
-(she grants nothing — proficiency comes only from the trainee's own hours),
-and 艾莉妮斯·達恩斯特瑞德爾, the elder, whose dwelling is memory rather than
-office: the branch, the forest, the village's past. Neither asks, permits,
-or decides anything. The shelter between them is host-less on purpose.
+威爾德布瑞亞爾 weaves at the loom on the slope; 格威娜拉·希爾維爾莉夫 makes
+the village's ornaments on 銀葉坡; 妮瑞斯·米斯特瓦勒 tends herbs and remedies
+by the 藥草園. Two voices converse without trading: 泰莉爾·菲溫德, the
+village's sword instructor on 練刀場, who grants nothing (skill comes from
+the trainee's own practice), and 艾莉妮斯·達恩斯特瑞德爾, the elder, whose
+dwelling is memory rather than office. Neither asks, permits, or decides
+anything. The shelter between them is host-less on purpose.
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
 # 格威娜拉·希爾維爾莉夫 — the adornment maker (暗影谷村綴飾者).
-# elven_adornments: 三稜晶符, 月牙耳環. Ornament is a love, not a trade;
-# the village simply asked her to hang things up.
+# elven_adornments: 三稜晶符, 月牙耳環. Chatty and delighted by pretty things;
+# ornament is a love, not a trade, and she mends broken pieces for free. She
+# takes back only the pieces her own line carries.
 GWENAERA_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "綴飾",
-        "「銀絲是我自己絞的，貝殼是溪邊撿的，磨一整晚才亮得起來。"
-        "完成的都曬在窗邊繩上，讓人看的，`shop stock` 報此刻掛著的；"
-        "谷裡的人喜歡，我才多做一些。」",
+        "「銀絲我自己絞，貝殼在溪邊撿，晶砂要磨一整晚才會亮。做好的都掛在窗邊"
+        "那條繩上，族人喜歡就拿去戴。你喜歡哪件就跟我說，看著給點什麼都好嘛。"
+        "」",
     ),
     KeywordResponse(
         "晶符",
-        "「三稜晶是族裡老辦法磨的，光進去、三條色出來，孩子各分著玩。"
-        "掛在頸上也是這個用法——好看而已，不是什麼神器。"
-        "想帶一枚走，`shop stock` 看看繩上還有沒有。」",
+        "「三稜晶符用族裡傳下來的老方法磨，光照進去，會分成三種顏色跑出來，很"
+        "漂亮對吧？欸，戴在脖子上就是好看而已，沒有什麼神奇的力量喔。村裡的孩"
+        "子成年時，常來跟我討一枚。」",
     ),
     KeywordResponse(
         "耳環",
-        "「月牙那對本就是做給自己戴的，戴過一季洗淨了，"
-        "瓦爾溫掛出去也是該的——飾物在谷裡不算稀罕，合眼緣要自己挑。"
-        "在不在，`buy` 加名之前先 `shop stock` 問一聲。」",
+        "「月牙耳環是我最常做的東西，一對接一對地絞，絞到閉著眼睛都會。瓦爾溫"
+        "耳朵上那對也出自我手，跟我身上這幾枚同一批。合不合眼緣要你自己挑，我"
+        "幫你舉著鏡子嘛。」",
     ),
     KeywordResponse(
         "舊飾",
-        "「斷了的耳勾、鬆了的絲結，拿來我修，不計錢——器物壞了可惜。"
-        "真要脫手什麼舊飾，`sell` 一聲，我掂著銀的成色回你；"
-        "谷裡東西總該有第二條命，瓦爾溫也這樣講。」",
+        "「斷掉的耳勾、鬆掉的絲結，拿來我幫你修，不用錢。東西壞了就丟，太可惜"
+        "了嘛。用不到的晶符或耳環也可以拿回來，我會看銀的成色，回你一點東西。"
+        "」",
     ),
 )
 
 # 海莉爾·斯塔爾法爾 — the blade-smith (暗影谷村鑄刃者). elven_crafted_arms:
-# 暗影鋼刀, 暗影鋼刀·影. She shares the blade, not trade talk.
+# 暗影鋼刀, 暗影鋼刀·影, forged as a pair. Measured and plain; she looks at a
+# visitor's hands before talking blades, and takes back only her own blades.
 HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "鍛刀",
-        "「谷底的鐵砂性子烈，鍛得溫順了才配叫鋼刀。砧邊擱著的是讓人帶走的，"
-        "`shop stock` 報此刻的數；看中哪柄，同我說一聲便是——"
-        "谷裡不興吆喝那一套。」",
+        "「谷底的鐵砂性子烈，要反覆鍛打，打到鋼性均勻才叫暗影鋼。砧邊那對暗影"
+        "鋼刀剛完成。外人難得來，你要是真用得上，拿銅幣來換，我也肯割愛。」",
     ),
     KeywordResponse(
         "影刀",
-        "「『影』是我留手的名字：刃身淬過谷底第一道霜，靜看是黑的，"
-        "舞起來才有那道影。一季出不了幾柄，想請它走，"
-        "先 `shop stock` 看看它在不在砧邊。」",
+        "「暗影鋼刀·影是副手刀，跟主手刀成對打。刃身淬過谷底的第一道霜，靜止"
+        "時看起來一片黑，揮起來才看得到那道影子。我一次只做一對，砧邊還有沒有"
+        "，你自己去瞧吧。」",
     ),
     KeywordResponse(
         "鐵料",
-        "「你手上有多餘的鐵料、磨壞的舊刃？擱這兒，爐子吃得下。"
-        "同我說一聲 `sell`，我掂過分量回你銅幣——"
-        "谷裡往來本來這樣，你來我往。」",
+        "「鐵料就不用了，鐵砂我自己去谷底挖。我打的刀用舊了、用不到了，拿回來"
+        "給我，還能用的我收下。」",
     ),
     KeywordResponse(
         "用刀",
-        "「獵熊有獵熊的刀，剝皮有剝皮的刀，別拿一柄應所有事。"
-        "要挑就 `shop stock` 看現下的；不合適我直說——"
-        "刀跟人一樣，講緣分，不講體面。」",
+        "「打獵有打獵的刀，剝皮有剝皮的刀，別想拿一把刀應付所有事。暗影鋼刀當"
+        "主手，影刀當副手，兩把一起用最順。合不合你的手，我會直說。」",
     ),
 )
 
 # 拉瑞內斯·妮特布倫 — the fare-keeper (暗影谷村花饌好手). elven_fare:
-# 精靈蜜漬花蕊. She feeds guests first and trades second.
+# 精靈蜜漬花蕊. Soft and unhurried; she feeds a guest before anything else and
+# takes back only her own jars.
 LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "花饌",
-        "「花蕊是春尾收的，蜜是自家蜂房的，漬足三個月才封罐。"
-        "現下還剩幾罐，`shop stock` 一報你便知——帶幾罐上路，"
-        "比乾糧體面，比鮮果耐放。」",
+        "「這是春末收的花蕊，用谷裡採的蜜漬上三個月才封罐……甜，可是不膩口吧"
+        "？想帶幾罐上路，拿銅幣來換就好。比乾糧好吃，也比鮮果耐放。」",
     ),
     KeywordResponse(
         "山產",
-        "「雨季的菌、秋深的果，谷裡給什麼我做什麼。你獵採得了好料，"
-        "拿來同我換銅，喊一聲 `sell` 便好；我這灶不挑料，只挑新鮮。」",
+        "「谷裡每一季都有好東西……雨季有菌子，秋天有果子，春末有花。我做點心"
+        "只用自己採的料，哪一季採到什麼，就做什麼。我漬的花蕊要是吃不完，原封"
+        "不動拿回來，我收下就是。」",
     ),
     KeywordResponse(
         "茶點",
-        "「走累了先坐，粗茶是留客的，不計錢。要帶茶點上路，"
-        "`shop stock` 裡現下有什麼便拿什麼，同我說 `buy` 加名字，"
-        "我替你包兩層葉子。」",
+        "「走累了先坐下吧，花茶請你喝……今天的茶點擺在窗邊的矮凳上，路過的人"
+        "都能拿。想帶花蕊上路，跟我說一聲，我用兩層葉子幫你包好。」",
     ),
     KeywordResponse(
         "口味",
-        "「甜口的多，鹹口的少——谷裡口味清淡，旅人擔待。"
-        "要濃的，你往王都餐館去，那邊灶氣旺。我這裡連蜜都捨不得多放，"
-        "想甜的，`shop stock` 裡挑花蕊就是了。」",
+        "「谷裡的口味清淡，甜多鹹少……想吃重口味，大概要到外頭的大城去了吧。"
+        "我連蜜都不敢多放，怕蓋住花香。喜歡甜，就挑蜜漬花蕊吧。」",
     ),
 )
 
@@ -244,37 +236,34 @@ VETHIEL_RESPONSES: tuple[KeywordResponse, ...] = (
 
 # 艾莉妮斯·達恩斯特瑞德爾 — the elder (暗影谷村長老). Her dwelling is a
 # keeper's, not an office: no petition, no permission, no council business.
-# Memory is her content — the branch, the forest, the village's past. Her
+# Memory is her content: the branch, the forest, the village's past. Her
 # people's devotions stay where the document leaves them: unshown.
 ELENIS_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "村子",
-        "「這谷裡的樹比我記得的事還老一截。早年村子不在這裡，"
-        "是樹長穩了、溪改道了，人才跟著搬過來，一棵一棵認臉認熟的。"
-        "你問村子的來歷，我能說的都是這種小事——精靈不寫史，"
-        "史活在記得的人對著的那棵樹下。」",
+        "「嗯……這村子早年不在這裡。古樹長穩了、溪水改了道，族人才跟著搬過來"
+        "，一棵樹接一棵樹地認熟。你問村子的來歷，我能說的都是這種小事。精靈不"
+        "寫史書，往事都記在記得的人心裡，還有那幾棵老樹下。」",
     ),
     KeywordResponse(
         "基亞蘭",
-        "「基亞蘭這一支是愛舞刀的，外頭傳我們脾氣硬，其實是記性長："
-        "刀上刻的名字一代比一代密，磨損的是柄、不是名字。"
-        "那對黑髮的雙生子就是這樣長大的：悠花在練刀場從雨季待到天晴，"
-        "泰莉爾說她的手一握上木刀，整個場子就安靜下來。精靈的孩子在這裡"
-        "長大，要去哪裡，總是自己決定的。」",
+        "「是啊，基亞蘭這一支愛刀。外頭說我們脾氣硬，我們自己覺得是記性長。刀"
+        "柄上刻的名字一代比一代多，刀柄磨舊了，名字還在。那對黑髮的雙生子也在"
+        "這裡長大，悠花在練刀場從雨季待到天晴，泰莉爾說，那孩子一握上木刀，整"
+        "個場子都安靜下來。」",
     ),
     KeywordResponse(
         "森林",
-        "「林子認得村裡每一雙腳。獵有獵的道，採有採的時辰，"
-        "哪片坡哪年歇養、哪條溪產什麼魚，族裡老一輩都背得下來。"
-        "你要進林，記一句便夠：帶走多少、還回去多少，森林不計較，"
-        "但會記得。」",
+        "「林子認得村裡每一雙腳。打獵有打獵的路，採集有採集的時節，哪片坡哪一"
+        "年該讓它歇著，族裡的老一輩都記得。你要進林子，記住一句就夠，帶走多少"
+        "，就還回去多少。森林不計較，可是它會記得。」",
     ),
     KeywordResponse(
         "往事",
-        "「你說要我決定？沒有什麼決定。族裡多年沒有『重要事務』了，"
-        "幾棵樹下坐一坐、把話說齊，事情原本就是那個樣子。"
-        "我不是管事的，也沒有什麼能准你或擋你的——"
-        "要坐就坐，要問往事就問，老人家這裡只有時間。」",
+        "「往事啊……有一年冬天溪水結了冰，孩子們跑到冰上練刀，摔得滿身是雪，"
+        "笑聲一路傳到古樹這裡。族裡的往事多半是這樣的小事，已經很多年沒有什麼"
+        "『重要的事』了。常有人來找我做主，可是我不管事，也沒有什麼能准你或攔"
+        "你。」",
     ),
 )
 
@@ -285,10 +274,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_hailiel_home",
         DialogueDefinition(
             greeting=(
-                "海莉爾·斯塔爾法爾把淬火的刀按進油槽，白煙竄起；她抬眼看你："
-                "「來得巧，今早剛出幾柄。砧邊擱著的隨你看，"
-                "`shop stock` 報現下的數；要請走哪柄，同我說一聲。"
-                "有鐵料舊刃要留這兒的，也儘管留。」"
+                "海莉爾·斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下"
+                "你的手：「來看刀吧。砧邊那對剛打好，可以拿起來試。先讓我瞧一下你平常"
+                "怎麼握刀。」"
             ),
             responses=HAILIEL_RESPONSES,
         ),
@@ -297,10 +285,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_lareneth_home",
         DialogueDefinition(
             greeting=(
-                "拉瑞內斯·妮特布倫從醃甕後抬起臉，指尖還沾著蜜，先遞給你一片葉："
-                "「先嚐，再說別的。花蕊漬足三個月了，現下剩幾罐，"
-                "`shop stock` 報你聽；想帶幾罐上路，同我說 `buy`。"
-                "灶上永遠有粗茶，留客的，不計錢。」"
+                "溪畔小徑旁的屋裡飄著糖漬花的甜香，拉瑞內斯·妮特布倫從醃甕後抬起臉，"
+                "先遞給你一片葉子，上面擺著一顆蜜漬花蕊：「遠來的客人……先嚐一口吧。"
+                "嚐過了，我們再聊。」"
             ),
             responses=LARENETH_RESPONSES,
         ),
@@ -334,10 +321,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_gwenaera_home",
         DialogueDefinition(
             greeting=(
-                "銀葉坡頂的屋裡，格威娜拉·希爾維爾莉夫從工作台後抬起眼，"
-                "指間還捻著一縷銀絲：「來得正好，幫我看看這兩朵絞花哪個順眼。"
-                "完成的都曬窗邊繩上，`shop stock` 報此刻掛著的；喜歡哪件同我說"
-                "`buy`——谷裡人愛戴，我才多做。有斷了舊了要修的，擱這兒，不計錢。」"
+                "銀葉坡頂的屋裡，格威娜拉·希爾維爾莉夫從工作檯後抬起頭，舉起兩朵銀絲"
+                "絞花湊到你面前：「欸，你來得正好！這兩朵哪一朵比較好看？左邊這朵嘛…"
+                "…算了，我等一下再改。做好的都掛在窗邊繩上，喜歡哪件就跟我說；有東西"
+                "壞了要修，也拿過來吧。」"
             ),
             responses=GWENAERA_RESPONSES,
         ),
@@ -358,10 +345,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_elenis_home",
         DialogueDefinition(
             greeting=(
-                "古樹下的坐石被太陽曬得微溫，艾莉妮斯·達恩斯特瑞德爾抬眼看你，"
-                "手裡一縷新剝的樹皮擱在膝上沒動：「坐。老人家這裡不賣東西，"
-                "也沒有事情要你辦——你想問什麼，村裡的事、林子的事、"
-                "還是這支刀的名字？記得的我說，不記得的我同你一起想。」"
+                "長老古樹下的坐石曬得微溫，艾莉妮斯·達恩斯特瑞德爾抬眼看你，膝上擱著"
+                "一縷剛剝下的樹皮：「是啊，坐吧，小傢伙。老人家這裡沒有東西可以給你，"
+                "也沒有事情要你辦。想聽村子的事、林子的事，還是這一族為什麼愛刀？記得"
+                "的我就說。」"
             ),
             responses=ELENIS_RESPONSES,
         ),
