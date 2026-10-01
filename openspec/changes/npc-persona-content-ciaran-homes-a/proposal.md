@@ -26,7 +26,7 @@ None.
 ## Impact
 
 - Content: `world/lore/npc_profiles/ciaran_homes_a.py`, `world/lore/settlements/places_ciaran.py` (4 rows gain `host_profile_key`), `world/lore/dialogue/ciaran.py` (4 tables rewritten).
-- Tests: no new test module. The pinned place tuples of the three trading homes in `test_settlements` gain their `host_profile_key`; `test_dialogue_assembly` drops its pre-split content digests and keeps a prose-free four-answer shape check, and the shipped-registry immutability check moves to the `test_npc_profile_inventory` data contract (identical hunks in every content slice). The village-register and goods-naming rules of `test_service_host_merchant_dialogue` keep applying unchanged.
+- Tests: no new test module. The pinned place tuples of the three trading homes in `test_settlements` gain their `host_profile_key`; `test_dialogue_assembly` drops its pre-split content digests of the capital tables and keeps a prose-free four-answer shape check over them, and the shipped-registry immutability check moves to the `test_npc_profile_inventory` data contract (identical hunks in every content slice). The village-register and goods-naming rules of `test_service_host_merchant_dialogue` keep applying unchanged.
 - No mechanism, schema, prompt, or UI change; live stock, prices, quest listings, and command availability are untouched.
 
 ## Batch:
