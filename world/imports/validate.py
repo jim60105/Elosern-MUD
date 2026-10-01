@@ -186,6 +186,8 @@ def _check_npc_persona_card(
     first violation, so at most one card issue is reported per record (D2).
     On success the normalized card record is returned so the validated
     record -- and therefore the loader -- carries exactly what was checked.
+    On failure the record keeps its raw ``persona``; it is rejected, so the
+    loader never instantiates it.
     Deliberately catching ``NpcCardError``: the conversion returns a
     diagnosis that rejects the whole record, so it is not a silent swallow.
     """

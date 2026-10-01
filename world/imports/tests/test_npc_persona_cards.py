@@ -16,7 +16,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from typeclasses.npcs import NPC
+from typeclasses.npcs import LLMNPC, NPC
 from world.imports.loader import ImportRejected, instantiate_character, load_batch
 from world.imports.tests.helpers import example_record
 from world.imports.validate import main, validate_batch, validate_character
@@ -146,6 +146,13 @@ class NpcCardValidationTests(BatchFiles, EvenniaTestCase):
         # The caller's raw record is never mutated by normalization.
         self.assertEqual(record["persona"], raw_persona)
 
+    @covers_requirement("import-validation::npc-target-imports-validate-a-complete-compact-card")
+    def test_npc_subclass_target_applies_the_card_contract(self):
+        record = npc_record()
+        del record["persona"]["habit"]
+        issues = persona_issues(validate_character(record, LLMNPC))
+        self.assertEqual([issue.field for issue in issues], ["persona.habit"])
+
     def test_failed_card_leaves_the_lineage_normalized_record(self):
         record = npc_record()
         record["persona"]["habit"] = 7
@@ -223,6 +230,31 @@ class NpcCardLoaderTests(BatchFiles, EvenniaTestCase):
         self.assertEqual(snapshot.version, 1)
         self.assertEqual(snapshot.card.habit, "重試後的合成習慣。")
         self.assertEqual(npc.db.persona["habit"], "重試後的合成習慣。")
+
+    @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
+    def test_npc_subclass_import_is_initialized_with_import_provenance(self):
+        npc = instantiate_character(npc_record(key="synthetic_llm_npc"), LLMNPC)
+        self.assertIsInstance(npc, LLMNPC)
+        snapshot = read_npc_persona(npc)
+        self.assertIsInstance(snapshot, NpcPersonaSnapshot)
+        self.assertEqual(snapshot.version, 1)
+        self.assertEqual(
+            snapshot.provenance, {"kind": "import", "record": "synthetic_llm_npc"}
+        )
+
+    def test_single_record_entry_rejects_a_bad_card_and_creates_nothing(self):
+        record = npc_record(key="synthetic_single_bad")
+        record["persona"]["speech_style"] = "   "
+        with self.assertRaises(ImportRejected) as ctx:
+            instantiate_character(record)
+        (report,) = ctx.exception.report.records
+        self.assertEqual(
+            [issue.field for issue in persona_issues(report)],
+            ["persona.speech_style"],
+        )
+        self.assertFalse(
+            NPC.objects.filter_family(db_key="synthetic_single_bad").exists()
+        )
 
     @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
     def test_player_import_stores_arbitrary_persona_verbatim_without_metadata(self):
