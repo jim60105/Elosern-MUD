@@ -33,6 +33,7 @@ from world.ai.scenario_director import (
     QuestBlueprint,
 )
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+from world.quests.tests._card_fixtures import occupant_card_record
 
 
 def _live_registry(dotted: str, attribute: str):
@@ -269,6 +270,7 @@ def _instance_payload():
             "disposition": None,
             "display_name": "灰篷旅人",
             "title": "夜巡帶頭者",
+            "persona": occupant_card_record(),
         }
     ]
     return payload

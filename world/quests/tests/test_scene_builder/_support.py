@@ -57,19 +57,22 @@ from world.tests.synthetic_data import (
     synthetic_registries,
 )
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 def _portrait_callbacks(callbacks):
-    """The captured on-commit callbacks excluding quest-transition events.
+    """The captured on-commit callbacks excluding other boundary events.
 
     The observability migration schedules one ``quest_transition`` event per
-    changed quest through ``transaction.on_commit``; the portrait-seam
-    contracts below count only the callbacks the seam itself owns.
+    changed quest, and the NPC persona initializer one
+    ``npc_persona_initialized`` event per spawned occupant, through
+    ``transaction.on_commit``; the portrait-seam contracts below count only the
+    callbacks the seam itself owns.
     """
     return [
         callback
         for callback in callbacks
         if not getattr(getattr(callback, "__code__", None), "co_filename", "").endswith(
-            "world/quests/transitions.py"
+            ("world/quests/transitions.py", "world/rules/npc_persona.py")
         )
     ]
 
@@ -172,6 +175,7 @@ def _instance_bound_payload(**overrides):
                         "disposition": None,
                         "display_name": "黑鬍",
                         "title": "林間盜匪首領",
+                        "persona": occupant_card_record(),
                     }
                 ],
             }

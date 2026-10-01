@@ -29,10 +29,17 @@ from world.tests.synthetic_data import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
+
+_DROP = object()
 
 
 def _entry(**overrides):
-    entry = {"display_name": "莉絲·晨星", "title": "城鎮圖書館員"}
+    entry = {
+        "display_name": "莉絲·晨星",
+        "title": "城鎮圖書館員",
+        "persona": occupant_card_record(),
+    }
     if overrides.pop("no_identity", False):
         entry = {}
     entry.update(overrides)
@@ -83,51 +90,74 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         )
         self.assertEqual(characterize_errors(entry, lifespan_upper_bound=80), [])
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_valid_persona_and_background_pass(self):
-        entry = _entry(
-            display_name="莉絲·晨星",
-            persona={
-                "personality": "沉穩",
-                "life_story": "守護圖書館多年",
-                "habit": "黃昏時整理書架",
-            },
-            background="來自邊境的旅人",
-        )
-        self.assertEqual(characterize_errors(entry, lifespan_upper_bound=80), [])
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_a_complete_card_passes(self):
+        self.assertEqual(characterize_errors(_entry(), lifespan_upper_bound=80), [])
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_over_bound_or_non_text_persona_fields_reject(self):
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
+    def test_missing_or_contract_violating_cards_name_the_leaf(self):
+        def card(**changes):
+            record = occupant_card_record()
+            for key, value in changes.items():
+                if key == "identity_public":
+                    record["identity"]["public"] = value
+                elif value is _DROP:
+                    del record[key]
+                else:
+                    record[key] = value
+            return record
+
         cases = (
-            {"persona": {"personality": "x" * 601}},
-            {"persona": {"personality": ""}},
-            {"persona": {"personality": 42}},
-            {"persona": "not-an-object"},
-            {"background": "x" * 601},
-            {"background": 42},
+            (_entry(persona=card(speech_style=_DROP)), "persona.speech_style: missing_field"),
+            (_entry(persona=card(speech_style="  ")), "persona.speech_style: required_empty"),
+            (_entry(persona=card(appearance="x" * 601)), "persona.appearance: leaf_too_long"),
+            (_entry(persona=card(habit=42)), "persona.habit: not_text"),
+            (_entry(persona=card(identity_public="")), "persona.identity.public: required_empty"),
+            (_entry(persona=card(background="舊欄位")), "persona.background: unknown_field"),
+            (
+                _entry(
+                    persona=card(
+                        appearance="長" * 600,
+                        personality="長" * 600,
+                        life_story="長" * 600,
+                        habit="長" * 600,
+                    )
+                ),
+                "persona: card_too_long",
+            ),
+            (_entry(persona="not-an-object"), "persona: card_not_object"),
+            (_entry(persona=None), "persona: card_not_object"),
         )
-        for entry in cases:
-            with self.subTest(entry=entry):
-                self.assertTrue(
-                    characterize_errors(entry, lifespan_upper_bound=80),
-                    entry,
-                )
+        for entry, expected in cases:
+            with self.subTest(expected=expected):
+                errors = characterize_errors(entry, lifespan_upper_bound=80)
+                self.assertIn(expected, errors)
+        missing = _entry()
+        del missing["persona"]
+        errors = characterize_errors(missing, lifespan_upper_bound=80)
+        self.assertTrue(any(error.startswith("persona is required") for error in errors))
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_duplicate_stable_key_agreement_includes_persona_identity(self):
-        base = {
-            "display_name": "莉絲·晨星",
-            "age": 68,
-            "apparent_age": 68,
-            "portrait": {"stable_key": "library_keeper"},
-            "persona": {"personality": "沉穩"},
-        }
-        twin = dict(base)
-        twin["persona"] = {"personality": "開朗"}
-        self.assertEqual(
-            duplicate_stable_key_errors([base, base]),
-            [],
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_the_retired_background_key_rejects(self):
+        errors = characterize_errors(
+            _entry(background="來自邊境的旅人"), lifespan_upper_bound=80
         )
+        self.assertTrue(any(error.startswith("background") for error in errors), errors)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_duplicate_stable_key_agreement_compares_normalized_cards(self):
+        base = _entry(
+            age=68,
+            apparent_age=68,
+            portrait={"stable_key": "library_keeper"},
+        )
+        padded = dict(base)
+        padded["persona"] = occupant_card_record()
+        padded["persona"]["habit"] = "  " + padded["persona"]["habit"] + "  "
+        self.assertEqual(duplicate_stable_key_errors([base, padded]), [])
+        twin = dict(base)
+        twin["persona"] = occupant_card_record("（另一人）")
         errors = duplicate_stable_key_errors([base, twin])
         self.assertEqual(len(errors), 1)
         self.assertIn("conflicting characterization", errors[0])

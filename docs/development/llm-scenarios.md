@@ -127,13 +127,14 @@ LLM 必須輸出 JSON 格式：
 輸出必須為吻合 `QuestBlueprint` 的 JSON 物件：
 * `stages`：階段目標（擊敗怪物、到達地點、護送 NPC、取得道具）。
 * `location_req`：場景階層與原型需求（Anchor、Grid 或動態 Instance）。
-* `npc_req`：目標 NPC 之角色階層與性格標籤。
+* `npc_req`：目標 NPC 之角色階層、署名身分（`display_name`、`title`），以及必填的精簡人物卡 `persona`（`identity` 含 `public`／`hidden`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄）；整份藍圖所有階段的 `npc_req` 合計最多 3 個。
 * `reward`：銅幣（整數）、物品清單與公會功績點（Merit）。
 * `failure`：期限時數與失敗代價。
 
 ### 語意防護與降級
 * **登錄表存在性校驗**：藍圖中引用的怪物階級、物品代碼、錨點與公會分部，必須 100% 存在於 `world.lore` 靜態登錄表，杜絕幻覺產生不存在的獎勵或目標。
 * **獎勵邊界保護**：報酬銅幣不得超過該公會階級的上限。
+* **人物卡契約**：每個 `npc_req` 的人物卡都透過共用的 `world/quests/characterization.py` 依精簡人物卡契約（`world/lore/npc_card.py`）驗證必填欄位與字數上限；編譯、持久化還原與場景具現化時都會再驗證一次，具現化時經 `initialize_npc_persona` 以 `generated_quest` 來源寫入 NPC。
 * **降級機制**：若失敗，立即由 `world/ai/director_templates.py` 根據請求的階級與地點，隨機抽出一張預先編寫的手寫任務範本編譯交付。
 
 ---

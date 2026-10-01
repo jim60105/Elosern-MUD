@@ -28,6 +28,11 @@ MAX_CONTEXT_FIELD_LENGTH = 200
 MAX_TOTAL_SIZE = 12000
 MAX_NAME_LENGTH = 80
 MAX_SCENE_SENTENCE_LENGTH = 500
+# A blueprint declares at most this many ``npc_req`` occupants in total across
+# all of its stages, so every occupant's complete compact card fits one bounded
+# ``scenario_director`` response (npc-persona-generated-quest-cards D6). The cap
+# is a model-response budget rule enforced by the guardrail only.
+MAX_BLUEPRINT_OCCUPANTS = 3
 
 _CJK_START = "\u4e00"
 _CJK_END = "\u9fff"
@@ -112,6 +117,61 @@ class BlueprintPortrait:
 
 
 @dataclass(frozen=True)
+class BlueprintPersona:
+    """One occupant's compact NPC card as authored in the proposal.
+
+    Mirrors the seven card fields of ``world.lore.npc_card`` with the identity
+    section flattened into ``identity_public``/``identity_hidden`` so the value
+    stays a flat frozen object (npc-persona-generated-quest-cards D1). It is a
+    structural carrier only: the bounds, required leaves, and normalization are
+    enforced by the shared ``world.quests.characterization`` helper, which
+    validates the record form produced by :meth:`to_record`.
+    """
+
+    identity_public: str
+    identity_hidden: str
+    appearance: str
+    personality: str
+    speech_style: str
+    life_story: str
+    habit: str
+    social_connection: str
+
+    def __post_init__(self) -> None:
+        _reject_mutable_containers(self, type(self).__name__)
+
+    def to_record(self) -> dict[str, Any]:
+        """Return the nested card record (the compact card storage shape)."""
+        return {
+            "identity": {
+                "public": self.identity_public,
+                "hidden": self.identity_hidden,
+            },
+            "appearance": self.appearance,
+            "personality": self.personality,
+            "speech_style": self.speech_style,
+            "life_story": self.life_story,
+            "habit": self.habit,
+            "social_connection": self.social_connection,
+        }
+
+    @classmethod
+    def from_record(cls, record: Any) -> "BlueprintPersona":
+        """Build the carrier from a guardrail-validated card record."""
+        identity = record["identity"]
+        return cls(
+            identity_public=identity["public"],
+            identity_hidden=identity["hidden"],
+            appearance=record["appearance"],
+            personality=record["personality"],
+            speech_style=record["speech_style"],
+            life_story=record["life_story"],
+            habit=record["habit"],
+            social_connection=record["social_connection"],
+        )
+
+
+@dataclass(frozen=True)
 class BlueprintNpcReq:
     """One stage's NPC requirement: role, tier, disposition, and story-driven
     characterization (design D1).
@@ -120,11 +180,14 @@ class BlueprintNpcReq:
     (npc-title-authored-identities D5): the structural layer keeps the
     defaulted ``str | None`` shape so a missing field surfaces as the shared
     helper's named guardrail diagnostic instead of a constructor error. Paired
-    ``age``/``apparent_age``, ``portrait``, and the optional authored
-    persona/background flavor block stay optional. All fields are authored by
-    the generative layer like speech and bounded deterministically by the
-    shared ``world.quests.characterization`` helper. ``portrait`` is a frozen
-    value object so the immutability-by-construction guard stays intact.
+    ``age``/``apparent_age`` and ``portrait`` stay optional. ``persona`` is
+    the REQUIRED complete compact card (npc-persona-generated-quest-cards D1);
+    ``None`` is only the structural default so a missing card surfaces as the
+    shared helper's named diagnostic. All fields are authored by the generative
+    layer like speech and bounded deterministically by the shared
+    ``world.quests.characterization`` helper. ``portrait`` and ``persona`` are
+    frozen value objects so the immutability-by-construction guard stays
+    intact.
     """
 
     role: str
@@ -135,8 +198,7 @@ class BlueprintNpcReq:
     age: int | None = None
     apparent_age: int | None = None
     portrait: BlueprintPortrait | None = None
-    background: str | None = None
-    persona: tuple[tuple[str, str], ...] = ()
+    persona: BlueprintPersona | None = None
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
@@ -326,13 +388,8 @@ class QuestBlueprint:
                                 else {}
                             ),
                             **(
-                                {"background": requirement.background}
-                                if requirement.background is not None
-                                else {}
-                            ),
-                            **(
-                                {"persona": dict(requirement.persona)}
-                                if requirement.persona
+                                {"persona": requirement.persona.to_record()}
+                                if requirement.persona is not None
                                 else {}
                             ),
                         }
@@ -399,10 +456,10 @@ class QuestBlueprint:
                             if requirement.get("portrait") is not None
                             else None
                         ),
-                        background=requirement.get("background"),
-                        persona=tuple(
-                            tuple(pair)
-                            for pair in (requirement.get("persona") or {}).items()
+                        persona=(
+                            BlueprintPersona.from_record(requirement["persona"])
+                            if requirement.get("persona") is not None
+                            else None
                         ),
                     )
                     for requirement in stage.get("npc_req") or ()

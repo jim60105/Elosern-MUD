@@ -34,6 +34,7 @@ from world.ai.scenario_director.blueprints import (
     _CJK_END,
     _CJK_START,
     _TEMPLATE_PLACEHOLDER_RE,
+    MAX_BLUEPRINT_OCCUPANTS,
     MAX_NAME_LENGTH,
     MAX_SCENE_SENTENCE_LENGTH,
     BlueprintLocationLayer,
@@ -53,6 +54,43 @@ class ScenarioDirectorNotRegisteredError(RuntimeError):
 class ScenarioDirectorTemplateError(RuntimeError):
     """Raised when no template in the pool fits the request context."""
 
+
+# The complete compact NPC card every ``npc_req`` carries (D3): exactly the
+# seven card keys, the identity section as a ``public``/``hidden`` object, every
+# leaf a string, and no extra key at either level. Budgets (per-leaf, identity
+# section, rendered total) and required-leaf non-emptiness are semantic rules
+# owned by the card contract through the shared characterization helper,
+# because code-point and rendered-label bounds cannot be expressed here.
+_NPC_CARD_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": [
+        "identity",
+        "appearance",
+        "personality",
+        "speech_style",
+        "life_story",
+        "habit",
+        "social_connection",
+    ],
+    "properties": {
+        "identity": {
+            "type": "object",
+            "required": ["public", "hidden"],
+            "properties": {
+                "public": {"type": "string"},
+                "hidden": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+        "appearance": {"type": "string"},
+        "personality": {"type": "string"},
+        "speech_style": {"type": "string"},
+        "life_story": {"type": "string"},
+        "habit": {"type": "string"},
+        "social_connection": {"type": "string"},
+    },
+    "additionalProperties": False,
+}
 
 SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -124,7 +162,13 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "required": ["role", "tier", "display_name", "title"],
+                            "required": [
+                                "role",
+                                "tier",
+                                "display_name",
+                                "title",
+                                "persona",
+                            ],
                             "properties": {
                                 "role": {"type": "string"},
                                 "tier": {"type": "string"},
@@ -144,16 +188,7 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                     },
                                     "additionalProperties": False,
                                 },
-                                "background": {"type": ["string", "null"]},
-                                "persona": {
-                                    "type": ["object", "null"],
-                                    "properties": {
-                                        "personality": {"type": "string"},
-                                        "life_story": {"type": "string"},
-                                        "habit": {"type": "string"},
-                                    },
-                                    "additionalProperties": False,
-                                },
+                                "persona": _NPC_CARD_SCHEMA,
                             },
                         },
                     },
@@ -306,9 +341,9 @@ def _validate_npc_tier_known(parsed: Any) -> list[str]:
 
 
 def _validate_npc_characterization(parsed: Any) -> list[str]:
-    """Validate every ``npc_req`` entry's optional characterization fields.
+    """Validate every ``npc_req`` entry's characterization fields.
 
-    Delegates per-entry age/name/key rules and the cross-entry duplicate
+    Delegates per-entry age/name/key/card rules and the cross-entry duplicate
     ``stable_key`` agreement rule to the shared ``world.quests.characterization``
     helper -- the single rule source both this guardrail and the deterministic
     compiler call (design D3). The race-lifespan upper bound is resolved
@@ -339,6 +374,29 @@ def _validate_npc_characterization(parsed: Any) -> list[str]:
     errors.extend(duplicate_stable_key_errors(entries))
     errors.extend(duplicate_display_name_errors(entries))
     return errors
+
+
+def _validate_npc_occupant_total(parsed: Any) -> list[str]:
+    """Cap the total ``npc_req`` occupants across every stage (design D6).
+
+    Each occupant carries a complete compact card, so the occupant count
+    bounds the response size: a blueprint declaring more than
+    ``MAX_BLUEPRINT_OCCUPANTS`` occupants in total is rejected and retried
+    like any other semantic failure.
+    """
+    total = 0
+    for stage in _stages(parsed):
+        if not isinstance(stage, dict):
+            continue
+        requirements = stage.get("npc_req")
+        if isinstance(requirements, list):
+            total += len(requirements)
+    if total > MAX_BLUEPRINT_OCCUPANTS:
+        return [
+            f"blueprint declares {total} npc_req occupants in total; at most "
+            f"{MAX_BLUEPRINT_OCCUPANTS} occupants are allowed across all stages"
+        ]
+    return []
 
 
 def _validate_monster_tier_known(parsed: Any) -> list[str]:
@@ -580,6 +638,7 @@ _VALIDATORS: dict[str, Any] = {
     "archetype_known": _validate_archetype_known,
     "npc_tier_known": _validate_npc_tier_known,
     "npc_characterization": _validate_npc_characterization,
+    "npc_occupant_total": _validate_npc_occupant_total,
     "monster_tier_known": _validate_monster_tier_known,
     "anchor_known": _validate_anchor_known,
     "defeat_selector": _validate_defeat_selector,

@@ -42,6 +42,7 @@ from world.rules.quest_issuance import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
     def setUp(self):
@@ -190,6 +191,7 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
+                "persona": occupant_card_record(),
             }
         ]
         return compile_quest_blueprint(payload)
@@ -238,6 +240,7 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
+                "persona": occupant_card_record(),
             }
         ]
         second = compile_quest_blueprint(second_payload)

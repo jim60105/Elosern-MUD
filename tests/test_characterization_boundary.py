@@ -10,7 +10,6 @@ inline duplicate of the rules from reappearing in either layer.
 
 import ast
 from pathlib import Path
-import re
 import unittest
 
 from tools.spec_traceability import covers_requirement
@@ -184,26 +183,14 @@ class SharedCharacterizationHelperGuardTests(unittest.TestCase):
             "the shared name/title validators must be deferred-imported inside "
             f"{SHARED_VALIDATOR_MODULE.rsplit('.', 1)[-1]} functions",
         )
+        # The occupant card delegates to the pure compact-card contract
+        # (npc-persona-generated-quest-cards D2), a registry-only lore module.
+        self.assertIn("world.lore.npc_card", imported)
         for banned in ("typeclasses", "evennia.utils.create"):
             self.assertFalse(
                 any(module == banned or module.startswith(banned + ".") for module in imported),
                 f"characterization.py must not import {banned}",
             )
-
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_the_persona_field_bound_mirrors_the_rules_bound(self):
-        # The characterization helper may import only
-        # ``world.rules.npc_identity`` (purity contract above), never
-        # ``world.rules.character_creation``, so the authored persona bound is
-        # mirrored locally and pinned here to the authoritative persona cap.
-        char_source = _production_source("world/quests/characterization.py")
-        rules_source = _production_source("world/rules/character_creation.py")
-        char_match = re.search(r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*([0-9]+)", char_source, re.MULTILINE)
-        rules_match = re.search(r"^MAX_PERSONA_FIELD_LENGTH\s*=\s*([0-9]+)", rules_source, re.MULTILINE)
-        self.assertIsNotNone(char_match, "characterization MAX_PERSONA_FIELD_LENGTH missing")
-        self.assertIsNotNone(rules_match, "rules MAX_PERSONA_FIELD_LENGTH missing")
-        self.assertEqual(char_match.group(1), rules_match.group(1))
-        self.assertEqual(rules_match.group(1), "600")
 
 
 if __name__ == "__main__":

@@ -38,7 +38,9 @@ from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
 from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
+from world.lore.npc_card import NpcCard, NpcCardError
 from world.rules.npc_identity import validate_npc_name, validate_npc_title
+from world.rules.npc_persona import NpcPersonaStorageError, initialize_npc_persona
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
 from world.quests.runtime import (
@@ -157,9 +159,10 @@ def _revalidate_characterization(
     forged ``StageSpawnRequirement`` could bypass it and write a negative or
     non-integer canonical age (a permanently portrait-ineligible NPC), a
     malformed policy, or an occupant WITHOUT the authored identity. Every
-    occupant MUST carry a characterization with a valid ``display_name`` and
-    ``title``: re-running the same shared rules here keeps the age-bounds rule
-    and the authored-identity invariant hard floors on every spawn path
+    occupant MUST carry a characterization with a valid ``display_name``,
+    ``title``, and complete compact ``persona`` card: re-running the same
+    shared rules here keeps the age-bounds rule, the authored-identity
+    invariant, and the card contract hard floors on every spawn path
     (design D6).
     A missing or field-incomplete characterization raises
     ``SceneBuilderSpawnError`` and rolls the whole materialization back before
@@ -188,10 +191,8 @@ def _revalidate_characterization(
         entry["apparent_age"] = characterization.apparent_age
     if characterization.portrait_stable_key is not None:
         entry["portrait"] = {"stable_key": characterization.portrait_stable_key}
-    if characterization.background is not None:
-        entry["background"] = characterization.background
-    if characterization.persona:
-        entry["persona"] = dict(characterization.persona)
+    if characterization.persona is not None:
+        entry["persona"] = _card_record(characterization.persona)
     for message in characterize_errors(
         entry,
         lifespan_upper_bound=race_lifespan_upper_bound(tier_key),
@@ -199,6 +200,20 @@ def _revalidate_characterization(
         raise SceneBuilderSpawnError(
             f"invalid characterization for occupant {role!r}: {message}"
         )
+
+
+def _card_record(persona: Any) -> Any:
+    """Return the record form of a carried card without trusting its type.
+
+    Only a genuine frozen ``NpcCard`` is converted through ``to_record()``; a
+    forged requirement may hold any object in this slot, which is passed on
+    unchanged so the card contract rejects it by name. Revalidation and the
+    persona write both read through this one function, so what is validated
+    is exactly what is stored.
+    """
+    if isinstance(persona, NpcCard):
+        return persona.to_record()
+    return persona
 
 
 def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom:
@@ -225,6 +240,7 @@ def _apply_characterization(
     npc: NPC,
     requirement: Any,
     position: int,
+    quest_key: str,
 ) -> None:
     """Apply one compiled occupant's characterization per-field (design D1).
 
@@ -236,7 +252,11 @@ def _apply_characterization(
     canonical inputs (design D3). An occupant without a portrait policy never
     receives the default or a policy (design D4). The policy is written only
     after the ages, so a policy-bearing occupant always carries canonical
-    integer ages.
+    integer ages. The occupant's compact card is written through the
+    deterministic persona initializer with ``generated_quest`` provenance
+    (npc-persona-generated-quest-cards D5), inside the caller's atomic
+    materialization; any initializer failure is raised as
+    ``SceneBuilderSpawnError`` and rolls the whole stage spawn back.
     """
     characterizations = getattr(requirement, "characterizations", ())
     if position >= len(characterizations):
@@ -264,26 +284,21 @@ def _apply_characterization(
             "mode": "named",
             "stable_key": characterization.portrait_stable_key,
         }
-    persona = dict(characterization.persona)
-    if characterization.background is not None:
-        persona["background"] = characterization.background
-    if persona:
-        # The scene-builder characterization seam is one of the two NPC-persona
-        # writers (the import loader is the other); the authored flavor text
-        # lands verbatim so the look appearance path renders it. The record is
-        # kept in the import-card shape (empty containers for non-prose keys)
-        # so every PersonaStore consumer sees the documented six-key contract.
-        record = {
-            "identity": {},
-            "personality": persona.get("personality", ""),
-            "life_story": persona.get("life_story", ""),
-            "habit": persona.get("habit", ""),
-            "appearance": {},
-            "social_connection": {},
-        }
-        if characterization.background is not None:
-            record["background"] = characterization.background
-        npc.db.persona = record
+    try:
+        initialize_npc_persona(
+            npc,
+            _card_record(characterization.persona),
+            {
+                "kind": "generated_quest",
+                "quest": quest_key,
+                "stage": requirement.index,
+                "occupant": position,
+            },
+        )
+    except (NpcCardError, NpcPersonaStorageError) as error:
+        raise SceneBuilderSpawnError(
+            f"occupant {position} persona initialization failed: {error}"
+        ) from error
     if characterization.combat_traits:
         from world.rules.traits import set_combat_traits
 
@@ -297,6 +312,7 @@ def _spawn_npc(
     tier_key: str,
     disposition: str | None,
     position: int,
+    quest_key: str,
 ) -> NPC:
     tier = NPC_TIER_REGISTRY[tier_key]
     # The tier's four bands (three physical + magic_power) drive the whole
@@ -335,7 +351,7 @@ def _spawn_npc(
     npc.db.npc_tier_key = tier_key
     npc._apply_trait_config(config)
     npc.db.disposition = disposition
-    _apply_characterization(npc, requirement, position)
+    _apply_characterization(npc, requirement, position, quest_key)
     # The shared lineage auto-seed (use-driven-skill-lineage DC6): a spawned
     # NPC that owns a deep skill gets its prerequisite chain closed and each
     # unsatisfied edge seeded to exactly the required proficiency, so its
@@ -375,11 +391,14 @@ def _spawn_occupants(
     room: InstanceRoom,
     requirement: Any,
     objective: Any,
+    quest_key: str,
 ) -> tuple[Any, ...]:
     occupants: list[Any] = []
     for position, (role, tier_key, disposition) in enumerate(requirement.npc_reqs):
         occupants.append(
-            _spawn_npc(room, requirement, role, tier_key, disposition, position)
+            _spawn_npc(
+                room, requirement, role, tier_key, disposition, position, quest_key
+            )
         )
     if objective.kind is ObjectiveKind.DEFEAT and objective.monster_tier is not None:
         for position in range(objective.quantity):
@@ -589,7 +608,7 @@ def _materialize_instance(actor, record, definition, requirement, origin_room):
 
             room = _spawn_scene_room(actor, origin_room, requirement)
             objective = definition.stages[record.stage_index].objective
-            occupants = _spawn_occupants(room, requirement, objective)
+            occupants = _spawn_occupants(room, requirement, objective, definition.key)
             bound = _bind_stage(actor, record, room, objective, occupants)
             flavor_context = build_flavor_context(requirement, definition, room, origin_room)
             return SceneMaterialization(room, bound, flavor_context=flavor_context)

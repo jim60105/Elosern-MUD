@@ -36,6 +36,7 @@ from world.ai.tests._director_helpers import (
 from world.quests.tests._fixtures import RegistryIsolationMixin
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 
 
@@ -177,58 +178,29 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
     def test_npc_persona_and_background_are_validated_through_the_shared_helper(self):
         validators = scenario_director._VALIDATORS
         validate_npc = validators["npc_characterization"]
-        good = {
-            "stages": [
-                {
-                    "npc_req": [
-                        {
-                            "role": "bandit",
-                            "tier": "bandit",
-                            "display_name": "沉穩獵人",
-                            "title": "森林嚮導",
-                            "persona": {
-                                "personality": "沉穩",
-                                "life_story": "守護森林多年",
-                                "habit": "黃昏時擦拭獵弓",
-                            },
-                            "background": "來自邊境的嚮導",
-                        }
-                    ]
-                }
-            ]
-        }
-        self.assertEqual(validate_npc(good), [])
-        over_bound = {
-            "stages": [
-                {
-                    "npc_req": [
-                        {
-                            "role": "bandit",
-                            "tier": "bandit",
-                            "persona": {"personality": "x" * 601},
-                        }
-                    ]
-                }
-            ]
-        }
-        errors = validate_npc(over_bound)
+
+        def _entry(**overrides):
+            entry = {
+                "role": "bandit",
+                "tier": _npc_tier_key(),
+                "display_name": "沉穩獵人",
+                "title": "森林嚮導",
+                "persona": occupant_card_record(),
+            }
+            entry.update(overrides)
+            return {"stages": [{"npc_req": [entry]}]}
+
+        self.assertEqual(validate_npc(_entry()), [])
+        over_bound = occupant_card_record()
+        over_bound["personality"] = "x" * 601
+        errors = validate_npc(_entry(persona=over_bound))
         self.assertTrue(
-            any("persona.personality" in error for error in errors), errors
+            any("persona.personality: leaf_too_long" in error for error in errors),
+            errors,
         )
-        non_text = {
-            "stages": [
-                {
-                    "npc_req": [
-                        {
-                            "role": "bandit",
-                            "tier": "bandit",
-                            "background": 42,
-                        }
-                    ]
-                }
-            ]
-        }
-        self.assertTrue(validate_npc(non_text))
+        # The retired flavor ``background`` key is a named shape violation.
+        errors = validate_npc(_entry(background="來自邊境的嚮導"))
+        self.assertTrue(any("background" in error for error in errors), errors)
 
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_unknown_monster_tier_is_rejected(self):
@@ -403,6 +375,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
+                "persona": occupant_card_record(),
             }
         ]
         payload.update(overrides)
@@ -550,6 +523,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
+                "persona": occupant_card_record(),
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "t_synth_scene_chief"},
@@ -744,6 +718,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "disposition": None,
                 "display_name": "另一個人",
                 "title": "林間盜匪副手",
+                "persona": occupant_card_record(),
                 "age": 40,
                 "apparent_age": 40,
                 "portrait": {"stable_key": "t_synth_scene_chief"},

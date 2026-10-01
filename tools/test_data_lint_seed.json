@@ -9,6 +9,10 @@
       "reason": "authoring docs contract"
     },
     {
+      "path": "world/ai/tests/test_director_template_cards.py",
+      "reason": "offline quest template occupant card contract"
+    },
+    {
       "path": "world/lore/tests/test_anchor_placement.py",
       "reason": "anchor placement data contract"
     },

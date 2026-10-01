@@ -43,6 +43,8 @@ from world.tests.synthetic_data import SYNTH_ANCHORS
 from world.ai.scenario_director import QuestBlueprint
 
 from tools.spec_traceability import covers_requirement
+from world.lore.npc_card import normalize_card
+from world.quests.tests._card_fixtures import occupant_card, occupant_card_record
 
 #: Synthetic offline-loop fixtures: a placed anchor, a castable kit spell,
 #: and the defeat target item.
@@ -50,6 +52,7 @@ _T_OFFLINE_ANCHOR = "t_hollow_tarn"
 _T_CAST_SKILL = "t_ember_burst"
 _OFFLINE_QUEST_NAME = "討伐苔徑盜匪"
 _OFFLINE_NPC_NAME = "灰鬍"
+_OFFLINE_NPC_CARD = occupant_card_record("（苔徑）")
 
 
 def _offline_kit_blueprint():
@@ -86,6 +89,7 @@ def _offline_kit_blueprint():
                             "disposition": None,
                             "display_name": _OFFLINE_NPC_NAME,
                             "title": "苔徑盜匪首領",
+                            "persona": _OFFLINE_NPC_CARD,
                             "age": 35,
                             "apparent_age": 35,
                             "portrait": {"stable_key": "t_synth_moss_bandit"},
@@ -181,11 +185,11 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         return matches[0]
 
     @covers_requirement("scene-builder::scene-entry-and-generated-quest-triggers-are-deterministic-commands-that-keep-the-offline-loop-playable")
+    @covers_requirement("scenario-director::offline-template-occupants-carry-fully-authored-cards")
     def test_offline_loop_materializes_an_instance_scene_without_an_llm(self):
-        disabled = {
-            layer: {"enabled": False}
-            for layer in ("narrator", "npc_dialogue", "scenario_director", "scene_builder")
-        }
+        from world.ai.profiles import LAYER_NAMES
+
+        disabled = {layer: {"enabled": False} for layer in LAYER_NAMES}
         with override_settings(LLM_PROFILES=_raw(**disabled)):
             output = self.call(CmdGuildRequest(), "", "你張貼了一份委託", caller=self.player)
         self.assertIn(_OFFLINE_QUEST_NAME, output)
@@ -216,6 +220,22 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
 
         bandit = next(
             obj for obj in self.player.location.contents if isinstance(obj, NPC)
+        )
+        # The degraded template's authored card lands verbatim (normalized)
+        # through the persona initializer with generated_quest provenance.
+        self.assertEqual(
+            bandit.db.persona, normalize_card(_OFFLINE_NPC_CARD).to_record()
+        )
+        meta = bandit.db.npc_persona_meta
+        self.assertEqual(meta["persona_version"], 1)
+        self.assertEqual(
+            meta["provenance"],
+            {
+                "kind": "generated_quest",
+                "quest": definition_key,
+                "stage": 0,
+                "occupant": 0,
+            },
         )
         bandit.traits.hp._data["current"] = 1
         result = self._resolve_lethal(bandit)
@@ -334,14 +354,19 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
             return spawned
 
         requirement = SimpleNamespace(
+            index=0,
             archetype=_T_ARCHETYPE,
             characterizations=(
-                StageNpcCharacterization(display_name="深skills盜匪", title="試煉佔用者"),
+                StageNpcCharacterization(
+                    display_name="深skills盜匪",
+                    title="試煉佔用者",
+                    persona=occupant_card(),
+                ),
             ),
         )
         with patch.object(scene_builder, "spawn", deep_skill_spawn):
             npc = _spawn_npc(
-                self.room, requirement, "bandit", _T_NPC_TIER, None, 0
+                self.room, requirement, "bandit", _T_NPC_TIER, None, 0, "t_quest_key"
             )
         self.assertIn(_T_PREREQ_MID.key, set(npc.db.skills["active"]))
         threshold = _T_PREREQ_DEEP.prerequisites[0].min_proficiency
@@ -358,12 +383,19 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
         from types import SimpleNamespace
 
         requirement = SimpleNamespace(
+            index=0,
             archetype=_T_ARCHETYPE,
             characterizations=(
-                StageNpcCharacterization(display_name="無skills盜匪", title="試煉佔用者"),
+                StageNpcCharacterization(
+                    display_name="無skills盜匪",
+                    title="試煉佔用者",
+                    persona=occupant_card(),
+                ),
             ),
         )
-        npc = _spawn_npc(self.room, requirement, "bandit", _T_NPC_TIER, None, 0)
+        npc = _spawn_npc(
+            self.room, requirement, "bandit", _T_NPC_TIER, None, 0, "t_quest_key"
+        )
         # The scene_npc prototype carries no skills: spawn must not fabricate
         # any proficiency state.
         self.assertIsNone(npc.db.skills)

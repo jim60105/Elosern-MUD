@@ -10,6 +10,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
@@ -902,6 +903,7 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
             "title": "無光者",
             "age": 40,
             "apparent_age": 40,
+            "persona": occupant_card_record(),
             "combat_traits": ["undead"],
         }
         compiled = _compile_characterization(char_req)
@@ -919,9 +921,12 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
             "age": 40,
             "apparent_age": 40,
             "portrait_stable_key": None,
+            "persona": occupant_card_record(),
             "combat_traits": ["undead"],
         }
-        deserialized = _characterization_from_payload(payload)
+        deserialized = _characterization_from_payload(
+            payload, quest="ai_stored", stage=0, occupant=0
+        )
         self.assertEqual(deserialized.combat_traits, ("undead",))
 
         # Invalid trait raises QuestCompileError

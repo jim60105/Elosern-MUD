@@ -9,11 +9,13 @@ closed runtime aggregate, rejecting anything that cannot be self-consistent
 guards, keeping this module a leaf above the registration publishers.
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from enum import Enum
 from typing import Any
 
 from world.lore.guild import GUILD_BRANCH_REGISTRY
+from world.lore.npc_card import NpcCardError, normalize_card
 from world.quests.compile.contracts import (
     CompiledQuest,
     IssuanceDescriptor,
@@ -78,10 +80,46 @@ def _compiled_to_payload(
             "reward": _db_safe(asdict(compiled.reward)),
         },
         "requirements": [
-            _db_safe(asdict(requirement))
+            _requirement_to_payload(requirement)
             for requirement in compiled.stage_requirements
         ],
     }
+
+
+def _characterization_to_payload(
+    characterization: StageNpcCharacterization | None,
+) -> dict[str, Any] | None:
+    """Encode one occupant characterization with its card as the card record.
+
+    The card is written through ``NpcCard.to_record()`` (design D4) -- the
+    single storage shape of the compact card contract -- rather than a generic
+    dataclass walk, so the durable shape cannot drift from the card contract.
+    """
+    if characterization is None:
+        return None
+    return {
+        "display_name": characterization.display_name,
+        "title": characterization.title,
+        "age": characterization.age,
+        "apparent_age": characterization.apparent_age,
+        "portrait_stable_key": characterization.portrait_stable_key,
+        "persona": (
+            None
+            if characterization.persona is None
+            else characterization.persona.to_record()
+        ),
+        "combat_traits": list(characterization.combat_traits),
+    }
+
+
+def _requirement_to_payload(requirement: StageSpawnRequirement) -> dict[str, Any]:
+    """Encode one stage spawn requirement into its JSON-safe payload."""
+    data = _db_safe(asdict(requirement))
+    data["characterizations"] = [
+        _characterization_to_payload(characterization)
+        for characterization in requirement.characterizations
+    ]
+    return data
 
 
 def _locator_from_payload(data: dict[str, Any] | None) -> RoomLocator | None:
@@ -114,27 +152,61 @@ def _stage_from_payload(data: dict[str, Any]) -> QuestStage:
 
 
 def _characterization_from_payload(
-    data: dict[str, Any] | None,
-) -> StageNpcCharacterization | None:
-    if data is None:
-        return None
+    data: Any,
+    *,
+    quest: str,
+    stage: int,
+    occupant: int,
+) -> StageNpcCharacterization:
+    """Strictly decode one stored occupant characterization (design D4).
+
+    Every stored occupant carries the normalized compact card; a missing
+    characterization, a missing or non-conforming card, or the retired
+    ``background`` key fails with ``QuestCompileError`` naming the quest,
+    stage, and occupant. There is no fallback decoder for an older shape.
+    """
+    where = f"stored quest {quest!r} stage {stage} occupant {occupant}"
+    if not isinstance(data, Mapping):
+        raise QuestCompileError(f"{where} carries no characterization")
     if "title" not in data:
         raise QuestCompileError(
-            "stored characterization lacks the required authored title field"
+            f"{where} characterization lacks the required authored title field"
         )
+    if "background" in data:
+        raise QuestCompileError(
+            f"{where} characterization carries the retired background field"
+        )
+    if "persona" not in data:
+        raise QuestCompileError(f"{where} characterization carries no persona card")
+    try:
+        persona = normalize_card(data["persona"])
+    except NpcCardError as error:
+        raise QuestCompileError(
+            f"{where} persona card violates the card contract: {error}"
+        ) from error
     return StageNpcCharacterization(
         display_name=data["display_name"],
         title=data["title"],
         age=data["age"],
         apparent_age=data["apparent_age"],
         portrait_stable_key=data["portrait_stable_key"],
-        background=data.get("background"),
-        persona=tuple(tuple(pair) for pair in data.get("persona") or ()),
+        persona=persona,
         combat_traits=tuple(data.get("combat_traits") or ()),
     )
 
 
-def _requirement_from_payload(data: dict[str, Any]) -> StageSpawnRequirement:
+def _requirement_from_payload(data: dict[str, Any], *, quest: str) -> StageSpawnRequirement:
+    npc_reqs = tuple(tuple(entry) for entry in data["npc_reqs"])
+    stored = data["characterizations"]
+    if (
+        not isinstance(stored, Sequence)
+        or isinstance(stored, (str, bytes))
+        or len(stored) != len(npc_reqs)
+    ):
+        raise QuestCompileError(
+            f"stored quest {quest!r} stage {data['index']} characterizations "
+            "must align one-to-one with its npc_reqs"
+        )
     return StageSpawnRequirement(
         index=data["index"],
         objective_kind=ObjectiveKind(data["objective_kind"]),
@@ -142,10 +214,12 @@ def _requirement_from_payload(data: dict[str, Any]) -> StageSpawnRequirement:
         archetype=data["archetype"],
         anchor_near=data["anchor_near"],
         scene_sentence=data["scene_sentence"],
-        npc_reqs=tuple(tuple(entry) for entry in data["npc_reqs"]),
+        npc_reqs=npc_reqs,
         characterizations=tuple(
-            _characterization_from_payload(entry)
-            for entry in data["characterizations"]
+            _characterization_from_payload(
+                entry, quest=quest, stage=data["index"], occupant=position
+            )
+            for position, entry in enumerate(stored)
         ),
     )
 
@@ -183,7 +257,7 @@ def payload_to_registrations(
     issuer_key = issuance_data["issuer_key"]
     settlement_value = issuance_data["settlement"]
     requirements = tuple(
-        _requirement_from_payload(requirement)
+        _requirement_from_payload(requirement, quest=definition.key)
         for requirement in payload["requirements"]
     )
     _validate_restored_payload(definition, issuer_key, settlement_value, reward, requirements)

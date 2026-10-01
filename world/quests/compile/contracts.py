@@ -13,6 +13,7 @@ only sanctioned writer.
 from dataclasses import dataclass
 import re
 
+from world.lore.npc_card import NpcCard
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -44,15 +45,16 @@ _DESTINATION_KIND_BY_VALUE = {
 
 @dataclass(frozen=True)
 class StageNpcCharacterization:
-    """Optional frozen characterization of one spawned occupant.
+    """Frozen characterization of one spawned occupant.
 
     Carries the validated per-occupant characterization fields in deterministic
     order (design D5): the required authored ``display_name``/``title``, paired
     ``age``/``apparent_age``, the named portrait ``stable_key``, and the
-    optional authored persona/background flavor block. The structural layer
-    keeps ``str | None`` (npc-title-authored-identities D5): the shared helper
-    enforces requiredness, so a ``None`` identity here means only that a
-    pre-change stored payload predates the field.
+    required normalized compact ``persona`` card
+    (npc-persona-generated-quest-cards D1). The structural layer keeps
+    ``None`` defaults: the shared helper enforces requiredness at compile and
+    again at materialization, so a forged value missing a field fails there
+    by name.
     """
 
     display_name: str | None = None
@@ -60,8 +62,7 @@ class StageNpcCharacterization:
     age: int | None = None
     apparent_age: int | None = None
     portrait_stable_key: str | None = None
-    background: str | None = None
-    persona: tuple[tuple[str, str], ...] = ()
+    persona: NpcCard | None = None
     combat_traits: tuple[str, ...] = ()
 
 

@@ -3,8 +3,9 @@
 Change 22's mirror-validation rule source: both the scenario-director guardrail
 (``world/ai``) and the deterministic compile boundary (``world/quests``)
 validate the per-occupant characterization fields -- the required authored
-``display_name``/``title``, paired ``age``/``apparent_age``, and the named
-``portrait.stable_key`` -- through this one module, so the two layers cannot
+``display_name``/``title``, paired ``age``/``apparent_age``, the named
+``portrait.stable_key``, and the required compact ``persona`` card -- through
+this one module, so the two layers cannot
 drift. The module never mutates state, and its only world.rules dependency is
 the single shared identity validator in ``world/rules/npc_identity.py``
 (npc-title-authored-identities D3: the name and title character rules delegate
@@ -25,6 +26,11 @@ from world.art.subjects import (
     MAX_SUBJECT_KEY_LENGTH,
     is_reserved_player_stable_key,
 )
+# The occupant card obeys the single pure compact-card contract
+# (npc-persona-generated-quest-cards D2): required, normalized, and bounded by
+# ``world.lore.npc_card`` -- a registry-only lore module with no Evennia,
+# Django, or ``world.rules`` dependency, so the helper stays pure.
+from world.lore.npc_card import NpcCardError, normalize_card
 
 # Bounded text/key caps for the characterization fields. The authored-name cap
 # is the shared NPC name bound itself (npc-title-authored-identities D3): the
@@ -39,17 +45,6 @@ from world.rules.npc_identity import MAX_NPC_NAME_CODE_POINTS
 
 MAX_DISPLAY_NAME_LENGTH = MAX_NPC_NAME_CODE_POINTS
 MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
-
-# The optional authored persona/background flavor fields share the persona
-# field bound (fix-custom-creation-information-and-background D7): a generated
-# NPC's flavor text must always fit the read-only ``PersonaStore`` contract so
-# the look appearance path can render it unchanged. The value mirrors
-# ``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``; under the
-# shared-helper purity contract this module's only ``world.rules`` dependency
-# is ``world.rules.npc_identity``, so the persona bound is mirrored locally
-# and a parity contract pins the two numbers together.
-MAX_PERSONA_FIELD_LENGTH = 600
-PERSONA_PROSE_KEYS = ("personality", "life_story", "habit")
 
 # The lower bound of a reasonable declared age: no age below zero is
 # meaningful, and the upper bound is the declared race's lifespan ceiling.
@@ -78,7 +73,7 @@ def characterize_errors(
     *,
     lifespan_upper_bound: int,
 ) -> list[str]:
-    """Validate one ``npc_req`` entry's optional characterization fields.
+    """Validate one ``npc_req`` entry's characterization fields.
 
     Returns a list of human-readable problems (empty when valid). The rules
     mirror design D2/D3/D4 and the art-side subject-key contract:
@@ -98,6 +93,9 @@ def characterize_errors(
       keyspace is reserved for player characters (whose stable keys are
       ``str(pk)``), so a blueprint can never claim a player's portrait subject
       (fix-portrait-stable-key-collision D2).
+    - ``persona`` is the REQUIRED complete compact card validated through the
+      card contract (npc-persona-generated-quest-cards D2); a top-level
+      ``background`` key is rejected because the card replaced it.
     """
     errors: list[str] = []
 
@@ -191,52 +189,54 @@ def characterize_errors(
                         "for player characters"
                     )
 
-    if "persona" in entry:
-        persona = entry["persona"]
-        if persona is None or not isinstance(persona, Mapping):
-            errors.append("persona must be an object with optional prose fields")
-        else:
-            extra = sorted(set(persona) - set(PERSONA_PROSE_KEYS))
-            if extra:
-                # The persona block is exactly the three prose fields; a nested
-                # ``background`` (or any other key) is not part of the authored
-                # contract and would be silently dropped at compile, so it is
-                # rejected here. Background flavor belongs at the top level
-                # (fix-custom-creation-information-and-background D7).
-                errors.append(
-                    "persona may only carry personality, life_story, and habit"
-                )
-            for field in PERSONA_PROSE_KEYS:
-                if field not in persona:
-                    continue
-                value = persona[field]
-                if value is None or not isinstance(value, str) or not value.strip():
-                    errors.append(f"persona.{field} must be non-empty text")
-                elif len(value) > MAX_PERSONA_FIELD_LENGTH:
-                    errors.append(
-                        f"persona.{field} exceeds the "
-                        f"{MAX_PERSONA_FIELD_LENGTH}-character cap"
-                    )
+    if "persona" not in entry:
+        errors.append(
+            "persona is required (every occupant carries a complete compact card)"
+        )
+    else:
+        error = card_error(entry["persona"])
+        if error is not None:
+            errors.append(error)
     if "background" in entry:
-        # The top-level ``background`` is the canonical authored flavor surface
-        # for a characterization entry, validated independently of whether a
-        # ``persona`` object is also present.
-        value = entry["background"]
-        if value is None or not isinstance(value, str):
-            errors.append("background must be text")
-        elif value.strip() and len(value) > MAX_PERSONA_FIELD_LENGTH:
-            errors.append(
-                f"background exceeds the "
-                f"{MAX_PERSONA_FIELD_LENGTH}-character cap"
-            )
+        # The optional flavor ``background`` was replaced end to end by the
+        # complete card (npc-persona-generated-quest-cards D1); a stray key is
+        # a shape violation, never silently dropped.
+        errors.append(
+            "background is not part of the occupant shape; the persona card "
+            "carries all characterization prose"
+        )
     return errors
+
+
+def card_error(raw: Any) -> str | None:
+    """Return the named card-contract violation of one occupant card, if any.
+
+    Delegates to ``world.lore.npc_card.normalize_card`` (design D2) and maps an
+    ``NpcCardError`` onto ``persona.<leaf>: <code>`` (or ``persona: <code>``
+    for a whole-card failure such as the rendered total bound).
+    """
+    try:
+        normalize_card(raw)
+    except NpcCardError as error:
+        if error.field:
+            return f"persona.{error.field}: {error.code}"
+        return f"persona: {error.code}"
+    return None
+
+
+def _comparable_card(raw: Any) -> Any:
+    """Return the normalized card record, or the raw value when invalid."""
+    try:
+        return normalize_card(raw).to_record()
+    except NpcCardError:
+        return raw
 
 
 def duplicate_stable_key_errors(entries: list[Mapping[str, Any]]) -> list[str]:
     """Return errors when shared portrait ``stable_key`` entries disagree.
 
     Two ``npc_req`` entries sharing a ``stable_key`` in one blueprint SHALL
-    declare the same ``display_name``, ages, persona/background flavor, and
+    declare the same ``display_name``, ages, normalized persona card, and
     portrait key; conflicting characterization under the same key is a
     blueprint error and rejects (design D6). Entries without a well-formed
     portrait key are ignored -- ``characterize_errors`` reports them.
@@ -254,8 +254,7 @@ def duplicate_stable_key_errors(entries: list[Mapping[str, Any]]) -> list[str]:
             entry.get("display_name"),
             entry.get("age"),
             entry.get("apparent_age"),
-            entry.get("persona"),
-            entry.get("background"),
+            _comparable_card(entry.get("persona")),
         )
         if stable_key in seen and seen[stable_key] != identity:
             errors.append(
