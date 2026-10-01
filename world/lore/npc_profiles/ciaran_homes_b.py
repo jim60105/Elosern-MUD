@@ -1,5 +1,197 @@
-"""NPC profiles owned by the ``ciaran_homes_b`` content slice (暗影谷村 homes, second half)."""
+"""NPC profiles owned by the ``ciaran_homes_b`` content slice (暗影谷村, second half).
 
-from world.lore.npc_profiles.shape import NpcProfile
+One profile per host, keyed by the host's ``service_id``: the hedge-healer,
+the sword instructor, the collector and the weaver. Each card is grounded in
+the place rows of ``world/lore/settlements/places_ciaran.py``, the elf
+passages of ``docs/lore/overview.md`` (lifespan 800 to 1200 years, the
+ciaran branch's love of the blade, no fixed trades, no shame about the
+body) and the village passages of ``docs/lore/settlement-locations.md``.
+Every host's dialogue table authors its own greeting, so each profile
+authors only the ``misunderstood`` voice line.
 
-ROWS: tuple[NpcProfile, ...] = ()
+The village has no commerce: the three makers share what they make, and the
+instructor grants nothing, so no card speaks of a shop, stock, business or
+apprenticeship.
+"""
+
+from world.lore.npc_card import NpcCard, NpcCardIdentity
+from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+ROWS: tuple[NpcProfile, ...] = (
+    NpcProfile(
+        key="ciaran_nireth",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的調藥者，住在藥草園畔。照顧園裡的藥草，熬強效治療"
+                    "藥水和魔力藥水，族人受了傷都來找她，偶爾來訪的外人也能換幾罐"
+                    "帶著。"
+                ),
+            ),
+            appearance=(
+                "看起來三十出頭的黑暗精靈女性，深棕色長髮用布巾包起，額前垂著"
+                "幾縷。穿著短袍與沾著草汁的圍裙，腰間掛著一排小藥瓶，指甲縫裡"
+                "總帶著泥土。"
+            ),
+            personality=(
+                "細心、愛操心，見到有人帶傷就忍不住數落幾句，數落完再替對方上藥。"
+                "相信藥該留給需要的人，從不多給，也不讓人空手離開。精靈不會生病，"
+                "她卻比誰都在意傷口和疲勞。"
+            ),
+            speech_style=(
+                "口語、語氣溫和卻直接，愛用「喔」「啊」。稱呼對方「你」。開口先"
+                "看對方身上有沒有傷，再問要往哪裡去。說到藥效只講用途，從不誇大。"
+            ),
+            life_story=(
+                "小時候跟著懂藥草的長輩認草，比起練刀，更喜歡蹲在園子裡看藥草"
+                "發芽。幾百年來把藥草園逐畦擴大，族裡打獵受傷的人都由她照顧。"
+                "村裡請她多熬一些藥，留給偶爾來訪的外人。"
+            ),
+            habit=(
+                "每天日出時先巡一遍藥草園。日落前把熬好的藥倒進罐裡，在罐口繫上"
+                "不同顏色的繩子分辨。"
+            ),
+            social_connection=(
+                "鑄刃者海莉爾·斯塔爾法爾手上的燙傷都由她照顧，兩人為此經常拌嘴。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「啊？我沒聽懂喔。你是哪裡受傷了，還是想問藥的事？」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_teliel",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的刀術導師，家就在練刀場邊。看著村裡的孩子從握木刀"
+                    "開始學刀，不收學生，也不替任何人代練，只守著場子，讓想練的人"
+                    "自己練。"
+                ),
+            ),
+            appearance=(
+                "看起來二十七八歲的黑暗精靈女性，身形修長，黑髮剪到肩上，用一條"
+                "細繩束起。穿著墨黑短袍，袖口紮緊，赤腳站在場上，腰間佩著一對"
+                "暗影鋼刀。"
+            ),
+            personality=(
+                "冷靜、嚴格，相信刀是基亞蘭人說話的另一種方式，用來守護的時候比"
+                "用來殺敵的時候多。不喜歡被叫作老師，覺得本事只能靠自己反覆練出"
+                "來，別人頂多在旁邊看。對認真的孩子很溫柔，對逞強的人一句話就讓"
+                "對方安靜。"
+            ),
+            speech_style=(
+                "口語、簡短，語氣平穩，很少用語尾詞。稱呼對方「你」。說話前會先"
+                "看對方的站姿，常用「腳」「肩」「看好」這類一兩個字的提醒。不談"
+                "自己的名聲，被誇時只說「繼續練」。"
+            ),
+            life_story=(
+                "在練刀場邊出生長大，看長輩練刀看了幾百年，自己也練了幾百年。族人習慣把孩子帶到她身邊，久了，場子就由她看著。"
+                "悠花小時候常在場上待到天黑，泰莉爾至今記得那"
+                "孩子第一次握木刀的樣子。"
+            ),
+            habit=(
+                "每天天亮前獨自在場上走完一整套動作，再把木刀逐一擦乾淨，排回"
+                "門邊。"
+            ),
+            social_connection=(
+                "鑄刃者海莉爾·斯塔爾法爾和她同住練刀場邊，海莉爾打好的刀總先"
+                "拿給她試。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「嗯，這句我沒聽懂。你想練，還是想問場子的事？」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_valwyn",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的蒐羅者，住在村北古樹下。家裡掛滿一輩子蒐羅來的零物，"
+                    "每樣都有一段故事；她編的精靈蛛絲比族人多，也替大家掛出來讓人"
+                    "取用。"
+                ),
+            ),
+            appearance=(
+                "看起來二十歲上下的黑暗精靈女性，淺銀色長髮編成好幾條細辮，辮尾"
+                "綁著羽毛和小貝殼。穿著短袍，外面套一件縫滿口袋的背心，耳上戴著"
+                "一對月牙耳環。"
+            ),
+            personality=(
+                "好奇、念舊，什麼東西都捨不得丟，覺得每樣東西都記得自己從哪裡來。"
+                "最愛聽外面的故事，常拿自己的收藏換一段旅途見聞。說話容易岔題，"
+                "一件小東西能講上半天。"
+            ),
+            speech_style=(
+                "口語、熱絡，句子長，愛用「哎」「呢」，常講到一半就岔到別的事上。"
+                "稱呼對方「你」。見面先問對方從哪裡來、路上看到了什麼。"
+            ),
+            life_story=(
+                "從小就愛撿東西，幾百年來走遍谷裡每一條溪、每一片坡，撿回來的"
+                "東西把屋子塞滿了。蛛絲是每個族人都會編的東西，她編得特別多，"
+                "就掛出來讓族人和偶爾來訪的外人取用。"
+            ),
+            habit=(
+                "每撿到一樣新東西，就用炭筆在小木牌上寫下撿到的地點和日子，綁在"
+                "那樣東西上。"
+            ),
+            social_connection=(
+                "綴飾者格威娜拉·希爾維爾莉夫常用飾品換她撿來的貝殼和晶砂，兩人"
+                "耳上的月牙耳環出自同一批。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「哎？你剛才說什麼？我又想到別的事去了，再說一次吧。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="ciaran_vethiel",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "暗影谷村的織衣者，住在織房坡上。整天守著織機，織族裡的墨黑"
+                    "短袍、戰鬥服飾、白色的蛛絲傳統服飾和晨露輕紗，族人和來訪的人"
+                    "都能換一件穿。"
+                ),
+            ),
+            appearance=(
+                "看起來三十多歲的黑暗精靈女性，深紫色長髮披在背後，用一根木梭"
+                "當髮簪。只在腰間繫一條自己織的寬帶，上身什麼也沒穿，手指上纏著"
+                "幾圈染好的線。"
+            ),
+            personality=(
+                "耐心、講究，一塊布可以從清晨織到星光出來。覺得衣服的本分是讓"
+                "身體更好看，所以對外人那種把身體包得密不透風的衣服總有點不以為然。對自己"
+                "織的每一件都很有感情，交出去之前會再摸一遍。"
+            ),
+            speech_style=(
+                "說話慢而輕，常停下來想一下用詞，愛用「嗯」。稱呼對方「你」。開口"
+                "先問對方喜歡什麼顏色，再從架上挑一件給對方看。講到布料會用手比出"
+                "經線和緯線的走向。"
+            ),
+            life_story=(
+                "從小在織機旁長大，族裡口耳相傳的花樣譜，她背得一字不差。"
+                "幾百年來把族裡每一種傳統服飾都織過，祭禮用的白色蛛絲衣也"
+                "由她一手包辦。"
+            ),
+            habit=(
+                "每天傍晚把當天織好的布攤在坡上的繩子上，讓晚風吹過再收進屋。"
+            ),
+            social_connection=(
+                "蒐羅者瓦爾溫·斯蒂爾瓦特爾編的蛛絲，有一大半進了她的織機。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「嗯……我沒聽懂。你是想看衣服，還是有舊衣要拿來？」"
+            ),
+        ),
+    ),
+)

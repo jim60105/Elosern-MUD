@@ -117,120 +117,118 @@ LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
 )
 
 # 妮瑞斯·米斯特瓦勒 — the hedge-healer (暗影谷村調藥者). elven_remedies:
-# 強效治療藥水, 魔力藥水. Her knowledge exists because elves get hurt
-# too; the jars are simply what she keeps enough of to share.
+# 強效治療藥水, 魔力藥水. Her knowledge exists because elves get hurt too;
+# she fusses over wounds first and takes back only her own jars.
 NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "調藥",
-        "「藥草是園裡長的，方子是族裡傳的，製藥這一爐小火從早熬到晚。"
-        "強效治療藥水與魔力藥水是兩爐常備的，`shop stock` 報此刻罐裡的數；"
-        "精靈不害病歸不害病，傷口與空掉的魔力可不認種族。」",
+        "「藥草從園裡採，方子是族裡老一輩傳下來的方法，一爐小火從早熬到晚。精"
+        "靈不會生病，可是傷口和用光的魔力，不管哪一族都一樣。常備的就兩種，強"
+        "效治療藥水和魔力藥水。」",
     ),
     KeywordResponse(
         "重傷",
-        "「紅的這罐救急，傷重才舍得開封，輕傷用清水與草灰就夠。"
-        "要帶幾罐備著，`buy` 加名便是；擱藥園邊晒著的那批，"
-        "下個月才熬得新一輪——急不來。」",
+        "「紅色那罐是強效治療藥水，傷得重才開，小傷用清水和草灰就夠了，別浪費"
+        "喔。要帶幾罐防身，留幾枚銅幣給我就好。」",
     ),
     KeywordResponse(
         "魔力",
-        "「藍的是魔力藥水，給施法的人回氣用的，魔法種族一樣喝得，效用不打折。"
-        "外頭賣得金貴，谷裡不過是多熬一爐的事，`shop stock` 有就提走。」",
+        "「藍色那罐是魔力藥水，施法的人累了，喝一口就能緩過來，精靈喝也一樣有"
+        "效。聽說外頭把這東西當寶，在谷裡只是多熬一爐的事啊。」",
     ),
     KeywordResponse(
         "藥草",
-        "「園裡採得多、你尋得的料好，我都收：曬乾的根、開花的頂葉都要。"
-        "`sell` 喊一聲我過秤回銅，藥性壞了的請帶回去——"
-        "那類東西我擱不下手。」",
+        "「園裡的藥草我自己採，外頭的我不收，誰知道藥性有沒有走掉。我熬的藥你"
+        "要是用不到，原封不動拿回來，我收下就是。」",
     ),
 )
 
 # 瓦爾溫·斯蒂爾瓦特爾 — the collector (暗影谷村蒐羅者). elven_sundries:
-# 精靈蛛絲 (月牙耳環 rides the adornment maker's shelf since
-# ciaran-village-crafts). Her home is full of kept things, each with a story.
+# 精靈蛛絲. Her home is full of kept things, each with a story; she trades
+# stories for stories, wears a 月牙耳環 from 格威娜拉's batch, and takes back
+# only the silk she hangs out.
 VALWYN_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "蒐羅",
-        "「路上撿的、林裡換的、潮水推上岸的——留得下的都掛在這兒了。"
-        "哪件入眼同我說；`shop stock` 報的是此刻還掛著的。"
-        "掛出來，就是讓人帶走的。」",
+        "「這些呀，路上撿到、林子裡換來、溪水沖上岸，全都在這兒。哎，你看那根"
+        "羽毛，三百年前一隻大鳥掉下來，那天下了好大的雨……啊，又扯遠了。這些"
+        "都是我的寶貝，不拿出來換，你看就好。」",
     ),
     KeywordResponse(
         "蛛絲",
-        "「林蛛的絲韌得很，編進繩索裡，風雨不斷。一小束一小束繫著，"
-        "要幾束同我說，`buy` 加個名便是。這東西村裡人人編得，"
-        "我編得多些，就替大夥兒掛出來罷了。」",
+        "「精靈蛛絲是林子裡的蛛吐的絲，韌得很，編成繩子，風雨都扯不斷。村裡每"
+        "個人都會編，我編得多一點，就掛出來給大家取用。你要幾束就跟我說，我替"
+        "你從繩上解下來。」",
     ),
     KeywordResponse(
         "耳環",
-        "「月牙那對是銀絲絞的，我自己戴過一季，洗淨就掛出來了。"
-        "飾物在谷裡不算稀罕，稀罕的是合眼緣——`shop stock` 看看在不在，"
-        "在，就是它與你有緣。」",
+        "「這對月牙耳環？格威娜拉的手藝，我跟她換來，戴了好多年了。哎，要是你"
+        "也喜歡，去銀葉坡找她，她窗邊掛著一整排呢。我這對可不給喔，上面有故事"
+        "。」",
     ),
     KeywordResponse(
         "以物易物",
-        "「你若捨得什麼，留下同我換，銅錢倒在其次。舊繩結、路上雕的"
-        "小木活、外頭帶稀奇的零嘴，都算。要脫手現成的也成，"
-        "`sell` 喊一聲，我替你收著。」",
+        "「我最喜歡換東西了！不過我換的是故事，你說一段路上的見聞，我就講一段"
+        "這屋裡哪樣東西的來歷。蛛絲要是用不完，原封不動拿回來，我收下，回你幾"
+        "枚銅幣。」",
     ),
 )
 
 # 泰莉爾·菲溫德 — the sword instructor (暗影谷村刀術導師). She shares the
 # 練刀場 with 海莉爾 the blade-smith: the forge and the teaching, on one
-# clearing. She teaches nothing directly — training is `rest` plus
-# `practice`, and her lines say so without pretending otherwise.
+# clearing. She grants nothing and spars with nobody: skill comes from the
+# trainee's own repetition, and her lines say so in the village's terms.
 TELIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "刀術",
-        "「基亞蘭的孩子先認刀柄、後認刀鋒：舞刀是谷裡人說話的另一種聲音，"
-        "不是殺人用的手藝。你看見林緣挂的那些刀痕了嗎？一代人補一片，"
-        "傷口的帳早就算清了。想學的是這個，不是我的名聲。」",
+        "「基亞蘭的孩子先認刀柄，再認刀鋒。舞刀是谷裡人說話的另一種方式，用來"
+        "守護的時候，比用來殺敵的時候多。你看林邊樹幹上那些刀痕，一代人留一片"
+        "。想學，學的是這個，我的名聲不重要。」",
     ),
     KeywordResponse(
         "練習",
-        "「我這邊沒有『拜師』這道門——谷裡不興把功夫鎖在某個人手上。"
-        "要練就 `rest` 養足精神，再 `practice 刀術`，一個時辰一個時辰地熬；"
-        "熟練度是你自己流汗換來的，我站在這裡只是讓你知道場子怎麼用。」",
+        "「谷裡沒有拜師這回事，本事也沒辦法從誰手上交給你。想練，就自己來場上"
+        "反覆練，練到手記得為止。我站在這裡，只是讓你知道場子怎麼用。」",
     ),
     KeywordResponse(
         "練刀場",
-        "「場子日夜都在。清晨是孩子的，日頭偏西是輪值的獵隊，"
-        "入夜後誰想獨自走幾遍式子，誰就自己來。木刀擱場邊，借還不用登記；"
-        "要買真刀才要找對人——鍛的那位住場子另一頭。」",
+        "「場子日夜都在。清晨給孩子，日頭偏西換輪值的獵隊，入夜以後，誰想一個"
+        "人練，誰就自己來。木刀擱在場邊，借還都不用說。想要真刀，去找住在場子"
+        "另一頭的海莉爾。」",
     ),
     KeywordResponse(
         "比劃",
-        "「想找人過兩手？谷裡人得閒會陪，手上有準頭，點到為止；"
-        "`engage` 開口便是，也可以去公會考場按規矩打。"
-        "我不同你比——導師的手留給還不會收刀的人，不是留給看熱鬧的。」",
+        "「想找人對打？谷裡沒有人陪外人動刀，我也不陪。我的手留給還不會收刀的"
+        "孩子。想試身手，樁子在那邊，先對著它練。」",
     ),
 )
 
 # 維特希爾·威爾德布瑞亞爾 — the weaver (暗影谷村織衣者). elven_attire:
-# 精靈短袍傳統服飾, 精靈戰鬥服飾, 精靈傳統服飾, 精靈森林輕紗.
+# 精靈短袍傳統服飾, 精靈戰鬥服飾, 精靈傳統服飾, 精靈森林輕紗. Slow and
+# thoughtful; clothes exist to show the body well (the elves hold no shame
+# about it), and she takes back only what she wove.
 VETHIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "織衣",
-        "「經線是我漿的，緯線是我染的，一塊布從早織到星起。"
-        "織成都擱架上讓人挑，`shop stock` 報此刻的數——"
-        "短袍、戰衣、禮袍、林紗，各是各的性子。」",
+        "「經線我自己漿，緯線我自己染，一塊布從清晨織到星光出來。架上有墨黑的"
+        "短袍、戰鬥服飾、白色的蛛絲傳統服飾，還有晨露織的森林輕紗，每一件的性"
+        "子都不一樣。喜歡哪件，換去穿就是。」",
     ),
     KeywordResponse(
         "戰衣",
-        "「戰鬥服飾夾了細鏈，輕是真輕，護得住肩背。進林子獵狼穿它正合適；"
-        "要哪件同我說，`buy` 加名，我從架上取下來替你拍淨。」",
+        "「精靈戰鬥服飾是墨黑色，貼身、好動，進林子打獵穿它最方便。嗯……它讓"
+        "身體動得自在，遮住的地方不多，族裡的人都喜歡。」",
     ),
     KeywordResponse(
         "禮袍",
-        "「祭禮的袍子一季織兩件，花樣是老譜，織的人手生不得。"
-        "外鄉人愛那襲森林輕紗，透光像霧——在不在架上，"
-        "`shop stock` 一問便知。急不來，織物有自己的時辰。」",
+        "「白色那件是精靈傳統服飾，用蛛絲織成，族裡祭禮時穿。我們覺得身體值得"
+        "讓人看，所以它織得很薄……外面的人看了常會臉紅呢。森林輕紗是晨露編的"
+        "長裙，透光像霧，只在那一季做得出來。」",
     ),
     KeywordResponse(
         "舊衣",
-        "「穿舊的、小了的不必丟，洗淨拿來我改；改不了的拆成布，"
-        "布還有布的去處。要連布帶線一併脫手，`sell` 一聲，"
-        "我按紗的成色回你——谷裡東西總該有第二條命。」",
+        "「穿舊或穿不下的衣服不用丟，洗乾淨拿來我改；改不了的就拆成布，布還能"
+        "派上別的用場。我織的衣服用不到了，也可以拿回來，換幾枚銅幣回去。」",
     ),
 )
 
@@ -296,11 +294,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_valwyn_home",
         DialogueDefinition(
             greeting=(
-                "古樹下的屋裡，瓦爾溫·斯蒂爾瓦特爾正把一串貝殼掛上繩結；"
-                "她抬手環指了一圈：「路上撿的、林裡換的，"
-                "掛出來就是讓人帶走的。哪件入眼同我說，"
-                "`shop stock` 報此刻還掛著的。你也捨得什麼要留下？"
-                "喊 `sell` 便好——你來我往，谷裡本來這樣。」"
+                "村北古樹下的屋裡，瓦爾溫·斯蒂爾瓦特爾正把一串貝殼掛上繩結，聽見腳步"
+                "聲就回頭笑了：「哎，有客人！你從哪裡來呀？路上看到什麼了？先別急著走"
+                "，坐下來聊一會兒。這屋裡掛的東西都有故事，想聽哪一樣，我都講給你聽。"
+                "」"
             ),
             responses=VALWYN_RESPONSES,
         ),
@@ -309,10 +306,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_vethiel_home",
         DialogueDefinition(
             greeting=(
-                "織機聲在門內停下，維特希爾·威爾德布瑞亞爾從經線間探出半張臉，"
-                "手上還捏著梭子：「等等就好——成了。短袍戰衣禮袍林紗，"
-                "架上隨你挑，`shop stock` 報此刻的數。要帶走哪件同我說 `buy`；"
-                "有舊衣要拿來的，洗淨了擱機邊便是。」"
+                "織機聲在門內停下，維特希爾·威爾德布瑞亞爾從經線間探出身子，手上還捏"
+                "著梭子：「嗯……來了啊。你喜歡什麼顏色？架上的衣服隨你看，看上哪件，"
+                "我拿下來讓你摸一下料子。」"
             ),
             responses=VETHIEL_RESPONSES,
         ),
@@ -333,10 +329,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_nireth_home",
         DialogueDefinition(
             greeting=(
-                "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯·米斯特瓦勒正替藥爐"
-                "壓小火：「來得巧，這輪剛起罐。強效治療藥水與魔力藥水都還有些，"
-                "`shop stock` 報罐裡的數；要帶幾罐防身，同我說 `buy`。"
-                "園裡採得多的藥草你要脫手，`sell` 一聲，我過秤。」"
+                "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯·米斯特瓦勒正替藥爐壓小火，"
+                "回頭先把你上下打量了一遍：「沒受傷吧？那就好。這輪藥剛起罐，強效治療"
+                "藥水和魔力藥水都還有一些，要帶幾罐上路就跟我說喔。」"
             ),
             responses=NIRETH_RESPONSES,
         ),
@@ -357,10 +352,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_teliel_home",
         DialogueDefinition(
             greeting=(
-                "場邊的木刀排成一列，泰莉爾·菲溫德剛收最後一組式子，額上的汗"
-                "還沒乾；她抱臂看你：「來看練刀的？場子就是這樣用的。"
-                "先 `rest` 養好精神，再 `practice 刀術`，一個時辰一個時辰來——"
-                "谷裡沒有捷徑，我這裡也沒有要賣你的東西。」"
+                "場邊的木刀排成一列，泰莉爾·菲溫德剛收完最後一組動作，額上的汗還沒乾"
+                "。她看了一眼你的站姿：「來看練刀？場子在這裡，木刀在門邊。我這裡沒有"
+                "東西要給你，也沒有捷徑。」"
             ),
             responses=TELIEL_RESPONSES,
         ),
