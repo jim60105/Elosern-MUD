@@ -103,6 +103,10 @@ def dialogue_open_fallback_line(name: str) -> str:
     return DIALOGUE_OPEN_FALLBACK_TEMPLATE.format(name=name)
 
 
+# Stable explanation for dialogue exchanges invalidated by mid-flight persona edits (D2).
+STALE_PERSONA_NOTE = "人物設定已更新，請重新對話。"
+
+
 # Stable defeat-aftermath EventLog templates (defeat-aftermath-core D-C6).
 # Every new aftermath kind ships its zh-tw offline template line here and the
 # rendered text flows through the ordinary EventLog path (Telnet and WebClient
