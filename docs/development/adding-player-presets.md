@@ -112,7 +112,9 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 ### Step 6 — 宣告同行夥伴
 
-`starting_companions` 每筆是 `StartingCompanion(preset_key, affinity, relationship)`：`preset_key` 點名夥伴自己的卡（夥伴的數值、技能、物品、人格全部來自那張卡），`affinity` 是啟動綁定播進關係記錄的值，`relationship` 是寫進夥伴人格 `social_connection` 的關係標籤。同一張卡不得宣告自己、不得重複點名同一夥伴；數量與數值邊界（見 §4）在 rules 層掃。
+`starting_companions` 每筆是 `StartingCompanion(preset_key, affinity, relationship)`：`preset_key` 點名夥伴自己的卡（夥伴的數值、技能、物品全部來自那張卡，而夥伴作為 NPC 的精簡人物卡與離線問候語則由該模板的 `PresetPersona` 單一源頭推導），`affinity` 是啟動綁定播進關係記錄的值，`relationship` 是寫進夥伴人格 `social_connection` 最前方的關係標籤。
+
+為滿足夥伴 NPC 的角色卡與台詞需求，`PresetPersona` 擴充了兩項選填的 NPC 專用欄位：`speech_style`（精簡 NPC 角色卡的說話風格葉，必填純文字）與 `greeting`（單段離線問候語，≤300 碼點純文字）。這兩項欄位在玩家啟動時**絕不投影**進玩家的角色卡記錄（`to_record()` 忽略之），因此對純玩家角色完全透明。同一張卡不得宣告自己、不得重複點名同一夥伴；數量、親和度與推導角色卡契約邊界（見 §4）在 rules 層掃。
 
 ### Step 7 — 補測試與驗證
 
@@ -147,7 +149,7 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_starting_companions` | lore 匯入 | 非 `StartingCompanion`、夥伴卡未登錄、宣告自己、同夥伴重複 | `that is not registered`／`declares itself as its own companion`／`more than once` |
 | `_validate_preset_fallback_keys` | lore 匯入 | `fallback_key` 不在閉合詞彙表（六鍵之外且非 `None`） | `declares fallback key ... outside the closed fallback vocabulary` |
 | `_validate_preset_persona_lengths` | `character_creation` 匯入 | persona record 任何字串超過 600 碼點 | `exceeds the 600-character length cap` |
-| `_validate_preset_companion_bounds` | `starting_companions` 匯入 | 夥伴數超過 `PARTY_MAX_COMPANIONS`（4）、`affinity` 不在 1～`NATURAL_CAP`（99）或為 bool、`relationship` 超過 600 | `more than the party cap 4`／`outside 1..99`／`persona length cap` |
+| `_validate_preset_companion_bounds` | `starting_companions` 匯入 | 夥伴數超過 `PARTY_MAX_COMPANIONS`（4）、`affinity` 不在 1～`NATURAL_CAP`（99）或為 bool、合成最大擁有者名推導出的人物卡違反精簡角色卡契約（必填葉非空、單葉 ≤600、區塊 ≤2000） | `more than the party cap 4`／`outside 1..99`／`derived card violates contract` |
 
 配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超跨度，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
 

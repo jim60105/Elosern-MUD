@@ -44,7 +44,7 @@ The rules sweep at `world/rules/starting_companions.py` import time replaces the
 
 `build_starting_companion` replaces `npc.db.persona = _build_persona_record(...)` with, at the same point in the build and inside the existing `try` whose `except` deletes the NPC:
 
-1. `initialize_npc_persona(npc, card, {"kind": "companion", "preset": partner_preset_key, "owner": player.pk})` where `card` is D2's derivation for this owner. `_build_persona_record` is deleted.
+1. `initialize_npc_persona(npc, card, {"kind": "companion", "profile": partner_preset_key, "owner": player.pk})` where `card` is D2's derivation for this owner. `_build_persona_record` is deleted.
 2. `npc.db.npc_offline_greeting = greeting` when the preset authors one — the per-instance offline-greeting field (plain text, ≤ 300 code points after normalization, single paragraph), **not** inside `db.persona` (the card is exactly seven fields) and **not** inside `db.npc_persona_meta` (metadata is never prose). It is a generic contract any future producer with an authored greeting (offline bundles, quest director, imports) can write; this change ships the companion writer only. Dialogue reads it (routing specified by `npc-persona-dialogue-consumption`); the author editor edits it (transport specified by `npc-persona-editor-window`'s server delta), and a greeting-only edit advances `persona_version` like any changed leaf, so the version-checked update and the stale-persona gate cover it without a second version counter. The preset only seeds the field at build; later edits detach from the template.
 
 The preset is still read for every mechanical value. A failure of either write deletes the partial NPC and re-raises, inside `activate_player_character`'s atomic block as today.
