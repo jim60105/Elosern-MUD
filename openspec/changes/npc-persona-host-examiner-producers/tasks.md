@@ -11,7 +11,7 @@ Apply on branch `feat/npc-persona-host-examiner-producers` in worktree `.worktre
 
 ## 3. Exam opponents
 
-- [ ] 3.1 Initialize the opponent's card from `examiner_profile_key` inside `_spawn_opponent`'s compensation per design D3 and extend `guild_exam_opponent_created` with `profile`; verify in `world/rules/tests/test_guild_exams.py`: card and provenance at spawn, injected failure rolls back opponent/record/session, a second spawn after editing the first carries the unedited card.
+- [x] 3.1 Initialize the opponent's card from `examiner_profile_key` inside `_spawn_opponent`'s compensation per design D3 and extend `guild_exam_opponent_created` with `profile`; verify in `world/rules/tests/test_guild_exams.py`: card and provenance at spawn, injected failure rolls back opponent/record/session, a second spawn after editing the first carries the unedited card.
 
 ## 4. Gates
 

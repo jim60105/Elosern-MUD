@@ -19,6 +19,8 @@ from typing import Any
 from evennia.utils.create import create_object
 
 from world.observability import log_info, log_warn
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_identity import validate_npc_title
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
@@ -267,6 +269,12 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
         opponent.npc_title = validate_npc_title(rank.examiner_title)
         ensure_npc_canonical_age(opponent)
+        examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
+        initialize_npc_persona(
+            opponent,
+            examiner_profile.card.to_record(),
+            {"kind": "profile", "profile": rank.examiner_profile_key},
+        )
         opponent.location = actor.location
         # Occupancy check inside the same start_guild_exam transaction: no
         # check-then-create window. A later same-rank spawn always sees the
@@ -276,7 +284,11 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         opponent.save()
         log_info(
             "guild_exam_opponent_created",
-            context={"char": opponent.key, "rank": target_rank},
+            context={
+                "char": opponent.key,
+                "rank": target_rank,
+                "profile": rank.examiner_profile_key,
+            },
         )
     except Exception:
         try:
