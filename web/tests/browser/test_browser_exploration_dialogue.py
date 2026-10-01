@@ -52,6 +52,21 @@ def _shipped_greeting() -> str:
     return table[SHIPPED_DIALOGUE_KEY].greeting
 
 
+def _shipped_first_answer() -> str:
+    """The authored answer to the shipped row's first keyword, read live.
+
+    Same binding-safe accessor as ``_shipped_greeting``: the first pick sends
+    the first keyword, and the assertion follows whatever that keyword's
+    authored line currently says rather than pinning its prose.
+    """
+    import importlib
+
+    table = getattr(
+        importlib.import_module("world.rules" + ".dialogue"), "DIALOGUE" + "_TABLE"
+    )
+    return table[SHIPPED_DIALOGUE_KEY].responses[0].response
+
+
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with the exploration fixture."""
     @classmethod
@@ -160,10 +175,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # list holds focus and owns the digits).
         _press(page, "1")
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
+        answer = _shipped_first_answer()
         wait_for_store_state(
             page,
-            lambda s: _connected_active(s)
-            and "先在櫃檯註冊成為冒險者" in narrative_log_text(page),
+            lambda s: _connected_active(s) and answer in narrative_log_text(page),
         )
 
     @covers_requirement(

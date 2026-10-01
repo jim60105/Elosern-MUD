@@ -39,6 +39,7 @@ class GuildNPCIdentityTests(unittest.TestCase):
         bad["D"] = GuildRank(
             row.key, row.order, row.reward_min_copper, row.reward_max_copper,
             row.description, row.title_key, row.examiner_name, "含\x00控制的稱號",
+            row.examiner_profile_key,
         )
         with self.assertRaises(ValueError) as caught:
             validate_guild_npc_identities(ranks=bad, branches={})
@@ -65,6 +66,51 @@ class GuildNPCIdentityTests(unittest.TestCase):
         fields.pop("examiner_title")
         with self.assertRaises(TypeError):
             GuildRank(**fields)
+
+    def test_missing_or_unregistered_examiner_profile_key_is_named_by_rank(self):
+        # npc-persona-content-altoria-guild D6: every validated rank must name
+        # a registered examiner profile; the error names the rank and field.
+        import dataclasses
+
+        row = GUILD_RANK_REGISTRY["D"]
+        for key in (None, "t_no_such_examiner_profile"):
+            with self.subTest(examiner_profile_key=key):
+                bad = {"D": dataclasses.replace(row, examiner_profile_key=key)}
+                with self.assertRaises(ValueError) as caught:
+                    validate_guild_npc_identities(ranks=bad, branches={})
+                message = str(caught.exception)
+                self.assertIn("guild rank D", message)
+                self.assertIn("examiner_profile_key", message)
+
+    def test_examiner_profile_with_voice_lines_is_rejected(self):
+        # An examiner is a combat opponent with no dialogue capability, so the
+        # profile a rank names must author no voice lines.
+        import dataclasses
+        from unittest import mock
+
+        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+        from world.lore.npc_profiles.shape import NpcVoiceLines
+
+        row = GUILD_RANK_REGISTRY["D"]
+        speaking = dataclasses.replace(
+            NPC_PROFILE_REGISTRY[row.examiner_profile_key],
+            key="t_speaking_examiner",
+            voice=NpcVoiceLines(misunderstood="「嗯？」"),
+        )
+        registry = {**NPC_PROFILE_REGISTRY, "t_speaking_examiner": speaking}
+        with mock.patch(
+            "world.lore.npc_profiles.NPC_PROFILE_REGISTRY", registry
+        ):
+            with self.assertRaises(ValueError) as caught:
+                validate_guild_npc_identities(
+                    ranks={
+                        "D": dataclasses.replace(
+                            row, examiner_profile_key="t_speaking_examiner"
+                        )
+                    },
+                    branches={},
+                )
+        self.assertIn("voice lines", str(caught.exception))
 
     @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_shipped_rows_load_clean(self):

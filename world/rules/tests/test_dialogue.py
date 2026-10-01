@@ -45,6 +45,18 @@ SYNTH_BRANCH = synthetic_branch_key()
 SYNTH_DIALOGUE_KEY = next(iter(SYNTH_DIALOGUE))
 
 
+def _staff_answer(keyword):
+    """The guild_staff table's authored answer to ``keyword``, read live.
+
+    Tests compare the host's answers with its own authored table and never
+    pin the prose, so rewording a line breaks nothing.
+    """
+    definition = live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY]
+    return next(
+        entry.response for entry in definition.responses if entry.keyword == keyword
+    )
+
+
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -81,7 +93,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_scripted_host_answers_known_keyword(self):
         host = self._scripted_host()
         response = dialogue_response(host, self.player, "公會")
-        self.assertIn("guild list", response)
+        self.assertEqual(response, _staff_answer("公會"))
 
     @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
     def test_unknown_keyword_yields_no_understanding(self):
@@ -99,7 +111,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         host = self._scripted_host()
         greeting = greeting_for(host)
         self.assertIsNotNone(greeting)
-        self.assertIn("guild register", greeting)
+        self.assertEqual(greeting, live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY].greeting)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_missing_greeting_falls_back_to_none(self):
@@ -165,7 +177,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
             GuildStaff.create(host, service_id="staff", branch_key=SYNTH_BRANCH)
         )
         response = dialogue_response(host, player, GUILD_STAFF_TURNIN_KEYWORD)
-        self.assertIn("guild register", response)
+        self.assertEqual(response, _staff_answer(GUILD_STAFF_TURNIN_KEYWORD))
         self.assertNotIn("可以交回", response)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
@@ -237,43 +249,21 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(host.relations.affinity_for(player), 5)
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
-    def test_every_taught_guild_command_resolves_to_a_registered_command(self):
-        from commands.default_cmdsets import CharacterCmdSet
-
-        cmdset = CharacterCmdSet()
-        cmdset.at_cmdset_creation()
-        taught = [
-            "guild register",
-            "guild list",
-            "guild accept",
-            "guild log",
-            "guild show",
-            "guild turnin",
-            "guild abandon",
-            "guild merit",
-        ]
-        keys = {str(command) for command in cmdset.commands}
-        for command in taught:
-            with self.subTest(command=command):
-                self.assertIn(command, keys)
-
-    @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
-    def test_guild_staff_definition_teaches_the_guild_commands(self):
+    @covers_requirement("scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed")
+    def test_guild_staff_definition_stays_in_character(self):
+        # The branch master explains the counter in the world's own terms and
+        # names no command (npc-persona-content-altoria-guild D5): no backticked
+        # token and no `guild <verb>` anywhere in the greeting or answers.
         definition = live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY]
         combined = definition.greeting + "".join(
             entry.response for entry in definition.responses
         )
-        for command in (
-            "guild register",
-            "guild list",
-            "guild accept",
-            "guild log",
-            "guild show",
-            "guild turnin",
-            "guild abandon",
-            "guild merit",
-        ):
-            self.assertIn(command, combined)
+        self.assertNotIn("`", combined)
+        self.assertNotRegex(combined, r"guild\s+[a-z]")
+        self.assertIn(
+            GUILD_STAFF_TURNIN_KEYWORD,
+            [entry.keyword for entry in definition.responses],
+        )
 
 
 class OpensDialoguePredicateTests(EvenniaTest):
@@ -388,8 +378,7 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self.guild_master.location = self.hall_room
         self.char1.location = self.hall_room
         output = self.call(CmdsTalk(), f"{self.guild_master.key} 公會", caller=self.char1)
-        self.assertIn("guild list", output)
-        self.assertIn("guild turnin", output)
+        self.assertIn(_staff_answer("公會"), output)
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
     def test_no_keyword_talk_presents_the_greeting(self):
@@ -398,7 +387,7 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self.guild_master.location = self.hall_room
         self.char1.location = self.hall_room
         output = self.call(CmdsTalk(), self.guild_master.key, caller=self.char1)
-        self.assertIn("guild register", output)
+        self.assertIn(live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY].greeting, output)
 
     def _player_state(self):
         return {
