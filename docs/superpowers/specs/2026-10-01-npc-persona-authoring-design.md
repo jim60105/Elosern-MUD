@@ -287,28 +287,30 @@ No implementation, archive, feature branch, or worktree is created as part of th
 
 `os-propose` produced the following 20 changes, committed on `master` between `141fcc53` and `e81df684`. All pass `openspec validate --strict` and are in phase `proposed`. Each `proposal.md` carries a machine-readable `## Batch:` section that is authoritative for queueing; this table is a summary.
 
-| # | Change | Scope | Depends on |
-|---|---|---|---|
-| 1 | `npc-persona-card-foundation` | Pure seven-field card contract (`world/lore/npc_card.py`: 600-code-point leaves, identity-section and 2,000-code-point budgets, shared label order); speech-style label in `PersonaStore`; persistence/versioning service `world/rules/npc_persona.py` (separate meta record, lock-then-read, idmapper-bypassing reads, compare-and-set, `storage_unavailable`, cache restore, events); shared boundary fixtures | — |
-| 2 | `npc-persona-profile-registry` | `NpcProfile` and voice lines, single assembly point, seven empty slices, source inventory, conditional `host_profile_key`, Altoria dialogue split by terrace | 1 |
-| 3 | `npc-persona-content-altoria-lower` | Full card and dialogue rewrite for 5 lower-terrace hosts | 2 |
-| 4 | `npc-persona-content-altoria-trade` | 6 middle-terrace commerce hosts | 2 |
-| 5 | `npc-persona-content-altoria-guild` | Guild branch master, `guild_staff` dialogue table, 7 examiners, required `GuildRank.examiner_profile_key` | 2 |
-| 6 | `npc-persona-content-altoria-upper` | 5 upper-terrace hosts | 2 |
-| 7 | `npc-persona-content-ciaran-homes-a` | 4 elven hosts in village_ciaran | 2 |
-| 8 | `npc-persona-content-ciaran-homes-b` | Remaining 4 elven hosts in village_ciaran | 2 |
-| 9 | `npc-persona-companion-profiles` | 4 companion NPC profiles with required `npc_profile_key`; builder composes the owner-relationship line instead of copying the player-preset persona | 1, 2 |
-| 10 | `npc-persona-offline-bundles` | 22 whole-card offline bundles (2 per tier for 10 tiers, plus beastfolk), SHA-256 stable selector | 2 |
-| 11 | `npc-persona-host-examiner-producers` | `host_profile_key` becomes required; host and examiner creation writes the card; reused hosts are never overwritten | 1, 2, 3–8 |
-| 12 | `npc-persona-import-cards` | Typeclass-aware NPC import card validation, loader through the initializer, rewritten shipped examples | 1 |
-| 13 | `npc-persona-generated-quest-cards` | Required card through blueprint, prompt, helper, compile, strict codec, restore, and materializer; 8,192-token director budget; at most 3 occupants per blueprint | 1 |
-| 14 | `npc-persona-dialogue-consumption` | Seven-field prompt with a current-persona frame; profile-specific misunderstanding and offline greeting lines | 1, 2 |
-| 15 | `npc-persona-dialogue-version-gate` | `persona_version` completion gate with a `stale_persona` outcome for browser talk, party invite, and text invite | 1 |
-| 16 | `npc-persona-editor-actions` | `npc.persona.read` / `npc.persona.update`, admission gates, private five-field result, `npc_persona` affordance, JS card-contract mirror | 1 |
-| 17 | `npc-persona-editor-window` | Vue editor window, state machine, showcase entry, core browser journey, player documentation | 16 |
-| 18 | `npc-persona-editor-browser-edges` | Test-only (`skip_specs`) browser edges: late results, NPC departure, puppet change, cross-tab conflict | 17 |
-| 19 | `npc-persona-roster-validation` | Fail-loud boot gate for full-roster completeness, roster review record, adding-NPCs guide | 3–9, 11–15 |
-| 20 | `npc-persona-roster-cutover` | One-time, exclusive, single-transaction replacement of existing NPC cards and durable generated-quest payloads | 9–13, 19 |
+| # | Change | Kind | Scope | Depends on |
+|---|---|---|---|---|
+| 1 | `npc-persona-card-foundation` | Logic | Pure seven-field card contract (`world/lore/npc_card.py`: 600-code-point leaves, identity-section and 2,000-code-point budgets, shared label order); speech-style label in `PersonaStore`; persistence/versioning service `world/rules/npc_persona.py` (separate meta record, lock-then-read, idmapper-bypassing reads, compare-and-set, `storage_unavailable`, cache restore, events); shared boundary fixtures | — |
+| 2 | `npc-persona-profile-registry` | Logic | `NpcProfile` and voice lines, single assembly point, seven empty slices, source inventory, conditional `host_profile_key`, Altoria dialogue split by terrace | 1 |
+| 3 | `npc-persona-content-altoria-lower` | Content | Full card and dialogue rewrite for 5 lower-terrace hosts | 2 |
+| 4 | `npc-persona-content-altoria-trade` | Content | 6 middle-terrace commerce hosts | 2 |
+| 5 | `npc-persona-content-altoria-guild` | Content | Guild branch master, `guild_staff` dialogue table, 7 examiners, required `GuildRank.examiner_profile_key` | 2 |
+| 6 | `npc-persona-content-altoria-upper` | Content | 5 upper-terrace hosts | 2 |
+| 7 | `npc-persona-content-ciaran-homes-a` | Content | 4 elven hosts in village_ciaran | 2 |
+| 8 | `npc-persona-content-ciaran-homes-b` | Content | Remaining 4 elven hosts in village_ciaran | 2 |
+| 9 | `npc-persona-companion-profiles` | Content + logic | 4 companion NPC profiles with required `npc_profile_key`; builder composes the owner-relationship line instead of copying the player-preset persona | 1, 2 |
+| 10 | `npc-persona-offline-bundles` | Content | 22 whole-card offline bundles (2 per tier for 10 tiers, plus beastfolk), SHA-256 stable selector | 2 |
+| 11 | `npc-persona-host-examiner-producers` | Logic | `host_profile_key` becomes required; host and examiner creation writes the card; reused hosts are never overwritten | 1, 2, 3–8 |
+| 12 | `npc-persona-import-cards` | Logic + content | Typeclass-aware NPC import card validation, loader through the initializer, rewritten shipped examples | 1 |
+| 13 | `npc-persona-generated-quest-cards` | Logic + content | Required card through blueprint, prompt, helper, compile, strict codec, restore, and materializer; 8,192-token director budget; at most 3 occupants per blueprint | 1 |
+| 14 | `npc-persona-dialogue-consumption` | Logic + content | Seven-field prompt with a current-persona frame; profile-specific misunderstanding and offline greeting lines | 1, 2 |
+| 15 | `npc-persona-dialogue-version-gate` | Logic | `persona_version` completion gate with a `stale_persona` outcome for browser talk, party invite, and text invite | 1 |
+| 16 | `npc-persona-editor-actions` | Logic | `npc.persona.read` / `npc.persona.update`, admission gates, private five-field result, `npc_persona` affordance, JS card-contract mirror | 1 |
+| 17 | `npc-persona-editor-window` | Visual | Vue editor window, state machine, showcase entry, core browser journey, player documentation | 16 |
+| 18 | `npc-persona-editor-browser-edges` | Logic | Test-only (`skip_specs`) browser edges: late results, NPC departure, puppet change, cross-tab conflict | 17 |
+| 19 | `npc-persona-roster-validation` | Logic + content | Fail-loud boot gate for full-roster completeness, roster review record, adding-NPCs guide | 3–9, 11–15 |
+| 20 | `npc-persona-roster-cutover` | Logic | One-time, exclusive, single-transaction replacement of existing NPC cards and durable generated-quest payloads | 9–13, 19 |
+
+**Kind** marks where human editorial or visual review is needed. *Logic*: code and tests only, at most a label or one system message string. *Content*: authored character cards, dialogue lines, or offline bundles are the main deliverable. *Logic + content* / *Content + logic*: the change is primarily one and carries some of the other — 12 rewrites the shipped import example card and docs; 13 authors the offline occupant 黑鬍's card and the scenario-director prompt text; 14 adds the `npc_dialogue.persona_frame` prompt text (the voice lines themselves are authored in 3–8); 19 writes the roster review record and the adding-NPCs guide; 9 is an even split of four companion cards and the companion-builder rewrite. *Visual*: 17 is the only change with new UI and needs a visual check. Character writing is concentrated in 3–10 plus the cards in 12 and 13.
 
 ### 12.2 Implementation batch suggestion
 
