@@ -4,7 +4,7 @@ Apply on branch `feat/npc-persona-dialogue-version-gate` in worktree `.worktrees
 
 - [x] 1.1 Add `current_persona_version` to `world/rules/npc_persona.py` (design D1) with tests that malformed metadata yields `None` and nothing is written.
 - [x] 1.2 Implement design D2 in `typeclasses/npcs.py` and `world/rules/player_messages.py`; verify with `twisted.internet.task.Clock`-driven tests in `typeclasses/tests/`: one-leaf edit mid-flight, change-and-revert mid-flight, no-op save mid-flight (still presents and applies), degraded-then-stale, thinking timer cancelled, no second client call, player line kept and no NPC line appended.
-- [ ] 1.3 Map the stale outcome in `_talk_freeform_adapter`, `_party_invite_adapter`/`_render_invite_outcome`, and `commands/invite.py`; verify in `web/webclient/actions/tests/` and `commands/tests/`: rejected `stale_persona` result with no session refresh, invite with no join/refusal/threshold, text `invite` prints the explanation, and the existing separated-context tests stay green.
+- [x] 1.3 Map the stale outcome in `_talk_freeform_adapter`, `_party_invite_adapter`/`_render_invite_outcome`, and `commands/invite.py`; verify in `web/webclient/actions/tests/` and `commands/tests/`: rejected `stale_persona` result with no session refresh, invite with no join/refusal/threshold, text `invite` prints the explanation, and the existing separated-context tests stay green.
 
 ## 2. Gates
 

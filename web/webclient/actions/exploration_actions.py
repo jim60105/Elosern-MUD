@@ -51,7 +51,10 @@ from world.rules.party import (
     join_party,
     party_size,
 )
-from world.rules.player_messages import dialogue_open_fallback_line
+from world.rules.player_messages import (
+    STALE_PERSONA_NOTE,
+    dialogue_open_fallback_line,
+)
 from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
@@ -605,9 +608,15 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         # dispatcher's newer-revision snapshot publishes.
         open_or_refresh_dialogue(actor, npc, line)
 
-    deferred = npc.at_talked_to(payload["speech"], actor, client, settled_line=_settled_line)
+    deferred = npc.at_talked_to(
+        payload["speech"], actor, client, settled_line=_settled_line, notify_stale=False
+    )
 
     def _on_success(result: Any) -> dict[str, Any]:
+        from typeclasses.npcs import STALE_PERSONA
+
+        if result is STALE_PERSONA:
+            return _rejected("stale_persona", STALE_PERSONA_NOTE)
         if is_stale_context(result):
             # The seam showed the speech and the stale note; the panel result
             # carries the same outcome so the client reports the dropped
@@ -648,9 +657,11 @@ def _party_invite_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     from web.webclient.actions.dialogue_composition import build_dialogue_client
 
     client = build_dialogue_client()
-    deferred = npc.run_npc_exchange(payload["message"], actor, client)
+    deferred = npc.run_npc_exchange(payload["message"], actor, client, path="party_invite")
 
     def _on_success(result: Any) -> dict[str, Any]:
+        if getattr(result, "stale_persona", False):
+            return _rejected("stale_persona", STALE_PERSONA_NOTE)
         message = _render_invite_outcome(npc, actor, result)
         return _success("invited", message, AFFECTED_FULL)
 
@@ -676,6 +687,10 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
         JOIN_REJECTION_MESSAGES,
         REFUSED_MESSAGE,
     )
+
+    if getattr(result, "stale_persona", False):
+        actor.msg(STALE_PERSONA_NOTE)
+        return STALE_PERSONA_NOTE
 
     if result.degraded:
         from world.rules.affinity_config import get_config
