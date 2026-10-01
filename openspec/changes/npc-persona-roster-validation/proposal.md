@@ -38,5 +38,6 @@ depends-on: npc-persona-host-examiner-producers
 depends-on: npc-persona-import-cards
 depends-on: npc-persona-generated-quest-cards
 depends-on: npc-persona-dialogue-consumption
+depends-on: npc-persona-dialogue-version-gate
 
 Code-conflict notes: `server/conf/at_server_startstop.py` (`STARTUP_STEP_ORDER` and `at_server_start`) is also edited by `npc-persona-roster-cutover`, which lands after this change and inserts its own step; sequential, so no parallel conflict. `docs/development/adding-npcs.md` was edited by `npc-persona-import-cards` (import sections only); this change edits the authoring-flow sections. Every requirement here is satisfiable only after all listed changes, which is why it cannot run earlier; no placeholder profile or relaxed check may be used to make it pass sooner.
