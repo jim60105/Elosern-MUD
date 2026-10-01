@@ -27,7 +27,7 @@ Every rule writes a complete new card; no rule copies old prose.
 
 ### D3. Exclusivity
 
-`npc_persona.py` gains `_WRITES_SUSPENDED` and a `suspended_writes()` context manager used only by the cutover. While set, `initialize_npc_persona` and `update_npc_persona` raise `NpcPersonaWritesSuspended` (the editor maps it to `npc_persona.unavailable`, import and spawn fail their all-or-nothing transactions). Entering the context while already set raises `NpcPersonaCutoverError("cutover already running")`; there is no wait or retry. The cutover's own writes go through a private writer that bypasses the guard. Because the step runs during `at_server_start`, no session is served concurrently; the guard covers re-entrancy and any in-process caller.
+`npc_persona.py` gains `_WRITES_SUSPENDED` and a `suspended_writes()` context manager used only by the cutover. While set, `initialize_npc_persona` and `update_npc_persona` raise `NpcPersonaWritesSuspended` (import and spawn fail their all-or-nothing transactions; an editor request cannot occur because no session is served during `at_server_start`, and any in-process caller gets the exception through its normal failure path). Entering the context while already set raises `NpcPersonaCutoverError("cutover already running")`; there is no wait or retry. The cutover's own writes go through a private writer that bypasses the guard. Because the step runs during `at_server_start`, no session is served concurrently; the guard covers re-entrancy and any in-process caller.
 
 ### D4. Boot placement and idempotence
 

@@ -2,7 +2,7 @@ Apply on branch `feat/npc-persona-roster-cutover` in worktree `.worktrees/npc-pe
 
 ## 1. Writer suspension
 
-- [ ] 1.1 Add `suspended_writes()` and `NpcPersonaWritesSuspended` to `world/rules/npc_persona.py` per design D3, map the suspension to `npc_persona.unavailable` in the editor adapter when present, and verify tests: initializer, update, an NPC import, and a scene spawn each reject while suspended; re-entry raises immediately.
+- [ ] 1.1 Add `suspended_writes()` and `NpcPersonaWritesSuspended` to `world/rules/npc_persona.py` per design D3 (no editor-adapter edit: the step runs during `at_server_start` before any session is served), and verify tests: initializer, update, an NPC import, and a scene spawn each reject while suspended; re-entry raises immediately.
 
 ## 2. Plan
 
