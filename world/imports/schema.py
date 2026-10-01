@@ -181,8 +181,10 @@ CHARACTER_SCHEMA_V1 = {
         "persona": {
             "type": "object",
             "description": (
-                "Opaque persona payload. Validation confirms only that it is an "
-                "object and never inspects or constrains its nested content."
+                "Persona payload. The schema checks only that it is an object. "
+                "An NPC-target import applies the compact NPC card contract "
+                "during semantic validation (world.lore.npc_card); a non-NPC "
+                "target's persona is opaque and never inspected."
             ),
         },
         "affinity_elements": {

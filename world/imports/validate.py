@@ -23,6 +23,7 @@ from world.art.subjects import (
 )
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.creation_wizard import (
     AGE_MAXIMUM,
@@ -171,6 +172,31 @@ def _check_npc_title(record: dict[str, Any]) -> list[Issue]:
     except ValueError as error:
         return [Issue("title", str(error))]
     return []
+
+
+def _check_npc_persona_card(
+    record: dict[str, Any],
+) -> tuple[list[Issue], dict[str, Any] | None]:
+    """Apply the compact NPC card contract to an NPC-target record's persona.
+
+    Called only for NPC targets (the resolved class, never a record field;
+    npc-persona-import-cards D1). A contract violation becomes one named
+    issue on ``persona.<leaf>`` (or ``persona`` for a card-wide reason) whose
+    message starts with the contract's stable code; the contract stops at its
+    first violation, so at most one card issue is reported per record (D2).
+    On success the normalized card record is returned so the validated
+    record -- and therefore the loader -- carries exactly what was checked.
+    Deliberately catching ``NpcCardError``: the conversion returns a
+    diagnosis that rejects the whole record, so it is not a silent swallow.
+    """
+    try:
+        card = normalize_card(record.get("persona"))
+    except NpcCardError as error:
+        field_name = f"persona.{error.field}" if error.field else "persona"
+        return [
+            Issue(field_name, f"{error.code}: compact NPC card contract violation")
+        ], None
+    return [], card.to_record()
 
 
 def _check_entity_key_contract(record: dict[str, Any]) -> list[Issue]:
@@ -790,6 +816,15 @@ def validate_character(
     # must reject here instead of being dropped or persisted unchecked.
     report.rejections.extend(_check_skill_proficiency_keys(record))
     record = normalize_lineage_record(record)
+    npc_target = _is_npc_target(typeclass)
+    if npc_target:
+        # NPC targets carry the compact card (npc-persona-import-cards D1/D2);
+        # the validated record holds the NORMALIZED card so the loader
+        # persists exactly what was validated. A non-NPC persona stays opaque.
+        card_issues, normalized_card = _check_npc_persona_card(record)
+        report.rejections.extend(card_issues)
+        if normalized_card is not None:
+            record = {**record, "persona": normalized_card}
     report.record = record
     report.rejections.extend(_check_entity_key_contract(record))
     report.rejections.extend(_check_npc_title(record))
@@ -804,7 +839,7 @@ def validate_character(
     report.rejections.extend(_check_combat_traits(record))
     report.rejections.extend(_check_skills(record))
     profession_issues, report.profession_row = _check_profession_fields(
-        record, _is_npc_target(typeclass)
+        record, npc_target
     )
     report.rejections.extend(profession_issues)
     report.warnings.extend(_check_stats_band(record))

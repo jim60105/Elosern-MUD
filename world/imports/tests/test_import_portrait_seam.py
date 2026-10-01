@@ -15,6 +15,19 @@ from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from tools.spec_traceability import covers_requirement
 
 
+def portrait_callbacks(callbacks):
+    """The post-commit portrait ensures among every registered callback.
+
+    An NPC import also registers the persona initializer's commit-bound
+    ``npc_persona_initialized`` event, so the portrait count is filtered.
+    """
+    return [
+        callback
+        for callback in callbacks
+        if callback.__qualname__.startswith("schedule_portrait_ensure.")
+    ]
+
+
 class ImportPortraitSeamTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
@@ -51,7 +64,7 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             entities = load_batch(paths)
         self.assertEqual(len(entities), 2)
-        self.assertEqual(len(callbacks), 2)
+        self.assertEqual(len(portrait_callbacks(callbacks)), 2)
         for entity in entities:
             self.assertEqual(
                 entity.db.portrait_policy,
@@ -101,7 +114,7 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         ):
             entities = load_batch([path])
         self.assertEqual(len(entities), 1)
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(portrait_callbacks(callbacks)), 1)
         self.assertTrue(
             NPC.objects.filter(db_key="human_reference").exists()
         )

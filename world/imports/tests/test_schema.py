@@ -72,15 +72,27 @@ class SchemaTests(TestCase):
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
 
-    @covers_requirement("import-reference-example::the-reference-example-exercises-every-major-schema-branch-it-can-demonstrate-on-its-race", "import-schema::persona-is-validated-as-an-object-and-nothing-more")
-    def test_persona_is_opaque_but_must_be_an_object(self):
+    @covers_requirement("import-schema::persona-is-an-object-at-the-schema-layer-and-npc-targets-validate-it-semantically")
+    def test_persona_is_only_an_object_at_the_schema_layer(self):
         record = example_record()
         record["persona"] = {"anything": [1, {"nested": None}]}
         self.assertFalse(
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
-        self.assert_character_invalid(lambda r: r.update(persona="not an object"))
-        self.assertIn("opaque", CHARACTER_SCHEMA_V1["properties"]["persona"]["description"].lower())
+        for bad in ("not an object", ["a"], 3):
+            self.assert_character_invalid(lambda r, bad=bad: r.update(persona=bad))
+        self.assertEqual(
+            set(CHARACTER_SCHEMA_V1["properties"]["persona"]), {"type", "description"}
+        )
+        description = CHARACTER_SCHEMA_V1["properties"]["persona"]["description"].lower()
+        # Clause 1: the schema layer checks only for an object.
+        self.assertIn("checks only that it is an object", description)
+        # Clause 2: NPC targets apply the compact card contract semantically.
+        self.assertIn("npc-target import applies the compact npc card contract", description)
+        self.assertIn("semantic validation", description)
+        # Clause 3: non-NPC personas are opaque and never inspected.
+        self.assertIn("non-npc", description)
+        self.assertIn("opaque and never inspected", description)
 
     @covers_requirement("import-schema::sexual-baseline-requires-arousal-virgin-and-sensitivity-with-level-fields-constrained-to-the-sexual-vocabulary-registry")
     @covers_requirement("import-validation::sexual-baseline-shape-violations-are-rejections")
