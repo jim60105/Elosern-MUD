@@ -1,5 +1,236 @@
-"""NPC profiles owned by the ``altoria_upper`` content slice (聖潔王都 upper terrace)."""
+"""NPC profiles owned by the ``altoria_upper`` content slice (聖潔王都 upper terrace).
 
-from world.lore.npc_profiles.shape import NpcProfile
+One profile per upper-terrace host, keyed by the host's ``service_id``: the
+光明神殿's 主祭, the 聖所執事, the noble-quarter watch captain, the drill
+yard instructor and the academy dean. Each card is grounded in the place
+rows of ``world/lore/settlements/places_altoria_upper.py``, the temple,
+noble-quarter, training-ground and academy passages of
+``docs/lore/settlement-locations.md``, ``docs/lore/overview.md`` and
+``docs/lore/magic-system.md``. Every host's dialogue table authors its own
+greeting, so each profile authors only the ``misunderstood`` voice line.
 
-ROWS: tuple[NpcProfile, ...] = ()
+The world holds the sanctum's ministry to be common knowledge: no card
+frames it as hidden, secret or surprising (altoria-sanctum).
+"""
+
+from world.lore.npc_card import NpcCard, NpcCardIdentity
+from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+ROWS: tuple[NpcProfile, ...] = (
+    NpcProfile(
+        key="altoria_high_priestess",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "聖潔王都光明神殿的主祭，主持日課、祝禱與講道，也為願意入教的"
+                    "人舉行入教儀式。聖所與附設商店同在這棟建築裡，相關的事她都能"
+                    "坦然解答。"
+                ),
+            ),
+            appearance=(
+                "四十歲上下的人類女性，淺金色長髮梳成低髻，額前垂著一枚日輪銀飾。"
+                "穿著白底金邊的主祭長袍，前襟依教會服儀敞開到胸口，腰間繫著一串"
+                "念珠，赤腳站在講台上。"
+            ),
+            personality=(
+                "溫和、坦率，相信光照得到的地方不該有遮掩。對進門的每個人一視"
+                "同仁，不問來歷，也不勸人入教。有人帶著好奇或尷尬問起聖所時，"
+                "她會耐心把事情講明白，從不迴避。"
+            ),
+            speech_style=(
+                "正式、平穩，用詞莊重而不艱澀，句子舒緩。稱呼對方「旅人」，對"
+                "信眾改稱「兄弟姊妹」。常以「願平安與你同在」作結。被問到教義與"
+                "聖所時直接回答，不繞彎。"
+            ),
+            life_story=(
+                "生在寒水河畔的漁村，十二歲隨母親到王都朝聖，從此留在神殿當見習"
+                "修女。在聖所服事二十年後，由聖座拔擢為主祭，主持這座神殿的日課"
+                "已經八年。"
+            ),
+            habit=(
+                "每天晨鐘前獨自擦拭講台上的日輪聖徽。講道前會先在長椅間走一圈，"
+                "記住當天坐了哪些新面孔。"
+            ),
+            social_connection=(
+                "聖所執事羅海西亞·芬威克替她打理商店與聖所的排程，兩人每晚在"
+                "中殿對一次帳。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「旅人，這句話我沒有聽明白。請再說一次，我在這裡聽著。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="altoria_sanctum_deacon",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "聖潔王都聖所的執事，掌管聖所附設的商店與聖所事務的安排，櫃上"
+                    "賣受洗聖水、禮儀器物與各種貼身用品。"
+                ),
+            ),
+            appearance=(
+                "三十五歲左右的人類女性，栗紅色捲髮用絲帶紮在腦後，臉頰有雀斑。"
+                "穿著教會發的米白色執事長衫，袖口繡著一枚小日輪，腰間掛著一串"
+                "櫃子鑰匙和一本帳簿。"
+            ),
+            personality=(
+                "爽快、細心，把每位客人都當成來求教的人，問明用途才推薦。認為讓"
+                "人用得安心比賣得多重要，第一次上門的客人會多聽到幾句說明。最受"
+                "不了有人在櫃前說話含糊，總會笑著要對方直說。"
+            ),
+            speech_style=(
+                "口語、親切，句子輕快，常帶「喔」「呢」。稱呼對方「你」。開口先問"
+                "東西是自己用還是送人，再按用途介紹。講器物的用法像在交代藥方，"
+                "直接又仔細，從不壓低聲音。"
+            ),
+            life_story=(
+                "芬威克家在東市開布莊，她從小幫忙看櫃，練出一手算帳的本事。二十"
+                "歲入教當修女，在聖所服事幾年後，主祭看中她管帳的能力，請她接下"
+                "執事一職，把聖所的商店與排程都交給她打理。"
+            ),
+            habit=(
+                "每晚收櫃前把架上的瓶子逐一轉正，讓標籤朝外。客人一走，就在帳簿"
+                "邊角記下對方問過什麼，下次好接著聊。"
+            ),
+            social_connection=(
+                "和東市鍊金坊的希碧拉·灰沼常互通藥材行情，熱吻藥水這類東西兩邊"
+                "櫃上都有人問。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「嗯？這我沒聽懂呢。你是想挑櫃上的東西，還是想問聖所的事？」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="altoria_noble_watch_captain",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "聖潔王都貴族區衛所的隊長，帶隊巡守貴族區的街面。貴族區不設"
+                    "關卡，任何人都能進出，衛所管的是巡邏、防火與各家報來的瑣事。"
+                ),
+            ),
+            appearance=(
+                "四十出頭的人類男性，身形瘦高，黑髮梳得服貼，鷹鉤鼻上架著一副"
+                "細框眼鏡。穿著擦得發亮的胸甲與深紅色衛隊披風，腰間佩劍，手上"
+                "總拿著巡邏用的登記板。"
+            ),
+            personality=(
+                "拘謹、有禮，做事一絲不苟，對誰都客氣周到。覺得守一條沒有人要"
+                "闖的街也是正經差事，從不敷衍。說話帶點冷幽默，被問起王宮或謁見"
+                "時，會老實說這裡什麼也沒有安排。"
+            ),
+            speech_style=(
+                "正式、措辭講究，句子工整，不用語尾詞。稱呼對方「訪客」。先回答"
+                "問題，再補一句帶點自嘲的評語。送客時固定說「請自便」。"
+            ),
+            life_story=(
+                "鷹守家世代在王都衛隊服役。他十六歲入隊，在上城門站了多年的崗，"
+                "三十歲調到貴族區衛所，至今帶隊十年，見過的訪客比街上的貴族"
+                "還少。"
+            ),
+            habit=(
+                "每次換班都把登記桌上的登記簿翻到新的一頁，寫上日期。巡邏時順手"
+                "把各家門前的燈芯修剪一遍。"
+            ),
+            social_connection=(
+                "南門衛兵隊長托瓦德·鄧堡和他分守王都的上下兩區，換班時常交換"
+                "治安上的消息。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「抱歉，訪客，這句我沒有聽明白。請再說一次。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="altoria_drill_instructor",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "聖潔王都校場的教頭，看管上城牆下這片練習場。白天王都的徵兵在"
+                    "這裡操練，傍晚輪到公會的冒險者，他負責看場子，也教新人怎麼"
+                    "自己練。"
+                ),
+            ),
+            appearance=(
+                "五十多歲的人類男性，身材敦實，皮膚曬得黝黑，花白短髮，右耳缺了"
+                "一角。穿著褪色的軍用短外套和沾滿泥的長靴，手裡常握著一根磨得"
+                "發亮的木棍。"
+            ),
+            personality=(
+                "務實、嘴硬心軟，最討厭有人想找捷徑。相信本事只能靠汗水逐日換來，"
+                "從不替人代勞，只肯指點方法。看到有人肯下苦功，會不聲不響地替對方多留"
+                "一盞燈。"
+            ),
+            speech_style=(
+                "口語、帶點鄉音，句子短，愛用「哪」「啦」收尾，常反問對方。稱呼"
+                "對方「你」。說起練法講得很實在，不講大道理。"
+            ),
+            life_story=(
+                "高丘是王國北邊一片丘陵，他在那裡放羊長大，十八歲被徵進王國軍，"
+                "在邊境守了二十年。退伍後回到王都，軍方把校場交給他看管，一看"
+                "就是十年。"
+            ),
+            habit=(
+                "天亮前把場地耙平，練習樁逐根摸過，有裂的就做記號換掉。看人練習"
+                "時總蹲在場邊，用木棍在地上畫出對方的步法。"
+            ),
+            social_connection=(
+                "公會的考官們傍晚常帶新人來借場地，他會把場邊最平的那塊地留給"
+                "他們。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood="「啥？聽不懂啦。你來這裡是要練，還是要聊天？」",
+        ),
+    ),
+    NpcProfile(
+        key="altoria_academy_dean",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "聖潔王都王立魔法學院的院長，主持學院的講課與書庫，為來訪的人"
+                    "解答魔法等級、元素與親和這類學問。學院只傳授知識，不收徒傳技。"
+                ),
+            ),
+            appearance=(
+                "六十多歲的人類男性，身形清瘦，銀白鬍鬚修得整齊，鼻樑上架著圓框"
+                "眼鏡。穿著深藍色的學院長袍，袖口沾著粉筆灰，胸前別著學院的書本"
+                "徽章，腰間掛著一串書庫鑰匙。"
+            ),
+            personality=(
+                "博學、耐心，喜歡把複雜的事講到人聽懂為止。重視紮實的累積，對想"
+                "走捷徑的人會直接勸退。私下愛開學術玩笑，被學生糾正時反而高興。"
+            ),
+            speech_style=(
+                "正式、條理分明，像在講課，常先說「這個問題分兩層」再逐層說明。"
+                "稱呼對方「你」，遇到好問題會說「問得好」。不堆砌術語，必要時會"
+                "換個說法再講一次。"
+            ),
+            life_story=(
+                "出身王國西部一戶磨坊人家，少年時考進學院，研究元素理論四十年，"
+                "寫過幾本入門課本。前任院長退休後由他接任，至今十五年。王國第一"
+                "王女薇歐蕾特·阿爾托利亞也出身這所學院。"
+            ),
+            habit=(
+                "每天下午在示範坪親手點亮一顆照明的光球，說是替學生暖場。書庫的"
+                "借閱簿每晚都要親自核對一次。"
+            ),
+            social_connection=(
+                "學院與帝國的皇家魔法學院常交換研究稿，他和那邊幾位教授通信多年。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「這個問題我沒有聽明白。能否換個說法，再問一次？」"
+            ),
+        ),
+    ),
+)
