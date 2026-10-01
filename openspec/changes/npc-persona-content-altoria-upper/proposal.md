@@ -26,7 +26,7 @@ None.
 ## Impact
 
 - Content: `world/lore/npc_profiles/altoria_upper.py`, `world/lore/settlements/places_altoria_upper.py` (5 rows gain `host_profile_key`), `world/lore/dialogue/altoria_upper.py` (5 tables rewritten).
-- Tests: no new test module. The crown-watch, learning-exchange and sanctum suites drop their exact-word pins on these tables for no-command-token assertions (the academy's rank and element substance checks, which read the lore registries, stay); `test_dialogue_assembly` drops its pre-split content digests and keeps a prose-free four-answer shape check; the pinned place tuples in `test_settlements` gain their `host_profile_key`; the shipped-registry immutability check moves to the `test_npc_profile_inventory` data contract and the guild-economy test support resolves its service ids by place kind (identical hunks in every content slice).
+- Tests: no new test module. The crown-watch, learning-exchange and sanctum suites drop their exact-word pins on these tables for no-command-token assertions (the academy's rank and element substance checks, which read the lore registries, stay); `test_dialogue_assembly` drops its pre-split content digests and keeps a prose-free four-answer shape check; no owned place tuple is pinned in `test_settlements`; the shipped-registry immutability check moves to the `test_npc_profile_inventory` data contract and the guild-economy test support resolves its service ids by place kind (identical hunks in every content slice).
 - No mechanism, schema, prompt, or UI change; live stock, prices, quest listings, and command availability are untouched.
 
 ## Batch:
