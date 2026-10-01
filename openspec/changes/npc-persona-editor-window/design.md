@@ -6,7 +6,7 @@ See proposal.md for motivation. The exploration panel delivers each target's aff
 
 **Goals:** the complete editor journey on existing primitives; correctness under late results, conflicts, departures, reconnects, and session changes; accessible keyboard operation; real-browser evidence.
 
-**Non-Goals:** server changes (actions change); fixed-dialogue editing; name/title/stat editing; gamepad additions; a global NPC catalogue.
+**Non-Goals:** fixed-dialogue editing (scripted tables stay read-only author data); name/title/stat editing; gamepad additions; a global NPC catalogue. The one server surface here is the bounded `offline_greeting` extension of the archived editor transport (design §13a amendment).
 
 ## Decisions
 
@@ -29,6 +29,10 @@ Departure: when a committed exploration snapshot no longer lists the bound `npcI
 ### D5. Accessibility and focus
 
 The drawer root is `role="dialog"` `aria-modal="true"` with `aria-labelledby` on the heading; notices are static text; errors and save results announce through an `aria-live="polite"` region; the discard confirmation is a small in-drawer alertdialog. Focus is trapped with `lib/focus-trap.js`; on close focus returns to the opener row if it still exists, else to the interaction surface root. The keyboard router ignores keys whose target is an editable control (verify the existing guard covers `textarea`; extend it if not).
+
+### D5a. The offline-greeting control (override model)
+
+Every NPC shows one optional single-paragraph control after the seven card controls, labeled 離線問候語, seeded from the read snapshot's `offline_greeting` (verbatim, `""` when unset). It carries its own 300-code-point budget from the mirror (it does NOT count toward the card's 2,000 total — it is not a card leaf). A preview line below it shows `default_greeting` as the currently-effective authored default (for a table-backed host, its dialogue-table line; otherwise 無) so the author can restore it by clearing the field. The helper states the semantics: the line is spoken as the NPC's first line only when the generative layer is offline or the player talks without a keyword; LLM dialogue always follows the card; keyword answers are unaffected. Save submits `{persona, offline_greeting}` as one payload; the server's `greeting_invalid` rejections behave like any field rejection (draft kept, field focused, announced). A greeting-only change is a dirty draft and advances `persona_version` exactly like a card edit, so conflict/reload/stale-exchange semantics are identical.
 
 ### D6. No echo, no storage
 

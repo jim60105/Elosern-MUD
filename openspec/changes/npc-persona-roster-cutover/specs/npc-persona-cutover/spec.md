@@ -5,15 +5,15 @@ Replace, exactly once and atomically, every provisional persona of existing NPCs
 ## ADDED Requirements
 
 ### Requirement: The cutover replaces every unmarked NPC and durable occupant characterization from known provenance
-At server start, before generated-quest restore, the system SHALL plan a replacement for every NPC-family instance that lacks the current content-generation marker and for every durable generated-quest occupant whose characterization is not a valid compact card. Each replacement SHALL be a complete card resolved by known provenance — a service host's place profile, an exam opponent's rank examiner profile from the exam record naming it, a starting companion's profile with its owner relationship recomputed from its party binding or unique declaring owner, a scene occupant's durable declaration replacement, a shipped template occupant's template card — and otherwise an offline bundle selected by stable identity. Old persona text SHALL never be carried forward, and no instance SHALL be deleted or respawned. `Monster` instances and player characters SHALL NOT be touched.
+At server start, before generated-quest restore, the system SHALL plan a replacement for every NPC-family instance that lacks the current content-generation marker and for every durable generated-quest occupant whose characterization is not a valid compact card. Each replacement SHALL be a complete card resolved by known provenance — a service host's place profile, an exam opponent's rank examiner profile from the exam record naming it, a starting companion derived from its partner preset via the shared companion derivation with its owner relationship recomputed from its party binding or unique declaring owner, a scene occupant's durable declaration replacement, a shipped template occupant's template card — and otherwise an offline bundle selected by stable identity. Old persona text SHALL never be carried forward, and no instance SHALL be deleted or respawned. `Monster` instances and player characters SHALL NOT be touched.
 
 #### Scenario: Existing hosts receive their profile cards
 - **WHEN** the cutover runs against a world whose service hosts carry no persona metadata
 - **THEN** each host carries its place profile's card with metadata at the current generation and `profile` provenance
 
-#### Scenario: A companion loses its copied preset persona
-- **WHEN** a bound starting companion still carries the persona copied from its partner preset
-- **THEN** it carries its companion profile card whose social connection begins with the owner line for its bound owner, and none of the old preset prose remains in its persona
+#### Scenario: A companion is re-derived from its partner preset
+- **WHEN** a bound starting companion still carries the legacy copied persona record
+- **THEN** it carries the compact card derived from its partner preset (identity, personality, life story, and habit consistent with the preset's authored persona, `speech_style` from the preset's extension field, social connection beginning with the owner line for its bound owner), its persona metadata names `companion` provenance with the partner preset key, and its offline-greeting field holds the preset's authored greeting
 
 #### Scenario: Durable occupants and materialized occupants share one baseline
 - **WHEN** a stored generated quest has an old-shape occupant and that stage's occupant is already materialized

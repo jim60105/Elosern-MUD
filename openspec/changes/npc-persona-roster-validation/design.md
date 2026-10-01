@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`world/lore/npc_profiles/inventory.py`) lists every shipped source and its owner; each content slice proved its own rows; the producers made host and examiner references mandatory; the companion change made `npc_profile_key` mandatory; the quest and import changes made template occupants and the reference example carry cards. Boot steps run in `STARTUP_STEP_ORDER` through `_startup_step`, fail-loud by default; `starting_companion_validation` is the precedent of a registry-validation boot step.
+See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`world/lore/npc_profiles/inventory.py`) lists every shipped source and its owner; each content slice proved its own rows; the producers made host and examiner references mandatory; per the design §13a amendment the companion change (`npc-persona-companion-profiles`) anchors companion characterization in the partner preset (extended `PresetPersona` with `speech_style`/`greeting`, no companion profile slice); the quest and import changes made template occupants and the reference example carry cards. Boot steps run in `STARTUP_STEP_ORDER` through `_startup_step`, fail-loud by default; `starting_companion_validation` is the precedent of a registry-validation boot step.
 
 ## Goals / Non-Goals
 
@@ -16,7 +16,7 @@ See proposal.md for motivation. The `npc-persona-profile-registry` inventory (`w
 
 ### D2. Checks and error reporting
 
-`validate_npc_roster()` raises `NpcRosterError` listing every violation (not just the first), each naming the source kind/key and profile key: inventory mismatch (missing or stale rows); unresolved or invalid card; a dialogue table referenced by zero or several hosted places; a scripted host profile without `misunderstood`; a companion profile without `greeting`; an orphan profile (in `NPC_PROFILE_REGISTRY` but referenced by no place, rank, or declaration); a profile behind a scripted host that authors a `greeting` (the table greeting is the single source for hosts, so the two cannot drift). Import examples are validated with `validate_character(record, NPC)`; template occupants through the shared characterization helper.
+`validate_npc_roster()` raises `NpcRosterError` listing every violation (not just the first), each naming the source kind/key and profile or preset key: inventory mismatch (missing or stale rows); unresolved or invalid card; a dialogue table referenced by zero or several hosted places; a scripted host profile without `misunderstood`; a companion declaration whose partner preset fails the shared companion derivation (empty `speech_style` or `greeting`, or a card over budget with the maximum-length synthetic owner); an orphan profile (in `NPC_PROFILE_REGISTRY` but referenced by no hosted place or examiner rank — companion declarations anchor to presets, never profiles); a profile behind a scripted host that authors a `greeting` (the table greeting is the single source for hosts, so the two cannot drift). Import examples are validated with `validate_character(record, NPC)`; template occupants through the shared characterization helper.
 
 ### D3. Boot placement
 

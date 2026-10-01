@@ -24,7 +24,7 @@ The stored `definition.key` is a digest over the pre-change canonical content; t
 
 1. Service host (has a service component whose `service_id` is in the roster) → `profile` provenance, the place's profile card.
 2. Exam opponent (its id appears as `opponent_id` in any stored exam record) → the record's rank examiner profile.
-3. Starting companion (`LLMNPC` with `creation_preset_key` matching a declaration partner) → `companion` provenance; owner = `party_member` when bound, else the unique player character whose preset declares that partner and holds an affinity record toward the NPC; owner line recomputed exactly as the companion builder composes it. No unique owner → treated as rule 6 with a `warn` event naming the NPC (never a fabricated owner).
+3. Starting companion (`LLMNPC` with `creation_preset_key` matching a declaration partner) → `companion` provenance naming the partner preset key; the card is the shared partner-preset derivation of `npc-persona-companion-profiles` (D2 there); owner = `party_member` when bound, else the unique player character whose preset declares that partner and holds an affinity record toward the NPC; owner line recomputed exactly as the companion builder composes it, and the partner preset's authored `greeting` is written to the NPC's `db.npc_offline_greeting` field (old companions predate the field). No unique owner → treated as rule 6 with a `warn` event naming the NPC (never a fabricated owner).
 4. Scene occupant (id in an active quest record's `objective_target_ids`) → the replacement card computed for that durable occupant (rule 5), `generated_quest` provenance — so a materialized occupant and its declaration share one baseline.
 5. Durable payload occupant: if the payload's definition was compiled from a shipped template (same quest name, stage index, occupant position, display name, and title as a `QUEST_TEMPLATE_POOL` occupant) → the template card; else the offline bundle for the occupant's tier with seed `"{definition_key}:{issuer_key}:{stage}:{position}"`. The rewritten occupant drops `background` and the old `persona` and stores the new card.
 6. Everything else in the NPC family (imported, dynamic, unresolvable) → `offline_pool_for(db.npc_tier_key, race)` with seed `str(npc.id)`, `offline_bundle` provenance.
@@ -45,7 +45,7 @@ Step `npc_persona_cutover` is inserted immediately before `sync_quest_runtime` (
 
 ### D5. What is preserved
 
-Only `db.persona`, `db.npc_persona_meta`, and the occupant characterization fields inside stored payloads change. Object ids, keys, titles, location, components, traits, inventory, party bindings, quest records and bindings, schedules, affinity, chat memory, dialogue sessions, and every other payload field are untouched; tests compare full attribute snapshots before and after.
+Only `db.persona`, `db.npc_persona_meta`, `db.npc_offline_greeting` (rule 3 only), and the occupant characterization fields inside stored payloads change. Object ids, keys, titles, location, components, traits, inventory, party bindings, quest records and bindings, schedules, affinity, chat memory, dialogue sessions, and every other payload field are untouched; tests compare full attribute snapshots before and after.
 
 ## Risks / Trade-offs
 
