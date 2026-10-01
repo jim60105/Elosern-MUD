@@ -177,6 +177,38 @@ def current_persona_version(npc: Any) -> int | None:
     return version
 
 
+def provenance_profile_key(npc: Any) -> str | None:
+    """Read an NPC's provenance profile key without writing or repairing (design D2).
+
+    Returns:
+        The string profile key iff the entity is an NPC with valid metadata whose
+        provenance kind is 'profile'. For absent, non-NPC, malformed metadata, or
+        any other provenance kind (such as 'companion', whose voice lines live on the
+        instance field), returns None. Never writes or repairs.
+    """
+    if not isinstance(npc, NPC):
+        return None
+    try:
+        if not getattr(npc, "attributes", None) or not npc.attributes.has("npc_persona_meta"):
+            return None
+        raw_meta = getattr(getattr(npc, "db", None), "npc_persona_meta", None)
+    except Exception:  # observability: ignore R2: deleted or inaccessible entities yield None
+        return None
+
+    if not isinstance(raw_meta, Mapping) or isinstance(raw_meta, (str, bytes)):
+        return None
+
+    prov = raw_meta.get("provenance")
+    if not isinstance(prov, Mapping) or isinstance(prov, (str, bytes)):
+        return None
+    if prov.get("kind") != "profile":
+        return None
+    key = prov.get("profile")
+    if not isinstance(key, str) or isinstance(key, bool) or not key:
+        return None
+    return key
+
+
 def is_card_available(npc: Any) -> bool:
     """Silent, read-only predicate checking whether an NPC's card is available and valid (D5).
 

@@ -180,16 +180,23 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 
 ### Requirement: NPC dialogue degrades to greeting or silence offline
 
-When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `generate_npc_reply` SHALL resolve to `None`, and the caller SHALL render that as the NPC's authored greeting when one is available, or as silence when it is not; the game SHALL remain fully playable with the LLM entirely offline, and no dialogue call SHALL change state or open a network connection.
+When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `generate_npc_reply` SHALL resolve to `None`, and the caller SHALL render that as the NPC's authored greeting when one is available, or as silence when it is not; the game SHALL remain fully playable with the LLM entirely offline, and no dialogue call SHALL change state or open a network connection. The authored greeting SHALL be resolved in order: the greeting stored in the NPC's own bounded per-instance offline-greeting field (seeded at build, author-editable, and overriding every authored default when set), then the NPC's dialogue-table greeting when its table authors one, then the greeting authored by the NPC profile named in its persona provenance; a runtime card edit SHALL NOT change the table or profile default, and the instance field speaks exactly its stored text.
 
 #### Scenario: Offline dialogue falls back to the authored greeting
 - **WHEN** the LLM is offline and the NPC has an authored greeting
 - **THEN** the player receives the authored greeting with no state change and no network request
 
 #### Scenario: Offline dialogue with no greeting is silence
-- **WHEN** the LLM is offline and the NPC has no authored greeting
+- **WHEN** the LLM is offline and the NPC has no table greeting, no offline-greeting field text, and no profile greeting
 - **THEN** the NPC stays silent and no state changes
 
+#### Scenario: An NPC with an offline-greeting field speaks it offline
+- **WHEN** the LLM is offline and a free-form NPC without a scripted table carries a non-empty offline-greeting field
+- **THEN** the player receives that field's greeting verbatim, distinct from another such NPC's greeting, with no state change and without resolving any profile
+
+#### Scenario: A profiled host speaks its profile greeting offline
+- **WHEN** the LLM is offline, an NPC has no table greeting and an empty offline-greeting field, and its persona provenance names a profile that authors a greeting
+- **THEN** the player receives that profile greeting verbatim with no state change
 ### Requirement: The LLMNPC entity provides chat memory, thinking state, and a dialogue seam
 
 `typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass carrying persistent per-character chat memory, a bounded memory window, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`. Before invoking the guarded pipeline, the seam SHALL consult

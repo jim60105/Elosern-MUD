@@ -150,6 +150,7 @@ class PersonaPromptTests(unittest.TestCase):
         )
         self.assertIn(block, system["content"])
         self.assertNotIn("{persona}", system["content"])
+        self.assertIn("以下是你目前的人物設定", system["content"])
 
     @covers_requirement("persona-dialogue-injection::the-npc-s-own-persona-feeds-the-dialogue-system-message")
     def test_absent_npc_persona_keeps_the_byte_identical_baseline(self):
@@ -172,6 +173,38 @@ class PersonaPromptTests(unittest.TestCase):
             _npc_context(), _player_context(), _memory(), npc_persona=block
         )
         self.assertIn(block, system["content"])
+        self.assertIn("以下是你目前的人物設定", system["content"])
+
+    @covers_requirement("persona-dialogue-injection::the-npc-s-own-persona-feeds-the-dialogue-system-message")
+    @covers_requirement("prompt-library::the-npc-persona-frame-key-is-registered-with-exactly-the-block-placeholder")
+    def test_compact_card_render_order_and_frame_in_system_prompt(self):
+        from world.lore.npc_card import NpcCard, NpcCardIdentity, render_card_block
+        from types import SimpleNamespace
+        from world.rules.persona import PersonaStore
+        from world.ai.npc_dialogue import NPC_PERSONA_FIELDS
+
+        card = NpcCard(
+            identity=NpcCardIdentity(public="公會守衛", hidden="王國密探"),
+            appearance="高大挺拔，身披輕甲。",
+            personality="嚴謹負責，不苟言笑。",
+            speech_style="語氣沉穩，條理清晰。",
+            life_story="出生於邊境村落，長年駐守城門。",
+            habit="巡邏時總會握著劍柄。",
+            social_connection="與城門老兵熟識。",
+        )
+        card_block = render_card_block(card)
+        store = PersonaStore(SimpleNamespace(db=SimpleNamespace(persona=card.to_record())))
+        flattened = store.flatten(NPC_PERSONA_FIELDS)
+        self.assertEqual(flattened, card_block)
+        self.assertNotIn("…", card_block)
+
+        system, _ = build_npc_dialogue_prompt(
+            _npc_context(), _player_context(), _memory(), npc_persona=flattened
+        )
+        content = system["content"]
+        self.assertIn("以下是你目前的人物設定，之後的回應以此為準；先前對話與已發生的事件仍是歷史，不因設定改變而改寫。\n" + card_block, content)
+        self.assertLess(content.index("性格：嚴謹負責"), content.index("說話風格：語氣沉穩"))
+        self.assertIn("隱秘身分：王國密探", content)
 
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")

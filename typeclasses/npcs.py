@@ -611,9 +611,9 @@ class LLMNPC(NPC):
             return STALE_PERSONA
 
         if result.degraded:
-            from world.rules.dialogue import greeting_for
+            from world.rules.dialogue import offline_greeting_for
 
-            greeting = greeting_for(self)
+            greeting = offline_greeting_for(self)
             if greeting is not None:
                 character.msg(f"{self.key}說：{greeting}")
                 # The authored degrade line is still a presented exchange: the

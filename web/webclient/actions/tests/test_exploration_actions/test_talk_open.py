@@ -92,6 +92,20 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
     )
+    def test_edited_offline_greeting_opens_the_conversation(self):
+        host = self._scripted_host()
+        host.db.npc_offline_greeting = "自訂開場白！"
+        with patch.object(self.player, "msg") as msg:
+            result = _talk_open_adapter(self.player, {"npc_id": int(host.pk)})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["message"], f"{host.key}說：自訂開場白！")
+        stored = self.player.db.dialogue_session
+        self.assertEqual(stored["line"], "自訂開場白！")
+
+
+    @covers_requirement(
+        "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
+    )
     def test_llmnpc_without_a_component_opens_with_the_fallback_line(self):
         npc = create_object(LLMNPC, key="吟遊詩人", location=self.room1)
         result = _talk_open_adapter(self.player, {"npc_id": int(npc.pk)})
