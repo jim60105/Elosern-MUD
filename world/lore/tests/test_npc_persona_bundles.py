@@ -15,8 +15,6 @@ import sys
 import unittest
 from types import MappingProxyType
 from unittest.mock import patch
-
-from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import NpcCard
 from world.lore.npc_profiles.bundles import (
     NPC_PERSONA_BUNDLE_POOLS,
@@ -336,7 +334,7 @@ class ShippedNpcPersonaBundleDataContractTests(unittest.TestCase):
     """Data-contract tests over the shipped offline bundle pools."""
 
     # Prohibited third-person sex pronouns and personal markers
-    _DENY_PRONOUNS = ("他", "她", "牠", "祂", "伊")
+    _DENY_PRONOUNS = ("他", "她", "牠", "祂", "它", "伊")
     _DENY_LATIN = re.compile(r"\b(he|she|him|her|his|hers|it|its)\b", re.IGNORECASE)
     _NUMERIC_AGE = re.compile(r"\d+歲|\d+年齡")
 

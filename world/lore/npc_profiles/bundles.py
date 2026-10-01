@@ -157,19 +157,20 @@ def _validate_bundle_pools(pools: Mapping[str, NpcBundlePool]) -> None:
                 f"tier race {tier.race_key!r}"
             )
 
-    # Validate race coverage: every race in RACE_REGISTRY must have at least one pool
-    tier_races = {tier.race_key for tier in NPC_TIER_REGISTRY.values()}
+    # Validate race coverage: every race in RACE_REGISTRY must resolve to a pool
+    # when requested generically without a tier (offline_pool_for(None, race_key))
     for race_key in RACE_REGISTRY:
-        if race_key not in tier_races:
+        if race_key == "human":
+            if "civilian" not in pools or pools["civilian"].race_key != "human":
+                raise ValueError(f"Race 'human' requires a valid 'civilian' pool")
+        elif race_key == "elf":
+            if "elven_civilian" not in pools or pools["elven_civilian"].race_key != "elf":
+                raise ValueError(f"Race 'elf' requires a valid 'elven_civilian' pool")
+        else:
             generic_pool_key = f"{race_key}_generic"
-            if generic_pool_key not in pools:
+            if generic_pool_key not in pools or pools[generic_pool_key].race_key != race_key:
                 raise ValueError(
-                    f"Race {race_key!r} has no tier pools and is missing generic pool {generic_pool_key!r}"
-                )
-            if pools[generic_pool_key].race_key != race_key:
-                raise ValueError(
-                    f"Generic pool {generic_pool_key!r} race {pools[generic_pool_key].race_key!r} "
-                    f"does not match race {race_key!r}"
+                    f"Race {race_key!r} requires generic pool {generic_pool_key!r} with matching race"
                 )
 
 
@@ -554,7 +555,7 @@ _AUTHORED_POOLS: dict[str, NpcBundlePool] = {
                     ),
                     appearance=(
                         "體態端莊，儀容修整精細。穿著剪裁考究的深紅天鵝絨長外袍，"
-                        "胸前佩戴家族徽飾領針，袖口與衣襟綴有細密的暗金滾邊，神態從容矜持。"
+                        "胸前佩戴家族徽飾胸針，袖口與衣襟綴有細密的暗金滾邊，神態從容矜持。"
                     ),
                     personality=(
                         "彬彬有禮，城府深沉。看重門第聲譽與長期利益交換，"
