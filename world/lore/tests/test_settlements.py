@@ -632,6 +632,7 @@ class PlaceRegistryTests(unittest.TestCase):
             except ValueError as error:  # pragma: no cover - failure path asserts below
                 self.fail(f"registered host_profile_key rejected: {error}")
 
+    @covers_requirement("settlement-place-registry::every-host-authoring-place-names-its-host-s-npc-profile")
     def test_a_hosted_place_without_a_host_profile_key_fails_as_partial_host(self):
         # npc-persona-host-examiner-producers: host_profile_key joins HOST_IDENTITY_FIELDS.
         # A place authoring a complete host but no host_profile_key fails load naming the

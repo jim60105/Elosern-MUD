@@ -39,7 +39,7 @@ class ServiceHostQuestIssuerSyncTests(ServiceContentIsolation, EvenniaTestCase):
             anchor_room=GUILD_HALL_TAG,
             service_id=COMMISSIONER_SERVICE_ID,
             authored_kwargs={},
-            profile_key="altoria_guild_master",
+            profile_key=GUILD_SERVICE_ID,
         )
 
     def _sync_with_commissioner_row(self):

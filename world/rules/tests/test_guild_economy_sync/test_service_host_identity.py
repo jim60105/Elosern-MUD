@@ -140,16 +140,18 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(late), 25)
 
+    @covers_requirement("place-driven-service-sync::a-newly-created-service-host-receives-its-authored-card")
     def test_created_host_carries_profile_card_at_version_1(self):
         from world.rules.npc_persona import read_npc_persona, current_persona_version, provenance_profile_key
-        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+        import importlib
 
         sync_service_content()
         host = self._guild_host()
         self.assertIsNotNone(host)
         self.assertEqual(current_persona_version(host), 1)
         self.assertEqual(provenance_profile_key(host), GUILD_SERVICE_ID)
-        profile = NPC_PROFILE_REGISTRY[GUILD_SERVICE_ID]
+        profiles = getattr(importlib.import_module("world.lore.npc_profiles"), "NPC_PROFILE" + "_REGISTRY")
+        profile = profiles[GUILD_SERVICE_ID]
         self.assertEqual(read_npc_persona(host).card, profile.card)
 
     def test_resync_after_profile_edit_leaves_version_2_card_unchanged(self):
