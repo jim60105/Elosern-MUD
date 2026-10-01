@@ -156,21 +156,27 @@ class PlaceRegistryTests(unittest.TestCase):
             "一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺著等誰來買。",
             (2, 1), '海莉爾的家', ('hailiel', "hailiel's home"), '海莉爾·斯塔爾法爾', '暗影谷村鑄刃者', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_hailiel', ('elven_crafted_arms',),
-            (('shop_key', 'ciaran_hailiel_home'), ('dialogue_key', 'ciaran_hailiel_home')), (), (), None
+            (('shop_key', 'ciaran_hailiel_home'), ('dialogue_key', 'ciaran_hailiel_home')), (), (),
+            # npc-persona-content-ciaran-homes-a names the host's own profile.
+            'ciaran_hailiel'
         ),
         "ciaran_gwenaera_home": (
             'ciaran_gwenaera_home', 'village_ciaran', PlaceKind.HOME, '格威娜拉的家',
             "銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。",
             (2, 3), '格威娜拉的家', ('gwenaera', "gwenaera's home"), '格威娜拉·希爾維爾莉夫', '暗影谷村綴飾者', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_gwenaera', ('elven_adornments',),
-            (('shop_key', 'ciaran_gwenaera_home'), ('dialogue_key', 'ciaran_gwenaera_home')), (), (), None
+            (('shop_key', 'ciaran_gwenaera_home'), ('dialogue_key', 'ciaran_gwenaera_home')), (), (),
+            # npc-persona-content-ciaran-homes-a names the host's own profile.
+            'ciaran_gwenaera'
         ),
         "ciaran_lareneth_home": (
             'ciaran_lareneth_home', 'village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
             "溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。",
             (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"), '拉瑞內斯·妮特布倫', '暗影谷村花饌好手', 'elf', 'ciaran',
             'female', 'merchant', 'ciaran_lareneth', ('elven_fare',),
-            (('shop_key', 'ciaran_lareneth_home'), ('dialogue_key', 'ciaran_lareneth_home')), (), (), None
+            (('shop_key', 'ciaran_lareneth_home'), ('dialogue_key', 'ciaran_lareneth_home')), (), (),
+            # npc-persona-content-ciaran-homes-a names the host's own profile.
+            'ciaran_lareneth'
         ),
         "ciaran_nireth_home": (
             'ciaran_nireth_home', 'village_ciaran', PlaceKind.HOME, '妮瑞斯的家',
