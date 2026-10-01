@@ -42,6 +42,7 @@ from world.lore.player_presets.vocab import (
     PresetPersona,
     PresetSexualBaseline,
     StartingCompanion,
+    derive_companion_card,
 )
 
 # Byte-identical old-module namespace parity: the single-module history's
@@ -90,6 +91,7 @@ __all__ = [
     "PresetPersona",
     "PresetSexualBaseline",
     "StartingCompanion",
+    "derive_companion_card",
     "_PERSONA_PROSE_FIELDS",
     "_validate_preset_affinity_elements",
     "_validate_preset_disguised_stats",

@@ -32,6 +32,8 @@ from django.db import transaction
 from evennia.utils.create import create_object
 
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset, StartingCompanion
+from world.lore.player_presets import derive_companion_card
+from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.races import SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules.affinity import NATURAL_CAP, seed_affinity
@@ -41,13 +43,13 @@ from world.rules.affinity import NATURAL_CAP, seed_affinity
 # private-symbol coupling: character_creation is the design's high-churn
 # serialization point, and importing its composition beats duplicating it.
 from world.rules.character_creation import (
-    MAX_PERSONA_FIELD_LENGTH,
     CharacterCreationError,
     _preset_lineage_state,
     finalize_player_portrait,
     resolve_preset_values,
     validate_affinity_seed,
 )
+from world.rules.creation_wizard import NAME_MAX_LENGTH
 from world.rules.equipment import toggle_equipment
 from world.rules.party import PARTY_MAX_COMPANIONS, join_party
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
@@ -89,12 +91,20 @@ def _validate_preset_companion_bounds(registry: dict[str, PlayerPreset]) -> None
                     f"{entry.affinity!r} outside 1..{NATURAL_CAP} for "
                     f"{entry.preset_key!r}"
                 )
-            if len(entry.relationship) > MAX_PERSONA_FIELD_LENGTH:
-                raise StartingCompanionError(
-                    f"preset {preset.key!r} declares a companion relationship "
-                    f"exceeding the {MAX_PERSONA_FIELD_LENGTH}-character persona "
-                    f"length cap for {entry.preset_key!r}"
+            partner = registry.get(entry.preset_key)
+            if partner is None:
+                continue
+            synthetic_owner = "測" * NAME_MAX_LENGTH
+            try:
+                card_dict = derive_companion_card(
+                    partner, synthetic_owner, entry.relationship
                 )
+                normalize_card(card_dict)
+            except (NpcCardError, ValueError) as err:
+                raise StartingCompanionError(
+                    f"preset {preset.key!r} companion {entry.preset_key!r} "
+                    f"derived card violates contract: {err}"
+                ) from err
 
 
 def _key_taken_by_other(entity: Any) -> bool:

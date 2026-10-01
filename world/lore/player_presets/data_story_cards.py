@@ -365,6 +365,11 @@ ROWS: dict[str, PlayerPreset] = {
                 "表面理由是「想看看短壽者們如何過日子」，實則貪戀人族對精靈的尊敬所"
                 "允許的、名正言順的暴露。"
             ),
+            speech_style=(
+                "看似天真無邪的孩童甜美聲線，刻意帶著軟糯尾音；"
+                "說話善於以『精靈古老傳統』等大道理掩蓋私心，語氣理直氣壯、純真中透著狡黠反差。"
+            ),
+            greeting="「初次見面，短壽者。我乃幽月谷的幻童精靈……嗯？你一直盯著我看，該不會是著迷了吧？」",
         ),
         # Story's disguise layer: magic 120, physical 50, agility 50, defense 30.
         disguised_stats=(("magic_power", 120), ("atk_phys", 50),

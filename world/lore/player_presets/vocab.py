@@ -130,6 +130,59 @@ class PresetPersona:
         return record
 
 
+_APPEARANCE_SUBKEY_ORDER = (
+    "height",
+    "weight",
+    "measurement",
+    "style",
+    "overview",
+    "attire",
+    "feature",
+)
+
+
+def derive_companion_card(
+    preset: "PlayerPreset",
+    owner_key: str,
+    relationship: str,
+) -> dict[str, Any]:
+    """Derive a compact NPC card dictionary deterministically from a partner preset.
+
+    Leaves:
+    - identity: public / hidden from preset verbatim.
+    - personality, life_story, habit: from preset verbatim.
+    - speech_style: from preset.persona.speech_style verbatim.
+    - appearance: authored non-empty appearance sub-keys in _SUBKEY_ORDER joined with '；'.
+    - social_connection: one factual owner line f"{owner_key}：{relationship}" first,
+      then each preset social_connection entry as name：relationship lines.
+    - background: excluded.
+    """
+    persona = preset.persona
+    appearance_values = [
+        getattr(persona.appearance, field)
+        for field in _APPEARANCE_SUBKEY_ORDER
+    ]
+    flattened_appearance = "；".join(val for val in appearance_values if val)
+
+    social_lines: list[str] = [f"{owner_key}：{relationship}"]
+    for name, rel in persona.social_connection:
+        social_lines.append(f"{name}：{rel}")
+    social_connection_text = "\n".join(social_lines)
+
+    return {
+        "identity": {
+            "public": persona.identity.public,
+            "hidden": persona.identity.hidden,
+        },
+        "appearance": flattened_appearance,
+        "personality": persona.personality,
+        "speech_style": persona.speech_style,
+        "life_story": persona.life_story,
+        "habit": persona.habit,
+        "social_connection": social_connection_text,
+    }
+
+
 @dataclass(frozen=True)
 class PresetSexualBaseline:
     """One preset's authored sexual baseline, in import-card record shape.
