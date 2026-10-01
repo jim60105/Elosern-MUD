@@ -1,56 +1,56 @@
 """The adventure guild's authored dialogue row (the guild-hall counter).
 
-One table: the ``guild_staff`` row spoken by the 阿爾托利亞分會 front-desk
-clerk, keyed by the ``dialogue_key`` the guild-hall place row authors.
+One table: the ``guild_staff`` row spoken by 葛里安·衛登, the 阿爾托利亞分會
+branch master behind the counter, keyed by the ``dialogue_key`` the
+guild-hall place row authors. The table is written against the branch
+master's persona card in ``world/lore/npc_profiles/altoria_guild.py``; the
+host authors sex ``other``, so narration gives no gendered pronoun.
 
-The clerk talks like a clerk, in 正體中文: guidance rides inside what the
-person behind the counter would actually say, never a recited command
-manual. Two shape rules bind authored rows here:
+Every line is spoken in character (scripted-dialogue, guild-registration):
+the branch master explains what the counter is for in the world's own terms
+(sign the register, take a slip from the board, report back with the slip's
+number, hand a slip back, ask where one stands) and never names a command.
+The register is formal: an office-holder receiving adventurers. Two shape
+rules bind this row:
 
 - Four keyword answers at most. The dialogue panel ships
   ``DIALOGUE_MAX_CHOICES`` entries and silently drops the rest, so a fifth
   keyword is a keyword the player can never press. This row carries
   exactly four.
-- The strings stay load-bearing. The scripted-dialogue and
-  guild-registration contracts pin substrings of this text (the `回報`
-  keyword and the unregistered register-first fallback, and every
-  ``guild <verb>`` command somewhere in the combined greeting and
-  responses), and focused tests plus one browser flow match those
-  substrings verbatim. Reword freely around them; never delete one.
+- ``回報`` is a keyword identifier with mechanics behind it: for a
+  registered member the talk path answers with the guild service's own
+  reportable-quest listing or turn-in result, so the authored response
+  below is the register-first fallback an unregistered player hears.
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# Exactly four answers, in panel order. Each is one clerk's spoken remark;
-# the contract-pinned substrings ride inside the prose.
+# Exactly four answers, in panel order.
 GUILD_STAFF_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "註冊",
-        "「先在櫃檯註冊成為冒險者（guild register），階級從F起——"
-        "沒有名號的人，連那邊的任務板都碰不得。登記過了，這行飯"
-        "才輪得到你吃。」",
+        "「登記很簡單，在這本名冊上寫下名字，公會就認你是冒險者。每個人都"
+        "從 F 級開始，先接採集這類簡單的委託，再逐級往上。名冊上記下的每"
+        "一筆，公會都會負責到底。」",
     ),
     KeywordResponse(
         "任務",
-        "「單子都釘在那頭的板上。你先 guild list 撿一張合階級的，"
-        "喊一聲 guild accept 加任務名就領走。辦完了回這張櫃檯，"
-        "對我說『回報』再報上編號，或是自己敲 guild turnin "
-        "<任務編號> 交回，兩條路我都認；中途不想辦了，"
-        "guild abandon 撒手便是。」",
+        "「委託單都釘在大廳那面任務板上，單子寫著階級、地點與報酬。挑一張"
+        "合你階級的拿來櫃檯，我登記之後，這份委託就算你接下了。辦到哪一步"
+        "，隨時可以來問，名冊上都有記錄。中途辦不下去，把單子交回來即可，"
+        "不必勉強。」",
     ),
     KeywordResponse(
         "公會",
-        "「這裡是埃洛西恩冒險者公會，阿爾托利亞分會。櫃檯歸我守："
-        "看單接單，guild list、guild accept；辦過的、辦到一半的，"
-        "guild log 與 guild show 帳上都查得到；交回用 guild turnin，"
-        "或直接對我說『回報』；撒單用 guild abandon；功績夠了想"
-        "知道自個兒幾階，guild merit 一查便知。」",
+        "「埃洛西恩冒險者公會由三國共同承認，總部設在帝國首都，這裡是阿爾"
+        "托利亞分會。分會負責冒險者的登記、委託的發放與結算，以及階級的晉"
+        "升。想知道自己目前是幾級、離下一級還有多遠，到櫃檯問一聲，我翻名"
+        "冊給你看。」",
     ),
     KeywordResponse(
         "回報",
-        "「交回單子？我帳上還沒有你的名字——先來 guild register "
-        "報到，註冊過後辦完的單，再對我說『回報』加上編號，"
-        "或是 guild turnin <任務編號>，一樣算數。」",
+        "「回報？名冊上還沒有你的名字。請先在櫃檯登記成冒險者。接下委託、"
+        "辦完之後，再回到這裡向我回報，並報上委託單的編號。公會只認名冊上寫下的事。」",
     ),
 )
 
@@ -61,13 +61,11 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "guild_staff",
         DialogueDefinition(
             greeting=(
-                "櫃檯後的公會職員從帳簿裡抬起眼：「新面孔？想在這行"
-                "吃飯，規矩是先走一遍 guild register，從F階起。之後"
-                "的細活我懶得念第二遍：guild list 挑單、guild accept "
-                "領單，辦到哪一步 guild log 與 guild show 都有底；"
-                "辦完回來說聲『回報』加編號，或自己 guild turnin 交回；"
-                "不想辦了 guild abandon，功績攢出階級來再 guild merit。"
-                "說罷，他又低頭繼續撥他的算盤。」"
+                "櫃檯後的分會會長葛里安·衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記"
+                "，還是來交委託？還沒登記"
+                "的話，請先在這本名冊上留下名字，從 F 級開始。登記之後，到大廳"
+                "那面任務板挑一張合你階級的委託單，拿來櫃檯讓我登記。辦完了回到"
+                "這裡向我回報，報上委託單的編號即可。」"
             ),
             responses=GUILD_STAFF_RESPONSES,
         ),

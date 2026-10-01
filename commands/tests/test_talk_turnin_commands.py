@@ -21,6 +21,7 @@ from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
+from world.rules.tests._guild_service_probes import live_dialogue_table
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
@@ -191,7 +192,15 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         unregistered.race = "human"
         unregistered.apply_race_baseline()
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}", caller=unregistered)
-        self.assertIn("guild register", output)
+        # The authored register-first line, read from the live table so no
+        # NPC prose is pinned here.
+        definition = live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY]
+        fallback = next(
+            entry.response
+            for entry in definition.responses
+            if entry.keyword == GUILD_STAFF_TURNIN_KEYWORD
+        )
+        self.assertIn(fallback, output)
         self.assertNotIn("可以交回", output)
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")

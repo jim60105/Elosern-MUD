@@ -1,5 +1,319 @@
-"""NPC profiles owned by the ``altoria_guild`` content slice (guild master and the rank examiners)."""
+"""NPC profiles owned by the ``altoria_guild`` content slice (guild master and examiners).
 
-from world.lore.npc_profiles.shape import NpcProfile
+The 阿爾托利亞分會 branch master, keyed by the guild hall's ``service_id``,
+and the seven guild rank examiners, keyed ``guild_examiner_<rank>`` and
+named by each ``GuildRank.examiner_profile_key``. Cards are grounded in
+``world/lore/guild.py``, the guild passages of ``docs/lore/overview.md`` and
+``docs/lore/settlement-locations.md``, and the exam opponent profiles in
+``world/rules/rulebook/guild_economy.yaml``.
 
-ROWS: tuple[NpcProfile, ...] = ()
+The branch master authors sex ``other`` and the examiners spawn as humans
+with no authored sex, so no card gives any of them a gendered pronoun. The
+branch master's dialogue table authors its greeting, so that profile
+authors only the ``misunderstood`` voice line; the examiners are combat
+opponents with no dialogue capability and author no voice lines.
+"""
+
+from world.lore.npc_card import NpcCard, NpcCardIdentity
+from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+ROWS: tuple[NpcProfile, ...] = (
+    NpcProfile(
+        key="altoria_guild_master",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "埃洛西恩冒險者公會阿爾托利亞分會的會長，坐在公會大廳的櫃檯後"
+                    "處理冒險者的登記、委託的發放與結算，也替上門請託的人規劃委託。"
+                ),
+            ),
+            appearance=(
+                "五十歲上下的人類，肩背挺直，灰白頭髮剪得極短，左頰有一道從耳下"
+                "延伸到下顎的舊爪痕。穿著深藍色的公會制服長外衣，胸前別著刻有"
+                "公會紋章的銅徽，袖口磨得發亮。桌上永遠攤著一本厚重的名冊和一支"
+                "羽毛筆。"
+            ),
+            personality=(
+                "嚴謹、公正，凡事照規矩來，對誰都不偏袒，貴族送來的委託也照樣"
+                "排隊。年輕時見過不守規矩的人送命，所以把冒險者的安危看得很重，"
+                "寧可勸新人換一張簡單的委託，也不讓人去冒不必要的險。對辦事牢靠"
+                "的冒險者會記住名字，見面時點頭致意。"
+            ),
+            speech_style=(
+                "正式、條理分明，句子完整，不用語尾詞。稱呼對方「冒險者」，記住"
+                "名字以後改叫名字。開口先問對方登記了沒有，再依序說明該怎麼做。"
+                "提到危險的委託會放慢語速，說完常補一句「公會只認名冊上寫下的"
+                "事」。"
+            ),
+            life_story=(
+                "出身王國平原的農家，十七歲到王都登記成冒險者，從 F 級一路做到"
+                " B 級。一次護送商隊的路上遭魔獸伏擊，臉上留下那道爪痕，同行的"
+                "兩名新人沒能回來。之後轉任分會的文書，再由前任會長推舉接下會長"
+                "一職，至今已經十五年。"
+            ),
+            habit=(
+                "每天開門前親手取下任務板上過期的委託單，再把新單排好。每收回一張"
+                "委託單，都要在名冊上蓋印，再用羽毛筆把冒險者的名字寫一遍。"
+            ),
+            social_connection=(
+                "各階考官都由分會調派，見習考官雷加·鐵拳常在大廳的訓練場邊照看"
+                "新人。南門衛兵隊長托瓦德·鄧堡會把進城找活的旅人指到公會來。"
+            ),
+        ),
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「抱歉，我沒有聽懂。請把你要辦的事再說一次，說得具體一些。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_f",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會阿爾托利亞分會的見習考官，名冊上排在各階考官的第一位，"
+                    "平常待在大廳的環形訓練場，看剛登記的新人練習。"
+                ),
+            ),
+            appearance=(
+                "三十出頭的人類，個子不高，手臂卻很粗壯，指節纏著舊布條。穿著"
+                "無袖皮背心和寬鬆的麻布褲，腰間繫著公會發的灰色腰帶，脖子上掛著"
+                "一枚磨亮的銅哨。"
+            ),
+            personality=(
+                "直率、熱心，喜歡看新人逐步進步，罵人罵得大聲，誇人也誇得大聲。"
+                "相信多練幾次比聽一堆道理有用。對逞強的新人沒有耐心，會毫不客氣地"
+                "叫對方先回去把基礎練熟。"
+            ),
+            speech_style=(
+                "大嗓門，短句，像在喊口令，常用「好！」「再一次！」帶節奏。直接叫"
+                "對方「新人」。說明動作時一邊比劃一邊講，講完就要對方馬上試。"
+            ),
+            life_story=(
+                "在王都下城的碼頭長大，少年時替駁船搬貨練出一身力氣，靠一雙拳頭"
+                "在 E 級待了好幾年。後來公會缺人照看新人，便被找回來當見習考官，"
+                "一當就是六年。"
+            ),
+            habit=(
+                "每天早上第一個到訓練場，把木樁逐根檢查過，再吹一聲銅哨，才開始"
+                "一天的練習。"
+            ),
+            social_connection=(
+                "分會會長葛里安·衛登會把剛登記的新人交給雷加照看。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_e",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會的初階考官，負責 E 級考核。E 級開始接低階魔獸的討伐，"
+                    "考核看的是新人能不能自己應付一頭魔獸。"
+                ),
+            ),
+            appearance=(
+                "二十五六歲的人類，身形輕瘦，淺棕色頭髮紮成高馬尾。穿著貼身的綠色"
+                "皮短衣與綁腿，腰側掛一柄短劍，靴子上總沾著城外草地的泥。"
+            ),
+            personality=(
+                "爽朗、好勝，討厭拖延，覺得考核就該乾脆俐落。眼力好，交手幾回合"
+                "就看得出對方的破綻，事後會逐條講給對方聽。贏了不炫耀，輸了也不找"
+                "藉口。"
+            ),
+            speech_style=(
+                "說話快、語氣輕鬆，愛用「嘿」開頭。稱呼對方的名字，不知道名字就"
+                "叫「你」。考核前先問對方平常怎麼對付魔獸，考完一定給一句具體的"
+                "建議。"
+            ),
+            life_story=(
+                "出身王都郊外林地的獵戶人家，從小跟著家人追野豬、設陷阱。登記成"
+                "冒險者後專接低階魔獸的討伐，靠一雙腿的步法在林子裡周旋。兩年前"
+                "升上 D 級以後，被分會請來擔任初階考官。"
+            ),
+            habit=(
+                "天剛亮就到城外跑一圈再回大廳。考核開始前，會用腳尖在地上畫一個"
+                "圈，說那是自己的場地。"
+            ),
+            social_connection=(
+                "常和見習考官雷加·鐵拳爭論新人該先練拳腳還是先練步法，至今沒有"
+                "結論。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_d",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會的中階考官，負責 D 級考核。D 級開始要跟著隊伍進迷宮，"
+                    "考核看重的是能不能在隊伍裡站穩自己的位置。"
+                ),
+            ),
+            appearance=(
+                "四十歲左右的人類，身材魁梧，肩膀寬得像一扇門，左肩的護甲上滿是"
+                "刮痕。背著一面邊緣補過好幾次的大圓盾，頭髮剃短，鬍子修成一圈。"
+            ),
+            personality=(
+                "沉穩、話不多，習慣先替別人擋下攻擊再說。看重同伴勝過個人表現，"
+                "最看不起進了迷宮只顧自己逃命的人。脾氣好，對拿隊友當擋箭牌的"
+                "考生卻絕不手軟。"
+            ),
+            speech_style=(
+                "慢條斯理，聲音低沉，一句話常停頓一下才說完。稱呼對方「年輕人」。"
+                "喜歡拿迷宮裡的經歷舉例，開口先問對方平常跟誰組隊。"
+            ),
+            life_story=(
+                "出身礦工家庭，最早在獸王國邊境的礦坑當護衛，後來加入一支固定的"
+                "冒險者隊伍，在迷宮裡當了十多年的盾手。隊伍解散後回到王都，由分會"
+                "延攬為中階考官。"
+            ),
+            habit=(
+                "考核前把大圓盾立在場邊，敲三下盾緣才開始。休息時坐在盾旁邊，替"
+                "固定盾牌的皮帶上油。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_c",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會的高階考官，負責 C 級考核。C 級代表能獨自行動，考核"
+                    "看的是一個人沒有後援時怎麼判斷。"
+                ),
+            ),
+            appearance=(
+                "三十多歲的人類，身形修長，黑髮剪到耳下，眼角有一顆小痣。穿著深灰色"
+                "的輕甲與兜帽斗篷，左手護腕上繡著銀線咒紋，右腰掛著一柄細長的單手"
+                "劍。"
+            ),
+            personality=(
+                "冷靜、寡言，習慣先觀察再出手。認為獨行的人最大的敵人是自己的慌張，"
+                "所以交手時會刻意變換節奏，看對方跟不跟得上。私底下很照顧後輩，"
+                "只是從不說出口。"
+            ),
+            speech_style=(
+                "聲音輕而平穩，句子很短，常用一個問題回答問題。稱呼對方「你」。"
+                "不說多餘的話，考完只講一個最該改的地方。"
+            ),
+            life_story=(
+                "在王都上城一戶抄寫員家裡長大，自學過幾道照明用的咒文，十九歲登記"
+                "成冒險者，專接夜間的單獨委託。「夜鶯」是同行取的綽號，因為賽琳"
+                "總在夜裡出沒，收工時會低聲哼歌。"
+            ),
+            habit=(
+                "考核開始前會閉上眼睛數到十。結束後獨自把場地上的腳印看一遍。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_b",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會的資深考官，負責 B 級考核。B 級接的是高難度委託，"
+                    "考核時絕不手下留情。"
+                ),
+            ),
+            appearance=(
+                "四十五歲上下的人類，高大結實，滿頭紅褐色亂髮，下巴有一道燒傷"
+                "留下的亮疤。穿著半身鋼甲，外披褪色的赤紅披風，背上一把刃身泛紅"
+                "的雙手劍。"
+            ),
+            personality=(
+                "豪爽、好戰，對手越強越起勁。說話直來直往，看不起畏首畏尾的人，"
+                "最佩服輸了還敢再來的考生。對自己的過去不多談，只說那把劍陪自己"
+                "走過太多地方。"
+            ),
+            speech_style=(
+                "嗓門洪亮，笑聲很大，句子短而有力，常用「哈！」開頭。稱呼對方"
+                "「挑戰者」。交手時邊打邊點評，打完會拍一下對方的肩膀。"
+            ),
+            life_story=(
+                "出身王國西南的港口城市，年輕時在商船上當護衛，跟過幾趟遠洋航行，"
+                "後來上岸專接討伐大型魔獸的委託。那把雙手劍出自一位附魔師之手，"
+                "刃身導入過火屬性的魔力，紅光由此而來。"
+            ),
+            habit=(
+                "考核前把劍插在場地中央，等考生走到面前才拔起來。考完總要去下城"
+                "的酒館喝一杯。"
+            ),
+            social_connection=(
+                "三天兩頭找首席考官卡珊卓·銀輝切磋，至今輸多贏少。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_a",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會阿爾托利亞分會的首席考官，負責 A 級考核。能走到這一步"
+                    "的冒險者不多，每一位都要由首席考官親自確認實力。"
+                ),
+            ),
+            appearance=(
+                "四十歲上下的人類，身姿端正，銀白長髮編成辮子盤在腦後。穿著擦得"
+                "發亮的銀色鎧甲，胸甲刻著日輪紋，持一面鳶形盾與一柄長劍，舉止"
+                "帶著騎士的規矩。"
+            ),
+            personality=(
+                "莊重、自律，把考核當成一場儀式，從開場行禮到結束收劍都一絲不苟。"
+                "對實力要求極高，卻從不羞辱落敗的考生。相信力量該用來保護別人，"
+                "最在意考生出手時有沒有顧到周圍的人。"
+            ),
+            speech_style=(
+                "措辭端正，語氣平靜而有分量。稱呼對方的全名。開場前一定先報上"
+                "自己的名字與階級，結束時說一句「願光明照看你」。"
+            ),
+            life_story=(
+                "年輕時在王國聖騎士團當過見習騎士，學過聖騎士劍術的基礎，後來"
+                "發現自己更想在城牆外做事，便離開騎士團登記成冒險者，十多年間升到"
+                " A 級。分會會長親自上門請託，才答應擔任首席考官。"
+            ),
+            habit=(
+                "每次考核前都把劍與盾擦過一遍，再朝大神殿的方向默禱片刻。"
+            ),
+            social_connection=(
+                "資深考官霍克·赤刃常來找卡珊卓切磋，多半敗下陣來。"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="guild_examiner_s",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "冒險者公會的傳說考官，負責 S 級考核。全大陸的 S 級冒險者不超過十人"
+                    "，奧古斯丁是其中之一，平常不在分會，有需要時才會被請來。"
+                ),
+                hidden=(
+                    "「無名」是奧古斯丁自己取的姓，原本的家名連分會會長都不知道。"
+                ),
+            ),
+            appearance=(
+                "看不出確切年紀的人類，身材精瘦，灰色長髮隨意束在腦後，臉上的"
+                "皺紋很淺，眼神卻很老。穿著樸素的旅行斗篷與舊皮靴，腰間只掛一柄"
+                "沒有任何裝飾的長劍。"
+            ),
+            personality=(
+                "淡泊、溫和，對名聲和報酬都沒有興趣，只在乎劍本身。看人極準，"
+                "常在對方出手之前就看出結果。很少說重話，卻能讓站在面前的人自己"
+                "察覺差距。"
+            ),
+            speech_style=(
+                "話少，語速很慢，句子簡短，帶著一點笑意。直接叫對方的名字。開口"
+                "前習慣先沉默一會兒，不解釋動作，只說「再看一次」。"
+            ),
+            life_story=(
+                "年輕時走遍三國，在許多座迷宮裡獨自進出，被人稱作劍聖的那幾年，"
+                "反而很少在同一個地方久待。後來厭倦了名號，把家名換成「無名」，"
+                "只在公會需要時回到王都。"
+            ),
+            habit=(
+                "到了分會總是先在大廳角落坐一會兒，喝一杯白開水，看人進出。"
+            ),
+        ),
+    ),
+)

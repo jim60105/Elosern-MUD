@@ -111,7 +111,9 @@ class PlaceRegistryTests(unittest.TestCase):
             '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。', (4, 3),
             '冒險者公會大廳', ('guild hall', 'hall'), '葛里安·衛登', '阿爾托利亞分會會長', 'human', None, 'other', 'guild_staff',
             'altoria_guild_master', (),
-            (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), (), None
+            (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), (),
+            # npc-persona-content-altoria-guild names the host's own profile.
+            'altoria_guild_master'
         ),
         "altoria_general_store": (
             'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
@@ -484,6 +486,7 @@ class PlaceRegistryTests(unittest.TestCase):
             host_sex=None,
             profession=None,
             service_id=None,
+            host_profile_key=None,
             assortment_keys=(),
             authored_kwargs=(),
         )
