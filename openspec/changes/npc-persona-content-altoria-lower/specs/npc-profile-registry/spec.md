@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Altoria lower-terrace hosts carry individual authored profiles and rewritten dialogue
-Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card: no provisional greeting or response SHALL survive verbatim. Within the slice, no two profiles SHALL share a personality or speech-style text, and no two greetings SHALL be identical after replacing the hosts' names and titles with one placeholder. Rewritten dialogue SHALL keep every service semantic its settlement and dialogue specifications require and SHALL NOT state fixed prices, stock counts, or availability that live service data owns.
+Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card: no provisional greeting or response SHALL survive verbatim. Within the slice, no two profiles SHALL share a personality or speech-style text, and no two greetings SHALL be identical after replacing the hosts' names and titles with one placeholder. Every greeting, response and voice line SHALL be spoken in character and SHALL NOT name a command, a game mechanic, or an interface element. Rewritten dialogue SHALL keep every service semantic its settlement and dialogue specifications require and SHALL NOT state fixed prices, stock counts, or availability that live service data owns.
 
 #### Scenario: Every owned host references its own valid profile
 - **WHEN** the slice's place rows are resolved against the profile registry
@@ -18,6 +18,10 @@ Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name,
 #### Scenario: Voices are not name substitutions
 - **WHEN** the owned greetings are compared after replacing host names and titles with one placeholder, and the owned profiles' personality and speech-style texts are compared
 - **THEN** no two are identical
+
+#### Scenario: No line breaks character
+- **WHEN** every owned greeting, keyword response, and misunderstanding reply is inspected
+- **THEN** none contains a backticked command token
 
 #### Scenario: Service semantics are preserved
 - **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
