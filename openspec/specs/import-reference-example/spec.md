@@ -47,6 +47,18 @@ and SHALL carry no `background` key.
 - **WHEN** the example's `persona` object is inspected
 - **THEN** it has exactly the seven card fields and no `background` key
 
+### Requirement: The reference example demonstrates the base-value stats convention correctly
+`examples/example_character.json` SHALL set at least one static stat (`atk_phys`, `agility`, or
+`defense`) to a base value consistent with its race's documented band, never to a value that would
+only make sense with a skill multiplier already applied, matching the schema's own documented
+convention (see the `import-schema` capability).
+
+#### Scenario: The example's static stats fall inside its race's documented band
+- **WHEN** `examples/example_character.json`'s `race` is `elf` and its `stats.atk_phys` is
+  inspected
+- **THEN** the value falls within `RACE_REGISTRY["elf"].static_baseline.atk_phys` (70-95 or the
+  open-ended prodigy range), not in the tens-of-thousands range a x1000 multiplier would produce
+
 ### Requirement: The reference example exercises every major schema branch and a complete NPC card
 `examples/example_character.json` SHALL set a `subrace` (exercising the race/subrace cross-check),
 a fully populated `stats` object (all eight keys), an empty `disguised_stats` object (the record's
@@ -77,15 +89,3 @@ field set, and a `persona` that is a complete compact NPC card.
 #### Scenario: The example's persona is a complete compact card
 - **WHEN** `examples/example_character.json`'s `persona` object is inspected through the card contract
 - **THEN** it is a valid seven-field compact NPC card
-
-### Requirement: The reference example demonstrates the base-value stats convention correctly
-`examples/example_character.json` SHALL set at least one static stat (`atk_phys`, `agility`, or
-`defense`) to a base value consistent with its race's documented band, never to a value that would
-only make sense with a skill multiplier already applied, matching the schema's own documented
-convention (see the `import-schema` capability).
-
-#### Scenario: The example's static stats fall inside its race's documented band
-- **WHEN** `examples/example_character.json`'s `race` is `elf` and its `stats.atk_phys` is
-  inspected
-- **THEN** the value falls within `RACE_REGISTRY["elf"].static_baseline.atk_phys` (70-95 or the
-  open-ended prodigy range), not in the tens-of-thousands range a x1000 multiplier would produce
