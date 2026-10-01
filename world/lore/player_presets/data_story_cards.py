@@ -92,6 +92,12 @@ ROWS: dict[str, PlayerPreset] = {
                 "護衛考核名列前茅，隨從武藝與護主本能使她永遠站在殿下與危險之間；"
                 "基礎身體強化是她僅有的魔法天賦。"
             ),
+            speech_style=(
+                "嚴格遵照侍從禮節的敬語，簡短有力、條理分明，極少有多餘情緒詞；"
+                "面對薇歐蕾特時語調溫順至極，偶爾因害羞而結巴；面對潛在威脅或外人"
+                "時冷淡果決，不帶任何多餘字眼。"
+            ),
+            greeting="「莉茲婭隨時聽候差遣。請放心，殿下與同伴的安全由我來守護。」",
         ),
         sexual_baseline=PresetSexualBaseline(
             arousal="平靜", virgin=True,
@@ -177,6 +183,12 @@ ROWS: dict[str, PlayerPreset] = {
                 "雙刃旋舞與影斬在村裡沒有對手，轉生特典武感使她總能先一步抵達對手要害。"
                 "陽光開朗，視戰鬥為與自身極限的對話，與姊姊悠奈形影不離。"
             ),
+            speech_style=(
+                "爽朗俐落、元氣滿滿的口吻，語速略快，句尾乾脆俐落；習慣直呼名字，"
+                "說話充滿朝氣與自信。提到刀術時興奮滔滔不絕，在悠奈身邊時偶爾會像撒嬌"
+                "般壓低聲音咕噥。"
+            ),
+            greeting="「嘿！今天要去哪裡鍛鍊？隨時叫上我，我的雙刀早就等不及啦！」",
         ),
         # Story's disguise layer: magic 30, physical 60, agility 60, defense 30.
         disguised_stats=(("magic_power", 30), ("atk_phys", 60),
@@ -262,6 +274,12 @@ ROWS: dict[str, PlayerPreset] = {
                 "是將性魔法鑽研到極致的享樂主義者。精通火與闇屬性，"
                 "並以神之秘法觸及性愛系統的領域。"
             ),
+            speech_style=(
+                "優雅平穩、慢條斯理的知性語調，聲音輕柔如耳語，帶著從容自信；"
+                "措辭禮貌考究，卻能面不改色地吐露帶有挑逗意味的字句，反差鮮明；"
+                "叫喚悠花時尾音常微微上揚，帶著寵溺玩味。"
+            ),
+            greeting="「呵呵……你好呀。今天打算探索什麼有趣的秘密呢？我也很樂意同行喔。」",
         ),
         # Story's disguise layer: 30 across magic and all three physical axes.
         disguised_stats=(("magic_power", 30), ("atk_phys", 30),
@@ -347,6 +365,11 @@ ROWS: dict[str, PlayerPreset] = {
                 "表面理由是「想看看短壽者們如何過日子」，實則貪戀人族對精靈的尊敬所"
                 "允許的、名正言順的暴露。"
             ),
+            speech_style=(
+                "看似天真無邪的孩童甜美聲線，刻意帶著軟糯尾音；"
+                "說話善於以『精靈古老傳統』等大道理掩蓋私心，語氣理直氣壯、純真中透著狡黠反差。"
+            ),
+            greeting="「初次見面，短壽者。我乃幽月谷的幻童精靈……嗯？你一直盯著我看，該不會是著迷了吧？」",
         ),
         # Story's disguise layer: magic 120, physical 50, agility 50, defense 30.
         disguised_stats=(("magic_power", 120), ("atk_phys", 50),

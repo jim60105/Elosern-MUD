@@ -238,16 +238,51 @@ class CompanionBoundsSweepTests(unittest.TestCase):
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_an_overlong_relationship_label_names_the_offending_preset(self):
-        # The label is injected into the built persona's social_connection,
-        # which PersonaStore renders as prose under the same field cap.
+        # The label is injected into the derived card's social_connection,
+        # which normalize_card bounds at LEAF_LIMIT (600 code points).
         partner = next(key for key in _live_presets() if key != "t_probe")
         preset = _probe_preset(
             starting_companions=(
-                StartingCompanion(partner, 50, "關" * (MAX_PERSONA_FIELD_LENGTH + 1)),
+                StartingCompanion(partner, 50, "關" * 601),
             )
         )
-        with self.assertRaisesRegex(StartingCompanionError, "persona"):
-            _validate_preset_companion_bounds({"t_probe": preset})
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: _live_presets()[partner]})
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_empty_speech_style_in_partner_preset_names_the_offending_preset(self):
+        from dataclasses import replace
+        from world.lore.player_presets import PresetPersona
+
+        partner = next(key for key in _live_presets() if key != "t_probe")
+        partner_card = replace(
+            _live_presets()[partner],
+            persona=replace(_live_presets()[partner].persona, speech_style=""),
+        )
+        preset = _probe_preset(
+            starting_companions=(
+                StartingCompanion(partner, 50, "同行者"),
+            )
+        )
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: partner_card})
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_over_budget_partner_preset_names_the_offending_preset(self):
+        from dataclasses import replace
+
+        partner = next(key for key in _live_presets() if key != "t_probe")
+        partner_card = replace(
+            _live_presets()[partner],
+            persona=replace(_live_presets()[partner].persona, personality="長" * 600, life_story="長" * 600, habit="長" * 600),
+        )
+        preset = _probe_preset(
+            starting_companions=(
+                StartingCompanion(partner, 50, "同行者"),
+            )
+        )
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: partner_card})
 
 
 _BUILDER_SCOPE_LOGICALS = (
@@ -317,16 +352,23 @@ class CompanionBuildTests(_BuilderCase):
         self.assertEqual(companion.db.age, shell.db.age)
         self.assertEqual(companion.db.apparent_age, shell.db.apparent_age)
         self.assertEqual(companion.db.disguised_stats, shell.db.disguised_stats)
-        # The persona is the card's record plus exactly the owner link.
+        # The persona is the compact card derived from the partner preset per D2.
+        from world.lore.player_presets import derive_companion_card
+        expected_card = derive_companion_card(
+            _live_presets()[_T_PARTNER], self.owner.key, _T_RELATIONSHIP
+        )
+        self.assertEqual(companion.db.persona, expected_card)
+        # Metadata is at version 1 with companion provenance naming preset and owner pk
+        meta = companion.db.npc_persona_meta
+        self.assertEqual(meta["persona_version"], 1)
         self.assertEqual(
-            companion.db.persona,
-            {
-                **shell.db.persona,
-                "social_connection": {
-                    **shell.db.persona["social_connection"],
-                    self.owner.key: "雙胞胎姊姊",
-                },
-            },
+            meta["provenance"],
+            {"kind": "companion", "profile": _T_PARTNER, "owner": self.owner.pk},
+        )
+        # Offline greeting is persisted verbatim from partner preset
+        self.assertEqual(
+            companion.db.npc_offline_greeting,
+            _live_presets()[_T_PARTNER].persona.greeting,
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
@@ -413,9 +455,10 @@ class CompanionBuildTests(_BuilderCase):
             self.owner,
             StartingCompanion(_T_TWIN, _T_DECLARED_AFFINITY2, _T_RELATIONSHIP2),
         )
-        self.assertEqual(
-            companion.db.persona["social_connection"][self.owner.key],
-            _T_RELATIONSHIP2,
+        self.assertTrue(
+            companion.db.persona["social_connection"].startswith(
+                f"{self.owner.key}：{_T_RELATIONSHIP2}"
+            )
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")

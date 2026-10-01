@@ -72,6 +72,24 @@ class PresetPersona:
     appearance: PresetAppearance = PresetAppearance()
     social_connection: tuple[tuple[str, str], ...] = ()  # name -> relationship
     background: str = ""
+    speech_style: str = ""
+    greeting: str = ""
+
+    def __post_init__(self) -> None:
+        if self.greeting:
+            from world.lore.npc_card import _normalize_text_leaf
+            from world.lore.npc_profiles.shape import VOICE_LINE_LIMIT
+
+            normalized = _normalize_text_leaf(self.greeting, "greeting")
+            if "\n" in normalized:
+                raise ValueError(
+                    "PresetPersona.greeting must be a single paragraph (no newline)"
+                )
+            if len(normalized) > VOICE_LINE_LIMIT:
+                raise ValueError(
+                    f"PresetPersona.greeting exceeds {VOICE_LINE_LIMIT} code points"
+                )
+            object.__setattr__(self, "greeting", normalized)
 
     def to_record(self) -> dict[str, Any]:
         """Return the storage shape written to ``character.db.persona``.
@@ -110,6 +128,59 @@ class PresetPersona:
         if self.background:
             record["background"] = self.background
         return record
+
+
+_APPEARANCE_SUBKEY_ORDER = (
+    "height",
+    "weight",
+    "measurement",
+    "style",
+    "overview",
+    "attire",
+    "feature",
+)
+
+
+def derive_companion_card(
+    preset: "PlayerPreset",
+    owner_key: str,
+    relationship: str,
+) -> dict[str, Any]:
+    """Derive a compact NPC card dictionary deterministically from a partner preset.
+
+    Leaves:
+    - identity: public / hidden from preset verbatim.
+    - personality, life_story, habit: from preset verbatim.
+    - speech_style: from preset.persona.speech_style verbatim.
+    - appearance: authored non-empty appearance sub-keys in _SUBKEY_ORDER joined with '；'.
+    - social_connection: one factual owner line f"{owner_key}：{relationship}" first,
+      then each preset social_connection entry as name：relationship lines.
+    - background: excluded.
+    """
+    persona = preset.persona
+    appearance_values = [
+        getattr(persona.appearance, field)
+        for field in _APPEARANCE_SUBKEY_ORDER
+    ]
+    flattened_appearance = "；".join(val for val in appearance_values if val)
+
+    social_lines: list[str] = [f"{owner_key}：{relationship}"]
+    for name, rel in persona.social_connection:
+        social_lines.append(f"{name}：{rel}")
+    social_connection_text = "\n".join(social_lines)
+
+    return {
+        "identity": {
+            "public": persona.identity.public,
+            "hidden": persona.identity.hidden,
+        },
+        "appearance": flattened_appearance,
+        "personality": persona.personality,
+        "speech_style": persona.speech_style,
+        "life_story": persona.life_story,
+        "habit": persona.habit,
+        "social_connection": social_connection_text,
+    }
 
 
 @dataclass(frozen=True)

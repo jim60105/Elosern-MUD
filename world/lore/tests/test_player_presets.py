@@ -500,6 +500,42 @@ class PlayerPresetTests(unittest.TestCase):
         self.assertEqual(partial["appearance"], {"attire": "斗篷"})
         self.assertNotIn("background", partial)
 
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_preset_persona_extension_fields_validation_and_projection(self):
+        from world.lore.player_presets import PresetPersona
+
+        # Defaults keep every shipped non-companion record byte-identical
+        base = PresetPersona()
+        self.assertEqual(base.speech_style, "")
+        self.assertEqual(base.greeting, "")
+        self.assertNotIn("speech_style", base.to_record())
+        self.assertNotIn("greeting", base.to_record())
+
+        # to_record() ignores both fields even when authored
+        authored = PresetPersona(
+            personality="豪爽",
+            speech_style="大聲呼喝，句尾常帶「哈！」",
+            greeting="喲！今天天氣不錯嘛！",
+        )
+        record = authored.to_record()
+        self.assertNotIn("speech_style", record)
+        self.assertNotIn("greeting", record)
+        self.assertEqual(record["personality"], "豪爽")
+
+        # greeting normalizes whitespace and CRLF
+        clean = PresetPersona(greeting="  哈囉！\r\n  ")
+        self.assertEqual(clean.greeting, "哈囉！")
+
+        # Multiline greeting is rejected at construction
+        with self.assertRaises(ValueError) as caught:
+            PresetPersona(greeting="第一段\n第二段")
+        self.assertIn("single paragraph", str(caught.exception))
+
+        # Over-limit greeting (> 300 code points) is rejected at construction
+        with self.assertRaises(ValueError) as caught:
+            PresetPersona(greeting="語" * 301)
+        self.assertIn("300", str(caught.exception))
+
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
     def test_disguised_stats_validation_rejects_bad_keys_values_and_duplicates(self):
         from world.lore.player_presets import _validate_preset_disguised_stats
