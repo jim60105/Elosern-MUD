@@ -52,6 +52,11 @@ from world.tests.synthetic_data import (
     synthetic_registries,
 )
 from tools.spec_traceability import covers_requirement
+import json
+
+from world.lore.npc_card import normalize_card
+from world.quests.tests._card_fixtures import occupant_card, occupant_card_record
+from world.rules.npc_persona import read_npc_persona, update_npc_persona
 
 from ._support import (
     _T_ARCHETYPE,
@@ -109,83 +114,141 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
             {"mode": "named", "stable_key": "forest_bandit_chief"},
         )
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_authored_persona_and_background_land_on_the_spawned_npc(self):
-        npc = self._spawned_npc(
-            self._characterized(
-                persona={
-                    "personality": "沉穩",
-                    "life_story": "守護森林多年的老獵人",
-                    "habit": "黃昏時擦拭獵弓",
-                },
-                background="來自邊境村莊的資深嚮導",
-            )
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_card_survives_compile_restore_and_materialization_unchanged(self):
+        from world.quests.compile import (
+            _compiled_to_payload,
+            payload_to_registrations,
         )
+
+        raw = occupant_card_record("（存續）")
+        # Surrounding whitespace is normalized once at compile; the stored,
+        # restored, and spawned card are the normalized form leaf for leaf.
+        raw["habit"] = "  " + raw["habit"] + "\r\n"
+        expected = normalize_card(raw)
+        payload = self._characterized(persona=raw)
+        compiled = compile_quest_blueprint(payload)
+        restored = payload_to_registrations(
+            json.loads(json.dumps(_compiled_to_payload(compiled)))
+        )
+        self.assertEqual(restored, compiled)
         self.assertEqual(
-            npc.db.persona,
+            restored.stage_requirements[0].characterizations[0].persona, expected
+        )
+
+        record, _ = self._accept(payload)
+        result = materialize_stage(
+            self.player, record.quest_id, origin_room=self.anchor
+        )
+        npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
+        self.assertEqual(npc.db.persona, expected.to_record())
+        meta = npc.db.npc_persona_meta
+        self.assertEqual(meta["persona_version"], 1)
+        self.assertEqual(
+            meta["provenance"],
             {
-                "identity": {},
-                "personality": "沉穩",
-                "life_story": "守護森林多年的老獵人",
-                "habit": "黃昏時擦拭獵弓",
-                "appearance": {},
-                "social_connection": {},
-                "background": "來自邊境村莊的資深嚮導",
+                "kind": "generated_quest",
+                "quest": record.definition_key,
+                "stage": 0,
+                "occupant": 0,
             },
         )
-        # The flavor never feeds a stored stat.
-        self.assertIsNotNone(npc.traits.atk_phys)
+        snapshot = read_npc_persona(npc)
+        self.assertEqual(snapshot.card, expected)
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_an_npc_without_a_persona_block_carries_none(self):
-        npc = self._spawned_npc(self._characterized())
-        self.assertIsNone(npc.db.persona)
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_card_never_influences_stored_stats(self):
+        plain = self._spawned_npc(self._characterized())
+        other = occupant_card_record("（另一張）")
+        other["personality"] = "力大無窮、身手矯健、刀槍不入的勇者。"
+        record, _ = self._accept(
+            self._characterized(display_name="另一人", persona=other)
+        )
+        result = materialize_stage(
+            self.player, record.quest_id, origin_room=self.anchor
+        )
+        carded = next(obj for obj in result.room.contents if isinstance(obj, NPC))
+        for trait in ("hp", "atk_phys", "agility", "defense", "magic_power"):
+            with self.subTest(trait=trait):
+                self.assertEqual(
+                    getattr(carded.traits, trait).base,
+                    getattr(plain.traits, trait).base,
+                )
 
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_over_bound_or_non_text_persona_fields_are_rejected_at_compile(self):
-        from world.quests.compile import compile_quest_blueprint
-
-        for overrides in (
-            {"persona": {"personality": "x" * 601}},
-            {"background": "x" * 601},
-            {"persona": {"personality": 42}},
-        ):
-            with self.subTest(overrides=overrides):
-                payload = self._characterized(**overrides)
-                with self.assertRaises(ValueError):
-                    compile_quest_blueprint(payload)
-
-    @covers_requirement("scene-builder::npc-characterization-carries-an-optional-authored-persona-block-for-look-flavor")
-    def test_forged_over_bound_persona_is_rejected_before_any_spawn(self):
-        from world.quests.scene_builder import SceneBuilderSpawnError
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_forged_invalid_card_is_rejected_before_any_spawn(self):
+        from world.lore.npc_card import NpcCard, NpcCardIdentity
 
         record, _ = self._accept(self._characterized())
-        forged = (
-            StageSpawnRequirement(
-                index=0,
-                objective_kind=ObjectiveKind.DEFEAT,
-                location=RoomLocator(DestinationKind.BOUND_INSTANCE),
-                archetype=_T_ARCHETYPE,
-                anchor_near=_T_ANCHOR,
-                scene_sentence=_T_SENTENCE,
-                npc_reqs=(("bandit", _T_NPC_TIER, None),),
-                characterizations=(
-                    StageNpcCharacterization(
-                        display_name="偽造者",
-                        title="偽造測試員",
-                        background="x" * 601,
+        empty_speech = NpcCard(
+            identity=NpcCardIdentity(public="偽造的公開身分"),
+            appearance="偽造外觀",
+            personality="偽造性格",
+            speech_style="",
+            life_story="偽造經歷",
+            habit="偽造習慣",
+        )
+        over_bound = NpcCard(
+            identity=NpcCardIdentity(public="偽造的公開身分"),
+            appearance="x" * 601,
+            personality="偽造性格",
+            speech_style="偽造語氣",
+            life_story="偽造經歷",
+            habit="偽造習慣",
+        )
+        for persona in (None, empty_speech, over_bound):
+            with self.subTest(persona=persona):
+                forged = (
+                    StageSpawnRequirement(
+                        index=0,
+                        objective_kind=ObjectiveKind.DEFEAT,
+                        location=RoomLocator(DestinationKind.BOUND_INSTANCE),
+                        archetype=_T_ARCHETYPE,
+                        anchor_near=_T_ANCHOR,
+                        scene_sentence=_T_SENTENCE,
+                        npc_reqs=(("bandit", _T_NPC_TIER, None),),
+                        characterizations=(
+                            StageNpcCharacterization(
+                                display_name="偽造者",
+                                title="偽造測試員",
+                                persona=persona,
+                            ),
+                        ),
                     ),
-                ),
-            ),
+                )
+                SCENE_REQUIREMENT_REGISTRY[record.definition_key] = forged
+                rooms_before = InstanceRoom.objects.all().count()
+                npcs_before = NPC.objects.all().count()
+                with self.assertRaisesRegex(SceneBuilderSpawnError, "persona"):
+                    materialize_stage(
+                        self.player, record.quest_id, origin_room=self.anchor
+                    )
+                self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
+                self.assertEqual(NPC.objects.all().count(), npcs_before)
+                current = next(
+                    r for r in read_records(self.player)
+                    if r.quest_id == record.quest_id
+                )
+                self.assertIsNone(current.stage_room_id)
+                self.assertFalse(current.objective_target_ids)
+
+    @covers_requirement("scene-builder::npc-characterization-carries-a-complete-compact-card-through-compile-restore-and-materialization")
+    def test_rematerialization_keeps_an_edited_occupant_card(self):
+        record, _ = self._accept(self._characterized())
+        first = materialize_stage(
+            self.player, record.quest_id, origin_room=self.anchor
         )
-        SCENE_REQUIREMENT_REGISTRY[record.definition_key] = forged
-        rooms_before = InstanceRoom.objects.all().count()
-        with self.assertRaises(SceneBuilderSpawnError):
-            materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.assertEqual(
-            InstanceRoom.objects.all().count(), rooms_before,
-            "a rejected persona must not spawn a room",
+        npc = next(obj for obj in first.room.contents if isinstance(obj, NPC))
+        edited = occupant_card_record("（已編輯）")
+        outcome = update_npc_persona(npc, edited, 1)
+        self.assertEqual((outcome.status, outcome.version), ("updated", 2))
+
+        again = materialize_stage(
+            self.player, record.quest_id, origin_room=self.anchor
         )
+        self.assertEqual(again.room.pk, first.room.pk)
+        self.assertEqual(npc.db.persona, normalize_card(edited).to_record())
+        self.assertEqual(npc.db.npc_persona_meta["persona_version"], 2)
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_portrait_only_occupant_receives_the_default_age(self):
@@ -253,6 +316,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                         display_name="偽造者",
                         title="偽造測試員",
                         portrait_stable_key="forged_key",
+                        persona=occupant_card(),
                     ),
                 ),
             ),
@@ -278,7 +342,11 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         permanently portrait-ineligible occupant). Each forged shape raises
         before any room or occupant is created.
         """
-        _ids = {"display_name": "偽造者", "title": "偽造測試員"}
+        _ids = {
+            "display_name": "偽造者",
+            "title": "偽造測試員",
+            "persona": occupant_card(),
+        }
         forged_shapes = (
             StageNpcCharacterization(**_ids, age=-1, apparent_age=-1),
             StageNpcCharacterization(**_ids, age="30", apparent_age="30"),
@@ -286,8 +354,8 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
             StageNpcCharacterization(**_ids, age=True, apparent_age=30),
             # Missing identity fields are themselves fail-closed (design D6):
             # a nameless or titleless forged occupant never spawns.
-            StageNpcCharacterization(title="缺名"),
-            StageNpcCharacterization(display_name="缺銜"),
+            StageNpcCharacterization(title="缺名", persona=occupant_card()),
+            StageNpcCharacterization(display_name="缺銜", persona=occupant_card()),
             None,
         )
         record, _ = self._accept(_instance_bound_payload())
