@@ -7,6 +7,7 @@ from typing import Any
 from evennia.typeclasses.attributes import AttributeProperty
 from twisted.internet import defer
 
+from world.observability import log_info
 from .entities import LivingEntity
 
 # Trait keys whose true current values become no-leak secrets when the NPC
@@ -392,7 +393,7 @@ class LLMNPC(NPC):
                 try:
                     displayed = int(disguised[key])
                     true_value = int(trait.value)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError):  # observability: ignore R2: non-numeric disguise traits are skipped
                     continue
                 if displayed != true_value:
                     secrets.add(str(true_value))
@@ -413,7 +414,7 @@ class LLMNPC(NPC):
 
         try:
             return render_prompt("npc.thinking", name=self.key)
-        except PromptUnavailableError:
+        except PromptUnavailableError:  # observability: ignore R2: fallback to empty echo when thinking key missing
             return ""
 
     @defer.inlineCallbacks
@@ -505,8 +506,6 @@ class LLMNPC(NPC):
 
         current_version = current_persona_version(self)
         if current_version != captured_version:
-            from world.observability import log_info
-
             log_info(
                 "npc_dialogue_stale_persona",
                 context={

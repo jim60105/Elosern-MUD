@@ -1163,6 +1163,28 @@ class DialogueVersionGateTests(EvenniaTest):
         texts = _msg_texts(msg)
         self.assertNotIn(STALE_PERSONA_NOTE, texts)
 
+    def test_stale_persona_emits_observability_event(self):
+        """A stale persona settlement emits npc_dialogue_stale_persona with context."""
+        client = _HeldClient()
+        with patch("typeclasses.npcs.log_info") as log_mock:
+            d = self.npc.run_npc_exchange("你好", self.player, client, path="custom_path")
+            card2 = dict(self.valid_card)
+            card2["habit"] = "新習慣。"
+            update_npc_persona(self.npc, card2, expected_version=1)
+            client.deferred.callback(_reply_text(speech="回應。"))
+            await_result(d)
+
+        log_mock.assert_called_once_with(
+            "npc_dialogue_stale_persona",
+            context={
+                "npc": str(self.npc.pk),
+                "char": str(self.player.pk),
+                "version_from": 1,
+                "version_to": 2,
+                "path": "custom_path",
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

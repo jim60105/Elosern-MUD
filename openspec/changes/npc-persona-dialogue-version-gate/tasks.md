@@ -8,5 +8,5 @@ Apply on branch `feat/npc-persona-dialogue-version-gate` in worktree `.worktrees
 
 ## 2. Gates
 
-- [ ] 2.1 Add the event to the observability catalog and run `uv run --locked python -m tools.observability_lint check` in the same batch as the focused labels; `tools/observability_freeze.json` unchanged.
+- [x] 2.1 Add the event to the observability catalog and run `uv run --locked python -m tools.observability_lint check` in the same batch as the focused labels; `tools/observability_freeze.json` unchanged.
 - [ ] 2.2 Confirm shard ownership with `tests.test_evennia_test_optimization_contract`; sync the ADDED `npc-dialogue` requirement into `openspec/specs/`, annotate with literal IDs from `uv run --locked python -m tools.spec_traceability list`; verify `tools.spec_traceability check`, `tools.contract_gate`, `git diff --check`, and `openspec validate npc-persona-dialogue-version-gate --strict`.
