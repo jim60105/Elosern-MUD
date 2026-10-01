@@ -9,6 +9,7 @@ from world.ai.scenario_director import (
     BlueprintLocation,
     BlueprintNpcReq,
     BlueprintObjective,
+    BlueprintPersona,
     BlueprintPortrait,
     BlueprintReward,
     BlueprintStage,
@@ -26,6 +27,7 @@ from world.ai.tests._director_helpers import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 
 
@@ -166,11 +168,8 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
                             portrait=BlueprintPortrait(
                                 stable_key="forest_bandit_chief"
                             ),
-                            background="來自邊境的資深嚮導",
-                            persona=(
-                                ("personality", "沉穩"),
-                                ("life_story", "守護森林多年"),
-                                ("habit", "黃昏時擦拭獵弓"),
+                            persona=BlueprintPersona.from_record(
+                                occupant_card_record()
                             ),
                         ),
                     ),
@@ -185,15 +184,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         self.assertEqual(requirement.age, 35)
         self.assertEqual(requirement.apparent_age, 35)
         self.assertEqual(requirement.portrait.stable_key, "forest_bandit_chief")
-        self.assertEqual(requirement.background, "來自邊境的資深嚮導")
-        self.assertEqual(
-            dict(requirement.persona),
-            {
-                "personality": "沉穩",
-                "life_story": "守護森林多年",
-                "habit": "黃昏時擦拭獵弓",
-            },
-        )
+        self.assertEqual(requirement.persona.to_record(), occupant_card_record())
 
     @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
     def test_field_less_blueprint_round_trips_byte_identically(self):
@@ -231,6 +222,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "無portrait頭目",
+                "persona": occupant_card_record(),
             }
         ]
         first = compile_quest_blueprint(base_payload)

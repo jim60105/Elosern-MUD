@@ -179,7 +179,7 @@ profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Eve
 | `LLM_REASONING_EFFORT` | `LLM_PROFILES[*].reasoning_effort` | 可省略選擇 | 省略 | 閉集合 `minimal/low/medium/high`（不分大小寫，存小寫） |
 | `LLM_REASONING_STYLE` | `LLM_PROFILES[*].reasoning_style` | 選擇 | `openrouter` | 閉集合 `openrouter/vllm/off`（不分大小寫） |
 | `LLM_MAX_COMPLETION_TOKENS` | `LLM_PROFILES[*].max_completion_tokens` | 可省略整數 | 省略 | 正整數；空白＝省略 |
-| `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`action_options` 320、`title_nomination` 640） | 正整數；未設定時各層保留自己的程式碼預設值 |
+| `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`action_options` 320、`title_nomination` 640、`scenario_director` 8192） | 正整數；未設定時各層保留自己的程式碼預設值 |
 | `LLM_TIMEOUT_SECONDS` | `LLM_PROFILES[*].timeout_seconds` | 整數 | `60` | 正整數 |
 | `LLM_MAX_RETRIES` | `LLM_PROFILES[*].max_retries` | 整數 | `2` | 非負整數 |
 | `LLM_SUPPORTS_RESPONSE_FORMAT` | `LLM_PROFILES[*].supports_response_format` | 布林字 | `False` | 布林字彙表；`action_options` 被強制為 True，企圖用覆寫清除會開機失敗 |

@@ -43,6 +43,7 @@ from commands.scene import CmdEnterScene
 from tools.spec_traceability import covers_requirement
 
 from server.scene_flavor_service import SceneFlavorContextError, schedule_scene_flavor
+from world.quests.tests._card_fixtures import occupant_card_record
 
 _VALID_FLAVOR = (
     "祭壇的苔石在幽暗中泛著微光，潮濕的泥土氣味與燃過的薰香交織，"
@@ -304,6 +305,7 @@ def _instance_bound_payload(**overrides):
                         "disposition": None,
                         "display_name": "黑鬍",
                         "title": "林間盜匪首領",
+                        "persona": occupant_card_record(),
                     }
                 ],
             }

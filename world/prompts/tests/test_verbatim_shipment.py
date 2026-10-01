@@ -50,13 +50,24 @@ _SCENARIO_DIRECTOR_SYSTEM = (
     '"anchor/grid/instance", "archetype": "…", "anchor_key": null, '
     '"anchor_near": null, "xyz": null, "scene_sentence": null}, "npc_req": '
     '[{"role": "…", "tier": "…", "disposition": null, "display_name": "…", '
-    '"title": "…"}]}], "reward": '
+    '"title": "…", "persona": {"identity": {"public": "…", "hidden": ""}, '
+    '"appearance": "…", "personality": "…", "speech_style": "…", '
+    '"life_story": "…", "habit": "…", "social_connection": ""}}]}], "reward": '
     '{"copper": 100, "items": [{"item_key": "healing_potion", "quantity": 1}], '
     '"merit": 25}, "failure": {"deadline_hours": 72, "conditions": []}}。'
     "stage 的 index 必須從 0 開始連續遞增。"
     "每個 npc_req 必須附帶 display_name 與 title；以下名字僅供靈感，"
     "可直接採用或依角色的性別、背景與語氣改寫："
     "{name_inspiration}。"
+    "每個 npc_req 也必須附帶 persona 人物卡物件，恰好包含七個欄位："
+    "identity（身分，為物件，含 public 公開身分與 hidden 隱秘身分）、"
+    "appearance（外觀）、personality（性格）、"
+    "speech_style（說話風格，描述此人如何說話，例如語氣、用詞與口頭禪）、"
+    "life_story（人生經歷）、habit（習慣）、social_connection（人脈）；"
+    "不得加入其他欄位。identity.hidden 與 social_connection 可為空字串，"
+    "其餘欄位皆不得為空。每個欄位上限 600 個字元，身分段落上限 600 個字元，"
+    "整張人物卡呈現後上限 2000 個字元；請讓每張人物卡保持精簡，"
+    "約 800 個字元左右。整份提案所有 stage 的 npc_req 合計最多 3 個。"
 )
 _NPC_DIALOGUE_TEMPLATE = (
     "{persona}"

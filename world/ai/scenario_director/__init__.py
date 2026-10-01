@@ -67,6 +67,7 @@ from world.quests.characterization import (
 )
 
 from world.ai.scenario_director.blueprints import (
+    MAX_BLUEPRINT_OCCUPANTS,
     MAX_CONTEXT_FIELD_LENGTH,
     MAX_NAME_LENGTH,
     MAX_SCENE_SENTENCE_LENGTH,
@@ -78,6 +79,7 @@ from world.ai.scenario_director.blueprints import (
     BlueprintNpcReq,
     BlueprintObjective,
     BlueprintObjectiveKind,
+    BlueprintPersona,
     BlueprintPortrait,
     BlueprintQuestType,
     BlueprintReward,
@@ -106,6 +108,7 @@ from world.ai.scenario_director.validators import (
     _validate_monster_tier_known,
     _validate_no_template_placeholder,
     _validate_npc_characterization,
+    _validate_npc_occupant_total,
     _validate_npc_tier_known,
     _validate_objective_selectors,
     _validate_rank_known,

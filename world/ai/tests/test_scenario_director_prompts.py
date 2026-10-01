@@ -17,6 +17,7 @@ from world.ai.tests._director_helpers import _context
 from world.rules.namegen import roll_name_for_race
 
 from tools.spec_traceability import covers_requirement
+from world.quests.tests._card_fixtures import occupant_card_record
 
 
 # Capability probe: this module must prove the prompt layer never mutates the
@@ -144,7 +145,11 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertEqual(
             validate(
                 _payload(
-                    {"display_name": "非庫名・自取", "title": "邊境嚮導"}
+                    {
+                        "display_name": "非庫名・自取",
+                        "title": "邊境嚮導",
+                        "persona": occupant_card_record(),
+                    }
                 )
             ),
             [],

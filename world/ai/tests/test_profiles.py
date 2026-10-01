@@ -345,6 +345,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(os.environ, before)
 
     @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment", "ai-action-options-prompts::layer-names-gains-the-action-options-slot-with-structured-output-defaults")
+    @covers_requirement("llm-profiles::per-layer-profile-registry")
     def test_default_profiles_target_local_ollama_by_default(self):
         profiles = build_profiles(default_profiles())
         for layer in LAYER_NAMES:
@@ -361,6 +362,9 @@ class RegistryTests(unittest.TestCase):
                 self.assertEqual(profiles[layer].max_tokens, 320)
             elif layer == "title_nomination":
                 self.assertEqual(profiles[layer].max_tokens, 640)
+            elif layer == "scenario_director":
+                self.assertFalse(profiles[layer].supports_response_format)
+                self.assertEqual(profiles[layer].max_tokens, 8192)
             else:
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 250)

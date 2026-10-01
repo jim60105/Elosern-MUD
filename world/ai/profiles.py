@@ -32,6 +32,11 @@ ACTION_OPTIONS_MAX_TOKENS = 320
 # action-options payload with headroom for 80-character Traditional-Chinese
 # basis quotes.
 TITLE_NOMINATION_MAX_TOKENS = 640
+# A quest blueprint whose (at most three) occupants each carry a complete
+# compact card of about 800 rendered code points costs roughly 5,800 output
+# tokens at a conservative 2 tokens per Traditional Chinese code point
+# (npc-persona-generated-quest-cards D6); 8,192 leaves headroom.
+SCENARIO_DIRECTOR_MAX_TOKENS = 8192
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
@@ -272,7 +277,8 @@ def default_profiles(
     requests structured output when the endpoint declares support; the
     ``action_options`` layer is the single exception and always defaults to
     the capability on, with ``max_tokens`` sized for a 5-card JSON payload
-    (pipeline design doc §5).
+    (pipeline design doc §5). ``title_nomination`` and ``scenario_director``
+    carry their own larger output budgets.
     """
     profiles = {
         layer: {
@@ -297,6 +303,10 @@ def default_profiles(
     profiles["title_nomination"] = {
         **profiles["title_nomination"],
         "max_tokens": TITLE_NOMINATION_MAX_TOKENS,
+    }
+    profiles["scenario_director"] = {
+        **profiles["scenario_director"],
+        "max_tokens": SCENARIO_DIRECTOR_MAX_TOKENS,
     }
     if defaults is not None:
         for layer, overrides in defaults.items():
