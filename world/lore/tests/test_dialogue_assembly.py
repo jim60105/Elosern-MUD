@@ -35,6 +35,18 @@ class AltoriaDialogueSplitContractTests(unittest.TestCase):
         ]
         self.assertEqual(list(DIALOGUE_ROWS.keys()), expected_keys)
 
+    def test_every_altoria_table_keeps_its_greeting_and_four_answers(self):
+        # Shape only, no prose: the dialogue panel shows four choices and
+        # silently drops a fifth, so every capital table carries a greeting
+        # and exactly four keyword answers.
+        tables = (*ALTORIA_LOWER_ROWS, *ALTORIA_MIDDLE_ROWS, *ALTORIA_UPPER_ROWS)
+        self.assertEqual(len(tables), 16)
+        for key, definition in tables:
+            with self.subTest(table=key):
+                self.assertIs(DIALOGUE_ROWS[key], definition)
+                self.assertTrue(definition.greeting)
+                self.assertEqual(len(definition.responses), 4)
+
     def test_each_table_terrace_matches_its_place_row(self):
         lower_places = {
             dict(p.authored_kwargs).get("dialogue_key")
