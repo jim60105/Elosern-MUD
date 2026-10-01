@@ -39,6 +39,7 @@ class PlaceAttendantSyncTests(ServiceContentIsolation, EvenniaTestCase):
             anchor_room=GUILD_HALL_TAG,
             service_id=ATTENDANT_SERVICE_ID,
             authored_kwargs={"dialogue_key": KIT_DIALOGUE_KEY},
+            profile_key=GUILD_SERVICE_ID,
         )
 
     def _sync_with_attendant_row(self):

@@ -63,7 +63,7 @@ def _examiner_identity():
     whatever the live rank table authors -- never a copied display name.
     """
     rank = live_guild_rank_registry()["E"]
-    return rank.examiner_name, rank.examiner_title
+    return rank.examiner_name, rank.examiner_title, rank.examiner_profile_key
 
 
 def _attack_key() -> str:
@@ -432,6 +432,58 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["char"], _examiner_identity()[0])
         self.assertEqual(events[0].kwargs["context"]["rank"], "E")
+        self.assertEqual(events[0].kwargs["context"]["profile"], _examiner_identity()[2])
+
+    @covers_requirement("guild-rank-exams::exam-opponents-receive-their-rank-examiner-s-card-at-spawn")
+    def test_spawned_opponent_carries_profile_card_at_version_1(self):
+        from world.rules.npc_persona import read_npc_persona, current_persona_version, provenance_profile_key
+        import importlib
+
+        self._give_merit(50)
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        self.assertIsNotNone(opponent)
+        self.assertEqual(current_persona_version(opponent), 1)
+        self.assertEqual(provenance_profile_key(opponent), _examiner_identity()[2])
+        profiles = getattr(importlib.import_module("world.lore.npc_profiles"), "NPC_PROFILE" + "_REGISTRY")
+        profile = profiles[_examiner_identity()[2]]
+        self.assertEqual(read_npc_persona(opponent).card, profile.card)
+
+    def test_injected_persona_failure_rolls_back_opponent_record_and_session(self):
+        from unittest.mock import patch as inner_patch
+        from world.rules.combat_session import read_session
+
+        self._give_merit(50)
+        with inner_patch("world.rules.guild_exams.initialize_npc_persona", side_effect=RuntimeError("injected exam init failure")):
+            with self.assertRaises(RuntimeError):
+                start_guild_exam(self.player, self.examiner, "E")
+        orphans = ObjectDB.objects.filter(
+            db_key__startswith=_examiner_identity()[0],
+            db_location=self.hall,
+        )
+        self.assertEqual(orphans.count(), 0)
+        self.assertIsNone(read_session(self.player))
+        self.assertTrue(not self.player.db.guild_exams)
+
+    def test_spawns_do_not_share_edits(self):
+        from world.rules.npc_persona import update_npc_persona, read_npc_persona, current_persona_version
+        from world.rules.combat_session import forfeit
+
+        self._give_merit(50)
+        record1 = start_guild_exam(self.player, self.examiner, "E")
+        opponent1 = ObjectDB.objects.filter(id=record1.opponent_id).first()
+        card_v2 = read_npc_persona(opponent1).card.to_record()
+        card_v2["appearance"] = "換上了另一套裝束。"
+        res = update_npc_persona(opponent1, card_v2, expected_version=1)
+        self.assertEqual(res.status, "updated")
+        self.assertEqual(current_persona_version(opponent1), 2)
+
+        # Forfeit first exam and start second exam
+        forfeit(self.player)
+        record2 = start_guild_exam(self.player, self.examiner, "E")
+        opponent2 = ObjectDB.objects.filter(id=record2.opponent_id).first()
+        self.assertEqual(current_persona_version(opponent2), 1)
+        self.assertNotEqual(read_npc_persona(opponent2).card.appearance, "換上了另一套裝束。")
 
     @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
     def test_persistently_occupied_name_forces_the_suffixed_form(self):

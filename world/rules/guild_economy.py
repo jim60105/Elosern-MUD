@@ -17,6 +17,8 @@ from django.db import transaction
 from evennia.utils.create import create_object
 
 from world.observability import log_info, log_warn
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+from world.rules.npc_persona import initialize_npc_persona
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.bootstrap import sync_service_interiors
@@ -116,29 +118,8 @@ def _sync_service_host(row, room) -> NPC:
     anchor_slot = _row_anchor_class(row).get_component_slot()
     host = _find_service_host(row.service_id, anchor_slot)
     if host is None:
-        host = create_object(NPC, key=validate_npc_name(row.name), location=room)
-        host.npc_title = validate_npc_title(row.title)
-        place = PLACE_REGISTRY.get(row.anchor_room)
-        if place is None:
-            raise RuntimeError(
-                f"roster row {row.service_id!r} anchors at {row.anchor_room!r}, "
-                "which has no place registry row"
-            )
-        host.race = place.host_race
-        host.subrace = place.host_subrace
-        host.sex = place.host_sex
-        host.apply_race_baseline()
-        first_kwargs = authored_map[row.profession.components[0].type_key]
-        # Commit-bound: sync runs inside startup transactions; a creation event
-        # must never describe a host a later rollback destroyed.
-        transaction.on_commit(
-            lambda context={
-                "char": host.key,
-                "service": row.service_id,
-                "shop": first_kwargs.get("shop_key") or first_kwargs.get("branch_key"),
-                "profession": row.profession.key,
-            }: log_info("guild_service_host_created", context=context)
-        )
+        with transaction.atomic():
+            host = _create_and_initialize_host(row, room, authored_map)
     elif host.location is not room:
         host.location = room
     ensure_npc_canonical_age(host)
@@ -150,6 +131,43 @@ def _sync_service_host(row, room) -> NPC:
         host, row.profession, authored_map, anchor_room=room
     )
     _apply_authored_initial_arousal(host, authored_map, attached)
+    return host
+
+
+def _create_and_initialize_host(row, room, authored_map) -> NPC:
+    """Build, baseline, initialize persona, and schedule creation event."""
+    from world.rules.npc_identity import validate_npc_name, validate_npc_title
+
+    host = create_object(NPC, key=validate_npc_name(row.name), location=room)
+    host.npc_title = validate_npc_title(row.title)
+    place = PLACE_REGISTRY.get(row.anchor_room)
+    if place is None:
+        raise RuntimeError(
+            f"roster row {row.service_id!r} anchors at {row.anchor_room!r}, "
+            "which has no place registry row"
+        )
+    host.race = place.host_race
+    host.subrace = place.host_subrace
+    host.sex = place.host_sex
+    host.apply_race_baseline()
+    profile = NPC_PROFILE_REGISTRY[row.profile_key]
+    initialize_npc_persona(
+        host,
+        profile.card.to_record(),
+        {"kind": "profile", "profile": row.profile_key},
+    )
+    first_kwargs = authored_map[row.profession.components[0].type_key]
+    # Commit-bound: sync runs inside startup transactions; a creation event
+    # must never describe a host a later rollback destroyed.
+    transaction.on_commit(
+        lambda context={
+            "char": host.key,
+            "service": row.service_id,
+            "shop": first_kwargs.get("shop_key") or first_kwargs.get("branch_key"),
+            "profession": row.profession.key,
+            "profile": row.profile_key,
+        }: log_info("guild_service_host_created", context=context)
+    )
     return host
 
 
@@ -289,6 +307,12 @@ def sync_service_content() -> None:
     # integrity error means nothing is created, renamed, or deleted. The
     # probe reads only live component anchors, so it covers EVERY row even
     # when its room cannot resolve.
+    for row in roster:
+        if row.profile_key not in NPC_PROFILE_REGISTRY:
+            raise ServiceAnchorIntegrityError(
+                f"service {row.service_id!r} names profile_key {row.profile_key!r} "
+                "which is absent from the NPC profile registry"
+            )
     for row in roster:
         _find_service_host(row.service_id, _row_anchor_class(row).get_component_slot())
     _converge_service_hosts({row.service_id for row in roster})

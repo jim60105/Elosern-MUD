@@ -535,6 +535,7 @@ class PlaceRegistryTests(unittest.TestCase):
             self.assertIn(field, message)
         for field in ("host_race", "host_sex", "profession", "service_id"):
             self.assertIn(field, message)
+        self.assertIn("host_profile_key", message)
         # The mirror image: a profession without a host name.
         profession_only = replace(self._hostless(), profession="merchant")
         with self.assertRaises(ValueError) as caught:
@@ -630,6 +631,20 @@ class PlaceRegistryTests(unittest.TestCase):
                 validate_place_registry({"t_offense_place": place})
             except ValueError as error:  # pragma: no cover - failure path asserts below
                 self.fail(f"registered host_profile_key rejected: {error}")
+
+    @covers_requirement("settlement-place-registry::every-host-authoring-place-names-its-host-s-npc-profile")
+    def test_a_hosted_place_without_a_host_profile_key_fails_as_partial_host(self):
+        # npc-persona-host-examiner-producers: host_profile_key joins HOST_IDENTITY_FIELDS.
+        # A place authoring a complete host but no host_profile_key fails load naming the
+        # place and listing host_profile_key as missing.
+        complete_without_profile = replace(self.store, host_profile_key=None)
+        with self.assertRaises(ValueError) as caught:
+            validate_place_registry({"t_store_place": complete_without_profile})
+        message = str(caught.exception)
+        self.assertIn("t_store_place", message)
+        self.assertIn("partial host", message)
+        self.assertIn("host_profile_key", message)
+        self.assertIn("missing", message)
 
     # ---- shared exteriors (altoria-place-slices) ----------------------------
 

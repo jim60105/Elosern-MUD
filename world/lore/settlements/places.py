@@ -28,7 +28,6 @@ from world.lore.sex import SEX_VALUES
 
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 
-
 class PlaceKind(StrEnum):
     """Closed vocabulary of what a place's location IS in the world.
 
@@ -155,6 +154,11 @@ HOST_IDENTITY_FIELDS: tuple[str, ...] = (
     "host_sex",
     "profession",
     "service_id",
+    "host_profile_key",
+)
+
+_HOST_SCALARS_WITHOUT_PROFILE: tuple[str, ...] = tuple(
+    field for field in HOST_IDENTITY_FIELDS if field != "host_profile_key"
 )
 
 
@@ -173,7 +177,6 @@ def place_is_hostless(place: PlaceDefinition) -> bool:
         all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS)
         and place.host_subrace is None
         and place.authored_kwargs == ()
-        and place.host_profile_key is None
     )
 
 
@@ -237,7 +240,7 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
             )
         hostless = place_is_hostless(place)
         if place.host_profile_key is not None:
-            if all(getattr(place, field) is None for field in HOST_IDENTITY_FIELDS):
+            if all(getattr(place, field) is None for field in _HOST_SCALARS_WITHOUT_PROFILE):
                 raise ValueError(
                     f"place {place.key!r} names host_profile_key "
                     f"{place.host_profile_key!r} but authors no host (a hostless "
