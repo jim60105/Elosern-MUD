@@ -61,6 +61,10 @@
       "reason": "nation data contract"
     },
     {
+      "path": "world/lore/tests/test_npc_profile_inventory.py",
+      "reason": "shipped NPC source inventory data contract"
+    },
+    {
       "path": "world/lore/tests/test_npc_tiers.py",
       "reason": "npc tier data contract"
     },
