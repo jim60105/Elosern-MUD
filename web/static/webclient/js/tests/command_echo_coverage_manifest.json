@@ -40,6 +40,8 @@
     "guild.register",
     "inventory.toggle_equip",
     "inventory.use",
+    "npc.persona.read",
+    "npc.persona.update",
     "options.dismiss",
     "shop.buy",
     "shop.sell",
@@ -59,6 +61,8 @@
     "gallery.card.delete",
     "gallery.face_rect.update",
     "gallery.binding.save",
+    "npc.persona.read",
+    "npc.persona.update",
     "options.dismiss"
   ]
 }

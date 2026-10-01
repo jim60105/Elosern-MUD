@@ -177,6 +177,43 @@ def current_persona_version(npc: Any) -> int | None:
     return version
 
 
+def is_card_available(npc: Any) -> bool:
+    """Silent, read-only predicate checking whether an NPC's card is available and valid (D5).
+
+    Unlike ``read_npc_persona``, this does NOT emit the ``npc_persona_unavailable``
+    observability warning: exploration snapshot calculation runs frequently and
+    must stay silent for uninitialized or non-NPC targets.
+    """
+    if not isinstance(npc, NPC):
+        return False
+    if not npc.attributes.has("persona") or not npc.attributes.has("npc_persona_meta"):
+        return False
+    try:
+        normalize_card(npc.db.persona)
+    except Exception:  # observability: ignore R2: silent read-only presentation predicate deliberately suppresses card parse errors
+        return False
+    raw_meta = npc.db.npc_persona_meta
+    if not isinstance(raw_meta, Mapping) or isinstance(raw_meta, (str, bytes)):
+        return False
+    version = raw_meta.get("persona_version")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        return False
+    generation = raw_meta.get("generation")
+    card_fmt = raw_meta.get("format")
+    if (
+        not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or not isinstance(card_fmt, int)
+        or isinstance(card_fmt, bool)
+    ):
+        return False
+    try:
+        validate_provenance(raw_meta.get("provenance"))
+    except Exception:  # observability: ignore R2: silent read-only presentation predicate deliberately suppresses provenance parse errors
+        return False
+    return True
+
+
 def initialize_npc_persona(
     npc: Any,
     card_raw: Any,

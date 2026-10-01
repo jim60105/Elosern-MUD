@@ -98,7 +98,7 @@ ACTION_IDS = tuple(
     for code in ACTION_CODE_ALLOWLIST
     if code not in ("explore.talk_scripted", "explore.talk_freeform")
 )
-SURFACES = ("guild", "shop")
+SURFACES = ("guild", "shop", "npc_persona")
 ENTITY_KINDS = ("character", "npc", "monster")
 
 
@@ -535,6 +535,7 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
     from typeclasses.components import GuildStaff, Merchant
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
+    from world.rules.npc_persona import is_card_available
     from world.rules.possession import (
         POSSESSED_REFUSAL_MESSAGES,
         REASON_POSSESSED_TALK,
@@ -621,6 +622,34 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                     # the row (schema version 2, quest-deliver-action).
                     row["params"] = dict(entry.params)
                 affordances.append(row)
+        if isinstance(obj, NPC):
+            # Design D5: Reserve space for the author-editor affordance within MAX_AFFORDANCES
+            affordances = affordances[: MAX_AFFORDANCES - 1]
+            card_ok = is_card_available(obj)
+            if possessed:
+                dis_reason = {
+                    "code": REASON_POSSESSED_TALK,
+                    "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK],
+                }
+                is_enabled = False
+            elif not card_ok:
+                dis_reason = {
+                    "code": "npc_persona.unavailable",
+                    "message": "此角色的設定目前無法編輯或尚未初始化。",
+                }
+                is_enabled = False
+            else:
+                dis_reason = None
+                is_enabled = True
+            affordances.append(
+                {
+                    "kind": "navigate",
+                    "surface": "npc_persona",
+                    "label": "編輯人物設定",
+                    "enabled": is_enabled,
+                    "disabled_reason": dis_reason,
+                }
+            )
         targets.append(
             {
                 "identity": int(obj.pk),

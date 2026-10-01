@@ -267,6 +267,7 @@
       "name": "webclient-presentation-a",
       "labels": [
         "web.webclient.presentation.tests.test_affordances",
+        "web.webclient.presentation.tests.test_exploration_npc_persona",
         "web.webclient.presentation.tests.test_coordinator",
         "web.webclient.presentation.tests.test_coordinator_push",
         "web.webclient.presentation.tests.test_creation_panel",

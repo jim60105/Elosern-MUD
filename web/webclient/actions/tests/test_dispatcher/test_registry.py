@@ -97,6 +97,8 @@ class RegistryTests(unittest.TestCase):
                     "gallery.card.delete",
                     "gallery.face_rect.update",
                     "gallery.binding.save",
+                    "npc.persona.read",
+                    "npc.persona.update",
                 }
             ),
         )

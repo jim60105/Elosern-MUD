@@ -45,7 +45,8 @@ service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`,
 `explore.possess`, `explore.possess_release`, and `explore.deliver`, the two
 title ballot adapters `title.accept` and `title.decline`, the two title codex
 adapters `title.equip` and `title.remove`, the persona adapter
-`character.persona.update`, the `options.dismiss` action, and the six gallery
+`character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and
+`npc.persona.update`, the `options.dismiss` action, and the six gallery
 management adapters `gallery.subject.select`, `gallery.generate`,
 `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, and
 `gallery.binding.save`.
@@ -67,7 +68,7 @@ management adapters `gallery.subject.select`, `gallery.generate`,
 
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
 
-- **WHEN** the production registry is loaded after the practice-webclient change and the gallery-management change adds its six gallery adapters
+- **WHEN** the production registry is loaded after the practice-webclient change, the gallery-management change adds its six gallery adapters, and the NPC author-editor change adds its two adapters
 - **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`, each with its own exact validator and deterministic adapter
 
 #### Scenario: Test proof action remains isolated

@@ -47,7 +47,7 @@ var EXPLORATION_ACTION_IDS = [
   "explore.possess_release",
   "explore.deliver",
 ];
-var EXPLORATION_SURFACES = ["guild", "shop"];
+var EXPLORATION_SURFACES = ["guild", "shop", "npc_persona"];
 var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
 
 

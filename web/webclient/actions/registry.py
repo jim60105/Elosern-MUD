@@ -91,7 +91,8 @@ def build_production_action_registry() -> ActionRegistry:
     ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
     ``explore.deliver``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
-    account adapters (``account.character.switch``, ``account.character.create``), and the
+    account adapters (``account.character.switch``, ``account.character.create``), the two
+    NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), and the
     ``options.dismiss`` action. Each action
     binds one exact payload validator and one narrow deterministic adapter; no
     action routes through the text parser.
@@ -113,6 +114,14 @@ def build_production_action_registry() -> ActionRegistry:
     from web.webclient.actions.character_actions import (
         _character_persona_update_adapter,
         validate_character_persona_update_payload,
+    )
+    from web.webclient.actions.npc_persona_actions import (
+        AFFECTED_READ,
+        AFFECTED_UPDATE,
+        read_npc_persona_adapter,
+        update_npc_persona_adapter,
+        validate_read_payload,
+        validate_update_payload,
     )
     from web.webclient.actions.creation_actions import (
         _creation_activate_adapter,
@@ -610,5 +619,13 @@ def build_production_action_registry() -> ActionRegistry:
     registry.register(ActionSpec(
         "gallery.binding.save", validate_gallery_binding_save_payload,
         _gallery_binding_save_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "npc.persona.read", validate_read_payload,
+        read_npc_persona_adapter, AFFECTED_READ,
+    ))
+    registry.register(ActionSpec(
+        "npc.persona.update", validate_update_payload,
+        update_npc_persona_adapter, AFFECTED_UPDATE,
     ))
     return registry
