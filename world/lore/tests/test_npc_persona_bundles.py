@@ -8,14 +8,17 @@ and lack of state writes.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import unittest
 from types import MappingProxyType
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import NpcCard
 from world.lore.npc_profiles.bundles import (
+    NPC_PERSONA_BUNDLE_POOLS,
     NpcBundlePool,
     NpcPersonaBundle,
     _validate_bundle_pools,
@@ -121,7 +124,6 @@ class NpcPersonaBundleValidationTests(unittest.TestCase):
 
     def test_malformed_card_over_budget_rejected_naming_pool_and_bundle(self):
         pools = _build_minimal_valid_pools()
-        # Create an NpcCard that bypasses normal constructor or has overlong leaf
         from world.lore.npc_card import NpcCardIdentity
 
         overlong_story = "長" * 601
@@ -287,7 +289,6 @@ class NpcPersonaBundleSelectorTests(unittest.TestCase):
         self.assertEqual(res1[1], res2[1])
 
     def test_distinct_seeds_reach_both_bundles_with_authored_speech_style(self):
-        # With a 2-bundle pool, testing various seeds should hit both bundles
         seen_keys: set[str] = set()
         seen_speech_styles: set[str] = set()
 
@@ -328,3 +329,74 @@ class NpcPersonaBundleSelectorTests(unittest.TestCase):
             check=True,
         )
         self.assertEqual(proc.stdout, expected_out)
+
+
+class ShippedNpcPersonaBundleDataContractTests(unittest.TestCase):
+    """Data-contract tests over the shipped offline bundle pools."""
+
+    # Prohibited third-person sex pronouns and personal markers
+    _DENY_PRONOUNS = ("他", "她", "牠", "祂", "伊")
+    _DENY_LATIN = re.compile(r"\b(he|she|him|her|his|hers|it|its)\b", re.IGNORECASE)
+    _NUMERIC_AGE = re.compile(r"\d+歲|\d+年齡")
+
+    def test_every_tier_resolves_to_valid_pool(self):
+        for tier_key, tier in NPC_TIER_REGISTRY.items():
+            with self.subTest(tier=tier_key):
+                pool = offline_pool_for(tier_key, tier.race_key)
+                self.assertIsNotNone(pool)
+                self.assertEqual(pool.key, tier_key)
+                self.assertEqual(pool.race_key, tier.race_key)
+                self.assertGreaterEqual(len(pool.bundles), 2)
+
+    def test_every_race_resolves_to_valid_pool(self):
+        for race_key in RACE_REGISTRY:
+            with self.subTest(race=race_key):
+                pool = offline_pool_for(None, race_key)
+                self.assertIsNotNone(pool)
+                self.assertEqual(pool.race_key, race_key)
+                self.assertGreaterEqual(len(pool.bundles), 2)
+
+    def test_every_shipped_bundle_has_empty_hidden_and_social(self):
+        for pool_key, pool in NPC_PERSONA_BUNDLE_POOLS.items():
+            for bundle in pool.bundles:
+                with self.subTest(pool=pool_key, bundle=bundle.key):
+                    self.assertEqual(
+                        bundle.card.identity.hidden,
+                        "",
+                        f"Bundle {bundle.key} in pool {pool_key} has non-empty hidden identity",
+                    )
+                    self.assertEqual(
+                        bundle.card.social_connection,
+                        "",
+                        f"Bundle {bundle.key} in pool {pool_key} has non-empty social_connection",
+                    )
+
+    def test_deny_list_on_shipped_bundles(self):
+        """Bundles must be sex- and age-agnostic (no pronouns, no numeric ages)."""
+        for pool_key, pool in NPC_PERSONA_BUNDLE_POOLS.items():
+            for bundle in pool.bundles:
+                card = bundle.card
+                text_fields = {
+                    "identity.public": card.identity.public,
+                    "appearance": card.appearance,
+                    "personality": card.personality,
+                    "speech_style": card.speech_style,
+                    "life_story": card.life_story,
+                    "habit": card.habit,
+                }
+                for field_name, text in text_fields.items():
+                    with self.subTest(pool=pool_key, bundle=bundle.key, field=field_name):
+                        for pronoun in self._DENY_PRONOUNS:
+                            self.assertNotIn(
+                                pronoun,
+                                text,
+                                f"Bundle {bundle.key} field {field_name} contains prohibited pronoun {pronoun!r}",
+                            )
+                        self.assertFalse(
+                            self._DENY_LATIN.search(text),
+                            f"Bundle {bundle.key} field {field_name} contains prohibited Latin pronoun",
+                        )
+                        self.assertFalse(
+                            self._NUMERIC_AGE.search(text),
+                            f"Bundle {bundle.key} field {field_name} contains prohibited numeric age",
+                        )
