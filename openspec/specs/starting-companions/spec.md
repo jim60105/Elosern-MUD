@@ -17,9 +17,9 @@ exactly `preset_key` (the companion's own `PLAYER_PRESET_REGISTRY` key),
 `relationship` (the label composed into the companion's owner relationship
 line). The declaration SHALL NOT carry an NPC profile reference: the partner
 preset itself is the companion's single authored characterization source.
-`PlayerPreset` SHALL carry a keyword-only
-`starting_companions` tuple of these entries, defaulting to empty, so a preset
-that declares none behaves exactly as it does today.
+`PlayerPreset` SHALL carry a keyword-only `starting_companions` tuple of these
+entries, defaulting to empty, so a preset that declares none behaves exactly as
+it does today.
 
 `PresetPersona` SHALL carry two optional NPC-need extension fields defaulting
 to empty: `speech_style` (the compact card's speech leaf, which the player
