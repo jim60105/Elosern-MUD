@@ -37,8 +37,9 @@ turn-in paths are both bypassed for the blocked interaction.
 
 #### Scenario: No-keyword talk presents the host's greeting
 - **WHEN** the player runs `talk <guild-master>` without a keyword
-- **THEN** the guild master presents its authored greeting teaching the guild
-  commands, and no state changes (including no affinity change)
+- **THEN** the guild master presents its authored in-character greeting about
+  what the guild counter is for, and no state changes (including no affinity
+  change)
 
 #### Scenario: Missing greeting falls back to the no-response line
 - **WHEN** the player runs `talk <scripted-host>` without a keyword and the host
@@ -97,16 +98,20 @@ tuple of frozen `KeywordResponse` values. The registry SHALL be read-only at
 runtime. A `dialogue_key` with no registered table SHALL resolve to the
 no-understanding line for keywords and to no greeting. The `guild_staff`
 definition SHALL include the `回報` keyword, whose authored response serves as
-the register-first fallback for unregistered players, and SHALL teach the
-documented guild commands (`guild register`, `guild list`, `guild accept`,
-`guild log`, `guild show`, `guild turnin`, `guild abandon`, `guild merit`) and
-the dialogue turn-in path (`talk <guild-staff> 回報 <任務編號>`) in its greeting
-or keyword responses.
+the register-first fallback for unregistered players. The `guild_staff` greeting
+and keyword responses SHALL be spoken in character: they SHALL tell, in the
+host's own in-world voice, what the guild counter is for (registering as an
+adventurer, taking commissions from the board, reporting finished work back at
+the counter with the commission's number, giving up a commission, and asking
+where one stands in rank), and SHALL NOT name a command, a game mechanic, or an
+interface element. Command discoverability belongs to help, documentation and
+the interface.
 
 #### Scenario: guild_staff definition registers and answers command guidance
 - **WHEN** the `guild_staff` dialogue definition is registered and queried
-- **THEN** its greeting and keyword responses name the guild commands and the
-  dialogue turn-in path a player can use at the guild hall
+- **THEN** its greeting and keyword responses describe registering, taking a
+  commission from the board and reporting it back at the counter, and none of
+  them contains a backticked token or a `guild` command name
 
 #### Scenario: guild_staff definition carries the 回報 keyword for chip rendering
 - **WHEN** the `guild_staff` dialogue table is inspected for keyword chips
