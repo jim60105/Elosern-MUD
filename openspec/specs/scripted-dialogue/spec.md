@@ -2,9 +2,10 @@
 
 ## Purpose
 
-Let service NPCs (such as guild staff) answer authored `talk` lines and teach
-players the relevant commands through a generic, immutable, keyed dialogue
-mechanism that causes no state change.
+Let service NPCs (such as guild staff) answer authored `talk` lines in
+character, explaining their place in in-world terms without naming commands or
+game mechanics, through a generic, immutable, keyed dialogue mechanism that
+causes no state change.
 
 ## Requirements
 
