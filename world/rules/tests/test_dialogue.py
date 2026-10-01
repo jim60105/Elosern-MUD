@@ -260,6 +260,10 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.assertNotIn("`", combined)
         self.assertNotRegex(combined, r"guild\s+[a-z]")
+        self.assertNotRegex(
+            combined,
+            r"(?<![A-Za-z])(register|list|accept|log|show|turnin|abandon|merit)(?![A-Za-z])",
+        )
         self.assertIn(
             GUILD_STAFF_TURNIN_KEYWORD,
             [entry.keyword for entry in definition.responses],
