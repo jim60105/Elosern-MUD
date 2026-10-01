@@ -283,6 +283,60 @@ The proposal dependency/conflict matrix must identify shared schema, registry as
 
 No implementation, archive, feature branch, or worktree is created as part of the current document/proposal request. Design and proposal artifacts are committed on the primary branch according to the proposal workflow.
 
+### 12.1 Proposed change set
+
+`os-propose` produced the following 20 changes, committed on `master` between `141fcc53` and `e81df684`. All pass `openspec validate --strict` and are in phase `proposed`. Each `proposal.md` carries a machine-readable `## Batch:` section that is authoritative for queueing; this table is a summary.
+
+| # | Change | Scope | Depends on |
+|---|---|---|---|
+| 1 | `npc-persona-card-foundation` | Pure seven-field card contract (`world/lore/npc_card.py`: 600-code-point leaves, identity-section and 2,000-code-point budgets, shared label order); speech-style label in `PersonaStore`; persistence/versioning service `world/rules/npc_persona.py` (separate meta record, lock-then-read, idmapper-bypassing reads, compare-and-set, `storage_unavailable`, cache restore, events); shared boundary fixtures | — |
+| 2 | `npc-persona-profile-registry` | `NpcProfile` and voice lines, single assembly point, seven empty slices, source inventory, conditional `host_profile_key`, Altoria dialogue split by terrace | 1 |
+| 3 | `npc-persona-content-altoria-lower` | Full card and dialogue rewrite for 5 lower-terrace hosts | 2 |
+| 4 | `npc-persona-content-altoria-trade` | 6 middle-terrace commerce hosts | 2 |
+| 5 | `npc-persona-content-altoria-guild` | Guild branch master, `guild_staff` dialogue table, 7 examiners, required `GuildRank.examiner_profile_key` | 2 |
+| 6 | `npc-persona-content-altoria-upper` | 5 upper-terrace hosts | 2 |
+| 7 | `npc-persona-content-ciaran-homes-a` | 4 elven hosts in village_ciaran | 2 |
+| 8 | `npc-persona-content-ciaran-homes-b` | Remaining 4 elven hosts in village_ciaran | 2 |
+| 9 | `npc-persona-companion-profiles` | 4 companion NPC profiles with required `npc_profile_key`; builder composes the owner-relationship line instead of copying the player-preset persona | 1, 2 |
+| 10 | `npc-persona-offline-bundles` | 22 whole-card offline bundles (2 per tier for 10 tiers, plus beastfolk), SHA-256 stable selector | 2 |
+| 11 | `npc-persona-host-examiner-producers` | `host_profile_key` becomes required; host and examiner creation writes the card; reused hosts are never overwritten | 1, 2, 3–8 |
+| 12 | `npc-persona-import-cards` | Typeclass-aware NPC import card validation, loader through the initializer, rewritten shipped examples | 1 |
+| 13 | `npc-persona-generated-quest-cards` | Required card through blueprint, prompt, helper, compile, strict codec, restore, and materializer; 8,192-token director budget; at most 3 occupants per blueprint | 1 |
+| 14 | `npc-persona-dialogue-consumption` | Seven-field prompt with a current-persona frame; profile-specific misunderstanding and offline greeting lines | 1, 2 |
+| 15 | `npc-persona-dialogue-version-gate` | `persona_version` completion gate with a `stale_persona` outcome for browser talk, party invite, and text invite | 1 |
+| 16 | `npc-persona-editor-actions` | `npc.persona.read` / `npc.persona.update`, admission gates, private five-field result, `npc_persona` affordance, JS card-contract mirror | 1 |
+| 17 | `npc-persona-editor-window` | Vue editor window, state machine, showcase entry, core browser journey, player documentation | 16 |
+| 18 | `npc-persona-editor-browser-edges` | Test-only (`skip_specs`) browser edges: late results, NPC departure, puppet change, cross-tab conflict | 17 |
+| 19 | `npc-persona-roster-validation` | Fail-loud boot gate for full-roster completeness, roster review record, adding-NPCs guide | 3–9, 11–15 |
+| 20 | `npc-persona-roster-cutover` | One-time, exclusive, single-transaction replacement of existing NPC cards and durable generated-quest payloads | 9–13, 19 |
+
+### 12.2 Implementation batch suggestion
+
+Changes within one wave touch disjoint code or only append-only shared files, so they may be implemented in parallel; each wave starts after its prerequisites are archived.
+
+| Wave | Changes | Notes |
+|---|---|---|
+| W0 | 1 | Foundation for every other change |
+| W1 | 2, 12, 13, 15, 16 | Each depends only on 1 |
+| W2 | 3–8, 9, 10, 14, 17 | Content slices and bundles need 2; 9 and 14 need 1 and 2; 17 needs 16 |
+| W3 | 11, 18 | 11 needs every host/examiner content slice; 18 needs 17 |
+| W4 | 19 | Requires all content, producers, and dialogue consumers |
+| W5 | 20 | Activation cutover, last |
+
+Merge 20 as soon as possible after 13: once 13 lands, a development database that still holds pre-change generated-quest payloads fails closed on restore until the cutover runs. No compatibility decoder is added for that window.
+
+Code-conflict hot spots for parallel work:
+
+- `typeclasses/npcs.py`: 14 and 15 modify different functions; apply them in sequence.
+- `world/rules/npc_persona.py`: created by 1; 14, 15, 16, and 20 each add separate functions.
+- `exploration_actions.py`: modified only by 15, which must keep the `_present_by_id` name because 16 imports it.
+- `places_altoria_middle.py` (4, 5), `places_ciaran.py` and `dialogue/ciaran.py` (7, 8): different rows, adjacent-hunk rebase conflicts only.
+- `world/lore/npc_profiles/__init__.py` and `world/lore/dialogue/__init__.py`: assembly owned by 2 only; `places.py` is modified by 2 and then 11.
+- `npc_dialogue.yaml` is changed only by 14; `scenario_director.yaml` only by 13.
+- Dispatcher `registry.py` and `presentation/exploration.py`: 16 only. UI router files (`AppClient.vue`, `use-dock.js`, `use-drawers.js`, `exploration_menu.js`, `command_echo.js`, stores): 17 only.
+- `at_server_startstop.py`: 19, then 20.
+- Append-only shared files (`.github/evennia-shards.json`, `.github/browser-shards.json`, `tools/test_data_freeze.json`, the observability catalog): mechanical rebase conflicts only.
+
 ## 13. Explicit architectural amendments and non-goals
 
 This design preserves the generative/deterministic single-writer boundary and the existing read-only `PersonaStore`. It explicitly amends the old architecture document's statement that persona contents are never inspected **only for NPC compact-card structure, text bounds, and completeness**. NPC import validation becomes typeclass-aware; player/non-NPC opaque persona handling remains unchanged. No engine interprets personality prose as a mechanical rule.
