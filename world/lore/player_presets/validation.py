@@ -251,6 +251,14 @@ def _validate_preset_personas(registry: dict[str, PlayerPreset]) -> None:
                 raise ValueError(
                     f"preset {preset.key!r} declares persona.{field} that is not text"
                 )
+        if not isinstance(persona.speech_style, str):
+            raise ValueError(
+                f"preset {preset.key!r} declares persona.speech_style that is not text"
+            )
+        if not isinstance(persona.greeting, str):
+            raise ValueError(
+                f"preset {preset.key!r} declares persona.greeting that is not text"
+            )
         identity = persona.identity
         if not isinstance(identity, PresetIdentity):
             raise ValueError(

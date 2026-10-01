@@ -72,6 +72,24 @@ class PresetPersona:
     appearance: PresetAppearance = PresetAppearance()
     social_connection: tuple[tuple[str, str], ...] = ()  # name -> relationship
     background: str = ""
+    speech_style: str = ""
+    greeting: str = ""
+
+    def __post_init__(self) -> None:
+        if self.greeting:
+            from world.lore.npc_card import _normalize_text_leaf
+            from world.lore.npc_profiles.shape import VOICE_LINE_LIMIT
+
+            normalized = _normalize_text_leaf(self.greeting, "greeting")
+            if "\n" in normalized:
+                raise ValueError(
+                    "PresetPersona.greeting must be a single paragraph (no newline)"
+                )
+            if len(normalized) > VOICE_LINE_LIMIT:
+                raise ValueError(
+                    f"PresetPersona.greeting exceeds {VOICE_LINE_LIMIT} code points"
+                )
+            object.__setattr__(self, "greeting", normalized)
 
     def to_record(self) -> dict[str, Any]:
         """Return the storage shape written to ``character.db.persona``.
