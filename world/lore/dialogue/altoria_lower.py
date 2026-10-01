@@ -1,17 +1,20 @@
 """聖潔王都 (capital_altoria) LOWER-terrace authored dialogue rows.
 
-These rows moved verbatim from the former ``altoria.py`` so each terrace
-slice is owned by one content change: the eatery, tavern, lodging,
-bathhouse and guardhouse tables, keyed exactly as the LOWER-terrace place
-rows in ``places_altoria_lower.py`` author them.
+The eatery, tavern, lodging, bathhouse and guardhouse tables, keyed exactly
+as the LOWER-terrace place rows in ``places_altoria_lower.py`` author them.
+Every greeting and response is written against the host's authored card in
+``world/lore/npc_profiles/altoria_lower.py`` (npc-persona-content-altoria-
+lower); the keyword identifiers are the dialogue panel's choice labels and
+stay fixed.
 
-The hospitality tables (altoria-hospitality) belong to ``attendant`` hosts
-who sell nothing, so they ship no trade verb at all: the innkeeper's
-greeting names ``rest``/``sleep``/``practice``, the tavern keeper's names
-``talk``/``invite``, and the bathhouse keeper's explains the separated
-sides — the commands each location exists to host, taught by the person
-standing in it. None of them quotes a price or promises an unimplemented
-effect (lodging fees, drink effects and bathing mechanics stay 〔提案〕).
+Every line is spoken in character: a host knows only its own world, so no
+line names a command, a game mechanic or the interface. A table teaches
+what its place is for in the world's own terms (the innkeeper speaks of
+resting, sleeping and quiet practice; the tavern keeper of talking to the
+room and inviting a companion; the bathhouse keeper of the separated
+sides). The hospitality hosts are ``attendant`` hosts who sell nothing;
+none of the tables quotes a price or promises an unimplemented effect
+(lodging fees, drink effects and bathing mechanics stay 〔提案〕).
 
 Four keyword answers at most: the dialogue panel ships
 ``DIALOGUE_MAX_CHOICES`` entries and silently drops the rest, so each row
@@ -20,176 +23,163 @@ here carries exactly four.
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 西格瑪·庫柏 — the eatery. Barrel-maker's family trade turned kitchen;
-# he talks food the way coopers talk casks: warm and plain. staple_meals.
+# 西格瑪·庫柏 — the eatery (staple_meals). A cooper's son who started by
+# cooking for barge crews; plain, short sentences, asks whether you have
+# eaten. He names the goods he deals in and leaves prices and counts to
+# the counter's list (merchant-dialogue: live stock owns those facts).
 EATERY_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "餐點",
-        "「熱食、黑麥硬麵包、行軍口糧，後頭灶上一直溫著。`shop stock` "
-        "看得見還剩幾份，餓了就 `buy` 加品名，端走就吃。」",
+        "「最基本的就是一碗熱湯配麵包，吃完保證有力氣。黑麥硬麵包很耐放，攜行"
+        "口糧放進背包剛剛好。每天剩多少不一定啦，看單子就知道，要什麼跟我講。"
+        "」",
     ),
     KeywordResponse(
         "招牌",
-        "「濃湯是招牌，颳風下雨的天，一碗下肚半條命回來。甜食櫃檯邊有，"
-        "精靈那邊的蜜漬花蕊我也進了一小罐——那是稀罕物，賣完算完。"
-        "清單 `shop stock`，要了喊 `buy`。」",
+        "「招牌喔？當然是龍蝦濃湯啊！港灣來的老船工教我的，我熬了二十年都沒改"
+        "過。想吃甜的就拿帝國的蜜漬果乾。精靈的蜜漬花蕊偶爾也會進一點，不過很"
+        "少，碰到算你運氣好。今天有哪些，單子上都有。」",
     ),
     KeywordResponse(
         "乾糧",
-        "「要出城進地城，帶足攜行口糧和燻獸肉乾。餓到一半才想起吃，"
-        "就晚了。`shop stock` 看看存量，`buy` 多屯幾份，"
-        "銅幣花在肚裡總比花在醫館便宜。」",
+        "「要出城？那攜行口糧跟燻肉乾一定要帶幾份。肉乾鹹是鹹了點，放好幾天都"
+        "不會壞。等肚子餓了才想到要吃，就來不及囉。要幾份先算好，我一次幫你包"
+        "起來。」",
     ),
     KeywordResponse(
         "收食",
-        "「獵得的好肉好料，拿來我收，`sell` 加品名折價給你。"
-        "講好了再提現成的：飯食過櫃不候，入口的東西我只要乾淨貨——"
-        "廚子的規矩，也是你我的規矩。」",
+        "「打到的肉、採到的東西，拿來我看看嘛。乾淨新鮮的我就收，價錢照我店裡"
+        "的規矩算。臭掉的、說不出是哪來的，我可不收，誰拿來都一樣。」",
     ),
 )
 
-# 蘿溫·古橡 — the 醉月酒館. The lane's information room: the document's
-# designated place for 招募同伴 and 打聽情報, so her table names the commands
-# that already work here (`talk` with anyone in the room, `invite` to the
-# party) and sells nothing — the cups are scenery: no drink does anything,
-# no gamble pays out (docs/lore/settlement-locations.md line 285 keeps both
-# 〔提案〕). Her voice is a hostess's: warm, ears open, mouth shut.
-# Post-implementation review cut the promises this change does not ship:
-# the synchronised tavern holds only plain-NPC hosts (invite is reserved
-# for recruitable travellers met out in the world, never the people behind
-# this counter), and no authored row auto-delivers rumours or commissions —
-# information-gathering here is the player opening their mouth, `talk`.
+# 蘿溫·古橡 — the 醉月酒館, the lane's information room (招募同伴、打聽情報).
+# Teasing, unhurried, answers with a question. Her table points at what
+# already works here (talking to anyone in the room, inviting a traveller
+# met out in the world to come along) and sells nothing: the cups are scenery, no drink does anything, no gamble pays
+# out (docs/lore/settlement-locations.md keeps both 〔提案〕). The people
+# behind her counter are settled and cannot be invited, and no authored
+# row delivers rumours or commissions on its own.
 TAVERN_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "傳聞",
-        "「我這店裡最不缺的就是話。你要打聽什麼，開口找人問——"
-        "店裡誰都能 `talk`，問得投緣，人家記得上你。傳聞這東西"
-        "我這裡不掛板也不賣，都在人嘴上，你得自己開口。」"
+        "「消息？我這兒可沒貼告示喔，都在客人嘴裡。誰剛從迷宮出來、誰熟東門外"
+        "的路，聊了才知道嘛。挑個順眼的坐過去，聊得來的話，人家下次還會記得你"
+        "。我呢，頂多告訴你該往哪桌走。」",
     ),
     KeywordResponse(
         "同伴",
-        "「想招人同行，得先遇得上人：路上、店裡，看哪位是能同行的，"
-        "`talk` 聊幾句，聊得好了當場 `invite` 一句，願不願意人家自己答。"
-        "我這兒櫃檯後站的、灶前燒火的，都是安了家的，邀不走。」",
+        "「想找人一起走？那得先碰得到人啊，路上也好、店裡也好。坐下來聊一聊，"
+        "合得來再開口約，人家要不要是人家的事。我跟店裡的人就別想啦，我們有家"
+        "有店，不出城。」",
     ),
     KeywordResponse(
         "委託",
-        "「公會單子在公會的板上，我這兒不掛板，也不代人招工。"
-        "你要尋活路，去公會看板；要在外頭結識了能共事的，回我這裡"
-        "`talk` 說上話、`invite` 定下來，都行。"
-        "酒館裡談事有個好處：出了這門，誰也不認得誰。」"
+        "「正經的委託去公會看板找啦，我這兒不貼單子，也不幫人找人手。公會前那"
+        "棟大廳就是。在外面認識了靠得住的人，帶回來這兒坐，事情談好了再一起出"
+        "發。放心，這屋裡講的話，出了門沒人會提。」",
     ),
     KeywordResponse(
         "歇腳",
-        "「趕路趕晚了？巷底就是爐火旅店，溫弗蕾德那兒床乾淨；"
-        "不過夜就在我這兒坐著，`rest` 在哪兒都能歇，我這兒爐子暖、"
-        "話又多，歇得比客棧巷外頭體面。要走了記得把話帶上，別把東西落下。」",
+        "「走到天都黑了吧？隔壁就是溫弗蕾德的旅店，床乾淨，門也鎖得牢。只是想"
+        "坐一下的話，壁爐旁邊還有位子，我這兒比外面暖，也熱鬧多啦。」",
     ),
 )
 
-# 溫弗蕾德·古林 — the 爐火旅店. Her rooms are the narrative home of the
-# rest/sleep/practice commands, and her table's job is exactly that
-# discoverability (altoria-hospitality design: dialogue carries the
-# affordance). She states the commands work here as anywhere — and quotes
-# no rate, no bill, no stay entitlement: the lodging fee the document marks
-# 〔提案〕 at line 308 stays un-invented, and a landlady who promises a free
-# night is inventing a policy the change refuses to ship.
+# 溫弗蕾德·古林 — the 爐火旅店. Gentle, orderly, calls the young 「孩子」.
+# Her rooms are the narrative home of resting, sleeping and quiet practice,
+# and she speaks of them as a landlady would, never as commands. Resting
+# works here as anywhere; she quotes no rate, no bill and no stay entitlement
+# (the lodging fee stays 〔提案〕).
 LODGING_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "房間",
-        "「樓上房間一排，各有門閂，關上門就是你自己的人。"
-        "要歇就在樓下爐邊或樓上房間裡 `rest`，`rest` 這指令本不挑地方，"
-        "只是我這兒牆厚門實，歇得住。要怎麼用，你開口問，我指給你。」",
+        "「房間在樓上，一張床、一個臉盆，門閂一拉，裡面就是你自己的地方了。要"
+        "歇一下，在房裡或樓下火塘邊都行。我這裡沒什麼了不起的，就是牆厚、門關"
+        "得緊。」",
     ),
     KeywordResponse(
         "過夜",
-        "「要睡就 `sleep`，睡到精神全回那種；樓上靜，樓下爐邊也有人打盹。"
-        "同一句話我講在前頭：`sleep` 本不挑地方，在哪裡都是睡，"
-        "我這裡不過是床比街邊好——要睡個完整覺，我勸你上樓。」"
+        "「累壞了吧？那就上樓好好睡一晚。樓下也有人靠著火塘打瞌睡，不過聽我的"
+        "，上樓睡，安靜多了。睡路邊跟睡床上，隔天起來的精神差很多呢。」",
     ),
     KeywordResponse(
         "修煉",
-        "「坐著乾歇可惜，可以邊歇邊練：`rest` 加時數，再掛一句 `practice` 加技能名，"
-        "練的進帳按整小時結算。你尚未學會的、練到頂的，喊了也白喊，"
-        "我勸你別白坐。要試就挑個空房，門閂一落，沒人打擾。」"
+        "「光坐著發呆多可惜呀。很多冒險者會待在房裡，一邊歇一邊練劍、溫習咒文"
+        "，花個幾鐘頭，手就順了。還沒學過的東西，坐再久也變不出來；已經練到家"
+        "的，再練也長進不了多少。先想想要練哪樣吧。」",
     ),
     KeywordResponse(
         "澡堂",
-        "「出巷往東走，浴場前那間公共浴場就是——男女兩邊、深池河水，"
-        "伊莎貝爾守著。`rest` `sleep` 的事我這兒管，泡澡的事她管，"
-        "兩條腿走路，別錯過了街口。」",
+        "「浴場啊？出了巷子往東走就到了，伊莎貝爾在顧。男女分兩邊，池子是河水"
+        "燒的。睡覺的事找我，洗澡的事找她。洗乾淨再回來睡，床單也比較乾淨嘛。"
+        "」",
     ),
 )
 
-# 伊莎貝爾·葦沼 — the 公共浴場管理員. Her whole job is the two sides and the
-# order between them (docs/lore/settlement-locations.md line 354), and the
-# room's content is the contrast the document keeps for story: human and
-# beastfolk cover up, elves have no concept of shame. She runs no mechanism
-# — no soak restores anything (line 352 keeps that 〔提案〕), and she says
-# so in her own terms.
+# 伊莎貝爾·葦沼 — the 公共浴場管理員. Fast, loud, exclamatory; curious
+# about the elven custom, never contemptuous. Her job is the two sides and
+# the order between them (docs/lore/settlement-locations.md), and the
+# room's content is the contrast the document keeps for story. She runs no
+# mechanism: no soak restores anything, and she says so herself.
 BATHHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "規矩",
-        "「這地方只有一條規矩：男左女右，一邊一道牆，各進各門。"
-        "泡的是河水燒的深池，洗的是趕路一身的塵。看順了眼要闖錯邊，"
-        "我喊你回來——這一天我要喊幾百回，習慣了就好。」"
+        "「就一條啦：男左女右，中間一道牆，各走各的門！今天我已經叫回來好幾個"
+        "走錯的了，大多是剛進城、被水氣熏到眼花的。走錯也沒關係，聽到我喊就轉"
+        "回來嘛！」",
     ),
     KeywordResponse(
         "精靈",
-        "「精靈客人？她們不覺得要牆。人跟獸人進這門先脫外袍、"
-        "再彼此避開眼光，覺得遮著才禮貌；精靈從小就是那麼過的，"
-        "你遮反而是你看不自然。到底誰怪，我守了廿年櫃檯也沒守出答案，"
-        "反正牆在，各洗各的，相安無事。」",
+        "「精靈喔！他們覺得那道牆根本多餘。人類跟獸人進來都要先脫外衣，還要互"
+        "相別過頭去，覺得遮起來才有禮貌。精靈從小就不覺得身體有什麼好遮的，看"
+        "你遮著身子，他們反而覺得怪。到底誰比較對？我顧了二十年櫃檯還是搞不懂"
+        "。反正牆在那裡，各洗各的，大家都相安無事啦！」",
     ),
     KeywordResponse(
         "泡湯",
-        "「池子深水熱，泡到臉紅耳熱再上來衝一桶涼的，渾身鬆快——"
-        "舒坦是舒坦，不是藥。有人說泡完連傷都好了一半，那是他昨夜睡得好，"
-        "別記在池子帳上。要真講究，洗乾淨了再走，別帶著一身河風進旅店。」"
+        "「水夠熱喔，泡到臉紅再起來，沖一桶冷水，整個人都鬆了！不過泡澡可治不"
+        "了傷喔。有人說泡完傷好了一半，那是他前一晚睡得好啦，別算在池子頭上。"
+        "洗乾淨再走，別帶一身灰回旅店！」",
     ),
     KeywordResponse(
         "歇息",
-        "「洗完想坐就外間長椅坐著；`rest` 在哪裡都使得，我這兒不過是"
-        "蒸汽熏著容易睡著。睡過頭別怪我——要一覺睡到樓上去，"
-        "旅店在巷子底，問溫弗蕾德。」"
+        "「洗完想坐一下？外面有長椅。我這邊水氣暖，坐沒多久就想睡了。真的要好"
+        "好睡，去客棧巷找溫弗蕾德，那邊有床啦！」",
     ),
 )
 
-# 托瓦德·鄧堡 — the 衛兵駐所 captain behind the 南門. His table's job is
-# orientation: a traveller has just come through the arch and has not yet
-# seen the city. He names the streets `地圖` and `前往` already resolve, sends
-# anyone hunting work up the road to the guild board, and hangs nothing of his
-# own — the document rules a parallel bounty system out in as many words
-# (docs/lore/settlement-locations.md line 410), and the change's second
-# refusal keeps his wall bare. He posts no work; the two roads that exist
-# already carry it.
+# 托瓦德·鄧堡 — the 衛兵駐所 captain behind the 南門. Clipped, orders his
+# directions 「第一、第二」, hates being asked twice. His table orients the
+# traveller who has just come through the arch with real street names. He
+# posts no
+# work of his own (docs/lore/settlement-locations.md rules a parallel
+# bounty system out) and points work-seekers at the guild board and
+# private arrangements.
 GUARDHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "進城",
-        "「剛過南門的吧？聽一句：正對門這條是南大道，一直走到頭是中央廣場，"
-        "廣場再上去三層台——市集、公會、神殿，一路都有門牌。"
-        "要看全城的圖喊 `地圖`，要走去哪條街喊 `前往` 加街名，"
-        "路是死的，圖上都有，不用問我第二次。」"
+        "「聽好。第一，腳下這條是南大道，一路往北，過了大道北段就是中央廣場。"
+        "第二，廣場東邊是公會前，西邊是市場街，北邊是通往上城的聖階。第三，每"
+        "個路口都有路牌，照著走不會迷路。記住了，我不說第二遍。」",
     ),
     KeywordResponse(
         "找活",
-        "「尋活路上來對了：出門左轉，沿大道走到公會前，大廳裡有看板，"
-        "`guild list` 撿單、`guild accept` 簽字，那是正路。"
-        "我這牆上不掛單，也不代人掛——城裡委託走公會板，私底下相熟的另約，"
-        "沒有一套掛在衛所牆上的懸賞，你別再問。」"
+        "「找工作，往北到中央廣場，再往東到公會前。大廳裡有看板，委託都貼在那"
+        "裡，看中了就向公會的人登記。熟人私下託你的事，屬於你們之間的約定。駐"
+        "所不貼委託單，以後也不會貼，不必再問。」",
     ),
     KeywordResponse(
         "治安",
-        "「城裡治安歸我們：白天查街、夜裡輪門。你在街上遇著事，"
-        "找穿這身牌的，南門駐所、貴族區衛所兩處都有人。"
-        "不過真話講在前面：我們管的是街，不是你背包裡東西的歸屬——"
-        "錢貨糾紛去公會評，那才有條文。」"
+        "「城裡的治安由衛兵負責。白天巡街，夜間輪班守門。在街上遇到麻煩，就找"
+        "穿藍色罩袍的人，南門駐所和上城的貴族區衛所都有人值勤。我們管街上的秩"
+        "序；你和別人之間的交易糾紛，不歸駐所處理。」",
     ),
     KeywordResponse(
         "過夜",
-        "「天黑前要床？出駐所沿南大道往北，客棧巷底有爐火旅店，"
-        "巷裡也有酒館可坐，坐得下趕路人。`rest` `sleep` 不挑地方，"
-        "我這兒後頭那間小值房也躺得人，不過沒門閂，睡得睡不睡得看你。」"
+        "「要找地方睡，趁天黑前沿南大道往北，右手邊的客棧巷有爐火旅店，隔壁是"
+        "醉月酒館。累了在哪裡都能靠著打個盹，但這間值房只有長凳，沒有門閂。要"
+        "睡在這裡，你自己決定。」",
     ),
 )
 
@@ -203,10 +193,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_eatery",
         DialogueDefinition(
             greeting=(
-                "餐館的老闆西格瑪·庫柏從灶後探出半個身子，圍裙上還沾著麵粉："
-                "「餓了吧？熱食、乾糧、湯品，灶上都溫著。"
-                "`shop stock` 還剩幾份瞞不了你，要就 `buy`；"
-                "獵得的好料想換錢，帶來我 `sell` 收。先坐，先坐。」"
+                "餐館老闆西格瑪·庫柏用圍裙擦著手，從灶後探出頭來：「喔，客人！吃飯了"
+                "沒？湯還熱著喔，麵包跟帶出城的乾糧也都有。今天有什麼、還剩幾份，櫃檯"
+                "上的單子都寫著，看中哪樣跟我說一聲就好。外面打到什麼好肉，也可以拿來"
+                "給我看看啦。來，先坐。」"
             ),
             responses=EATERY_RESPONSES,
         ),
@@ -215,11 +205,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_tavern",
         DialogueDefinition(
             greeting=(
-                "醉月酒館的蘿溫·古橡從櫃檯後打量你一眼，把抹布往肩上一搭："
-                "「新面孔，坐。先把規矩聽懂：我這兒做的是話的生意——"
-                "在店裡誰都能 `talk`；路上遇著投緣、能同行的，`invite` "
-                "一聲才算正式邀定。傳聞都在人嘴上，你要打聽就開口問，"
-                "坐著等，它是會挑人的。」"
+                "醉月酒館的蘿溫·古橡把抹布往肩上一甩，靠著吧台打量你：「唷，新面孔嘛"
+                "。我這兒就一條規矩：在這裡講的話，不會害到講話的人。想打聽什麼就自己"
+                "找人聊；路上碰到聊得來、又想一起走的，開口約就是了。消息啊，都在客人"
+                "嘴裡，你不開口問，誰會跟你說？」"
             ),
             responses=TAVERN_RESPONSES,
         ),
@@ -228,10 +217,10 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_lodging",
         DialogueDefinition(
             greeting=(
-                "爐火旅店的溫弗蕾德·古林從櫃檯後迎上來，指間捏著一串門閂鑰匙："
-                "「趕路來的？樓上房間一排，各有門閂。我這兒能用的就三樣："
-                "歇就 `rest`，睡就 `sleep`，想邊歇邊練就加一句 `practice` 加技能名。"
-                "這三樣本不挑地方，我這裡不過是牆厚門實，歇得住。」"
+                "爐火旅店的溫弗蕾德·古林從櫃檯後站起來，腰間的鑰匙叮噹作響：「歡迎啊"
+                "，孩子，一路辛苦了吧。樓上有房間，每間都有門閂。想歇一下，樓下火塘邊"
+                "有椅子；想好好睡一覺，床單我才剛換過。要是想趁安靜練個劍、溫習一下咒"
+                "文，房裡也很安靜喔。」"
             ),
             responses=LODGING_RESPONSES,
         ),
@@ -240,9 +229,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_bathhouse",
         DialogueDefinition(
             greeting=(
-                "公共浴場管理員伊莎貝爾·葦沼抱著一疊乾淨布巾從水氣裡走出來，"
-                "把你上下一量：「男邊往左，女邊往右，各進各門，這是這兒唯一的規矩。"
-                "池子是河水燒的，深淺兩格。想問什麼儘管問，我手上活多，答得快。」"
+                "公共浴場管理員伊莎貝爾·葦沼抱著一大疊布巾從水氣裡鑽出來，上下瞄了你"
+                "一眼：「新來的吧！男生左邊、女生右邊，各走各的門，這裡就這一條規矩！"
+                "池子是燒熱的河水，深的淺的都有。要問什麼快問，我還有一堆布巾沒折！」"
             ),
             responses=BATHHOUSE_RESPONSES,
         ),
@@ -251,10 +240,9 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_guardhouse",
         DialogueDefinition(
             greeting=(
-                "衛兵駐所的托瓦德·鄧堡從值房窗後轉出來，胸牌在燭火裡磕了一下："
-                "「過門進來的？南門一帶歸我管。你要問路，我指；"
-                "要問規矩，我講。牆上沒有你要找的東西——這話我先說在前頭，"
-                "省得你繞回來再問。」"
+                "衛兵隊長托瓦德·鄧堡從值房的窗邊轉過身，胸前的銅牌映著火盆的光：「剛"
+                "從南門進來的？這一帶由我負責。問路，我告訴你；問規矩，我也告訴你。另"
+                "外，駐所牆上沒有委託單，要找工作，請到冒險者公會。」"
             ),
             responses=GUARDHOUSE_RESPONSES,
         ),
