@@ -186,6 +186,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `npc_persona_unavailable` | `npc`、`reason`（warn 級；不可用原因） |
 | `npc_dialogue_stale_persona` | `npc`、`char`、`version_from`、`version_to`、`path` |
 | `npc_voice_profile_missing` | `npc`、`profile`（error 級；dangling profile reference） |
+| `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |
+| `guild_exam_opponent_created` | `char`、`rank`、`profile` |
 
 ### 4.3 AI／外部服務邊界
 
