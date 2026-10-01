@@ -238,16 +238,51 @@ class CompanionBoundsSweepTests(unittest.TestCase):
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_an_overlong_relationship_label_names_the_offending_preset(self):
-        # The label is injected into the built persona's social_connection,
-        # which PersonaStore renders as prose under the same field cap.
+        # The label is injected into the derived card's social_connection,
+        # which normalize_card bounds at LEAF_LIMIT (600 code points).
         partner = next(key for key in _live_presets() if key != "t_probe")
         preset = _probe_preset(
             starting_companions=(
-                StartingCompanion(partner, 50, "關" * (MAX_PERSONA_FIELD_LENGTH + 1)),
+                StartingCompanion(partner, 50, "關" * 601),
             )
         )
-        with self.assertRaisesRegex(StartingCompanionError, "persona"):
-            _validate_preset_companion_bounds({"t_probe": preset})
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: _live_presets()[partner]})
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_empty_speech_style_in_partner_preset_names_the_offending_preset(self):
+        from dataclasses import replace
+        from world.lore.player_presets import PresetPersona
+
+        partner = next(key for key in _live_presets() if key != "t_probe")
+        partner_card = replace(
+            _live_presets()[partner],
+            persona=replace(_live_presets()[partner].persona, speech_style=""),
+        )
+        preset = _probe_preset(
+            starting_companions=(
+                StartingCompanion(partner, 50, "同行者"),
+            )
+        )
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: partner_card})
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_over_budget_partner_preset_names_the_offending_preset(self):
+        from dataclasses import replace
+
+        partner = next(key for key in _live_presets() if key != "t_probe")
+        partner_card = replace(
+            _live_presets()[partner],
+            persona=replace(_live_presets()[partner].persona, personality="長" * 600, life_story="長" * 600, habit="長" * 600),
+        )
+        preset = _probe_preset(
+            starting_companions=(
+                StartingCompanion(partner, 50, "同行者"),
+            )
+        )
+        with self.assertRaisesRegex(StartingCompanionError, "t_probe"):
+            _validate_preset_companion_bounds({"t_probe": preset, partner: partner_card})
 
 
 _BUILDER_SCOPE_LOGICALS = (

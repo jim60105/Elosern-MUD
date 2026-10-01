@@ -14,7 +14,7 @@ Apply on branch `feat/npc-persona-companion-profiles` in worktree `.worktrees/np
 
 ## 2. Declaration sweep
 
-- [ ] 2.1 Implement the shared derivation of design D2 (lore-side pure function; appearance flattened in render order, owner line first, `background` excluded) and replace the relationship-length check in `_validate_preset_companion_bounds` with the derived-card sweep of design D2 (synthetic 64-code-point owner, required leaves non-empty, leaf ≤ 600, rendered block ≤ 2,000 via the card contract); verify with synthetic presets in `world/rules/tests/test_starting_companions.py`: an over-budget partner preset raises at rules import naming the preset, an empty `speech_style` raises naming the preset, and the shipped four pass.
+- [x] 2.1 Implement the shared derivation of design D2 (lore-side pure function; appearance flattened in render order, owner line first, `background` excluded) and replace the relationship-length check in `_validate_preset_companion_bounds` with the derived-card sweep of design D2 (synthetic 64-code-point owner, required leaves non-empty, leaf ≤ 600, rendered block ≤ 2,000 via the card contract); verify with synthetic presets in `world/rules/tests/test_starting_companions.py`: an over-budget partner preset raises at rules import naming the preset, an empty `speech_style` raises naming the preset, and the shipped four pass.
 
 ## 3. Builder
 

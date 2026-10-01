@@ -4,7 +4,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from world.lore.player_presets import PlayerPreset, PresetPersona, StartingCompanion
+from world.lore.player_presets import (
+    PlayerPreset,
+    PresetAppearance,
+    PresetIdentity,
+    PresetPersona,
+    StartingCompanion,
+)
 from world.quests.definitions import (
     KNOWN_GRID_MAP_KEYS,
     DestinationKind,
@@ -51,7 +57,13 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         # non-empty (every shipped card authors one), so the kit cards carry
         # synthetic persona prose of their own.
         persona=PresetPersona(
+            identity=PresetIdentity(public="合成漫遊者"),
+            appearance=PresetAppearance(overview="褐色短髮的流浪者"),
             personality="安靜而警覺。",
+            speech_style="簡短低沉。",
+            life_story="在荒原漫遊多年。",
+            habit="檢查裝備。",
+            greeting="……有事？",
             background="Synthetic wanderer preset persona background.",
         ),
     ),
@@ -77,7 +89,13 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         starting_items=(("t_huskapple", 3),),
         sex="male",
         persona=PresetPersona(
+            identity=PresetIdentity(public="合成搬運工"),
+            appearance=PresetAppearance(overview="身材壯碩的搬運工"),
             personality="寡言的搬運工。",
+            speech_style="語氣樸實沉穩。",
+            life_story="自幼在商隊搬運貨物。",
+            habit="整理貨箱。",
+            greeting="要搬什麼？",
             background="Synthetic porter preset persona background.",
         ),
     ),
