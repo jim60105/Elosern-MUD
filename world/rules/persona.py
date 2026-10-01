@@ -39,6 +39,7 @@ _TRUNCATION_MARKER = "…"
 # back to their raw key as the label.
 _FIELD_LABELS = {
     "personality": "性格：",
+    "speech_style": "說話風格：",
     "life_story": "人生經歷：",
     "habit": "習慣：",
     "background": "背景：",

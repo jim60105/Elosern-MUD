@@ -180,6 +180,10 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
 | `defeat_aftermath` | `char`、`room`、`tick`、`hp_after`（擊敗善後邊界；defeat-aftermath-core） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
+| `npc_persona_initialized` | `npc`、`source`（provenance kind）、`profile`（若有）、`version` |
+| `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |
+| `npc_persona_update_rejected` | `npc`、`char`、`reason`（拒絕原因，可帶版本） |
+| `npc_persona_unavailable` | `npc`、`reason`（warn 級；不可用原因） |
 
 ### 4.3 AI／外部服務邊界
 
