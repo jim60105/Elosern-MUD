@@ -16,4 +16,4 @@ Apply on branch `feat/npc-persona-roster-validation` in worktree `.worktrees/npc
 
 ## 4. Gates
 
-- [ ] 4.1 Register `world.rules.tests.test_npc_roster_validation` in exactly one rules shard and verify `tests.test_evennia_test_optimization_contract`; sync the ADDED requirement into `openspec/specs/npc-profile-registry/spec.md` and annotate with the literal ID from `uv run --locked python -m tools.spec_traceability list`; verify `tools.spec_traceability check`, `uv run --locked python -m tools.observability_lint check`, `tools.contract_gate`, `git diff --check`, and `openspec validate npc-persona-roster-validation --strict`.
+- [x] 4.1 Register `world.rules.tests.test_npc_roster_validation` in exactly one rules shard and verify `tests.test_evennia_test_optimization_contract`; sync the ADDED requirement into `openspec/specs/npc-profile-registry/spec.md` and annotate with the literal ID from `uv run --locked python -m tools.spec_traceability list`; verify `tools.spec_traceability check`, `uv run --locked python -m tools.observability_lint check`, `tools.contract_gate`, `git diff --check`, and `openspec validate npc-persona-roster-validation --strict`.
