@@ -73,6 +73,7 @@ class GalleryPruneTests(EvenniaTestCase):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
 
     @covers_requirement(

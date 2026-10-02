@@ -235,6 +235,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         cards_before = gallery_api.cards_for(subject)
         output = self.call(CmdArtRequeue(), f"portrait:character:{player.pk}")
@@ -363,6 +364,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 requested_fields=[],
                 binding=None,
                 source="seed",
+                image_size={"width": 1000, "height": 1000},
             )
             with patch("world.art.service.log_info"):
                 output = self.call(CmdArtRequeue(), f"portrait:monster:{tier}")
@@ -441,6 +443,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         output = self.call(CmdArtRetry(), "")
         self.assertIn("重新請求 0 次圖庫生成", output)
@@ -523,6 +526,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         output = self.call(CmdArtRetry(), "")
         self.assertIn("重新請求 0 次圖庫生成", output)
@@ -735,6 +739,7 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         output = self.call(CmdArtStatus(), "")
         self.assertIn("圖庫狀態:", output)
@@ -761,6 +766,7 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         output = self.call(CmdArtStatus(), "")
         self.assertIn("圖庫狀態:", output)
@@ -859,6 +865,7 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         gallery_api.record_error(one, "sd_connection_error")
         two = ArtSubject(ArtSubjectKind.CHARACTER, "43")
@@ -921,6 +928,7 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         gallery_api.record_error(subject, "sd_timeout")
         gallery_before = [(s.subject.full(), s.card_count, s.has_default, s.error_code) for s in gallery_api.gallery_states()]

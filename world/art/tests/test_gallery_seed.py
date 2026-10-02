@@ -27,6 +27,7 @@ from world.art.gallery import (
     DEFAULT_FACE_RECT,
     append_card,
     cards_for,
+    default_face_rect,
     record_for,
     remove_card,
     set_default,
@@ -40,6 +41,13 @@ from tools.spec_traceability import covers_requirement
 _SEED_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
     "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
+
+# A deterministic 1x2 valid PNG, distinct from ``_SEED_BYTES``: seed appends
+# prove their decode by a size the 1x1 constant can never fake.
+_SECOND_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAIAAAAW4yFwAAAAEElEQVR4nGPg5GBn"
+    "YmBgAAAAogAb5lwhpwAAAABJRU5ErkJggg=="
 )
 
 
@@ -325,7 +333,7 @@ class SyncIdempotencyTests(_TempRoots):
         subject = _character(hero)
         before = cards_for(subject)
 
-        self.tree.image("character", hero, "z.png", b"\x89PNG second")
+        self.tree.image("character", hero, "z.png", _SECOND_BYTES)
         summary = sync_all()
         after = cards_for(subject)
         self.assertEqual(summary["appended"], 1)
@@ -334,7 +342,10 @@ class SyncIdempotencyTests(_TempRoots):
         self.assertEqual(after[: len(before)], before)
         image_id, identity = self._identity_for(subject, "z.png")
         self.assertEqual(after[-1]["image_id"], image_id)
-        self.assertEqual((self.store_root / identity).read_bytes(), b"\x89PNG second")
+        # Provenance: the recorded size is decoded from the copied bytes
+        # (the deterministic 1x2 PNG), never requested metadata.
+        self.assertEqual(after[-1]["image_size"], {"width": 1, "height": 2})
+        self.assertEqual((self.store_root / identity).read_bytes(), _SECOND_BYTES)
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_unsupported_unresolvable_and_hostile_entries_are_bounded_skips(self):
@@ -518,7 +529,7 @@ class ManifestSyncTests(_TempRoots):
         expected_id, _ = self._identity_for(subject, "alpha.png")
         self.assertEqual(record_for(subject).db.default_image_id, expected_id)
         for card in cards_for(subject):
-            self.assertEqual(card["face_rect"], gallery_api.default_face_rect(card["image_size"]))
+            self.assertEqual(card["face_rect"], default_face_rect(card["image_size"]))
 
     @covers_requirement("art-gallery-seed-sync::an-optional-per-subject-manifest-declares-the-default-and-the-face-rectangle")
     def test_an_invalid_manifest_degrades_with_one_diagnostic(self):
@@ -653,6 +664,7 @@ class GeneratedCardIsolationTests(_TempRoots):
             requested_fields=["appearance"],
             binding=binding,
             source="generated",
+            image_size={"width": 1000, "height": 1000},
         )
         before = cards_for(subject)
         self.tree.image("character", hero, "a.png")

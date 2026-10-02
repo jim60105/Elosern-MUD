@@ -166,6 +166,7 @@ class GalleryIdentityServingTests(EvenniaTestCase):
                 "requested_fields": ["appearance"],
                 "binding": None,
                 "source": "generated",
+                "image_size": {"width": 1000, "height": 1000},
             },
         )
         return identity

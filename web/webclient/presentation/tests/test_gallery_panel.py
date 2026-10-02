@@ -98,7 +98,9 @@ class GalleryWireTests(unittest.TestCase):
         add("pending with URL", lambda p: p["cards"][0].update(status="pending"))
         add("unknown field", lambda p: p["cards"][0].update(requested_fields=["unknown"]))
         add("duplicate field", lambda p: p["cards"][0].update(requested_fields=["appearance", "appearance"]))
-        add("chip mismatch", lambda p: p["cards"][0].update(chips=["自訂臉框", "目前預設"]))
+        # The relaxed wire carries whatever face chip the presenter committed,
+        # so a mismatch is two (or zero) face chips, not a rect disagreement.
+        add("chip mismatch", lambda p: p["cards"][0].update(chips=["預設臉框", "自訂臉框", "目前預設"]))
         add("unsupported equipment", lambda p: p["capabilities"].update(supports_bindings=False))
         add("warning missing card", lambda p: p["binding_warnings"].append({"image_id": image_id(99), "label": "不存在", "conditions": ["防具：未裝備"]}))
         def subjects(p, count):
@@ -211,9 +213,11 @@ class GalleryPresenterTests(EvenniaTest):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"image")
         size = image_size or {"width": 1000, "height": 1000}
+        # The write boundary fills an OMITTED rect; an explicit None is malformed.
+        rect = {} if face is None else {"face_rect": face}
         return api.append_card(subject, image_id=image_id(number), stored_identity=identity,
             prompt=None, seed=None, checkpoint=None, requested_fields=[], binding=binding,
-            source="seed", created_at=timestamp, image_size=size, face_rect=face)
+            source="seed", created_at=timestamp, image_size=size, **rect)
 
     def make_session(self):
         session = SimpleNamespace(ndb=SimpleNamespace(), puppet=self.actor, protocol_key="websocket", msg=lambda **kwargs: None)

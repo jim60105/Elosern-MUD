@@ -116,6 +116,9 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         self.assertEqual(card["stored_identity"], identity)
         self.assertEqual(card["source"], "generated")
         self.assertEqual(card["seed"], 4242)
+        # Provenance: the recorded pixel size is what the fake's bytes decode
+        # to (its 1x1 DEFAULT_PNG), never the request's render dimensions.
+        self.assertEqual(card["image_size"], {"width": 1, "height": 1})
         # The verbatim pair the client returned (the fake's defaults are the
         # GeneratedImage defaults), carried as exactly positive/negative.
         self.assertEqual(sorted(card["prompt"]), ["negative", "positive"])
@@ -147,6 +150,7 @@ class GalleryWorkerTests(WorkerStoreIsolation):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
         (self.root / "gallery" / "character" / "42").mkdir(parents=True)
         job = self._gallery_job()

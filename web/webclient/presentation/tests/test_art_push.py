@@ -362,6 +362,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             prompt={"positive": "ally", "negative": ""},
             seed=1,
             checkpoint="sd_v1-5",
+            image_size={"width": 1000, "height": 1000},
         )
 
         with (
@@ -417,6 +418,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             prompt={"positive": "m", "negative": ""},
             seed=1,
             checkpoint="sd_v1-5",
+            image_size={"width": 1000, "height": 1000},
         )
 
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):

@@ -76,6 +76,7 @@ def _card_fields(subject, image_id=None, **overrides):
         ),
         "binding": None,
         "source": "generated",
+        "image_size": {"width": 1000, "height": 1000},
     }
     fields.update(overrides)
     return fields

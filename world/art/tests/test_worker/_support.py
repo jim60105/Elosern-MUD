@@ -145,7 +145,14 @@ class _OpaqueClient:
 
     def generate(self, subject: ArtSubject, description: str) -> GeneratedImage:
         self.calls.append((subject, description))
-        return GeneratedImage(data=_opaque_portrait_png(), seed=self.seed)
+        # The trusted provenance is the size actually decoded from the bytes:
+        # the fixture is a deterministic 16x12 image (design D7).
+        return GeneratedImage(
+            data=_opaque_portrait_png(),
+            seed=self.seed,
+            decoded_width=16,
+            decoded_height=12,
+        )
 
 
 class _ExplodingBackend:

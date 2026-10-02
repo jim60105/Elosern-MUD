@@ -91,6 +91,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
             requested_fields=[],
             binding=None,
             source="seed",
+            image_size={"width": 1000, "height": 1000},
         )
 
     def _drain(self):
