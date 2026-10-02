@@ -63,21 +63,24 @@ subject record, except the puppet whose numeric identity is always eligible.
 
 ### Requirement: Subject selection is session presentation state retired with the options layer
 
+Canonical requirement ID: `webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer`.
+
 The selected subject SHALL be stored per live WebSocket-and-puppet presentation
 sequence, defaulting to the puppet. A selection naming no current rail entry
 SHALL re-select the puppet at render time without an error. The store SHALL be
 retired at disconnect, unpuppet, and account character switch, exactly like the
 session options state. The store SHALL expose a write API taking a
 rail-grammar subject key and reporting `unknown_subject` for a key naming no
-rail entry; the ui_action adapter registered by the companion
-`webclient-gallery-actions` change is its only caller, writes nothing else, and
-publishes a `gallery`-affected panel update. Nothing in this capability mutates
-a gallery record, card, or job.
+rail entry; the gallery subject-selection `ui_action` adapter is its only
+caller, writes nothing else, and publishes one affected-panel update containing
+freshly rendered `gallery`, `art`, and `roster` panels on success or domain
+rejection under the gallery-management action contract. Nothing in this
+capability mutates a gallery record, card, or job.
 
 #### Scenario: Selecting a companion re-renders the companion's gallery
 
 - **WHEN** a client dispatches `gallery.subject.select` naming a listed companion subject
-- **THEN** the result succeeds, one `gallery` panel update is published whose `selected` names that subject, and no `GalleryRecord` was touched
+- **THEN** the result succeeds, one update contains freshly rendered gallery, art, and roster with gallery's `selected` naming that subject, and no `GalleryRecord` was touched
 
 #### Scenario: A retired selection falls back to the puppet
 
