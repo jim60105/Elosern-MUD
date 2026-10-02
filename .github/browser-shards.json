@@ -4,13 +4,6 @@
       "index": 0,
       "name": "combat-0",
       "files_a": [
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_save_reopen_and_offline_greeting",
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_keyboard_dirty_close_and_field_rejection",
-        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_single_page_conflict_reload_and_discard",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_npc_departure_and_return_protects_draft",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_puppet_switch_clears_editor",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_cross_tab_conflict_reload_and_discard",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_single_skill_target_flow",
@@ -437,6 +430,21 @@
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_dense_island_keeps_every_node_and_name_reachable",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_full_map_marks_the_current_place_once",
         "web.tests.browser.test_browser_map_legibility.MapLegibilityBrowserTest.test_ordinary_island_reads_at_its_chrome_step"
+      ]
+    },
+    {
+      "index": 19,
+      "name": "npc_persona-19",
+      "files_a": [
+        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_save_reopen_and_offline_greeting",
+        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_keyboard_dirty_close_and_field_rejection",
+        "web.tests.browser.test_browser_npc_persona_editor.NpcPersonaEditorBrowserTest.test_single_page_conflict_reload_and_discard"
+      ],
+      "files_b": [
+        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_late_read_does_not_seed_different_npc",
+        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_npc_departure_and_return_protects_draft",
+        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_puppet_switch_clears_editor",
+        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_cross_tab_conflict_reload_and_discard"
       ]
     }
   ]
