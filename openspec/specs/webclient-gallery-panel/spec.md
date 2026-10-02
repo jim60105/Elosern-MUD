@@ -108,8 +108,14 @@ file has vanished SHALL be omitted from `cards`, never emitted with a broken
 URL. `chips` SHALL be the
 server-authored label list derived from the card's binding mask (`weapon_main`
 → 「主手」, `weapon_off` → 「副手」, `armor` → 「防具」, `accessories` → 「飾品」),
-the face fact 「自訂臉框」 when the rect differs from `DEFAULT_FACE_RECT` else
-「預設臉框」, and 「目前預設」 exactly when `is_default`. `cards` SHALL be ordered
+the face fact 「自訂臉框」 when the rect differs from the card's fitted default
+`default_face_rect(image_size)` else 「預設臉框」, and 「目前預設」 exactly when
+`is_default`. The row validators SHALL NOT re-derive which face chip a row must
+carry from the rect's numeric relation to the literal `DEFAULT_FACE_RECT`
+constant — the chip is authored server-side against the card's recorded
+`image_size`, which rows never carry (no row admits an `image_size` key), and
+both validator sides accept either face chip so a fitted-default row on a
+non-square image stays valid across the wire. `cards` SHALL be ordered
 newest-first by `created_at` with append order as the stable tiebreaker.
 
 #### Scenario: A bound custom-face default card carries its exact chips
@@ -126,6 +132,14 @@ newest-first by `created_at` with append order as the stable tiebreaker.
 - **WHEN** two stored cards with different `created_at` values and one pending job are projected
 - **THEN** both card rows read 「肖像」, the pending row reads 「肖像（生成中）」, no label contains a
   timestamp, each row carries its own `created_at`, and no stored record is renamed
+
+#### Scenario: A fitted-default row on a non-square image survives both validator sides
+- **WHEN** a card whose `image_size` is 768×1024 carries the fitted default rect `{x:0.25,y:0.06,w:0.5,h:0.375}` and its row chip 「預設臉框」 is validated by the server validator and by its mirrored legacy validator
+- **THEN** both accept the row, because neither re-derives the chip from a literal-constant comparison
+
+#### Scenario: A row never carries an image size
+- **WHEN** any card row is checked for the key `image_size`
+- **THEN** it fails the exact-key validation — the squareness reference never crosses the wire
 
 ### Requirement: Pending jobs and the recorded error render as truthful synthetic rows
 

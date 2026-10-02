@@ -8,7 +8,9 @@ generation failures reported (never gated) while the image server is down, an
 idempotent startup prune that reclaims orphan gallery files and spent gallery
 job records, and the `gallery_generate`/`gallery_settle` boundary events that
 make every request and terminal settle observable.
+
 ## Requirements
+
 ### Requirement: One validated service seam requests every gallery image
 `world/art/service.py::request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", binding=None, face_rect=None)`
 SHALL be the only gameplay-reachable entry point that queues a gallery generation, and it SHALL serve
@@ -31,7 +33,11 @@ than from a comparison against a particular kind:
 
 An argument naming a capability the kind does not declare SHALL be REJECTED, never silently dropped,
 so a card's recorded provenance can never claim data the request could not have used. The seam SHALL
-validate the face rectangle through the `world/art/gallery.py` validators BEFORE any queue write, SHALL
+validate the face rectangle through the `world/art/gallery.py` validators BEFORE any queue write,
+against the subject kind's planned render pixel size (the configured portrait dimensions), so a
+rectangle that is not pixel-square for the image about to be rendered raises before the queue
+record exists — with no value exemption for any rect, including the shared default constant; a
+`None` rect stays legal and takes the fitted default at append. The seam SHALL
 mint a fresh uuid `image_id`, and SHALL enqueue exactly one job. A subject whose kind declares no
 gallery SHALL be refused. A rejection SHALL raise a typed error at the service boundary and SHALL leave
 no record, no file, and no card behind. The seam SHALL be failure-isolated on every gameplay path
@@ -50,6 +56,14 @@ rolls back creation, import, spawn, or movement, and an art failure only logs a 
 #### Scenario: An invalid binding or rect never reaches the queue
 - **WHEN** a gallery image is requested with a malformed binding or an out-of-bounds face rectangle
 - **THEN** a typed error is raised, no record is created, and no prompt is rendered
+
+#### Scenario: A non-square rect never reaches the queue
+- **WHEN** a gallery image is requested with a rect that passes the bounds rules but is not pixel-square for the configured portrait render size — including one field-for-field equal to the shared default constant
+- **THEN** a typed error is raised, no record is created, and no prompt is rendered
+
+#### Scenario: A null rect queues and takes the fitted default
+- **WHEN** a gallery image is requested with `face_rect=None` and its job settles
+- **THEN** the queued job carries no rect and the appended card's rect is the fitted default square for the settled image's recorded pixel size
 
 #### Scenario: An undeclared capability is rejected, never ignored
 - **WHEN** a gallery image is requested for a monster subject with a non-empty field selection, a non-empty custom prompt, or a binding
@@ -138,4 +152,3 @@ produces the queue-level `sd_job_claim`/`sd_job_settled` events keyed by the job
 #### Scenario: A failed gallery generation reports its bounded reason
 - **WHEN** a gallery job settles `failed`
 - **THEN** the `gallery_settle` event carries the failed status and the bounded error code as its reason
-
