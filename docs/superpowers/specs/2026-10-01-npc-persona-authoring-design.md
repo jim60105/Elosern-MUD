@@ -343,6 +343,20 @@ Code-conflict hot spots for parallel work:
 - `at_server_startstop.py`: 19 only.
 - Append-only shared files (`.github/evennia-shards.json`, `.github/browser-shards.json`, `tools/test_data_freeze.json`, the observability catalog): mechanical rebase conflicts only.
 
+### 12.3 Follow-up review fixes and KISS retirement proposals
+
+Five complete, strictly validated follow-up proposals address the integration review and §13c decision. Proposal completion does not imply implementation; no tests were run during authoring.
+
+| # | Proposal | Scope | Depends on |
+|---|---|---|---|
+| 21 | [npc-authored-canonical-ages](../../../openspec/changes/npc-authored-canonical-ages/proposal.md) | P2: align all 25 hosts' and seven examiners' canonical ages with their authored cards, preserving reused instances | — |
+| 22 | [npc-persona-visible-targets](../../../openspec/changes/npc-persona-visible-targets/proposal.md) | P2: apply existing visibility policy to interaction publication and editor read/update admission | — |
+| 23 | [npc-offline-greeting-literal-output](../../../openspec/changes/npc-offline-greeting-literal-output/proposal.md) | P2: escape editable greetings at text-output boundaries; preserve raw storage/OOB and trusted defaults | 22 |
+| 24 | [npc-persona-unicode-normalization](../../../openspec/changes/npc-persona-unicode-normalization/proposal.md) | P3: align Python/JavaScript whitespace normalization, budgets, and normalized equality | 23 |
+| 25 | [remove-unused-npc-persona-bundles](../../../openspec/changes/remove-unused-npc-persona-bundles/proposal.md) | KISS: remove unused selector, 22 cards, owned tests/metadata/contracts; recover from Git history if needed | 21, 24 |
+
+Apply sequentially: 21 → 22 → 23 → 24 → 25. Ordering avoids shared-file/spec conflicts; each proposal's `## Batch:` metadata is authoritative. Preserve §§13a/13b and live NPC producers; add no LLM token usage or calls.
+
 ## 13. Explicit architectural amendments and non-goals
 
 This design preserves the generative/deterministic single-writer boundary and the existing read-only `PersonaStore`. It explicitly amends the old architecture document's statement that persona contents are never inspected **only for NPC compact-card structure, text bounds, and completeness**. NPC import validation becomes typeclass-aware; player/non-NPC opaque persona handling remains unchanged. No engine interprets personality prose as a mechanical rule.
