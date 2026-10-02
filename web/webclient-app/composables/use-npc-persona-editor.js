@@ -26,6 +26,7 @@ import {
   personaFromDraft,
   rejectionField,
   sameDraft,
+  sameNormalizedDraft,
   validateDraft,
 } from "../components/npc-persona-editor-model.js";
 
@@ -44,6 +45,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   const rejection = ref(null);
   const conflict = ref(null);
   const readFailure = ref(null);
+  const resyncFailure = ref(null);
   const needsResync = ref(false);
   const discardAfterReload = ref(false);
   const announcement = ref("");
@@ -74,6 +76,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
     rejection.value = null;
     conflict.value = null;
     readFailure.value = null;
+    resyncFailure.value = null;
     needsResync.value = false;
     discardAfterReload.value = false;
     announcement.value = "";
@@ -179,6 +182,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
     header.value = { displayName: data.display_name || "", npcTitle: data.npc_title || "" };
     defaultGreeting.value = typeof data.default_greeting === "string" ? data.default_greeting : "";
     readFailure.value = null;
+    resyncFailure.value = null;
     if (kind === "initial" || baseline.value === null) {
       needsResync.value = false;
       baseline.value = fresh;
@@ -193,11 +197,12 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
         announce("連線已恢復，草稿仍保留。");
         return;
       }
-      if (sameDraft(draft, fresh)) {
+      if (sameNormalizedDraft(draft, fresh)) {
         // The version moved to exactly what the draft holds (typically this
         // editor's own save whose result was lost): adopt it as saved.
         baseline.value = fresh;
         version.value = data.persona_version;
+        Object.assign(draft, fresh);
         conflict.value = null;
         announce(`連線已恢復，人物設定目前為第 ${data.persona_version} 版。`);
         return;
@@ -258,9 +263,12 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   function applyReadFailure(result, kind) {
     const message = typeof result.message === "string" && result.message ? result.message : "目前無法讀取人物設定。";
     if (kind === "resync") {
-      // The re-read after a reconnect was refused (the NPC left, the mode
-      // changed): stay unavailable with the draft until it is present again.
+      // A terminal rejection is not a held dispatch. Do not re-arm the read
+      // when the store releases its lock; retry only on explicit intent or
+      // a committed departure/return transition.
       needsResync.value = true;
+      resyncFailure.value = { message };
+      if (baseline.value === null) readFailure.value = { message, retryable: true };
       announce(message);
       return;
     }
@@ -313,6 +321,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
       // No claim either way: the pending request's outcome is unknown.
       const lostSave = pending.value && pending.value.kind === "save";
       pending.value = null;
+      resyncFailure.value = null;
       needsResync.value = true;
       announce(
         lostSave
@@ -334,13 +343,17 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   function tryResync() {
     const bound = binding.value;
     const v = store.view;
-    if (!bound || !needsResync.value || pending.value) {
+    if (!bound || !needsResync.value || pending.value || resyncFailure.value) {
       return;
     }
     if (!v.connected || v.phase !== "active" || v.epoch == null || v.mutationsLocked || v.dispatch?.inFlight) {
       return;
     }
     if (v.generation !== bound.generation) {
+      if (bound.characterId == null) {
+        close({ restoreFocus: true });
+        return;
+      }
       const current = currentCharacterId();
       if (bound.characterId != null) {
         if (current == null) {
@@ -361,6 +374,13 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
     }
     read("resync");
   }
+
+  watch(present, (now, before) => {
+    if (now === true && before === false && needsResync.value) {
+      resyncFailure.value = null;
+      tryResync();
+    }
+  });
 
   watch(
     () => [
@@ -420,6 +440,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
       if (present.value === false) {
         return { kind: "departed", message: "對方已不在這裡，或目前的狀態無法編輯。草稿會保留；回到對方身邊後即可儲存。" };
       }
+      if (resyncFailure.value) return { kind: "resync_failed", message: `${resyncFailure.value.message}　草稿仍保留，請重新讀取後再儲存。` };
       return { kind: "resyncing", message: pending.value ? "正在重新讀取人物設定……" : "等待連線與操作狀態恢復後，將重新讀取人物設定。" };
     }
     if (present.value === false) {
@@ -508,7 +529,8 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   function retry() {
     if (!binding.value || pending.value) return false;
     readFailure.value = null;
-    return read("initial");
+    resyncFailure.value = null;
+    return read(needsResync.value ? "resync" : "initial");
   }
 
   function close({ restoreFocus = true } = {}) {

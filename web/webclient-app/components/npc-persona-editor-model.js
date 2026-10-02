@@ -126,6 +126,11 @@ export function sameDraft(a, b) {
   return FIELD_KEYS.every((key) => a[key] === b[key]);
 }
 
+export function sameNormalizedDraft(a, b) {
+  if (!a || !b) return false;
+  return FIELD_KEYS.every((key) => NpcPersonaCard.normalizeText(a[key]) === NpcPersonaCard.normalizeText(b[key]));
+}
+
 export function changedFields(draft, baseline) {
   if (!draft || !baseline) return [];
   return FIELD_KEYS.filter((key) => draft[key] !== baseline[key]);

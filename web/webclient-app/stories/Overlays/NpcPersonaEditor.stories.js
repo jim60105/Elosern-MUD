@@ -31,6 +31,7 @@ export const FieldRejected = { args: { editor: npcPersonaEditorStates.rejected()
 export const Conflict = { args: { editor: npcPersonaEditorStates.conflict() } };
 
 export const Unavailable = { args: { editor: npcPersonaEditorStates.departed() } };
+export const ResyncRejected = { args: { editor: npcPersonaEditorStates.resyncFailed() } };
 
 export const ReadFailed = { args: { editor: npcPersonaEditorStates.readFailed() } };
 

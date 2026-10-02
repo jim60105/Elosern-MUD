@@ -108,6 +108,11 @@ export const npcPersonaEditorStates = {
       edits: { habit: "收工後會在船頭擦拭一把舊短刀，再把它藏回船板下。" },
       unavailable: { kind: "departed", message: "對方已不在這裡。草稿會保留，但目前無法儲存。" },
     }),
+  resyncFailed: () => baseEditor({
+    state: "unavailable",
+    edits: { habit: "每天收工後擦拭筆尖。" },
+    unavailable: { kind: "resync_failed", message: "目前無法讀取人物設定。草稿仍保留，請重新讀取後再儲存。" },
+  }),
   readFailed: () =>
     baseEditor({
       state: "unavailable",

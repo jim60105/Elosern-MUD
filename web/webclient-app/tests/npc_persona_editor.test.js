@@ -81,6 +81,40 @@ describe("NPC editor state machine", () => {
     f.store.view.generation = 2; f.store.view.epoch = "b"; f.store.view.connected = true; await nextTick();
     await f.result(); await nextTick(); expect(f.view().state).toBe("ready_clean"); expect(f.store.dispatchAction).toHaveBeenCalledTimes(2);
   });
+  it("does not retry a rejected resync when the dispatch lock releases", async () => {
+    const f = fixture(); await f.open(); await f.result();
+    f.ed.npcPersonaSetField("habit", "草稿");
+    let id = 100;
+    f.store.dispatchAction.mockImplementation(() => {
+      f.store.view.dispatch.inFlight = { requestId: `retry:${++id}` };
+      return `retry:${id}`;
+    });
+    f.store.view.connected = false; await nextTick();
+    f.store.view.generation = 2; f.store.view.epoch = "b"; f.store.view.connected = true; await nextTick();
+    await f.result(null, { outcome: "rejected", code: "npc_persona.unavailable", message: "無法讀取" });
+    f.store.view.dispatch.inFlight = null; await nextTick();
+    expect(f.store.dispatchAction).toHaveBeenCalledTimes(2);
+    expect(f.view().unavailable.kind).toBe("resync_failed");
+    expect(f.view().draft.habit).toBe("草稿");
+    f.ed.npcPersonaRetry(); expect(f.store.dispatchAction).toHaveBeenCalledTimes(3);
+    await f.result(); expect(f.view().draft.habit).toBe("草稿");
+    expect(f.view().state).toBe("ready_dirty");
+  });
+  it("adopts a confirmed lost save whose only draft difference is normalization", async () => {
+    const f = fixture(); await f.open(); await f.result();
+    f.ed.npcPersonaSetField("habit", "  草稿\r\n "); f.ed.npcPersonaSave();
+    f.store.view.connected = false; await nextTick();
+    f.store.view.generation = 2; f.store.view.epoch = "b"; f.store.view.connected = true; await nextTick();
+    await f.result({ ...sample, persona_version: 4, persona: { ...sample.persona, habit: "草稿" } });
+    expect(f.view().state).toBe("ready_clean"); expect(f.view().version).toBe(4);
+    expect(f.view().draft.habit).toBe("草稿");
+  });
+  it("clears instead of reconnecting private data when the opening character was unknown", async () => {
+    const f = fixture(); f.store.view.rosterCharacters = []; await f.open(); await f.result();
+    f.store.view.connected = false; await nextTick();
+    f.store.view.generation = 2; f.store.view.epoch = "b"; f.store.view.connected = true; await nextTick();
+    expect(f.view().open).toBe(false); expect(f.view().draft["identity.hidden"]).toBe("");
+  });
 });
 
 describe("NPC editor dialog", () => {
@@ -109,6 +143,16 @@ describe("NPC editor dialog", () => {
     const editor = { ...npcPersonaEditorStates.clean(), draft: { ...npcPersonaEditorStates.clean().draft, offline_greeting: "<b>草稿</b>" }, rejection: { field: "offline_greeting", message: "問候語格式無效" }, focusRequest: null };
     const w = render(editor); await w.setProps({ editor: { ...editor, focusRequest: { field: "offline_greeting", seq: 1 }, announcement: "問候語格式無效" } }); await nextTick();
     const field = w.get("#npc-persona-field-offline_greeting"); expect(document.activeElement).toBe(field.element); expect(field.element.value).toBe("<b>草稿</b>"); expect(field.attributes("aria-describedby")).toContain("-error"); expect(w.get('[data-testid="npc-persona-editor-status"]').attributes("aria-live")).toBe("polite");
+  });
+  it("focuses an identity-section rejection without blaming the public leaf", async () => {
+    const f = fixture(); await f.open(); await f.result(); const w = render(f.view());
+    f.ed.npcPersonaSetField("identity.hidden", "隱秘草稿"); f.ed.npcPersonaSave();
+    await f.result(null, { outcome: "rejected", code: "npc_persona.identity_section_too_long.identity", message: "身分區塊超過上限" });
+    await w.setProps({ editor: f.view() }); await nextTick();
+    expect(document.activeElement).toBe(w.get("#npc-persona-field-identity").element);
+    expect(w.get("#npc-persona-identity-error").text()).toBe("身分區塊超過上限");
+    expect(w.get("#npc-persona-field-identity-public").attributes("aria-invalid")).toBeUndefined();
+    expect(w.get("#npc-persona-field-identity-hidden").attributes("aria-describedby")).toContain("npc-persona-identity-error");
   });
 });
 

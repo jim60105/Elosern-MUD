@@ -359,6 +359,7 @@ const saveLabel = computed(() => (state.value === "saving" ? "儲存中……" :
             >
               <span class="npe-banner__mark" aria-hidden="true">◇</span>
               <p class="npe-banner__text">{{ ed.unavailable.message }}</p>
+              <button v-if="ed.unavailable.kind === 'resync_failed'" type="button" class="npe-btn" data-testid="npc-persona-editor-retry" :disabled="ed.busy" @click="emit('retry')">重新讀取</button>
             </div>
             <div v-if="ed.conflict" class="npe-banner npe-banner--seal" data-testid="npc-persona-editor-conflict">
               <span class="npe-banner__mark" aria-hidden="true">!</span>
