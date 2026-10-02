@@ -27,7 +27,7 @@ from world.skills.registry.vocab import (
 )
 
 ROWS: tuple[SkillDef, ...] = (
-        # 風 — 學徒（機動路線・根）
+        # 風 — 學徒（機動路線‧根）
         _spell(
             "gale_step",
             "疾風術",
@@ -71,7 +71,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="wind",
             prerequisites=(SkillPrerequisite("gale_chain_step", 3),),
         ),
-        # 風 — 賢者（機動路線・終點）
+        # 風 — 賢者（機動路線‧終點）
         _spell(
             "haste_domain",
             "神速領域",
@@ -86,7 +86,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("afterimage_step", 5),),
             effect_policies=(EffectPolicy(audience=EffectAudience.ALLIES),),
         ),
-        # 風 — 學徒（破壞路線・根）
+        # 風 — 學徒（破壞路線‧根）
         _spell(
             "wind_blade",
             "風刃術",
@@ -100,7 +100,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="wind",
             effect_policies=(EffectPolicy(coefficient=0.7),),
         ),
-        # 風 — 術師（破壞路線・分支點）
+        # 風 — 術師（破壞路線‧分支點）
         _spell(
             "tornado_blade",
             "龍捲風刃",
@@ -115,7 +115,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("wind_blade", 3),),
             effect_policies=(EffectPolicy(coefficient=1.4),),
         ),
-        # 風 — 大師（破壞路線・暴風分支）
+        # 風 — 大師（破壞路線‧暴風分支）
         _spell(
             "storm_domain",
             "暴風領域",
@@ -133,7 +133,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES),
             ),
         ),
-        # 風 — 大師（破壞路線・刃舞分支）
+        # 風 — 大師（破壞路線‧刃舞分支）
         _spell(
             "gale_dance_strike",
             "疾風刃舞",
@@ -153,7 +153,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 風 — 賢者（破壞路線・暴風分支）
+        # 風 — 賢者（破壞路線‧暴風分支）
         _spell(
             "heavens_wrath_storm",
             "天譴風暴",
@@ -168,7 +168,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("storm_domain", 5),),
             effect_policies=(EffectPolicy(coefficient=2.0),),
         ),
-        # 風 — 賢者（破壞路線・刃舞分支）
+        # 風 — 賢者（破壞路線‧刃舞分支）
         _spell(
             "sky_rending_slash",
             "天穹裂斬",
@@ -183,7 +183,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("gale_dance_strike", 8),),
             effect_policies=(EffectPolicy(coefficient=2.8),),
         ),
-        # 風 — 主宰（破壞路線・暴風分支終點）
+        # 風 — 主宰（破壞路線‧暴風分支終點）
         _spell(
             "sky_tempest",
             "蒼穹暴風",
@@ -205,7 +205,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES),
             ),
         ),
-        # 風 — 主宰（破壞路線・刃舞分支終點・處決級）
+        # 風 — 主宰（破壞路線‧刃舞分支終點‧處決級）
         _spell(
             "vacuum_severance",
             "真空斬滅",
@@ -225,7 +225,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 風 — 神格（兩線匯合・樹冠）
+        # 風 — 神格（兩線匯合‧樹冠）
         _spell(
             "sky_apotheosis",
             "天穹神格",

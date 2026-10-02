@@ -134,7 +134,7 @@ SOLO_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "solo_toy_vibrator",
-        "玩具自慰·振動",
+        "玩具自慰‧振動",
         "以振動玩具抵住私處，讓機械的顫動取代手指的節奏。",
         TargetSpec.SELF,
         {"masturbation_count": 25},
@@ -149,7 +149,7 @@ SOLO_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "solo_toy_clamps",
-        "玩具自慰·夾具",
+        "玩具自慰‧夾具",
         "用夾具夾住自己的乳尖，在輕微的刺痛與快感之間尋求平衡。",
         TargetSpec.SELF,
         {"masturbation_count": 25},
@@ -164,7 +164,7 @@ SOLO_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "solo_toy_plug",
-        "玩具自慰·填充",
+        "玩具自慰‧填充",
         "將玩具緩緩推入後庭，讓被填滿的壓迫感轉化為快感。",
         TargetSpec.SELF,
         {"masturbation_count": 25},
@@ -179,7 +179,7 @@ SOLO_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "solo_toy_advanced_link",
-        "高階玩具·連結",
+        "高階玩具‧連結",
         "以連結玩具同時刺激身體多處要害，讓每一處都無法逃開快感。",
         TargetSpec.SELF,
         {"masturbation_count": 25, "toy_use_count": 15},
@@ -194,7 +194,7 @@ SOLO_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "solo_toy_advanced_full",
-        "高階玩具·全身",
+        "高階玩具‧全身",
         "讓高階玩具覆蓋全身的敏感帶，徹底沉溺在持續的刺激之中。",
         TargetSpec.SELF,
         {"masturbation_count": 25, "toy_use_count": 15},

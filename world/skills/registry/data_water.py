@@ -146,7 +146,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(),
             ),
         ),
-        # 水 — 賢者（潮汐路線・範圍友方）
+        # 水 — 賢者（潮汐路線‧範圍友方）
         _spell(
             "abyssal_surge",
             "深淵潮汛",

@@ -59,7 +59,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(4, 4),  # 大神殿前
         doorway_key_zh="光明神殿",
         doorway_aliases=("temple", "cathedral", "church"),
-        host_name="艾莉安娜·寒水",
+        host_name="艾莉安娜‧寒水",
         host_title="聖潔王都光明神殿主祭",
         host_race="human",
         host_subrace=None,
@@ -92,7 +92,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(4, 4),  # 大神殿前
         doorway_key_zh="聖所",
         doorway_aliases=("sanctum", "church sanctum"),
-        host_name="羅海西亞·芬威克",
+        host_name="羅海西亞‧芬威克",
         host_title="聖潔王都聖所執事",
         host_race="human",
         host_subrace=None,
@@ -146,7 +146,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(3, 5),  # 貴族區前
         doorway_key_zh="貴族區衛所",
         doorway_aliases=("noble watch", "watch post"),
-        host_name="古利安·鷹守",
+        host_name="古利安‧鷹守",
         host_title="聖潔王都貴族區衛隊長",
         host_race="human",
         host_subrace=None,
@@ -175,7 +175,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(2, 4),  # 校場外
         doorway_key_zh="校場",
         doorway_aliases=("drill yard", "training ground"),
-        host_name="伊沃·高丘",
+        host_name="伊沃‧高丘",
         host_title="聖潔王都訓練場教頭",
         host_race="human",
         host_subrace=None,
@@ -189,7 +189,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     # 聖潔王都王立魔法學院 — the capital's academy, off 學院前 (5,5), the
     # square the map already carries. The document's 魔法學院與圖書館 is 〔有〕
     # for 都城 and 〔無〕 for every other archetype, and the Kingdom's is
-    # 薇歐蕾特·阿爾托利亞's old school. The dean is the capital's attendant
+    # 薇歐蕾特‧阿爾托利亞's old school. The dean is the capital's attendant
     # whose table carries subject matter instead of a command lesson: the
     # magic-rank ladder and the element vocabulary, the two closed lore
     # vocabularies the document names as this room's natural reveal site
@@ -204,13 +204,13 @@ ROWS: tuple[PlaceDefinition, ...] = (
         room_desc_zh=(
             "聖潔王都的學院把講課收在同一個屋簷下，一間長廳，階梯式的長椅面對著示範場，無論幾點都燈光明亮到能讀書，廳旁是一間書庫，王都藏的階級課"
             "本照學生攀登的順序上架。學生在門外的階梯上爭論，裡面的講師回答問題的方式正是一所學校該有的樣子，一路答到底。院長的書桌正對著示範場；"
-            "這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特·阿爾托利亞從前坐過的教"
+            "這座城市懂得的每一條魔法階級階梯與八元素的知識，都出自像這樣某個地方，而王國的這一間，正是薇歐蕾特‧阿爾托利亞從前坐過的教"
             "室。"
         ),
         exterior_xy=(5, 5),  # 學院前
         doorway_key_zh="王立魔法學院",
         doorway_aliases=("academy", "royal academy", "magic academy"),
-        host_name="奧德溫·薩契",
+        host_name="奧德溫‧薩契",
         host_title="聖潔王都魔法學院院長",
         host_race="human",
         host_subrace=None,

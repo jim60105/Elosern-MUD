@@ -100,7 +100,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("scorching_wave", 3),),
             effect_policies=(EffectPolicy(coefficient=2.0),),
         ),
-        # 火 — 術師（反灼護甲・分支終點）
+        # 火 — 術師（反灼護甲‧分支終點）
         _spell(
             "scorching_armor",
             "灼熱裝甲",
@@ -202,7 +202,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(),
             ),
         ),
-        # 火 — 神格（兩線匯合・雙向燃身）
+        # 火 — 神格（兩線匯合‧雙向燃身）
         _spell(
             "crimson_apotheosis",
             "紅蓮神格",

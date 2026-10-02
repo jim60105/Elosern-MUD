@@ -195,7 +195,7 @@ ROWS: tuple[ItemDefinition, ...] = (
         ),
         ItemDefinition(
             key="shadow_blade_echo",
-            display_name_zh="暗影鋼刀·影",
+            display_name_zh="暗影鋼刀‧影",
             price_table_key="masterwork_gear",
             sellable=True,
             presentation=ItemPresentation(

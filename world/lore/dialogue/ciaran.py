@@ -17,21 +17,21 @@ design: 「對這位精靈而言這是分享興趣與互助，不是營業」) b
 - Four keyword answers at most (the panel truncates).
 
 Host mapping (keys travel in the place rows; the slice assembles into
-DIALOGUE_ROWS unchanged): 海莉爾·斯塔爾法爾 forges the village's shadow
-steel; 拉瑞內斯·妮特布倫 keeps the candied blossom larder; 瓦爾溫·斯蒂爾瓦特爾
-is the collector whose kept things line the old tree's house; 維特希爾·
-威爾德布瑞亞爾 weaves at the loom on the slope; 格威娜拉·希爾維爾莉夫 makes
-the village's ornaments on 銀葉坡; 妮瑞斯·米斯特瓦勒 tends herbs and remedies
-by the 藥草園. Two voices converse without trading: 泰莉爾·菲溫德, the
+DIALOGUE_ROWS unchanged): 海莉爾‧斯塔爾法爾 forges the village's shadow
+steel; 拉瑞內斯‧妮特布倫 keeps the candied blossom larder; 瓦爾溫‧斯蒂爾瓦特爾
+is the collector whose kept things line the old tree's house; 維特希爾‧
+威爾德布瑞亞爾 weaves at the loom on the slope; 格威娜拉‧希爾維爾莉夫 makes
+the village's ornaments on 銀葉坡; 妮瑞斯‧米斯特瓦勒 tends herbs and remedies
+by the 藥草園. Two voices converse without trading: 泰莉爾‧菲溫德, the
 village's sword instructor on 練刀場, who grants nothing (skill comes from
-the trainee's own practice), and 艾莉妮斯·達恩斯特瑞德爾, the elder, whose
+the trainee's own practice), and 艾莉妮斯‧達恩斯特瑞德爾, the elder, whose
 dwelling is memory rather than office. Neither asks, permits, or decides
 anything. The shelter between them is host-less on purpose.
 """
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 格威娜拉·希爾維爾莉夫 — the adornment maker (暗影谷村綴飾者).
+# 格威娜拉‧希爾維爾莉夫 — the adornment maker (暗影谷村綴飾者).
 # elven_adornments: 三稜晶符, 月牙耳環. Chatty and delighted by pretty things;
 # ornament is a love, not a trade, and she mends broken pieces for free. She
 # takes back only the pieces her own line carries.
@@ -62,8 +62,8 @@ GWENAERA_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 海莉爾·斯塔爾法爾 — the blade-smith (暗影谷村鑄刃者). elven_crafted_arms:
-# 暗影鋼刀, 暗影鋼刀·影, forged as a pair. Measured and plain; she looks at a
+# 海莉爾‧斯塔爾法爾 — the blade-smith (暗影谷村鑄刃者). elven_crafted_arms:
+# 暗影鋼刀, 暗影鋼刀‧影, forged as a pair. Measured and plain; she looks at a
 # visitor's hands before talking blades, and takes back only her own blades.
 HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
@@ -73,7 +73,7 @@ HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "影刀",
-        "「暗影鋼刀·影是副手刀，跟主手刀成對打。刃身淬過谷底的第一道霜，靜止"
+        "「暗影鋼刀‧影是副手刀，跟主手刀成對打。刃身淬過谷底的第一道霜，靜止"
         "時看起來一片黑，揮起來才看得到那道影子。我一次只做一對，砧邊還有沒有"
         "，你自己去瞧吧。」",
     ),
@@ -89,7 +89,7 @@ HAILIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 拉瑞內斯·妮特布倫 — the fare-keeper (暗影谷村花饌好手). elven_fare:
+# 拉瑞內斯‧妮特布倫 — the fare-keeper (暗影谷村花饌好手). elven_fare:
 # 精靈蜜漬花蕊. Soft and unhurried; she feeds a guest before anything else and
 # takes back only her own jars.
 LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
@@ -116,7 +116,7 @@ LARENETH_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 妮瑞斯·米斯特瓦勒 — the hedge-healer (暗影谷村調藥者). elven_remedies:
+# 妮瑞斯‧米斯特瓦勒 — the hedge-healer (暗影谷村調藥者). elven_remedies:
 # 強效治療藥水, 魔力藥水. Her knowledge exists because elves get hurt too;
 # she fusses over wounds first and takes back only her own jars.
 NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
@@ -143,7 +143,7 @@ NIRETH_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 瓦爾溫·斯蒂爾瓦特爾 — the collector (暗影谷村蒐羅者). elven_sundries:
+# 瓦爾溫‧斯蒂爾瓦特爾 — the collector (暗影谷村蒐羅者). elven_sundries:
 # 精靈蛛絲. Her home is full of kept things, each with a story; she trades
 # stories for stories, wears a 月牙耳環 from 格威娜拉's batch, and takes back
 # only the silk she hangs out.
@@ -174,7 +174,7 @@ VALWYN_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 泰莉爾·菲溫德 — the sword instructor (暗影谷村刀術導師). She shares the
+# 泰莉爾‧菲溫德 — the sword instructor (暗影谷村刀術導師). She shares the
 # 練刀場 with 海莉爾 the blade-smith: the forge and the teaching, on one
 # clearing. She grants nothing and spars with nobody: skill comes from the
 # trainee's own repetition, and her lines say so in the village's terms.
@@ -201,7 +201,7 @@ TELIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 維特希爾·威爾德布瑞亞爾 — the weaver (暗影谷村織衣者). elven_attire:
+# 維特希爾‧威爾德布瑞亞爾 — the weaver (暗影谷村織衣者). elven_attire:
 # 精靈短袍傳統服飾, 精靈戰鬥服飾, 精靈傳統服飾, 精靈森林輕紗. Slow and
 # thoughtful; clothes exist to show the body well (the elves hold no shame
 # about it), and she takes back only what she wove.
@@ -230,7 +230,7 @@ VETHIEL_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 艾莉妮斯·達恩斯特瑞德爾 — the elder (暗影谷村長老). Her dwelling is a
+# 艾莉妮斯‧達恩斯特瑞德爾 — the elder (暗影谷村長老). Her dwelling is a
 # keeper's, not an office: no petition, no permission, no council business.
 # Memory is her content: the branch, the forest, the village's past. Her
 # people's devotions stay where the document leaves them: unshown.
@@ -270,7 +270,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_hailiel_home",
         DialogueDefinition(
             greeting=(
-                "海莉爾·斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下"
+                "海莉爾‧斯塔爾法爾把剛淬好的刀按進油槽，白煙竄了起來。她抬眼看了一下"
                 "你的手：「來看刀吧。砧邊那對剛打好，可以拿起來試。先讓我瞧一下你平常"
                 "怎麼握刀。」"
             ),
@@ -281,7 +281,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_lareneth_home",
         DialogueDefinition(
             greeting=(
-                "溪畔小徑旁的屋裡飄著糖漬花的甜香，拉瑞內斯·妮特布倫從醃甕後抬起臉，"
+                "溪畔小徑旁的屋裡飄著糖漬花的甜香，拉瑞內斯‧妮特布倫從醃甕後抬起臉，"
                 "先遞給你一片葉子，上面擺著一顆蜜漬花蕊：「遠來的客人……先嚐一口吧。"
                 "嚐過了，我們再聊。」"
             ),
@@ -292,7 +292,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_valwyn_home",
         DialogueDefinition(
             greeting=(
-                "村北古樹下的屋裡，瓦爾溫·斯蒂爾瓦特爾正把一串貝殼掛上繩結，聽見腳步"
+                "村北古樹下的屋裡，瓦爾溫‧斯蒂爾瓦特爾正把一串貝殼掛上繩結，聽見腳步"
                 "聲就回頭笑了：「哎，有人來了！你從哪裡來呀？路上看到什麼了？先別急著"
                 "走，坐下來聊一會兒。這屋裡掛的東西都有故事，想聽哪一樣，我都講給你聽"
                 "。」"
@@ -304,7 +304,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_vethiel_home",
         DialogueDefinition(
             greeting=(
-                "織機聲在門內停下，維特希爾·威爾德布瑞亞爾從經線間探出身子，手上還捏"
+                "織機聲在門內停下，維特希爾‧威爾德布瑞亞爾從經線間探出身子，手上還捏"
                 "著梭子：「來了。你喜歡什麼顏色？墨黑、月白，還是霧一樣的淡綠？架上的"
                 "衣服隨你看，看上哪件，我拿下來讓你摸一下料子。」"
             ),
@@ -315,7 +315,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_gwenaera_home",
         DialogueDefinition(
             greeting=(
-                "銀葉坡頂的屋裡，格威娜拉·希爾維爾莉夫從工作檯後抬起頭，舉起兩朵銀絲"
+                "銀葉坡頂的屋裡，格威娜拉‧希爾維爾莉夫從工作檯後抬起頭，舉起兩朵銀絲"
                 "絞花湊到你面前：「欸，你來得正好！這兩朵哪一朵比較好看？左邊這朵嘛…"
                 "…算了，我等一下再改。做好的都掛在窗邊繩上，喜歡哪件就跟我說；有東西"
                 "壞了要修，也拿過來吧。」"
@@ -327,7 +327,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_nireth_home",
         DialogueDefinition(
             greeting=(
-                "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯·米斯特瓦勒正替藥爐壓小火，"
+                "藥草園邊的屋裡滿是苦甜交錯的氣味，妮瑞斯‧米斯特瓦勒正替藥爐壓小火，"
                 "回頭先把你上下打量了一遍：「沒受傷吧？那就好。這輪藥剛起罐，強效治療"
                 "藥水和魔力藥水都還有一些，要帶幾罐上路就跟我說喔。」"
             ),
@@ -338,7 +338,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_elenis_home",
         DialogueDefinition(
             greeting=(
-                "長老古樹下的坐石曬得微溫，艾莉妮斯·達恩斯特瑞德爾抬眼看你，膝上擱著"
+                "長老古樹下的坐石曬得微溫，艾莉妮斯‧達恩斯特瑞德爾抬眼看你，膝上擱著"
                 "一縷剛剝下的樹皮：「是啊，坐吧，小傢伙。老人家這裡沒有東西可以給你，"
                 "也沒有事情要你辦。想聽村子的事、林子的事，還是這一族為什麼愛刀？記得"
                 "的我就說。」"
@@ -350,7 +350,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "ciaran_teliel_home",
         DialogueDefinition(
             greeting=(
-                "場邊的木刀排成一列，泰莉爾·菲溫德剛收完最後一組動作，額上的汗還沒乾"
+                "場邊的木刀排成一列，泰莉爾‧菲溫德剛收完最後一組動作，額上的汗還沒乾"
                 "。她看了一眼你的站姿：「來看練刀？場子在這裡，木刀在門邊。我這裡沒有"
                 "東西要給你，也沒有捷徑。」"
             ),

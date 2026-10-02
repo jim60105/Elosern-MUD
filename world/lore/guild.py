@@ -45,20 +45,20 @@ class GuildBranch:
 
 
 GUILD_RANK_REGISTRY: dict[str, GuildRank] = {
-    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks.", "g_f_rank", "雷加·鐵拳", "公會見習考官", "guild_examiner_f"),
-    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts.", "g_e_rank", "薇拉·晨風", "公會初階考官", "guild_examiner_e"),
-    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs.", "g_d_rank", "巴德·石肩", "公會中階考官", "guild_examiner_d"),
-    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone.", "g_c_rank", "賽琳·夜鶯", "公會高階考官", "guild_examiner_c"),
-    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions.", "g_b_rank", "霍克·赤刃", "公會資深考官", "guild_examiner_b"),
-    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments.", "g_a_rank", "卡珊卓·銀輝", "公會首席考官", "guild_examiner_a"),
-    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale.", "g_s_rank", "奧古斯丁·無名", "公會傳說考官", "guild_examiner_s"),
+    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks.", "g_f_rank", "雷加‧鐵拳", "公會見習考官", "guild_examiner_f"),
+    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts.", "g_e_rank", "薇拉‧晨風", "公會初階考官", "guild_examiner_e"),
+    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs.", "g_d_rank", "巴德‧石肩", "公會中階考官", "guild_examiner_d"),
+    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone.", "g_c_rank", "賽琳‧夜鶯", "公會高階考官", "guild_examiner_c"),
+    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions.", "g_b_rank", "霍克‧赤刃", "公會資深考官", "guild_examiner_b"),
+    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments.", "g_a_rank", "卡珊卓‧銀輝", "公會首席考官", "guild_examiner_a"),
+    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale.", "g_s_rank", "奧古斯丁‧無名", "公會傳說考官", "guild_examiner_s"),
 }
 
 GUILD_BRANCH_REGISTRY: dict[str, GuildBranch] = {
     "guild_branch_altoria": GuildBranch(
         "guild_branch_altoria",
         "埃洛西恩冒險者公會 阿爾托利亞分會",
-        "葛里安·衛登",
+        "葛里安‧衛登",
         "阿爾托利亞分會會長",
         "capital_altoria",
     ),

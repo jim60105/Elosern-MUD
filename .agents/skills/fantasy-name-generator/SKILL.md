@@ -44,10 +44,10 @@ Default output gives the display name, the original spelling, which pool it
 came from, and the etymology of both halves:
 
 ```
-奇幻・精靈（fantasy-elf）
+奇幻‧精靈（fantasy-elf）
 命名慣例：精靈壽命長、氏族觀念淡薄，正式場合常用「本名、家族／棲居地複合詞」…
 
-1. 戴莉爾・威爾德布瑞亞爾  (Daeliel Wildbriar)  〔女性〕
+1. 戴莉爾‧威爾德布瑞亞爾  (Daeliel Wildbriar)  〔女性〕
    名：Daeliel — 霞光＋…之女 — 詞根 Dael（霞光）接陰性後綴 -iel
    姓：Wildbriar — 野薔薇
 ```

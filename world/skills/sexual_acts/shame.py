@@ -43,7 +43,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "shame_half_expose_chest",
-        "半露出·胸口",
+        "半露出‧胸口",
         "拉下衣領露出胸口，讓肌膚在半掩之間引人注目。",
         TargetSpec.SELF,
         {"exposure_act_count": 5},
@@ -58,7 +58,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "shame_half_expose_lower",
-        "半露出·下身",
+        "半露出‧下身",
         "掀起裙擺露出下身，在他人目光下微微發顫。",
         TargetSpec.SELF,
         {"exposure_act_count": 5},

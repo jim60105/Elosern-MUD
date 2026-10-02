@@ -55,7 +55,7 @@ def _roll_from_pack(pack: NamePack, sex: str | None, rng: Random) -> str:
 
 
 def roll_name(pack_key: str, sex: str | None, rng: Random) -> str:
-    """Roll 「given.zh・surname.zh」 from one named pack.
+    """Roll 「given.zh‧surname.zh」 from one named pack.
 
     An unknown ``pack_key`` propagates ``KeyError`` unchanged (design D5):
     callers pass program constants, and swallowing the error would ship a

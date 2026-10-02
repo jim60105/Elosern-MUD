@@ -24,7 +24,7 @@ here carries exactly four.
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 瑪爾特·金秤 — the general store (sex ``other``: no gendered pronoun in
+# 瑪爾特‧金秤 — the general store (sex ``other``: no gendered pronoun in
 # narration). Brisk, lists goods like a stock check, asks whether the
 # visitor is heading out or just back. The shelf is the sundries bundle:
 # light, compass, camp gear, raw materials and the dungeon drops it buys.
@@ -57,7 +57,7 @@ GENERAL_STORE_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 維爾登·黑潭 — the forge. Terse to the bone: few words, no particles,
+# 維爾登‧黑潭 — the forge. Terse to the bone: few words, no particles,
 # asks what the visitor fights with first. common_arms is his wall, from the
 # plain sword up to the knight blade he is proudest of. He buys back only
 # what he hangs on that wall, and there is no repair service to promise.
@@ -84,7 +84,7 @@ FORGE_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 妮絲塔·狐溪 — the tailor. Warm, chatty, sizes people up while she talks
+# 妮絲塔‧狐溪 — the tailor. Warm, chatty, sizes people up while she talks
 # and asks where they are headed. common_outfits is her rack: leathers,
 # robes, mail and plate for the road, and the vestments the upper city and
 # the cathedral order from her.
@@ -116,7 +116,7 @@ TAILOR_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 艾蓮娜·鴉丘 — the jeweller. Slow, soft and exacting; addresses the
+# 艾蓮娜‧鴉丘 — the jeweller. Slow, soft and exacting; addresses the
 # visitor plainly with few particles and starts from whatever they are already wearing.
 # capital_adornments is her glass case: everyday pieces, the blessed and
 # hunter's work, and the two rare enchanted carry-alls.
@@ -146,7 +146,7 @@ JEWELLER_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 希碧拉·灰沼 — the alchemist. Flat, orderly, asks about symptoms first and
+# 希碧拉‧灰沼 — the alchemist. Flat, orderly, asks about symptoms first and
 # never oversells an effect (capital_remedies). The baptismal holy water is
 # the sanctum's, up the 聖階, and she says so.
 ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
@@ -174,7 +174,7 @@ ALCHEMIST_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 尤斯汀·柯德溫 — the 商會會長, an attendant. Formal: 「閣下」 for the
+# 尤斯汀‧柯德溫 — the 商會會長, an attendant. Formal: 「閣下」 for the
 # visitor, 「本人」 for himself, complete sentences. The trade of 東市 is
 # coordinated from his desk, and he talks caravans, roads and tariffs as
 # substance. The hall posts no work: the escort commissions its name
@@ -219,7 +219,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_general_store",
         DialogueDefinition(
             greeting=(
-                "櫃檯後的瑪爾特·金秤從帳簿上抬起頭，炭筆還捏在指間：「要出城，還是剛"
+                "櫃檯後的瑪爾特‧金秤從帳簿上抬起頭，炭筆還捏在指間：「要出城，還是剛"
                 "回來？出城的話，燈、羅盤、露營的東西架上都有；回來的話，帶了什麼先擱"
                 "秤上。」"
             ),
@@ -230,7 +230,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_forge",
         DialogueDefinition(
             greeting=(
-                "鍛造鋪裡砧聲沒停，維爾登·黑潭頭也沒抬：「用什麼兵器？哪隻手？說。」"
+                "鍛造鋪裡砧聲沒停，維爾登‧黑潭頭也沒抬：「用什麼兵器？哪隻手？說。」"
             ),
             responses=FORGE_RESPONSES,
         ),
@@ -239,7 +239,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_tailor",
         DialogueDefinition(
             greeting=(
-                "裁縫坊的妮絲塔·狐溪從布堆裡探出頭，軟尺還掛在脖子上：「來，進來呀！"
+                "裁縫坊的妮絲塔‧狐溪從布堆裡探出頭，軟尺還掛在脖子上：「來，進來呀！"
                 "讓我瞧一下你這身……嗯，要出遠門對吧？打算往哪裡去呢？」"
             ),
             responses=TAILOR_RESPONSES,
@@ -249,7 +249,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_jeweller",
         DialogueDefinition(
             greeting=(
-                "首飾坊的艾蓮娜·鴉丘放下鹿皮布，目光先停在你的衣領上：「歡迎。你身上"
+                "首飾坊的艾蓮娜‧鴉丘放下鹿皮布，目光先停在你的衣領上：「歡迎。你身上"
                 "那件……算了，先不提。請隨意看吧，喜歡哪一件，我拿出來讓你對著光瞧。"
                 "」"
             ),
@@ -260,7 +260,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_alchemist",
         DialogueDefinition(
             greeting=(
-                "鍊金坊的希碧拉·灰沼從一整牆瓶罐後面探出頭，指尖還沾著草綠色：「哪裡"
+                "鍊金坊的希碧拉‧灰沼從一整牆瓶罐後面探出頭，指尖還沾著草綠色：「哪裡"
                 "受傷了？還是先備著，以防萬一？說吧，我聽著。」"
             ),
             responses=ALCHEMIST_RESPONSES,
@@ -270,7 +270,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_merchant_hall",
         DialogueDefinition(
             greeting=(
-                "商會公所的尤斯汀·柯德溫會長從稅率長桌後起身，向你略一點頭：「歡迎來"
+                "商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向你略一點頭：「歡迎來"
                 "到商會公所。閣下若想了解商隊、商路或公所的事務，本人樂意說明。另外請"
                 "閣下先知道一件事，公所不發委託。」"
             ),

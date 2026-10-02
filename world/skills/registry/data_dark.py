@@ -23,7 +23,7 @@ from world.skills.registry.vocab import (
 )
 
 ROWS: tuple[SkillDef, ...] = (
-        # 暗 — 學徒（詛咒路線・根）
+        # 暗 — 學徒（詛咒路線‧根）
         _spell(
             "weaken",
             "衰弱術",
@@ -37,7 +37,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="dark",
             effect_policies=(EffectPolicy(),),
         ),
-        # 暗 — 術師（詛咒路線・分支點）
+        # 暗 — 術師（詛咒路線‧分支點）
         _spell(
             "curse",
             "詛咒術",
@@ -52,7 +52,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("weaken", 3),),
             effect_policies=(EffectPolicy(),),
         ),
-        # 暗 — 大師（詛咒路線・純減益分支）
+        # 暗 — 大師（詛咒路線‧純減益分支）
         _spell(
             "curse_spread",
             "詛咒擴散",
@@ -67,7 +67,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("curse", 3),),
             effect_policies=(EffectPolicy(),),
         ),
-        # 暗 — 賢者（詛咒路線・控場分支終點）
+        # 暗 — 賢者（詛咒路線‧控場分支終點）
         _spell(
             "dark_dominion",
             "黑暗支配",
@@ -82,7 +82,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("curse_spread", 5),),
             effect_policies=(EffectPolicy(),),
         ),
-        # 暗 — 大師（詛咒路線・侵蝕分支）
+        # 暗 — 大師（詛咒路線‧侵蝕分支）
         _spell(
             "shadow_torture",
             "暗影之刑",
@@ -97,7 +97,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("curse", 3),),
             effect_policies=(EffectPolicy(coefficient=2.0), EffectPolicy()),
         ),
-        # 暗 — 賢者（詛咒路線・深層侵蝕）
+        # 暗 — 賢者（詛咒路線‧深層侵蝕）
         _spell(
             "shadow_blight",
             "暗影侵蝕",
@@ -112,7 +112,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("shadow_torture", 8),),
             effect_policies=(EffectPolicy(coefficient=2.8), EffectPolicy()),
         ),
-        # 暗 — 主宰（詛咒路線・處決匯合支）
+        # 暗 — 主宰（詛咒路線‧處決匯合支）
         _spell(
             "underworld_judgment",
             "冥界審判",
@@ -132,7 +132,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 暗 — 學徒（吞噬路線・根）
+        # 暗 — 學徒（吞噬路線‧根）
         _spell(
             "shadow_bolt",
             "暗影箭",
@@ -176,7 +176,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("dark_burst", 3),),
             effect_policies=(EffectPolicy(coefficient=1.4), EffectPolicy()),
         ),
-        # 暗 — 賢者（吞噬路線・處決）
+        # 暗 — 賢者（吞噬路線‧處決）
         _spell(
             "abyss_devour",
             "深淵吞噬",
@@ -196,7 +196,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 暗 — 主宰（吞噬路線・毀滅＋自癒）
+        # 暗 — 主宰（吞噬路線‧毀滅＋自癒）
         _spell(
             "void_annihilation",
             "虛空湮滅",
@@ -217,7 +217,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(),
             ),
         ),
-        # 暗 — 神格（兩根匯合頂點・樹冠）
+        # 暗 — 神格（兩根匯合頂點‧樹冠）
         _spell(
             "abyssal_apotheosis",
             "深淵神格",

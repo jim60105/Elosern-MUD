@@ -60,10 +60,10 @@
   label: 潮退
   severity: harmful
 - code: ebbing_deep
-  label: 潮退·深流
+  label: 潮退‧深流
   severity: harmful
 - code: ebbing_maelstrom
-  label: 潮退·漩渦
+  label: 潮退‧漩渦
   severity: harmful
 - code: suffocated
   label: 窒息
@@ -102,10 +102,10 @@
   label: 裂縫
   severity: harmful
 - code: earth_fissure_quake
-  label: 裂縫·地震
+  label: 裂縫‧地震
   severity: harmful
 - code: earth_fissure_apex
-  label: 裂縫·神格
+  label: 裂縫‧神格
   severity: harmful
 - code: gale_step_haste
   label: 疾風
@@ -123,10 +123,10 @@
   label: 擊退
   severity: harmful
 - code: displaced_tempest
-  label: 擊退·暴風
+  label: 擊退‧暴風
   severity: harmful
 - code: displaced_apotheosis
-  label: 擊退·神格
+  label: 擊退‧神格
   severity: harmful
 - code: lightning_static_ward
   label: 靜電護罩
@@ -162,13 +162,13 @@
   label: 凍結
   severity: harmful
 - code: ice_freeze_tundra
-  label: 凍結·凍土
+  label: 凍結‧凍土
   severity: harmful
 - code: ice_freeze_nightfall
-  label: 凍結·長夜
+  label: 凍結‧長夜
   severity: harmful
 - code: ice_freeze_apotheosis
-  label: 凍結·神格
+  label: 凍結‧神格
   severity: harmful
 - code: ice_prison
   label: 定身
@@ -243,7 +243,7 @@
   label: 守護直覺防禦提升
   severity: beneficial
 - code: reincarnation_boon_yuka_agility_bonus
-  label: 轉生祝福·悠花敏捷提升
+  label: 轉生祝福‧悠花敏捷提升
   severity: beneficial
 - code: dual_wield_style_atk_phys_bonus
   label: 雙持劍術攻擊提升

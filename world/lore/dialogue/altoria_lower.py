@@ -23,7 +23,7 @@ here carries exactly four.
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 西格瑪·庫柏 — the eatery (staple_meals). A cooper's son who started by
+# 西格瑪‧庫柏 — the eatery (staple_meals). A cooper's son who started by
 # cooking for barge crews; plain, short sentences, asks whether you have
 # eaten. He names the goods he deals in and leaves prices and counts to
 # the counter's list (merchant-dialogue: live stock owns those facts).
@@ -52,7 +52,7 @@ EATERY_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 蘿溫·古橡 — the 醉月酒館, the lane's information room (招募同伴、打聽情報).
+# 蘿溫‧古橡 — the 醉月酒館, the lane's information room (招募同伴、打聽情報).
 # Teasing, unhurried, answers with a question. Her table points at what
 # already works here (talking to anyone in the room, inviting a traveller
 # met out in the world to come along) and sells nothing: the cups are scenery, no drink does anything, no gamble pays
@@ -85,7 +85,7 @@ TAVERN_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 溫弗蕾德·古林 — the 爐火旅店. Gentle, orderly, calls the young 「孩子」.
+# 溫弗蕾德‧古林 — the 爐火旅店. Gentle, orderly, calls the young 「孩子」.
 # Her rooms are the narrative home of resting, sleeping and quiet practice,
 # and she speaks of them as a landlady would, never as commands. Resting
 # works here as anywhere; she quotes no rate, no bill and no stay entitlement
@@ -115,7 +115,7 @@ LODGING_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 伊莎貝爾·葦沼 — the 公共浴場管理員. Fast, loud, exclamatory; curious
+# 伊莎貝爾‧葦沼 — the 公共浴場管理員. Fast, loud, exclamatory; curious
 # about the elven custom, never contemptuous. Her job is the two sides and
 # the order between them (docs/lore/settlement-locations.md), and the
 # room's content is the contrast the document keeps for story. She runs no
@@ -147,7 +147,7 @@ BATHHOUSE_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 托瓦德·鄧堡 — the 衛兵駐所 captain behind the 南門. Clipped, orders his
+# 托瓦德‧鄧堡 — the 衛兵駐所 captain behind the 南門. Clipped, orders his
 # directions 「第一、第二」, hates being asked twice. His table orients the
 # traveller who has just come through the arch with real street names. He
 # posts no
@@ -191,7 +191,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_eatery",
         DialogueDefinition(
             greeting=(
-                "餐館老闆西格瑪·庫柏用圍裙擦著手，從灶後探出頭來：「喔，客人！吃飯了"
+                "餐館老闆西格瑪‧庫柏用圍裙擦著手，從灶後探出頭來：「喔，客人！吃飯了"
                 "沒？湯還熱著喔，麵包跟帶出城的乾糧也都有。今天有什麼、還剩幾份，櫃檯"
                 "上的單子都寫著，看中哪樣跟我說一聲就好。外面打到什麼好肉，也可以拿來給我瞧一下啦"
                 "。來，先坐。」"
@@ -203,7 +203,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_tavern",
         DialogueDefinition(
             greeting=(
-                "醉月酒館的蘿溫·古橡把抹布往肩上一甩，靠著吧台打量你：「唷，新面孔嘛"
+                "醉月酒館的蘿溫‧古橡把抹布往肩上一甩，靠著吧台打量你：「唷，新面孔嘛"
                 "。我這兒就一條規矩，在這裡講的話，不會害到講話的人。想打聽什麼就自己"
                 "找人聊；路上碰到聊得來、又想一起走的人，開口約就是了。消息啊，都在客人"
                 "嘴裡，你不開口問，誰會跟你說？」"
@@ -215,7 +215,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_lodging",
         DialogueDefinition(
             greeting=(
-                "爐火旅店的溫弗蕾德·古林從櫃檯後站起來，腰間的鑰匙叮噹作響：「歡迎啊"
+                "爐火旅店的溫弗蕾德‧古林從櫃檯後站起來，腰間的鑰匙叮噹作響：「歡迎啊"
                 "，孩子，一路辛苦了吧。樓上有房間，每間都有門閂。想歇一下，樓下火塘邊"
                 "有椅子；想睡個好覺，床單我才剛換過。要是想趁安靜練個劍、溫習一下咒"
                 "文，房裡也很安靜喔。」"
@@ -227,7 +227,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_bathhouse",
         DialogueDefinition(
             greeting=(
-                "公共浴場管理員伊莎貝爾·葦沼抱著一大疊布巾從水氣裡鑽出來，上下瞄了你"
+                "公共浴場管理員伊莎貝爾‧葦沼抱著一大疊布巾從水氣裡鑽出來，上下瞄了你"
                 "一眼：「新來的吧！男生左邊、女生右邊，各走各的門，這裡就這一條規矩！"
                 "池子是燒熱的河水，深的淺的都有。要問什麼快問，我還有一堆布巾沒摺！」"
             ),
@@ -238,7 +238,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_guardhouse",
         DialogueDefinition(
             greeting=(
-                "衛兵隊長托瓦德·鄧堡從值房的窗邊轉過身，胸前的銅牌映著火盆的光：「剛"
+                "衛兵隊長托瓦德‧鄧堡從值房的窗邊轉過身，胸前的銅牌映著火盆的光：「剛"
                 "從南門進來的？這一帶由我負責。問路，我告訴你；問規矩，我也告訴你。另"
                 "外，駐所牆上沒有委託單，要找工作，請到冒險者公會。」"
             ),

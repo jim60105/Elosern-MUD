@@ -1,6 +1,6 @@
 """The adventure guild's authored dialogue row (the guild-hall counter).
 
-One table: the ``guild_staff`` row spoken by 葛里安·衛登, the 阿爾托利亞分會
+One table: the ``guild_staff`` row spoken by 葛里安‧衛登, the 阿爾托利亞分會
 branch master behind the counter, keyed by the ``dialogue_key`` the
 guild-hall place row authors. The table is written against the branch
 master's persona card in ``world/lore/npc_profiles/altoria_guild.py``; the
@@ -61,7 +61,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "guild_staff",
         DialogueDefinition(
             greeting=(
-                "櫃檯後的分會會長葛里安·衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記"
+                "櫃檯後的分會會長葛里安‧衛登擱下羽毛筆，抬眼看你：「歡迎來到冒險者公會阿爾托利亞分會，冒險者。你是來登記"
                 "，還是來交委託？還沒登記"
                 "的話，請先在這本名冊上留下名字，從 F 級開始。登記之後，到大廳"
                 "那面任務板挑一張合你階級的委託單，拿來櫃檯讓我登記。辦完了回到"

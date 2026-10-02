@@ -3,7 +3,7 @@
 Every trading place in the village is a private home, not a storefront: a
 villager who happens to make or collect things trades from their own
 dwelling. The room names use the given name alone — a village refers to a
-neighbour's house by the neighbour, not by the full 名·姓 form — and the
+neighbour's house by the neighbour, not by the full 名‧姓 form — and the
 titles deliberately avoid 老闆 / 店主: those words denote commercial
 establishments, which this settlement does not have.
 
@@ -44,7 +44,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(1, 3),  # 長老古樹下
         doorway_key_zh="艾莉妮斯的家",
         doorway_aliases=("elenis", "elenis's home"),
-        host_name="艾莉妮斯·達恩斯特瑞德爾",
+        host_name="艾莉妮斯‧達恩斯特瑞德爾",
         host_title="暗影谷村長老",
         host_race="elf",
         host_subrace="ciaran",
@@ -67,7 +67,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(2, 3),  # 銀葉坡
         doorway_key_zh="格威娜拉的家",
         doorway_aliases=("gwenaera", "gwenaera's home"),
-        host_name="格威娜拉·希爾維爾莉夫",
+        host_name="格威娜拉‧希爾維爾莉夫",
         host_title="暗影谷村綴飾者",
         host_race="elf",
         host_subrace="ciaran",
@@ -94,7 +94,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(2, 1),  # 練刀場
         doorway_key_zh="海莉爾的家",
         doorway_aliases=("hailiel", "hailiel's home"),
-        host_name="海莉爾·斯塔爾法爾",
+        host_name="海莉爾‧斯塔爾法爾",
         host_title="暗影谷村鑄刃者",
         host_race="elf",
         host_subrace="ciaran",
@@ -120,7 +120,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(1, 0),  # 溪畔小徑
         doorway_key_zh="拉瑞內斯的家",
         doorway_aliases=("lareneth", "lareneth's home"),
-        host_name="拉瑞內斯·妮特布倫",
+        host_name="拉瑞內斯‧妮特布倫",
         host_title="暗影谷村花饌好手",
         host_race="elf",
         host_subrace="ciaran",
@@ -147,7 +147,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(3, 1),  # 藥草園
         doorway_key_zh="妮瑞斯的家",
         doorway_aliases=("nireth", "nireth's home"),
-        host_name="妮瑞斯·米斯特瓦勒",
+        host_name="妮瑞斯‧米斯特瓦勒",
         host_title="暗影谷村調藥者",
         host_race="elf",
         host_subrace="ciaran",
@@ -186,7 +186,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(2, 1),  # 練刀場
         doorway_key_zh="泰莉爾的家",
         doorway_aliases=("teliel", "teliel's home"),
-        host_name="泰莉爾·菲溫德",
+        host_name="泰莉爾‧菲溫德",
         host_title="暗影谷村刀術導師",
         host_race="elf",
         host_subrace="ciaran",
@@ -208,7 +208,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(1, 2),  # 村北古樹下
         doorway_key_zh="瓦爾溫的家",
         doorway_aliases=("valwyn", "valwyn's home"),
-        host_name="瓦爾溫·斯蒂爾瓦特爾",
+        host_name="瓦爾溫‧斯蒂爾瓦特爾",
         host_title="暗影谷村蒐羅者",
         host_race="elf",
         host_subrace="ciaran",
@@ -234,7 +234,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(2, 2),  # 織房坡
         doorway_key_zh="維特希爾的家",
         doorway_aliases=("vethiel", "vethiel's home"),
-        host_name="維特希爾·威爾德布瑞亞爾",
+        host_name="維特希爾‧威爾德布瑞亞爾",
         host_title="暗影谷村織衣者",
         host_race="elf",
         host_subrace="ciaran",

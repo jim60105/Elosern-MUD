@@ -45,7 +45,7 @@ NATION_REGISTRY: dict[str, Nation] = {
     ),
     "valhalla": Nation(
         "valhalla", "瓦爾哈拉獸王國", "capital_valhalla",
-        "Tribal federation", "beastfolk", 9_000_000, 0.25, "雷克斯·銀牙",
+        "Tribal federation", "beastfolk", 9_000_000, 0.25, "雷克斯‧銀牙",
         "Universal military duty supports mobilization of about 500,000 warriors.",
         "A hunting, herding, and mining federation that values nature and strength.",
     ),

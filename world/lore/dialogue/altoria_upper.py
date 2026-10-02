@@ -19,7 +19,7 @@ here carries exactly four.
 
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 
-# 艾莉安娜·寒水 — the 主祭 of the 光明神殿. Her counter is the dais: worship,
+# 艾莉安娜‧寒水 — the 主祭 of the 光明神殿. Her counter is the dais: worship,
 # blessing, the rite of joining the church, and straight answers about what
 # this building is. The source document binds her register
 # (docs/lore/settlement-locations.md §神殿／聖所): worship, the sanctum's
@@ -48,12 +48,12 @@ TEMPLE_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
     KeywordResponse(
         "商店",
-        "「商店在裡廳，由聖所執事羅海西亞·芬威克看管。受洗聖水、禮儀器物與修"
+        "「商店在裡廳，由聖所執事羅海西亞‧芬威克看管。受洗聖水、禮儀器物與修"
         "道用的物件，都在她的櫃上。挑選物品請問她，祝禱的事再回來問我。」",
     ),
 )
 
-# 羅海西亞·芬威克 — the 聖所執事. Her remit is the sanctum's ministry
+# 羅海西亞‧芬威克 — the 聖所執事. Her remit is the sanctum's ministry
 # arrangements and the shop that supplies it, and her voice is a friendly
 # shopkeeper's: what is it for, who is it for, here is how to use it. The
 # goods are the sanctum_wares bundle (the intimacy goods plus 受洗聖水); she
@@ -86,7 +86,7 @@ SANCTUM_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 古利安·鷹守 — the 貴族區衛所 captain, on duty and formal. The document's
+# 古利安‧鷹守 — the 貴族區衛所 captain, on duty and formal. The document's
 # 守門衛兵隊長 belongs to a restriction the capital deliberately does not ship
 # (a lock on an empty room is a wall, not a mystery), so his whole office is
 # the open door: the quarter is walkable to anyone and there is nothing to
@@ -107,7 +107,7 @@ NOBLE_WATCH_RESPONSES: tuple[KeywordResponse, ...] = (
     KeywordResponse(
         "衛所",
         "「本衛所負責三件事，巡邏的班次、防火的水源，以及各家報來的瑣事。下城"
-        "的街道與城門歸南門的衛兵隊長托瓦德·鄧堡管，我們換班時會互通消息；這"
+        "的街道與城門歸南門的衛兵隊長托瓦德‧鄧堡管，我們換班時會互通消息；這"
         "一區的街面，我可以回答。」",
     ),
     KeywordResponse(
@@ -118,7 +118,7 @@ NOBLE_WATCH_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 伊沃·高丘 — the 校場 instructor, colloquial and blunt. The yard adds no
+# 伊沃‧高丘 — the 校場 instructor, colloquial and blunt. The yard adds no
 # mechanism: practice works wherever a person stands, and the yard is simply
 # where the city comes to drill where the standard is visible. He promises
 # no drill bonus, no sparring partner and no exam of his own; rank trials
@@ -148,7 +148,7 @@ DRILL_YARD_RESPONSES: tuple[KeywordResponse, ...] = (
     ),
 )
 
-# 奧德溫·薩契 — the 王立魔法學院院長, formal and lecturing. The capital's
+# 奧德溫‧薩契 — the 王立魔法學院院長, formal and lecturing. The capital's
 # lore-reveal table (docs/lore/settlement-locations.md §魔法學院與圖書館): he
 # answers the rank ladder (every rung and its example spells) and the eight
 # elements as subject matter, matching docs/lore/magic-system.md. His 拜師
@@ -195,7 +195,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_temple",
         DialogueDefinition(
             greeting=(
-                "講台邊的艾莉安娜·寒水主祭合上經冊，晨光從她背後的高窗落進大殿：「願"
+                "講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她背後的高窗落進大殿：「願"
                 "平安與你同在，旅人。日課、祝禱，或是想問的事，都可以在這裡說。這座神"
                 "殿同時是禮拜堂、聖所與聖所的商店，三處都敞開著，你想問哪一處，我都會"
                 "回答。」"
@@ -207,7 +207,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_sanctum",
         DialogueDefinition(
             greeting=(
-                "裡廳櫃檯後的羅海西亞·芬威克執事把帳頁翻了個面，抬頭笑了笑：「歡迎喔"
+                "裡廳櫃檯後的羅海西亞‧芬威克執事把帳頁翻了個面，抬頭笑了笑：「歡迎喔"
                 "！是自己用，還是要送人呢？聖水、禮器、貼身用的都有，價錢寫在櫃邊的牌"
                 "子上，隨意挑。聖所那邊的安排，也可以問我。」"
             ),
@@ -218,7 +218,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_noble_watch",
         DialogueDefinition(
             greeting=(
-                "貴族區衛所的古利安·鷹守隊長從登記桌後抬起頭，推了推眼鏡：「訪客，貴"
+                "貴族區衛所的古利安‧鷹守隊長從登記桌後抬起頭，推了推眼鏡：「訪客，貴"
                 "族區不設關卡，進出無須登記。本衛所負責街面的巡守，若有需要詢問的事，"
                 "請說。」"
             ),
@@ -229,7 +229,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_drill_yard",
         DialogueDefinition(
             greeting=(
-                "校場的伊沃·高丘從練習樁那頭走回來，小臂上還沾著土：「來看熱鬧，還是"
+                "校場的伊沃‧高丘從練習樁那頭走回來，小臂上還沾著土：「來看熱鬧，還是"
                 "來練的啦？話說在前頭，我這裡沒有捷徑，只有這片土、那排樁子，還有幾句"
                 "練法。」"
             ),
@@ -240,7 +240,7 @@ ROWS: tuple[tuple[str, DialogueDefinition], ...] = (
         "altoria_academy",
         DialogueDefinition(
             greeting=(
-                "學院長廳的黑板前，奧德溫·薩契院長擦去一行算式，回頭看見你便放下粉筆"
+                "學院長廳的黑板前，奧德溫‧薩契院長擦去一行算式，回頭看見你便放下粉筆"
                 "：「歡迎。此刻沒有開課，但隨時可以提問。等級、元素、親和，你想從哪裡"
                 "問起？學院傳授的是知識，捷徑這裡沒有。」"
             ),
