@@ -375,7 +375,9 @@ class GalleryPresenterTests(EvenniaTest):
         a, b = self.make_session(), self.make_session()
         selected = "portrait:monster:t_beast"
         with patch("web.webclient.presentation.gallery_selection.log_info") as event:
-            self.assertEqual(select_gallery_subject(a, self.actor, selected)["outcome"], "success")
+            res = select_gallery_subject(a, self.actor, selected)
+            self.assertEqual(res["outcome"], "success")
+            self.assertNotIn("affected_panels", res)
             select_gallery_subject(a, self.actor, selected)
             event.assert_called_once_with("gallery_panel_selected", context={"subject": selected, "kind": "portrait:monster"})
         self.assertIsNone(gallery_selection_snapshot(b, self.actor))

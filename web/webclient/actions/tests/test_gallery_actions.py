@@ -126,7 +126,6 @@ for (const x of [NaN, Infinity, -Infinity]) assert.throws(() => p.validateGaller
   image_id: '12345678-1234-1234-1234-123456789abc', face_rect: {x, y: 0, w: 1, h: 1}}));
 """], cwd=ROOT, check=True)
 
-
 class GalleryActionIntegrationTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -188,11 +187,40 @@ class GalleryActionIntegrationTests(EvenniaTest):
         validate_ui_action_result(result)
         return result
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_all_six_actions_declare_uniform_affected_panels_registered_in_production(self):
+        self.assertEqual(actions.AFFECTED_GALLERY_PANELS, ("gallery", "art", "roster"))
+        registry = build_production_registry()
+        for name in actions.AFFECTED_GALLERY_PANELS:
+            self.assertIn(name, registry.panel_names)
+        card = self.card()
+        pair = {"subject_key": SUBJECT, "image_id": card["image_id"]}
+        operations = [
+            ("gallery.subject.select", {"subject_key": SUBJECT}),
+            ("gallery.generate", {"subject_key": SUBJECT, "fields": [], "custom_prompt": ""}),
+            ("gallery.default.set", pair),
+            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0, "y": 0, "w": 1, "h": 1})),
+            ("gallery.binding.save", dict(pair, slots=["armor"])),
+            ("gallery.card.delete", pair),
+        ]
+        for action, payload in operations:
+            with self.subTest(action=action):
+                spec = self.action_registry.spec(action)
+                adapter = spec.adapter
+                res = adapter(self.actor, payload, self.transport)
+                self.assertEqual(res["affected_panels"], actions.AFFECTED_GALLERY_PANELS)
+                self.assertEqual(res["outcome"], "success")
+                rej = adapter(self.actor, dict(payload, subject_key="portrait:character:t_absent"), self.transport)
+                self.assertEqual(rej["affected_panels"], actions.AFFECTED_GALLERY_PANELS)
+                self.assertEqual(rej["outcome"], "rejected")
+
     def panel(self):
         updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
         self.assertEqual(len(updates), 1)
         self.assertNotIn("ui_snapshot", self.sent[0])
-        self.assertEqual(set(updates[0]["panels"]), {"gallery"})
+        self.assertEqual(set(updates[0]["panels"]), {"gallery", "art", "roster"})
         self.assertEqual(updates[0]["revision"], self.sent[-1]["ui_action_result"][0][0]["presentation_revision"])
         return updates[0]["panels"]["gallery"]
 
@@ -409,7 +437,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 result = adapter(self.actor, payload, self.transport)
                 self.assertEqual(result["code"], code)
                 self.assertEqual(result["outcome"], "rejected")
-                self.assertEqual(result["affected_panels"], ("gallery",))
+                self.assertEqual(result["affected_panels"], ("gallery", "art", "roster"))
                 self.assertLessEqual(len(result["message"]), 64)
                 self.assertNotIn("bad", result["message"])
                 warn.assert_called_once()
@@ -450,6 +478,11 @@ class GalleryActionIntegrationTests(EvenniaTest):
             with self.subTest(action=action), patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
                 result = self.dispatch(action, payload)
                 self.assertEqual(result["outcome"], "success")
+                updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
+                self.assertEqual(len(updates), 1)
+                self.assertNotIn("ui_snapshot", self.sent[0])
+                self.assertEqual(set(updates[0]["panels"].keys()), {"gallery", "art", "roster"})
+                self.assertEqual(updates[0]["revision"], result["presentation_revision"])
                 self.assertEqual(info.call_count, 1)
                 self.assertEqual(info.call_args.args, ("gallery_action",))
                 context = info.call_args.kwargs["context"]
