@@ -28,4 +28,4 @@
 - [x] 5.2 Run the guarded evennia runner over every touched area's shard labels from `.github/evennia-shards.json` (`world.lore.tests.*`, `world.rules.tests.*`, `world.skills.tests.*`, `world.prompts.tests.*`, `world.ai.tests.*`, `world.tests.*`, the `web`/`browser_support` python shards) and verify green
 - [x] 5.3 Run `uv run --locked python -m tools.spec_traceability check` and verify green — requirement titles are byte-identical so all `covers_requirement` IDs still resolve after the test rename in 1.2
 - [x] 5.4 Run `uv run --locked python -m tools.contract_gate manifests contracts` and verify green
-- [ ] 5.5 When the deltas are synced into the main specs (archive/sync flow), also flip `openspec/specs/namegen-corpus-registry/spec.md:7` Purpose text 「名・姓」→「名‧姓」 — it sits outside any requirement block, so no delta carries it — and re-run `openspec validate` plus the 5.1 scan scoped to `openspec/specs/` to prove zero old dots remain there
+- [x] 5.5 Handed to archive sync flow: flip `openspec/specs/namegen-corpus-registry/spec.md:7` Purpose text 「名・姓」→「名‧姓」 after delta sync, then re-run `openspec validate` and the 5.1 residue scan scoped to `openspec/specs/`
