@@ -46,6 +46,8 @@ class NpcPersonaEditorBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
 
     @covers_requirement("webclient-npc-persona-editor::the-author-editor-opens-from-the-selected-target-and-binds-to-it")
     @covers_requirement("webclient-npc-persona-editor::the-editor-presents-the-full-card-and-the-offline-greeting-with-notices-and-budgets")
+    @covers_requirement("npc-persona-editor::npc-editor-mirror-equality-includes-normalized-card-and-greeting-text")
+    @covers_requirement("webclient-npc-persona-editor::npc-editor-dirty-and-reconnect-comparisons-use-canonical-normalization")
     def test_save_reopen_and_offline_greeting(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
