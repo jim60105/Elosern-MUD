@@ -23,8 +23,8 @@ Every outbound HTTP request the server itself makes at runtime SHALL carry a `Us
 
 ### Requirement: The configured identity falls back to the documented default
 When `HTTP_USER_AGENT` is absent, present-but-empty, or whitespace-only, every governed request SHALL carry the documented code default `elosern-mud/1.0`, never an empty header value: an empty `User-Agent` is the same class of edge-rejection failure this configuration exists to avoid, so the empty-string sentinel used by the generation free-text knobs SHALL NOT be available here.
+(On the LLM transport, an explicit profile-configured `User-Agent` mapping entry continues to win over this fallback identity, preserving the overlay precedence rule.)
 
-#### Scenario: Unset setting ships the documented default
 - **WHEN** the settings module is imported with `HTTP_USER_AGENT` absent from the environment
 - **THEN** the effective setting equals the documented default `elosern-mud/1.0`
 

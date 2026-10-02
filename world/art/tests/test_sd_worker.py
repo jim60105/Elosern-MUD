@@ -534,6 +534,54 @@ class TransportTests(unittest.TestCase):
         self.assertNotIn("hunter2", str(ctx.exception))
 
     @covers_requirement(
+        "outbound-http-identity::every-runtime-outbound-http-request-carries-the-configured-user-agent"
+    )
+    @covers_requirement(
+        "outbound-http-identity::the-configured-identity-falls-back-to-the-documented-default"
+    )
+    def test_http_request_carries_user_agent_header_and_falls_back_on_blank(self):
+        # POST case (_http_json)
+        conn_post = FakeConnection("sd.example", 7860)
+        conn_post.script(FakeResponse(200, b"{}"))
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=10, HTTP_USER_AGENT="custom-agent/9"
+        ):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                return_value=conn_post,
+            ):
+                _http_json("http://sd.example:7860/sdapi/v1/txt2img", b"{}")
+        self.assertEqual(conn_post.calls[0]["headers"]["User-Agent"], "custom-agent/9")
+
+        # GET case (_http_request)
+        conn_get = FakeConnection("sd.example", 7860)
+        conn_get.script(FakeResponse(200, b"[]"))
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=10, HTTP_USER_AGENT="custom-agent/9"
+        ):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                return_value=conn_get,
+            ):
+                _http_request("http://sd.example:7860/sdapi/v1/samplers", None)
+        self.assertEqual(conn_get.calls[0]["headers"]["User-Agent"], "custom-agent/9")
+
+        # Blank fallback cases (empty string and whitespace-only fall back to default)
+        for blank in ("", "   ", "\t  "):
+            with self.subTest(blank=blank):
+                conn_blank = FakeConnection("sd.example", 7860)
+                conn_blank.script(FakeResponse(200, b"{}"))
+                with override_settings(
+                    ART_SD_TIMEOUT_SECONDS=10, HTTP_USER_AGENT=blank
+                ):
+                    with patch(
+                        "world.art.sd_worker.http.client.HTTPConnection",
+                        return_value=conn_blank,
+                    ):
+                        _http_json("http://sd.example:7860/sdapi/v1/txt2img", b"{}")
+                self.assertEqual(conn_blank.calls[0]["headers"]["User-Agent"], "elosern-mud/1.0")
+
+    @covers_requirement(
         "art-sd-server-integration::the-sd-webui-client-enumerates-server-options-through-bounded-get-calls"
     )
     def test_per_call_timeout_override_bounds_connect_and_reads(self):

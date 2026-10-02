@@ -116,6 +116,12 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `MAX_NR_CHARACTERS` | `ELOSERN_MAX_CHARACTERS` | 整數 | `5` | 1 到 10 包含兩端（拒絕低於 1 或高於 10）；帳號可擁有的角色數量上限 |
 
+### 外發 HTTP 身份標識
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `HTTP_USER_AGENT` | `HTTP_USER_AGENT` | 自由文字 | `elosern-mud/1.0` | 去除前後空白之字串；伺服器外發 HTTP 請求（提示詞翻譯下載、sd-webui worker、LLM 客戶端）所攜帶之 User-Agent 標頭。未設定、空白或僅含空白字元時回退至預設值（不允許送出空標頭） |
+
 驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
 **衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名：`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。
@@ -155,8 +161,10 @@ profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Eve
 （`openrouter` → 巢狀 `reasoning` 物件、`vllm` →
 `chat_template_kwargs.enable_thinking`、`off` → 不發送）。標頭部分，非空的
 `api_key`／`app_title`／`app_url` 分別衍生 `Authorization: Bearer …`／
-`X-Title`／`HTTP-Referer`，profile 明設的 `headers` 最後覆寫（同名的明設
-標頭獲勝）。所有可省略欄位未設定時，預設設定的線上位元組與配置前的客戶端
+`X-Title`／`HTTP-Referer`，並由 `world/http_identity.py` 衍生 `User-Agent`
+（值來自 `HTTP_USER_AGENT` 設定），profile 明設的 `headers` 最後覆寫
+（同名的明設標頭獲勝，不分大小寫）。所有可省略欄位未設定時，除新增的
+`User-Agent` 標頭外，預設設定的線上位元組與配置前的客戶端
 完全相同。
 
 | 環境變數 | 設定／欄位 | 型別 | 預設值 | 驗證規則／說明 |

@@ -34,7 +34,7 @@ The client SHALL build the request headers passed to the transport by first deri
 - **THEN** the failure representation, the safe log line, and every message observable by the calling layer contain no trace of the key
 
 ### Requirement: A default profile produces an unchanged wire format
-When every optional endpoint-configuration field of the profile holds its omit default (empty string or `None`), the serialized request body SHALL equal the pre-configuration client's byte-for-byte, and the serialized headers SHALL equal the profile's frozen mapping plus exactly one additional derived `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting, so existing local endpoints observe no difference from the endpoint-configuration change other than the declared client identity added by `outbound-http-identity`.
+When every optional endpoint-configuration field of the profile holds its omit default (empty string or `None`), the serialized request body SHALL equal the pre-configuration client's byte-for-byte, and the serialized headers SHALL equal the profile's frozen mapping plus exactly one additional derived `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting (when no explicit `User-Agent` mapping entry was present in the profile), so existing local endpoints observe no difference from the endpoint-configuration change other than the declared client identity added by `outbound-http-identity`.
 
 #### Scenario: Byte identity under defaults
 - **WHEN** the client serializes a request under a profile with no optional field set

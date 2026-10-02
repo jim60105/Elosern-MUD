@@ -43,6 +43,7 @@ from typing import Any
 from django.conf import settings
 
 from world.observability import log_info, log_warn
+from world.http_identity import user_agent_headers
 from world.observability.sanitize import safe_endpoint
 
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -278,6 +279,7 @@ def _http_request(
     if payload is not None:
         headers["Content-Type"] = "application/json"
     headers.update(_basic_auth_header())
+    headers.update(user_agent_headers())
     method = "POST" if payload is not None else "GET"
     timeout = min(budget, remaining)
     if parsed.scheme == "https":

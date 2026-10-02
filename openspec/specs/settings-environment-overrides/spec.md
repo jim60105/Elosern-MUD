@@ -13,7 +13,7 @@ developer guide as the documentation of record.
 ### Requirement: Deployment settings accept typed environment overrides
 `server/conf/settings.py` SHALL derive the initial value of every deployment-tunable setting it
 declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`,
-`ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` groups from an environment
+`ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT` groups from an environment
 variable, using typed conversion at settings import. The env-backed set is exactly:
 `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, `ART_SD_CFG_SCALE`, `ART_SD_SAMPLER`,
 `ART_SD_SCHEDULER`, `ART_SD_CHECKPOINT`, `ART_SD_STYLES`, `ART_SD_MODULES`,
@@ -25,7 +25,7 @@ variable, using typed conversion at settings import. The env-backed set is exact
 `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`,
 `ART_TRANSLATE_DOWNLOAD_ENABLED`, `ART_TRANSLATE_THREADS`,
 `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`,
-`ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, and `DEFEAT_ADULT_SCENES` — each from a
+`ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT` — each from a
 variable of the same name — plus
 `ART_SD_BASE_URL` from
 `SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec. No other setting in these groups
@@ -36,7 +36,10 @@ pair `ART_SD_USERNAME`/`ART_SD_PASSWORD` in particular SHALL NOT (see their own 
 (`DEFEAT_ADULT_SCENES` is not an addition of this change: the exact-set statement here repairs
 a pre-existing omission — the setting has read its same-named environment variable in
 `settings.py`, been popped by `test_settings.py`, and been carried by the AST inventory
-contract test since before this change; the specification text simply never listed it.)
+contract test since before this change; the specification text simply never listed it.
+`HTTP_USER_AGENT` IS an addition of this change: the User-Agent is deployment-tunable request
+identity, neither a credential nor an import-executing dotted path, so the standing
+never-environment-configurable classes do not reach it.)
 Conversion rules: integers for `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, the four
 `ART_SD_{SCENE,PORTRAIT}_{WIDTH,HEIGHT}` dimensions, `ART_SD_MAX_RESPONSE_BYTES`,
 `ART_SD_MAX_IMAGE_DIMENSIONS`, `ART_SD_MAX_IMAGE_PIXELS`, `ART_SCHEDULER_INTERVAL_SECONDS`, and
@@ -63,12 +66,16 @@ case-insensitive membership in the closed set
 `bria-rmbg`);
 free-text strings for `ART_SD_SAMPLER`, `ART_SD_SCHEDULER`, `ART_SD_CHECKPOINT`,
 `ART_SD_STYLES`, and `ART_SD_MODULES`, whose empty value means "the server's default" (for the
-two list knobs, "the field is omitted from the request"). The four dimensions SHALL additionally
+two list knobs, "the field is omitted from the request"), and a stripped free-text string for
+`HTTP_USER_AGENT` with documented default `elosern-mud/1.0`, whose absent-or-blank value means
+that documented default rather than an empty sentinel — the header must never ship empty.
+The four dimensions SHALL additionally
 be positive multiples of 8. `ELOSERN_MAX_CHARACTERS` SHALL be the initial value of Evennia's
 `MAX_NR_CHARACTERS` setting, defaulting to `5`. A variable that is absent, or present-but-empty
 for typed, boolean,
 choice, and URL knobs, SHALL yield the documented code default; present-but-empty for a
-free-text knob SHALL yield the empty "server default" value. For the same-named set, the
+free-text knob SHALL yield the empty "server default" value, except that present-but-empty (or
+whitespace-only) for `HTTP_USER_AGENT` SHALL yield its documented default. For the same-named set, the
 `.env.example` entry, the error message, and the setting SHALL be one string.
 
 The test settings bootstrap `server/conf/test_settings.py` SHALL remove every env-backed
@@ -89,7 +96,7 @@ model download even when the shipped backend resolves against an unseeded direct
   `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
   `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`,
   `ART_TRANSLATE_DOWNLOAD_ENABLED=True`, `ART_TRANSLATE_THREADS=0`,
-  `DEFEAT_ADULT_SCENES=True`, and `MAX_NR_CHARACTERS=5`), and the server starts
+  `DEFEAT_ADULT_SCENES=True`, `HTTP_USER_AGENT=elosern-mud/1.0`, and `MAX_NR_CHARACTERS=5`), and the server starts
 
 #### Scenario: Valid overrides coerce to typed values
 - **WHEN** the settings module is imported with `ART_SD_PROBE_TIMEOUT_MS=2000` and
@@ -129,6 +136,17 @@ model download even when the shipped backend resolves against an unseeded direct
 #### Scenario: An empty dimension value falls back instead of poisoning the request
 - **WHEN** `ART_SD_SCENE_WIDTH` is present but empty in the environment
 - **THEN** `ART_SD_SCENE_WIDTH` equals the documented default rather than an empty or zero value
+
+#### Scenario: A blank user-agent override falls back to the documented identity
+- **WHEN** the settings module is imported with `HTTP_USER_AGENT` present but empty, then
+  separately whitespace-only, then separately absent
+- **THEN** each import yields the documented default `elosern-mud/1.0`, never an empty value
+
+#### Scenario: A user-agent override is used stripped and verbatim
+- **WHEN** the settings module is imported with `HTTP_USER_AGENT` set to a non-blank value
+  padded with surrounding spaces
+- **THEN** the effective setting is that value stripped of the surrounding whitespace and
+  otherwise byte-for-byte unchanged, with no case folding and no character rejection
 
 #### Scenario: Inherited deployment variables cannot perturb a test run
 - **WHEN** the test settings module is imported with `ART_SD_PROBE_TIMEOUT_MS=1` and
