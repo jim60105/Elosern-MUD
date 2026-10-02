@@ -6,7 +6,7 @@ Parses the vendored CC BY 4.0 fantasy-namegen corpus under
 fail fast on deviating corpus data (translit coverage, pool/mapping
 non-emptiness, longest composed display name vs the creation name validator).
 Composition constants (``NAME_SEPARATOR``) and the display-name helper live
-here so consumers never re-derive the 「名・姓」 shape.
+here so consumers never re-derive the 「名‧姓」 shape.
 
 This module is settings-required: invariant 3 reaches the real
 ``world.rules.character_creation._validate_name`` through a function-local
@@ -25,8 +25,8 @@ from typing import Any, Mapping
 
 from .races import RACE_REGISTRY
 
-# The only composition constant in the registry layer (design D7): 「名・姓」.
-NAME_SEPARATOR = "・"  # U+30FB KATAKANA MIDDLE DOT
+# The only composition constant in the registry layer (design D7): 「名‧姓」.
+NAME_SEPARATOR = "‧"  # U+2027 HYPHENATION POINT
 
 _GIVEN_POOLS = ("m", "f", "u")
 
@@ -243,6 +243,6 @@ NAME_PACK_REGISTRY, NAME_PACK_BY_RACE = _build_registry(
 
 
 def compose_display_name(given: NamePart, surname: NamePart) -> str:
-    """The player-visible display name: 「名・姓」, Chinese renderings only."""
+    """The player-visible display name: 「名‧姓」, Chinese renderings only."""
 
     return f"{given.zh}{NAME_SEPARATOR}{surname.zh}"
