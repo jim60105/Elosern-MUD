@@ -65,10 +65,6 @@
       "reason": "nation data contract"
     },
     {
-      "path": "world/lore/tests/test_npc_persona_bundles.py",
-      "reason": "offline persona bundle data contract"
-    },
-    {
       "path": "world/lore/tests/test_npc_profile_inventory.py",
       "reason": "shipped NPC source inventory data contract"
     },

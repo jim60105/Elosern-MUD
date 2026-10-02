@@ -190,13 +190,52 @@ class NpcPersonaServiceTest(EvenniaTest):
         self.assertIsInstance(res, NpcPersonaUnavailable)
         self.assertEqual(res.reason, "corrupt_meta")
 
+        # Retired offline_bundle provenance fails closed on read
+        retired_prov = {"kind": "offline_bundle", "pool": "pool_civilians", "bundle": "old_bundle"}
+        self.npc.db.persona = normalize_card(self.valid_card_raw).to_record()
+        self.npc.db.npc_persona_meta = {"format": 1, "generation": 1, "persona_version": 1, "provenance": retired_prov}
+        res = read_npc_persona(self.npc)
+        self.assertIsInstance(res, NpcPersonaUnavailable)
+        self.assertEqual(res.reason, "corrupt_meta")
+
+        # Retired offline_bundle fails closed on update (both changed and unchanged submissions)
+        update_res = update_npc_persona(self.npc, self.valid_card_raw, expected_version=1)
+        self.assertEqual(update_res.status, "unavailable")
+        self.assertEqual(update_res.reason, "corrupt_meta")
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 1)
+
+        changed_card = dict(self.valid_card_raw)
+        changed_card["appearance"] = "新的外觀描述。"
+        update_res2 = update_npc_persona(self.npc, changed_card, expected_version=1)
+        self.assertEqual(update_res2.status, "unavailable")
+        self.assertEqual(update_res2.reason, "corrupt_meta")
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 1)
+
         # Valid read
         self.npc.db.npc_persona_meta = {"format": 1, "generation": 1, "persona_version": 1, "provenance": self.provenance}
         res = read_npc_persona(self.npc)
         self.assertIsInstance(res, NpcPersonaSnapshot)
         self.assertEqual(res.version, 1)
 
+    @covers_requirement("npc-persona-card::npc-persona-metadata-is-a-separate-record")
+    def test_initialize_rejects_retired_offline_bundle_provenance(self) -> None:
+        """initialize_npc_persona rejects retired offline_bundle provenance without writing."""
+        retired_prov = {"kind": "offline_bundle", "pool": "pool_civilians", "bundle": "old_bundle"}
+        with self.assertRaises(NpcCardError) as ctx:
+            initialize_npc_persona(self.npc, self.valid_card_raw, retired_prov)
+        self.assertEqual(ctx.exception.code, "invalid_provenance")
+
+        # Attributes left untouched
+        self.assertFalse(self.npc.attributes.has("persona"))
+        self.assertFalse(self.npc.attributes.has("npc_persona_meta"))
+        self.assertIsNone(current_persona_version(self.npc))
+
+        res = read_npc_persona(self.npc)
+        self.assertIsInstance(res, NpcPersonaUnavailable)
+        self.assertEqual(res.reason, "missing_card")
+
     @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    @covers_requirement("npc-persona-editor::npc-editor-mirror-equality-includes-normalized-card-and-greeting-text")
     def test_boundary_only_and_crlf_card_and_greeting_resave_is_no_op(self) -> None:
         """Boundary-only whitespace and CRLF vs LF card/greeting resave succeeds unchanged with same version."""
         initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
