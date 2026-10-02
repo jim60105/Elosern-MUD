@@ -21,6 +21,7 @@ from web.webclient.presentation.exploration import (
 from web.webclient.presentation.protocol import ProtocolValidationError
 from world.rules.clock import get_world_clock
 from world.rules.npc_persona import initialize_npc_persona, is_card_available
+from web.webclient.presentation.affordances import exploration_affordances, _resolve_single_host
 
 
 class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
@@ -182,3 +183,116 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
         validated = validate_exploration(max_payload)
         self.assertEqual(len(validated["interact"]), MAX_INTERACT_TARGETS)
         self.assertEqual(len(validated["interact"][0]["affordances"]), MAX_AFFORDANCES)
+
+
+class ExplorationVisibilityTargetPublicationTest(EvenniaTest):
+    """Interaction publication and shared target visibility filtering (npc-persona-visible-targets)."""
+
+    def setUp(self):
+        super().setUp()
+        get_world_clock()
+        self.room = create_object(Room, key="大廳")
+        self.player = create_object(PlayerCharacter, key="探索玩家")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+
+    def _context(self, actor=None):
+        return PresentationContext(actor=actor or self.player, protocol_version=1)
+
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_denied_targets_never_publish_and_never_probe_card_availability(self):
+        visible_npc = create_object(NPC, key="可見NPC", location=self.room)
+        initialize_npc_persona(
+            visible_npc,
+            {"identity": {"public": "侍者", "hidden": ""}, "appearance": "外貌", "personality": "性格", "speech_style": "口氣", "life_story": "經歷", "habit": "習慣", "social_connection": ""},
+            {"kind": "profile", "profile": "p1"},
+        )
+
+        view_denied_npc = create_object(NPC, key="隱形NPC", location=self.room)
+        view_denied_npc.locks.add("view:false();search:true()")
+
+        search_denied_npc = create_object(NPC, key="無法搜尋NPC", location=self.room)
+        search_denied_npc.locks.add("view:true();search:false()")
+
+        denied_monster = create_object(Monster, key="隱形怪物", location=self.room)
+        denied_monster.locks.add("view:false()")
+
+        real_is_card = is_card_available
+
+        def card_probe_spy(npc):
+            if npc.id in {view_denied_npc.id, search_denied_npc.id}:
+                raise AssertionError(f"Excluded target {npc.id} had its card availability probed!")
+            return real_is_card(npc)
+
+        with patch("world.rules.npc_persona.is_card_available", side_effect=card_probe_spy):
+            payload = exploration_presenter(self._context())
+            validated = validate_exploration(payload)
+
+        interact_ids = [t["identity"] for t in validated["interact"]]
+        self.assertIn(visible_npc.id, interact_ids)
+        self.assertNotIn(view_denied_npc.id, interact_ids)
+        self.assertNotIn(search_denied_npc.id, interact_ids)
+        self.assertNotIn(denied_monster.id, interact_ids)
+
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_hidden_targets_cannot_crowd_out_visible_roster(self):
+        # Create MAX_INTERACT_TARGETS denied NPCs with lower/earlier IDs
+        denied_npcs = []
+        for i in range(MAX_INTERACT_TARGETS):
+            d_npc = create_object(NPC, key=f"隱形守衛_{i}", location=self.room)
+            d_npc.locks.add("view:false()")
+            denied_npcs.append(d_npc)
+
+        # Allowed target created after (higher ID)
+        visible_npc = create_object(NPC, key="最後的可見NPC", location=self.room)
+
+        payload = exploration_presenter(self._context())
+        validated = validate_exploration(payload)
+
+        interact_ids = [t["identity"] for t in validated["interact"]]
+        self.assertEqual(interact_ids, [visible_npc.id])
+
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_hidden_duplicate_merchant_does_not_disable_visible_host_navigation(self):
+        from typeclasses.components import Merchant
+        from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
+
+        visible_merchant = create_object(NPC, key="看得見的商人", location=self.room)
+        visible_merchant.components.add(
+            Merchant.create(visible_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        )
+
+        hidden_merchant = create_object(NPC, key="隱藏的商人", location=self.room)
+        hidden_merchant.locks.add("view:false()")
+        hidden_merchant.components.add(
+            Merchant.create(hidden_merchant, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY)
+        )
+
+        # _resolve_single_host finds the visible merchant uniquely
+        host = _resolve_single_host(self.player, Merchant)
+        self.assertEqual(host, visible_merchant)
+
+        payload = exploration_presenter(self._context())
+        validated = validate_exploration(payload)
+        self.assertEqual(len(validated["interact"]), 1)
+        target = validated["interact"][0]
+        self.assertEqual(target["identity"], visible_merchant.id)
+
+        nav_affordances = [a for a in target["affordances"] if a["kind"] == "navigate" and a.get("surface") == "shop"]
+        self.assertEqual(len(nav_affordances), 1)
+        self.assertTrue(nav_affordances[0]["enabled"])
+
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_overridden_room_policy_excludes_target(self):
+        from unittest.mock import patch
+        npc = create_object(NPC, key="受房間政策排除之NPC", location=self.room)
+
+        # Overridden room filter_visible that excludes the npc regardless of locks
+        def custom_filter_visible(objs, looker, **kwargs):
+            return [o for o in objs if o != npc and o != looker]
+
+        with patch.object(self.room, "filter_visible", side_effect=custom_filter_visible):
+            payload = exploration_presenter(self._context())
+            interact_ids = [t["identity"] for t in payload["interact"]]
+            self.assertNotIn(npc.id, interact_ids)

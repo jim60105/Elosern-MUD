@@ -90,6 +90,21 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "no_npc")
 
     @covers_requirement(
+        "webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates"
+    )
+    def test_hidden_recipient_rejects_without_delivering(self):
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
+        self.recipient.locks.add("view:false()")
+        result = _deliver_adapter(
+            self.player,
+            {"npc_id": int(self.recipient.pk), "item_key": _T_ITEM},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
+        self.assertEqual(result["message"], "這裡沒有這個對象。")
+        self.assertEqual(len(self.player.db.inventory), 2)
+
+    @covers_requirement(
         "quest-delivery::the-delivery-action-is-registered-with-an-exact-bounded-payload"
     )
     def test_success_delegates_to_the_shared_rule_and_reports_full_snapshot(self):

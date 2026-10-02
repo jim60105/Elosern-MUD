@@ -360,6 +360,25 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(len(client.calls), 0)
 
 
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_party_invite_hidden_target_rejects_without_ai_call(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        npc.locks.add("view:false()")
+        client = FakeLLMClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ):
+            result = _party_invite_adapter(
+                self.player, {"npc_id": int(npc.pk), "message": "一起走吧？"}
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
+        self.assertEqual(result["message"], "這裡沒有可以邀請的對象。")
+        self.assertEqual(len(client.calls), 0)
+        from world.rules.party import is_companion
+        self.assertFalse(is_companion(npc, self.player))
+
     @covers_requirement("webclient-exploration-menu::explore-party-leave-dismisses-a-bound-companion-without-affinity-change")
     def test_party_leave_dismisses_without_affinity_change(self):
         from world.rules.affinity import AffinitySource, apply_affinity_change
@@ -395,6 +414,18 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "no_npc")
 
 
+
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_engage_hidden_monster_rejects_without_combat(self):
+        monster = create_object(Monster, key="地精", location=self.room1)
+        monster.threat_tier = "low"
+        monster.locks.add("view:false()")
+
+        result = _engage_adapter(self.player, {"monster_id": int(monster.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_monster")
+        self.assertEqual(result["message"], "這裡沒有這個對象。")
+        self.assertFalse(is_in_active_session(self.player))
 
     # ------------------------------------------------------------------
     # explore.engage

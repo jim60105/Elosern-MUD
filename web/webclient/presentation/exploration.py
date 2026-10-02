@@ -547,10 +547,15 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
         return []
     guild_host = _resolve_single_host(actor, GuildStaff)
     shop_host = _resolve_single_host(actor, Merchant)
-    present = [
+    candidates = [
         obj
         for obj in location.contents
         if obj is not actor and isinstance(obj, (NPC, Monster))
+    ]
+    visible = location.filter_visible(candidates, actor)
+    present = [
+        obj
+        for obj in visible
     ]
     present.sort(key=lambda obj: (int(obj.pk),))
     possessed = is_possessed_actor(actor)

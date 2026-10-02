@@ -184,6 +184,19 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], REASON_POSSESSED_TALK)
         self.assertIsNone(companion.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates"
+    )
+    def test_forged_hidden_talk_target_rejects_without_dialogue_session(self):
+        host = self._scripted_host()
+        host.locks.add("view:false()")
+
+        result = _talk_open_adapter(self.player, {"npc_id": int(host.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
+        self.assertEqual(result["message"], "這裡沒有這個對象。")
+        self.assertIsNone(self.player.db.dialogue_session)
+
     # ------------------------------------------------------------------
     # Side-effect freedom
     # ------------------------------------------------------------------

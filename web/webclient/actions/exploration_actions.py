@@ -336,9 +336,9 @@ def _present_by_id(actor: Any, identity: int) -> Any | None:
     location = getattr(actor, "location", None)
     if location is None:
         return None
-    for obj in location.contents:
-        if int(obj.pk) == identity:
-            return obj
+    candidates = [obj for obj in location.contents if int(obj.pk) == identity]
+    for obj in location.filter_visible(candidates, actor):
+        return obj
     return None
 
 
