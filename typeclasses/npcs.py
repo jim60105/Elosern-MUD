@@ -626,16 +626,17 @@ class LLMNPC(NPC):
             return STALE_PERSONA
 
         if result.degraded:
-            from world.rules.dialogue import offline_greeting_for
+            from world.rules.dialogue import escape_evennia_greeting, resolve_greeting
 
-            greeting = offline_greeting_for(self)
+            greeting = resolve_greeting(self)
             if greeting is not None:
-                character.msg(f"{self.key}說：{greeting}")
+                speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
+                character.msg(f"{self.key}說：{speech}")
                 # The authored degrade line is still a presented exchange: the
                 # session observer records it, but only while the completion
                 # gate still passes (the pair is together and talk-allowed).
                 if settled_line is not None and intent_context_ok(self, character):
-                    settled_line(greeting)
+                    settled_line(greeting.text)
             return
 
         character.msg(f"{self.key}說：{result.reply.speech}")

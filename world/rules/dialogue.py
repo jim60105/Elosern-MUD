@@ -173,18 +173,51 @@ def misunderstood_line_for(npc: Any) -> str:
     return profile.voice.misunderstood or NO_UNDERSTANDING_LINE
 
 
-def offline_greeting_for(npc: Any) -> str | None:
-    """Resolve the single greeting for no-keyword and degraded presentation paths (design D3).
+@dataclass(frozen=True)
+class ResolvedGreeting:
+    """One resolved greeting line: its raw text and override status (change 23)."""
+
+    text: str
+    is_override: bool
+
+
+def escape_evennia_greeting(text: str) -> str:
+    """Escape an editable greeting for Evennia text-output boundaries.
+
+    Neutralizes Evennia ANSI codes (|/, |r, |n, ||) and MXP command/URL link
+    tokens (|lc...|lt...|le, |lu...|lt...|le) so they display as literal text
+    without linebreaks, styling, or link creation across telnet and webclient.
+    """
+    if not text:
+        return ""
+    import re
+
+    s = text.replace("{", "{{")
+
+    def _sub_pipe(m: re.Match[str]) -> str:
+        token = m.group(0)
+        if token in ("|lc", "|lt", "|le", "|lu"):
+            return "|||n" + token[1:]
+        return "||"
+
+    return re.sub(r"\|(?:lc|lt|le|lu)|\|", _sub_pipe, s)
+
+
+def resolve_greeting(npc: Any) -> ResolvedGreeting | None:
+    """Resolve the single greeting for no-keyword and degraded presentation paths.
 
     Precedence:
-    1. db.npc_offline_greeting (plain text, non-empty, verbatim)
+    1. db.npc_offline_greeting (plain text, non-empty, verbatim) -> is_override=True
     2. The authored default (``authored_greeting_for``): the dialogue table
-       greeting, else the profile greeting
+       greeting, else the profile greeting -> is_override=False
     """
     field = getattr(getattr(npc, "db", None), "npc_offline_greeting", None)
     if isinstance(field, str) and field:
-        return field
-    return authored_greeting_for(npc)
+        return ResolvedGreeting(text=field, is_override=True)
+    default = authored_greeting_for(npc)
+    if default is not None:
+        return ResolvedGreeting(text=default, is_override=False)
+    return None
 
 
 def authored_greeting_for(npc: Any) -> str | None:
@@ -192,7 +225,7 @@ def authored_greeting_for(npc: Any) -> str | None:
 
     The dialogue table greeting via ``greeting_for(npc)``, else the greeting of
     the profile named by the NPC's provenance, else ``None``. Never reads the
-    instance field, so it is exactly what ``offline_greeting_for`` answers once
+    instance field, so it is exactly what ``resolve_greeting`` answers once
     the field is cleared; the author editor previews it as the default.
     Read-only.
     """

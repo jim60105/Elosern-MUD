@@ -29,10 +29,11 @@ from world.rules.dialogue import (
     DIALOGUE_TABLE,
     clear_dialogue_session,
     dialogue_key_for,
-    offline_greeting_for,
+    escape_evennia_greeting,
     is_dialogue_host,
     live_dialogue_session,
     open_or_refresh_dialogue,
+    resolve_greeting,
     opens_dialogue,
     run_scripted_talk,
 )
@@ -528,14 +529,16 @@ def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None)
     if not opens_dialogue(npc):
         return _rejected("not_dialogue_host", "對方無法交談。")
 
-    line = offline_greeting_for(npc)
-    if line is None:
+    greeting = resolve_greeting(npc)
+    if greeting is None:
         # A greetingless host (an LLMNPC, or a table row with greeting=None)
         # opens on the fixed narration line instead of a quoted greeting.
         line = dialogue_open_fallback_line(npc.key)
         message = line
     else:
-        message = f"{npc.key}說：{line}"
+        line = greeting.text
+        speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
+        message = f"{npc.key}說：{speech}"
     open_or_refresh_dialogue(actor, npc, line)
     actor.msg(message)
     return _success("dialogue_opened", message, AFFECTED_FULL)

@@ -24,11 +24,14 @@ without causing state change except that a known-keyword answer SHALL grant +1 a
 applied by the deterministic talk writer in the same transaction as the answer; unknown keywords
 and no-keyword paths SHALL NOT write any state.
 `talk <npc>` without a keyword SHALL present the NPC's own non-empty offline-greeting field first,
-then the host's authored table greeting when one is configured, and the no-response line when
-neither exists; a known-keyword response and the no-understanding line SHALL NEVER consult the
-offline-greeting field. An NPC without any dialogue component SHALL keep yielding
-the no-response line unless its offline-greeting field is non-empty, in which case the no-keyword
-path presents that field. The
+then the host's authored table greeting when one is configured, then the greeting authored by
+the profile named in its persona provenance, and the no-response line only when every applicable
+source is absent. The instance override SHALL display literally at the text-output boundary;
+trusted authored defaults SHALL retain their existing formatting. A known-keyword response and
+the no-understanding line SHALL NEVER consult the offline-greeting field. An NPC without any
+dialogue component SHALL use the same instance-then-profile greeting precedence on the no-keyword
+path and SHALL yield no-response only when both are absent; this SHALL NOT add keyword
+conversation capability to a componentless NPC. The
 `guild_staff` host SHALL be the dialogue action exception: the keyword `回報`
 SHALL resolve the read-only reportable-quest listing through the deterministic
 guild service without granting the talk affinity, and `talk <guild-staff> 回報 <quest_id>` SHALL
@@ -52,11 +55,11 @@ turn-in paths are both bypassed for the blocked interaction.
 
 #### Scenario: An author-set offline greeting overrides the table greeting
 - **WHEN** an author has saved a non-empty offline-greeting field on a table-backed host and the player runs `talk <host>` without a keyword
-- **THEN** the host presents the field's text verbatim instead of its table greeting, and a known-keyword answer is still the authored table response
+- **THEN** the host presents the field's text literally instead of its table greeting, and a known-keyword answer is still the authored table response
 
 #### Scenario: Missing greeting falls back to the no-response line
 - **WHEN** the player runs `talk <scripted-host>` without a keyword, the host
-  has no configured greeting, and its offline-greeting field is empty
+  has no table or profile greeting, and its offline-greeting field is empty
 - **THEN** the player receives the no-response line and no state changes
 
 #### Scenario: Unknown keyword yields the no-understanding line
@@ -65,8 +68,14 @@ turn-in paths are both bypassed for the blocked interaction.
 - **THEN** the host gives the no-understanding line and no state changes
 
 #### Scenario: Componentless NPC still yields no response
-- **WHEN** the player talks to an NPC that carries neither dialogue component
+- **WHEN** the player talks without a keyword to an NPC that carries no dialogue component,
+  has an empty offline-greeting field, and has no applicable authored profile greeting
 - **THEN** the player receives the no-response line and no state changes
+
+#### Scenario: Clearing a componentless override restores the profile greeting
+- **WHEN** the player clears a componentless NPC's offline-greeting override and then talks
+  without a keyword to that NPC whose profile authors a greeting
+- **THEN** the authored profile greeting is presented with its trusted formatting and no talk state changes
 
 #### Scenario: Guild staff 回報 keyword lists reportable quests read-only
 - **WHEN** a registered player with completed, unclaimed quests talks to the
@@ -115,6 +124,26 @@ turn-in paths are both bypassed for the blocked interaction.
 #### Scenario: Card edits do not rewrite scripted lines
 - **WHEN** a profiled scripted host's runtime card is edited and the player then uses a known keyword, no keyword, and an unknown keyword
 - **THEN** the authored response, table greeting, and profile misunderstanding reply are returned unchanged
+
+### Requirement: Editable offline greeting text is literal at every speech output boundary
+A non-empty per-instance offline greeting SHALL be plain text on all no-keyword and degraded speech surfaces: scripted and componentless text commands, browser conversation-open narrative/action messages, and degraded generative-NPC speech. Its literal tokens, including color, newline and MXP command/URL markers and repeated pipes, SHALL NOT create formatting, extra lines or interactive links. Escaping SHALL occur only for the text-output surface, exactly once; storage, private editor fields, dialogue-session/OOB lines and settled-line observer values SHALL retain the normalized raw text. An editable override SHALL remain literal even if its text equals an authored default. Clearing the override SHALL restore the trusted authored table/profile default with its existing formatting. Known keywords and misunderstanding replies SHALL remain authored-only.
+
+#### Scenario: Markup-like override displays as literal speech
+- **WHEN** an author saves a valid greeting containing `|/`, `|r`, repeated pipes, an MXP command link and an MXP URL link, then uses each no-keyword or degraded speech surface
+- **THEN** the displayed override contains those literal tokens with no token-induced linebreak, color or actionable link and all raw storage/session/editor values remain unchanged
+
+#### Scenario: A degraded reply retains raw observer state
+- **WHEN** generative dialogue degrades for an NPC with an editable markup-like greeting and its existing completion gates pass
+- **THEN** speech is literal, the settled dialogue observer receives raw text, and persona/version, affinity and intents are unaffected by escaping
+
+#### Scenario: Matching default text does not grant formatting trust
+- **WHEN** an editable greeting equals a trusted default containing a color token
+- **THEN** the override displays that token literally, but clearing the field restores the authored default's normal color behavior
+
+#### Scenario: Browser republishing does not double escape
+- **WHEN** conversation-open stores a markup-like override and the dialogue panel is refreshed or restored after reconnect
+- **THEN** the raw OOB line displays as literal text without adding extra escape characters or interactive markup
+
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
 The dialogue-table registry SHALL be keyed by `dialogue_key` and SHALL hold only
 frozen `DialogueDefinition` values composed of an optional `greeting` and a

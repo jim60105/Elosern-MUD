@@ -15,9 +15,10 @@ from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
     dialogue_key_for,
-    offline_greeting_for,
+    escape_evennia_greeting,
     is_dialogue_host,
     open_or_refresh_dialogue,
+    resolve_greeting,
     run_scripted_talk,
 )
 from world.rules.guild import (
@@ -122,16 +123,18 @@ class CmdsTalk(Command):
             return
 
         if is_dialogue_host(npc):
-            greeting = offline_greeting_for(npc)
+            greeting = resolve_greeting(npc)
             if greeting is not None:
-                self.caller.msg(f"{npc.key}說：{greeting}\n{_USAGE}")
+                speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
+                self.caller.msg(f"{npc.key}說：{speech}\n{_USAGE}")
                 return
             self.caller.msg(_NO_RESPONSE)
             return
 
-        greeting = offline_greeting_for(npc)
+        greeting = resolve_greeting(npc)
         if greeting is not None:
-            self.caller.msg(f"{npc.key}說：{greeting}")
+            speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
+            self.caller.msg(f"{npc.key}說：{speech}")
             return
 
         self.caller.msg(_NO_RESPONSE)
