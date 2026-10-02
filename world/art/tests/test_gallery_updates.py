@@ -95,6 +95,7 @@ def _card_fields(subject, image_id=None, **overrides):
         ),
         "binding": None,
         "source": "generated",
+        "image_size": {"width": 768, "height": 1024},
     }
     fields.update(overrides)
     return fields
@@ -238,7 +239,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
                 self.assertEqual(_raw_cards(subject), before)
 
     @covers_requirement(
-        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
+        "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
     )
     def test_default_constant_rejected_on_non_square_card(self):
         subject = _character("rect_nonsquare_constant")
@@ -397,7 +398,7 @@ class CardBindingUpdateTests(EvenniaTestCase):
         stored = cards_for(subject)[0]
         self.assertEqual(stored["binding"], updated["binding"])
         # Placement metadata only: the face rect and default stay put.
-        self.assertEqual(stored["face_rect"], DEFAULT_FACE_RECT)
+        self.assertEqual(stored["face_rect"], {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375})
         self.assertEqual(record_for(subject).db.default_image_id, image_id)
         # A binding save never touches the card's file.
         self.assertTrue(image_file.exists())

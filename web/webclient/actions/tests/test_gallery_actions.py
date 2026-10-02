@@ -202,7 +202,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
             ("gallery.subject.select", {"subject_key": SUBJECT}),
             ("gallery.generate", {"subject_key": SUBJECT, "fields": [], "custom_prompt": ""}),
             ("gallery.default.set", pair),
-            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0, "y": 0, "w": 1, "h": 1})),
+            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3})),
             ("gallery.binding.save", dict(pair, slots=["armor"])),
             ("gallery.card.delete", pair),
         ]
@@ -334,7 +334,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])["face_rect"], rect)
 
     @covers_requirement(
-        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
+        "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
     )
     def test_non_square_face_rect_update_is_rejected(self):
         first = self.card()

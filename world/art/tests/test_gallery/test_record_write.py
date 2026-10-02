@@ -10,7 +10,6 @@ from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 from world.art import gallery_kinds
 from world.art.gallery import (
-    DEFAULT_FACE_RECT,
     GalleryRecord,
     GalleryRecordError,
     SLOT_ORDER,
@@ -124,7 +123,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             append_card(subject, **_card_fields(subject, image_id=image_id))
         self.assertEqual(len(cards_for(subject)), 1)
 
-    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
+    @covers_requirement("art-gallery-model::a-card-s-image-pixel-size-is-recorded-from-verified-bytes-at-append")
     def test_size_less_append_refuses(self):
         subject = _character("nosize")
         fields = _card_fields(subject)
@@ -156,8 +155,10 @@ class GalleryRecordWriteTests(EvenniaTestCase):
     def test_append_applies_the_shared_rect_and_stores_explicit_rects_verbatim(self):
         subject = _character("rects")
         stored = append_card(subject, **_card_fields(subject))
-        self.assertEqual(stored["face_rect"], DEFAULT_FACE_RECT)
-        explicit = {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}
+        # The append-time default is the size-fitted rect: on 768x1024 the
+        # pinned upper-half anchor scales h = 0.5 * 768 / 1024.
+        self.assertEqual(stored["face_rect"], {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375})
+        explicit = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         second = append_card(
             subject, **_card_fields(subject, face_rect=explicit)
         )
