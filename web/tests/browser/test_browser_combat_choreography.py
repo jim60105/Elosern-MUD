@@ -11,11 +11,14 @@ covered); the synthetic round is what lets a journey defeat the last foe in
 one attack.
 
 Motion is read from computed styles on the element that carries each gesture,
-polled on the store's own published stage, never from elapsed time, so a slow
-runner can only lengthen a window, never skip one.
+polled on the store's own published stage, never from elapsed time. Gesture
+witnesses come from a per-frame capture armed before the round plays, so a
+slow runner can only lengthen a window, never skip one.
 """
 
 from __future__ import annotations
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tools.spec_traceability import covers_requirement
 
@@ -176,6 +179,35 @@ def _foe_actor(ref: str) -> str:
     return f'[data-testid="foe-slot"][data-portrait-ref="{ref}"] [data-testid="stage-actor"]'
 
 
+# Pre-arms a per-frame gesture capture so a scheduling-delayed Python observer
+# can never miss a finite gesture window. The recorder samples each listed
+# actor's gesture on every animation frame from before the round plays, and
+# keeps the FIRST snapshot seen for each (selector, gesture) pair; `_wait_gesture`
+# then asserts on that captured frame rather than on a live element that may
+# already have moved past its act/pause window. It records; it never drives,
+# delays, or lengthens playback.
+_ARM_GESTURE_CAPTURE = """([sels, read]) => {
+  const key = '__c13cGestures';
+  if (!window[key]) {
+    window[key] = { seen: {} };
+    const readFn = new Function('return (' + read + ')')();
+    const tick = () => {
+      for (const sel of window[key].sels) {
+        const r = readFn(sel);
+        if (r && r.beat && !window[key].seen[sel + '|' + r.beat]) {
+          window[key].seen[sel + '|' + r.beat] = r;
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    window[key].sels = sels;
+    requestAnimationFrame(tick);
+  } else {
+    window[key].sels = sels;
+  }
+}"""
+
+
 class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
     """Design D4-D7: the beat gestures per level and the terminal-round hold."""
 
@@ -201,6 +233,12 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             "() => Number(getComputedStyle(document.querySelector('[data-testid=\"stage-combat-veil\"]')).opacity) === 1"
         )
+        # The recorder must sample from before the round plays, so it cannot
+        # miss a finite gesture window no matter how the runner schedules.
+        page.evaluate(
+            _ARM_GESTURE_CAPTURE,
+            [[PLAYER_ACTOR, *(_foe_actor(foe["portrait_ref"]) for foe in foes)], _GESTURE_OF],
+        )
         # The dock accepts the dispatch only once nothing is in flight.
         wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None and not s["dispatch"]["beatLocked"])
 
@@ -218,13 +256,26 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
         page.evaluate(_PLAY_ROUND, [env, kind, lines])
 
     def _wait_gesture(self, page, sel: str, gesture: str, timeout: int = 15000) -> dict:
-        handle = page.wait_for_function(
-            "([sel, g, read]) => { const r = (new Function('return ' + read))()(sel);"
-            " return r && r.beat === g ? r : null; }",
-            arg=[sel, gesture, _GESTURE_OF],
-            timeout=timeout,
-            polling="raf",
-        )
+        # Read the frame the in-page recorder captured, never a live element:
+        # by the time a loaded runner observes it, the gesture may have
+        # correctly finished. A timeout distinguishes "playback never reached
+        # the gesture" from "the recorder saw nothing" and reports the playback
+        # phase, so the failure names its own cause.
+        try:
+            handle = page.wait_for_function(
+                "([sel, g]) => window.__c13cGestures.seen[sel + '|' + g] || null",
+                arg=[sel, gesture],
+                timeout=timeout,
+                polling="raf",
+            )
+        except PlaywrightTimeoutError as exc:
+            seen = page.evaluate("() => Object.keys(window.__c13cGestures.seen)")
+            stage = self._stage(page)
+            raise AssertionError(
+                f"gesture {gesture!r} on {sel} was never captured in 15s of frames; "
+                f"recorder saw {seen}, playback phase={stage['phase']!r}, "
+                f"view hold={stage['viewHold']!r}"
+            ) from exc
         return handle.json_value()
 
     def _stage(self, page) -> dict:
