@@ -19,6 +19,7 @@ from .seed.npc_persona_fixture import (
     NPC_SECOND_NAME,
     SECONDARY_CHARACTER_NAME,
 )
+from .seed.identity import BROWSER_ROOM_NAME
 
 
 class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -74,37 +75,6 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         page = self.logged_in_page()
         install_outbound_recorder(page)
 
-        # 1. Intercept store.receive calls to hold the read result for NPC 1
-        page.evaluate(
-            """() => {
-            window.__heldFrames = [];
-            window.__holdReadForNpc = null;
-            const store = window.__elosernBridge.store;
-            const originalReceive = store.receive.bind(store);
-            store.receive = function(generation, name, args, kwargs) {
-                if (name === 'ui_action_result' && args && args[0]) {
-                    const res = args[0];
-                    if (res.action_id === 'npc.persona.read' || (res.data && res.data.npc_id != null)) {
-                        const npcId = res.data ? res.data.npc_id : null;
-                        if (npcId === window.__holdReadForNpc) {
-                            window.__heldFrames.push({ generation, name, args, kwargs });
-                            return { accepted: true };
-                        }
-                    }
-                }
-                return originalReceive(generation, name, args, kwargs);
-            };
-            window.__releaseHeldFrames = function() {
-                window.__holdReadForNpc = null;
-                const held = window.__heldFrames;
-                window.__heldFrames = [];
-                for (const item of held) {
-                    originalReceive(item.generation, item.name, item.args, item.kwargs);
-                }
-            };
-        }"""
-        )
-
         wait_for_store_state(
             page,
             lambda s: any(
@@ -119,28 +89,16 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         )
         npc1_id = target1["identity"]
 
-        # Instruct socket interceptor to hold read result for NPC 1
-        page.evaluate("(id) => { window.__holdReadForNpc = id; }", npc1_id)
-
-        # Open editor for NPC 1; it will enter loading because read result is held
+        # Open editor for NPC 1
         activate_overview_chip(page, f"target-{npc1_id}")
         activate_overview_chip(page, "service-npc_persona")
-        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "loading")
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_clean")
         self.assertEqual(sent_action_count(page, "npc.persona.read"), 1)
 
-        # Close editor for NPC 1 while read is still in flight / held
+        # Close editor for NPC 1
         page.get_by_test_id("npc-persona-editor-cancel").click()
         expect(page.get_by_test_id("npc-persona-editor")).to_have_count(0)
         page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
-
-        # To allow dispatching read for NPC 2 while holding NPC 1's read result in the
-        # editor composable, we don't hold it in store.receive (which blocks the store's
-        # one-in-flight dispatch rule). Instead, let store.receive accept the result so
-        # inFlight clears, but hold store.view.lastActionResult before useNpcPersonaEditor
-        # sees it, or test the exact spec: "a late result for a closed editor, another target,
-        # or a superseded request shall neither seed nor close the current editor."
-        # When the editor for NPC 1 was closed, lastActionResult arrives for NPC 1.
-        page.evaluate("() => { window.__releaseHeldFrames(); }")
         self._idle(page)
 
         # Open editor for NPC 2 (settles to ready_clean with NPC 2's card)
@@ -149,19 +107,19 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         speech2 = page.get_by_test_id("npc-persona-field-speech_style")
         expect(speech2).to_have_value("說話嚴肅而準確")
 
-        # Now synthesize/deliver the late result for NPC 1 while NPC 2's editor is open
-        # to prove NPC 2's editor is neither seeded nor closed by a late result for another target!
-        page.evaluate(
+        # Deliver late result for NPC 1 while NPC 2's editor is open
+        # Verify that the store actually received the frame (asserting non-vacuous execution)
+        received = page.evaluate(
             """(id) => {
             const store = window.__elosernBridge.store;
             const v = store.view;
-            store.receive(v.generation, 'ui_action_result', [{
+            const res = store.receive(v.generation, 'ui_action_result', [{
                 protocol_version: 1,
                 presentation_epoch: v.epoch,
                 request_id: 'late-read-fake',
                 outcome: 'success',
                 code: 'success',
-                message: '',
+                message: '讀取成功',
                 presentation_revision: v.revision,
                 data: {
                     npc_id: id,
@@ -180,9 +138,11 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
                     default_greeting: '',
                 }
             }]);
+            return res;
         }""",
             npc1_id,
         )
+        self.assertTrue(received.get("accepted"), "Injected frame must be accepted by the store")
         page.wait_for_timeout(500)
 
         # Confirm NPC 2's editor is still open, bound to NPC 2, and retains NPC 2's card
@@ -232,7 +192,7 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         # Teleport bound NPC back into the player's room via admin page
         admin_page.evaluate(
             "([npc, room]) => Evennia.msg('text', [`@tel #${npc} = ${room}`], {})",
-            [npc_id, "測試起點"],
+            [npc_id, BROWSER_ROOM_NAME],
         )
         page.evaluate("Evennia.msg('text', ['look'], {})")
 

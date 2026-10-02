@@ -162,37 +162,41 @@ def main() -> None:
         )
         return
 
-    # For standard play, #1 is a dummy superuser account so Evennia initial_setup
-    # wipe of superuser attributes does not touch BROWSER_ACCOUNT
-    superuser = create_account(
-        "admin_dummy",
-        "admin_dummy@example.test",
-        "AdminDummyPassword!2026",
-        typeclass=Account,
-        is_superuser=True,
-    )
-    dummy_char = create_object(PlayerCharacter, key="AdminDummyChar", nohome=True)
-    superuser.at_post_create_character(dummy_char)
-    dummy_char.db_account = superuser
-    dummy_room = create_object(Room, key="管理員暫存室", nohome=True)
-    dummy_char.location = dummy_room
-    dummy_char.home = dummy_room
-    dummy_char.save()
-    superuser.db._last_puppet = dummy_char
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
-    dummy_req = CharacterCreationRequest(
-        mode="preset",
-        preset_key="t_pale_wren" if synth else "t_pale_wren",
-        skip_portrait=True,
-    )
-    activate_player_character(superuser, dummy_char, dummy_req)
+    is_persona_test = os.environ.get("ELOSERN_BROWSER_NPC_PERSONA") == "1"
+
+    if is_persona_test:
+        # For NPC persona tests, #1 is an admin superuser account so Evennia initial_setup
+        # wipe of superuser attributes does not touch BROWSER_ACCOUNT, and admin actions (e.g. @tel)
+        # can be performed via admin_dummy without demoting browserplayer for other suites.
+        superuser = create_account(
+            "admin_dummy",
+            "admin_dummy@example.test",
+            "AdminDummyPassword!2026",
+            typeclass=Account,
+            is_superuser=True,
+        )
+        dummy_char = create_object(PlayerCharacter, key="AdminDummyChar", nohome=True)
+        superuser.at_post_create_character(dummy_char)
+        dummy_char.db_account = superuser
+        dummy_room = create_object(Room, key="管理員暫存室", nohome=True)
+        dummy_char.location = dummy_room
+        dummy_char.home = dummy_room
+        dummy_char.save()
+        superuser.db._last_puppet = dummy_char
+        dummy_req = CharacterCreationRequest(
+            mode="preset",
+            preset_key="t_pale_wren" if synth else "t_pale_wren",
+            skip_portrait=True,
+        )
+        activate_player_character(superuser, dummy_char, dummy_req)
 
     account = create_account(
         BROWSER_ACCOUNT_USERNAME,
         BROWSER_ACCOUNT_EMAIL,
         BROWSER_ACCOUNT_PASSWORD,
         typeclass=Account,
-        is_superuser=False,
+        is_superuser=not is_persona_test,
     )
     character = create_object(PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True)
     account.at_post_create_character(character)
