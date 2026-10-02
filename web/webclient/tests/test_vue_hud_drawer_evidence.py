@@ -113,7 +113,7 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         # accessory summary as four named positions in a compact two-column
         # square layout (restyle-inventory-equipment-slots). Since
         # realign-inventory-drawer-layout the section is titled `裝備` with the
-        # `真值 · 偽裝不影響` tag (never `裝備人偶`) and the square grid sits in
+        # `真值 ‧ 偽裝不影響` tag (never `裝備人偶`) and the square grid sits in
         # the mock's `.doll` flex row beside a 裝備描述 column whose labelled
         # entries carry the committed display names (slot label + name; every
         # accessory row groups under the 飾品 label), while the accessory

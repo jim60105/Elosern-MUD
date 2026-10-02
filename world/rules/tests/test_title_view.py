@@ -54,7 +54,7 @@ T_LODGING = "t_synth_lodging_friend"
 # production rank-ladder identifier (never a catalog token); everything the
 # view reads is authored here.
 T_RANK_F = GuildRank(
-    "F", 1, 10, 100, "Synthetic F-rank tasks.", T_FIRST, "霧鱗・灰秤", "合成公會考官"
+    "F", 1, 10, 100, "Synthetic F-rank tasks.", T_FIRST, "霧鱗‧灰秤", "合成公會考官"
 )
 
 # The starter epithet the (patched) guild-claim path banks.

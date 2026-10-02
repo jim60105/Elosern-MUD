@@ -184,7 +184,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         )
         # The reference draft's wording (index.html line 855).
         hint_text = hint.first.inner_text()
-        self.assertEqual(hint_text, "數字鍵 1–9 · Enter 執行 · Esc 返回")
+        self.assertEqual(hint_text, "數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回")
         self.assertNotIn("/ 聚焦指令列", hint_text)
         self.assertNotIn("方向鍵選擇", hint_text)
         # The draft's <kbd> structure: exactly two styled kbd elements.

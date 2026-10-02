@@ -295,9 +295,9 @@ class ResultEnvelopeTests(unittest.TestCase):
         "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
     )
     def test_success_may_carry_a_bounded_data_slot(self):
-        payload = _result(data={"display_name": "加斯帕・斯諾", "rank": 3})
+        payload = _result(data={"display_name": "加斯帕‧斯諾", "rank": 3})
         result = validate_ui_action_result(payload)
-        self.assertEqual(result["data"], {"display_name": "加斯帕・斯諾", "rank": 3})
+        self.assertEqual(result["data"], {"display_name": "加斯帕‧斯諾", "rank": 3})
         # A success result without the slot keeps the normalized shape exact.
         plain = validate_ui_action_result(_result())
         self.assertNotIn("data", plain)

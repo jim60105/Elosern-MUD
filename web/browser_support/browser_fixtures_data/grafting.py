@@ -51,7 +51,7 @@ def graft_synth_entry_rank() -> None:
         99,
         "Synthetic entry-rank tasks for the managed browser harness.",
         "t_synth_first_hunt",
-        "霧鱗・灰秤",
+        "霧鱗‧灰秤",
         "合成公會見習考官",
         examiner_profile_key=examiner_profile_key,
     )

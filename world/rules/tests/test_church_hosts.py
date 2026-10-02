@@ -1,9 +1,9 @@
 """Data-contract test: the clergy host, ChurchHost service attachment, and spawn-data arousal
 
-The one registered clergy roster row (艾莉安娜·寒水 high celebrant) must
+The one registered clergy roster row (艾莉安娜‧寒水 high celebrant) must
 resolve as a live service host with the ChurchHost capability attached
 through her profession blueprint and the raised initial arousal seeded into
-her spawn data; per owner decision the sanctum steward 羅海西亞·芬威克 stays a
+her spawn data; per owner decision the sanctum steward 羅海西亞‧芬威克 stays a
 plain merchant — no ChurchHost, no arousal seed — while both places keep the
 ``church`` venue kwarg the derived church-place set reads. Every other host
 stays clear of the clergy component, and place-driven-service-sync

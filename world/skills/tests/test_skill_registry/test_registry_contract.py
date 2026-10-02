@@ -499,7 +499,7 @@ class SkillRegistryTests(unittest.TestCase):
                 skill = SKILL_REGISTRY[key]
                 preset = PLAYER_PRESET_REGISTRY[preset_key]
                 self.assertIn(key, (*preset.active_skills, *preset.passive_skills))
-                self.assertEqual(skill.label, f"轉生祝福·{display_name}")
+                self.assertEqual(skill.label, f"轉生祝福‧{display_name}")
                 self.assertIs(skill.kind, SkillKind.PASSIVE)
                 self.assertEqual(skill.target_spec, TargetSpec.NONE)
                 self.assertEqual(skill.cost, {})

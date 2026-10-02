@@ -79,7 +79,7 @@ class AdapterDataSlotTests(unittest.TestCase):
         "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
     )
     def test_success_data_slot_emits_and_validates(self):
-        slot = {"display_name": "加斯帕・斯諾"}
+        slot = {"display_name": "加斯帕‧斯諾"}
         session = self._dispatch(
             lambda actor, payload, session=None: {
                 "outcome": "success",

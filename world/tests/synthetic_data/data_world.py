@@ -41,7 +41,7 @@ SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
         400,
         "Synthetic bronze-rank tasks.",
         "t_synth_bronze_badge",
-        "灰鱗・銅徽",
+        "灰鱗‧銅徽",
         "合成公會銅階考官",
     ),
     "t_silver": GuildRank(
@@ -51,7 +51,7 @@ SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
         4_000,
         "Synthetic silver-rank tasks.",
         "t_synth_silver_badge",
-        "霜鬃・銀環",
+        "霜鬃‧銀環",
         "合成公會銀階考官",
     ),
 }
@@ -62,7 +62,7 @@ SYNTH_GUILD_BRANCHES: dict[str, GuildBranch] = {
     "t_mossgate_branch": GuildBranch(
         "t_mossgate_branch",
         "苔徑公會合成分部",
-        "霧鱗・灰秤",
+        "霧鱗‧灰秤",
         "苔徑分部會長",
         "t_hollow_tarn",
     ),
@@ -182,7 +182,7 @@ SYNTH_NAME_PACKS: dict[str, NamePack] = {
         race_key="t_duskmari",
         surnames=(NamePart("Tarnwick", "澤紋", "合成語源：湖畔"),),
         given=FrozenDict({"u": (NamePart("Vesk", "維斯克", "合成語源：微光"),)}),
-        naming_note_zh="合成語料：名・姓。",
+        naming_note_zh="合成語料：名‧姓。",
     ),
 }
 
@@ -264,7 +264,7 @@ SYNTH_PLACES: dict[str, PlaceDefinition] = {
 SYNTH_SHOPS: dict[str, ShopDefinition] = {
     "t_mossgate_stall": ShopDefinition(
         key="t_mossgate_stall",
-        host_name="霧鱗・灰秤",
+        host_name="霧鱗‧灰秤",
         host_title="苔徑市集合成攤主",
         assortment_keys=("t_mossgate_goods",),
     ),

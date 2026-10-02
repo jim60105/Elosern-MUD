@@ -187,7 +187,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
                 self.assertLessEqual(card["time"]["bottom"], card["card"]["bottom"])
                 self.assertEqual(card["ruleHidden"], "true")
                 self.assertEqual(card["before"], "none")
-                self.assertEqual(card["text"], "春季 3 日 · 12:00")
+                self.assertEqual(card["text"], "春季 3 日 ‧ 12:00")
                 self.assertGreaterEqual(card["size"], 12)
                 self.assertIn("Noto Sans TC", card["family"])
                 self.assertIn("tabular-nums", card["numeric"])

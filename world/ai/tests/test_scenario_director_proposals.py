@@ -124,7 +124,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
             role="librarian",
             tier=_npc_tier_key(),
             disposition=None,
-            display_name="莉絲·晨星",
+            display_name="莉絲‧晨星",
             age=68,
             apparent_age=68,
             portrait=portrait,

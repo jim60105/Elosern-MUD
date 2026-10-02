@@ -36,7 +36,7 @@ _DROP = object()
 
 def _entry(**overrides):
     entry = {
-        "display_name": "莉絲·晨星",
+        "display_name": "莉絲‧晨星",
         "title": "城鎮圖書館員",
         "persona": occupant_card_record(),
     }
@@ -83,7 +83,7 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_valid_age_values_pass(self):
         entry = _entry(
-            display_name="莉絲·晨星",
+            display_name="莉絲‧晨星",
             age=68,
             apparent_age=68,
             portrait={"stable_key": "library_keeper"},
@@ -316,7 +316,7 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         for entry in (
             _entry(no_identity=True),  # both fields missing
             _entry(no_identity=True, title="城鎮圖書館員"),  # name missing
-            _entry(no_identity=True, display_name="莉絲·晨星"),  # title missing
+            _entry(no_identity=True, display_name="莉絲‧晨星"),  # title missing
             _entry(display_name=None),
             _entry(title=None),
             _entry(title="含 空白"),
@@ -336,15 +336,15 @@ class CharacterizationDuplicateKeyTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_identical_characterization_under_a_shared_key_validates(self):
         entries = [
-            _entry(display_name="莉絲·晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
-            _entry(display_name="莉絲·晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
+            _entry(display_name="莉絲‧晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
+            _entry(display_name="莉絲‧晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
         ]
         self.assertEqual(duplicate_stable_key_errors(entries), [])
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_conflicting_characterization_under_a_shared_key_rejects(self):
         entries = [
-            _entry(display_name="莉絲·晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
+            _entry(display_name="莉絲‧晨星", age=68, apparent_age=68, portrait={"stable_key": "library_keeper"}),
             _entry(display_name="另一個人", age=69, apparent_age=69, portrait={"stable_key": "library_keeper"}),
         ]
         self.assertTrue(duplicate_stable_key_errors(entries))

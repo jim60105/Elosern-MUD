@@ -140,13 +140,13 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         validate = _VALIDATORS["npc_characterization"]
         # Missing identity fields are named guardrail failures now.
         self.assertTrue(validate(_payload({})))
-        self.assertTrue(validate(_payload({"display_name": "非庫名・自取"})))
+        self.assertTrue(validate(_payload({"display_name": "非庫名‧自取"})))
         # A bank-external authored pair (rolled name adapted freely) validates.
         self.assertEqual(
             validate(
                 _payload(
                     {
-                        "display_name": "非庫名・自取",
+                        "display_name": "非庫名‧自取",
                         "title": "邊境嚮導",
                         "persona": occupant_card_record(),
                     }
@@ -176,4 +176,6 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         )
         # The rolled names exist only inside the returned message strings.
         self.assertIn(_expected_bank(user["content"]), system["content"])
-        self.assertNotIn("・", user["content"])
+        for unwanted in ("\u00b7", "\u30fb", "\uff65"):
+            self.assertNotIn(unwanted, user["content"])
+            self.assertNotIn(unwanted, system["content"])
