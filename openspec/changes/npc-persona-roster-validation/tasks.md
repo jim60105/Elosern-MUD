@@ -2,8 +2,8 @@ Apply on branch `feat/npc-persona-roster-validation` in worktree `.worktrees/npc
 
 ## 1. Validation module
 
-- [ ] 1.1 Implement `derive_shipped_sources()` and `validate_npc_roster()` in `world/rules/npc_roster_validation.py` per design D1/D2 (all violations collected), resolving `starting_companion` sources through the shared partner-preset derivation of `npc-persona-companion-profiles`; verify `world/rules/tests/test_npc_roster_validation.py` with synthetic registries: missing profile, invalid template card, table answered by zero/two hosts, missing misunderstanding reply, companion partner preset with empty `speech_style` or `greeting`, orphan profile, inventory mismatch both directions, and multiple violations in one failure.
-- [ ] 1.2 Add a data-contract test that the shipped roster validates (first docstring line `Data-contract test: …`, registered in `tools/test_data_freeze.json`) and switch the profile-registry inventory test to `derive_shipped_sources()`; verify both labels and `uv run --locked python -m tools.test_data_lint check`.
+- [x] 1.1 Implement `derive_shipped_sources()` and `validate_npc_roster()` in `world/rules/npc_roster_validation.py` per design D1/D2 (all violations collected), resolving `starting_companion` sources through the shared partner-preset derivation of `npc-persona-companion-profiles`; verify `world/rules/tests/test_npc_roster_validation.py` with synthetic registries: missing profile, invalid template card, table answered by zero/two hosts, missing misunderstanding reply, companion partner preset with empty `speech_style` or `greeting`, orphan profile, inventory mismatch both directions, and multiple violations in one failure.
+- [x] 1.2 Add a data-contract test that the shipped roster validates (first docstring line `Data-contract test: …`, registered in `tools/test_data_freeze.json`) and switch the profile-registry inventory test to `derive_shipped_sources()`; verify both labels and `uv run --locked python -m tools.test_data_lint check`.
 
 ## 2. Boot step
 
