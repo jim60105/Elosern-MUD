@@ -41,6 +41,9 @@ def _env_path(name: str, default: str) -> str:
 
 SERVERNAME = "Elosern Browser Test"
 
+# Account capacity: matches production default so multi-character fixtures can create characters
+MAX_NR_CHARACTERS = 5
+
 # The production settings register the project-authored trait types that the
 # combat/sexual handlers require; without them any materialization of a
 # project trait (for example ``SexualState``'s ``ordered_level``) fails.
