@@ -90,6 +90,10 @@ export function editFaceRectField(rect, field, value, dims = null) {
   return { ...rect };
 }
 
+export function squareFaceRectFromCenter(rect, dims) {
+  return refitFaceRectOnLoad(rect, dims);
+}
+
 export function refitFaceRectOnLoad(rect, dims) {
   if (!dims || !dims.width || !dims.height) {
     return { ...rect };
