@@ -48,7 +48,7 @@ describe("ReadingSample", () => {
     await nextTick();
     const sample = wrapper.get('[data-testid="settings-sample"]');
     expect(sample.attributes("data-typing")).toBe("true");
-    expect(wrapper.get('[data-testid="settings-sample-caption"]').text()).toBe("標準 · 每秒 45 字");
+    expect(wrapper.get('[data-testid="settings-sample-caption"]').text()).toBe("標準 ‧ 每秒 45 字");
     await run(400);
     const midway = shownLength(wrapper);
     expect(midway).toBeGreaterThan(0);
@@ -63,9 +63,9 @@ describe("ReadingSample", () => {
 
   it("shows the line at once for 瞬間 and whenever the motion level is not 完整", async () => {
     for (const [props, caption] of [
-      [{ textSpeed: "instant", motionLevel: "full" }, "瞬間 · 立即顯示"],
-      [{ textSpeed: "slow", motionLevel: "reduced" }, "動態效果「減少」· 立即顯示"],
-      [{ textSpeed: "slow", motionLevel: "off" }, "動態效果「關閉」· 立即顯示"],
+      [{ textSpeed: "instant", motionLevel: "full" }, "瞬間 ‧ 立即顯示"],
+      [{ textSpeed: "slow", motionLevel: "reduced" }, "動態效果「減少」‧ 立即顯示"],
+      [{ textSpeed: "slow", motionLevel: "off" }, "動態效果「關閉」‧ 立即顯示"],
     ]) {
       const w = mount(ReadingSample, { props });
       await nextTick();

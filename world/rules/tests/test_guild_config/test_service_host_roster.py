@@ -34,7 +34,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # guild row's two kwargs stay pinned exactly as they shipped.
     FORMER_YAML_ROWS = (
         {
-            "name": "葛里安·衛登",
+            "name": "葛里安‧衛登",
             "title": "阿爾托利亞分會會長",
             "profession": "guild_staff",
             "anchor_room": "altoria_guild_hall",
@@ -43,7 +43,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             "dialogue_key": "guild_staff",
         },
         {
-            "name": "瑪爾特·金秤",
+            "name": "瑪爾特‧金秤",
             "title": "阿爾托利亞雜貨商店老闆",
             "profession": "merchant",
             "anchor_room": "altoria_general_store",
@@ -213,7 +213,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     # earlier rows drifts while the roster grows.
     PRE_CHANGE_BASELINE = (
         {
-            "name": "葛里安·衛登",
+            "name": "葛里安‧衛登",
             "title": "阿爾托利亞分會會長",
             "profession": "guild_staff",
             "anchor_room": "altoria_guild_hall",
@@ -224,7 +224,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "瑪爾特·金秤",
+            "name": "瑪爾特‧金秤",
             "title": "阿爾托利亞雜貨商店老闆",
             "profession": "merchant",
             "anchor_room": "altoria_general_store",
@@ -235,7 +235,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "維爾登·黑潭",
+            "name": "維爾登‧黑潭",
             "title": "聖潔王都鍛造鋪鐵匠",
             "profession": "merchant",
             "anchor_room": "altoria_forge",
@@ -246,7 +246,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "西格瑪·庫柏",
+            "name": "西格瑪‧庫柏",
             "title": "聖潔王都餐館老闆",
             "profession": "merchant",
             "anchor_room": "altoria_eatery",
@@ -257,7 +257,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "妮絲塔·狐溪",
+            "name": "妮絲塔‧狐溪",
             "title": "聖潔王都裁縫坊坊主",
             "profession": "merchant",
             "anchor_room": "altoria_tailor",
@@ -268,7 +268,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "艾蓮娜·鴉丘",
+            "name": "艾蓮娜‧鴉丘",
             "title": "聖潔王都首飾坊主",
             "profession": "merchant",
             "anchor_room": "altoria_jeweller",
@@ -279,7 +279,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "希碧拉·灰沼",
+            "name": "希碧拉‧灰沼",
             "title": "聖潔王都鍊金坊主",
             "profession": "merchant",
             "anchor_room": "altoria_alchemist",
@@ -290,7 +290,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "海莉爾·斯塔爾法爾",
+            "name": "海莉爾‧斯塔爾法爾",
             "title": "暗影谷村鑄刃者",
             "profession": "merchant",
             "anchor_room": "ciaran_hailiel_home",
@@ -301,7 +301,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "格威娜拉·希爾維爾莉夫",
+            "name": "格威娜拉‧希爾維爾莉夫",
             "title": "暗影谷村綴飾者",
             "profession": "merchant",
             "anchor_room": "ciaran_gwenaera_home",
@@ -312,7 +312,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "拉瑞內斯·妮特布倫",
+            "name": "拉瑞內斯‧妮特布倫",
             "title": "暗影谷村花饌好手",
             "profession": "merchant",
             "anchor_room": "ciaran_lareneth_home",
@@ -323,7 +323,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "妮瑞斯·米斯特瓦勒",
+            "name": "妮瑞斯‧米斯特瓦勒",
             "title": "暗影谷村調藥者",
             "profession": "merchant",
             "anchor_room": "ciaran_nireth_home",
@@ -334,7 +334,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "瓦爾溫·斯蒂爾瓦特爾",
+            "name": "瓦爾溫‧斯蒂爾瓦特爾",
             "title": "暗影谷村蒐羅者",
             "profession": "merchant",
             "anchor_room": "ciaran_valwyn_home",
@@ -345,7 +345,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             },
         },
         {
-            "name": "維特希爾·威爾德布瑞亞爾",
+            "name": "維特希爾‧威爾德布瑞亞爾",
             "title": "暗影谷村織衣者",
             "profession": "merchant",
             "anchor_room": "ciaran_vethiel_home",
@@ -696,7 +696,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: between a row and the sync output would pass every derived comparison.
     CIARAN_COMMONS_ROWS = {
         "ciaran_elenis": (
-            "艾莉妮斯·達恩斯特瑞德爾",
+            "艾莉妮斯‧達恩斯特瑞德爾",
             "暗影谷村長老",
             "attendant",
             "ciaran_elenis_home",
@@ -704,7 +704,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "ciaran_elenis_home"},
         ),
         "ciaran_teliel": (
-            "泰莉爾·菲溫德",
+            "泰莉爾‧菲溫德",
             "暗影谷村刀術導師",
             "attendant",
             "ciaran_teliel_home",
@@ -760,7 +760,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: row's whole authored payload is its dialogue key.
     HOSPITALITY_ROWS = {
         "altoria_tavern_keeper": (
-            "蘿溫·古橡",
+            "蘿溫‧古橡",
             "聖潔王都酒館老闆",
             "attendant",
             "altoria_tavern",
@@ -768,7 +768,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "altoria_tavern"},
         ),
         "altoria_innkeeper": (
-            "溫弗蕾德·古林",
+            "溫弗蕾德‧古林",
             "聖潔王都旅店老闆娘",
             "attendant",
             "altoria_lodging",
@@ -776,7 +776,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "altoria_lodging"},
         ),
         "altoria_bathhouse_keeper": (
-            "伊莎貝爾·葦沼",
+            "伊莎貝爾‧葦沼",
             "聖潔王都公共浴場管理員",
             "attendant",
             "altoria_bathhouse",
@@ -818,17 +818,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     HOSPITALITY_PLACE_ROWS = {
         "altoria_tavern": (
             "tavern", (4, 1), "醉月酒館",
-            "蘿溫·古橡", "human", "female", (),
+            "蘿溫‧古橡", "human", "female", (),
             {"dialogue_key": "altoria_tavern"},
         ),
         "altoria_lodging": (
             "lodging", (4, 1), "爐火旅店",
-            "溫弗蕾德·古林", "human", "female", (),
+            "溫弗蕾德‧古林", "human", "female", (),
             {"dialogue_key": "altoria_lodging"},
         ),
         "altoria_bathhouse": (
             "bathhouse", (5, 1), "公共浴場",
-            "伊莎貝爾·葦沼", "human", "female", (),
+            "伊莎貝爾‧葦沼", "human", "female", (),
             {"dialogue_key": "altoria_bathhouse"},
         ),
     }
@@ -865,7 +865,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: pass every derived comparison (the HOSPITALITY_ROWS pattern).
     CROWN_WATCH_ROWS = {
         "altoria_guard_captain": (
-            "托瓦德·鄧堡",
+            "托瓦德‧鄧堡",
             "聖潔王都衛兵隊隊長",
             "attendant",
             "altoria_guardhouse",
@@ -873,7 +873,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "altoria_guardhouse"},
         ),
         "altoria_noble_watch_captain": (
-            "古利安·鷹守",
+            "古利安‧鷹守",
             "聖潔王都貴族區衛隊長",
             "attendant",
             "altoria_noble_watch",
@@ -881,7 +881,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "altoria_noble_watch"},
         ),
         "altoria_drill_instructor": (
-            "伊沃·高丘",
+            "伊沃‧高丘",
             "聖潔王都訓練場教頭",
             "attendant",
             "altoria_drill_yard",
@@ -930,17 +930,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         ),
         "altoria_noble_watch": (
             "watch_post", (3, 5), "貴族區衛所",
-            "古利安·鷹守", "human", "male", (),
+            "古利安‧鷹守", "human", "male", (),
             {"dialogue_key": "altoria_noble_watch"},
         ),
         "altoria_drill_yard": (
             "training_ground", (2, 4), "校場",
-            "伊沃·高丘", "human", "male", (),
+            "伊沃‧高丘", "human", "male", (),
             {"dialogue_key": "altoria_drill_yard"},
         ),
         "altoria_guardhouse": (
             "watch_post", (3, 0), "衛兵駐所",
-            "托瓦德·鄧堡", "human", "male", (),
+            "托瓦德‧鄧堡", "human", "male", (),
             {"dialogue_key": "altoria_guardhouse"},
         ),
     }
@@ -1003,7 +1003,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     #: a place row and the projection cannot pass every derived comparison.
     LEARNING_EXCHANGE_ROWS = {
         "altoria_academy_dean": (
-            "奧德溫·薩契",
+            "奧德溫‧薩契",
             "聖潔王都魔法學院院長",
             "attendant",
             "altoria_academy",
@@ -1011,7 +1011,7 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             {"dialogue_key": "altoria_academy"},
         ),
         "altoria_merchant_master": (
-            "尤斯汀·柯德溫",
+            "尤斯汀‧柯德溫",
             "聖潔王都商會會長",
             "attendant",
             "altoria_merchant_hall",
@@ -1053,12 +1053,12 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     LEARNING_EXCHANGE_PLACE_ROWS = {
         "altoria_academy": (
             "academy", (5, 5), "王立魔法學院",
-            "奧德溫·薩契", "human", "male", (),
+            "奧德溫‧薩契", "human", "male", (),
             {"dialogue_key": "altoria_academy"},
         ),
         "altoria_merchant_hall": (
             "merchant_hall", (5, 3), "商會公所",
-            "尤斯汀·柯德溫", "human", "male", (),
+            "尤斯汀‧柯德溫", "human", "male", (),
             {"dialogue_key": "altoria_merchant_hall"},
         ),
         "altoria_market_stalls": (

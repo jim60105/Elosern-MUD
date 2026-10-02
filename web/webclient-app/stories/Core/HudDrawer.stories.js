@@ -99,21 +99,21 @@ export const SkillDrawer = {
   args: {
     open: true,
     title: "技能書",
-    subtitle: "主動 91 · 被動 23",
+    subtitle: "主動 91 ‧ 被動 23",
     drawerKey: "skill",
     skillDrawer: true,
   },
 };
 
 // The inventory drawer's composed head (the offline showcase): the
-// reference's 背包 · 裝備 head with the backpack glyph shared with `items`
+// reference's 背包 ‧ 裝備 head with the backpack glyph shared with `items`
 // (align-drawer-chrome-symbols) and the wallet subtitle — the combination
 // AppClient wires for `hudDrawer === 'inventory'`.
 export const InventoryDrawer = {
   render: renderDrawer,
   args: {
     open: true,
-    title: "背包 · 裝備",
+    title: "背包 ‧ 裝備",
     subtitle: "錢袋 3,240 銅",
     drawerKey: "inventory",
     icon: "inventory",

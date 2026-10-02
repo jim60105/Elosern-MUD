@@ -628,11 +628,11 @@ describe("CreationOverlay (B5 overlays family)", () => {
         code: "name_rolled",
         message: "已擲出一個候選名字。",
         presentationRevision: 1,
-        data: { display_name: "加斯帕・斯諾" },
+        data: { display_name: "加斯帕‧斯諾" },
       },
     });
     expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe(
-      "加斯帕・斯諾",
+      "加斯帕‧斯諾",
     );
     // A replayed identical result never re-backfills over later edits: the
     // in-flight flag already settled, and a foreign id would not match.

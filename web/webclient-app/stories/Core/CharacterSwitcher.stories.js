@@ -119,7 +119,7 @@ export const LongNameTruncation = {
     characters: [
       {
         identity: 1,
-        name: "艾莉亞·馮·阿爾托利亞·潘德拉貢·卡美洛之光",
+        name: "艾莉亞‧馮‧阿爾托利亞‧潘德拉貢‧卡美洛之光",
         current: true,
         pending: false,
         portrait: null,

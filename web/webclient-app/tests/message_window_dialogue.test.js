@@ -72,8 +72,8 @@ describe("MessageWindow in dialogue mode (paged, under the name plate)", () => {
     // of its own, so the plate is the window's first element child.
     const w = mountWindow({}, { stubs: { transition: false } });
     const plate = w.get('[data-testid="message-name-plate"]');
-    expect(plate.text()).toBe("灰婆婆 · 羈絆 親睦");
-    expect(plate.get('[data-testid="dialogue-bond"]').element.textContent).toBe(" · 羈絆 親睦");
+    expect(plate.text()).toBe("灰婆婆 ‧ 羈絆 親睦");
+    expect(plate.get('[data-testid="dialogue-bond"]').element.textContent).toBe(" ‧ 羈絆 親睦");
     // The plate is the window's first row, above the text area.
     const root = w.get('[data-testid="message-window"]').element;
     expect(root.firstElementChild).toBe(plate.element);

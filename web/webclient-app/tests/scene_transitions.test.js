@@ -141,7 +141,7 @@ describe("PlaceCard location change", () => {
   const headings = (w) => w.findAll('[data-testid="place-card__location"]');
 
   it("the previous heading leaves inert while the new one enters", async () => {
-    wrapper = mount(PlaceCard, { ...REAL, props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 · 12:00" } });
+    wrapper = mount(PlaceCard, { ...REAL, props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" } });
     await wrapper.setProps({ locationLabel: "北岸大道" });
     const both = headings(wrapper);
     expect(both).toHaveLength(2);
@@ -154,11 +154,11 @@ describe("PlaceCard location change", () => {
   });
 
   it("a time-only change adds no leaving element", async () => {
-    wrapper = mount(PlaceCard, { ...REAL, props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 · 12:00" } });
-    await wrapper.setProps({ timeLabel: "春季 3 日 · 12:05" });
+    wrapper = mount(PlaceCard, { ...REAL, props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" } });
+    await wrapper.setProps({ timeLabel: "春季 3 日 ‧ 12:05" });
     expect(headings(wrapper)).toHaveLength(1);
     expect(wrapper.find("[inert]").exists()).toBe(false);
-    expect(wrapper.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 · 12:05");
+    expect(wrapper.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 ‧ 12:05");
   });
 });
 

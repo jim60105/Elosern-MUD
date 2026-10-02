@@ -245,7 +245,7 @@ const placeholderKind = computed(() => {
 
 const statusBadgeText = computed(() => {
   const isSample = showPlaceholder.value && props.mode !== "creation";
-  return isSample ? `範例場景 · ${placeholderLabel.value}` : placeholderLabel.value;
+  return isSample ? `範例場景 ‧ ${placeholderLabel.value}` : placeholderLabel.value;
 });
 
 // The scene label + alt always render as text outside the bitmap.

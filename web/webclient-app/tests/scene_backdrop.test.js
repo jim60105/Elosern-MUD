@@ -67,7 +67,7 @@ describe("SceneBackdrop (H1 D3/D8)", () => {
     const placeholder = w.get('[data-testid="scene-backdrop-placeholder"]');
     expect(placeholder.attributes("data-kind")).toBe("missing");
     expect(w.find('[data-testid="scene-backdrop-placeholder-kind"]').exists()).toBe(false);
-    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 · 場景圖像尚未生成");
+    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 ‧ 場景圖像尚未生成");
     // No scene caption row rendered without an actual image.
     expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(false);
     expect(w.find('[data-testid="scene-backdrop-control"]').exists()).toBe(false);
@@ -91,7 +91,7 @@ describe("SceneBackdrop (H1 D3/D8)", () => {
     const frame = w.get('[data-testid="scene-backdrop-placeholder"]');
     expect(frame.attributes("data-kind")).toBe("art_unavailable");
     expect(w.find('[data-testid="scene-backdrop-placeholder-kind"]').exists()).toBe(false);
-    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 · 場景圖像目前無法顯示");
+    expect(w.get('[data-testid="scene-backdrop-placeholder-label"]').text()).toBe("範例場景 ‧ 場景圖像目前無法顯示");
     expect(w.get('[data-testid="scene-backdrop"]').attributes("data-available")).toBe("false");
     expect(w.find('[data-testid="scene-backdrop-image"]').exists()).toBe(false);
     expect(w.find('[data-testid="scene-backdrop-caption"]').exists()).toBe(false);

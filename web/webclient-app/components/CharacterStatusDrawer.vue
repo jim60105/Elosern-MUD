@@ -151,7 +151,7 @@ const {
           data-testid="character-status-drawer__open-party"
           @click="$emit('open-party')"
         >
-          同伴 · 隊伍
+          同伴 ‧ 隊伍
         </button>
       </div>
     </header>
@@ -271,7 +271,7 @@ const {
          親密狀態 (intimate) → persona, with the intimate disclosure as the
          last main section. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__guild" aria-label="公會">
-      <p class="character-status-drawer__section-label">計數 · 公會</p>
+      <p class="character-status-drawer__section-label">計數 ‧ 公會</p>
       <div v-if="characterAvailable" class="character-status-drawer__statgrid">
         <div class="character-status-drawer__statrow" data-testid="character-status-drawer__guild-rank">
           <span class="character-status-drawer__statrow-key">公會階級</span>
@@ -294,7 +294,7 @@ const {
 
     <!-- The full condition roster (no cap, unlike H2's island). The status
          panel is available in every mode, so the roster renders even when the
-         character panel is unavailable; the 設計稿 order is 計數・公會 →
+         character panel is unavailable; the 設計稿 order is 計數‧公會 →
          條件/修正 → 偽裝, so this section is placed between the two
          character-backed blocks. -->
     <section class="character-status-drawer__section" data-testid="character-status-drawer__conditions" aria-label="狀態">

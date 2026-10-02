@@ -69,7 +69,7 @@ export function useCreationCustom(props, form, emit) {
   const budgetBriefing = computed(() => {
     const profile = currentProfile.value;
     if (!profile) return "";
-    const ranges = profile.axes.map((a) => `${a.label} ${a.minimum}-${a.maximum}`).join(" · ");
+    const ranges = profile.axes.map((a) => `${a.label} ${a.minimum}-${a.maximum}`).join(" ‧ ");
     return `點數額度 ${profile.budget}｜${ranges}｜總和須等於額度 ${profile.budget}`;
   });
 

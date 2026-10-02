@@ -39,7 +39,7 @@ export const LORE_CODEX_PANEL_SAMPLE = Object.freeze({
         card: Object.freeze([
           Object.freeze({ name: "display_name_zh", value: "霧骨狼" }),
           Object.freeze({ name: "description", value: "群棲於霧中的中型獸，骨白如霧。" }),
-          Object.freeze({ name: "example_monsters_zh", value: "霧骨狼·頭狼" }),
+          Object.freeze({ name: "example_monsters_zh", value: "霧骨狼‧頭狼" }),
         ]),
       }),
     ]),

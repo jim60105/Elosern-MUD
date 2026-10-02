@@ -60,10 +60,10 @@ describe("StageActor", () => {
   });
 
   it("draws the name's initial and the name when no entry exists", () => {
-    wrapper = mount(StageActor, { props: { portrait: null, name: "合成·旅人", side: "right" } });
+    wrapper = mount(StageActor, { props: { portrait: null, name: "合成‧旅人", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("合");
-    expect(wrapper.get("figcaption").text()).toBe("合成·旅人，無肖像");
+    expect(wrapper.get("figcaption").text()).toBe("合成‧旅人，無肖像");
     expect(wrapper.get("figure").attributes("data-status")).toBe("missing");
   });
 

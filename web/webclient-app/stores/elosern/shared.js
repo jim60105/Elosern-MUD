@@ -83,7 +83,7 @@ export function formatTimeLabel(serverTime) {
   }
   const hour = String(serverTime.hour).padStart(2, "0");
   const minute = String(serverTime.minute).padStart(2, "0");
-  return `${serverTime.season_label} ${serverTime.day_in_season} 日 · ${hour}:${minute}`;
+  return `${serverTime.season_label} ${serverTime.day_in_season} 日 ‧ ${hour}:${minute}`;
 }
 
 // The committed transport phase maps to the ConnectOverlay status slice the

@@ -135,7 +135,7 @@ function onPaneActivate(payload) {
     <!-- The shortcut legend (webclient-align-01-dock-chrome, re-homed by
          webclient-scene-overview-swap D3 and widened by
          webclient-retire-exploration-submenus): the draft's `.dock .hint`
-         markup — `數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回`
+         markup — `數字鍵 1–9 ‧ <kbd>Enter</kbd> 執行 ‧ <kbd>Esc</kbd> 返回`
          with styled `<kbd>` elements. It is the single visible legend and the
          only element carrying the `action-dock-description` hook; it renders
          in exploration, dialogue, and combat mode (never in creation mode). -->
@@ -144,7 +144,7 @@ function onPaneActivate(payload) {
       class="action-dock__legend"
       data-testid="action-dock-description"
     >
-      <span class="action-dock__legend-text">數字鍵 1–9 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回</span>
+      <span class="action-dock__legend-text">數字鍵 1–9 ‧ <kbd>Enter</kbd> 執行 ‧ <kbd>Esc</kbd> 返回</span>
     </p>
     <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
          and ✕ 清除建議 from ActionDock.vue source text). The active suggestions

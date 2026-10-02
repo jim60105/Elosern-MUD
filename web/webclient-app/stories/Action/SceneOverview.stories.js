@@ -9,8 +9,8 @@ import {
 } from "../fixtures/scene_overview.js";
 
 // SceneOverview: the exploration root of the command panel (AVG stage
-// design §7). Chip rows 出口 / 人物 / 物件 and a label-less footer (查看房間 ·
-// 等待／休息 · 建議), built by the real `overviewMenu` through the shared
+// design §7). Chip rows 出口 / 人物 / 物件 and a label-less footer (查看房間 ‧
+// 等待／休息 ‧ 建議), built by the real `overviewMenu` through the shared
 // derived-shape helper. Props: menu, focusedKey, localMap, idPrefix, active.
 // Events: focus-change (every click), activate ({key, item}, enabled chips
 // only). Each story renders inside a box the size of the command panel at
@@ -51,7 +51,7 @@ const FULL_ROOM = explorationPanelFixture({
     { label: "酒館門", destination: "room:903", enabled: false, reason: "酒館打烊了，門從裡面上了閂。" },
   ],
   targets: [
-    { identity: 11, name: "葛里安·衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
+    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
     { identity: 12, name: "布蘭", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
   ],
   entities: [{ identity: 21, name: "旅人艾拉" }],

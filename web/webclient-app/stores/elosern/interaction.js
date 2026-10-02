@@ -118,7 +118,7 @@ export function applyInteraction(ctx) {
   ctx.focusPress = function focusPress(key, repeat) {
     // The dock's positional row picks (webclient-align-01-dock-chrome,
     // widened by webclient-retire-exploration-submenus): the legend
-    // `數字鍵 1-9 · Enter 執行 · Esc 返回` names the first nine entries of the
+    // `數字鍵 1-9 ‧ Enter 執行 ‧ Esc 返回` names the first nine entries of the
     // current dock frame as reachable by the top-row number keys. A digit
     // moves the frame's focus onto its entry (1-indexed, rendered order) and
     // activates it through the same confirm path Enter uses (disabled entries

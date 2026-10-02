@@ -140,7 +140,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertTrue(local_map_surface.is_visible())
 
         # Inject below-max HP so the vitals island is visible and gauge rows render text
-        status = valid_status_panel("艾倫·灰誓", "char-42")
+        status = valid_status_panel("艾倫‧灰誓", "char-42")
         status["resources"]["hp"]["current"] = 80
         inject_snapshot(page, {"status": status})
         page.wait_for_timeout(200)
@@ -188,7 +188,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertNotEqual(location, "位置：--", "location must be synced")
         self.assertTrue(location.strip())
         clock = page.locator('[data-testid="place-card__time"]').inner_text()
-        self.assertRegex(clock, r"\d+ 日 · \d{2}:\d{2}")
+        self.assertRegex(clock, r"\d+ 日 ‧ \d{2}:\d{2}")
         self.assertEqual(page.locator('[data-testid="topbar-location"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="topbar-clock"]').count(), 0)
         header_text = header.inner_text()
@@ -343,7 +343,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 # An 8-condition status panel makes the +N overflow chip
                 # render, so the assertion runs with the overflow disclosed.
-                status = valid_status_panel("艾倫·灰誓", "char-42")
+                status = valid_status_panel("艾倫‧灰誓", "char-42")
                 status["resources"]["hp"]["current"] = 80
                 status["conditions"] = [
                     {
@@ -451,7 +451,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         """The vitals island hides with display:none at full health outside combat."""
         page = self.logged_in_page()
         # 1. Full vitals with no conditions outside combat: status-panel is attached but not visible (display:none)
-        full_status = valid_status_panel("艾倫·灰誓", "char-42")
+        full_status = valid_status_panel("艾倫‧灰誓", "char-42")
         full_status["resources"]["hp"]["current"] = full_status["resources"]["hp"]["maximum"]
         full_status["resources"]["mp"]["current"] = full_status["resources"]["mp"]["maximum"]
         full_status["resources"]["sp"]["current"] = full_status["resources"]["sp"]["maximum"]
@@ -503,7 +503,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
 
         def inject_status(hp_current: int, hp_maximum: int) -> None:
-            st = valid_status_panel("艾倫·灰誓", "char-42")
+            st = valid_status_panel("艾倫‧灰誓", "char-42")
             st["resources"] = {
                 "hp": {"current": hp_current, "maximum": hp_maximum},
                 "mp": {"current": 50, "maximum": 50},

@@ -22,17 +22,17 @@ describe("PlaceCard", () => {
 
   it("states the location as its heading and the world time beneath it", () => {
     wrapper = mount(PlaceCard, {
-      props: { locationLabel: "測試起點", timeLabel: "春季 3 日 · 12:00" },
+      props: { locationLabel: "測試起點", timeLabel: "春季 3 日 ‧ 12:00" },
     });
     const heading = wrapper.get('[data-testid="place-card__location"]');
     expect(heading.element.tagName).toBe("H1");
     expect(heading.text()).toBe("測試起點");
-    expect(wrapper.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 · 12:00");
+    expect(wrapper.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 ‧ 12:00");
   });
 
   it("sets the heading and the time on two levels with a decorative rule and no leading separator", () => {
     wrapper = mount(PlaceCard, {
-      props: { locationLabel: "測試起點", timeLabel: "春季 3 日 · 12:00" },
+      props: { locationLabel: "測試起點", timeLabel: "春季 3 日 ‧ 12:00" },
     });
     const children = [...wrapper.element.querySelectorAll("[data-testid]")].map((el) => el.dataset.testid);
     expect(children).toEqual(["place-card__location", "place-card__rule", "place-card__time"]);
@@ -40,7 +40,7 @@ describe("PlaceCard", () => {
     expect(rule.attributes("aria-hidden")).toBe("true");
     expect(rule.text()).toBe("");
     // The time line renders the committed label verbatim, from its first value.
-    expect(wrapper.get('[data-testid="place-card__time"]').element.textContent).toBe("春季 3 日 · 12:00");
+    expect(wrapper.get('[data-testid="place-card__time"]').element.textContent).toBe("春季 3 日 ‧ 12:00");
     const css = readFileSync(join(APP_ROOT, "components/PlaceCard.vue"), "utf8");
     expect(css).not.toMatch(/place-card__time::before/);
   });
@@ -52,8 +52,8 @@ describe("PlaceCard", () => {
   });
 
   it("keeps an overlong label whole for assistive technology and holds no tab stop", () => {
-    const long = "伊洛瑟恩王都外城區・商人公會附屬倉庫的地下儲藏室";
-    wrapper = mount(PlaceCard, { props: { locationLabel: long, timeLabel: "秋季 28 日 · 23:59" } });
+    const long = "伊洛瑟恩王都外城區‧商人公會附屬倉庫的地下儲藏室";
+    wrapper = mount(PlaceCard, { props: { locationLabel: long, timeLabel: "秋季 28 日 ‧ 23:59" } });
     const heading = wrapper.get('[data-testid="place-card__location"]');
     expect(heading.text()).toBe(long);
     expect(heading.attributes("title")).toBe(long);
@@ -71,11 +71,11 @@ describe("PlaceCard", () => {
     document.body.appendChild(host);
     wrapper = mount(AppShell, {
       attachTo: host,
-      props: { mode: "exploration", locationLabel: "石板廣場", timeLabel: "春季 3 日 · 12:00" },
+      props: { mode: "exploration", locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" },
     });
     const card = wrapper.get('[data-testid="anchor-place"] [data-testid="place-card"]');
     expect(card.get('[data-testid="place-card__location"]').text()).toBe("石板廣場");
-    expect(card.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 · 12:00");
+    expect(card.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 ‧ 12:00");
     // The top band states neither value.
     expect(wrapper.get('[data-testid="topbar"]').text()).not.toContain("石板廣場");
     expect(wrapper.get('[data-testid="topbar"]').text()).not.toContain("12:00");

@@ -223,7 +223,7 @@ class ValidLoadTests(unittest.TestCase):
     def test_double_braced_tokens_and_json_braces_pass_through(self):
         load_prompt_library(str(REPO_PROMPTS))
         scenario = render_prompt(
-            "scenario_director.system", name_inspiration="加斯帕・斯諾"
+            "scenario_director.system", name_inspiration="加斯帕‧斯諾"
         )
         self.assertIn('{"name": "…"', scenario)
         self.assertIn('"item_key": "healing_potion"', scenario)

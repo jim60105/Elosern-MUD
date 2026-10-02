@@ -344,7 +344,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
         )
         self.assertIsNotNone(description["text"])
         self.assertIn("目前沒有裝備任何物品。", description["text"])
-        self.assertEqual(description["title"], "裝備真值 · 偽裝不影響")
+        self.assertEqual(description["title"], "裝備真值 ‧ 偽裝不影響")
         self.assertTrue(description["emptyMain"])
         body_text = page.evaluate(
             "() => document.querySelector('[data-testid=\"inventory-panel\"]').textContent"

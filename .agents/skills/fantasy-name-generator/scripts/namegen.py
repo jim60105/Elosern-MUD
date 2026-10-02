@@ -30,8 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-# 「名・姓」, U+30FB KATAKANA MIDDLE DOT. The one composition constant.
-NAME_SEPARATOR = "・"
+# 「名‧姓」, U+2027 HYPHENATION POINT. The one composition constant.
+NAME_SEPARATOR = "‧"
 
 CORPUS_ROOT = Path(__file__).resolve().parent.parent / "assets" / "corpus"
 

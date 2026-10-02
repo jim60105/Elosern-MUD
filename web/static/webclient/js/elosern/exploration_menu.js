@@ -22,7 +22,7 @@
  *
  * The AVG scene overview (webclient-scene-overview-component, AVG stage
  * design §7): `overviewMenu` flattens the exits, the people, the objects,
- * and a footer (查看房間 · 等待／休息 · 建議) into ONE reading-order menu
+ * and a footer (查看房間 ‧ 等待／休息 ‧ 建議) into ONE reading-order menu
  * with a `sections` index and `geometry: "sections"` for the router, and
  * `verbMenuFor` is a person chip's verb popover (the target's affordances
  * plus 查看). `overviewMenu` is the exploration root the resolver serves.
@@ -147,7 +147,7 @@
     }
     if (panel.inventory && panel.inventory.available) {
       // 背包 is a client-local drawer open (the frameless precedent of the
-      // 角色狀態 row): activating it opens the 背包 · 裝備 drawer without
+      // 角色狀態 row): activating it opens the 背包 ‧ 裝備 drawer without
       // pushing a keyboard frame or switching the action dock.
       items.push({
         key: "inventory",

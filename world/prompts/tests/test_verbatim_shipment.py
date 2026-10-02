@@ -144,7 +144,7 @@ class VerbatimShipmentTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_scenario_director_system_message_is_shipped_verbatim(self):
-        bank = "加斯帕・斯諾、貝莎・鐵砧"
+        bank = "加斯帕‧斯諾、貝莎‧鐵砧"
         system = render_prompt("scenario_director.system", name_inspiration=bank)
         self.assertEqual(
             system, _SCENARIO_DIRECTOR_SYSTEM.replace("{name_inspiration}", bank)

@@ -24,7 +24,7 @@ from world.skills.registry.vocab import (
 )
 
 ROWS: tuple[SkillDef, ...] = (
-        # 冰 — 學徒（遲緩路線・根）
+        # 冰 — 學徒（遲緩路線‧根）
         _spell(
             "frost_breath",
             "凍結之息",
@@ -37,7 +37,7 @@ ROWS: tuple[SkillDef, ...] = (
             category=SkillCategory.ELEMENTAL_MAGIC,
             group="ice",
         ),
-        # 冰 — 術師（遲緩路線・分支點）
+        # 冰 — 術師（遲緩路線‧分支點）
         _spell(
             "ice_wall",
             "冰牆術",
@@ -51,7 +51,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="ice",
             prerequisites=(SkillPrerequisite("frost_breath", 3),),
         ),
-        # 冰 — 大師（遲緩路線・泥沼分支終點）
+        # 冰 — 大師（遲緩路線‧泥沼分支終點）
         _spell(
             "frost_mire",
             "凝霜泥沼",
@@ -66,7 +66,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("ice_wall", 3),),
             effect_policies=(EffectPolicy(audience=EffectAudience.ENEMIES),),
         ),
-        # 冰 — 大師（遲緩路線・永凍分支）
+        # 冰 — 大師（遲緩路線‧永凍分支）
         _spell(
             "permafrost_domain",
             "永凍領域",
@@ -80,7 +80,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="ice",
             prerequisites=(SkillPrerequisite("ice_wall", 3),),
         ),
-        # 冰 — 賢者（遲緩路線・永凍分支）
+        # 冰 — 賢者（遲緩路線‧永凍分支）
         _spell(
             "absolute_tundra",
             "絕對凍土",
@@ -98,7 +98,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES),
             ),
         ),
-        # 冰 — 主宰（遲緩路線・永凍分支終點・毀滅級）
+        # 冰 — 主宰（遲緩路線‧永凍分支終點‧毀滅級）
         _spell(
             "eternal_ice_field",
             "長夜冰原",
@@ -120,7 +120,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES),
             ),
         ),
-        # 冰 — 學徒（監禁路線・根）
+        # 冰 — 學徒（監禁路線‧根）
         _spell(
             "ice_shard",
             "冰錐術",
@@ -151,7 +151,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=1.0),
             ),
         ),
-        # 冰 — 大師（監禁路線・分支點）
+        # 冰 — 大師（監禁路線‧分支點）
         _spell(
             "ice_prison",
             "冰封監牢",
@@ -165,7 +165,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="ice",
             prerequisites=(SkillPrerequisite("frost_arrow_rain", 3),),
         ),
-        # 冰 — 賢者（監禁路線・暴風分支）
+        # 冰 — 賢者（監禁路線‧暴風分支）
         _spell(
             "blizzard",
             "暴風雪",
@@ -182,7 +182,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=2.0),
             ),
         ),
-        # 冰 — 賢者（監禁路線・碎裂分支終點）
+        # 冰 — 賢者（監禁路線‧碎裂分支終點）
         _spell(
             "crystal_shatter",
             "冰晶爆裂",
@@ -211,7 +211,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 冰 — 主宰（監禁路線・暴風分支終點・處決級）
+        # 冰 — 主宰（監禁路線‧暴風分支終點‧處決級）
         _spell(
             "absolute_zero",
             "絕對零度",
@@ -232,7 +232,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(),
             ),
         ),
-        # 冰 — 神格（兩線匯合・樹冠・毀滅級）
+        # 冰 — 神格（兩線匯合‧樹冠‧毀滅級）
         _spell(
             "eternal_frost_apotheosis",
             "永凍神格",

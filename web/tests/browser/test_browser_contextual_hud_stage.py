@@ -494,7 +494,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(legend_toggle.count(), 1)
         self.assertEqual(legend_toggle.get_attribute("aria-label"), "圖例")
         self.assertIn(
-            "滾輪或 +／− 縮放 · 拖曳平移",
+            "滾輪或 +／− 縮放 ‧ 拖曳平移",
             page.locator('[data-testid="map-overlay"] .map-overlay__guide').inner_text(),
         )
         import re

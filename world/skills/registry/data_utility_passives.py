@@ -163,7 +163,7 @@ ROWS: tuple[SkillDef, ...] = (
         ),
         _skill(
             "reincarnation_boon_elosia",
-            "轉生祝福·伊洛希雅",
+            "轉生祝福‧伊洛希雅",
             "轉生帶來的祝福，被動加速魔力成長。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
@@ -174,7 +174,7 @@ ROWS: tuple[SkillDef, ...] = (
         ),
         _skill(
             "reincarnation_boon_yuka",
-            "轉生祝福·悠花",
+            "轉生祝福‧悠花",
             "轉生帶來的祝福，被動強化戰鬥預感。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
@@ -185,7 +185,7 @@ ROWS: tuple[SkillDef, ...] = (
         ),
         _skill(
             "reincarnation_boon_yuna",
-            "轉生祝福·悠奈",
+            "轉生祝福‧悠奈",
             "轉生帶來的祝福，被動精通性魔法的掌握。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,

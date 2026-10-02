@@ -553,7 +553,7 @@
 }
 
 .status-marker::before {
-  content: "·";
+  content: "‧";
   font-weight: 700;
 }
 

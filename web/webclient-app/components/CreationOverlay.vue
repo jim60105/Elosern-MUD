@@ -131,7 +131,7 @@ function allocationFraction(axis) {
   >
     <header class="creation-overlay__header">
       <div>
-        <p class="creation-overlay__eyebrow">ELOSERN · 伊洛瑟恩</p>
+        <p class="creation-overlay__eyebrow">ELOSERN ‧ 伊洛瑟恩</p>
         <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
       </div>
       <p class="creation-overlay__intro">選擇起點，寫下你的故事。</p>
@@ -361,7 +361,7 @@ function allocationFraction(axis) {
             <div class="creation-allocations">
               <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
                 <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
-                <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} · {{ ax.minimum }}–{{ ax.maximum }}</p>
+                <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ {{ ax.minimum }}–{{ ax.maximum }}</p>
                 <div class="creation-stepper creation-overlay__field">
                   <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
                     :data-testid="`creation-step-${ax.axis}-down`" :disabled="!canStep(ax, -1)" @click="stepAllocation(ax, -1)">−</button>

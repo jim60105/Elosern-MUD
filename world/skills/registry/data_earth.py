@@ -27,7 +27,7 @@ from world.skills.registry.vocab import (
 )
 
 ROWS: tuple[SkillDef, ...] = (
-        # 土 — 學徒（地形路線・根）
+        # 土 — 學徒（地形路線‧根）
         _spell(
             "stone_shard",
             "石礫術",
@@ -55,7 +55,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="earth",
             prerequisites=(SkillPrerequisite("hardened_skin", 3),),
         ),
-        # 土 — 大師（護甲路線・磐石）
+        # 土 — 大師（護甲路線‧磐石）
         _spell(
             "bedrock_bastion",
             "磐石壁壘",
@@ -70,7 +70,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("stone_armor", 3),),
             effect_policies=(EffectPolicy(audience=EffectAudience.ALLIES),),
         ),
-        # 土 — 賢者（護甲路線・磐石）
+        # 土 — 賢者（護甲路線‧磐石）
         _spell(
             "earthen_ward",
             "大地庇護",
@@ -85,7 +85,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("bedrock_bastion", 5),),
             effect_policies=(EffectPolicy(audience=EffectAudience.ALLIES),),
         ),
-        # 土 — 大師（護甲路線・荊棘）
+        # 土 — 大師（護甲路線‧荊棘）
         # thorned_carapace is inherently self-only (`self_buff_apply`); the
         # counter itself is reaction data — earth_carapace is the mount the
         # shipped physical_hit rule's buff_active gate keys off.
@@ -117,7 +117,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="earth",
             prerequisites=(SkillPrerequisite("stone_shard", 3),),
         ),
-        # 土 — 大師（地形路線・裂縫）
+        # 土 — 大師（地形路線‧裂縫）
         _spell(
             "ground_fissure",
             "地裂術",
@@ -131,7 +131,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="earth",
             prerequisites=(SkillPrerequisite("dust_veil", 3),),
         ),
-        # 土 — 大師（地形路線・崩落）
+        # 土 — 大師（地形路線‧崩落）
         _spell(
             "rockslide",
             "岩壁崩落",
@@ -146,7 +146,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("dust_veil", 3),),
             effect_policies=(EffectPolicy(coefficient=1.4),),
         ),
-        # 土 — 賢者（地形路線・裂縫）
+        # 土 — 賢者（地形路線‧裂縫）
         _spell(
             "earthquake",
             "地震術",
@@ -169,7 +169,7 @@ ROWS: tuple[SkillDef, ...] = (
                 EffectPolicy(),
             ),
         ),
-        # 土 — 賢者（地形路線・單體）
+        # 土 — 賢者（地形路線‧單體）
         _spell(
             "fault_rupture",
             "地脈崩裂",
@@ -184,7 +184,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("rockslide", 8),),
             effect_policies=(EffectPolicy(coefficient=2.8),),
         ),
-        # 土 — 主宰（地形路線・裂縫）
+        # 土 — 主宰（地形路線‧裂縫）
         _spell(
             "mountain_collapse",
             "山嶽崩落",
@@ -204,7 +204,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 土 — 主宰（地形路線・單體）
+        # 土 — 主宰（地形路線‧單體）
         # 處決級（無視防禦）+ 裂縫連動：站在任一裂縫標記上觸發一次
         # 1.15 乘算（4.0×1.15=4.6 == 4.0+0.6，D6）；predicate any-match-once
         # 讓三個裂縫 rung 只計一次。

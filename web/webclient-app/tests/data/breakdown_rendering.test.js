@@ -358,7 +358,7 @@ describe("InventoryPanel joined adjustment", () => {
       inventory: {
         ...SERVICES_PANEL_SAMPLE.inventory,
         rows: [
-          { item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true, presentation: null, action: null },
+          { item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true, presentation: null, action: null },
         ],
       },
     };

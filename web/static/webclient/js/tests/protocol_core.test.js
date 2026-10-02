@@ -316,9 +316,9 @@ test("validates exact ui_action_result envelopes", () => {
 
 test("ui_action_result data slot accepts the server-legal shapes", () => {
   const valid = Protocol.validateActionResult(
-    actionResult({ data: { display_name: "加斯帕・斯諾", rank: 3 } })
+    actionResult({ data: { display_name: "加斯帕‧斯諾", rank: 3 } })
   );
-  assert.deepEqual(valid.data, { display_name: "加斯帕・斯諾", rank: 3 });
+  assert.deepEqual(valid.data, { display_name: "加斯帕‧斯諾", rank: 3 });
   assert.equal(
     Object.prototype.hasOwnProperty.call(Protocol.validateActionResult(actionResult()), "data"),
     false

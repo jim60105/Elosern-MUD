@@ -294,7 +294,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     const pos = doll.compareDocumentPosition(grid);
     expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     // The committed name reads in the doll's 裝備描述 column, not the cell.
-    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 ‧ 拾遺");
   });
 
   it("stacks the mock's 裝備 / 物品 / 金錢 sections on the bare drawer body", () => {

@@ -70,5 +70,5 @@
 | Key | 名稱 | 效果 | 取得條件權威 |
 | --- | --- | --- | --- |
 | `elf_longevity` | 精靈長壽 | `passive_trait:elf_longevity`，純敘事旗標，無戰鬥數值 | [天賦異能頁面](/lore/skill-trees/innate-gift) |
-| `reincarnation_boon_elosia` | 轉生祝福·伊洛希雅 | `growth_rate`，加速練習成長 | [天賦異能頁面](/lore/skill-trees/innate-gift) |
-| `reincarnation_boon_yuka` | 轉生祝福·悠花 | `combat_prediction:武感`，敏捷 +5% | [天賦異能頁面](/lore/skill-trees/innate-gift) |
+| `reincarnation_boon_elosia` | 轉生祝福‧伊洛希雅 | `growth_rate`，加速練習成長 | [天賦異能頁面](/lore/skill-trees/innate-gift) |
+| `reincarnation_boon_yuka` | 轉生祝福‧悠花 | `combat_prediction:武感`，敏捷 +5% | [天賦異能頁面](/lore/skill-trees/innate-gift) |

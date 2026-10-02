@@ -3,7 +3,7 @@ Name-corpus registry checks (npc-namegen-lore-registry).
 
 Pure ``unittest.TestCase`` covers the frozen registry shape, array-by-array
 coverage against the vendored JSON, the import-time invariant fail-fast paths
-through the injectable builder, and the 「名・姓」 composition. The
+through the injectable builder, and the 「名‧姓」 composition. The
 ``EvenniaTestCase`` class pins the ``sync_all`` mirror of the new
 ``name_packs`` category.
 """
@@ -243,15 +243,15 @@ def _race_bindings_stub() -> dict[str, str]:
 
 class DisplayCompositionTests(unittest.TestCase):
     @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
-    def test_separator_is_the_katakana_middle_dot(self):
-        self.assertEqual(NAME_SEPARATOR, "・")
-        self.assertEqual(ord(NAME_SEPARATOR), 0x30FB)
+    def test_separator_is_the_hyphenation_point(self):
+        self.assertEqual(NAME_SEPARATOR, "‧")
+        self.assertEqual(ord(NAME_SEPARATOR), 0x2027)
 
     @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
     def test_composition_is_given_separator_surname(self):
         given = NamePart(text="Gaspar", zh="加斯帕", meaning_zh="")
         surname = NamePart(text="Snow", zh="斯諾", meaning_zh="")
-        self.assertEqual(compose_display_name(given, surname), "加斯帕・斯諾")
+        self.assertEqual(compose_display_name(given, surname), "加斯帕‧斯諾")
 
     @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
     def test_composed_names_never_contain_raw_corpus_text(self):

@@ -264,7 +264,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # affordance — the draft wording, both implemented.
         self.assertEqual(
             page.locator(".hint").inner_text(),
-            "↑↓ 歷史 · Tab 補全",
+            "↑↓ 歷史 ‧ Tab 補全",
             "the hint states the history recall keys and the completion affordance",
         )
         # Seed the command history deterministically by sending two distinct text

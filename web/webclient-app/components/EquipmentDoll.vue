@@ -5,7 +5,7 @@
 // payload's `equipment[]`. The binding design's `.doll` row: a two-column
 // square grid of four stable positions (主手 / 副手 / 盔甲 / 飾品 summary)
 // beside a 裝備描述 column that lists the committed rows under their slot
-// labels — the section heading reads `裝備` with the `真值 · 偽裝不影響` tag.
+// labels — the section heading reads `裝備` with the `真值 ‧ 偽裝不影響` tag.
 // Each position carries a fixed slot-role SVG (the off-hand position is the
 // iconless position) and an explicit dashed empty state; labelled
 // passthrough rows keep any other server-authored slot key. No rarity
@@ -115,7 +115,7 @@ const duplicateRows = computed(() => {
 
 <template>
   <section class="equipment-doll" data-testid="equipment-doll">
-    <h3 class="equipment-doll__title" data-testid="equipment-doll__title">裝備<span class="equipment-doll__title-tag" data-testid="equipment-doll__title-tag">真值 · 偽裝不影響</span></h3>
+    <h3 class="equipment-doll__title" data-testid="equipment-doll__title">裝備<span class="equipment-doll__title-tag" data-testid="equipment-doll__title-tag">真值 ‧ 偽裝不影響</span></h3>
 
     <p
       v-if="!available"
@@ -202,7 +202,7 @@ const duplicateRows = computed(() => {
             class="equipment-doll__description-row"
             :data-testid="`equipment-doll__description-row--${entry.slot}`"
           >
-            {{ slotLabel(entry.slot) }} · {{ entry.row.display_name }}
+            {{ slotLabel(entry.slot) }} ‧ {{ entry.row.display_name }}
             <span
               v-if="entry.row.adjustment"
               class="equipment-doll__adjustment"
@@ -221,7 +221,7 @@ const duplicateRows = computed(() => {
               data-testid="equipment-doll__accessories"
               aria-label="飾品"
             >
-              <p class="equipment-doll__section-title">飾品 · {{ accessoryCount }} 件</p>
+              <p class="equipment-doll__section-title">飾品 ‧ {{ accessoryCount }} 件</p>
               <div
                 v-for="(row, index) in accessoryRows"
                 :key="`${row.item_key}-${index}`"

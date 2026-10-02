@@ -124,7 +124,7 @@ export const CHARACTER_PANEL_SAMPLE = {
     },
   ],
   equipment: [
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", adjustment: "" },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", adjustment: "" },
     {
       slot: "armor",
       item_key: "knight_platemail",
@@ -176,7 +176,7 @@ export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   // is empty (the traits keep their true totals without decomposition).
   traits: CHARACTER_PANEL_SAMPLE.traits.map((row) => ({ ...row, layers: [] })),
   equipment: [
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", adjustment: "" },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", adjustment: "" },
   ],
   disguise: { active: false, description: "", displayed: [] },
   guild: { rank: null, merit: 0 },

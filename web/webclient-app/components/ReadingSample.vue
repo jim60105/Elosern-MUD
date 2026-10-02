@@ -59,13 +59,13 @@ const complete = computed(() => !typewriter.typing.value);
 // The caption names the rule in force, in the reader's words.
 const caption = computed(() => {
   if (props.motionLevel !== "full") {
-    return `動態效果「${MOTION_LABELS[props.motionLevel]}」· 立即顯示`;
+    return `動態效果「${MOTION_LABELS[props.motionLevel]}」‧ 立即顯示`;
   }
   const speed = TEXT_SPEEDS.includes(props.textSpeed) ? props.textSpeed : "normal";
   if (speed === "instant") {
-    return "瞬間 · 立即顯示";
+    return "瞬間 ‧ 立即顯示";
   }
-  return `${SPEED_LABELS[speed]} · 每秒 ${TEXT_SPEED_CPS[speed]} 字`;
+  return `${SPEED_LABELS[speed]} ‧ 每秒 ${TEXT_SPEED_CPS[speed]} 字`;
 });
 
 function play() {

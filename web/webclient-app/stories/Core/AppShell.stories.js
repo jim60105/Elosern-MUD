@@ -292,7 +292,7 @@ const renderPlayer = (args) => ({
           } } : {}),
           ...(args.dialogue ? { dialogue: {
             schema_version: 2, available: true, kind: "dialogue",
-            host: { identity: 7, display_name: args.dialogue === "missing" ? "合成·旅人" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
+            host: { identity: 7, display_name: args.dialogue === "missing" ? "合成‧旅人" : "店長", portrait_ref: args.dialogue === "missing" ? null : "7" },
             bond_stage: "熟識",
             line: "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。",
             choices: [
@@ -360,7 +360,7 @@ const renderPlayer = (args) => ({
       // the window shows the last page complete, so the choice list shows at
       // once; `lateGreeting` delivers it after mount, so it types first.
       if (args.dialogue) {
-        const hostName = args.dialogue === "missing" ? "合成·旅人" : "店長";
+        const hostName = args.dialogue === "missing" ? "合成‧旅人" : "店長";
         const deliver = () =>
           store.appendText("out", `${hostName}說：「${args.greeting || "歡迎來到西風酒館。你可以在這裡打聽消息，也可以稍作休息再出發。"}」`);
         if (args.lateGreeting) setTimeout(deliver, 400);

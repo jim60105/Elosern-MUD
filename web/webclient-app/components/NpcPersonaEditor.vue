@@ -49,7 +49,7 @@ const leafFields = CARD_FIELDS.filter((field) => field.section !== "identity");
 
 const drawerTitle = computed(() => ed.value.displayName || "編輯人物設定");
 const drawerSubtitle = computed(() =>
-  !ready.value ? "" : ed.value.npcTitle ? `編輯人物設定 · ${ed.value.npcTitle}` : "編輯人物設定",
+  !ready.value ? "" : ed.value.npcTitle ? `編輯人物設定 ‧ ${ed.value.npcTitle}` : "編輯人物設定",
 );
 
 function domKey(key) {
@@ -303,7 +303,7 @@ const saveLabel = computed(() => (state.value === "saving" ? "儲存中……" :
 
           <div class="npe-notices">
             <div class="npe-notice npe-notice--spoiler" role="note" data-testid="npc-persona-editor-notice-spoiler">
-              <p class="npe-notice__title"><span class="npe-notice__mark" aria-hidden="true">✦</span>作者模式・含劇透</p>
+              <p class="npe-notice__title"><span class="npe-notice__mark" aria-hidden="true">✦</span>作者模式‧含劇透</p>
               <p class="npe-notice__body">這裡會顯示角色的隱秘身分與幕後設定。修改只影響這一位角色，不花費時間或金錢，也不會改變任何關係。</p>
             </div>
             <div class="npe-notice" role="note" data-testid="npc-persona-editor-notice-static">

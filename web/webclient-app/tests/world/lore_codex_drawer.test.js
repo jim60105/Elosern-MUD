@@ -79,7 +79,7 @@ describe("LoreCodexDrawer (webclient-lore-codex-drawer)", () => {
     // each field is named by its readable label while the raw identifier
     // stays the hook (webclient-zh-tw-copy-and-labels).
     expect(names).toEqual(["名稱", "描述", "例證"]);
-    expect(values).toEqual(["霧骨狼", "群棲於霧中的中型獸，骨白如霧。", "霧骨狼·頭狼"]);
+    expect(values).toEqual(["霧骨狼", "群棲於霧中的中型獸，骨白如霧。", "霧骨狼‧頭狼"]);
     expect(card.findAll(".lore-codex-drawer__card-field").map((f) => f.attributes("data-field"))).toEqual([
       "display_name_zh",
       "description",

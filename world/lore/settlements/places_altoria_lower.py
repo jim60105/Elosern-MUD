@@ -40,7 +40,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(3, 1),  # 南大道
         doorway_key_zh="餐館",
         doorway_aliases=("eatery", "restaurant", "diner"),
-        host_name="西格瑪·庫柏",
+        host_name="西格瑪‧庫柏",
         host_title="聖潔王都餐館老闆",
         host_race="human",
         host_subrace="human_plains",
@@ -54,7 +54,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ("dialogue_key", "altoria_eatery"),
         ),
     ),
-    # 蘿溫·古橡's tavern is the lane's information room: the document's
+    # 蘿溫‧古橡's tavern is the lane's information room: the document's
     # designated place for 招募同伴 and 打聽情報, so her table names the
     # commands that already work (talk, invite) and promises no drink
     # effect or gamble the source document leaves 〔提案〕.
@@ -71,7 +71,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(4, 1),  # 客棧巷
         doorway_key_zh="醉月酒館",
         doorway_aliases=("tavern", "drinking hall"),
-        host_name="蘿溫·古橡",
+        host_name="蘿溫‧古橡",
         host_title="聖潔王都酒館老闆",
         host_race="human",
         host_subrace=None,
@@ -82,7 +82,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=(),
         authored_kwargs=(("dialogue_key", "altoria_tavern"),),
     ),
-    # 溫弗蕾德·古林's inn shares the lane and its doorstep with the tavern.
+    # 溫弗蕾德‧古林's inn shares the lane and its doorstep with the tavern.
     # Her rooms host rest, sleep and practice exactly as those commands
     # work anywhere else — the room is narrative, never a mechanism, and
     # the lodging fee the document marks 〔提案〕 stays un-invented.
@@ -99,7 +99,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(4, 1),  # 客棧巷
         doorway_key_zh="爐火旅店",
         doorway_aliases=("inn", "lodging"),
-        host_name="溫弗蕾德·古林",
+        host_name="溫弗蕾德‧古林",
         host_title="聖潔王都旅店老闆娘",
         host_race="human",
         host_subrace=None,
@@ -110,7 +110,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         assortment_keys=(),
         authored_kwargs=(("dialogue_key", "altoria_lodging"),),
     ),
-    # 伊莎貝爾·葦沼's bathhouse is the document's contrast scene standing
+    # 伊莎貝爾‧葦沼's bathhouse is the document's contrast scene standing
     # ready: the human and beastfolk ethic of covered privacy against the
     # elven absence of shame, made visible in the room itself. No mechanic
     # (the document keeps 小幅恢復 as 〔提案〕); the keeper's job is the
@@ -129,7 +129,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(5, 1),  # 浴場前
         doorway_key_zh="公共浴場",
         doorway_aliases=("bathhouse", "baths"),
-        host_name="伊莎貝爾·葦沼",
+        host_name="伊莎貝爾‧葦沼",
         host_title="聖潔王都公共浴場管理員",
         host_race="human",
         host_subrace=None,
@@ -158,7 +158,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         exterior_xy=(3, 0),  # 南門
         doorway_key_zh="衛兵駐所",
         doorway_aliases=("guardhouse", "guard house"),
-        host_name="托瓦德·鄧堡",
+        host_name="托瓦德‧鄧堡",
         host_title="聖潔王都衛兵隊隊長",
         host_race="human",
         host_subrace=None,

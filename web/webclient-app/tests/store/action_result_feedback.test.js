@@ -325,13 +325,13 @@ describe("action-result narrative feedback", () => {
         fx.actionResult({
           request_id: "session:1",
           presentation_revision: 0,
-          data: { display_name: "加斯帕・斯諾" },
+          data: { display_name: "加斯帕‧斯諾" },
         }),
       ],
       {},
     );
     expect(accepted.accepted).toBe(true);
-    expect(store.view.lastActionResult.data).toEqual({ display_name: "加斯帕・斯諾" });
+    expect(store.view.lastActionResult.data).toEqual({ display_name: "加斯帕‧斯諾" });
     // A success result speaks no narrative line.
     expect(errLines()).toEqual([]);
   });

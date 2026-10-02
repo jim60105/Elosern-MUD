@@ -36,7 +36,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "combat_tease_whisper",
-        "挑逗·耳語",
+        "挑逗‧耳語",
         "在交鋒間隙湊近對方耳畔低語，以撩人的言語攪亂其心神。",
         TargetSpec.SINGLE,
         {"hostile_act_count": 5},
@@ -51,7 +51,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
     ),
     (
         "combat_tease_touch",
-        "挑逗·觸碰",
+        "挑逗‧觸碰",
         "在交鋒間隙以指尖輕觸對方腰腹，讓戰意與慾念一同升起。",
         TargetSpec.SINGLE,
         {"hostile_act_count": 5},

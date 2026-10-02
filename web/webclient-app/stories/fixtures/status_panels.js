@@ -21,7 +21,7 @@ export const STATUS_PANEL_SAMPLE = {
   schema_version: 2,
   available: true,
   actor: {
-    name: "艾倫·灰誓",
+    name: "艾倫‧灰誓",
     identity: "char-42",
     location: { label: "霧骨渡口", identity: "room-7" },
   },

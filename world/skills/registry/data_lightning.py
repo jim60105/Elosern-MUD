@@ -25,7 +25,7 @@ from world.skills.registry.vocab import (
 )
 
 ROWS: tuple[SkillDef, ...] = (
-        # 雷 — 學徒（先制路線・根）
+        # 雷 — 學徒（先制路線‧根）
         _spell(
             "static_ward",
             "靜電護罩",
@@ -59,7 +59,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("static_ward", 3),),
             effect_policies=(EffectPolicy(), EffectPolicy()),
         ),
-        # 雷 — 大師（先制路線・分支點）
+        # 雷 — 大師（先制路線‧分支點）
         _spell(
             "thunder_combo",
             "雷霆連擊",
@@ -95,7 +95,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("thunder_combo", 5),),
             effect_policies=(EffectPolicy(),),
         ),
-        # 雷 — 賢者（先制路線・分支終點）
+        # 雷 — 賢者（先制路線‧分支終點）
         _spell(
             "thunder_shatter_strike",
             "碎雷連擊",
@@ -110,7 +110,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("thunder_combo", 5),),
             effect_policies=(EffectPolicy(coefficient=2.8),),
         ),
-        # 雷 — 主宰（先制路線・處決級）
+        # 雷 — 主宰（先制路線‧處決級）
         _spell(
             "judgement_thunder",
             "審判雷霆",
@@ -130,7 +130,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 雷 — 學徒（過載路線・根）
+        # 雷 — 學徒（過載路線‧根）
         _spell(
             "spark_shock",
             "電擊術",
@@ -144,7 +144,7 @@ ROWS: tuple[SkillDef, ...] = (
             group="lightning",
             effect_policies=(EffectPolicy(coefficient=1.0),),
         ),
-        # 雷 — 術師（過載路線・分支點）
+        # 雷 — 術師（過載路線‧分支點）
         _spell(
             "chain_lightning",
             "雷鎖術",
@@ -159,7 +159,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("spark_shock", 3),),
             effect_policies=(EffectPolicy(coefficient=1.0),),
         ),
-        # 雷 — 術師（過載路線・分支點）
+        # 雷 — 術師（過載路線‧分支點）
         _spell(
             "paralyzing_bolt",
             "麻痺電擊",
@@ -192,7 +192,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("chain_lightning", 3),),
             effect_policies=(EffectPolicy(coefficient=1.4),),
         ),
-        # 雷 — 大師（過載路線・分支終點）
+        # 雷 — 大師（過載路線‧分支終點）
         _spell(
             "thunder_prison",
             "雷獄囚縛",
@@ -225,7 +225,7 @@ ROWS: tuple[SkillDef, ...] = (
             prerequisites=(SkillPrerequisite("lightning_strike", 5),),
             effect_policies=(EffectPolicy(coefficient=2.0),),
         ),
-        # 雷 — 主宰（過載路線・毀滅級）
+        # 雷 — 主宰（過載路線‧毀滅級）
         _spell(
             "divine_lightning_slaughter",
             "神雷滅殺",
@@ -246,7 +246,7 @@ ROWS: tuple[SkillDef, ...] = (
                 ),
             ),
         ),
-        # 雷 — 神格（兩線匯合・樹冠）
+        # 雷 — 神格（兩線匯合‧樹冠）
         _spell(
             "thunder_apotheosis",
             "雷霆神格",

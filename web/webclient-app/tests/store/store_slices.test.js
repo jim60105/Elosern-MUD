@@ -88,7 +88,7 @@ describe("store view slices", () => {
     openActiveSession(store);
     expect(store.view.statusSlice.connected).toBe(true);
     expect(store.view.statusSlice.locationLabel).toBe("測試起點");
-    expect(store.view.statusSlice.timeLabel).toBe("春季 3 日 · 12:00");
+    expect(store.view.statusSlice.timeLabel).toBe("春季 3 日 ‧ 12:00");
     expect(store.view.statusSlice).toEqual({
       connected: STATUS_SLICE_SAMPLE.connected,
       locationLabel: STATUS_SLICE_SAMPLE.locationLabel,

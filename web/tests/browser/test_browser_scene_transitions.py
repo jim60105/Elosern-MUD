@@ -120,7 +120,7 @@ def _interior(current: str) -> dict:
 
 
 def _status(hp: int, conditions: list | None = None) -> dict:
-    status = valid_status_panel("艾倫·灰誓", "char-42")
+    status = valid_status_panel("艾倫‧灰誓", "char-42")
     status["resources"] = {
         "hp": {"current": hp, "maximum": 100},
         "mp": {"current": 50, "maximum": 50},

@@ -12,7 +12,7 @@ import {
 
 // InventoryPanel (H4, webclient-hud-04-reference-drawers, task 6.6;
 // relocate-inventory-drawer-essentials; redesign-inventory-item-grid): the
-// 背包 · 裝備 drawer body, shown inside the open shared `HudDrawer` chrome
+// 背包 ‧ 裝備 drawer body, shown inside the open shared `HudDrawer` chrome
 // (the real drawer width, header icon and wallet subtitle) instead of an
 // unframed body. The equipment doll and the single drawer-layer wallet
 // were relocated here from the character-status drawer, so the story set
@@ -98,7 +98,7 @@ function renderDrawer(args) {
             HudDrawer,
             {
               open: open.value,
-              title: "背包 · 裝備",
+              title: "背包 ‧ 裝備",
               subtitle: walletSubtitle(args.services, character),
               icon: "inventory",
               drawerKey: "inventory",
@@ -327,7 +327,7 @@ export const UnknownSlotEquipment = {
     character: {
       ...CHARACTER_PANEL_SAMPLE,
       equipment: [
-        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
         { slot: "mount", item_key: "mount_ash", display_name: "灰驛" },
       ],
     },
@@ -341,7 +341,7 @@ function multiAccessoryCharacter() {
   return {
     ...CHARACTER_PANEL_SAMPLE,
     equipment: [
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
       { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
       { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
@@ -380,7 +380,7 @@ function richWalletCharacter() {
   return {
     ...CHARACTER_PANEL_SAMPLE,
     equipment: [
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
       { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
     ],
@@ -468,7 +468,7 @@ export const RowActionStates = {
               HudDrawer,
               {
                 open: open.value,
-                title: "背包 · 裝備",
+                title: "背包 ‧ 裝備",
                 subtitle: walletSubtitle(args.services, character),
                 icon: "inventory",
                 drawerKey: "inventory",

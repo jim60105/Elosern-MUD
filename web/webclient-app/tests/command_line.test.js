@@ -131,7 +131,7 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
   // webclient-align-02-quickbar-shortcuts: the truthful hint + Tab completion.
   it("the hint cluster states exactly the draft's history + completion affordance", () => {
     const w = mountLine();
-    expect(w.get(".hint").text()).toBe("↑↓ 歷史 · Tab 補全");
+    expect(w.get(".hint").text()).toBe("↑↓ 歷史 ‧ Tab 補全");
   });
 
   function pressTab(w, opts = {}) {

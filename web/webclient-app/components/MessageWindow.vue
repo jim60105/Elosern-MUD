@@ -874,7 +874,7 @@ export default {
                         : h(
                             "span",
                             { class: "message-window__plate-bond", "data-testid": "dialogue-bond" },
-                            ` · 羈絆 ${props.dialogue.bondStage}`,
+                            ` ‧ 羈絆 ${props.dialogue.bondStage}`,
                           ),
                     ]),
                   ])

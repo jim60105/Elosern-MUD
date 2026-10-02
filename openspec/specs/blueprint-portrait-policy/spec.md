@@ -31,7 +31,7 @@ missing `display_name` or `title` SHALL be rejected before any compilation.
 construction guard (`_reject_mutable_containers`) is preserved.
 
 #### Scenario: A named occupant with a story-driven age validates
-- **WHEN** a blueprint stage declares `npc_req: [{"role": "librarian", "tier": "civilian", "display_name": "莉絲·晨星", "title": "城鎮圖書館員", "age": 68, "apparent_age": 68, "portrait": {"stable_key": "library_keeper"}}]`
+- **WHEN** a blueprint stage declares `npc_req: [{"role": "librarian", "tier": "civilian", "display_name": "莉絲‧晨星", "title": "城鎮圖書館員", "age": 68, "apparent_age": 68, "portrait": {"stable_key": "library_keeper"}}]`
 - **THEN** the blueprint validates and carries all fields through the whole lifecycle
 
 #### Scenario: An elf of several centuries validates within the race lifespan band

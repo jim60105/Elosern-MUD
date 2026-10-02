@@ -268,7 +268,7 @@ export default {
                 surface: "fulllog",
                 icon: "log",
                 title: "日誌",
-                subtitle: "完整紀錄 · 由舊到新",
+                subtitle: "完整紀錄 ‧ 由舊到新",
                 titleId,
                 onClose: close,
               }),
@@ -301,7 +301,7 @@ export default {
                 h(
                   "span",
                   { class: "fulllog-overlay__legend", "aria-hidden": "true" },
-                  "↑↓ 捲動 · End 最新 · Esc 關閉",
+                  "↑↓ 捲動 ‧ End 最新 ‧ Esc 關閉",
                 ),
                 atEnd.value
                   ? null

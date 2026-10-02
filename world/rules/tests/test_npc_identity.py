@@ -129,8 +129,8 @@ class ValidateNPCNameTests(unittest.TestCase):
     def test_legal_name_round_trips_stripped(self):
         self.assertEqual(validate_npc_name(" 黑鬍 "), "黑鬍")
         self.assertEqual(
-            validate_npc_name(f"{_FULL_WIDTH_SPACE}岑影·鐵硨{_FULL_WIDTH_SPACE}"),
-            "岑影·鐵硨",
+            validate_npc_name(f"{_FULL_WIDTH_SPACE}岑影‧鐵硨{_FULL_WIDTH_SPACE}"),
+            "岑影‧鐵硨",
         )
 
     def test_interior_ordinary_whitespace_is_allowed(self):

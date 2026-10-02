@@ -44,7 +44,7 @@ let trap = null;
 // and its tooltip read the same words.
 function titleFor(name) {
   if (name === "map") {
-    return props.locationLabel ? `地圖 · ${props.locationLabel}` : "地圖";
+    return props.locationLabel ? `地圖 ‧ ${props.locationLabel}` : "地圖";
   }
   if (name === "settings") return "設定";
   return toolLabel(name) ?? toolLabel("help");
@@ -67,8 +67,8 @@ function iconFor(name) {
 function subtitleFor(name) {
   if (name === "map") return "所在位置與相鄰路徑";
   if (name === "settings") return "閱讀偏好與輔助顯示";
-  if (name === "lineage") return "熟練度 · 見頂 · 前置";
-  if (name === "codex") return "稱號 · 異名 · 提名中";
+  if (name === "lineage") return "熟練度 ‧ 見頂 ‧ 前置";
+  if (name === "codex") return "稱號 ‧ 異名 ‧ 提名中";
   if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
   if (name === "help") return "按鍵、指令列與閱讀操作";
   return "";

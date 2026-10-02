@@ -361,7 +361,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 focus_action_dock(page)
-                status = valid_status_panel("艾倫·灰誓", "char-42")
+                status = valid_status_panel("艾倫‧灰誓", "char-42")
                 status["resources"]["hp"] = {"current": 12, "maximum": 405}
                 # The signed modifier values mirror the deterministic
                 # combat_modifiers.yaml (defense -15, agility -10, hp -3):

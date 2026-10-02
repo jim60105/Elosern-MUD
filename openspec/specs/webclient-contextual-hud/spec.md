@@ -373,7 +373,7 @@ hidden with the message region.
 
 While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
 carry a name plate above its text area, naming the host with the panel's `display_name` plus
-` · 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
+` ‧ 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
 present the current response's pages — the session line as the narrative delivered it, paged and typed
 like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
 from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
@@ -425,7 +425,7 @@ waits for.
 
 #### Scenario: The dialogue line is paged under the name plate
 - **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, and a greeting long enough for two pages at 1920x1080
-- **THEN** the window spans the whole band, shows the name plate `灰婆婆 · 羈絆 親睦`, types page 1 with no marker until it is fully shown, shows `▼`, advances on Enter on the page surface to page 2, and shows `■` once page 2 is fully shown, with no choice row inside the window at any point
+- **THEN** the window spans the whole band, shows the name plate `灰婆婆 ‧ 羈絆 親睦`, types page 1 with no marker until it is fully shown, shows `▼`, advances on Enter on the page surface to page 2, and shows `■` once page 2 is fully shown, with no choice row inside the window at any point
 
 #### Scenario: An unbonded host's plate names only the host
 - **WHEN** mode `dialogue` commits with `bond_stage` `null`
@@ -864,8 +864,8 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 scrolling region, in exploration and combat mode (never in creation mode, and never visibly in
 dialogue mode, where the strip is hidden with the collapsed command region), matching
 `docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text
-`數字鍵 1–9 · ` followed by an `<kbd>` element naming `Enter`
-and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`.
+`數字鍵 1–9 ‧ ` followed by an `<kbd>` element naming `Enter`
+and the verb `執行`, the separator `‧`, and an `<kbd>` element naming `Esc` and the verb `返回`.
 The legend renders
 with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
 The legend SHALL render exactly once as visible content and SHALL be the only element carrying the
@@ -901,7 +901,7 @@ through to the text / command-history path.
 
 #### Scenario: The legend matches the reference wording and kbd structure
 - **WHEN** the dock renders its legend strip in exploration or combat mode
-- **THEN** the legend reads `數字鍵 1–9 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
+- **THEN** the legend reads `數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
 
 #### Scenario: A digit picks its row
@@ -1299,7 +1299,7 @@ register itself as an open surface so the stage recession this capability alread
 without a second mechanism.
 
 The skill-book drawer specifically SHALL carry, whenever the `character` panel is available, a
-subtitle stating its owner's active and passive skill counts (`主動 {n} · 被動 {m}`, computed from that
+subtitle stating its owner's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that
 same payload `SkillBook` renders) in the drawer head; when the panel is unavailable the subtitle is
 empty, matching the drawer's existing degrade-without-inventing-data contract. The skill-book drawer
 SHALL carry a footer stating the client's own cast-command syntax
@@ -1339,10 +1339,10 @@ sub-screen replaced.
 
 #### Scenario: The skill-book drawer states its skill counts and cast syntax
 - **WHEN** the skill-book drawer opens with the `character` panel available
-- **THEN** its head carries a leading skill glyph and a `主動 {n} · 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
+- **THEN** its head carries a leading skill glyph and a `主動 {n} ‧ 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
 
 ### Requirement: Reference drawers present no router frame and never host a dock row region
-No reference drawer SHALL present a keyboard router frame. Opening any reference drawer — including the 背包 · 裝備 drawer from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, and the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row — SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer. No reference drawer body SHALL render the dock's row renderer (`dock-menu`) or detail pane (`dock-detail`) in any state. Closing a reference drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the control that opened it. Committed rows inside a reference drawer SHALL remain reachable by keyboard without a hosted router frame.
+No reference drawer SHALL present a keyboard router frame. Opening any reference drawer — including the 背包 ‧ 裝備 drawer from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, and the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row — SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer. No reference drawer body SHALL render the dock's row renderer (`dock-menu`) or detail pane (`dock-detail`) in any state. Closing a reference drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the control that opened it. Committed rows inside a reference drawer SHALL remain reachable by keyboard without a hosted router frame.
 
 A drawer SHALL be openable only while its backing payload is present. When the committed mode changes so that a drawer's payload is no longer available, when the presentation epoch resets, or when the transport is lost, every open drawer SHALL close and every local selection, quantity and confirmation state inside it SHALL be discarded.
 
@@ -1375,7 +1375,7 @@ A drawer SHALL be openable only while its backing payload is present. When the c
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
 
 ### Requirement: The bag renders the bounded inventory rows without inventing a total or a rarity
-The bag workspace SHALL use shared chrome for the `背包 · 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section. The available body SHALL present an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
+The bag workspace SHALL use shared chrome for the `背包 ‧ 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section. The available body SHALL present an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
 
 Each registered row's non-null `presentation` SHALL select one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment. Its tile SHALL show committed held count and a non-colour equipped marker. A null presentation SHALL render only the neutral unknown-item SVG and visible unknown marker; the browser SHALL NOT derive type, icon, rarity, summary, or mechanics from item key or display name. The grid SHALL use native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths SHALL expose identical committed name, kind, rarity, count, equipped state, and summary, and the focused tile SHALL reference the stable inspector through `aria-describedby`.
 
@@ -1437,13 +1437,13 @@ The drawer SHALL remain available from its combat affordance when services v3 in
 - **THEN** transitions are effectively instant while labels, reasons, focus, and committed item information remain available
 
 ### Requirement: The equipment doll renders only server-authored slots and drops nothing
-The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 · 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title. The doll SHALL lay out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels. The doll SHALL render the server's three singleton slots and one accessory summary as four named positions in the square grid. The main-hand, armor, and accessory-summary positions SHALL each render a fixed local SVG selected by its server-authored slot role; the off-hand position SHALL be the iconless position. The doll SHALL NOT select an item icon from an item key or display name. A singleton slot with no row SHALL render a visible named empty state with a dashed outline. An occupied singleton slot SHALL render its visible slot label in the grid and its committed display name in the 裝備描述 column; when the committed rows carry more than one row for a recognised singleton slot, the square position consumes only the first row and every further row for that slot SHALL render as a labelled overflow row, so no committed row is lost. The accessory summary SHALL render its visible label and committed item count, while every repeatable accessory row SHALL render in the 裝備描述 column's accessory group. Any slot key outside the recognised set SHALL render as a labelled fallback row rather than being discarded, so no row the payload sends is lost. When the committed rows carry no equipment at all the doll SHALL render only its visible empty statement.
+The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 ‧ 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title. The doll SHALL lay out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels. The doll SHALL render the server's three singleton slots and one accessory summary as four named positions in the square grid. The main-hand, armor, and accessory-summary positions SHALL each render a fixed local SVG selected by its server-authored slot role; the off-hand position SHALL be the iconless position. The doll SHALL NOT select an item icon from an item key or display name. A singleton slot with no row SHALL render a visible named empty state with a dashed outline. An occupied singleton slot SHALL render its visible slot label in the grid and its committed display name in the 裝備描述 column; when the committed rows carry more than one row for a recognised singleton slot, the square position consumes only the first row and every further row for that slot SHALL render as a labelled overflow row, so no committed row is lost. The accessory summary SHALL render its visible label and committed item count, while every repeatable accessory row SHALL render in the 裝備描述 column's accessory group. Any slot key outside the recognised set SHALL render as a labelled fallback row rather than being discarded, so no row the payload sends is lost. When the committed rows carry no equipment at all the doll SHALL render only its visible empty statement.
 
 The doll SHALL NOT render an item statistic, attack or defence value, rarity, item icon, summary, or comparison against another item: the equipment rows carry none of those. Equipment SHALL be presented as true values that a disguise does not affect, and the section tag SHALL state exactly that.
 
 #### Scenario: The equipment section is titled 裝備 with the true-value tag
 - **WHEN** the bag renders its equipment section
-- **THEN** the section heading reads `裝備` with the tag `真值 · 偽裝不影響` in the bag's shared section-heading style, and the string `裝備人偶` appears nowhere in the drawer
+- **THEN** the section heading reads `裝備` with the tag `真值 ‧ 偽裝不影響` in the bag's shared section-heading style, and the string `裝備人偶` appears nowhere in the drawer
 
 #### Scenario: An empty slot is shown as empty
 - **WHEN** the committed equipment rows carry no row for a singleton slot
@@ -1486,7 +1486,7 @@ The character-status drawer SHALL preserve the 親密狀態 disclosure section a
 
 Each of the drawer's sections (vitals, traits, conditions, guild counters, disguise, intimate status, persona) SHALL carry a labelled, small-caps section heading naming what it presents, using the same heading treatment the HUD's other islands use. The vitals, traits, and guild-counter sections SHALL render each value as its own bordered card tile in an auto-fill grid of equal-width tracks rather than a plain text row, each tile only as tall as its own content, with the tile's label at the left and its `current`/`current / maximum` value in the shared numeral treatment at the right; a tile carrying more than two breakdown chips SHALL span its grid's full row so its chips wrap in one wide line; no value not already present in the committed payload (such as an effective-vs-base delta) SHALL be invented to fill the tile. The sections themselves SHALL be content-sized cards in an auto-fit grid of equal-width tracks in their DOM order, with the persona area, the intimate disclosure, and a panel-wide unavailable reason spanning the full row, so no section's height depends on another's.
 
-The drawer body SHALL open with a hero naming the committed character: the `status` panel's actor name, its composed full title (`status` actor `full_title`), and the `character` panel's guild rank, each rendered only when the payload supplies a non-blank value and omitted — never guessed — otherwise; the name and title therefore stay in every mode, and the rank is absent while the `character` panel is unavailable. The hero SHALL carry the drawer's existing secondary openers (技能書, and 同伴 · 隊伍 while the party panel is available) in one wrapping action row, with their existing behavior. The body SHALL NOT repeat the drawer title the shared header already renders. The condition roster SHALL render as a wrapped row of rounded pill badges, one per condition, each carrying that condition's label, its visible severity word, its non-colour severity glyph, and its duration/modifier text — the same content the roster shows today, none of it dropped — coloured per severity using the same severity-to-colour mapping the capped status-island condition chips use elsewhere in the HUD. These presentation rules apply identically whether a section is fully populated or marked with a registry-owned unavailable reason.
+The drawer body SHALL open with a hero naming the committed character: the `status` panel's actor name, its composed full title (`status` actor `full_title`), and the `character` panel's guild rank, each rendered only when the payload supplies a non-blank value and omitted — never guessed — otherwise; the name and title therefore stay in every mode, and the rank is absent while the `character` panel is unavailable. The hero SHALL carry the drawer's existing secondary openers (技能書, and 同伴 ‧ 隊伍 while the party panel is available) in one wrapping action row, with their existing behavior. The body SHALL NOT repeat the drawer title the shared header already renders. The condition roster SHALL render as a wrapped row of rounded pill badges, one per condition, each carrying that condition's label, its visible severity word, its non-colour severity glyph, and its duration/modifier text — the same content the roster shows today, none of it dropped — coloured per severity using the same severity-to-colour mapping the capped status-island condition chips use elsewhere in the HUD. These presentation rules apply identically whether a section is fully populated or marked with a registry-owned unavailable reason.
 
 #### Scenario: The drawer is useful in combat
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
@@ -1518,7 +1518,7 @@ The drawer body SHALL open with a hero naming the committed character: the `stat
 
 #### Scenario: The hero names the committed character
 - **WHEN** the character-status drawer opens with a `status` panel carrying an actor name and full title and an available `character` panel carrying a guild rank
-- **THEN** the hero shows that name, that title and `公會階級 <rank>` above one row holding the 技能書 and 同伴 · 隊伍 openers, and the drawer title appears only in the shared header
+- **THEN** the hero shows that name, that title and `公會階級 <rank>` above one row holding the 技能書 and 同伴 ‧ 隊伍 openers, and the drawer title appears only in the shared header
 
 ### Requirement: The drawer layer renders the wallet exactly once
 Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer. The shop, the lore reference, the character-status drawer, and every other body element of the inventory drawer SHALL NOT render a balance of their own. A drawer whose available character panel does not carry a committed non-negative integer wallet SHALL render no balance at all rather than a zero; the `金錢` body row is additionally gated on the bag's available inventory section, because it renders only inside the bag's three-section stack and the two renderings must never disagree.
@@ -1650,7 +1650,7 @@ visibility matrix.)
 
 ### Requirement: The command line advertises only affordances this client implements
 The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
-recall keys and the Tab-completion affordance — matching the draft's `↑↓ 歷史 · Tab 補全` — and
+recall keys and the Tab-completion affordance — matching the draft's `↑↓ 歷史 ‧ Tab 補全` — and
 Tab completion SHALL behave as named: pressing Tab inside the input field completes the current
 draft against the client's candidate set (session command history and the committed exploration panel's exit names and interact-target display names, deduplicated). With exactly one matching candidate the field SHALL hold the full completion with
 the caret at its end; with several the field SHALL hold the longest common prefix and successive
@@ -1906,14 +1906,14 @@ as the cell's tooltip, stating the display name, the HP numerals, and the row's 
 the committed combat panel's participant rows carry a row with the same `identity`, the cell SHALL
 additionally show that participant's session token (e.g. `a2`) as a visible badge on the avatar; a
 companion not fighting SHALL show no token. The island SHALL render no invite cell and no padding for
-missing companions: inviting and the 空位 row live in the 同伴 · 隊伍 drawer, where every row's name,
+missing companions: inviting and the 空位 row live in the 同伴 ‧ 隊伍 drawer, where every row's name,
 numerals, and bond stage are also visible text. Activating the island or any cell SHALL open the
-同伴 · 隊伍 drawer and SHALL NOT dispatch any action. The island SHALL present no affinity numeral, no
+同伴 ‧ 隊伍 drawer and SHALL NOT dispatch any action. The island SHALL present no affinity numeral, no
 companion trait the panel does not carry, and no estimate.
 
 Because the island is absent for an empty party, the character-status drawer SHALL carry one
-labelled `同伴 · 隊伍` control, rendered while the committed `party` panel is available, that opens
-the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachable at every party size.
+labelled `同伴 ‧ 隊伍` control, rendered while the committed `party` panel is available, that opens
+the 同伴 ‧ 隊伍 drawer and dispatches nothing, so that drawer stays reachable at every party size.
 
 #### Scenario: The quickbar mirrors the committed party
 - **WHEN** a snapshot commits two party slots with HP 180/220 and 144/160 and bond stages 親睦
@@ -1938,18 +1938,18 @@ the 同伴 · 隊伍 drawer and dispatches nothing, so that drawer stays reachab
 
 #### Scenario: The quickbar opens the drawer without mutating
 - **WHEN** the player activates a party cell
-- **THEN** the 同伴 · 隊伍 drawer opens and no `ui_action` or text command is sent
+- **THEN** the 同伴 ‧ 隊伍 drawer opens and no `ui_action` or text command is sent
 
 #### Scenario: An empty party renders no island
 - **WHEN** the committed `party` panel is available with an empty `slots` list in exploration mode
 - **THEN** no party island, header, count, or invite cell is rendered anywhere in the HUD, and nothing in the `vitals` anchor is focusable on its behalf
 
 #### Scenario: The party drawer stays reachable with an empty party
-- **WHEN** the committed party is empty and the player opens the character-status drawer and activates its `同伴 · 隊伍` control
-- **THEN** the 同伴 · 隊伍 drawer opens with its 空位 row and follow rules, and no `ui_action` or text command is sent
+- **WHEN** the committed party is empty and the player opens the character-status drawer and activates its `同伴 ‧ 隊伍` control
+- **THEN** the 同伴 ‧ 隊伍 drawer opens with its 空位 row and follow rules, and no `ui_action` or text command is sent
 
 ### Requirement: The party drawer presents compbig rows and the fixed follow rules
-The 同伴 · 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count
+The 同伴 ‧ 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count
 `N / 4`, one compbig row per committed party slot (initial-letter/gold avatar with the same
 portrait fallback, display name, bond stage line, HP bar with numerals, the joined 參戰 token
 when the companion fights, and a 請其離隊 control), and one 空位 row stating the invite rule in
@@ -2166,8 +2166,8 @@ reformat, abbreviate, or derive them. The heading, the rule, and the time line S
 fixed height.
 
 #### Scenario: The card names the location and the time
-- **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 · 12:00`, and no `local_map` panel
-- **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 · 12:00`, and no other stage or top-band element states either string
+- **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 ‧ 12:00`, and no `local_map` panel
+- **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 ‧ 12:00`, and no other stage or top-band element states either string
 
 #### Scenario: The card names the region, not the raw room key
 - **WHEN** the player stands in a wilderness cell whose status location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
@@ -2322,8 +2322,8 @@ any transition between them is owned by the motion layer.
 - **THEN** the host's stage actor renders that complete image bottom-aligned with contain fit, and no other image source is requested
 
 #### Scenario: A pending or missing portrait shows the truthful placeholder
-- **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安·衛登` opens a conversation
-- **THEN** the first stage actor shows a grounded silhouette with the host identity and pending state, and the second shows the initial `葛`, identity `葛里安·衛登` and missing state, and neither renders an image
+- **WHEN** the host's catalog entry is a pending placeholder, and later a host with `portrait_ref` `null` named `葛里安‧衛登` opens a conversation
+- **THEN** the first stage actor shows a grounded silhouette with the host identity and pending state, and the second shows the initial `葛`, identity `葛里安‧衛登` and missing state, and neither renders an image
 
 #### Scenario: The host speaks and the player is dimmed
 - **WHEN** a conversation opens and the host's greeting commits

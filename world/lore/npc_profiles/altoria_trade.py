@@ -9,7 +9,7 @@ passages of ``docs/lore/settlement-locations.md``. Every host's dialogue
 table authors its own greeting, so each profile authors only the
 ``misunderstood`` voice line.
 
-瑪爾特·金秤 authors sex ``other``: the card never gives the host a gendered
+瑪爾特‧金秤 authors sex ``other``: the card never gives the host a gendered
 pronoun.
 """
 
@@ -52,7 +52,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "閒下來就翻帳簿，用炭筆在頁邊畫只有自己看得懂的小記號。"
             ),
             social_connection=(
-                "和同在市場街的首飾坊主艾蓮娜·鴉丘、東市的鍊金坊主希碧拉·灰沼"
+                "和同在市場街的首飾坊主艾蓮娜‧鴉丘、東市的鍊金坊主希碧拉‧灰沼"
                 "是多年街坊，客人問起飾品或藥水，就直接請人過去找她們。"
             ),
         ),
@@ -98,7 +98,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "回爐裡重打。客人說話時，他手上的錘子也不會停。"
             ),
             social_connection=(
-                "和隔壁裁縫坊的妮絲塔·狐溪共用一個門口，兩人常為了煤灰飄進布料"
+                "和隔壁裁縫坊的妮絲塔‧狐溪共用一個門口，兩人常為了煤灰飄進布料"
                 "吵嘴，不過她店裡鎖子甲的鐵環，全出自他的鐵砧。"
             ),
         ),
@@ -144,7 +144,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "數字。收到舊衣，第一件事是翻過來看縫線。"
             ),
             social_connection=(
-                "和隔壁鍛造鋪的維爾登·黑潭共用一個門口，嘴上老抱怨他的煤灰，"
+                "和隔壁鍛造鋪的維爾登‧黑潭共用一個門口，嘴上老抱怨他的煤灰，"
                 "卻每天下午替他留一壺茶。"
             ),
         ),
@@ -192,7 +192,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "回去，擺錯一件就全部重來。"
             ),
             social_connection=(
-                "和雜貨店的瑪爾特·金秤是同一條街的老鄰居，瑪爾特常把來問飾品"
+                "和雜貨店的瑪爾特‧金秤是同一條街的老鄰居，瑪爾特常把來問飾品"
                 "的客人指到她這裡。大神殿的聖職者偶爾會來訂光輝聖徽。"
             ),
         ),
@@ -239,7 +239,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "貼紅標的瓶子，從不讓客人自己伸手去拿。"
             ),
             social_connection=(
-                "市場街雜貨店的瑪爾特·金秤會把要買藥水的客人送過來，希碧拉也把要買止血藥草的人送回雜貨店，兩家這樣互相介紹了好些年。"
+                "市場街雜貨店的瑪爾特‧金秤會把要買藥水的客人送過來，希碧拉也把要買止血藥草的人送回雜貨店，兩家這樣互相介紹了好些年。"
             ),
         ),
         age=40,
@@ -285,7 +285,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "出發，逐筆和書記核對過，才開始見客。"
             ),
             social_connection=(
-                "市場街雜貨店的瑪爾特·金秤和東市鍊金坊的希碧拉·灰沼都是商會成員，"
+                "市場街雜貨店的瑪爾特‧金秤和東市鍊金坊的希碧拉‧灰沼都是商會成員，"
                 "每到季底都會來公所清帳。"
             ),
         ),

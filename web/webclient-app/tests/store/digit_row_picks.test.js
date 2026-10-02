@@ -46,7 +46,7 @@ function sixSkillCategory() {
 }
 
 // The nine-chip overview: three exits, two person chips, one object chip, and
-// the three footer chips (查看房間 · 等待／休息 · 建議), in reading order.
+// the three footer chips (查看房間 ‧ 等待／休息 ‧ 建議), in reading order.
 const NINE_CHIP_OVERRIDES = {
   move: [
     { exit_ref: "east", label: "東", destination: "room:43", enabled: true, disabled_reason: null },

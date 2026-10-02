@@ -2,7 +2,7 @@
  "id": "fantasy-human",
  "region": "奇幻",
  "era": "人類",
- "label": "奇幻・人類",
+ "label": "奇幻‧人類",
  "note": "適用於高奇幻／低奇幻／TRPG 場景的人類角色命名，走喬治．馬丁式擬真中世紀命名風格。名字為原創，非收錄自既有奇幻作品之專有名字。",
  "corpus_note": "命名風格參考喬治．馬丁（George R.R. Martin）常見手法：取讀者熟悉的真實英語人名，改動一兩個字母造出既熟悉又陌生的變體（如 Edward→Edvard、Peter→Petyn、Catherine→Catryn），營造擬真中世紀氛圍而非奇語感。姓氏採中世紀英式命名法，涵蓋地景、職業，以及私生子慣用姓（Snow／Stone／Rivers／Hill／Waters／Sand／Flowers／Storm／Pyke 一類，私生子常以地景命名以別於婚生子嗣）。所有給名和姓氏均為本資料包依上述風格自建之原創組合，已比對知名角色名清單確認未照抄。",
  "license": "https://creativecommons.org/licenses/by/4.0/",

@@ -34,10 +34,10 @@
 #     be twelve names for one blueprint.
 #   - `clergy` is the ministry blueprint (implement-church-foundation): the
 #     place-bound ScriptedDialogue of an attendant plus the ChurchHost clergy
-#     capability marker. It is the high celebrant 艾莉安娜·寒水's blueprint —
+#     capability marker. It is the high celebrant 艾莉安娜‧寒水's blueprint —
 #     an attendant who also receives the church join/offer ministry surface
 #     (design 2026-09-22-church-system-design §5.1). Per owner decision she
-#     is the SOLE ChurchHost: the sanctum steward 羅海西亞·芬威克 stays a
+#     is the SOLE ChurchHost: the sanctum steward 羅海西亞‧芬威克 stays a
 #     plain `merchant` selling the sanctum's wares, ministry being the
 #     celebrant's office alone. ScriptedDialogue stays the FIRST component so
 #     the roster reuse anchor (the blueprint's first service-bearing class)

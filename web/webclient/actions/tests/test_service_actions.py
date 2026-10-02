@@ -95,25 +95,25 @@ _T_RANK_BADGE = make_title("t_svc_guild_start", display_name_zh="公會註冊徽
 _T_RANKS = {
     "F": GuildRank(
         "F", 1, 0, 400, "Authored F ladder row.", _T_RANK_BADGE.key,
-        "灰鱗・銅徽", "合成公會考官",
+        "灰鱗‧銅徽", "合成公會考官",
     ),
     "E": GuildRank(
         "E", 2, 400, 4000, "Authored E ladder row.", _T_RANK_BADGE.key,
-        "霜鬃・銀環", "合成公會考官",
+        "霜鬃‧銀環", "合成公會考官",
     ),
     "D": GuildRank(
         "D", 3, 4000, None, "Authored D ladder row.", _T_RANK_BADGE.key,
-        "霜鬃・金環", "合成公會考官",
+        "霜鬃‧金環", "合成公會考官",
     ),
     # The kit's own ladder rows stay inside the scoped registry; park them at
     # non-adjacent orders so the exact-next-rank search never picks one.
     "t_bronze": GuildRank(
         "t_bronze", 8, 50, 400, "Kit ladder row (parked).", _T_RANK_BADGE.key,
-        "灰鱗・銅徽", "合成公會銅階考官",
+        "灰鱗‧銅徽", "合成公會銅階考官",
     ),
     "t_silver": GuildRank(
         "t_silver", 9, 400, 4000, "Kit ladder row (parked).", _T_RANK_BADGE.key,
-        "霜鬃・銀環", "合成公會銀階考官",
+        "霜鬃‧銀環", "合成公會銀階考官",
     ),
 }
 _T_EXAM_RANK = "E"
