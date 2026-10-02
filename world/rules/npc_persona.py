@@ -436,6 +436,23 @@ def update_npc_persona(
                 )
                 return UpdateOutcome(status="unavailable", version=None, reason="corrupt_meta")
 
+            generation = raw_meta.get("generation")
+            card_fmt = raw_meta.get("format")
+            if (
+                not isinstance(generation, int)
+                or isinstance(generation, bool)
+                or not isinstance(card_fmt, int)
+                or isinstance(card_fmt, bool)
+            ):
+                log_info("npc_persona_update_rejected", context={"npc": str(npc.pk), "char": actor_id, "reason": "corrupt_meta"})
+                return UpdateOutcome(status="unavailable", version=None, reason="corrupt_meta")
+
+            try:
+                validate_provenance(raw_meta.get("provenance"))
+            except NpcCardError:
+                log_info("npc_persona_update_rejected", context={"npc": str(npc.pk), "char": actor_id, "reason": "corrupt_meta"})
+                return UpdateOutcome(status="unavailable", version=None, reason="corrupt_meta")
+
             # 3. Check version conflict
             if current_version != expected_version:
                 log_info(

@@ -175,7 +175,6 @@ class NpcCardBoundaryCasesTest(unittest.TestCase):
             {"kind": "companion", "profile": "companion_elena", "owner": 42},
             {"kind": "import", "record": "import_npc_20261001"},
             {"kind": "generated_quest", "quest": "q_goblin_01", "stage": 2, "occupant": 1},
-            {"kind": "offline_bundle", "pool": "pool_adventurers", "bundle": "b_01"},
         ]
         for prov in valid_cases:
             res = validate_provenance(prov)
@@ -185,6 +184,7 @@ class NpcCardBoundaryCasesTest(unittest.TestCase):
         invalid_cases = [
             ("not_dict", "string"),
             ("unknown_kind", {"kind": "magic_spawn"}),
+            ("retired_offline_bundle", {"kind": "offline_bundle", "pool": "pool_adventurers", "bundle": "b_01"}),
             ("prose_in_field", {"kind": "profile", "profile": "x" * 200}),
             ("bool_in_owner", {"kind": "companion", "profile": "c1", "owner": True}),
             ("negative_int", {"kind": "generated_quest", "quest": "q", "stage": -1, "occupant": 0}),

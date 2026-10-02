@@ -90,7 +90,6 @@ PROVENANCE_KINDS: frozenset[str] = frozenset({
     "companion",
     "import",
     "generated_quest",
-    "offline_bundle",
 })
 
 # Maximum length for an identifier string in provenance (never prose)
@@ -408,11 +407,5 @@ def validate_provenance(provenance: Any) -> dict[str, Any]:
         validated["quest"] = _check_id_str(provenance.get("quest"), "quest")
         validated["stage"] = _check_int(provenance.get("stage"), "stage")
         validated["occupant"] = _check_int(provenance.get("occupant"), "occupant")
-
-    elif kind == "offline_bundle":
-        if set(provenance.keys()) != {"kind", "pool", "bundle"}:
-            raise NpcCardError("invalid_provenance", "offline_bundle")
-        validated["pool"] = _check_id_str(provenance.get("pool"), "pool")
-        validated["bundle"] = _check_id_str(provenance.get("bundle"), "bundle")
 
     return validated

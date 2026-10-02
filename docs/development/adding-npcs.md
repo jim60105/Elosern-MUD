@@ -24,6 +24,8 @@
 
 四條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
 
+依據設計文件 `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §13c 條款（KISS 原則），未使用的離線人物設定套件（Offline Persona Bundles）子系統已完整移除，不維護離線套件選擇器或相容別名；若未來有經正式核准之重啟需求，可由 Git 歷史紀錄復原。現行所有生產環境 NPC 皆透過上述四條完整卡片路徑建立。
+
 對話行為是另一個正交的決定：
 
 | 對話形態 | 條件 | 降級行為 |
