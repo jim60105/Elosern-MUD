@@ -19,6 +19,13 @@ import {
   creationOverlayPresenting,
 } from "./shared.js";
 
+// Actions whose non-success result the NPC author editor announces in its own
+// live region (npc-persona-editor-window D6): the generic narrative error line
+// is skipped so editor outcomes never enter the narrative log. The check runs
+// inside the request-id/epoch-matched in-flight branch, so it is keyed to the
+// result's own request.
+const EDITOR_PRESENTED_ACTIONS = new Set(["npc.persona.read", "npc.persona.update"]);
+
 export function applyTransport(ctx) {
   ctx.handleTransportLifecycle = function handleTransportLifecycle(prev, rs) {
     if (rs.generation !== prev.generation) {
@@ -87,7 +94,8 @@ export function applyTransport(ctx) {
     // untouched by the append.
     if (
       NON_SUCCESS_OUTCOMES.indexOf(result.outcome) !== -1 &&
-      !creationOverlayPresenting(rs)
+      !creationOverlayPresenting(rs) &&
+      !EDITOR_PRESENTED_ACTIONS.has(ctx.inFlight.actionId)
     ) {
       const message =
         typeof result.message === "string" && result.message.trim() !== ""

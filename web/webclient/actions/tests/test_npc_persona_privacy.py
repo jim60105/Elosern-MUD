@@ -156,6 +156,13 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
         # Build maximal valid cards with CJK, astral, and JSON escape chars
         # Total budget <= 2000 code points
         session, coordinator = self._session_and_coordinator()
+        # A maximal authored default rides every success alongside the field.
+        default_patch = patch(
+            "web.webclient.actions.npc_persona_actions.authored_greeting_for",
+            return_value="預" * 150 + "😀" * 150,
+        )
+        default_patch.start()
+        self.addCleanup(default_patch.stop)
 
         # 1. CJK maximal card
         cjk_card = {
@@ -171,7 +178,7 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
             session,
             coordinator,
             "npc.persona.update",
-            {"npc_id": self.npc.id, "expected_persona_version": 1, "persona": cjk_card},
+            {"npc_id": self.npc.id, "expected_persona_version": 1, "persona": cjk_card, "offline_greeting": "問" * 300},
             request_id="max-cjk",
         )
         self.assertEqual(res_cjk["outcome"], "success")
@@ -190,7 +197,7 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
             session,
             coordinator,
             "npc.persona.update",
-            {"npc_id": self.npc.id, "expected_persona_version": 2, "persona": astral_card},
+            {"npc_id": self.npc.id, "expected_persona_version": 2, "persona": astral_card, "offline_greeting": "😀" * 300},
             request_id="max-astral",
         )
         self.assertEqual(res_astral["outcome"], "success")
@@ -210,7 +217,7 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
             session,
             coordinator,
             "npc.persona.update",
-            {"npc_id": self.npc.id, "expected_persona_version": 3, "persona": escape_card},
+            {"npc_id": self.npc.id, "expected_persona_version": 3, "persona": escape_card, "offline_greeting": '"\\/\b\f\t' * 50},
             request_id="max-escape",
         )
         self.assertEqual(res_esc["outcome"], "success")
@@ -229,6 +236,8 @@ class NpcPersonaPrivacyAndBoundsTest(EvenniaTest):
         v_cjk = validate_ui_action_result(envelope_cjk)
         self.assertEqual(v_cjk["outcome"], "success")
         self.assertEqual(v_cjk["data"], res_cjk["data"])
+        self.assertEqual(v_cjk["data"]["offline_greeting"], "問" * 300)
+        self.assertEqual(len(v_cjk["data"]["default_greeting"]), 300)
 
         envelope_astral = {
             "protocol_version": 1,

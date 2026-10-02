@@ -208,6 +208,8 @@ export function applyView(ctx) {
       // | shop | quest | lore | status); at most one drawer is open at a
       // time (structural: one value).
       hudDrawer: ctx.hudDrawer.value,
+      // The NPC author editor's latest open request (`{ npcId, seq }`).
+      npcPersonaRequest: ctx.npcPersonaRequest,
       // H5 (task 5.2): the single open-overlay name (null | map | settings
       // | help | lineage), plus the opener element captured at open time —
       // the anchor

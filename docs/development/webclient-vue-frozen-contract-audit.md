@@ -327,8 +327,11 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 **Re-mapped `data-testid` set (H1–H5)** — 下列各家族重新對應至穩定的 `data-testid` 掛鉤；受管 Playwright 切片由所屬波次重新導向。前綴項目涵蓋動態後綴。
 
+The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-persona-editor-<suffix>` family (`version`, `total`, `notice-spoiler`, `notice-static`, `save`, `cancel`, `conflict`, `reload`, `discard`, `confirm-keep`, `confirm-discard`) and `npc-persona-field-<suffix>` (`speech_style`, `offline_greeting`, and the other labeled card controls). These action-result-backed hooks are frozen as REMAP-TO-TESTID and exercised by `test_browser_npc_persona_editor.py`; the existing `hud-drawer-scrim` remains its dismissal target.
+
 | Hook family | Wave | Bucket |
 |---|---|---|
+| `npc-persona-editor` + `npc-persona-editor-<suffix>` and `npc-persona-field-<suffix>` (the correlated editor, budgets, notices, conflict and discard controls, named field controls; targeted by `test_browser_npc_persona_editor.py`) | npc-persona-editor-window | REMAP-TO-TESTID |
 | `topbar`, `topbar-clock`, `topbar-location` | H1 | REMAP-TO-TESTID |
 | `narrative-feed`, `narrative-fulllog-control` | H1 | REMAP-TO-TESTID |
 | `text-console`, `text-console-input`, `text-console-log` (the dependency-free fallback console) | H1 | REMAP-TO-TESTID |

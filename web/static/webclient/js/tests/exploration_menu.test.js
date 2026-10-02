@@ -765,3 +765,36 @@ test("verbMenuFor yields 查看 and back for a target with no mapped affordance"
   const menu = ExplorationMenu.verbMenuFor(model, panel.interact[0]);
   assert.deepEqual(menu.items.map((item) => item.key), ["look-target", "back"]);
 });
+
+// npc-persona-editor-window D1: the 編輯人物設定 navigate row opens the author
+// editor bound by value to the target identity; a disabled row opens nothing
+// and explains itself with the server-authored reason.
+test("verbMenuFor maps the npc_persona affordance to a bound editor row", () => {
+  const panel = validPanel();
+  const target = Object.assign({}, panel.interact[0], {
+    affordances: [
+      { kind: "navigate", surface: "npc_persona", label: "編輯人物設定", enabled: true, disabled_reason: null },
+    ],
+  });
+  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
+  const menu = ExplorationMenu.verbMenuFor(model, target);
+  const row = menu.items.find((item) => item.key === "service-npc_persona");
+  assert.equal(row.label, "編輯人物設定");
+  assert.equal(row.enabled, true);
+  assert.equal(row.openNpcPersona, target.identity);
+  assert.equal(row.actionId, null, "opening the editor dispatches nothing itself");
+  assert.equal(row.openDrawer, undefined);
+
+  const reason = { code: "npc_persona.unavailable", message: "此角色的設定目前無法編輯或尚未初始化。" };
+  const disabledTarget = Object.assign({}, target, {
+    affordances: [{ kind: "navigate", surface: "npc_persona", label: "", enabled: false, disabled_reason: reason }],
+  });
+  const disabled = ExplorationMenu.verbMenuFor(model, disabledTarget).items.find(
+    (item) => item.key === "service-npc_persona"
+  );
+  assert.equal(disabled.label, "編輯人物設定", "an empty label falls back to the editor name");
+  assert.equal(disabled.enabled, false);
+  assert.equal(disabled.openNpcPersona, null);
+  assert.equal(disabled.description, reason.message);
+  assert.deepEqual(disabled.disabledReason, reason);
+});

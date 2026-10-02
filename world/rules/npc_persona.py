@@ -23,6 +23,7 @@ from world.lore.npc_card import (
     NpcCard,
     NpcCardError,
     normalize_card,
+    normalize_offline_greeting,
     validate_provenance,
 )
 from world.observability import log_info, log_warn
@@ -209,6 +210,23 @@ def provenance_profile_key(npc: Any) -> str | None:
     return key
 
 
+OFFLINE_GREETING_KEY = "npc_offline_greeting"
+
+
+def read_offline_greeting(npc: Any) -> str:
+    """Return an NPC's stored offline-greeting field verbatim, ``""`` when unset.
+
+    Never writes, normalizes, or repairs: a stored value is returned exactly as
+    persisted (the editor validates it like any draft), and an absent or
+    non-text attribute reads as ``""``.
+    """
+    try:
+        value = getattr(getattr(npc, "db", None), OFFLINE_GREETING_KEY, None)
+    except Exception:  # observability: ignore R2: deleted or inaccessible entities read as no override
+        return ""
+    return value if isinstance(value, str) else ""
+
+
 def is_card_available(npc: Any) -> bool:
     """Silent, read-only predicate checking whether an NPC's card is available and valid (D5).
 
@@ -338,13 +356,20 @@ def update_npc_persona(
     card_raw: Any,
     expected_version: Any,
     *,
+    offline_greeting: Any = "",
     actor: Any = None,
 ) -> UpdateOutcome:
-    """Update an NPC persona using compare-and-set on persona_version.
+    """Update an NPC persona card and offline greeting using compare-and-set on persona_version.
+
+    The card and the per-instance offline greeting (``db.npc_offline_greeting``)
+    are ONE submission: any changed component advances ``persona_version``
+    exactly once, an identical submission succeeds unchanged, and a stale
+    expected version writes nothing. An empty greeting clears the override
+    (the attribute is removed), restoring the authored default.
 
     Serializes across processes via a guarded row UPDATE inside transaction.atomic(),
-    reads the persisted version directly from the database bypassing idmapper caches,
-    and restores attribute caches on rollback.
+    reads the persisted version, card, and greeting directly from the database
+    bypassing idmapper caches, and restores attribute caches on rollback.
     """
     actor_id = str(getattr(actor, "pk", actor)) if actor is not None else None
 
@@ -373,10 +398,20 @@ def update_npc_persona(
         )
         return UpdateOutcome(status="invalid", version=None, reason=card_err.code, error=card_err)
 
+    try:
+        new_greeting = normalize_offline_greeting(offline_greeting)
+    except NpcCardError as greeting_err:
+        log_info(
+            "npc_persona_update_rejected",
+            context={"npc": str(npc.pk), "char": actor_id, "reason": "invalid_greeting"},
+        )
+        return UpdateOutcome(status="invalid", version=None, reason=greeting_err.code, error=greeting_err)
+
     # Snapshot attributes before transaction.atomic() (D4)
     snapshots = {
         "persona": attribute_snapshot(npc, "persona"),
         "npc_persona_meta": attribute_snapshot(npc, "npc_persona_meta"),
+        OFFLINE_GREETING_KEY: attribute_snapshot(npc, OFFLINE_GREETING_KEY),
     }
 
     try:
@@ -428,24 +463,37 @@ def update_npc_persona(
                 )
                 return UpdateOutcome(status="unavailable", version=None, reason="corrupt_card")
 
-            if current_card == new_card:
-                # No-op success: card is identical, version does not advance
+            raw_greeting = _raw_attribute_value(npc, OFFLINE_GREETING_KEY)
+            current_greeting = raw_greeting if isinstance(raw_greeting, str) else ""
+            card_changed = current_card != new_card
+            greeting_changed = current_greeting != new_greeting
+
+            if not card_changed and not greeting_changed:
+                # No-op success: card and greeting identical, version does not advance
                 return UpdateOutcome(status="unchanged", version=current_version)
 
-            # 5. Card has changed; advance version by 1
+            # 5. A component changed; advance version by exactly 1
             new_version = current_version + 1
             new_meta = dict(raw_meta)
             new_meta["persona_version"] = new_version
 
-            npc.db.persona = new_card.to_record()
+            if card_changed:
+                npc.db.persona = new_card.to_record()
+            if greeting_changed:
+                if new_greeting:
+                    npc.attributes.add(OFFLINE_GREETING_KEY, new_greeting)
+                else:
+                    npc.attributes.remove(OFFLINE_GREETING_KEY)
             npc.db.npc_persona_meta = new_meta
 
-            # Hook commit-bound event
+            # Hook commit-bound event (identifiers and flags only, never prose)
             event_context = {
                 "npc": str(npc.pk),
                 "char": actor_id,
                 "version_from": current_version,
                 "version_to": new_version,
+                "card_changed": card_changed,
+                "greeting_changed": greeting_changed,
             }
             transaction.on_commit(
                 lambda: log_info("npc_persona_updated", context=event_context)

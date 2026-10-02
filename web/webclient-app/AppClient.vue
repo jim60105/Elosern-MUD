@@ -37,6 +37,7 @@ import HelpOverlay from "./components/HelpOverlay.vue";
 import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
+import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
@@ -82,6 +83,8 @@ const {
   onShopBuy, onShopSell, onInventoryItemAction, onTitleBallotAction, onTitleCodexAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
+  npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
+  npcPersonaRetry, npcPersonaClose,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The dialogue host's standing portrait (webclient-dialogue-stage-actors
 // D2): the committed `art` panel's raw catalog entry named by the committed
@@ -493,8 +496,21 @@ function onFoeLineupGone() {
          stage. A single `HudDrawer` chrome hosts the drawer body for the
          store's single open-drawer name; only the open drawer's surface is
          in the DOM (task 7.7: no reference surface while closed). -->
+    <!-- The NPC author editor (npc-persona-editor-window) owns its drawer
+         chrome: it binds to the target captured at 編輯人物設定 and guards a
+         dirty close. -->
+    <NpcPersonaEditor
+      v-if="store.view.hudDrawer === 'npc_persona' && npcPersonaEditor.open"
+      :editor="npcPersonaEditor"
+      @input="npcPersonaSetField"
+      @save="npcPersonaSave"
+      @reload="npcPersonaReload"
+      @discard="npcPersonaDiscard"
+      @retry="npcPersonaRetry"
+      @close="npcPersonaClose"
+    />
     <HudDrawer
-      v-if="store.view.hudDrawer"
+      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona'"
       :open="true"
       :title="practiceOpen && store.view.hudDrawer === 'skill' ? '修煉' : drawerTitle"
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"

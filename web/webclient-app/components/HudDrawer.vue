@@ -27,6 +27,15 @@ const props = defineProps({
   // The leading head glyph: a `dock-icons.js` registry key, drawn by the
   // shared DrawerHeader. Every reference drawer declares one.
   icon: { type: String, default: null },
+  // npc-persona-editor-window D6a (additive, absent for every other drawer):
+  // `closeGuard` is consulted before Escape / the close control / the scrim
+  // close the drawer; returning `false` keeps the drawer, its trap, and its
+  // focus. `titleId` names the dialog through its header title.
+  // `bodyFlush` drops the body padding and scrolling so the hosted surface
+  // can own a fixed column beside its own scrolling region.
+  closeGuard: { type: Function, default: null },
+  titleId: { type: String, default: null },
+  bodyFlush: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["close"]);
@@ -52,6 +61,14 @@ onMounted(() => {
 });
 
 function close() {
+  if (props.closeGuard && props.closeGuard() === false) {
+    return;
+  }
+  forceClose();
+}
+
+// Close without consulting the guard (the host's confirmed discard).
+function forceClose() {
   if (trap) {
     trap.restore();
     trap = null;
@@ -85,6 +102,8 @@ function onKeydown(event) {
 function onScrimClick() {
   close();
 }
+
+defineExpose({ forceClose });
 </script>
 
 <template>
@@ -107,6 +126,7 @@ function onScrimClick() {
     :class="open ? 'hud-drawer open' : 'hud-drawer'"
     role="dialog"
     aria-modal="true"
+    :aria-labelledby="titleId || undefined"
     tabindex="-1"
     data-testid="hud-drawer"
     :data-drawer-key="drawerKey"
@@ -119,6 +139,7 @@ function onScrimClick() {
       :icon="icon"
       :title="title"
       :subtitle="subtitle"
+      :title-id="titleId"
       :close-tabindex="open ? 0 : -1"
       @close="close"
     />
@@ -126,7 +147,7 @@ function onScrimClick() {
       <aside v-if="$slots.art" class="hud-drawer__art">
         <slot name="art" />
       </aside>
-      <div class="hud-drawer__body">
+      <div :class="bodyFlush ? 'hud-drawer__body hud-drawer__body--flush' : 'hud-drawer__body'">
         <slot />
       </div>
     </div>
@@ -224,6 +245,15 @@ function onScrimClick() {
 
 @media (max-width: 1350px) {
   .hud-drawer__body { padding: calc(14px * var(--ui-scale)); }
+}
+
+/* A flush body hands its whole box to the hosted surface, which owns its own
+   scrolling region (the NPC author editor's fixed notice column). */
+.hud-drawer__body.hud-drawer__body--flush {
+  padding: 0;
+  overflow: clip;
+  display: flex;
+  flex-direction: column;
 }
 
 .hud-drawer__foot {

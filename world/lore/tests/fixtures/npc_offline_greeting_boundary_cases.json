@@ -1,0 +1,57 @@
+[
+  {
+    "name": "empty_clears_override",
+    "greeting": "",
+    "expected_valid": true,
+    "expected": ""
+  },
+  {
+    "name": "outer_whitespace_and_crlf_trimmed",
+    "greeting": "  \r\n「歡迎光臨。」\r\n ",
+    "expected_valid": true,
+    "expected": "「歡迎光臨。」"
+  },
+  {
+    "name": "exact_300_code_points",
+    "repeat_char": "問",
+    "repeat": 300,
+    "expected_valid": true
+  },
+  {
+    "name": "exact_300_astral_code_points",
+    "repeat_char": "😀",
+    "repeat": 300,
+    "expected_valid": true
+  },
+  {
+    "name": "over_by_one",
+    "repeat_char": "問",
+    "repeat": 301,
+    "expected_valid": false
+  },
+  {
+    "name": "internal_newline_rejected",
+    "greeting": "第一段。\n第二段。",
+    "expected_valid": false
+  },
+  {
+    "name": "internal_carriage_return_rejected",
+    "greeting": "第一段。\r第二段。",
+    "expected_valid": false
+  },
+  {
+    "name": "non_text_number_rejected",
+    "greeting": 42,
+    "expected_valid": false
+  },
+  {
+    "name": "non_text_null_rejected",
+    "greeting": null,
+    "expected_valid": false
+  },
+  {
+    "name": "non_text_boolean_rejected",
+    "greeting": true,
+    "expected_valid": false
+  }
+]

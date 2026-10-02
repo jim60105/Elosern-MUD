@@ -16,6 +16,7 @@ from world.lore.npc_card import (
     NPC_CARD_FORMAT,
     NPC_CARD_RENDER_ORDER,
     NPC_PERSONA_CONTENT_GENERATION,
+    OFFLINE_GREETING_LIMIT,
     OPTIONAL_TEXT_LEAVES,
     REQUIRED_TEXT_LEAVES,
     CardBudget,
@@ -24,12 +25,21 @@ from world.lore.npc_card import (
     NpcCardIdentity,
     card_budget,
     normalize_card,
+    normalize_offline_greeting,
     render_card_block,
     render_identity_section,
     validate_provenance,
 )
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "npc_card_boundary_cases.json"
+GREETING_FIXTURES_PATH = Path(__file__).parent / "fixtures" / "npc_offline_greeting_boundary_cases.json"
+
+
+def greeting_case_input(case: dict) -> object:
+    """Build the raw greeting a shared greeting boundary case describes."""
+    if "repeat_char" in case:
+        return case["repeat_char"] * case["repeat"]
+    return case["greeting"]
 
 
 class NpcCardBoundaryCasesTest(unittest.TestCase):
@@ -101,11 +111,40 @@ class NpcCardBoundaryCasesTest(unittest.TestCase):
                         self.assertEqual(card.appearance, case["expected_appearance"])
                     if "expected_social_connection" in case:
                         self.assertEqual(card.social_connection, case["expected_social_connection"])
+                    if "expected_total" in case:
+                        # The browser mirror asserts the same rendered total
+                        # (label parity, design D6b).
+                        self.assertEqual(card_budget(card).total, case["expected_total"])
                 else:
                     with self.assertRaises(NpcCardError) as ctx:
                         normalize_card(raw)
                     self.assertEqual(ctx.exception.code, case["expected_code"])
                     self.assertEqual(ctx.exception.field, case["expected_field"])
+
+    @covers_requirement("npc-persona-editor::the-browser-mirrors-the-card-contract-exactly")
+    def test_offline_greeting_fixture_cases(self) -> None:
+        """Every shared greeting boundary case yields the decision the mirror also asserts."""
+        with open(GREETING_FIXTURES_PATH, "r", encoding="utf-8") as f:
+            cases = json.load(f)
+        self.assertEqual(OFFLINE_GREETING_LIMIT, 300)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                raw = greeting_case_input(case)
+                if case["expected_valid"]:
+                    normalized = normalize_offline_greeting(raw)
+                    expected = case.get("expected", raw)
+                    self.assertEqual(normalized, expected)
+                else:
+                    with self.assertRaises(NpcCardError) as ctx:
+                        normalize_offline_greeting(raw)
+                    self.assertEqual(ctx.exception.code, "greeting_invalid")
+                    self.assertEqual(ctx.exception.field, "offline_greeting")
+
+    def test_voice_line_limit_tracks_the_offline_greeting_bound(self) -> None:
+        """An authored greeting must always fit the editable field it defaults."""
+        from world.lore.npc_profiles.shape import VOICE_LINE_LIMIT
+
+        self.assertEqual(VOICE_LINE_LIMIT, OFFLINE_GREETING_LIMIT)
 
     def test_budget_calculation(self) -> None:
         """Assert card_budget calculates per-leaf, identity section, and remaining correctly."""

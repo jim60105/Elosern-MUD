@@ -175,6 +175,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",
+    # The NPC author editor joins through the action-result route
+    # (npc-persona-editor-window).
+    "Overlays/NpcPersonaEditor",
     # The AVG stage series (a governed redesign wave) adds the
     # stage place card (webclient-avg-place-card-top-bar).
     "Core/PlaceCard",

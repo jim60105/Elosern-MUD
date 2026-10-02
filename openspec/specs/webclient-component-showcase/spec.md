@@ -401,10 +401,13 @@ governed redesign wave that MAY both add and delete components), or a feature ch
 backed by a committed presentation panel — the portrait-gallery family
 (`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
 `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) joins the frozen set under
-exactly this route. A change that adds a component SHALL, in the same change, add its title to
+exactly this route — or a feature change that introduces a component rendered entirely from a
+committed action-result read model whose exact data shape is a main-spec requirement: the NPC
+author editor (`Overlays/NpcPersonaEditor`, backed by the `npc.persona.read`/`npc.persona.update`
+result data) joins the frozen set under exactly this route. A change that adds a component SHALL, in the same change, add its title to
 the manifest, ship its Storybook story with deterministic offline args, and extend this
 capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
-committed backing read model SHALL NOT be added under either route; it belongs on the deferred
+committed backing read model SHALL NOT be added under any route; it belongs on the deferred
 list instead. A component SHALL NOT be wired into the live application before its story exists.
 A governed wave change that deletes a component SHALL, in the same change, delete the component file, remove
 its title from the manifest, delete its Storybook story, delete or re-point every test that mounts it,
@@ -444,6 +447,11 @@ and each later growth SHALL re-freeze it at its new complete set.
 
 - **WHEN** a change in the AVG stage redesign series deletes a manifest-listed component
 - **THEN** the same change removes the component file, its manifest title, its Storybook story, and every spec and test reference to it, and the component-coverage gate passes on the smaller re-frozen set
+
+#### Scenario: The NPC author editor joins through the action-result route
+
+- **WHEN** the NPC author-editor window change lands `Overlays/NpcPersonaEditor`
+- **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args for every editor state, and the matching spec entry, the component-coverage gate passes, and the component is not mounted in the live application before its story exists
 
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 

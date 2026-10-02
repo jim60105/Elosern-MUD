@@ -248,6 +248,37 @@ class NpcPersonaServiceTest(EvenniaTest):
         self.assertEqual(res2.version, 3)
         self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 3)
 
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_card_and_greeting_share_one_version(self) -> None:
+        """Greeting-only, both, stale, and clear submissions all ride persona_version."""
+        from world.rules.npc_persona import current_persona_version, read_offline_greeting
+
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        res = update_npc_persona(self.npc, self.valid_card_raw, expected_version=1, offline_greeting="「早安。」")
+        self.assertEqual((res.status, res.version), ("updated", 2))
+        self.assertEqual(read_offline_greeting(self.npc), "「早安。」")
+        # The stale-persona completion gate reads this same version.
+        self.assertEqual(current_persona_version(self.npc), 2)
+
+        changed = dict(self.valid_card_raw)
+        changed["habit"] = "晨間散步。"
+        both = update_npc_persona(self.npc, changed, expected_version=2, offline_greeting="「晚安。」")
+        self.assertEqual((both.status, both.version), ("updated", 3))
+
+        stale = update_npc_persona(self.npc, self.valid_card_raw, expected_version=2, offline_greeting="")
+        self.assertEqual((stale.status, stale.version), ("version_conflict", 3))
+        self.assertEqual(read_offline_greeting(self.npc), "「晚安。」")
+        self.assertEqual(read_npc_persona(self.npc).card.habit, "晨間散步。")
+
+        cleared = update_npc_persona(self.npc, changed, expected_version=3, offline_greeting="")
+        self.assertEqual((cleared.status, cleared.version), ("updated", 4))
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+        self.assertEqual(read_offline_greeting(self.npc), "")
+
+        invalid = update_npc_persona(self.npc, changed, expected_version=4, offline_greeting="甲\n乙")
+        self.assertEqual((invalid.status, invalid.reason), ("invalid", "greeting_invalid"))
+        self.assertEqual(current_persona_version(self.npc), 4)
+
     @covers_requirement("npc-persona-card::persona-updates-are-compare-and-set-on-persona-version")
     def test_boolean_or_non_integer_version_rejected(self) -> None:
         """Boolean or non-integer expected_version is rejected without writing."""
@@ -427,6 +458,35 @@ class NpcPersonaConcurrencyAndFailureTest(EvenniaTest):
         self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 1)
 
     @covers_requirement("npc-persona-card::persona-writes-are-atomic-serialized-and-restore-caches-on-rollback")
+    def test_failure_after_greeting_write_restores_the_field(self) -> None:
+        """A crash after the greeting write rolls back both a set and a cleared field."""
+        original_add = self.npc.attributes.add
+
+        def faulty_add(key, value, **kwargs):
+            if key == "npc_persona_meta":
+                raise RuntimeError("simulated write crash")
+            return original_add(key, value, **kwargs)
+
+        # Setting a new override over an absent field.
+        with patch.object(self.npc.attributes, "add", side_effect=faulty_add):
+            with self.assertRaises(RuntimeError):
+                update_npc_persona(self.npc, self.valid_card_raw, expected_version=1, offline_greeting="「新的問候。」")
+        self.assertIsNone(raw_attribute_value(self.npc, "npc_offline_greeting"))
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+        # Clearing an existing override.
+        self.assertEqual(
+            update_npc_persona(self.npc, self.valid_card_raw, expected_version=1, offline_greeting="「舊的問候。」").status,
+            "updated",
+        )
+        with patch.object(self.npc.attributes, "add", side_effect=faulty_add):
+            with self.assertRaises(RuntimeError):
+                update_npc_persona(self.npc, self.valid_card_raw, expected_version=2, offline_greeting="")
+        self.assertEqual(raw_attribute_value(self.npc, "npc_offline_greeting"), "「舊的問候。」")
+        self.assertEqual(self.npc.db.npc_offline_greeting, "「舊的問候。」")
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 2)
+
+    @covers_requirement("npc-persona-card::persona-writes-are-atomic-serialized-and-restore-caches-on-rollback")
     def test_sequential_same_version_updates_exactly_one_wins(self) -> None:
         """Exactly one of two sequential same-version updates wins; the second gets a version conflict."""
         card_a = dict(self.valid_card_raw)
@@ -512,6 +572,8 @@ class NpcPersonaObservabilityTest(EvenniaTest):
         self.assertEqual(ctx.get("char"), str(self.char1.pk))
         self.assertEqual(ctx.get("version_from"), 1)
         self.assertEqual(ctx.get("version_to"), 2)
+        self.assertIs(ctx.get("card_changed"), True)
+        self.assertIs(ctx.get("greeting_changed"), False)
 
         # Assert no prose in context values
         self.assertNotIn("換穿了便服", str(ctx))

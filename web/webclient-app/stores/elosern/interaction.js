@@ -38,6 +38,12 @@ export function applyInteraction(ctx) {
       ctx.openHudDrawer(item.openDrawer);
       return true;
     }
+    // The 編輯人物設定 row opens the NPC author editor bound to the row's
+    // target identity (npc-persona-editor-window D1); it dispatches nothing.
+    if (item.openNpcPersona != null) {
+      ctx.openNpcPersonaEditor(item.openNpcPersona);
+      return true;
+    }
     if (item.openSubmenu && ctx.EXPLORATION_SUBMENU_PUSHES[item.openSubmenu]) {
       // Declarative push (webclient-declarative-frame-stack): the frame is
       // ONLY the descriptor — the submenu content resolves at access time,

@@ -16,13 +16,17 @@ from web.webclient.presentation.protocol import (
 )
 from world.lore.npc_card import (
     NPC_CARD_FIELDS,
+    OFFLINE_GREETING_LIMIT,
     NpcCard,
     NpcCardError,
     normalize_card,
+    normalize_offline_greeting,
 )
+from world.rules.dialogue import authored_greeting_for
 from world.rules.npc_persona import (
     UpdateOutcome,
     read_npc_persona,
+    read_offline_greeting,
     update_npc_persona,
 )
 from world.rules.possession import (
@@ -41,14 +45,18 @@ CODE_NOT_ALLOWED = "npc_persona.not_allowed"
 CODE_NO_TARGET = "npc_persona.no_target"
 CODE_UNAVAILABLE = "npc_persona.unavailable"
 CODE_VERSION_CONFLICT = "npc_persona.version_conflict"
+CODE_GREETING_INVALID = "npc_persona.greeting_invalid"
 
 # Traditional Chinese messages
 MSG_NOT_ALLOWED_MODE = "你目前無法編輯 NPC 設定。"
 MSG_NO_TARGET = "這裡沒有這個對象。"
 MSG_UNAVAILABLE = "此角色的設定目前無法讀取或尚未初始化。"
 MSG_STORAGE_UNAVAILABLE = "伺服器忙碌中，請稍後再試。"
+MSG_GREETING_INVALID = f"離線問候語須為單一段落，且不超過 {OFFLINE_GREETING_LIMIT} 字。"
 
 _IDENTITY_KEYS = frozenset({"public", "hidden"})
+_UPDATE_REQUIRED_KEYS = frozenset({"npc_id", "expected_persona_version", "persona"})
+_UPDATE_OPTIONAL_KEYS = frozenset({"offline_greeting"})
 
 
 class NpcPersonaActionError(ValueError):
@@ -76,15 +84,19 @@ def validate_read_payload(payload: Any) -> dict[str, Any]:
 def validate_update_payload(payload: Any) -> dict[str, Any]:
     """Validate the exact ``npc.persona.update`` payload.
 
-    Must contain exactly ``{"npc_id": <int>, "expected_persona_version": <int>, "persona": <dict>}``.
-    Persona must contain exactly the 7 canonical keys, identity with exactly public and hidden,
-    and all leaf values must be strings <= MAX_STRING_CODE_POINTS (2048).
+    Must contain exactly ``{"npc_id": <int>, "expected_persona_version": <int>, "persona": <dict>}``
+    plus the optional ``offline_greeting`` string. Persona must contain exactly the 7 canonical
+    keys, identity with exactly public and hidden, and all leaf values (and the greeting) must be
+    strings <= MAX_STRING_CODE_POINTS (2048). The greeting's domain bound is checked by the
+    adapter (``npc_persona.greeting_invalid``), not here.
     """
     if not isinstance(payload, dict):
         raise NpcPersonaActionError("payload must be a dict")
-    if set(payload.keys()) != {"npc_id", "expected_persona_version", "persona"}:
+    keys = set(payload.keys())
+    if not _UPDATE_REQUIRED_KEYS <= keys or not keys <= _UPDATE_REQUIRED_KEYS | _UPDATE_OPTIONAL_KEYS:
         raise NpcPersonaActionError(
-            "payload must contain exactly 'npc_id', 'expected_persona_version', and 'persona'"
+            "payload must contain exactly 'npc_id', 'expected_persona_version', and 'persona', "
+            "plus the optional 'offline_greeting'"
         )
 
     npc_id = payload["npc_id"]
@@ -125,10 +137,17 @@ def validate_update_payload(payload: Any) -> dict[str, Any]:
         if len(val) > MAX_STRING_CODE_POINTS:
             raise NpcPersonaActionError(f"{key} exceeds maximum string length")
 
+    greeting = payload.get("offline_greeting", "")
+    if not isinstance(greeting, str):
+        raise NpcPersonaActionError("offline_greeting must be a string")
+    if len(greeting) > MAX_STRING_CODE_POINTS:
+        raise NpcPersonaActionError("offline_greeting exceeds maximum string length")
+
     return {
         "npc_id": npc_id,
         "expected_persona_version": expected_version,
         "persona": persona,
+        "offline_greeting": greeting,
     }
 
 
@@ -151,6 +170,19 @@ _NPC_CARD_FIELD_NAMES: dict[str, str] = {
     "habit": "習慣",
     "social_connection": "人際關係",
 }
+
+def _editor_data(target: NPC, version: int, card: NpcCard) -> dict[str, Any]:
+    """The seven-key editor snapshot shared by read and update successes."""
+    return {
+        "npc_id": target.id,
+        "display_name": target.key,
+        "npc_title": getattr(target, "npc_title", None) or "",
+        "persona_version": version,
+        "persona": card.to_record(),
+        "offline_greeting": read_offline_greeting(target),
+        "default_greeting": authored_greeting_for(target) or "",
+    }
+
 
 def _card_error_message(code: str, field: str | None) -> str:
     field_name = _NPC_CARD_FIELD_NAMES.get(field or "", field or "欄位")
@@ -191,13 +223,7 @@ def read_npc_persona_adapter(actor: Any, payload: dict[str, Any], session: Any =
     if hasattr(snapshot, "reason"):  # NpcPersonaUnavailable
         return _rejected(CODE_UNAVAILABLE, MSG_UNAVAILABLE)
 
-    data = {
-        "npc_id": target.id,
-        "display_name": target.key,
-        "npc_title": getattr(target, "npc_title", None) or "",
-        "persona_version": snapshot.version,
-        "persona": snapshot.card.to_record(),
-    }
+    data = _editor_data(target, snapshot.version, snapshot.card)
     return {
         "outcome": "success",
         "code": "read",
@@ -222,21 +248,21 @@ def update_npc_persona_adapter(actor: Any, payload: dict[str, Any], session: Any
             code = f"{code}.{exc.field}"
         return _rejected(code, _card_error_message(exc.code, exc.field))
 
+    try:
+        normalize_offline_greeting(payload.get("offline_greeting", ""))
+    except NpcCardError:
+        return _rejected(CODE_GREETING_INVALID, MSG_GREETING_INVALID)
+
     outcome: UpdateOutcome = update_npc_persona(
         target,
         payload["persona"],
         expected_version=payload["expected_persona_version"],
+        offline_greeting=payload.get("offline_greeting", ""),
         actor=actor,
     )
 
     if outcome.status in ("updated", "unchanged"):
-        data = {
-            "npc_id": target.id,
-            "display_name": target.key,
-            "npc_title": getattr(target, "npc_title", None) or "",
-            "persona_version": outcome.version,
-            "persona": normalized_card.to_record(),
-        }
+        data = _editor_data(target, outcome.version, normalized_card)
         return {
             "outcome": "success",
             "code": outcome.status,
@@ -251,6 +277,8 @@ def update_npc_persona_adapter(actor: Any, payload: dict[str, Any], session: Any
 
     if outcome.status == "invalid":
         err = outcome.error
+        if err is not None and err.code == "greeting_invalid":
+            return _rejected(CODE_GREETING_INVALID, MSG_GREETING_INVALID)
         if err is not None:
             code = f"npc_persona.{err.code}"
             if err.field:
@@ -269,6 +297,7 @@ def update_npc_persona_adapter(actor: Any, payload: dict[str, Any], session: Any
 
 
 __all__ = [
+    "CODE_GREETING_INVALID",
     "CODE_NOT_ALLOWED",
     "CODE_NO_TARGET",
     "CODE_UNAVAILABLE",

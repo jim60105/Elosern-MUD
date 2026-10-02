@@ -13,7 +13,8 @@
       "habit": "整理櫃檯上的文件。",
       "social_connection": ""
     },
-    "expected_valid": true
+    "expected_valid": true,
+    "expected_total": 101
   },
   {
     "name": "valid_astral_leaf_exact_600",
@@ -30,7 +31,8 @@
       "social_connection": ""
     },
     "use_astral_600_field": "life_story",
-    "expected_valid": true
+    "expected_valid": true,
+    "expected_total": 656
   },
   {
     "name": "invalid_leaf_601",
@@ -126,7 +128,8 @@
     "expected_public": "第一行\n第二行",
     "expected_hidden": "第三行",
     "expected_appearance": "外觀第一行\n第二行",
-    "expected_social_connection": ""
+    "expected_social_connection": "",
+    "expected_total": 66
   },
   {
     "name": "invalid_unknown_top_level_key",
@@ -301,6 +304,41 @@
       "habit": "Habit with \\\\ escape",
       "social_connection": "Connection with <tag>{key}</tag>"
     },
-    "expected_valid": true
+    "expected_valid": true,
+    "expected_total": 267
+  },
+  {
+    "name": "valid_total_parity_optional_sections_empty",
+    "card": {
+      "identity": {
+        "public": "渡口的擺渡人",
+        "hidden": ""
+      },
+      "appearance": "斗笠壓得很低。",
+      "personality": "沉默寡言。",
+      "speech_style": "只說必要的話。",
+      "life_story": "在渡口撐船多年。",
+      "habit": "收錢前先看天色。",
+      "social_connection": ""
+    },
+    "expected_valid": true,
+    "expected_total": 74
+  },
+  {
+    "name": "valid_total_parity_all_sections_with_crlf",
+    "card": {
+      "identity": {
+        "public": "渡口的擺渡人",
+        "hidden": "曾是逃兵"
+      },
+      "appearance": "斗笠壓得很低。\r\n袖口磨破。",
+      "personality": "沉默寡言。",
+      "speech_style": "只說必要的話。",
+      "life_story": "在渡口撐船多年。",
+      "habit": "收錢前先看天色。",
+      "social_connection": "與對岸的茶攤老闆相熟。"
+    },
+    "expected_valid": true,
+    "expected_total": 105
   }
 ]

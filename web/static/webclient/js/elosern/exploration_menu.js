@@ -393,6 +393,25 @@
         // Both guild and shop surfaces open client-local frameless drawers
         // (openDrawer: "quest" | "shop", the 背包 precedent), leaving the
         // router's frame stack untouched.
+        if (affordance.surface === "npc_persona") {
+          // The author editor (npc-persona-editor-window D1): a client-local
+          // window bound BY VALUE to this target's identity. It never pushes a
+          // router frame; a disabled entry opens nothing and carries the
+          // server-authored reason as its explanation.
+          items.push({
+            key: "service-npc_persona",
+            label: affordance.label || "編輯人物設定",
+            enabled: !!affordance.enabled,
+            actionId: null,
+            payload: null,
+            openNpcPersona: affordance.enabled ? target.identity : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+          return;
+        }
         var drawerMap = { guild: "quest", shop: "shop" };
         var drawerName = drawerMap[affordance.surface] || affordance.surface;
         var labelFallback = affordance.surface === "guild" ? "公會服務" : "商店";

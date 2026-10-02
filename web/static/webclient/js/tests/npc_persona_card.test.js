@@ -66,6 +66,14 @@ test("NpcPersonaCard fixture cases match server contract exactly", () => {
       if (c.expected_social_connection !== undefined) {
         assert.equal(normalized.social_connection, c.expected_social_connection);
       }
+      if (c.expected_total !== undefined) {
+        // Rendered-total parity with world.lore.npc_card (labels and separators).
+        assert.equal(
+          NpcPersonaCard.cardBudget(normalized).total,
+          c.expected_total,
+          `Case ${c.name} rendered total mismatch`
+        );
+      }
     } else {
       let threw = false;
       try {
@@ -86,4 +94,35 @@ test("NpcPersonaCard fixture cases match server contract exactly", () => {
       assert.ok(threw, `Case ${c.name} should have thrown`);
     }
   }
+});
+
+const GREETING_FIXTURES_PATH = path.resolve(
+  __dirname,
+  "../../../../../world/lore/tests/fixtures/npc_offline_greeting_boundary_cases.json"
+);
+
+test("NpcPersonaCard offline greeting cases match server contract exactly", () => {
+  const cases = JSON.parse(fs.readFileSync(GREETING_FIXTURES_PATH, "utf-8"));
+  assert.equal(NpcPersonaCard.OFFLINE_GREETING_LIMIT, 300);
+  for (const c of cases) {
+    const raw = c.repeat_char !== undefined ? c.repeat_char.repeat(c.repeat) : c.greeting;
+    if (c.expected_valid) {
+      const expected = c.expected !== undefined ? c.expected : raw;
+      assert.equal(NpcPersonaCard.normalizeOfflineGreeting(raw), expected, c.name);
+    } else {
+      assert.throws(
+        () => NpcPersonaCard.normalizeOfflineGreeting(raw),
+        (err) => err.code === "greeting_invalid" && err.field === "offline_greeting",
+        c.name
+      );
+    }
+  }
+});
+
+test("the identity section renders the server's exact labels", () => {
+  assert.equal(
+    NpcPersonaCard.renderIdentitySection("擺渡人", "逃兵"),
+    "身分：\n公開身分：擺渡人\n隱秘身分：逃兵"
+  );
+  assert.equal(NpcPersonaCard.renderIdentitySection("擺渡人", ""), "身分：\n公開身分：擺渡人");
 });

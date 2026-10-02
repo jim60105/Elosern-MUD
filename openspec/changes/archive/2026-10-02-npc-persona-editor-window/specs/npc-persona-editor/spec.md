@@ -1,27 +1,14 @@
-## Purpose
+## REMOVED Requirements
 
-Let the authenticated player, as an author, read and replace the complete compact card of an NPC standing with their active character through two allowlisted, re-authorized, version-checked browser actions, without exposing card data anywhere else.
+### Requirement: npc.persona.read returns a private editor snapshot
+**Reason**: superseded by the seven-key snapshot below — the five-field result cannot carry the offline-greeting field or its read-only authored default.
+**Migration**: consumers (the editor surface) switch to the added requirement's `offline_greeting`/`default_greeting` keys; every previously accepted payload still succeeds.
 
-## Requirements
+### Requirement: npc.persona.update replaces the whole card under a version check
+**Reason**: superseded by the card-and-greeting submission below — the optional `offline_greeting` component and its atomic single-version semantics extend the same version check.
+**Migration**: every previously valid card-only payload remains valid; a card-only payload is a submission whose `offline_greeting` is absent, which stores the field empty (the editor always submits the field it read); saves that also change the greeting use the added requirement.
 
-### Requirement: Author editing admits only a co-located NPC for the session's own active character
-The `npc.persona.read` and `npc.persona.update` actions SHALL resolve the actor only from the authenticated session's current, activated, account-owned puppet and SHALL admit it only in exploration or dialogue mode: a creation-pending actor, an actor in an active combat session, and a possessed NPC acting as the puppet SHALL be rejected with `npc_persona.not_allowed`. The `npc_id` SHALL be re-resolved on every request from the actor's current location contents and SHALL be admitted only when it names an NPC-family instance; an unknown, forged, remote, departed, or deleted identity, a player character (including another account's), a `Monster`, and any other object SHALL be rejected with `npc_persona.no_target`. Author editing SHALL NOT require a conversation, affinity, or schedule slot.
-
-#### Scenario: A co-located NPC is readable in exploration and dialogue
-- **WHEN** an activated character standing with an NPC that carries a valid card submits `npc.persona.read` in exploration mode, and again while in a dialogue session with a different NPC
-- **THEN** both reads succeed for that NPC without any conversation, affinity, or schedule requirement
-
-#### Scenario: Forbidden targets are rejected without data
-- **WHEN** the actor submits either action for a forged id, another account's player character, a monster, an NPC in another room, or an NPC deleted after it was read
-- **THEN** the result is rejected with `npc_persona.no_target`, carries no data, and nothing is written
-
-#### Scenario: Forbidden modes are rejected
-- **WHEN** the actor is creation-pending, in an active combat session, or a possessed NPC
-- **THEN** both actions are rejected with `npc_persona.not_allowed` and nothing is written
-
-#### Scenario: A target that left after the read cannot be saved
-- **WHEN** the actor reads an NPC's card, the NPC then moves to another room, and the actor submits an update
-- **THEN** the update is rejected with `npc_persona.no_target` and the card is unchanged
+## ADDED Requirements
 
 ### Requirement: npc.persona.read returns a private editor snapshot with the offline greeting
 `npc.persona.read` SHALL accept a payload of exactly `npc_id`, a positive integer within the protocol safe-integer range and never a boolean. On success it SHALL return a result whose `data` holds exactly `npc_id`, `display_name`, `npc_title`, `persona_version`, `persona`, `offline_greeting`, and `default_greeting`, where `persona` is the complete normalized seven-field card with `identity` holding `public` and `hidden`, `offline_greeting` is the NPC's stored offline-greeting field verbatim (`""` when unset, never initialized or repaired), and `default_greeting` is the read-only authored presentation default resolved at read time through the same precedence the no-keyword greeting resolver applies below the instance field — the scripted dialogue-table greeting when the NPC has a table authoring one, else the authored profile greeting named by the NPC's profile provenance, else `""`. `default_greeting` is presentation data and SHALL NOT be copied into the stored field, so an authored table or profile line stays live for every NPC whose field is empty. The seven-key result stays within the protocol's result-data field maximum of eight, and every valid payload including CJK and escape-heavy text stays within the protocol's per-string and envelope byte limits. Reading SHALL never initialize or repair a card: an NPC whose card or persona metadata is missing or invalid SHALL be rejected with `npc_persona.unavailable`. Reading SHALL change no game state, clock, currency, quest knowledge, relationship, or party state. Both greeting keys are editor data and follow the existing privacy rule: only the requesting session's result carries them, ordinary snapshots do not, and no card or greeting prose enters logs or narrative output.
@@ -76,6 +63,8 @@ The `npc.persona.read` and `npc.persona.update` actions SHALL resolve the actor 
 #### Scenario: An in-flight exchange sees a greeting-only edit as stale
 - **WHEN** an asynchronous dialogue exchange captured version N and the actor saves a greeting-only change before settlement
 - **THEN** the stale-persona completion gate rejects the exchange's settlement through the existing stale-persona outcome
+
+## MODIFIED Requirements
 
 ### Requirement: Card data reaches only the requesting session
 Only the success result of `npc.persona.read` or `npc.persona.update` SHALL carry card or offline-greeting data, and only to the requesting session. Exploration, dialogue, and every other presentation panel SHALL carry at most the author-editor navigation affordance, never card text, hidden identity, or the editor's greeting keys. No action message, narrative output, operational event, or analytics record SHALL include card or greeting-field text; error results SHALL carry no `data`. The result data SHALL use only fixed lowercase keys, SHALL use `persona_version` rather than any reserved state key, and SHALL fit the protocol's result-data field, string, and byte limits for every valid payload, including maximal cards and maximal 300-code-point greetings of CJK text, astral characters, and JSON-escaped characters.

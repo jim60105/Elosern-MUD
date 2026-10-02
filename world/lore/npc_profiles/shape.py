@@ -12,14 +12,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from world.lore.npc_card import NpcCard, _normalize_text_leaf
+from world.lore.npc_card import OFFLINE_GREETING_LIMIT, NpcCard, _normalize_text_leaf
 
 # A profile key: a lowercase letter, then any run of lowercase letters,
 # digits, or underscores, 1..64 code points total.
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
-# Each voice line is single-paragraph plain text, bounded like a card leaf.
-VOICE_LINE_LIMIT = 300
+# Each voice line is single-paragraph plain text. The bound is deliberately the
+# per-instance offline-greeting bound: an authored greeting is the default the
+# editable field replaces, so both must accept the same lines.
+VOICE_LINE_LIMIT = OFFLINE_GREETING_LIMIT
 
 
 @dataclass(frozen=True)

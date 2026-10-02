@@ -14,6 +14,7 @@ import { useOverlays } from "./use-overlays.js";
 import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
 import { useModeChange } from "./use-mode-change.js";
+import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 
 export function useAppClient(store, shellRef, sceneBackdropRef) {
   // The single dispatch seam (webclient-action-feedback): every surface's
@@ -45,5 +46,8 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       shellRef,
     }),
     ...useIntentHandlers(store, dispatchIntent),
+    // The NPC author editor (npc-persona-editor-window): its own correlated
+    // read/update state machine over the single store dispatch entry.
+    ...useNpcPersonaEditor(store, { shellRef }),
   };
 }

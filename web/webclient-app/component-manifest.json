@@ -59,7 +59,8 @@
     "Data/GalleryDetailRail",
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
-    "Overlays/GalleryFaceRectModal"
+    "Overlays/GalleryFaceRectModal",
+    "Overlays/NpcPersonaEditor"
   ],
   "frozen": true
 }
