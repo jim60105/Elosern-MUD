@@ -73,15 +73,14 @@ def main() -> None:
             raise AssertionError("starting profile budget exceeds allocatable spans")
         return result
 
-    account = create_account(
-        BROWSER_ACCOUNT_USERNAME,
-        BROWSER_ACCOUNT_EMAIL,
-        BROWSER_ACCOUNT_PASSWORD,
-        typeclass=Account,
-        is_superuser=True,
-    )
-
     if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
+        account = create_account(
+            BROWSER_ACCOUNT_USERNAME,
+            BROWSER_ACCOUNT_EMAIL,
+            BROWSER_ACCOUNT_PASSWORD,
+            typeclass=Account,
+            is_superuser=True,
+        )
         # A pending-creation account (webclient-character-creation-ui): the
         # auto-created shell is creation-pending with an empty trait set and no
         # activation, exactly as a freshly registered account sees it.
@@ -163,9 +162,43 @@ def main() -> None:
         )
         return
 
+    # For standard play, #1 is a dummy superuser account so Evennia initial_setup
+    # wipe of superuser attributes does not touch BROWSER_ACCOUNT
+    superuser = create_account(
+        "admin_dummy",
+        "admin_dummy@example.test",
+        "AdminDummyPassword!2026",
+        typeclass=Account,
+        is_superuser=True,
+    )
+    dummy_char = create_object(PlayerCharacter, key="AdminDummyChar", nohome=True)
+    superuser.at_post_create_character(dummy_char)
+    dummy_char.db_account = superuser
+    dummy_room = create_object(Room, key="管理員暫存室", nohome=True)
+    dummy_char.location = dummy_room
+    dummy_char.home = dummy_room
+    dummy_char.save()
+    superuser.db._last_puppet = dummy_char
+    synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    dummy_req = CharacterCreationRequest(
+        mode="preset",
+        preset_key="t_pale_wren" if synth else "t_pale_wren",
+        skip_portrait=True,
+    )
+    activate_player_character(superuser, dummy_char, dummy_req)
+
+    account = create_account(
+        BROWSER_ACCOUNT_USERNAME,
+        BROWSER_ACCOUNT_EMAIL,
+        BROWSER_ACCOUNT_PASSWORD,
+        typeclass=Account,
+        is_superuser=False,
+    )
     character = create_object(PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True)
     account.at_post_create_character(character)
     account.db._last_puppet = character
+    if hasattr(account, "characters") and character not in account.characters:
+        account.characters.add(character)
 
     room = create_object(Room, key=BROWSER_ROOM_NAME, nohome=True)
     character.location = room
@@ -225,7 +258,7 @@ def main() -> None:
     _exploration_fixture(character)
     _options_surface_fixture(character)
     _titles_fixture(character)
-    _npc_persona_fixture(character)
+    _npc_persona_fixture(character, account=account)
 
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
