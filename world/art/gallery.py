@@ -818,8 +818,9 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
     the incoming rectangle passes the shared ``validate_face_rect`` against
     the card's recorded ``image_size`` before any write and is stored
     unaltered — no crop, no second image, no file write. A malformed or
-    missing entry match is the ``remove_card`` miss form, and one
-    ``gallery_card_updated`` facade event closes a successful update.
+    missing entry match is the ``remove_card`` miss form — reported once by
+    the shared writer's tolerant locate, so this pre-check stays silent —
+    and one ``gallery_card_updated`` facade event closes a successful update.
     Returns the updated stored card.
     """
     with gallery_lock:
@@ -836,7 +837,11 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
                 located = validated
                 break
         if located is None:
-            raise GalleryRecordError(f"no card with image_id {image_id!r} exists")
+            # No valid entry carries the id. Delegate to the shared writer's
+            # tolerant locate, which reports each malformed entry once and
+            # then raises the same remove_card miss form; a silent miss here
+            # would launder corruption without a trace.
+            return _update_card_field(subject, image_id, "face_rect", face_rect)
         valid_rect = validate_face_rect(face_rect, image_size=located["image_size"])
     return _update_card_field(
         subject, image_id, "face_rect", valid_rect
