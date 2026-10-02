@@ -546,6 +546,9 @@ class WireHeaderTests(unittest.TestCase):
     @covers_requirement(
         "llm-client::request-headers-carry-authentication-and-attribution-without-leaking-the-key"
     )
+    @covers_requirement(
+        "outbound-http-identity::every-runtime-outbound-http-request-carries-the-configured-user-agent"
+    )
     def test_user_agent_header_derives_and_allows_explicit_override(self):
         # Derived User-Agent when not explicitly configured in profile
         with override_settings(HTTP_USER_AGENT="custom-agent/9"):

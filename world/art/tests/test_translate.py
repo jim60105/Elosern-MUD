@@ -881,6 +881,9 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
     @covers_requirement(
         "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
+    @covers_requirement(
+        "outbound-http-identity::every-runtime-outbound-http-request-carries-the-configured-user-agent"
+    )
     def test_the_fetch_declares_a_user_agent_on_the_request(self):
         # Field regression: the argos-net.com edge 403-blocks urllib's
         # default ``Python-urllib/*`` agent, latching the whole per-process

@@ -533,6 +533,12 @@ class TransportTests(unittest.TestCase):
         # The bounded error never echoes the request headers or response body.
         self.assertNotIn("hunter2", str(ctx.exception))
 
+    @covers_requirement(
+        "outbound-http-identity::every-runtime-outbound-http-request-carries-the-configured-user-agent"
+    )
+    @covers_requirement(
+        "outbound-http-identity::the-configured-identity-falls-back-to-the-documented-default"
+    )
     def test_http_request_carries_user_agent_header_and_falls_back_on_blank(self):
         # POST case (_http_json)
         conn_post = FakeConnection("sd.example", 7860)
