@@ -325,7 +325,7 @@ only as the count of rows actually shipped and never as a claim about untruncate
 `character` panel's `intimate` field (`webclient-exploration-menu`'s version-4 character-panel
 requirement), and its completeness and absence-when-`null` behaviour are governed by
 `webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. The
-party quickbar and the 同伴 · 隊伍 drawer are likewise NOT among the deferred surfaces: they are backed by
+party quickbar and the 同伴 ‧ 隊伍 drawer are likewise NOT among the deferred surfaces: they are backed by
 the `party` panel read model (`webclient-party-panel`), and their rendering and mutation behaviour is
 governed by `webclient-contextual-hud`'s party quickbar and party drawer requirements, not this
 deferred-surface list. The persistent objective tracker is likewise NOT among the deferred surfaces: it is
@@ -373,7 +373,7 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 #### Scenario: The party surfaces are no longer deferred
 - **WHEN** the complete component set and its deferred-surface assertion are enumerated
-- **THEN** the party quickbar and the 同伴 · 隊伍 drawer are absent from the deferred-surface list, because they now have a backing OOB read model (the `party` panel), their components are manifest-listed with deterministic offline stories, and their behaviour is asserted by `webclient-contextual-hud`'s party requirements instead
+- **THEN** the party quickbar and the 同伴 ‧ 隊伍 drawer are absent from the deferred-surface list, because they now have a backing OOB read model (the `party` panel), their components are manifest-listed with deterministic offline stories, and their behaviour is asserted by `webclient-contextual-hud`'s party requirements instead
 
 #### Scenario: The action-feedback queue is built while the event-log queue stays deferred
 - **WHEN** the complete component set and the deferred-surface assertion are enumerated

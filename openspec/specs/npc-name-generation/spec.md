@@ -19,7 +19,7 @@ pool `"f"`, `"male"` → pool `"m"`, `"other"` → pool `"u"`, and an empty stri
 value outside `SEX_VALUES` → a pool chosen randomly from `"m"`, `"f"`, `"u"` via `rng` (design D2:
 unrecognised values are treated exactly like unspecified ones; this layer validates nothing).
 It SHALL return
-`compose_display_name(given, surname)` — the `given.zh・surname.zh` composition owned by
+`compose_display_name(given, surname)` — the `given.zh‧surname.zh` composition owned by
 `world/lore/names.py` — picking both parts from the selected pack via `rng`, and SHALL NOT define
 its own separator constant or concatenate parts itself. The original-language `NamePart.text`
 SHALL never appear in the returned name.
@@ -28,8 +28,8 @@ SHALL never appear in the returned name.
 - **WHEN** `roll_name("fantasy-human", "female", rng)` and `roll_name("fantasy-human", "male", rng)`
   are called with a fixed-seed `Random`
 - **THEN** each returned name's given component equals the `zh` of some part in the pack's `"f"`
-  (respectively `"m"`) pool, and the full result matches the `given.zh・surname.zh` form with the
-  U+30FB separator
+  (respectively `"m"`) pool, and the full result matches the `given.zh‧surname.zh` form with the
+  U+2027 separator
 
 #### Scenario: other prefers the u pool and empty, None, or unrecognised values pick a pool at random
 - **WHEN** `roll_name` is called with `sex` `"other"`, and separately with `""`, `None`, and a

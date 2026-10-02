@@ -4,7 +4,7 @@
 
 Freeze the vendored CC BY 4.0 fantasy-namegen corpus (`third_party/fantasy-namegen/`) into an
 import-time lore registry — `NAME_PACK_REGISTRY` / `NAME_PACK_BY_RACE` — with fail-fast corpus
-invariants, the 「名・姓」 Chinese display-name composition contract, the idempotent
+invariants, the 「名‧姓」 Chinese display-name composition contract, the idempotent
 `sync_all()` mirror, and the container-image packaging the runtime import depends on.
 
 ## Requirements
@@ -124,7 +124,7 @@ Evennia process (server startup, the lore test runner, and later rules/UI consum
   tail actually invokes every invariant on the constructed data
 
 ### Requirement: Display names compose from Chinese renderings with the middle-dot separator
-`world/lore/names.py` SHALL define `NAME_SEPARATOR = "・"` (U+30FB KATAKANA MIDDLE DOT) as the only
+`world/lore/names.py` SHALL define `NAME_SEPARATOR = "‧"` (U+2027 HYPHENATION POINT) as the only
 composition constant in the registry layer, and `compose_display_name(given: NamePart, surname:
 NamePart) -> str` returning `f"{given.zh}{NAME_SEPARATOR}{surname.zh}"`. The original-language
 `text` field SHALL never appear in the composed output.
@@ -132,7 +132,7 @@ NamePart) -> str` returning `f"{given.zh}{NAME_SEPARATOR}{surname.zh}"`. The ori
 #### Scenario: Composition format is given, separator, surname
 - **WHEN** `compose_display_name` is called with a given part (`zh` 「加斯帕」) and a surname part
   (`zh` 「斯諾」)
-- **THEN** it returns 「加斯帕・斯諾」 with the U+30FB separator between the two Chinese renderings
+- **THEN** it returns 「加斯帕‧斯諾」 with the U+2027 separator between the two Chinese renderings
 
 #### Scenario: Raw corpus text never reaches composed output
 - **WHEN** composed display names are built for every given/surname pairing within one pack

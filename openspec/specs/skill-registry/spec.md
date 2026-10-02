@@ -319,26 +319,26 @@ inert `weapon_style:light_sword`), resolved by the already-registered `damage` e
   light-elemental physical damage
 
 ### Requirement: Reincarnation boon labels match the preset character names
-The three per-character 轉生特典 passives SHALL declare labels that read 轉生祝福·悠花
-(`reincarnation_boon_yuka`), 轉生祝福·悠奈 (`reincarnation_boon_yuna`), and 轉生祝福·伊洛希雅
+The three per-character 轉生特典 passives SHALL declare labels that read 轉生祝福‧悠花
+(`reincarnation_boon_yuka`), 轉生祝福‧悠奈 (`reincarnation_boon_yuna`), and 轉生祝福‧伊洛希雅
 (`reincarnation_boon_elosia`) — each matching the `display_name` of the preset character whose kit
 declares that boon in `PLAYER_PRESET_REGISTRY`. Their keys, costs, kinds, and target
 specs SHALL NOT change, and each `effects` list keeps its shape with exactly one re-keying: the
 伊洛希雅 boon's effect string is `growth_rate:practice:5:wind` — a scoped growth rate naming the wind
 tree, replacing the unscoped `growth_rate:practice:100`, whose three-segment form no longer parses. The derived `status_display.yaml` row `reincarnation_boon_yuka_agility_bonus`
-SHALL label itself 轉生祝福·悠花敏捷提升.
+SHALL label itself 轉生祝福‧悠花敏捷提升.
 
 #### Scenario: Every preset-carried boon label equals its owner's display name exactly
 - **WHEN** the label of each `reincarnation_boon_*` skill declared by a preset's skill kit is
   compared against that preset's `display_name`
-- **THEN** the label equals exactly `轉生祝福·<display_name>` (轉生祝福·悠花, 轉生祝福·悠奈,
-  轉生祝福·伊洛希雅), and the skill's `kind`, `target_spec`, `cost`, and `effects` are
+- **THEN** the label equals exactly `轉生祝福‧<display_name>` (轉生祝福‧悠花, 轉生祝福‧悠奈,
+  轉生祝福‧伊洛希雅), and the skill's `kind`, `target_spec`, `cost`, and `effects` are
   byte-identical to the shipped registry values (all PASSIVE, `TargetSpec.NONE`, empty cost,
   `growth_rate:practice:5:wind` / `combat_prediction:武感` / `sexual_magic_mastery` respectively)
 
 #### Scenario: The status display row follows the corrected name
 - **WHEN** the `status_display.yaml` row keyed `reincarnation_boon_yuka_agility_bonus` is inspected
-- **THEN** its label is 轉生祝福·悠花敏捷提升
+- **THEN** its label is 轉生祝福‧悠花敏捷提升
 
 ### Requirement: Every skill declares usable_out_of_combat deliberately, under one written policy
 `usable_out_of_combat` SHALL mean exactly "this skill may be *selected* while no combat session is
@@ -506,7 +506,7 @@ The earth spell family SHALL provide the documented two-root 護甲/地形 progr
 - **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
 ### Requirement: Fire spell progression composes executable burn-and-immolation behavior
-The fire spell family SHALL provide the documented HP・消滅 progression as executable skill behavior using the common effect, audience, policy, buff, reaction and lineage mechanisms: burn damage-over-time rows on the hp axis at the authored rungs and durations with the reused family key re-homed without alias, an on-physical-hit ignition of the attacker mounted by a detectable self-only armor buff through the shared outcome-reaction vocabulary (an ignition applied to the strike's source with grant-time attribution, never a reflected damage counter), a ground-lava marker hazard whose standing-on-it fact is the live marker instance and whose damage ticks at the authored DoT rung with the shared battlefield-exit extinguishment, a 處決級 execution rung that ignores defense subtraction through the shared damage policy, immolation cast costs priced as authored static coefficients beside a self-burn row that lands as an independent effect component regardless of the damage leg, and a three-way branch-point lineage whose two-parent 神格 capstone gates through the shared lineage engine with prerequisite caps derived from the shared reverse-edge map. No fire-specific behavior code SHALL exist: every clause above is data over the shipped event, marker, policy and lineage vocabularies.
+The fire spell family SHALL provide the documented HP‧消滅 progression as executable skill behavior using the common effect, audience, policy, buff, reaction and lineage mechanisms: burn damage-over-time rows on the hp axis at the authored rungs and durations with the reused family key re-homed without alias, an on-physical-hit ignition of the attacker mounted by a detectable self-only armor buff through the shared outcome-reaction vocabulary (an ignition applied to the strike's source with grant-time attribution, never a reflected damage counter), a ground-lava marker hazard whose standing-on-it fact is the live marker instance and whose damage ticks at the authored DoT rung with the shared battlefield-exit extinguishment, a 處決級 execution rung that ignores defense subtraction through the shared damage policy, immolation cast costs priced as authored static coefficients beside a self-burn row that lands as an independent effect component regardless of the damage leg, and a three-way branch-point lineage whose two-parent 神格 capstone gates through the shared lineage engine with prerequisite caps derived from the shared reverse-edge map. No fire-specific behavior code SHALL exist: every clause above is data over the shipped event, marker, policy and lineage vocabularies.
 
 #### Scenario: The burn ladder scorches at the authored rung and expires
 - **WHEN** a synthetic single-target fire composition dealing its authored coefficient plus the family burn row resolves through ordinary action settlement and the clock advances past several tick intervals and then past expiry
