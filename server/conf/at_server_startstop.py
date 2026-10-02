@@ -50,6 +50,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "equipment_rulebook_validation",
     "starting_companion_validation",
     "state_reaction_rules",
+    "npc_persona_roster_validation",
     "sync_all",
     "sync_limbo",
     "sync_grid",
@@ -415,6 +416,13 @@ def at_server_start():
     _startup_step(
         "state_reaction_rules",
         lambda: importlib.import_module("world.rules.state_reactions"),
+    )
+    # Fail-loud full-roster validation gate (npc-persona-roster-validation D3):
+    # verifies all shipped sources, cards, voice coverage, and inventory
+    # equality before any world synchronization can persist partial state.
+    _startup_step(
+        "npc_persona_roster_validation",
+        lambda: _late("world.rules.npc_roster_validation", "validate_npc_roster"),
     )
     _startup_step("sync_all", sync_all)
     _startup_step("sync_limbo", sync_limbo)

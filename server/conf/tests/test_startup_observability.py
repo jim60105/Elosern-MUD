@@ -29,6 +29,7 @@ from tools.spec_traceability import covers_requirement
 # Names imported inside at_server_start's body: patch the source modules.
 _BODY_TARGETS = (
     "world.rules.clock.get_world_clock",
+    "world.rules.npc_roster_validation.validate_npc_roster",
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_limbo",
     "world.maps.bootstrap.sync_grid",
@@ -117,6 +118,34 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertIsInstance(error.call_args.kwargs["exc"], RuntimeError)
         warn.assert_not_called()
         # Steps before the failure emitted their events; nothing after ran.
+        self.assertEqual(
+            self._steps(info),
+            [
+                "world_clock_init",
+                "equipment_rulebook_validation",
+                "starting_companion_validation",
+                "state_reaction_rules",
+                "npc_persona_roster_validation",
+            ],
+        )
+
+    def test_npc_persona_roster_validation_failure_aborts_before_sync_all(self):
+        info, warn, error = self._run(
+            {
+                "world.rules.npc_roster_validation.validate_npc_roster": {
+                    "side_effect": RuntimeError("invalid roster")
+                }
+            },
+            assert_raises=RuntimeError,
+        )
+        error.assert_called_once()
+        self.assertEqual(error.call_args.args[0], "startup_step_failed")
+        self.assertEqual(
+            error.call_args.kwargs["context"],
+            {"step": "npc_persona_roster_validation"},
+        )
+        self.assertIsInstance(error.call_args.kwargs["exc"], RuntimeError)
+        warn.assert_not_called()
         self.assertEqual(
             self._steps(info),
             [

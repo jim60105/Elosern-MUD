@@ -7,7 +7,7 @@ Apply on branch `feat/npc-persona-roster-validation` in worktree `.worktrees/npc
 
 ## 2. Boot step
 
-- [ ] 2.1 Add the fail-loud `npc_persona_roster_validation` step to `at_server_start` and `STARTUP_STEP_ORDER` per design D3; verify the startup-order guard tests in `server/conf/tests/` (update the expected order) and a test that a failing validation aborts before `sync_all`.
+- [x] 2.1 Add the fail-loud `npc_persona_roster_validation` step to `at_server_start` and `STARTUP_STEP_ORDER` per design D3; verify the startup-order guard tests in `server/conf/tests/` (update the expected order) and a test that a failing validation aborts before `sync_all`.
 
 ## 3. Review and docs
 
