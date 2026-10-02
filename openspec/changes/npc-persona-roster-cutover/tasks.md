@@ -10,9 +10,9 @@ Apply on branch `feat/npc-persona-roster-cutover` in worktree `.worktrees/npc-pe
 
 ## 3. Fresh-bootstrap and fail-closed tests
 
-- [ ] 3.1 Add `world/rules/tests/test_npc_persona_fresh_bootstrap.py` (Evennia fixture per repo testing guide) pinning design D4 case 1: after the startup syncs run, every NPC-family instance carries the current content-generation marker and a contract-valid complete card, and `STARTUP_STEP_ORDER` contains the roster-validation step and no cutover step.
-- [ ] 3.2 Pin design D4 case 2 in the same module: a hand-authored synthetic fixture in the pre-amendment occupant shape (old optional three-field `persona` plus `background`, shape copied via `git show` of the durable schema at the commit before `npc-persona-generated-quest-cards`) is rejected by the strict restore/codec path with a named validation failure; assert the quest is not restored.
-- [ ] 3.3 Pin design D4 case 3: the runbook file exists and names the migrate command and the retained test database path (docs-contract test, same pattern as `tests/test_command_docs.py`).
+- [x] 3.1 Add `world/rules/tests/test_npc_persona_fresh_bootstrap.py` (Evennia fixture per repo testing guide) pinning design D4 case 1: after the startup syncs run, every NPC-family instance carries the current content-generation marker and a contract-valid complete card, and `STARTUP_STEP_ORDER` contains the roster-validation step and no cutover step.
+- [x] 3.2 Pin design D4 case 2 in the same module: a hand-authored synthetic fixture in the pre-amendment occupant shape (old optional three-field `persona` plus `background`, shape copied via `git show` of the durable schema at the commit before `npc-persona-generated-quest-cards`) is rejected by the strict restore/codec path with a named validation failure; assert the quest is not restored.
+- [x] 3.3 Pin design D4 case 3: the runbook file exists and names the migrate command and the retained test database path (docs-contract test, same pattern as `tests/test_command_docs.py`).
 
 ## 4. Gates
 
