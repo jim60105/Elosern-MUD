@@ -17,6 +17,7 @@
 
 .npe {
   position: relative;
+  overflow: clip;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -28,7 +29,9 @@
 .npe-layout {
   flex: 1;
   min-height: 0;
+  overflow: clip;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-columns: calc(296px * var(--ui-scale)) minmax(0, 1fr);
 }
 
@@ -36,7 +39,7 @@
 
 .npe-side {
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
   display: flex;
   flex-direction: column;
   gap: calc(18px * var(--ui-scale));
@@ -269,6 +272,19 @@
 .npe-index__item[data-flag="error"] .npe-index__dot { background: var(--seal-500); }
 
 /* --------------------------------------------------------------- form */
+
+/* Short desktop workspaces keep both notices readable. The header already
+   names the NPC, so the duplicated dossier name gives way before the notices. */
+@media (min-width: 901px) and (max-height: 800px) {
+  .npe-side { gap: calc(10px * var(--ui-scale)); padding: calc(14px * var(--ui-scale)); }
+  .npe-dossier { padding-bottom: calc(10px * var(--ui-scale)); }
+  .npe-dossier .npe-name, .npe-dossier .npe-npc-title { display: none; }
+  .npe-capacity { grid-template-columns: calc(52px * var(--ui-scale)) 1fr; }
+  .npe-ring { width: calc(52px * var(--ui-scale)); height: calc(52px * var(--ui-scale)); }
+  .npe-capacity__figure strong { font-size: var(--text-xl); }
+  .npe-notice { padding: calc(8px * var(--ui-scale)) calc(10px * var(--ui-scale)); }
+  .npe-index { display: none; }
+}
 
 .npe-main {
   min-height: 0;

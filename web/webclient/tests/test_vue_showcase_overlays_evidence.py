@@ -224,6 +224,19 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
+        "webclient-npc-persona-editor::editor-state-transitions-are-correlated-and-never-fabricate-outcomes",
+        "webclient-npc-persona-editor::conflicts-departures-and-session-changes-protect-the-draft",
+        "webclient-npc-persona-editor::editor-closing-and-accessibility-follow-the-shell-s-dialog-rules",
+    )
+    def test_npc_persona_editor_lifecycle_and_accessibility(self):
+        """Execute the correlated editor's deterministic behavioral suite."""
+        result = run_node(
+            ["node_modules/vitest/vitest.mjs", "run", "web/webclient-app/tests/npc_persona_editor.test.js"],
+            timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    @covers_requirement(
         "webclient-component-showcase::the-full-overlays-are-complete-the-deferred-surfaces-are-absent-and-the-manifest-is-frozen"
     )
     def test_vitest_overlays_family_suite_passes(self):

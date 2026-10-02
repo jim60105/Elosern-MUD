@@ -251,7 +251,7 @@ defineExpose({ forceClose });
    scrolling region (the NPC author editor's fixed notice column). */
 .hud-drawer__body.hud-drawer__body--flush {
   padding: 0;
-  overflow: hidden;
+  overflow: clip;
   display: flex;
   flex-direction: column;
 }

@@ -523,7 +523,7 @@ const saveLabel = computed(() => (state.value === "saving" ? "儲存中……" :
         >
           <p id="npc-persona-editor-confirm-title" class="npe-confirm__title">放棄未儲存的修改？</p>
           <p id="npc-persona-editor-confirm-body" class="npe-confirm__body">
-            你修改了 {{ dirtyCount }} 個欄位。關閉後，這些修改不會保留。
+            你修改了 {{ dirtyCount }} 個欄位。關閉後，本機草稿會清除；已送出的儲存操作不會因此撤回。
           </p>
           <div class="npe-confirm__actions">
             <button ref="confirmKeepRef" type="button" class="npe-btn npe-btn--primary" data-testid="npc-persona-editor-confirm-keep" @click="keepEditing">繼續編輯</button>

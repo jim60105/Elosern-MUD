@@ -18,6 +18,7 @@ from web.tests.browser.seed.identity import (
 from web.tests.browser.seed.art_fixture import _art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
+from web.tests.browser.seed.npc_persona_fixture import _npc_persona_fixture
 from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
 from web.tests.browser.seed.services_fixture import _services_fixture
 from web.tests.browser.seed.titles_fixture import _titles_fixture
@@ -224,6 +225,7 @@ def main() -> None:
     _exploration_fixture(character)
     _options_surface_fixture(character)
     _titles_fixture(character)
+    _npc_persona_fixture(character)
 
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
