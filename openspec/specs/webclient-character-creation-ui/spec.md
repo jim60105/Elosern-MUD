@@ -289,9 +289,10 @@ concept-apply button until a fresh proposal revision is applied, a result carryi
 submitted request id with a non-success outcome settles the request, or the global
 dispatch gate releases without a matching settlement (the safety net for a synchronous
 transport failure or a lost mutation; the in-progress state SHALL only ever be entered
-after the dispatch was admitted, so a gate-rejected apply never shows it); through the
-whole in-flight window no store publish or draft re-sync SHALL move the presented tab — the
-tab is pinned while the loading state is alive. The browser SHALL present no other completion
+after the dispatch was admitted, so a gate-rejected apply never shows it). While a creation
+form's own admitted request is in its in-flight loading state (concept apply or name roll),
+no store publish or draft re-sync SHALL move the presented tab — the tab is pinned while
+that loading state is alive. The browser SHALL present no other completion
 affordance for a settled apply beyond the custom-tab switch (the confirmation toast is
 surfaced through the action-feedback queue by the form's apply path, and the failure toast
 by the action-feedback result slice — not by any form-embedded banner). The final activation and the
@@ -325,6 +326,15 @@ No canonical service or creation state SHALL be stored in localStorage.
 #### Scenario: The name-roll button dispatches and backfills by request id
 - **WHEN** a player clicks the `creation-roll-name` button and a success result carrying that submitted request id arrives with `data.display_name`
 - **THEN** exactly one `creation.roll_name` payload `{race, subrace, sex}` was dispatched, the button was disabled while in flight, and the display-name input is backfilled with the rolled name which the player can then edit
+
+#### Scenario: The custom tab stays pinned through in-flight name-roll republishes
+- **WHEN** a player pointer-selects the custom tab and clicks `creation-roll-name`, the
+  name-roll dispatch is admitted and synchronously publishes the store view, and a
+  success result carrying the submitted request id and `data.display_name` commits
+- **THEN** the presented tab remains the custom tab for the whole in-flight window,
+  including the dispatch publish, result settlement, and dispatch-gate release; the
+  display-name input receives the rolled name, the button re-enables, and subsequent
+  unchanged-stage republishes do not replace the custom tab with the preset tab
 
 #### Scenario: A failed or foreign roll result never rewrites the name field
 - **WHEN** the in-flight roll settles with a non-success outcome or a result whose request id does not match the submitted one

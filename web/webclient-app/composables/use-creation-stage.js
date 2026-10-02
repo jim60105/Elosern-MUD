@@ -4,7 +4,8 @@
 // stage mirror — after the form/proposal/dispatch groups.
 import { watch } from "vue";
 
-export function useCreationStage(props, form, emit) {
+export function useCreationStage(props, form, emit, options = {}) {
+  const { rollPending = { value: false } } = options;
   const { mode, conceptPending, selectedPresetKey, latchedStage } = form;
 
   // -- Preset state -----------------------------------------------------------
@@ -35,16 +36,16 @@ export function useCreationStage(props, form, emit) {
       if (value === null || value === lastStage) {
         return;
       }
-      // The in-flight pin and the completion-publish pin (D2/D3): while a
-      // concept apply is pending, the store's stage signal never moves the
-      // presented tab (a republish — including the dispatch's own re-emitted
-      // root — must not kick the player off the concept tab); and the stage
+      // The in-flight pin and the completion-publish pin (D1/D2/D3): while a
+      // concept apply or name roll is pending, the store's stage signal never
+      // moves the presented tab (a republish — including the dispatch's own
+      // re-emitted root — must not kick the player off the custom/concept tab);
       // object of the publish whose completion navigation this overlay already
       // performed is recognized as stale, so it cannot overwrite the landing
       // on the custom tab. The pin is exactly one publish: any later publish
       // (new object identity) mirrors normally, keeping keyboard navigation
       // intact.
-      if (conceptPending.value) {
+      if (conceptPending.value || rollPending.value) {
         lastStage = value;
         return;
       }

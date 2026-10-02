@@ -21,6 +21,7 @@ export function useCreationForm(props) {
   // releases without a matching settlement). Reconnect/remount resets it to
   // false naturally.
   const conceptPending = ref(false);
+  const rollPending = ref(false);
   // The stage object of the publish whose completion navigation this overlay
   // just performed (D3 completion-publish pin): while `props.stage` IS that
   // object, its stale root value must not overwrite the completion tab. One
@@ -130,6 +131,7 @@ export function useCreationForm(props) {
         stage !== "concept" &&
         !formTouched.value &&
         !conceptPending.value &&
+        !rollPending.value &&
         props.stage !== latchedStage.value
       ) {
         mode.value = "preset";
@@ -143,7 +145,7 @@ export function useCreationForm(props) {
       // pre-filled custom form shows; a resumed concept draft (no stage flip) keeps
       // the concept field (stageMode maps concept_filled -> concept).
       const stage = props.stage ? props.stage.stage : null;
-      if (!conceptPending.value && props.stage !== latchedStage.value) {
+      if (!conceptPending.value && !rollPending.value && props.stage !== latchedStage.value) {
         mode.value = stage === "custom" ? "custom" : stageMode(d.stage);
       }
       if (d.mode === "preset") {
@@ -175,7 +177,11 @@ export function useCreationForm(props) {
   }
 
   syncFromDraft();
-  watch(() => props.creation.draft, syncFromDraft, { deep: true });
+  watch(
+    () => props.creation.draft,
+    syncFromDraft,
+    { deep: true },
+  );
 
   function personaFilled() {
     return [persona.personality, persona.life_story, persona.habit].filter(
@@ -201,6 +207,7 @@ export function useCreationForm(props) {
     custom,
     draft,
     conceptPending,
+    rollPending,
     latchedStage,
     applyFrozen,
     stageMode,
