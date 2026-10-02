@@ -39,8 +39,10 @@ export function applyHud(ctx) {
     ctx.publishView();
   };
 
-  const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party"]);
-  const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "quest", "shop"]);
+  const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party", "npc_persona"]);
+  // `npc_persona` (the NPC author editor) never hosts a router frame either:
+  // the verb popover that opened it stays the current frame.
+  const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "quest", "shop", "npc_persona"]);
   const hudDrawer = ref(null);
   ctx.hudDrawer = hudDrawer;
 
@@ -55,6 +57,18 @@ export function applyHud(ctx) {
     hudDrawer.value = name;
     ctx.publishView();
     return true;
+  };
+
+  // The NPC author editor's single open entry (npc-persona-editor-window D1):
+  // open the `npc_persona` drawer and publish the request the editor
+  // composable binds to. A non-positive or non-integer identity is rejected.
+  ctx.openNpcPersonaEditor = function openNpcPersonaEditor(npcId) {
+    if (typeof npcId !== "number" || !Number.isInteger(npcId) || npcId <= 0) {
+      return false;
+    }
+    ctx.npcPersonaSeq += 1;
+    ctx.npcPersonaRequest = { npcId, seq: ctx.npcPersonaSeq };
+    return ctx.openHudDrawer("npc_persona");
   };
 
   ctx.closeHudDrawer = function closeHudDrawer() {

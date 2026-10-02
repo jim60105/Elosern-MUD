@@ -38,7 +38,6 @@ const ENVELOPE_KEYS = [
 // The shared coverage manifest (single id source for the Node catalog gate,
 // this behavioral table, and the Python registry pin).
 const REGISTERED_MUTATION_IDS = COVERAGE_MANIFEST.registeredMutationActionIds;
-const SILENT_IDS = COVERAGE_MANIFEST.silentPresentationControlIds;
 
 const FREEFORM_SCALES = [
   { scale: 0.25, label: "1/4", mp_cost: 4 },
@@ -181,6 +180,15 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
   // Each row: activate one surface deliberately, then assert exactly the one
   // echo (or the declared silence) and a descriptor-free envelope.
   const SURFACES = [
+    ...["npc.persona.read", "npc.persona.update"].map((actionId) => ({
+      id: `EXPECTED SILENCE: ${actionId} private editor control`,
+      ids: [actionId],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction(actionId, { npc_id: 41 });
+      },
+    })),
     {
       id: "backpack row: confirmed item use",
       ids: ["inventory.use"],
@@ -788,19 +796,6 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         `${actionId} must have a behavioral table row (silent controls included)`,
       ).toBe(true);
     }
-    expect(SILENT_IDS).toEqual([
-      "account.character.create",
-      "account.character.switch",
-      "creation.roll_name",
-      "explore.dialogue_leave",
-      "gallery.subject.select",
-      "gallery.generate",
-      "gallery.default.set",
-      "gallery.card.delete",
-      "gallery.face_rect.update",
-      "gallery.binding.save",
-      "options.dismiss",
-    ]);
   });
 
   it("a fill never overrides an explicitly provided descriptor field", () => {

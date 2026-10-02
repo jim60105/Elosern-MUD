@@ -302,7 +302,12 @@ export function applyCreation(ctx) {
       if (rs.mode === "creation" && d === "party") {
         ctx.hudDrawer.value = null;
       }
-      if (transportLost || epochChanged || detached) {
+      // The NPC author editor owns its own lifecycle across these events
+      // (npc-persona-editor-window D3): it survives a transport loss and a
+      // reconnect of the same character (keeping the draft and re-reading),
+      // and its composable closes it on a detach, a same-transport epoch
+      // replacement, or a reconnect onto another character.
+      if ((transportLost || epochChanged || detached) && d !== "npc_persona") {
         if (ctx.hudDrawer.value) {
           ctx.hudDrawer.value = null;
         }

@@ -69,6 +69,9 @@ export const GLYPHS = {
   shop: "M4 9h16l-1.6-5H5.6L4 9Z M4 9c0 1.7 1.8 2.5 4 2.5S12 10.7 12 9c0 1.7 1.8 2.5 4 2.5S20 10.7 20 9 M5 11.3V20h14v-8.7 M10 20v-5h4v5",
   // The full log's header medallion: a ruled page.
   log: "M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M8.5 8h7M8.5 12h7M8.5 16h4.5",
+  // The NPC author editor's header medallion (npc-persona-editor-window): a
+  // quill over a written line.
+  quill: "M19.5 3.5C13 4 8.5 8.6 7.2 15.3L6 19l3.6-1.3C16 16.2 20 11.5 20.5 4.5ZM7.2 15.3 13.5 9 M4 21h9",
   // The drawer chrome's close glyph (the reference's `.closebtn` X,
   // docs/design/elosern-redesign/index.html).
   close: "M6 6l12 12M18 6 6 18",
@@ -85,6 +88,7 @@ const STROKE_ATTRS = {
   flee: { "stroke-linecap": "round" },
   // The close X must render with rounded caps, matching the reference.
   close: { "stroke-linecap": "round" },
+  quill: { "stroke-linecap": "round", "stroke-linejoin": "round" },
   log: { "stroke-linecap": "round", "stroke-linejoin": "round" },
   lineage: { "stroke-linecap": "round" },
   lore: { "stroke-linecap": "round" },

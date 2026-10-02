@@ -100,6 +100,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // `ui_snapshot` to an anonymous session, so "connected with no snapshot"
   // means "waiting for login" until the account actually logs in.
   ctx.loggedIn = false;
+  // The NPC author editor's open request (npc-persona-editor-window D1):
+  // `{ npcId, seq }` of the most recent 編輯人物設定 activation, published so
+  // the editor composable binds BY VALUE to that identity. Null until used.
+  ctx.npcPersonaRequest = null;
+  ctx.npcPersonaSeq = 0;
   // The CombatMenu model (client-local skill/scale/AREA selection) lives in
   // the resolver registry — the ONE model home (the declared purity
   // exception); the store reaches it only through
@@ -251,6 +256,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // rejected) and the single close entry (`closeHudDrawer`).
     openHudDrawer: ctx.openHudDrawer,
     closeHudDrawer: ctx.closeHudDrawer,
+    openNpcPersonaEditor: ctx.openNpcPersonaEditor,
     // H5 (task 5.3): the full-screen overlay controller — the single open
     // entry (`openOverlay` over `map` / `settings` / `help` / `lineage`,
     // unknown names
