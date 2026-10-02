@@ -8,8 +8,10 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     activate_overview_chip,
     install_outbound_recorder,
+    narrative_log_length,
     sent_action_count,
     store_state,
+    wait_for_narrative_settled,
     wait_for_store_state,
 )
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -67,6 +69,33 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
             and not (s.get("dispatch") or {}).get("inFlight"),
         )
 
+    def _dispatch_denied(self, page, payload: dict, code: str) -> dict:
+        """Dispatch one persona save and prove ITS OWN rejection result.
+
+        `dispatchAction` returns the request ID, or null when the store
+        refuses the dispatch outright; a refusal must fail loudly rather than
+        let the assertion read a retained result from an earlier request.
+        The settled result is correlated by request ID, so a stale
+        `lastActionResult` can never satisfy the wait.
+        """
+        request_id = page.evaluate(
+            "(payload) => window.__elosernBridge.store.dispatchAction('npc.persona.update', payload)",
+            payload,
+        )
+        self.assertIsNotNone(request_id, "the store must accept the denied save dispatch")
+        wait_for_store_state(
+            page,
+            lambda s: s.get("phase") == "active"
+            and not s.get("mutationsLocked")
+            and not (s.get("dispatch") or {}).get("inFlight")
+            and (s.get("lastActionResult") or {}).get("requestId") == request_id,
+        )
+        result = store_state(page)["lastActionResult"]
+        self.assertEqual(result.get("requestId"), request_id)
+        self.assertEqual(result.get("outcome"), "rejected")
+        self.assertEqual(result.get("code"), code)
+        return result
+
     @covers_requirement(
         "npc-persona-editor::persona-target-admission-revalidates-current-room-visibility"
     )
@@ -81,28 +110,43 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_dirty")
         expect(page.get_by_test_id("npc-persona-editor-save")).to_be_enabled()
 
-        # Admin page to lock view on the NPC
+        # Admin page to lock view on the NPC. Each @lock lands on the admin's
+        # own narrative before the next dispatch: the admin command's
+        # submission is not an execution barrier for the player page.
         from .browser_helpers import login_and_open
         admin_page = self.new_page()
         login_and_open(admin_page, self.webclient_url, self.base_url, account="admin_dummy", password="AdminDummyPassword!2026")
 
+        def _admin_command(text: str) -> None:
+            before = narrative_log_length(admin_page)
+            admin_page.evaluate(
+                "(t) => Evennia.msg('text', [t], {})",
+                text,
+            )
+            wait_for_narrative_settled(admin_page, before)
+
         # 1. Deny view
-        admin_page.evaluate(
-            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:false()`], {})",
-            [npc_id],
-        )
+        _admin_command(f"@lock #{npc_id} = view:false()")
 
         # Before refresh, attempt save via dispatch bridge while view denied
-        save_res1 = page.evaluate(
-            """([npc]) => window.__elosernBridge.dispatch('npc.persona.update', {
-                npc_id: npc,
-                expected_persona_version: 1,
-                persona: { identity: { public: '接待員', hidden: '' }, appearance: '外貌', personality: '性格', speech_style: '觀察可見性草稿', life_story: '經歷', habit: '習慣', social_connection: '' }
-            })""",
-            [npc_id],
+        save_res1 = self._dispatch_denied(
+            page,
+            {
+                "npc_id": npc_id,
+                "expected_persona_version": 1,
+                "persona": {
+                    "identity": {"public": "接待員", "hidden": ""},
+                    "appearance": "外貌",
+                    "personality": "性格",
+                    "speech_style": "觀察可見性草稿",
+                    "life_story": "經歷",
+                    "habit": "習慣",
+                    "social_connection": "",
+                },
+                "offline_greeting": "",
+            },
+            "npc_persona.no_target",
         )
-        self.assertEqual(save_res1.get("outcome"), "rejected")
-        self.assertEqual(save_res1.get("code"), "npc_persona.no_target")
         page.evaluate("Evennia.msg('text', ['look'], {})")
 
         # Target disappears from exploration interact list and editor flips to unavailable
@@ -118,21 +162,26 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         expect(speech).to_have_value("觀察可見性草稿")
 
         # 2. Deny search (view true, search false)
-        admin_page.evaluate(
-            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:all();search:false()`], {})",
-            [npc_id],
-        )
+        _admin_command(f"@lock #{npc_id} = view:all();search:false()")
 
-        save_res2 = page.evaluate(
-            """([npc]) => window.__elosernBridge.dispatch('npc.persona.update', {
-                npc_id: npc,
-                expected_persona_version: 1,
-                persona: { identity: { public: '接待員', hidden: '' }, appearance: '外貌', personality: '性格', speech_style: '觀察可見性草稿', life_story: '經歷', habit: '習慣', social_connection: '' }
-            })""",
-            [npc_id],
+        save_res2 = self._dispatch_denied(
+            page,
+            {
+                "npc_id": npc_id,
+                "expected_persona_version": 1,
+                "persona": {
+                    "identity": {"public": "接待員", "hidden": ""},
+                    "appearance": "外貌",
+                    "personality": "性格",
+                    "speech_style": "觀察可見性草稿",
+                    "life_story": "經歷",
+                    "habit": "習慣",
+                    "social_connection": "",
+                },
+                "offline_greeting": "",
+            },
+            "npc_persona.no_target",
         )
-        self.assertEqual(save_res2.get("outcome"), "rejected")
-        self.assertEqual(save_res2.get("code"), "npc_persona.no_target")
         page.evaluate("Evennia.msg('text', ['look'], {})")
 
         wait_for_store_state(
@@ -147,13 +196,11 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         expect(speech).to_have_value("觀察可見性草稿")
 
         # 3. Restore visibility and set sleeping/resting schedule
-        admin_page.evaluate(
-            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:all();search:all()`], {})",
-            [npc_id],
-        )
-        admin_page.evaluate(
-            "([npc]) => Evennia.msg('text', [`@py evennia.search_object('#${npc}')[0].db.schedule_state = 'resting'`], {})",
-            [npc_id],
+        _admin_command(f"@lock #{npc_id} = view:all();search:all()")
+        _admin_command(
+            # The `=` form echoes the expression result, so the narrative
+            # settle wait is bounded; a bare assignment would land silently.
+            f"@py = setattr(evennia.search_object('#{npc_id}')[0].db, 'schedule_state', 'resting') or 'resting-scheduled'"
         )
         page.evaluate("Evennia.msg('text', ['look'], {})")
 
