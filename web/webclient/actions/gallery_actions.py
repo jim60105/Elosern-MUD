@@ -20,7 +20,7 @@ from world.art.service import request_gallery_image, resolve_gallery_subject_by_
 from world.art.subjects import ArtSubjectError, ArtSubjectKind, monster_subject_for
 from world.observability import log_info, log_warn
 
-AFFECTED_GALLERY = ("gallery",)
+AFFECTED_GALLERY_PANELS = ("gallery", "art", "roster")
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 REJECTION_MESSAGES = {
     "unknown_subject": "找不到此肖像圖庫。",
@@ -102,7 +102,7 @@ def validate_gallery_binding_save_payload(payload):
 def _rejected(code):
     return {
         "outcome": "rejected", "code": code, "message": REJECTION_MESSAGES[code],
-        "affected_panels": AFFECTED_GALLERY,
+        "affected_panels": AFFECTED_GALLERY_PANELS,
     }
 
 
@@ -148,7 +148,7 @@ def _context(action_id, payload):
 
 def _gallery_subject_select_adapter(actor, payload, session=None):
     result = dict(select_gallery_subject(session, actor, payload["subject_key"]))
-    result["affected_panels"] = AFFECTED_GALLERY
+    result["affected_panels"] = AFFECTED_GALLERY_PANELS
     context = _context("gallery.subject.select", payload)
     if result["outcome"] == "success":
         log_info("gallery_action", context=context)
@@ -198,7 +198,7 @@ def _mutate(action_id, payload):
         log_warn("gallery_action", context=context, exc=error)
         return _rejected(_error_code(error, resolved=subject is not None))
     code, message = _SUCCESS[action_id]
-    result = {"outcome": "success", "code": code, "message": message, "affected_panels": AFFECTED_GALLERY}
+    result = {"outcome": "success", "code": code, "message": message, "affected_panels": AFFECTED_GALLERY_PANELS}
     if action_id == "gallery.generate":
         result["data"] = {"image_id": image_id}
     log_info("gallery_action", context=context)

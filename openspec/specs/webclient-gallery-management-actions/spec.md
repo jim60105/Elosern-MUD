@@ -2,19 +2,31 @@
 
 ## Purpose
 
-Defines the six production `ui_action` adapters that let the webclient reach the gallery backend's management seam: subject selection, image generation, default setting, card deletion, face-rect re-marking, and binding saving. Each action binds one exact payload validator, re-resolves every client-supplied identity through the public `world/art/service.py` / `world/art/gallery.py` APIs (never a direct record write), maps typed backend errors to stable codes with bounded zh-TW messages, emits exactly one `gallery` panel update and one facade observability event per completed mutation, and obeys the dispatcher's idempotency discipline.
+Defines the six production `ui_action` adapters that let the webclient reach the gallery backend's management seam: subject selection, image generation, default setting, card deletion, face-rect re-marking, and binding saving. Each action binds one exact payload validator, re-resolves every client-supplied identity through the public `world/art/service.py` / `world/art/gallery.py` APIs (never a direct record write), maps typed backend errors to stable codes with bounded zh-TW messages, uniformly declares `("gallery", "art", "roster")` so each completed success or domain rejection publishes one newer three-panel update plus one facade observability event, and obeys the dispatcher's idempotency discipline.
 
 ## Requirements
 
 ### Requirement: Six gallery management actions are registered with exact payload validators
 
+Canonical requirement ID: `webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators`.
+
 The production action registry SHALL register exactly the six actions
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`,
 `gallery.card.delete`, `gallery.face_rect.update`, and `gallery.binding.save`,
 each bound to one exact payload validator rejecting any missing, extra, or
-wrongly typed field before the adapter runs, and each declaring
-`affected_panels: ("gallery",)` on success and domain rejection. Every
-persistent-mutation adapter SHALL re-resolve the payload's
+wrongly typed field before the adapter runs, and each declaring exactly
+`affected_panels: ("gallery", "art", "roster")` on success and domain rejection.
+The declaration SHALL be uniform for all six actions, including subject
+selection and generation, even when an action leaves art or roster resolution
+unchanged. Each such completed action SHALL publish one newer affected-panel
+`ui_update` containing freshly rendered `gallery`, `art`, and `roster` panels
+before its action result, whose presentation revision SHALL identify that
+update. The existing coordinator's mode-coherence companion panels SHALL remain
+permitted; no full snapshot SHALL substitute for this declared-panel update.
+Admission failures before the adapter runs and cached duplicate requests SHALL
+retain their existing dispatcher publication behavior.
+
+Every persistent-mutation adapter SHALL re-resolve the payload's
 `subject_key` — character kind through
 `world/art/service.py::resolve_gallery_subject_by_key` (returning the typed
 subject and its live entity), registry kinds through the kind's typed producer
@@ -43,18 +55,42 @@ Image IDs SHALL be canonical lowercase UUID text (8-4-4-4-12 hexadecimal).
 - **WHEN** `gallery.generate` carries a field beyond `subject_key`, `fields`, and `custom_prompt`
 - **THEN** the dispatcher returns `malformed_payload` and the adapter never executes
 
+#### Scenario: Every successful gallery action refreshes the same three panels
+
+- **WHEN** any of the six gallery actions completes successfully under a fresh valid request in exploration mode
+- **THEN** its adapter declares exactly `("gallery", "art", "roster")` and one newer `ui_update` contains exactly those three freshly rendered panels, with no `ui_snapshot`, followed by the successful result naming that revision
+
+#### Scenario: Every gallery domain rejection refreshes the same three panels
+
+- **WHEN** any of the six gallery adapters returns a domain rejection after admission under a fresh request
+- **THEN** it declares exactly `("gallery", "art", "roster")`, no rejected mutation is applied, and one newer update refreshes all three panels before the rejected action result naming that revision
+
+#### Scenario: Setting a default refreshes stage portrait sources
+
+- **WHEN** `gallery.default.set` changes the card selected by canonical portrait resolution for an owned roster character or a currently catalogued dialogue host or combat participant
+- **THEN** the same action-completion update carries the new gallery default and freshly resolved roster and art portraits, so existing stage consumers receive their new value without a full snapshot
+
 ### Requirement: Subject selection writes only session presentation state
+
+Canonical requirement ID: `webclient-gallery-management-actions::subject-selection-writes-only-session-presentation-state`.
 
 `gallery.subject.select` SHALL accept exactly `subject_key`, SHALL write only
 the per-presentation-sequence selection store shipped by the gallery panel, and
 SHALL return stable code `unknown_subject` (zh-TW message) when the key names no
 current rail entry. It SHALL NOT create, mutate, or delete any gallery record,
-card, or job, and its completion SHALL publish one `gallery` panel update.
+card, or job, and its success or domain rejection SHALL declare exactly
+`affected_panels: ("gallery", "art", "roster")` and publish one newer
+`ui_update` containing those freshly rendered panels through the dispatcher.
 
 #### Scenario: Selecting a rail subject re-renders the panel
 
 - **WHEN** a client selects a listed companion subject key
-- **THEN** the result succeeds, one `gallery` update names it as `selected`, and the store is retired with the sequence at unpuppet
+- **THEN** the result succeeds, one update contains `gallery`, `art`, and `roster`, gallery names the subject as `selected`, and the selection store is retired with the sequence at unpuppet
+
+#### Scenario: An unknown selection preserves state while refreshing presentation
+
+- **WHEN** a schema-valid selected key names no current rail entry
+- **THEN** selection is rejected with `unknown_subject`, the prior selection and all gallery records remain unchanged, and one update re-renders gallery, art, and roster from the current state
 
 ### Requirement: Generation routes one request through the service seam
 

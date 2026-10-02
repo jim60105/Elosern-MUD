@@ -83,5 +83,4 @@ def select_gallery_subject(session, actor, subject_key) -> dict:
         log_info("gallery_panel_selected", context={"subject": subject_key, "kind": subject.kind.value})
     return {
         "outcome": "success", "code": "gallery_selected", "message": "已切換肖像圖庫",
-        "affected_panels": ("gallery",),
     }
