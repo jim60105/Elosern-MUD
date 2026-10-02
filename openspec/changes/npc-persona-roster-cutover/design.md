@@ -1,54 +1,39 @@
 ## Context
 
-See proposal.md for motivation. Facts the plan relies on: hosts carry a component `service_id` mapped to a place with a mandatory `host_profile_key`; exam records (`actor.db.guild_exams`) carry `opponent_id` and `target_rank`, and ranks carry `examiner_profile_key`; companions carry `db.creation_preset_key` and, when bound, `db.party_member` naming the owner; scene occupants carry `db.npc_tier_key` and appear in active quest records' `objective_target_ids` for a definition whose durable payload declares the stage occupants; the durable generated-quest store holds JSON payloads whose pre-change occupants have optional `background`/three-field `persona`; the offline bundle selector is pure; `world/rules/surfaces.py` restores attribute caches; boot steps run sequentially before the server serves sessions.
+See proposal.md for the user-ordered scope reversal (2026-10-02: no database migration; existing databases are destroyed and re-initialized). Facts this plan relies on: every production NPC creation path already writes a complete compact card plus the current content-generation marker at creation time (`npc-persona-host-examiner-producers`, `npc-persona-companion-profiles`, `npc-persona-import-cards`, `npc-persona-generated-quest-cards`); `npc-persona-roster-validation` fails the boot loudly when the shipped roster is incomplete; the generated-quest store decodes payloads through the strict codec from `npc-persona-generated-quest-cards`, which rejects occupant characterizations that are not complete cards; the project's stated default is no backward-compatibility layers or data migrations because there are no released users; the retained test database is `server/db/evennia-test.sqlite3` and the container image mounts a persistent SQLite volume.
 
 ## Goals / Non-Goals
 
-**Goals:** every existing NPC-family instance and durable occupant ends with a complete new card and metadata in one atomic step; gameplay state untouched; idempotent; edits never overwritten; restore succeeds afterwards.
+**Goals:** the persona design set reaches its done-state without shipping migration code; a fresh database is demonstrably born with the complete marked roster; pre-amendment databases fail closed with a named error and have a documented, supported destroy-and-reinitialize path; the design document's shipped record matches reality.
 
-**Non-Goals:** rewriting conversation transcripts or memory; deleting/respawning NPCs; `Monster` instances; player characters or presets; any reusable migration framework; a runtime old-payload decoder.
+**Non-Goals:** any cutover mechanism (suspension guard, plan/apply phases, boot step, cutover events); a legacy payload decoder; general migration infrastructure; changes to the roster-validation boot gate, the strict codec, or any writer contract; touching any existing database file as part of implementation (the actual developer-database deletion is an operator action ordered outside this change's code).
 
 ## Decisions
 
-### D1. Plan, then one apply transaction
+### D1. Delete the cutover mechanism rather than ship it
 
-`plan_cutover()` builds an in-memory list of `(target, new_card, provenance, version)` and `(payload_identity, rewritten_payload)` with no writes, validating every card through the contract and every rewritten payload through the strict codec from `npc-persona-generated-quest-cards`. Any plan failure raises `NpcPersonaCutoverError` naming the source (`kind:key`) or entity (`#dbref`) before a single write. `apply_cutover(plan)` snapshots `persona`/`npc_persona_meta` attribute caches for every target and the store's payload list, then in one `transaction.atomic()` writes each card and meta (`generation = NPC_PERSONA_CONTENT_GENERATION`; `persona_version = previous + 1` when meta exists, else `1`; provenance per D2), replaces the store payload list once, and sets the persistent marker (`ServerConfig` `npc_persona_cutover_generation`). On exception: rollback, restore every snapshot, emit `npc_persona_cutover_failed` with `exc=`, re-raise. Alternative rejected: batching per NPC (explicitly forbidden partial completion).
+The §6.2 in-place cutover exists only to move pre-amendment data forward. Under the user's destroy-and-reinitialize order, that data class is unsupported by definition, so the mechanism's plan/apply/suspend code, its `npc_persona_cutover` boot step, and its three observability events are not implemented at all — no dead code, no dormant boot step, no catalog rows. Enforcement that nobody boots against pre-amendment payloads is already provided for free: the strict codec fails restore deterministically. The repository's no-migrations default then becomes the active rule instead of an exception to it.
 
-### D1a. Old payloads are rewritten as raw JSON, never decoded
+### D2. Supersede design §6.2 with a dated amendment clause
 
-The plan reads stored payloads as the raw JSON-safe dicts the store holds. For each occupant it reads only identity fields (definition key and name, issuer key, stage index, occupant position, `tier`, `display_name`, `title`) — never the old `persona`/`background` prose — deletes those two keys, writes the new card record under `persona`, and then validates the whole rewritten payload with the strict codec from `npc-persona-generated-quest-cards`. No legacy decoder exists anywhere. Tests use a true pre-change payload captured from the pre-change compiler output (`git show` of a compiled template payload at the commit before `npc-persona-generated-quest-cards`) as a frozen fixture.
+The design document gains a dated, user-ordered amendment in the §13a style (§13b) stating: the §6.2 one-time in-place cutover is superseded by supported database lifecycle — pre-amendment databases are destroyed and re-initialized per the developer runbook, and `npc-persona-roster-cutover` delivers the fresh-bootstrap guarantees and the runbook instead of a migration. §6.2's heading gets a pointer to the amendment; §12.2's row 20 scope text is corrected the same way. The original §6.2 body is kept as historical rationale under the amendment, exactly as §13 keeps pre-amendment clauses.
 
-The stored `definition.key` is a digest over the pre-change canonical content; the cutover keeps every stored key unchanged so quest records, offers, and bindings keep resolving. Key-equals-digest is therefore not an invariant for rewritten payloads, and restore performs no such check. Consequence: a template quest compiled after the cutover receives a new key, so the board may show one pre-cutover template offer beside a newly generated one with identical mechanics; this is accepted for the single pre-release cutover and a test pins that both register without conflict.
+### D3. Runbook is the operator contract
 
-### D2. Provenance classification order
+`docs/development/database-reset.md` documents the full procedure: stop the server; delete the SQLite file named by the server settings (dev default `server/db/evennia.db`); `uv run --locked evennia migrate`; start the server; verify the `startup_step` events complete, `npc_persona_roster_validation` passes, and the NPC family is fully marked. It names the retained test database (`server/db/evennia-test.sqlite3` — same removal procedure, or drop `--keepdb` per AGENTS.md) and the container persistent volume, and it states explicitly that deleting the database also deletes player characters, progress, and generated quests — intended for pre-release development use only.
 
-1. Service host (has a service component whose `service_id` is in the roster) → `profile` provenance, the place's profile card.
-2. Exam opponent (its id appears as `opponent_id` in any stored exam record) → the record's rank examiner profile.
-3. Starting companion (`LLMNPC` with `creation_preset_key` matching a declaration partner) → `companion` provenance naming the partner preset key; the card is the shared partner-preset derivation of `npc-persona-companion-profiles` (D2 there); owner = `party_member` when bound, else the unique player character whose preset declares that partner and holds an affinity record toward the NPC; owner line recomputed exactly as the companion builder composes it, and the partner preset's authored `greeting` is written to the NPC's `db.npc_offline_greeting` field (old companions predate the field). No unique owner → treated as rule 6 with a `warn` event naming the NPC (never a fabricated owner).
-4. Scene occupant (id in an active quest record's `objective_target_ids`) → the replacement card computed for that durable occupant (rule 5), `generated_quest` provenance — so a materialized occupant and its declaration share one baseline.
-5. Durable payload occupant: if the payload's definition was compiled from a shipped template (same quest name, stage index, occupant position, display name, and title as a `QUEST_TEMPLATE_POOL` occupant) → the template card; else the offline bundle for the occupant's tier with seed `"{definition_key}:{issuer_key}:{stage}:{position}"`. The rewritten occupant drops `background` and the old `persona` and stores the new card.
-6. Everything else in the NPC family (imported, dynamic, unresolvable) → `offline_pool_for(db.npc_tier_key, race)` with seed `str(npc.id)`, `offline_bundle` provenance.
+### D4. Two pinned behaviors plus a docs contract, one test module
 
-Every rule writes a complete new card; no rule copies old prose.
+`world/rules/tests/test_npc_persona_fresh_bootstrap.py` (rules shard) pins what the replacement relies on:
 
-### D3. Exclusivity
+1. **Fresh bootstrap is born complete:** after startup syncs against a synchronized test database, every NPC-family instance carries the current content-generation marker and a contract-valid complete card, with no rewrite step run — proving producers alone suffice.
+2. **Pre-amendment payloads fail closed:** a pre-amendment-shape occupant payload (old optional three-field `persona` plus `background`, shape hand-copied from the pre-change durable schema via `git show` of the codec at the commit before `npc-persona-generated-quest-cards`) is rejected by the strict restore path with a named validation failure — proving no compatibility decoder exists. The fixture is file-local synthetic data in the pre-change shape, not shipped lore, so it needs no data-freeze registration.
+3. **Runbook contract:** the reset runbook exists and names the migrate step and the retained test database path, guarding the operator contract the same way `tests/test_command_docs.py` guards player docs.
 
-`npc_persona.py` gains `_WRITES_SUSPENDED` and a `suspended_writes()` context manager used only by the cutover. While set, `initialize_npc_persona` and `update_npc_persona` raise `NpcPersonaWritesSuspended` (import and spawn fail their all-or-nothing transactions; an editor request cannot occur because no session is served during `at_server_start`, and any in-process caller gets the exception through its normal failure path). Entering the context while already set raises `NpcPersonaCutoverError("cutover already running")`; there is no wait or retry. The cutover's own writes go through a private writer that bypasses the guard. Because the step runs during `at_server_start`, no session is served concurrently; the guard covers re-entrancy and any in-process caller.
+The first two assertions are behavior; none of them pins prose. The module is registered in exactly one `.github/evennia-shards.json` shard and its requirements carry literal `covers_requirement` IDs.
 
-### D3a. Exclusivity depends on a synchronous step
+## Risks / Tradeoffs
 
-The step is a plain synchronous call that never yields to the reactor (no Deferred, no `inlineCallbacks`); Evennia runs `at_server_start` hooks before syncing portal sessions, so no session action can interleave. A separate process (an `evennia shell` import) is not covered by the in-process flag; it is serialized by the database write lock that the cutover's transaction holds once it starts writing, and its own persona writes use the foundation's lock-before-read protocol. A test asserts the step function returns a plain value (not a Deferred) and the startup wrapper calls it synchronously.
-
-### D4. Boot placement and idempotence
-
-Step `npc_persona_cutover` is inserted immediately before `sync_quest_runtime` (after `sync_service_interiors`, so instance rooms exist, and after `npc_persona_roster_validation`). A run with nothing to plan emits `npc_persona_cutover_skipped` and writes nothing. Marked instances are never re-planned, so player edits — including optional leaves cleared to empty strings — survive every restart. `sync_guild_economy` then initializes only newly created hosts (producer rule), and restore decodes only valid payloads.
-
-### D5. What is preserved
-
-Only `db.persona`, `db.npc_persona_meta`, `db.npc_offline_greeting` (rule 3 only), and the occupant characterization fields inside stored payloads change. Object ids, keys, titles, location, components, traits, inventory, party bindings, quest records and bindings, schedules, affinity, chat memory, dialogue sessions, and every other payload field are untouched; tests compare full attribute snapshots before and after.
-
-## Risks / Trade-offs
-
-- [A large retained world makes one transaction big] → pre-release, single-player scale; acceptable and required by the design.
-- [A misclassified instance gets a bundle voice instead of its profile] → classification order is explicit and tested per rule; the `warn` event names any companion without a resolvable owner.
-- [A failed cutover blocks boot] → intended fail-closed behavior; the event names the source/entity to fix; the prior state is intact.
+- [A developer boots with an old database and hits a hard restore failure] → intended fail-closed behavior; the runbook is the named remedy, linked from the failure's operational event context; single-player pre-release scale makes loss acceptable and the user ordered exactly this.
+- [The design doc's §6.2 narrative still describes a cutover] → D2's amendment clause is the shipped-of-record supersession; §12.2's table row is corrected in the same edit so no reader follows a stale instruction.
+- [A future team wants in-place migration] → explicitly out of scope; nothing built here blocks writing one as a new change when there are released users to protect.
