@@ -11,8 +11,8 @@ Apply on branch `feat/npc-persona-roster-validation` in worktree `.worktrees/npc
 
 ## 3. Review and docs
 
-- [ ] 3.1 Write `docs/lore/npc-persona-roster-review.md` per design D4 from the slices' recorded reviews plus a fresh cross-slice same-profession comparison; state model-review status honestly.
-- [ ] 3.2 Update the authoring-flow sections of `docs/development/adding-npcs.md` (creation paths now initialize cards; profiles and slices; references; inventory and boot validation; voice lines; the in-game editor and its no-regeneration rule) in Traditional Chinese; run any docs contract test that covers the file.
+- [x] 3.1 Write `docs/lore/npc-persona-roster-review.md` per design D4 from the slices' recorded reviews plus a fresh cross-slice same-profession comparison; state model-review status honestly.
+- [x] 3.2 Update the authoring-flow sections of `docs/development/adding-npcs.md` (creation paths now initialize cards; profiles and slices; references; inventory and boot validation; voice lines; the in-game editor and its no-regeneration rule) in Traditional Chinese; run any docs contract test that covers the file.
 
 ## 4. Gates
 
