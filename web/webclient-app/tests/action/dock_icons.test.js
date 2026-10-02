@@ -15,7 +15,7 @@ describe("dock-icons glyph table", () => {
     attack: "M5 19 19 5M5 19h4M5 19v-4",
     skills: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     items: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
-    // The reference's 背包 · 裝備 drawer-head backpack outline
+    // The reference's 背包 ‧ 裝備 drawer-head backpack outline
     // (index.html:958) — the identical string the `items` tab draws.
     inventory: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
     defend: "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z",

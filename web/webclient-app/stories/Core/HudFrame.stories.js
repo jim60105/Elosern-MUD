@@ -27,12 +27,12 @@ const sample = (label, extra = "") =>
 const renderFrame = (args) => ({
   render: () =>
     h(HudFrame, args, {
-      "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
+      "actor-left": () => sample("actor-left ‧ 玩家立繪", "background:#1a1d2099;"),
       // In combat `actor-right` holds the foe line-up
       // (webclient-combat-foes-on-stage), reaching left beyond its box.
       "actor-right": () =>
         args.mode === "dialogue"
-          ? sample("actor-right · 對話對象立繪", "background:#1a1d2099;")
+          ? sample("actor-right ‧ 對話對象立繪", "background:#1a1d2099;")
           : args.mode === "combat"
             ? h(FoeLineup, { foes: foeParticipants(3), artPanel: { portrait_catalog: FOE_PORTRAIT_CATALOG } })
             : null,
@@ -40,17 +40,17 @@ const renderFrame = (args) => ({
       // D6): a sample of its height, centred in the `choices` anchor's span.
       choices: () =>
         args.mode === "dialogue"
-          ? sample("choices · 對話選項（置中）", "height:330px;pointer-events:auto;background:#1a1d20cc;")
+          ? sample("choices ‧ 對話選項（置中）", "height:330px;pointer-events:auto;background:#1a1d20cc;")
           : null,
-      place: () => sample("place · 地點卡"),
-      vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
+      place: () => sample("place ‧ 地點卡"),
+      vitals: () => sample("vitals ‧ 生命／狀態／同伴", "height:120px;"),
       map: () => [
-        sample("map · 小地圖", "width:218px;height:200px;align-self:flex-end;"),
-        sample("map · 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
+        sample("map ‧ 小地圖", "width:218px;height:200px;align-self:flex-end;"),
+        sample("map ‧ 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
       ],
-      "band-message": () => sample(args.mode === "dialogue" ? "band-message · 訊息視窗（全寬，名牌）" : "band-message · 訊息視窗（2/3）"),
-      "band-command": () => sample("band-command · 指令面板（1/3）"),
-      "command-line": () => sample("command-line · 指令列"),
+      "band-message": () => sample(args.mode === "dialogue" ? "band-message ‧ 訊息視窗（全寬，名牌）" : "band-message ‧ 訊息視窗（2/3）"),
+      "band-command": () => sample("band-command ‧ 指令面板（1/3）"),
+      "command-line": () => sample("command-line ‧ 指令列"),
     }),
 });
 
@@ -177,7 +177,7 @@ const renderHoldLoop = (args) => ({
     onBeforeUnmount(() => clearInterval(timer));
     return () =>
       h(HudFrame, { ...args, beatHold: hold.value }, {
-        "actor-left": () => sample("actor-left · 玩家立繪", "background:#1a1d2099;"),
+        "actor-left": () => sample("actor-left ‧ 玩家立繪", "background:#1a1d2099;"),
         "actor-right": () =>
           hold.value
             ? h(FoeLineup, {
@@ -186,15 +186,15 @@ const renderHoldLoop = (args) => ({
                 inert: true,
               })
             : null,
-        place: () => sample("place · 地點卡"),
-        vitals: () => sample("vitals · 生命／狀態／同伴", "height:120px;"),
+        place: () => sample("place ‧ 地點卡"),
+        vitals: () => sample("vitals ‧ 生命／狀態／同伴", "height:120px;"),
         map: () => [
-          sample("map · 小地圖（已回到探索）", "width:218px;height:200px;align-self:flex-end;"),
-          sample("map · 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
+          sample("map ‧ 小地圖（已回到探索）", "width:218px;height:200px;align-self:flex-end;"),
+          sample("map ‧ 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
         ],
-        "band-message": () => sample("band-message · 訊息視窗（最後的節拍）"),
-        "band-command": () => sample("band-command · 指令面板（探索，鎖定中）"),
-        "command-line": () => sample("command-line · 指令列"),
+        "band-message": () => sample("band-message ‧ 訊息視窗（最後的節拍）"),
+        "band-command": () => sample("band-command ‧ 指令面板（探索，鎖定中）"),
+        "command-line": () => sample("command-line ‧ 指令列"),
       });
   },
 });

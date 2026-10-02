@@ -120,7 +120,7 @@ describe("StatusPanel (H2 island-stack root)", () => {
     const w = mountPanel({ status: STATUS_PANEL_COMBAT_SAMPLE });
     const combat = w.get('[data-testid="status-panel__combat"]');
     expect(combat.attributes("data-mode")).toBe("guild_exam");
-    expect(combat.text()).toBe("戰鬥中（公會考核）· 第 3 回合");
+    expect(combat.text()).toBe("戰鬥中（公會考核）‧ 第 3 回合");
   });
 
   it("renders no conditions island when conditions are empty", () => {

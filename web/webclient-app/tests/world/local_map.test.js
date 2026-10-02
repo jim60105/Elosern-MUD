@@ -268,7 +268,7 @@ describe("LocalMap (B4 world family)", () => {
       const w = mountMap({ localMap: localMapModelFor(sample) });
       const text = w.text();
       expect(text).not.toContain("°");
-      // No compass bearing like 「北 324° · 西 262°」 and no distance unit.
+      // No compass bearing like 「北 324° ‧ 西 262°」 and no distance unit.
       expect(text).not.toMatch(/[北南東西]\s*\d+/);
       expect(text).not.toMatch(/\d+\s*(?:公尺|公里|km)\b/i);
       // slim-minimap-island D2: the current node's own `座標 x,y` figure is

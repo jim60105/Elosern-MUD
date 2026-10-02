@@ -36,7 +36,7 @@ const OVERVIEW_PANEL = explorationPanelFixture({
     { label: "東", destination: "room:902" },
   ],
   targets: [
-    { identity: 11, name: "葛里安·衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
+    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
   ],
   objects: [{ identity: 31, name: "任務板" }],
 });

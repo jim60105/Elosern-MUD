@@ -90,7 +90,7 @@ export const HostPendingPlaceholder = {
 // No catalog entry (`portrait_ref` null): the name's initial and the name.
 export const HostMissingEntry = {
   render: renderActor,
-  args: { portrait: null, name: "合成·旅人", side: "right", dimmed: false },
+  args: { portrait: null, name: "合成‧旅人", side: "right", dimmed: false },
 };
 
 export const Failed = {
@@ -106,7 +106,7 @@ export const Opaque = {
   render: renderActor,
   args: {
     portrait: { ...HOST_ENTRY, url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="400" height="600" fill="#686a70"/><circle cx="200" cy="95" r="50" fill="#202027"/><path d="M150 155h100l45 440H105Z" fill="#202027"/></svg>')}` },
-    name: "合成·旅人",
+    name: "合成‧旅人",
   },
 };
 

@@ -199,7 +199,7 @@ function confirmAbandonNow() {
 
           <p class="quest-log__row-objective">{{ row.objective_line }}</p>
           <p class="quest-log__stage" data-testid="quest-log__quest-stage">
-            第 {{ row.stage_index }} 階段 · 進度 {{ row.stage_progress }}
+            第 {{ row.stage_index }} 階段 ‧ 進度 {{ row.stage_progress }}
           </p>
           <p
             v-if="row.deadline_line"

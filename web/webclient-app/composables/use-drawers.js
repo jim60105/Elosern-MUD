@@ -10,12 +10,12 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // derived from the single open-drawer name the store publishes.
   const DRAWER_TITLES = {
     skill: "技能書",
-    inventory: "背包 · 裝備",
+    inventory: "背包 ‧ 裝備",
     shop: "商店",
     quest: "任務",
     lore: "世界圖鑑",
     status: "角色狀態",
-    party: "同伴 · 隊伍",
+    party: "同伴 ‧ 隊伍",
   };
   const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
   // The drawer head glyph (webclient-drawer-frame-unification): a
@@ -89,7 +89,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
       return "";
     }
     const character = panel("character");
-    return `主動 ${skillCount(character?.actives)} · 被動 ${skillCount(character?.passives)}`;
+    return `主動 ${skillCount(character?.actives)} ‧ 被動 ${skillCount(character?.passives)}`;
   });
 
   // The inventory drawer's committed wallet figure (relocate-inventory-drawer-

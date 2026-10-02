@@ -59,7 +59,7 @@ function skillCount(rows) {
 
 // The category summary's count is the flattened total of that category's
 // own skill rows (sum of group.skills.length) — a plain digit, not the
-// draft's richer "8 元素 · 87" qualifier text (no backing field for it).
+// draft's richer "8 元素 ‧ 87" qualifier text (no backing field for it).
 function categorySkillCount(category) {
   let count = 0;
   for (const group of category.groups ?? []) {
@@ -129,7 +129,7 @@ function costText(row) {
   const parts = [];
   if (cost.mp) parts.push(`${cost.mp} mp`);
   if (cost.sp) parts.push(`${cost.sp} sp`);
-  return parts.length > 0 ? parts.join(" ・ ") : "免費";
+  return parts.length > 0 ? parts.join(" ‧ ") : "免費";
 }
 
 // The cost cell's colour mirrors `costText`'s normalization: only positive
@@ -156,7 +156,7 @@ function castText(row) {
     parts.push(
       `威力 ${row.freeform_scales
         .map((s) => `${s.label}（${s.mp_cost} mp）`)
-        .join("・")}`,
+        .join("‧")}`,
     );
   }
   if (Array.isArray(row.shorthands) && row.shorthands.length > 0) {

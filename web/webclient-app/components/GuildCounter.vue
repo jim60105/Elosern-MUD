@@ -127,7 +127,7 @@ const hasNextStep = computed(
         </p>
           <p class="guild-counter__merit" data-testid="guild-counter__merit">
             <template v-if="hasNextStep">
-              功績 {{ rank.merit }} · 升格至 {{ rank.next_rank }} 需 {{ rank.next_threshold }}
+              功績 {{ rank.merit }} ‧ 升格至 {{ rank.next_rank }} 需 {{ rank.next_threshold }}
             </template>
             <template v-else>
               功績 {{ rank.merit }}（最高等級）

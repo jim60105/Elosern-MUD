@@ -7,7 +7,7 @@
 // on the avatar. The name, HP numerals, and bond stage are the cell's
 // accessible name and tooltip; the party drawer shows them as text. No invite
 // padding: inviting lives in the drawer. When empty, renders nothing.
-// Activating the island or any cell opens the 同伴 · 隊伍 drawer and dispatches nothing.
+// Activating the island or any cell opens the 同伴 ‧ 隊伍 drawer and dispatches nothing.
 import { computed } from "vue";
 import {
   buildCombatTokenMap,

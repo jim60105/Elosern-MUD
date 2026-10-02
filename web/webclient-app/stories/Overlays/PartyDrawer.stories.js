@@ -11,7 +11,7 @@ import {
 } from "../fixtures.js";
 
 // PartyDrawer (webclient-align-05-party-hud):
-// the 同伴 · 隊伍 drawer body, shown inside the shared right-anchored HudDrawer chrome.
+// the 同伴 ‧ 隊伍 drawer body, shown inside the shared right-anchored HudDrawer chrome.
 // Deterministic and offline.
 
 export default {
@@ -34,7 +34,7 @@ function renderDrawer(args) {
             HudDrawer,
             {
               open: true,
-              title: "同伴 · 隊伍",
+              title: "同伴 ‧ 隊伍",
               subtitle: `${slots.length} / 4`,
               drawerKey: "party",
               icon: "party",

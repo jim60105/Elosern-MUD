@@ -95,7 +95,7 @@ export const LongNames = {
       condition("long_focus", "beneficial", "專注", 60, { accuracy: 10 }),
       condition("long_fear", "warning", "恐懼", 30, { agility: "-15%" }),
       condition("long_poison", "harmful", "中毒", 120),
-      condition("long_more", "informational", "轉生祝福·悠花敏捷提升", null, { agility_flat: 3 }),
+      condition("long_more", "informational", "轉生祝福‧悠花敏捷提升", null, { agility_flat: 3 }),
     ],
   },
 };

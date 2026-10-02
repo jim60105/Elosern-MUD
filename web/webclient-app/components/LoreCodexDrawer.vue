@@ -116,7 +116,7 @@ const selectedEntry = computed(
            chrome's own 世界圖鑑 title. -->
       <div class="lore-codex-drawer__head" data-testid="lore-codex-drawer__head">
         <h3 class="lore-codex-drawer__title" data-testid="lore-codex-drawer__title">圖鑑</h3>
-        <span class="lore-codex-drawer__sub" data-testid="lore-codex-drawer__sub">僅已發現 · 8 類</span>
+        <span class="lore-codex-drawer__sub" data-testid="lore-codex-drawer__sub">僅已發現 ‧ 8 類</span>
       </div>
 
       <!-- Category strip: the aggregate control plus one honest control per

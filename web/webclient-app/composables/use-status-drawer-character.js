@@ -18,7 +18,7 @@ export function useStatusDrawerCharacter(props) {
 
   // The 設計稿's #dr-status 屬性 section shows only the four true-attribute
   // rows. The gauge (hp/mp/sp) and counter (guild_merit) values are already
-  // owned by the 生命量 and 計數・公會 sections, so the 屬性 section filters
+  // owned by the 生命量 and 計數‧公會 sections, so the 屬性 section filters
   // to an allowlist (fails closed: a new server trait key renders nowhere
   // until reviewed in) rather than rendering every trait row.
   const ATTRIBUTE_KEYS = ["atk_phys", "agility", "defense", "magic_power"];

@@ -17,7 +17,7 @@ describe("character-identity (H2 head-card derivations)", () => {
   });
 
   it("derives the portrait glyph as the first grapheme of the display name", () => {
-    expect(portraitGlyph("艾倫·灰誓")).toBe("艾");
+    expect(portraitGlyph("艾倫‧灰誓")).toBe("艾");
     expect(portraitGlyph("")).toBe("");
     expect(portraitGlyph(null)).toBe("");
     expect(portraitGlyph(undefined)).toBe("");

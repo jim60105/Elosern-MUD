@@ -38,7 +38,7 @@ export const MARKUP_STRESS_SAMPLE = [
 export const STATUS_SLICE_SAMPLE = {
   connected: true,
   locationLabel: "測試起點",
-  timeLabel: "春季 3 日 · 12:00",
+  timeLabel: "春季 3 日 ‧ 12:00",
 };
 
 export const PROMPT_SAMPLE = "<span class=\"color-111\">></span> ";

@@ -138,7 +138,7 @@ describe("ConditionChips (H2 conditions island)", () => {
       "魔法陣理解施法準度提升",
       "隨從武藝訓練攻擊提升",
       "靜電麻痺微階鎖定行動",
-      "轉生祝福·悠花敏捷提升",
+      "轉生祝福‧悠花敏捷提升",
       "連閃麻痺微階鎖定行動",
     ].map((label, i) => ({
       code: `long_${i}`,

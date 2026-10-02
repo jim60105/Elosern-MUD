@@ -151,7 +151,7 @@ function handleMove(payload) {
     <div v-else class="map-overlay__content" data-testid="map-overlay-content">
       <div class="map-overlay__guide">
         <p>點選可通行的相鄰節點，繼續探索。</p>
-        <span>Tab 切換路徑 · Enter 確認移動 · 滾輪或 +／− 縮放 · 拖曳平移</span>
+        <span>Tab 切換路徑 ‧ Enter 確認移動 ‧ 滾輪或 +／− 縮放 ‧ 拖曳平移</span>
       </div>
       <!-- The viewport cell takes every row the guide and the remembered
            list leave (design D7), and the lattice fills it through its
@@ -380,7 +380,7 @@ function handleMove(payload) {
 }
 
 /* The view controls: one floating glass pill in the map's top-right corner,
-   grouped as zoom pair · 置中 · legend with hairline separators. */
+   grouped as zoom pair ‧ 置中 ‧ legend with hairline separators. */
 .map-overlay__toolbar {
   position: absolute;
   /* Clear of the frame's 5px + 12px corner bracket. */

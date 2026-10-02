@@ -17,7 +17,7 @@ function characterWith(equipment) {
 
 function filledSlots() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
     { slot: "armor", item_key: "leather_armor", display_name: "皮甲", held: 1, equipped: true },
   ]);
@@ -29,7 +29,7 @@ function emptySlots() {
 
 function threeAccessories() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
     { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符", held: 2, equipped: false },
     { slot: "accessory", item_key: "guard_amulet", display_name: "防禦護身", held: 1, equipped: false },
@@ -38,14 +38,14 @@ function threeAccessories() {
 
 function unrecognisedSlot() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "mount", item_key: "mount_ash", display_name: "灰驛", held: 1, equipped: false },
   ]);
 }
 
 function mainHandOnly() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
   ]);
 }
 
@@ -65,20 +65,20 @@ function zeroAccessories() {
   // The committed panel carries a main-hand item but no accessory rows, so
   // the 飾品 summary cell states the zero count (never a fabricated row).
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
   ]);
 }
 
 function oneAccessory() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
   ]);
 }
 
 function twoAccessories() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
     { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符", held: 2, equipped: false },
   ]);
@@ -104,7 +104,7 @@ function duplicateSingletonSlots() {
   // Two committed rows for the same singleton slot: the square grid shows
   // the first row and the duplicate renders as a labelled overflow row.
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍", held: 1, equipped: false },
   ]);
 }
@@ -203,7 +203,7 @@ export const DuplicateSingletonSlots = {
 // slot labels — singleton first rows plus the accessory group.
 function describedEquipment() {
   return characterWith([
-    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+    { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
     { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕" },
     { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
     { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },

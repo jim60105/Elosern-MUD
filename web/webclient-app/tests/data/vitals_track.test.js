@@ -188,7 +188,7 @@ describe("VitalsTrack (H2 vitals island)", () => {
     });
     const combat = w.get('[data-testid="status-panel__combat"]');
     expect(combat.attributes("data-mode")).toBe("guild_exam");
-    expect(combat.text()).toBe("戰鬥中（公會考核）· 第 3 回合");
+    expect(combat.text()).toBe("戰鬥中（公會考核）‧ 第 3 回合");
   });
 
   it("renders the combat line only when the payload carries one", () => {

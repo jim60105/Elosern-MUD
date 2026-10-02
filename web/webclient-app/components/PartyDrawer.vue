@@ -1,6 +1,6 @@
 <script setup>
 // PartyDrawer (webclient-align-05-party-hud, design D1/D2/D3):
-// the 同伴 · 隊伍 drawer body, mounted inside the shared HudDrawer chrome.
+// the 同伴 ‧ 隊伍 drawer body, mounted inside the shared HudDrawer chrome.
 // Renders the committed `party.slots` compbig rows with avatar initial fallback,
 // display name, bond stage line, HP bar + numerals, joined combat token,
 // 請其離隊 confirmation flow, an 空位 row with stage-name-word invite rule,
@@ -263,7 +263,7 @@ function onInviteCurrentNpc() {
           {{ slot.display_name }}
         </div>
         <div class="bondrow" data-testid="party-drawer__bond">
-          羈絆 · <i>{{ slot.bond_stage }}</i>
+          羈絆 ‧ <i>{{ slot.bond_stage }}</i>
         </div>
         <div class="cbar" data-testid="party-drawer__hp-bar">
           <div

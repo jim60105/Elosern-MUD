@@ -15,15 +15,15 @@ import DrawerHeader from "../../components/DrawerHeader.vue";
 const SURFACES = [
   { icon: "character", heading: "角色狀態" },
   { icon: "quests", heading: "任務" },
-  { icon: "inventory", heading: "背包 · 裝備", sub: "錢袋 3,240 銅" },
-  { icon: "skills", heading: "技能書", sub: "主動 11 · 被動 3" },
-  { icon: "party", heading: "同伴 · 隊伍", sub: "1 / 4" },
+  { icon: "inventory", heading: "背包 ‧ 裝備", sub: "錢袋 3,240 銅" },
+  { icon: "skills", heading: "技能書", sub: "主動 11 ‧ 被動 3" },
+  { icon: "party", heading: "同伴 ‧ 隊伍", sub: "1 / 4" },
   { icon: "shop", heading: "商店" },
   { icon: "lore", heading: "世界圖鑑" },
-  { icon: "map", heading: "地圖 · 冒險者公會大廳", sub: "所在位置與相鄰路徑" },
+  { icon: "map", heading: "地圖 ‧ 冒險者公會大廳", sub: "所在位置與相鄰路徑" },
   { icon: "settings", heading: "設定", sub: "閱讀偏好與輔助顯示" },
-  { icon: "lineage", heading: "技能系譜", sub: "熟練度 · 見頂 · 前置" },
-  { icon: "codex", heading: "稱號冊", sub: "稱號 · 異名 · 提名中" },
+  { icon: "lineage", heading: "技能系譜", sub: "熟練度 ‧ 見頂 ‧ 前置" },
+  { icon: "codex", heading: "稱號冊", sub: "稱號 ‧ 異名 ‧ 提名中" },
   { icon: "gallery", heading: "角色肖像圖庫", sub: "記錄不同的你，也是旅途的一部分。" },
   { icon: "help", heading: "說明", sub: "分類 → 條目 → 子主題" },
 ];
@@ -52,7 +52,7 @@ export default {
   args: {
     icon: "lineage",
     title: "技能系譜",
-    subtitle: "熟練度 · 見頂 · 前置",
+    subtitle: "熟練度 ‧ 見頂 ‧ 前置",
     surface: "overlay-host",
   },
 };

@@ -57,7 +57,7 @@ describe("CharacterStatusDrawer", () => {
 
     const wWith = mountDrawer({ partyAvailable: true });
     const btn = wWith.get('[data-testid="character-status-drawer__open-party"]');
-    expect(btn.text()).toBe("同伴 · 隊伍");
+    expect(btn.text()).toBe("同伴 ‧ 隊伍");
     await btn.trigger("click");
     expect(wWith.emitted("open-party")).toHaveLength(1);
   });
@@ -168,7 +168,7 @@ describe("CharacterStatusDrawer", () => {
     expect(labels.map((el) => el.text())).toEqual([
       "生命量",
       "屬性",
-      "計數 · 公會",
+      "計數 ‧ 公會",
       "狀態",
       "偽裝",
       "親密狀態",
@@ -246,7 +246,7 @@ describe("CharacterStatusDrawer", () => {
     expect(vitals).toHaveLength(3);
     // The 屬性 section renders exactly the four true-attribute rows; the
     // gauge (hp/mp/sp) and guild-merit values are owned by the 生命量 and
-    // 計數・公會 sections, so they are not repeated under 屬性.
+    // 計數‧公會 sections, so they are not repeated under 屬性.
     for (const key of ["atk_phys", "agility", "defense", "magic_power"]) {
       expect(w.find(`[data-testid="character-status-drawer__trait--${key}"]`).exists()).toBe(true);
     }

@@ -28,7 +28,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
 
   it("renders an explicit empty state for each named slot box when the slot is unfilled", () => {
     const w = mountDoll({ character: characterWith([
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
     ]) });
     // 副手 and 盔甲 are unfilled → their boxes show the empty state.
     expect(w.get('[data-testid="equipment-doll__slot-empty--weapon_off"]').text()).toBe("未裝備");
@@ -36,35 +36,35 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     // 主手 is filled: the square cell carries only its fixed symbol and
     // caption — the committed name reads in the 裝備描述 column beside the
     // grid (realign-inventory-drawer-layout).
-    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).not.toContain("短劍 · 拾遺");
-    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__slot--weapon_main"]').text()).not.toContain("短劍 ‧ 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 ‧ 拾遺");
     expect(w.find('[data-testid="equipment-doll__slot-empty--weapon_main"]').exists()).toBe(false);
   });
 
-  it("titles the section 裝備 with the 真值 · 偽裝不影響 tag (realign-inventory-drawer-layout)", () => {
+  it("titles the section 裝備 with the 真值 ‧ 偽裝不影響 tag (realign-inventory-drawer-layout)", () => {
     const w = mountDoll();
     // The mock's tracked section heading replaces the old `裝備人偶` title.
-    expect(w.get('[data-testid="equipment-doll__title"]').text()).toBe("裝備真值 · 偽裝不影響");
-    expect(w.get('[data-testid="equipment-doll__title-tag"]').text()).toBe("真值 · 偽裝不影響");
+    expect(w.get('[data-testid="equipment-doll__title"]').text()).toBe("裝備真值 ‧ 偽裝不影響");
+    expect(w.get('[data-testid="equipment-doll__title-tag"]').text()).toBe("真值 ‧ 偽裝不影響");
     expect(w.text()).not.toContain("裝備人偶");
   });
 
   it("renders the 裝備描述 column with one entry per primary row grouped by slot label", () => {
     const w = mountDoll({ character: characterWith([
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
       { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣" },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
       { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
     ]) });
     const description = w.get('[data-testid="equipment-doll__description"]');
-    expect(description.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toBe("主手 · 短劍 · 拾遺");
-    expect(description.get('[data-testid="equipment-doll__description-row--armor"]').text()).toBe("盔甲 · 革製護身衣");
+    expect(description.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toBe("主手 ‧ 短劍 ‧ 拾遺");
+    expect(description.get('[data-testid="equipment-doll__description-row--armor"]').text()).toBe("盔甲 ‧ 革製護身衣");
     // 副手 carries no committed row → no description entry is invented.
     expect(description.find('[data-testid="equipment-doll__description-row--weapon_off"]').exists()).toBe(false);
     // Every accessory row renders in the description column's accessory
     // group, under the 飾品 label.
     const accessoryGroup = description.get('[data-testid="equipment-doll__description-row--accessory"]');
-    expect(accessoryGroup.text()).toContain("飾品 · 2 件");
+    expect(accessoryGroup.text()).toContain("飾品 ‧ 2 件");
     expect(accessoryGroup.get('[data-testid="equipment-doll__accessories"]').exists()).toBe(true);
     expect(accessoryGroup.get('[data-testid="equipment-doll__accessory--fog_talisman"]').text()).toContain("霧隱護符");
     expect(accessoryGroup.get('[data-testid="equipment-doll__accessory--speed_charm"]').text()).toContain("迅捷護符");
@@ -78,7 +78,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     }));
     const w = mountDoll({ character: characterWith(rows) });
     const group = w.get('[data-testid="equipment-doll__description-row--accessory"]');
-    expect(group.text()).toContain("飾品 · 5 件");
+    expect(group.text()).toContain("飾品 ‧ 5 件");
     for (let i = 1; i <= 5; i += 1) {
       expect(group.get(`[data-testid="equipment-doll__accessory--acc_cap_${i}"]`).exists()).toBe(true);
     }
@@ -89,7 +89,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     // wire always carries it; a missing/empty string renders no adjustment
     // element) must not fabricate any value.
     const w = mountDoll({ character: characterWith([
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺" },
       { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍" },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
       { slot: "mount", item_key: "mount_ash", display_name: "灰驛" },
@@ -99,7 +99,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     expect(text).not.toContain("NaN");
     // First row → description column; the duplicate and the unrecognised
     // slot → their labelled fallback sections only (no double rendering).
-    expect(w.get('[data-testid="equipment-doll__description"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description"]').text()).toContain("短劍 ‧ 拾遺");
     expect(w.get('[data-testid="equipment-doll__description"]').text()).not.toContain("輕劍");
     expect(w.get('[data-testid="equipment-doll__duplicates"]').text()).toContain("輕劍");
     expect(w.get('[data-testid="equipment-doll__description"]').text()).not.toContain("灰驛");
@@ -108,7 +108,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
 
   it("renders the accessory group for 0..3 accessory rows", () => {
     const w = mountDoll({ character: characterWith([
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
       { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符", held: 2, equipped: false },
        { slot: "accessory", item_key: "guard_amulet", display_name: "防禦護身", held: 1, equipped: false },
@@ -120,7 +120,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
 
   it("renders an unrecognised slot key as a labelled passthrough row, not dropped", () => {
     const w = mountDoll({ character: characterWith([
-      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+      { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
        { slot: "mount", item_key: "mount_ash", display_name: "灰驛", held: 1, equipped: false },
      ]) });
     // The unrecognised `mount` slot renders a labelled passthrough row.
@@ -154,7 +154,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
   it("renders each fixed slot-role SVG by slot identity (restyle-inventory-equipment-slots)", () => {
     const w = mountDoll({
       character: characterWith([
-        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
         { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
         { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣", held: 1, equipped: true },
         { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
@@ -210,7 +210,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
   it("states the accessory summary count and renders every accessory row", () => {
     const w = mountDoll({
       character: characterWith([
-        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
         { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
         { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符", held: 2, equipped: false },
       ]),
@@ -226,7 +226,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
   it("renders duplicate singleton rows as labelled overflow rows (no row dropped)", () => {
     const w = mountDoll({
       character: characterWith([
-        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
         { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍", held: 1, equipped: false },
         { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
         { slot: "weapon_off", item_key: "bone_knife", display_name: "骨刀", held: 1, equipped: false },
@@ -237,7 +237,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     // The square grid consumes only the first row per singleton slot: the
     // first row shows in the description column; the cell keeps just its
     // symbol/caption.
-    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 · 拾遺");
+    expect(w.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toContain("短劍 ‧ 拾遺");
     const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
     expect(offSlot.find("svg").exists()).toBe(false);
     expect(w.get('[data-testid="equipment-doll__description-row--weapon_off"]').text()).toContain("月牙短匕");
@@ -257,7 +257,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
   it("preserves an unrecognised slot as a labelled row and invents no item presentation", () => {
     const w = mountDoll({
       character: characterWith([
-        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
+        { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 ‧ 拾遺", held: 1, equipped: true },
         { slot: "mount", item_key: "mount_ash", display_name: "灰驛", held: 1, equipped: false },
       ]),
     });

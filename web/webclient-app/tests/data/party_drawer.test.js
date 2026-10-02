@@ -10,12 +10,12 @@ import {
   ART_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
-// webclient-align-05-party-hud: the 同伴 · 隊伍 drawer body.
+// webclient-align-05-party-hud: the 同伴 ‧ 隊伍 drawer body.
 // Renders compbig rows, bond stages, joined combat tokens,
 // 請其離隊 confirmation contract, empty slot with invite preconditions,
 // and verbatim follow rules.
 
-describe("PartyDrawer (同伴 · 隊伍 drawer)", () => {
+describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
   let wrapper;
 
   afterEach(() => {

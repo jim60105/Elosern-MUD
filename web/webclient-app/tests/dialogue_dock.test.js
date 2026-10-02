@@ -125,7 +125,7 @@ describe("the collapsed dock keeps its ordinary form", () => {
     expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(true);
     const legends = wrapper.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);
-    expect(legends[0].text()).toBe("數字鍵 1–9 · Enter 執行 · Esc 返回");
+    expect(legends[0].text()).toBe("數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回");
     expect(wrapper.text()).not.toContain("對話選項");
     expect(wrapper.text()).not.toContain("指令列自由對話");
   });

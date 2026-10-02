@@ -7,7 +7,7 @@
 // history-walk backup, and Tab-completion cycle while the anchor is
 // collapsed with `display:none`). The bar renders, in this order: a `›`
 // prompt chevron, `#inputfield` with its send control inside `.inputfieldwrapper`,
-// the hint cluster (`↑↓ 歷史 · Tab 補全` —
+// the hint cluster (`↑↓ 歷史 ‧ Tab 補全` —
 // both affordances implemented, webclient-align-02-quickbar-shortcuts: Tab
 // completes the draft before the caret over session history and the committed
 // exploration panel's exit/target names; unique → full completion, many → longest-common-prefix then
@@ -370,7 +370,7 @@ defineExpose({ focusField });
           ›
         </button>
       </div>
-      <span class="hint">↑↓ 歷史 · Tab 補全</span>
+      <span class="hint">↑↓ 歷史 ‧ Tab 補全</span>
       <span class="hist">
         <button
           type="button"

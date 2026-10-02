@@ -157,12 +157,12 @@ describe("SkillBook (B3 data family)", () => {
     const fireball = w.find('[data-testid="skill-book__skill"][data-key="fireball"]');
     expect(fireball.find('[data-testid="skill-book__cost"]').text()).toBe("14 mp");
     expect(fireball.find('[data-testid="skill-book__cast"]').text()).toBe(
-      "威力 1/4（4 mp）・1/2（7 mp）・1（14 mp）・2（28 mp）・4（56 mp）",
+      "威力 1/4（4 mp）‧1/2（7 mp）‧1（14 mp）‧2（28 mp）‧4（56 mp）",
     );
 
     // Multi-resource cost and the area target with cast shorthands.
     const firestorm = w.find('[data-testid="skill-book__skill"][data-key="firestorm"]');
-    expect(firestorm.find('[data-testid="skill-book__cost"]').text()).toBe("30 mp ・ 5 sp");
+    expect(firestorm.find('[data-testid="skill-book__cost"]').text()).toBe("30 mp ‧ 5 sp");
     expect(firestorm.find('[data-testid="skill-book__target"]').text()).toBe("範圍");
     expect(firestorm.find('[data-testid="skill-book__cast"]').text()).toBe("範圍代號 all-enemies／all");
 

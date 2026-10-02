@@ -22,7 +22,7 @@ const PANEL = explorationPanelFixture({
     { label: "東", destination: "room:902" },
   ],
   targets: [
-    { identity: 11, name: "葛里安·衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
+    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
     { identity: 13, name: "霧狼", kind: "monster", affordances: [AFFORDANCES.engage] },
     { identity: 14, name: "沉睡的醉漢", affordances: [] },
   ],

@@ -3,7 +3,7 @@
 // webclient-scene-overview-component, design D4): the exploration root of
 // the command panel. It renders the one overview menu of
 // `ExplorationMenu.overviewMenu` as labelled chip rows — 出口, 人物, 物件 —
-// and a label-less footer (查看房間 · 等待／休息 · 建議), in the menu's
+// and a label-less footer (查看房間 ‧ 等待／休息 ‧ 建議), in the menu's
 // reading order. Chips wrap inside the panel; an absent section renders no
 // row and no label.
 //
