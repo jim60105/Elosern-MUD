@@ -2,7 +2,7 @@
 
 Define how the NPC persona content set reaches existing persisted worlds without a data migration: fresh databases are initialized with the complete marked roster directly by the creation producers, pre-amendment databases fail closed, and the supported recovery is a documented destroy-and-reinitialize of the development database.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: A fresh database is initialized with the complete marked NPC roster without any rewrite step
 The system SHALL materialize every production-created NPC with a complete compact card and the current content-generation marker at creation time, so that a database built from scratch and synchronized by the normal startup sequence contains an NPC family in which every instance carries a contract-valid card and the current marker before any player action, with no in-place rewrite step run.

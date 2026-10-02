@@ -163,8 +163,8 @@ class PreAmendmentPayloadFailClosedTests(EvenniaTest):
                         "anchor_key": None,
                         "xyz": None,
                     },
-                    "archetype": "forest_path",
-                    "anchor_near": "capital_altoria",
+                    "archetype": None,
+                    "anchor_near": None,
                     "scene_sentence": "王都近郊的林間小徑樹影搖曳，一名盜匪的身影在樹叢間若隱若現。",
                     "npc_reqs": [["bandit", "bandit", None]],
                     "characterizations": [
