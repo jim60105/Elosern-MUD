@@ -6,7 +6,7 @@ Apply on branch `feat/npc-persona-roster-cutover` in worktree `.worktrees/npc-pe
 
 ## 2. Reset runbook
 
-- [ ] 2.1 Write `docs/development/database-reset.md` per design D3: stop server, delete the SQLite database file named by the server settings (state the actual dev default read from `server/conf/settings.py`), `uv run --locked evennia migrate`, start and verify `startup_step`/roster-validation events; cover the retained test database `server/db/evennia-test.sqlite3` (or omitting `--keepdb` per AGENTS.md) and the container persistent DB volume; state the progress-destruction warning; link it from the development docs index if one exists.
+- [x] 2.1 Write `docs/development/database-reset.md` per design D3: stop server, delete the SQLite database file named by the server settings (state the actual dev default read from `server/conf/settings.py`), `uv run --locked evennia migrate`, start and verify `startup_step`/roster-validation events; cover the retained test database `server/db/evennia-test.sqlite3` (or omitting `--keepdb` per AGENTS.md) and the container persistent DB volume; state the progress-destruction warning; link it from the development docs index if one exists.
 
 ## 3. Fresh-bootstrap and fail-closed tests
 
