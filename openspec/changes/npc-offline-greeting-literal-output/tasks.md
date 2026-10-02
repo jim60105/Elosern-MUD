@@ -5,7 +5,7 @@
 
 ## 2. Consumer-visible regression coverage
 
-- [ ] 2.1 Add focused regressions exercising the real ANSI/MXP parser with synthetic `|/`, color, command-link, URL-link and repeated-pipe overrides through all four consumer rows in design.md; verify literal rendered text/no links and clearing restores actual trusted formatting rather than asserting helper calls.
+- [ ] 2.1 Add focused regressions exercising the real ANSI/MXP parser with synthetic `|/`, color, command-link, URL-link and repeated-pipe overrides through all four consumer rows in design.md; verify literal rendered text/no links and clearing restores table/profile formatting, including a componentless profile-backed NPC; no-response requires all applicable sources absent, without asserting helper calls.
 - [ ] 2.2 Verify editor read/update data, canonical storage, dialogue-session/OOB line and degraded settled-line callback retain raw text, without version/state change caused by output escaping; preserve stale-persona, schedule and visibility gates and authored keyword responses.
 - [ ] 2.3 Audit browser dialogue/editor/narrative rendering of raw versus Evennia-escaped slots and adjust only an actual markup-interpreting consumer; verify refreshed/reconnected panels show single literal tokens, no double escaping, and no hidden card data leaks.
 

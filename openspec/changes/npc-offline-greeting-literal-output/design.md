@@ -4,6 +4,8 @@ Static sources: `normalize_offline_greeting` (`world/lore/npc_card.py:324–338`
 
 The current persona-editor privacy requirement says no greeting text in narrative/panels, contradicting the existing public greeting behavior. Amend it narrowly: private editor payloads stay private; selected greeting speech/session line is intentionally public. Do not relax hidden-card restrictions.
 
+The final whole-batch critique also found that the existing scripted-dialogue no-keyword requirement omits the current profile fallback and unconditionally rejects componentless defaults. Its full MODIFIED delta now preserves keyword/affinity/schedule/report guarantees while reconciling instance → table → profile → no-response precedence. A missing-greeting scenario requires all applicable sources to be absent; clearing a componentless override explicitly restores its profile default.
+
 ## Goals / Non-Goals
 
 **Goals:** Literal editable greeting text on every actual speech consumer, raw canonical OOB/state values, preserved trusted formatting.
