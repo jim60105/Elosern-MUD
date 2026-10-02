@@ -49,7 +49,7 @@
   ```
 
 - **容器化部署環境**：
-  在 Docker / Podman 容器中，SQLite 資料庫檔案掛載於 `/var/evennia/server/db` 或具名磁碟區（Volume）。
+  依據 `compose.yaml`，容器內的 SQLite 資料庫目錄掛載於 `/app/server/db`，對應具名磁碟區（Volume）為 `evennia-db`。
 
 ---
 
@@ -82,10 +82,11 @@ uv run --locked evennia migrate
 uv run evennia start
 ```
 Evennia 開機程序會自動呼叫 `server/conf/at_server_startstop.py` 中的 `at_server_start()`，按 `STARTUP_STEP_ORDER` 執行世界與 NPC 全新同步：
-1. `sync_grid` 與 `sync_service_interiors`：同步王都與城鎮室內空間地圖。
-2. `sync_service_content`：自動生成所有公會服務主持人（Host）與考核官，並直接賦予標準人物設定卡與內容標記。
-3. `npc_persona_roster_validation`：自動全面校驗伺服器名冊的完整性。
-4. `sync_quest_runtime`：初始化任務系統執行期環境。
+1. `npc_persona_roster_validation`：在世界同步前執行，嚴格檢驗所有靜態名冊設定、人物卡規範與對話表引用。
+2. `sync_grid` 與 `sync_service_interiors`：同步王都、城鎮網格與服務室內空間地圖。
+3. `sync_quest_runtime`：初始化任務系統執行期環境。
+4. `sync_guild_economy`：透過 `sync_service_content` 自動生成所有公會服務主持人（Host）與考核官，並直接賦予標準人物設定卡與內容標記。
+5. `sync_npc_schedules`：為全體 NPC 綁定生活日程標記。
 
 ### 步驟 5：驗證初始化成果
 檢查伺服器日誌以確認所有開機步驟成功完成：
@@ -94,8 +95,8 @@ tail -n 100 server/logs/server.log
 ```
 驗證重點：
 - 搜尋 `startup_step` 事件，確認各步驟均正常耗時紀錄並回傳成功。
-- 確認 `npc_persona_roster_validation` 步驟成功執行，無任何缺少人物設定卡的異常回報。
-- 登入遊戲或透過檢視腳本確認全體 NPC 皆帶有最新版本標記（`generation == 1`，`persona_version >= 1`）。
+- 確認 `npc_persona_roster_validation` 步驟成功執行，證明靜態名冊定義完整無誤。
+- 透過檢視腳本或登入確認經由 `sync_guild_economy` 生成的實例全體皆帶有最新版本標記（`generation == 1`，`persona_version >= 1`）與合規的緊湊人物設定卡。
 
 ---
 
@@ -104,12 +105,14 @@ tail -n 100 server/logs/server.log
 本專案本機測試常使用 `--keepdb` 旗標以加速測試執行。若在結構變更後遭遇保留資料庫狀態殘留或無法載入的錯誤：
 
 1. **直接刪除保留測試庫**：
+   請先確保無正在運行的測試行程，然後刪除保留資料庫檔案：
    ```bash
    rm -f server/db/evennia-test.sqlite3
    ```
-2. **或在下次執行測試時省略 `--keepdb` 並加上 `--noinput`**：
+2. **或在執行測試時省略 `--keepdb` 並加上 `--noinput` 透過測試設定重建**：
+   測試環境專用設定檔為 `server/conf/test_settings.py`，需搭配 `MUD_TEST_SETTINGS=1`：
    ```bash
-   uv run evennia test --settings settings.py --noinput tests.test_evennia_test_optimization_contract
+   MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput tests.test_evennia_test_optimization_contract
    ```
 
 ---
@@ -118,12 +121,21 @@ tail -n 100 server/logs/server.log
 
 若在容器化開發環境中運行：
 
-1. 停止並移除容器與磁碟區：
+1. **僅重置資料庫磁碟區（建議）**：
+   為了保留美術圖片快取（`evennia-art`）、去背模型（`evennia-rembg`）、日誌（`evennia-logs`）等無關資料，僅移除 `evennia-db` 磁碟區：
+   ```bash
+   docker compose stop evennia
+   docker compose rm -f evennia
+   docker volume rm mud_evennia-db  # 預設專案前綴，或使用 docker volume ls 查詢確認名稱
+   ```
+   隨後透過 bootstrap 服務重建結構並啟動：
+   ```bash
+   docker compose --profile bootstrap run --rm bootstrap
+   docker compose up -d evennia
+   ```
+
+2. **全堆疊完整重置（選用）**：
+   > **警告**：使用 `docker compose down -v` 會一併刪除所有具名磁碟區（包含生成的美術圖片、去背快取、翻譯模型與歷史日誌）。
    ```bash
    docker compose down -v
    ```
-   或手動移除對應的資料庫 volume：
-   ```bash
-   docker volume rm mud_evennia_db
-   ```
-2. 重新啟動容器，容器啟動指令會自動執行 `evennia migrate` 與 `at_server_start()` 完成全新初始化。

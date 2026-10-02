@@ -327,7 +327,7 @@ Changes within one wave touch disjoint code or only append-only shared files, so
 | W4 | 19 | Requires all content, producers, and dialogue consumers |
 | W5 | 20 | Database lifecycle runbook and fresh-bootstrap tests, last |
 
-Merge 20 as soon as possible after 13: once 13 lands, a development database that still holds pre-change generated-quest payloads fails closed on restore until the cutover runs. No compatibility decoder is added for that window.
+Pre-change generated-quest payloads fail closed on restore under change 13's strict decoder and are replaced by destroy-and-reinitialize per §13b; no compatibility decoder is added.
 
 Code-conflict hot spots for parallel work:
 

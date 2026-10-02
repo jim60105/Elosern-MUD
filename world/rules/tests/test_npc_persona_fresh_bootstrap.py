@@ -211,6 +211,29 @@ class PreAmendmentPayloadFailClosedTests(EvenniaTest):
         self.assertNotIn(quest_key, QUEST_DEFINITION_REGISTRY)
         self.assertNotIn(quest_key, GUILD_OFFER_REGISTRY)
 
+    @covers_requirement(
+        "npc-persona-cutover::pre-amendment-generated-quest-payloads-fail-closed-with-no-compatibility-decoder"
+    )
+    def test_pre_amendment_payload_without_background_fails_on_incomplete_persona(self):
+        """Payloads without background but carrying non-contract persona fail card normalization."""
+        payload = self._pre_amendment_payload()
+        quest_key = payload["definition"]["key"]
+        del payload["requirements"][0]["characterizations"][0]["background"]
+
+        # 1. Direct codec decode raises QuestCompileError on invalid card shape
+        with self.assertRaises(QuestCompileError) as ctx:
+            payload_to_registrations(payload)
+        self.assertIn("violates the card contract", str(ctx.exception))
+
+        # 2. Durable restore also fails loudly and does not register the quest
+        append_payload(payload)
+        with self.assertRaises(QuestCompileError):
+            restore_generated_quests()
+
+        # 3. Neither QUEST_DEFINITION_REGISTRY nor GUILD_OFFER_REGISTRY contains the stale quest
+        self.assertNotIn(quest_key, QUEST_DEFINITION_REGISTRY)
+        self.assertNotIn(quest_key, GUILD_OFFER_REGISTRY)
+
 
 class DatabaseResetRunbookContractTests(unittest.TestCase):
     """Docs contract test guarding the database-reset runbook."""

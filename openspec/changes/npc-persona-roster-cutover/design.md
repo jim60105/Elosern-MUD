@@ -20,7 +20,7 @@ The design document gains a dated, user-ordered amendment in the §13a style (§
 
 ### D3. Runbook is the operator contract
 
-`docs/development/database-reset.md` documents the full procedure: stop the server; delete the SQLite file named by the server settings (dev default `server/db/evennia.db`); `uv run --locked evennia migrate`; start the server; verify the `startup_step` events complete, `npc_persona_roster_validation` passes, and the NPC family is fully marked. It names the retained test database (`server/db/evennia-test.sqlite3` — same removal procedure, or drop `--keepdb` per AGENTS.md) and the container persistent volume, and it states explicitly that deleting the database also deletes player characters, progress, and generated quests — intended for pre-release development use only.
+`docs/development/database-reset.md` documents the full procedure: stop the server; delete the SQLite file named by the server settings (dev default `server/db/evennia.db3`); `uv run --locked evennia migrate`; start the server; verify the `startup_step` events complete, `npc_persona_roster_validation` passes, and the NPC family is fully marked. It names the retained test database (`server/db/evennia-test.sqlite3` — same removal procedure, or drop `--keepdb` per AGENTS.md) and the container persistent volume, and it states explicitly that deleting the database also deletes player characters, progress, and generated quests — intended for pre-release development use only.
 
 ### D4. Two pinned behaviors plus a docs contract, one test module
 
