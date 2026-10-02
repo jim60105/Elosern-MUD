@@ -70,6 +70,8 @@ def derive_shipped_sources(
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
         quest_templates = QUEST_TEMPLATE_POOL
+    elif not isinstance(quest_templates, tuple):
+        quest_templates = tuple(quest_templates)
     if examples_dir is None:
         import world.imports.examples as _examples_pkg
 
@@ -149,6 +151,8 @@ def validate_npc_roster(
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
         quest_templates = QUEST_TEMPLATE_POOL
+    elif not isinstance(quest_templates, tuple):
+        quest_templates = tuple(quest_templates)
     if examples_dir is None:
         import world.imports.examples as _examples_pkg
 

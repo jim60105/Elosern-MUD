@@ -560,3 +560,22 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         has_template = any("quest_template_occupant" in v for v in violations)
         self.assertTrue(has_inv, f"Expected inventory violation in {violations}")
         self.assertTrue(has_template, f"Expected template violation in {violations}")
+
+    @covers_requirement(
+        "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
+    )
+    def test_one_shot_quest_template_iterator_validates_occupants(self):
+        invalid_card = replace(
+            self.synth["quest_templates"][0].stages[0].npc_reqs[0].persona,
+            personality="",
+        )
+        broken_req = replace(self.synth["quest_templates"][0].stages[0].npc_reqs[0], persona=invalid_card)
+        broken_stage = replace(self.synth["quest_templates"][0].stages[0], npc_reqs=(broken_req,))
+        broken_template = replace(self.synth["quest_templates"][0], stages=(broken_stage,))
+        self.synth["quest_templates"] = iter([broken_template])
+
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        msg = str(caught.exception)
+        self.assertIn("quest_template_occupant", msg)
+        self.assertIn("invalid compact card", msg)
