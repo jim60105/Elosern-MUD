@@ -17,6 +17,7 @@ from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecordError,
+    default_face_rect,
     validate_face_rect,
 )
 from world.art.gallery_match import fallback_for, resolve_card
@@ -165,10 +166,10 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     bounded diagnostic — never a failed payload.
     """
     try:
-        face_rect = validate_face_rect(card["face_rect"])
+        face_rect = validate_face_rect(card["face_rect"], image_size=card.get("image_size"))
     except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
         log_warn("art_face_rect_invalid", context={"subject": subject.full()})
-        face_rect = dict(DEFAULT_FACE_RECT)
+        face_rect = default_face_rect(card["image_size"]) if card.get("image_size") else dict(DEFAULT_FACE_RECT)
     return {
         "kind": "asset",
         "label": "已生成",

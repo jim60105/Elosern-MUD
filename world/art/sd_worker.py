@@ -114,6 +114,8 @@ class GeneratedImage:
 
     data: bytes
     seed: int | None
+    decoded_width: int = 0
+    decoded_height: int = 0
     infotext: str | None = None
     prompt: str = ""
     negative_prompt: str = ""
@@ -440,7 +442,7 @@ def list_modules() -> list[str]:
     return _list_options("/sdapi/v1/sd-modules", item_keys=("model_name",))
 
 
-def _decode_image(response: dict[str, Any]) -> bytes:
+def _decode_image(response: dict[str, Any]) -> tuple[bytes, int, int]:
     """Validate the sd-webui envelope and return the decoded PNG bytes.
 
     Validates: non-empty ``images``, ``images[0]`` base64 text that decodes
@@ -480,7 +482,7 @@ def _decode_image(response: dict[str, Any]) -> bytes:
             "sd_image_dimensions_too_large",
             f"decoded PNG {width}x{height} exceeds the dimension/pixel caps",
         )
-    return png
+    return png, width, height
 
 
 def _extract_infotext(png: bytes) -> str | None:
@@ -640,10 +642,12 @@ class SDWebUIClient:
         request = build_txt2img_request(subject, description)
         try:
             response = self._transport(request)
-            data = _decode_image(response)
+            data, decoded_w, decoded_h = _decode_image(response)
             return GeneratedImage(
                 data=data,
                 seed=_parse_seed(response),
+                decoded_width=decoded_w,
+                decoded_height=decoded_h,
                 infotext=_extract_infotext(data),
                 prompt=str(request["prompt"]),
                 negative_prompt=str(request["negative_prompt"]),

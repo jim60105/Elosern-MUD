@@ -91,7 +91,7 @@ class GalleryRequestSeamTests(EvenniaTestCase):
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
     def test_a_valid_request_queues_exactly_one_job_with_the_supplied_metadata(self):
-        rect = {"x": 0.2, "y": 0.1, "w": 0.5, "h": 0.5}
+        rect = {"x": 0.2, "y": 0.1, "w": 0.4, "h": 0.3}
         with patch("world.art.service.log_info") as info:
             image_id = request_gallery_image(
                 self.player, binding=_valid_binding(), face_rect=rect
@@ -122,7 +122,12 @@ class GalleryRequestSeamTests(EvenniaTestCase):
                 request_gallery_image(self.player, binding={"mask": []})
             with self.assertRaises(gallery_api.GalleryRecordError):
                 request_gallery_image(
-                    self.player, face_rect={"x": 0.8, "y": 0.8, "w": 0.5, "h": 0.5}
+                    self.player, face_rect={"x": 0.8, "y": 0.8, "w": 0.4, "h": 0.3}
+                )
+            # Non-square rect (w=0.5, h=0.5 on 768x1024) is rejected
+            with self.assertRaises(gallery_api.GalleryRecordError):
+                request_gallery_image(
+                    self.player, face_rect={"x": 0.2, "y": 0.1, "w": 0.5, "h": 0.5}
                 )
         self.assertEqual(self._gallery_jobs(), [])
         digest.assert_not_called()

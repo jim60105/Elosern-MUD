@@ -10,7 +10,9 @@ terminal fallback seam, the presenter payload `face_rect` carriage contract,
 the rule that gallery media URLs are built only from validated card
 identities, and the media route's admission of gallery and built-in-default
 identities under the same store-root confinement discipline.
+
 ## Requirements
+
 ### Requirement: Display resolution is one deterministic chain from equipment to fallback
 `world/art/gallery_match.py` SHALL resolve the image shown for a subject by exactly this ordered
 chain, with no other input: (1) compute the entity's four-slot equipment snapshot from stored state,
@@ -91,12 +93,18 @@ resolved to the seam as an optional parameter; a bare subject-only call stays le
 
 ### Requirement: Every resolution payload carries a face rectangle or null
 `world/art/presenter.py` SHALL add `face_rect` to every resolution payload it produces: the resolved
-card's normalized rectangle when a card resolved, the shared default rectangle when a classic asset
-resolved, the rectangle the fallback seam supplies (defaulting to the shared default) when a
+card's normalized rectangle when a card resolved, validated through the gallery face-rect validator
+against that card's recorded `image_size`; the shared default rectangle when a classic asset
+resolved (the card-less composition anchor, which knows no image size), the rectangle the fallback
+seam supplies (defaulting to the shared default) when a
 fallback image resolved, and `null` for every placeholder payload. The value SHALL be a mapping
-of exactly `x`, `y`, `w`, `h` in `[0, 1]`. The server SHALL NOT crop, transform, or produce a second
-image: the rectangle is placement metadata for the client alone. A malformed stored rectangle SHALL
-degrade to the shared default rectangle with one bounded diagnostic, never to a failed payload.
+of exactly `x`, `y`, `w`, `h` in `[0, 1]`, and a rectangle carried from a card or the fallback map
+SHALL be pixel-square on the image it ships with — every rectangle a client receives from a
+resolution marks a square region of its image. The server SHALL NOT crop, transform, or produce a second
+image: the rectangle is placement metadata for the client alone. A malformed or non-square-for-its-image
+stored rectangle SHALL
+degrade to the fitted default square for that card's `image_size` (the shared default constant where
+no image size is known) with one bounded diagnostic, never to a failed payload.
 
 #### Scenario: A resolved card carries its own rectangle
 - **WHEN** a card with an explicit rectangle resolves
@@ -107,8 +115,12 @@ degrade to the shared default rectangle with one bounded diagnostic, never to a 
 - **THEN** the payload carries a null URL and a null `face_rect`
 
 #### Scenario: A malformed stored rectangle degrades to the default
-- **WHEN** the resolution seam hands the presenter a card whose stored rectangle fails validation
-- **THEN** the payload carries the shared default rectangle and one bounded diagnostic is logged
+- **WHEN** the resolution seam hands the presenter a card whose stored rectangle fails validation against the card's recorded image size — including one that is not pixel-square
+- **THEN** the payload carries the fitted default square for that card's image and one bounded diagnostic is logged
+
+#### Scenario: A classic-asset payload keeps the shared constant
+- **WHEN** a classic (non-card) asset resolves
+- **THEN** the payload carries the shared default constant rectangle, bounds-validated with no image size
 
 ### Requirement: Gallery URLs are built only from validated card identities
 The presenter SHALL build a gallery media URL only from a card's stored identity that it has
@@ -125,4 +137,3 @@ broken URL. The presenter SHALL never expose an absolute path or the store root.
 #### Scenario: A cross-subject or out-of-root identity is never served
 - **WHEN** a card carries an identity whose path segments address a different subject, or that resolves outside the store root or through a symlink
 - **THEN** the card is skipped and no URL is produced from it
-

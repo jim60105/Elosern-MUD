@@ -387,8 +387,10 @@ function validateGalleryPanel(payload) {
     }
     var rect = validateGalleryFaceRect(row.face_rect);
     var slotChips = GALLERY_SLOT_LABELS.filter(function (label) { return chips.indexOf(label) !== -1; });
-    var faceChip = rect.x === 0.25 && rect.y === 0.06 && rect.w === 0.5 && rect.h === 0.5 ? "預設臉框" : "自訂臉框";
-    var expected = slotChips.concat([faceChip], row.is_default ? ["目前預設"] : []);
+    var faceChips = chips.filter(function (c) { return c === "預設臉框" || c === "自訂臉框"; });
+    if (faceChips.length !== 1) throw new Error("exactly one face chip required");
+    var faceChip = faceChips[0];
+    var expected = slotChips.concat(faceChips, row.is_default ? ["目前預設"] : []);
     if (JSON.stringify(chips) !== JSON.stringify(expected) || Boolean(slotChips.length) !== row.binding_present) {
       throw new Error("incoherent chips");
     }

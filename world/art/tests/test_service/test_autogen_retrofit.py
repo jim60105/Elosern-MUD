@@ -113,13 +113,15 @@ class AutogenRetrofitTests(EvenniaTestCase):
     def test_a_committed_path_drains_to_exactly_one_unbound_default_card(self):
         self._schedule()
         self.assertEqual(len(self._gallery_jobs()), 1)
+        # autogen job record carries no explicit face_rect (face_rect=None)
+        self.assertIsNone(self._gallery_jobs()[0].db.gallery_face_rect)
         self.assertNotIn(self.classic_key,
                          {record.db_key for record in ArtAssetRecord.objects.all()})
         self._drain()
         cards = gallery_api.cards_for(self.subject)
         self.assertEqual(len(cards), 1)
         self.assertIsNone(cards[0]["binding"])
-        self.assertEqual(cards[0]["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+        self.assertEqual(cards[0]["face_rect"], gallery_api.default_face_rect(cards[0]["image_size"]))
         record = gallery_api.record_for(self.subject)
         self.assertEqual(record.db.default_image_id, cards[0]["image_id"])
         self.assertTrue(
@@ -257,7 +259,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         self.assertEqual(len(after), 2)
         self.assertEqual(after[0], cards[0])
         self.assertIsNone(after[1]["binding"])
-        self.assertEqual(after[1]["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+        self.assertEqual(after[1]["face_rect"], gallery_api.default_face_rect(after[1]["image_size"]))
         # The default stays the first card.
         self.assertEqual(
             gallery_api.record_for(self.subject).db.default_image_id,

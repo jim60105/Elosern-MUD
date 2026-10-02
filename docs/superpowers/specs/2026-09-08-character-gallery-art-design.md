@@ -37,7 +37,7 @@ the face in frame.
 | D6 | Display resolution is a deterministic chain: current-snapshot mask match (most-specific mask wins; tie → newest `created_at`) → subject default → built-in fallback image. |
 | D7 | Auto-generation (runtime LLM characters, quest characterization, startup recovery, player creation) is RETAINED as a character-creation step, but its image lands in the gallery as an unbound card with the fixed face-rect constant. Player creation may skip it; skipping falls back to the default/fallback chain. |
 | D8 | Monsters use the same model with a one-card cap (regenerate replaces) and no binding. Companion-before-NPC ordering is a presentation concern only. |
-| D9 | Face position is a normalized `{x, y, w, h}` rectangle on the card. The user draws it in the (future) UI; auto-generated cards get the fixed upper-half constant. NO automatic face detection. Avatars are rendered by CSS offset of the same image; the server never crops or stores a second image. |
+| D9 | Face position is a normalized `{x, y, w, h}` rectangle on the card, pixel-square on the card's decoded image size (amended by §13 addendum). The user draws it in the UI; auto-generated cards get the image-fitted square default. NO automatic face detection. Avatars are rendered by CSS offset of the same image; the server never crops or stores a second image. |
 | D10 | Seed art (bulk prebuilt template/NPC/player-template images) lives OUTSIDE git in an external directory mounted read-only (`ART_SEED_DIR`, the `PROMPTS_DIR` precedent) and is copied idempotently into the store at startup. Built-in fallback images (a handful) DO live in git and are served as static assets without copying into the store. |
 | D11 | Generated and synced images stay under `ART_STORE_ROOT` (`server/.art/`, already gitignored, already a named volume). Runtime art never enters git. |
 | D12 | This proposal is backend-only: service layer + seams + payload exposure. Frontend gallery/management UI is recorded as intent (D9 consumption, binding form, face-rect drag select) and left as TODO while the Vue rewrite is in flight. |
@@ -51,7 +51,7 @@ New modules under `world/art/` (`gallery.py` for the record + cards,
 sync). Record style follows `ArtAssetRecord` (a `DefaultScript` keyed
 `gallery:<full-subject-key>`).
 
-### 3.1 Image card (plain dict inside the record)
+### 3.1 Image card (plain dict inside the record, 11 keys)
 
 | Field | Shape | Notes |
 |---|---|---|
@@ -61,7 +61,8 @@ sync). Record style follows `ArtAssetRecord` (a `DefaultScript` keyed
 | `seed` | `int \| None` | server-reported seed, same tolerance as today |
 | `checkpoint` | `str \| None` | recorded only when `ART_SD_CHECKPOINT` was set |
 | `requested_fields` | list of field ids | which data blocks the user ticked (provenance only) |
-| `face_rect` | `{x, y, w, h}` floats in [0,1] | validated: x+w ≤ 1, y+h ≤ 1, w,h > 0; fixed constant when auto-generated |
+| `face_rect` | `{x, y, w, h}` floats in [0,1] | validated: x+w ≤ 1, y+h ≤ 1, w,h > 0, and pixel-square on `image_size` (|w·W − h·H| ≤ 1px); fitted square default when auto-generated |
+| `image_size` | `{"width": int > 0, "height": int > 0}` | pixel dimensions decoded from the stored image bytes (truthful provenance, never request settings) |
 | `binding` | `None` or `{mask, snapshot}` | D5; `None` = never auto-selected by equipment, default-candidate only |
 | `created_at` | float epoch | tie-break key |
 
@@ -164,7 +165,8 @@ symlink/path-confinement validation as today.
 > but no change wires it into the live client's avatar frames.
 
 - Constant `DEFAULT_FACE_RECT = {x: 0.25, y: 0.06, w: 0.5, h: 0.5}` (upper-half
-  anchor) — used for auto-generated cards and for any card lacking a rect.
+  anchor) — used for card-less presentation use (classic assets, unknown-size composition anchors, fallback gaps); stored cards take the fitted square default `default_face_rect(image_size)`.
+- All rects stored on cards must be pixel-square on `image_size` (|w·W − h·H| ≤ 1px) with no value exemptions.
 - The server stores the rect verbatim; it never transforms or crops images.
 - Avatar surfaces (future UI) map the normalized rect to CSS
   (`object-fit: cover` plus `object-position` computed from the rect center),
@@ -474,3 +476,17 @@ Python/Node payload parity. Its shard owner is the existing recursive
 `web.webclient.actions` label; adding a second module label would duplicate
 ownership. New requirement annotations belong to archive-time main-spec sync;
 apply annotates only existing matching requirements and leaves main specs alone.
+
+## 13. Addendum (2026-10-03): square face rectangles
+
+The gallery contract originally stated the goal of square avatar crops without enforcing
+geometric squareness on the marked box. Normalized `w == h` is geometrically non-square
+on non-square canvases (such as the default 768×1024 3:4 portrait render canvas and the
+864×1536 9:16 fallback images).
+
+Under this contract addendum:
+- `image_size: {"width": int > 0, "height": int > 0}` joins the card contract as its 11th key, recorded strictly from verified decoded bytes (IHDR on generated settles, Pillow decode on seed sync).
+- `validate_face_rect(rect, image_size=None)` enforces pixel-squareness `|w·W − h·H| ≤ 1.0` whenever `image_size` is known, with no value exemptions (submitting `DEFAULT_FACE_RECT` on a 768×1024 card rejects).
+- `default_face_rect(image_size)` computes `{x: 0.25, y: 0.06, w: 0.5, h: 0.5 * width / height}` (e.g. `{x: 0.25, y: 0.06, w: 0.5, h: 0.375}` on 768×1024). Cards written without an explicit rect receive this fitted default.
+- The pinned `DEFAULT_FACE_RECT` constant remains byte-pinned for card-less presentation fallbacks.
+- Frontend modal and pure helpers in `face-rect-edit.js` square-lock against the image's `naturalWidth` / `naturalHeight`, gating save until the image is genuinely loaded.

@@ -172,6 +172,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         return api.append_card(subject, image_id=image_id, stored_identity=identity,
             prompt={"positive": "test prompt", "negative": "test negative"}, seed=7,
             checkpoint="test-checkpoint", requested_fields=[], binding=None,
+            image_size={"width": 768, "height": 1024},
             source="generated", created_at=100 + number)
 
     def envelope(self, action, payload, request_id=None):
@@ -238,8 +239,12 @@ class GalleryActionIntegrationTests(EvenniaTest):
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(b"fake-offline-worker-image")
+        # decoded size 768x1024
         return queue.settle_gallery_generated(job.key, generation_token=job.db.generation_token,
-            output_identity=identity, tmp_path=str(tmp), prompt={"positive": "settled", "negative": "negative"}, seed=42, checkpoint=None)
+            output_identity=identity, tmp_path=str(tmp),
+            prompt={"positive": "settled", "negative": "negative"},
+            seed=42, checkpoint=None,
+            image_size={"width": 768, "height": 1024})
 
     @covers_requirement(
         "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer",
@@ -316,7 +321,8 @@ class GalleryActionIntegrationTests(EvenniaTest):
     def test_face_rect_changes_only_placement_and_never_file_or_provenance(self):
         first = self.card()
         second = self.card(2)
-        rect = {"x": 0.125, "y": 0.25, "w": 0.625, "h": 0.5}
+        # On 768x1024: w=0.4 => h=0.3
+        rect = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         image_path = self.root / first["stored_identity"]
         before_stat = image_path.stat()
         result = self.dispatch("gallery.face_rect.update", {"subject_key": SUBJECT, "image_id": first["image_id"], "face_rect": rect})
@@ -326,6 +332,17 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(image_path.read_bytes(), b"synthetic-image")
         self.assertEqual(len(list(self.root.rglob("*.png"))), 2)
         self.assertEqual(next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])["face_rect"], rect)
+
+    @covers_requirement(
+        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
+    )
+    def test_non_square_face_rect_update_is_rejected(self):
+        first = self.card()
+        non_square = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5}
+        result = self.dispatch("gallery.face_rect.update", {"subject_key": SUBJECT, "image_id": first["image_id"], "face_rect": non_square})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "gallery_rejected")
+        self.assertEqual(result["message"], "無法更新這張肖像。")
 
     @covers_requirement(
         "art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots",
@@ -470,7 +487,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
             ("gallery.subject.select", {"subject_key": SUBJECT}),
             ("gallery.generate", {"subject_key": SUBJECT, "fields": [], "custom_prompt": ""}),
             ("gallery.default.set", pair),
-            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0, "y": 0, "w": 1, "h": 1})),
+            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3})),
             ("gallery.binding.save", dict(pair, slots=["armor"])),
             ("gallery.card.delete", pair),
         ]

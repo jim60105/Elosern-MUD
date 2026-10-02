@@ -203,16 +203,17 @@ class GalleryPresenterTests(EvenniaTest):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def card(self, number, *, timestamp=100, binding=None, face=None, subject=None, extension=".png"):
+    def card(self, number, *, timestamp=100, binding=None, face=None, subject=None, extension=".png", image_size=None):
         subject = subject or self.subject
         directory = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
         identity = f"gallery/{directory}/{subject.key}/{image_id(number)}{extension}"
         target = self.root / identity
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"image")
+        size = image_size or {"width": 1000, "height": 1000}
         return api.append_card(subject, image_id=image_id(number), stored_identity=identity,
             prompt=None, seed=None, checkpoint=None, requested_fields=[], binding=binding,
-            source="seed", created_at=timestamp, face_rect=face or dict(api.DEFAULT_FACE_RECT))
+            source="seed", created_at=timestamp, image_size=size, face_rect=face)
 
     def make_session(self):
         session = SimpleNamespace(ndb=SimpleNamespace(), puppet=self.actor, protocol_key="websocket", msg=lambda **kwargs: None)
@@ -256,7 +257,8 @@ class GalleryPresenterTests(EvenniaTest):
     def test_card_chips_order_counts_and_overlap_are_server_facts(self):
         self.actor.db.equipment = {"weapon_main": "t_sword", "armor": "t_coat", "accessories": ["t_ring_b", "t_ring_a"]}
         bound = {"mask": ["weapon_main", "armor"], "snapshot": {"weapon_main": "t_sword", "armor": "t_coat"}}
-        self.card(1, binding=bound, face={"x": 0, "y": 0, "w": 1, "h": 1})
+        # Card 1 has custom face rect
+        self.card(1, binding=bound, face={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4})
         self.card(2, timestamp=200, binding={"mask": ["armor"], "snapshot": {"armor": "t_coat"}})
         self.card(3, timestamp=200, binding={"mask": ["weapon_main"], "snapshot": {"weapon_main": "t_other"}})
         with patch("web.webclient.presentation.gallery.ITEM_REGISTRY", {"t_sword": SimpleNamespace(display_name_zh="測試長劍"), "t_coat": SimpleNamespace(display_name_zh="測試外套")}):

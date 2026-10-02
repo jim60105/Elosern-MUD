@@ -6,7 +6,15 @@ import GalleryDetailRail from "../../components/GalleryDetailRail.vue";
 import GalleryGenerateDrawer from "../../components/GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "../../components/GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
-import { faceCropStyle, moveFaceRect, resizeFaceRect } from "../../components/face-rect-edit.js";
+import {
+  clampFaceRect,
+  defaultFaceRect,
+  editFaceRectField,
+  faceCropStyle,
+  moveFaceRect,
+  refitFaceRectOnLoad,
+  resizeFaceRect,
+} from "../../components/face-rect-edit.js";
 import { GALLERY_DATE_UNAVAILABLE, galleryCardName, galleryDate } from "../../components/gallery-copy.js";
 import { GALLERY_EMPTY, GALLERY_MONSTER, GALLERY_SAMPLE } from "../../stories/gallery-fixtures.js";
 
@@ -267,20 +275,36 @@ describe("gallery binding drawer", () => {
 
 describe("face geometry", () => {
   it("moves without resizing and clamps positive area at image boundaries", () => {
-    const rect = { x: .2, y: .3, w: .4, h: .2 };
-    expect(moveFaceRect(rect, 2, -2)).toEqual({ x: .6, y: 0, w: .4, h: .2 });
-    expect(resizeFaceRect(rect, 2, 2)).toEqual({ x: .2, y: .3, w: .8, h: .7 });
-    const small = resizeFaceRect(rect, -2, -2);
-    expect(small.w).toBeGreaterThan(0);
-    expect(small.h).toBeGreaterThan(0);
-    expect(faceCropStyle({ x: .25, y: .1, w: .5, h: .25 })).toEqual({ width: "200%", height: "400%", left: "-50%", top: "-40%" });
+    const dims = { width: 768, height: 1024 };
+    // Default on 768x1024:
+    expect(defaultFaceRect(dims)).toEqual({ x: 0.25, y: 0.06, w: 0.5, h: 0.375 });
+    // Move
+    const rect = { x: 0.2, y: 0.3, w: 0.4, h: 0.3 };
+    expect(moveFaceRect(rect, 2, -2)).toEqual({ x: 0.6, y: 0, w: 0.4, h: 0.3 });
+    // Resize with dims: width drives, h = w * width / height
+    const resized = resizeFaceRect(rect, 0.1, 0.1, dims);
+    expect(resized.w).toBeCloseTo(0.5);
+    expect(resized.h).toBeCloseTo(0.375);
+    // Edit fields
+    const editW = editFaceRectField(rect, "w", 0.4, dims);
+    expect(editW.h).toBeCloseTo(0.3);
+    const editH = editFaceRectField(rect, "h", 0.5, dims);
+    expect(editH.w).toBeCloseTo(0.6667, 3);
+    // Crop style
+    expect(faceCropStyle({ x: 0.25, y: 0.1, w: 0.5, h: 0.375 })).toEqual({ width: "200%", height: "266.6666666666667%", left: "-50%", top: "-26.666666666666668%" });
   });
 
   it("uses the displayed non-square image bounds, and submits the keyboard-adjusted rectangle without pixels", async () => {
     const wrapper = mountSurface(GalleryFaceRectModal, { card: GALLERY_SAMPLE.cards[0] });
     const image = wrapper.get(".gallery-face__original > img");
     image.element.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 400 });
+    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
+    // Before load: save button is disabled
+    expect(button(wrapper, "儲存框選").attributes("disabled")).toBeDefined();
     await image.trigger("load");
+    // After load: save button is enabled
+    expect(button(wrapper, "儲存框選").attributes("disabled")).toBeUndefined();
     const target = wrapper.get(".gallery-face__rect");
     target.element.setPointerCapture = vi.fn();
     await target.trigger("pointerdown", { button: 0, pointerId: 1, clientX: 150, clientY: 100 });
@@ -289,11 +313,16 @@ describe("face geometry", () => {
     expect(Number(wrapper.get('input[aria-label="水平位置"]').element.value)).toBeCloseTo(.35);
     expect(Number(wrapper.get('input[aria-label="垂直位置"]').element.value)).toBeCloseTo(.16);
     await wrapper.get('input[aria-label="寬度"]').setValue(.2);
+    // Height auto-adjusts to square: 0.2 * 768 / 1024 = 0.15
+    expect(Number(wrapper.get('input[aria-label="高度"]').element.value)).toBeCloseTo(.15);
     await button(wrapper, "儲存框選").trigger("click");
     const payload = wrapper.emitted("submit")[0][0];
     expect(Object.keys(payload)).toEqual(["face_rect"]);
     expect(payload.face_rect.w).toBe(.2);
+    expect(payload.face_rect.h).toBeCloseTo(.15);
     expect(payload.face_rect.x).toBeCloseTo(.35);
+    // Pixel square check: w * 768 == h * 1024
+    expect(Math.abs(payload.face_rect.w * 768 - payload.face_rect.h * 1024)).toBeLessThanOrEqual(1.0);
   });
 
   it("cancels without an action and restores the opener when the parent unmounts the modal", async () => {

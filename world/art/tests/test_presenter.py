@@ -12,7 +12,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.art.fake_sd_client import FakeSDWebUIClient
-from world.art.gallery import DEFAULT_FACE_RECT, append_card, cards_for
+from world.art.gallery import DEFAULT_FACE_RECT, append_card, cards_for, default_face_rect
 from world.art.presenter import (
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
@@ -464,6 +464,7 @@ class FaceRectPayloadTests(EvenniaTestCase):
             "checkpoint": "realVision.safetensors",
             "requested_fields": ["appearance"],
             "binding": None,
+            "image_size": {"width": 768, "height": 1024},
             "source": "generated",
         }
         fields.update(overrides)
@@ -474,7 +475,7 @@ class FaceRectPayloadTests(EvenniaTestCase):
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
     )
     def test_a_resolved_card_payload_carries_its_own_rectangle(self):
-        explicit = {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}
+        explicit = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         subject, image_id, identity = self._append_card_with_file(face_rect=explicit)
         payload = resolve_character(self.player)
         self.assertEqual(payload["kind"], "asset")
@@ -493,7 +494,7 @@ class FaceRectPayloadTests(EvenniaTestCase):
         ) as warn:
             payload = resolve_character(self.player)
         self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+        self.assertEqual(payload["face_rect"], default_face_rect(card["image_size"]))
         events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_face_rect_invalid"]
         self.assertEqual(len(events), 1, events)
 

@@ -4,7 +4,8 @@ const card = (index, changes = {}) => ({
   image_id: GALLERY_IDS[index], status: "card",
   label: "肖像",
   url: `/art/gallery/character/7001/${GALLERY_IDS[index]}.webp`,
-  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+  // On 768x1024 portrait aspect: w=0.5 => h=0.375
+  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.375 },
   is_default: false, chips: ["預設臉框"], requested_fields: ["appearance"],
   binding_present: false, created_at: 1700000800 - index * 100,
   ...changes,
@@ -57,7 +58,8 @@ export function galleryStoryModel(model = GALLERY_SAMPLE) {
   result.cards.forEach((row, index) => {
     if (row.url) {
       row.url = `/art/defaults/${images[index % images.length]}.webp`;
-      row.face_rect = { x: 0.35, y: 0, w: 0.3, h: 0.17 };
+      // On 864x1536 fallback aspect: h=0.16 => w=0.16*1536/864 ≈ 0.2847
+      row.face_rect = { x: 0.3576, y: 0.02, w: 0.2847, h: 0.16 };
     }
   });
   return result;

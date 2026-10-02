@@ -79,6 +79,8 @@ from stat import S_ISDIR, S_ISLNK, S_ISREG
 import uuid
 
 from django.conf import settings
+import io
+from PIL import Image, UnidentifiedImageError
 
 from world.art import gallery_kinds
 from world.art.formats import STORE_EXTENSIONS
@@ -270,7 +272,11 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
 
 
 def _parse_manifest(
-    subject_fd: int, eligible_names: set[str], diagnostics: _Diagnostics, subject: str
+    subject_fd: int,
+    eligible_names: set[str],
+    diagnostics: _Diagnostics,
+    subject: str,
+    image_sizes: Mapping[str, dict[str, int] | None] | None = None,
 ) -> tuple[str | None, dict | None]:
     """Return ``(default_filename, face_rect)`` for one subject folder fd.
 
@@ -307,6 +313,17 @@ def _parse_manifest(
         except GalleryRecordError:  # observability: ignore R2: an invalid rect degrades whole via the diagnostic below
             diagnostics.emit("manifest_invalid_face_rect", subject=subject)
             return None, None
+        if image_sizes is not None:
+            for name in eligible_names:
+                size = image_sizes.get(name)
+                if size is None:
+                    diagnostics.emit("manifest_invalid_face_rect", subject=subject)
+                    return None, None
+                try:
+                    validate_face_rect(face_rect, image_size=size)
+                except GalleryRecordError:  # observability: ignore R2: preflight squareness failure degrades whole
+                    diagnostics.emit("manifest_invalid_face_rect", subject=subject)
+                    return None, None
     default_name = raw.get("default")
     if default_name is None:
         return None, face_rect
@@ -418,8 +435,24 @@ def _sync_subject_open(
             images.append(name)
     if not images:
         return
+
+    decoded_sizes: dict[str, dict[str, int] | None] = {}
+    image_payloads: dict[str, bytes] = {}
+    for name in images:
+        try:
+            payload = _open_file_bytes(name, dir_fd=subject_fd)
+            image_payloads[name] = payload
+            with Image.open(io.BytesIO(payload)) as img:
+                w, h = img.size
+                if w > 0 and h > 0:
+                    decoded_sizes[name] = {"width": w, "height": h}
+                else:
+                    decoded_sizes[name] = None
+        except Exception:  # observability: ignore R2: undecodable image degrades to None
+            decoded_sizes[name] = None
+
     default_name, face_rect = _parse_manifest(
-        subject_fd, set(images), diagnostics, subject_key
+        subject_fd, set(images), diagnostics, subject_key, image_sizes=decoded_sizes
     )
     candidate_name = default_name or images[0]
     raw_count, existing_ids, referenced_identities = _raw_occupancy(subject)
@@ -469,7 +502,10 @@ def _sync_subject_open(
             )
             continue
         try:
-            payload = _open_file_bytes(name, dir_fd=subject_fd)
+            payload = image_payloads.get(name)
+            if payload is None:
+                payload = _open_file_bytes(name, dir_fd=subject_fd)
+                image_payloads[name] = payload
         except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
             diagnostics.emit("source_unreadable", subject=subject_key, entry=name)
             continue
@@ -486,6 +522,11 @@ def _sync_subject_open(
             continue
         if changed:
             counters["copied"] += 1
+        img_size = decoded_sizes.get(name)
+        if img_size is None:
+            diagnostics.emit("card_append_rejected", subject=subject_key, entry=name)
+            continue
+
         card_fields: dict = {
             "image_id": image_id,
             "stored_identity": identity,
@@ -494,6 +535,7 @@ def _sync_subject_open(
             "checkpoint": None,
             "requested_fields": [],
             "binding": None,
+            "image_size": img_size,
             "source": "seed",
         }
         if face_rect is not None:

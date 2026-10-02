@@ -14,6 +14,7 @@ import os
 import tempfile
 import unittest
 import uuid
+import base64
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,7 +36,11 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
 
-_SEED_BYTES = b"\x89PNG seed bytes"
+# Deterministic 1x1 valid PNG bytes so Pillow decodes a valid size
+_SEED_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
 
 
 def _unique(kind_directory: str) -> str:
@@ -181,7 +186,7 @@ class ManifestParsingTests(unittest.TestCase):
 
     @covers_requirement("art-gallery-seed-sync::an-optional-per-subject-manifest-declares-the-default-and-the-face-rectangle")
     def test_a_valid_manifest_returns_its_declared_pair(self):
-        rect = {"x": 0.1, "y": 0.0, "w": 0.5, "h": 0.5}
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4}
         result = self._parse({"default": "b.png", "face_rect": rect})
         self.assertEqual(result, ("b.png", rect))
         self.assertEqual(self.diagnostics.reasons, [])
@@ -205,7 +210,7 @@ class ManifestParsingTests(unittest.TestCase):
 
     @covers_requirement("art-gallery-seed-sync::an-optional-per-subject-manifest-declares-the-default-and-the-face-rectangle")
     def test_a_face_rect_only_manifest_still_applies_the_rectangle(self):
-        rect = {"x": 0.25, "y": 0.1, "w": 0.4, "h": 0.4}
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4}
         self.assertEqual(self._parse({"face_rect": rect}), (None, rect))
         self.assertEqual(self.diagnostics.reasons, [])
 
@@ -491,7 +496,8 @@ class ManifestSyncTests(_TempRoots):
         hero = _unique("character")
         self.tree.image("character", hero, "a.png")
         self.tree.image("character", hero, "b.png")
-        rect = {"x": 0.2, "y": 0.05, "w": 0.6, "h": 0.4}
+        # On 1x1 images, w and h must match for squareness
+        rect = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5}
         self.tree.manifest("character", hero, {"default": "b.png", "face_rect": rect})
         sync_all()
         subject = _character(hero)
@@ -512,7 +518,7 @@ class ManifestSyncTests(_TempRoots):
         expected_id, _ = self._identity_for(subject, "alpha.png")
         self.assertEqual(record_for(subject).db.default_image_id, expected_id)
         for card in cards_for(subject):
-            self.assertEqual(card["face_rect"], DEFAULT_FACE_RECT)
+            self.assertEqual(card["face_rect"], gallery_api.default_face_rect(card["image_size"]))
 
     @covers_requirement("art-gallery-seed-sync::an-optional-per-subject-manifest-declares-the-default-and-the-face-rectangle")
     def test_an_invalid_manifest_degrades_with_one_diagnostic(self):
@@ -584,6 +590,7 @@ class MonsterCapTests(_TempRoots):
             checkpoint=None,
             requested_fields=[],
             binding=None,
+            image_size={"width": 100, "height": 100},
             source="generated",
         )
         before = cards_for(subject)

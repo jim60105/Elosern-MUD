@@ -28,6 +28,8 @@ from world.art.gallery import (
     validate_binding,
     validate_card,
     validate_face_rect,
+    validate_image_size,
+    default_face_rect,
 )
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -129,6 +131,71 @@ class FaceRectValidationTests(unittest.TestCase):
             with self.subTest(rect=label):
                 with self.assertRaises(GalleryRecordError):
                     validate_face_rect(rect)
+
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
+    def test_size_aware_square_tolerance_and_boundary(self):
+        # 0.4 on 768 is 307.2 px; 0.3 on 1024 is 307.2 px => diff 0.0 <= 1.0 px
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}
+        size_768_1024 = {"width": 768, "height": 1024}
+        size_1000 = {"width": 1000, "height": 1000}
+        self.assertEqual(validate_face_rect(rect, image_size=size_768_1024), rect)
+        with self.assertRaises(GalleryRecordError):
+            validate_face_rect(rect, image_size=size_1000)
+
+        # DEFAULT_FACE_RECT is not square on 768x1024 (w*768 = 384, h*1024 = 512, diff = 128 px)
+        with self.assertRaises(GalleryRecordError):
+            validate_face_rect(DEFAULT_FACE_RECT, image_size=size_768_1024)
+
+        # Tolerance boundary: 1 px inside, 2 px out on 1000x1000
+        # pixel_w = 0.5 * 1000 = 500 px.
+        # 1 px inside: h = 501/1000 = 0.501 => abs(500 - 501) = 1.0 <= 1.0 -> ok
+        inside = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.501}
+        self.assertEqual(validate_face_rect(inside, image_size=size_1000), inside)
+        # 2 px out: h = 502/1000 = 0.502 => abs(500 - 502) = 2.0 > 1.0 -> rejects
+        outside = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.502}
+        with self.assertRaises(GalleryRecordError):
+            validate_face_rect(outside, image_size=size_1000)
+
+        # None image_size retains bounds-only behavior
+        self.assertEqual(validate_face_rect(rect, image_size=None), rect)
+        self.assertEqual(validate_face_rect(DEFAULT_FACE_RECT, image_size=None), DEFAULT_FACE_RECT)
+
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
+    def test_default_face_rect_computation(self):
+        fitted = default_face_rect({"width": 768, "height": 1024})
+        self.assertEqual(fitted, {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375})
+        square = default_face_rect({"width": 1000, "height": 1000})
+        self.assertEqual(square, DEFAULT_FACE_RECT)
+
+
+class ImageSizeValidationTests(unittest.TestCase):
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
+    def test_positive_integer_pairs_accepted(self):
+        self.assertEqual(
+            validate_image_size({"width": 768, "height": 1024}),
+            {"width": 768, "height": 1024},
+        )
+
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
+    def test_malformed_image_sizes_rejected(self):
+        bad_sizes = {
+            "missing_height": {"width": 100},
+            "missing_width": {"height": 100},
+            "extra_key": {"width": 100, "height": 100, "depth": 3},
+            "zero_width": {"width": 0, "height": 100},
+            "zero_height": {"width": 100, "height": 0},
+            "negative_width": {"width": -10, "height": 100},
+            "negative_height": {"width": 100, "height": -10},
+            "float_width": {"width": 100.5, "height": 100},
+            "bool_width": {"width": True, "height": 100},
+            "str_width": {"width": "100", "height": "100"},
+            "not_a_mapping": [100, 100],
+        }
+        for label, val in bad_sizes.items():
+            with self.subTest(size=label):
+                with self.assertRaises(GalleryRecordError):
+                    validate_image_size(val)
+
 
 class BindingValidationTests(unittest.TestCase):
     @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")

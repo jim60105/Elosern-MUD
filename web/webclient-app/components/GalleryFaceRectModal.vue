@@ -1,7 +1,15 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
-import { clampFaceRect, faceCropStyle, moveFaceRect, resizeFaceRect } from "./face-rect-edit.js";
+import {
+  clampFaceRect,
+  defaultFaceRect,
+  editFaceRectField,
+  faceCropStyle,
+  moveFaceRect,
+  refitFaceRectOnLoad,
+  resizeFaceRect,
+} from "./face-rect-edit.js";
 import { galleryCardName, galleryDate } from "./gallery-copy.js";
 import "./gallery.css";
 
@@ -11,18 +19,16 @@ const props = defineProps({
   rejected: { type: Boolean, default: false },
 });
 const emit = defineEmits(["close", "submit", "log"]);
-const rect = ref(clampFaceRect(props.card.face_rect));
+const rect = ref(props.card.face_rect ? clampFaceRect(props.card.face_rect) : defaultFaceRect());
 const root = ref(null);
 const image = ref(null);
 let trap;
 let drag = null;
 const loaded = ref(false);
-const dimensions = ref({ width: 1, height: 1 });
+const dimensions = ref(null);
 const previewStyle = computed(() => {
-  const ratio = dimensions.value.width * rect.value.w / (dimensions.value.height * rect.value.h);
-  return ratio >= 1
-    ? { width: "100%", height: `${100 / ratio}%` }
-    : { width: `${100 * ratio}%`, height: "100%" };
+  // By construction rect is pixel-square when loaded, so aspect ratio is 1:1
+  return { width: "100%", height: "100%" };
 });
 const rectStyle = computed(() => ({
   left: `${rect.value.x * 100}%`, top: `${rect.value.y * 100}%`,
@@ -51,14 +57,35 @@ function move(event) {
   if (!drag || drag.pointerId !== event.pointerId || props.disabled) return;
   const dx = (event.clientX - drag.x) / drag.bounds.width;
   const dy = (event.clientY - drag.y) / drag.bounds.height;
-  rect.value = drag.resize ? resizeFaceRect(drag.rect, dx, dy) : moveFaceRect(drag.rect, dx, dy);
+  rect.value = drag.resize ? resizeFaceRect(drag.rect, dx, dy, dimensions.value) : moveFaceRect(drag.rect, dx, dy);
 }
 function edit(field, event) {
-  rect.value = clampFaceRect({ ...rect.value, [field]: event.target.valueAsNumber });
+  rect.value = editFaceRectField(rect.value, field, event.target.valueAsNumber, dimensions.value);
 }
 function imageLoaded() {
-  loaded.value = true;
-  dimensions.value = { width: image.value.naturalWidth || 1, height: image.value.naturalHeight || 1 };
+  const w = image.value?.naturalWidth || 0;
+  const h = image.value?.naturalHeight || 0;
+  if (w > 0 && h > 0) {
+    loaded.value = true;
+    dimensions.value = { width: w, height: h };
+    if (!props.card.face_rect || (props.card.face_rect.x === 0.25 && props.card.face_rect.y === 0.06 && props.card.face_rect.w === 0.5 && props.card.face_rect.h === 0.5)) {
+      rect.value = defaultFaceRect(dimensions.value);
+    } else {
+      rect.value = refitFaceRectOnLoad(rect.value, dimensions.value);
+    }
+  } else {
+    loaded.value = false;
+    dimensions.value = null;
+  }
+}
+function imageError() {
+  loaded.value = false;
+  dimensions.value = null;
+}
+function submit() {
+  if (!loaded.value || !dimensions.value) return;
+  const finalRect = clampFaceRect(rect.value, dimensions.value);
+  emit("submit", { face_rect: finalRect });
 }
 </script>
 
@@ -73,7 +100,7 @@ function imageLoaded() {
         <section>
           <h4>原始圖片<span class="gallery-muted">（可拖曳調整框選範圍）</span></h4>
           <div class="gallery-face__original">
-            <img ref="image" :src="card.url" :alt="galleryCardName(card)" draggable="false" @load="imageLoaded" @error="loaded = false">
+            <img ref="image" :src="card.url" :alt="galleryCardName(card)" draggable="false" @load="imageLoaded" @error="imageError">
             <div v-if="loaded" class="gallery-face__rect" :style="rectStyle" @pointerdown="start($event)" @pointermove="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">
               <span class="gallery-face__cross"></span>
               <button class="gallery-face__resize" aria-label="拖曳調整框選大小" :disabled="disabled" @pointerdown.stop="start($event, true)" @pointermove.stop="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">↘</button>
@@ -92,12 +119,12 @@ function imageLoaded() {
           </div>
           <h4>方形裁切預覽（1:1）</h4>
           <div class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="card.url" :alt="`${galleryCardName(card)}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
-          <p class="gallery-muted">完整呈現框選範圍，保留原始比例。</p>
-          <p v-if="!loaded" class="gallery-muted">圖片尚未載入，可使用數值調整框選。</p>
+          <p class="gallery-muted">依真實比例呈顯方形頭像，鎖定等長像素範圍。</p>
+          <p v-if="!loaded" class="gallery-muted">圖片尚未載入，無法儲存框選。</p>
           <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，框選已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
         </section>
       </div>
-      <footer class="gallery-actions"><button @click="close">取消</button><button class="gallery-primary" :disabled="disabled" @click="emit('submit', { face_rect: { ...rect } })">儲存框選</button></footer>
+      <footer class="gallery-actions"><button @click="close">取消</button><button class="gallery-primary" :disabled="disabled || !loaded" @click="submit">儲存框選</button></footer>
     </section>
   </div>
 </template>

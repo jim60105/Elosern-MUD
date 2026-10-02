@@ -10,16 +10,20 @@ rectangle and no classic fixed-identity record, guarded for idempotency
 against the subject's gallery, with the existing age-check, post-commit, and
 failure-isolation guarantees intact. Player creation carries an explicit skip
 flag that establishes the named policy without requesting anything.
+
 ## Requirements
+
 ### Requirement: Automatic character portraits produce exactly one unbound default card
 Every automatic portrait path — player creation, validated import, named-NPC spawn, startup recovery,
 and generic-monster startup synchronization — SHALL route through the gallery generation request
 rather than the subject-keyed asset `ensure`, and SHALL request exactly one image built from the
-subject's standard deterministic description with no free text, no binding, and the shared default
-face rectangle. For a kind that declares field-selection support, that description is the authored
-appearance contribution and nothing else, expressed as the `appearance` field alone; for a kind that
-declares no field selection, it is that kind's registry-driven description with no selection supplied
-at all. The requirement is on the resulting description, not on the request's argument shape.
+subject's standard deterministic description with no free text, no binding, and no explicit face
+rectangle (`face_rect=None`), so the resulting card takes the fitted default square computed from
+the settled image's recorded pixel size. For a kind that declares field-selection support, that
+description is the authored appearance contribution and nothing else, expressed as the `appearance`
+field alone; for a kind that declares no field selection, it is that kind's registry-driven
+description with no selection supplied at all. The requirement is on the resulting description, not
+on the request's argument shape.
 
 The resulting card SHALL be unbound, so it is displayed only as the subject's default — which, being
 the subject's first card, it becomes automatically. NO gallery-bearing subject SHALL produce a classic
@@ -31,11 +35,11 @@ import, spawn, movement, or startup.
 
 #### Scenario: A committed creation produces one unbound default card
 - **WHEN** player creation commits and its post-commit job is drained
-- **THEN** the character's gallery holds exactly one unbound card carrying the shared default rectangle, that card is the default, and no classic asset record exists for the subject
+- **THEN** the character's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and no classic asset record exists for the subject
 
 #### Scenario: A registered monster tier produces one unbound default card
 - **WHEN** startup synchronization runs for a registered monster tier with an empty gallery and its job is drained
-- **THEN** that tier's gallery holds exactly one unbound card carrying the shared default rectangle, that card is the default, and startup wrote no classic asset record for the tier
+- **THEN** that tier's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no classic asset record for the tier
 
 #### Scenario: The age gate still rejects before any record or prompt
 - **WHEN** an automatic path runs for a character whose `age` or `apparent_age` is missing or non-integer
@@ -99,4 +103,3 @@ the rest of the finalization, so a rollback leaves no portrait state either way.
 #### Scenario: A rolled-back skipped activation leaves nothing
 - **WHEN** an activation with the skip flag set rolls back
 - **THEN** no portrait policy and no gallery state remain on the character
-
