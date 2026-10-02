@@ -87,6 +87,12 @@ def _items():
 def _subraces():
     return _live_registry("world.lore.races", "SUBRACE" + "_REGISTRY")
 
+def _npc_profiles():
+    return _live_registry("world.lore.npc_profiles", "NPC_PROFILE" + "_REGISTRY")
+
+def _guild_ranks():
+    return _live_registry("world.lore.guild", "GUILD_RANK" + "_REGISTRY")
+
 def _place_by_kind(kind: str):
     """The live place row of one service kind (registry-ordered first match)."""
     return next(place for place in _places().values() if place.kind == kind)

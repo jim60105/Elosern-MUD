@@ -388,6 +388,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 | `.action-dock__playback` + `.action-dock__playback-line` (the round-playback cue's wrapper and its decorative sweep line, whose animation duration is asserted under reduced motion; the managed suite targets the line via `test_browser_combat_beats.py`) | REMAP-TO-TESTID |
 | `.dock-menu__command-count` (the combat root's per-row command count badge; targeted by `test_browser_contextual_hud_dock.py`) | REMAP-TO-TESTID |
 | `.empty-state__glyph` (the shared EmptyState's decorative glyph icon; targeted by `test_browser_drawer_content.py`) | REMAP-TO-TESTID |
+| `.npe-confirm` (the NPC persona editor's dirty-close confirmation dialog root, styled by `npc-persona-editor.css`; the managed suite asserts its absence after a confirmed close via `page.locator(".npe-confirm")` in `test_browser_npc_persona_editor.py`; the hook was added by the npc-persona-editor-window change alongside the `npc-persona-editor-*` testid family) | REMAP-TO-TESTID |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
 | `.lm_header` (legacy GoldenLayout header assertion: must NOT render) | RETIRED-WITH-SHELL |
 | `.dock-menu-layout` (the removed dock pane wrapper per the remove-redundant-dock-menu-layout change: the managed suite asserts it must NOT render; no replacement selector) | RETIRED-WITH-SHELL |
@@ -552,6 +553,11 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 ---
 
 ## 6. 修訂記錄
+
+### npc-persona-editor-window-hook-registration — 2026-10-02（master 凍結契約復綠）
+
+- **§2.3 補登 hook：** `.npe-confirm`（NPC persona 編輯器的髒關閉確認對話框根元素）登記於 CSS class hooks 表為 REMAP-TO-TESTID。該掛鉤由 npc-persona-editor-window 變更連同 `npc-persona-editor-*` testid 家族一併加入，受管套件在 `test_browser_npc_persona_editor.py` 以 `page.locator(".npe-confirm")` 斷言確認關閉後其缺席；`tests/test_webclient_frozen_contract.py` 的受管瀏覽器目標掃描自此轉綠。
+- **§5 完整性聲明維持成立：** 本項為補登的文件同步，未改變凍結 façade（§1）或增量清單（§3）。
 
 ### frozen-audit-renewal-sweep-2 — 2026-09-30（master 凍結契約復綠）
 

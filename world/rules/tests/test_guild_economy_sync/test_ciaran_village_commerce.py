@@ -32,6 +32,7 @@ from ._support import (
     ServiceContentIsolation,
     _items,
     _place_by_kind,
+    _npc_profiles,
     _places,
     _settlements,
     _village_places,
@@ -165,9 +166,9 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         # The village people are one subrace WITHIN the capital's races: the
         # authored identity (race, the distinct minority subrace, sex) is read
         # off each place row; the hosts must carry it verbatim.
-        from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
         village_subrace = _village_subrace_key()
         sync_service_content()
+        profiles = _npc_profiles()
         for place in _village_places():
             with self.subTest(place=place.key):
                 if place.host_name is None:
@@ -176,7 +177,7 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(host.race, place.host_race)
                 self.assertEqual(host.subrace, village_subrace)
                 self.assertEqual(host.sex, place.host_sex)
-                expected_profile = NPC_PROFILE_REGISTRY[place.service_id]
+                expected_profile = profiles[place.service_id]
                 self.assertEqual(int(host.attributes.get("age")), expected_profile.age)
                 self.assertEqual(int(host.attributes.get("apparent_age")), expected_profile.apparent_age)
                 if "shop_key" in dict(place.authored_kwargs):

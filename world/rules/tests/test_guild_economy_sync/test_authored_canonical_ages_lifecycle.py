@@ -11,11 +11,11 @@ from world.rules.guild_exams import start_guild_exam
 from world.rules.guild import register_adventurer
 from world.rules.surfaces import write_counter_trait, read_counter_trait
 from typeclasses.components import GuildStaff
-from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.rules.npc_persona import update_npc_persona, read_npc_persona, current_persona_version
 from tools.spec_traceability import covers_requirement
 from world.rules.tests.test_guild_economy_sync._support import ServiceContentIsolation
 from world.rules.tests.test_guild_economy_sync._support import _guild_host_name, _merchant_host_name
+from world.rules.tests.test_guild_economy_sync._support import _guild_ranks, _npc_profiles
 
 
 class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTestCase):
@@ -75,7 +75,7 @@ class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTes
         player.apply_race_baseline()
         register_adventurer(player, examiner)
         write_counter_trait(player, "guild_merit", 100)
-        # E rank examiner: guild_examiner_e (26/26)
+        # E rank examiner: the rank's own authored profile (registry-derived).
         record = start_guild_exam(player, examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
@@ -85,9 +85,9 @@ class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTes
         # 2. Invalid age rollback: fresh eligible player, no active combat
         from unittest.mock import patch
         from dataclasses import replace
-        from world.lore.guild import GUILD_RANK_REGISTRY
-        rank_e = GUILD_RANK_REGISTRY["E"]
+        rank_e = _guild_ranks()["E"]
         self.assertEqual(opponent.key, rank_e.examiner_name)
+        examiner_profile_key = rank_e.examiner_profile_key
         player2 = create_object(PlayerCharacter, key="t_exam_tester2", location=examiner.location)
         player2.race = "human"
         player2.apply_race_baseline()
@@ -96,15 +96,16 @@ class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTes
         initial_merit = 100
         initial_affinity = examiner.relations.affinity_for(player2)
 
-        fake_registry = dict(NPC_PROFILE_REGISTRY)
-        bad_profile = replace(NPC_PROFILE_REGISTRY["guild_examiner_e"])
+        profiles = _npc_profiles()
+        fake_registry = dict(profiles)
+        bad_profile = replace(profiles[examiner_profile_key])
         object.__setattr__(bad_profile, "age", 10001)
-        fake_registry["guild_examiner_e"] = bad_profile
+        fake_registry[examiner_profile_key] = bad_profile
         with patch("world.rules.guild_exams.NPC_PROFILE_REGISTRY", fake_registry):
             with self.assertRaises(ValueError) as caught:
                 start_guild_exam(player2, examiner, "E")
             self.assertIn("10001", str(caught.exception))
-            self.assertIn("guild_examiner_e", str(caught.exception))
+            self.assertIn(examiner_profile_key, str(caught.exception))
 
         # Assert rollback of opponent, merit, affinity, and no session created for player2
         from world.rules.combat_session import read_session
