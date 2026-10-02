@@ -321,7 +321,7 @@ def _parse_manifest(
                     return None, None
                 try:
                     validate_face_rect(face_rect, image_size=size)
-                except GalleryRecordError:
+                except GalleryRecordError:  # observability: ignore R2: preflight squareness failure degrades whole
                     diagnostics.emit("manifest_invalid_face_rect", subject=subject)
                     return None, None
     default_name = raw.get("default")
@@ -448,7 +448,7 @@ def _sync_subject_open(
                     decoded_sizes[name] = {"width": w, "height": h}
                 else:
                     decoded_sizes[name] = None
-        except Exception:
+        except Exception:  # observability: ignore R2: undecodable image degrades to None
             decoded_sizes[name] = None
 
     default_name, face_rect = _parse_manifest(
@@ -506,7 +506,7 @@ def _sync_subject_open(
             if payload is None:
                 payload = _open_file_bytes(name, dir_fd=subject_fd)
                 image_payloads[name] = payload
-        except OSError:
+        except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
             diagnostics.emit("source_unreadable", subject=subject_key, entry=name)
             continue
         except _SeedFileRejected:  # observability: ignore R2: reported through the bounded diagnostic emitter below

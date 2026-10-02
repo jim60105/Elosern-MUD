@@ -124,7 +124,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             append_card(subject, **_card_fields(subject, image_id=image_id))
         self.assertEqual(len(cards_for(subject)), 1)
 
-    @covers_requirement("art-gallery-model::a-card-s-image-pixel-size-is-recorded-from-verified-bytes-at-append")
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_size_less_append_refuses(self):
         subject = _character("nosize")
         fields = _card_fields(subject)

@@ -334,7 +334,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])["face_rect"], rect)
 
     @covers_requirement(
-        "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
+        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
     )
     def test_non_square_face_rect_update_is_rejected(self):
         first = self.card()

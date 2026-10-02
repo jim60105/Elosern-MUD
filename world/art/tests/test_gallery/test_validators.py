@@ -169,14 +169,14 @@ class FaceRectValidationTests(unittest.TestCase):
 
 
 class ImageSizeValidationTests(unittest.TestCase):
-    @covers_requirement("art-gallery-model::a-card-s-image-pixel-size-is-recorded-from-verified-bytes-at-append")
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_positive_integer_pairs_accepted(self):
         self.assertEqual(
             validate_image_size({"width": 768, "height": 1024}),
             {"width": 768, "height": 1024},
         )
 
-    @covers_requirement("art-gallery-model::a-card-s-image-pixel-size-is-recorded-from-verified-bytes-at-append")
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_malformed_image_sizes_rejected(self):
         bad_sizes = {
             "missing_height": {"width": 100},

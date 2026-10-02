@@ -830,7 +830,7 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
         for entry in record.db.cards or []:
             try:
                 validated = validate_card(entry, subject, api_defaults=False)
-            except GalleryRecordError:
+            except GalleryRecordError:  # observability: ignore R2: tolerant locate ignores malformed cards
                 continue
             if validated["image_id"] == image_id:
                 located = validated

@@ -238,7 +238,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
                 self.assertEqual(_raw_cards(subject), before)
 
     @covers_requirement(
-        "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
+        "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
     )
     def test_default_constant_rejected_on_non_square_card(self):
         subject = _character("rect_nonsquare_constant")
