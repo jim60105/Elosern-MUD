@@ -81,6 +81,8 @@
   }
 
   var CRLF_REGEX = /\r\n|\r/g;
+  var LEADING_BOUNDARY_REGEX = /^[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]+/;
+  var TRAILING_BOUNDARY_REGEX = /[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]+$/;
 
   function countCodePoints(str) {
     if (typeof str !== "string") {
@@ -93,7 +95,10 @@
     if (typeof text !== "string") {
       return "";
     }
-    return text.replace(CRLF_REGEX, "\n").trim();
+    return text
+      .replace(CRLF_REGEX, "\n")
+      .replace(LEADING_BOUNDARY_REGEX, "")
+      .replace(TRAILING_BOUNDARY_REGEX, "");
   }
 
   function normalizeCard(raw) {
