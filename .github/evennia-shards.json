@@ -149,7 +149,8 @@
         "world.rules.tests.test_profession_config",
         "world.rules.tests.test_rules_observability",
         "world.rules.tests.test_service_binding_persistence",
-        "world.rules.tests.test_service_gate"
+        "world.rules.tests.test_service_gate",
+        "world.rules.tests.test_npc_persona_fresh_bootstrap"
       ]
     },
     {

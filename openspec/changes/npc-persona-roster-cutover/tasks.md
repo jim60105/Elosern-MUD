@@ -16,5 +16,5 @@ Apply on branch `feat/npc-persona-roster-cutover` in worktree `.worktrees/npc-pe
 
 ## 4. Gates
 
-- [ ] 4.1 Register `world.rules.tests.test_npc_persona_fresh_bootstrap` in exactly one rules shard of `.github/evennia-shards.json` and verify `tests.test_evennia_test_optimization_contract`; annotate the three new requirements with literal IDs from `uv run --locked python -m tools.spec_traceability list` and verify `tools.spec_traceability check`.
+- [x] 4.1 Register `world.rules.tests.test_npc_persona_fresh_bootstrap` in exactly one rules shard of `.github/evennia-shards.json` and verify `tests.test_evennia_test_optimization_contract`; annotate the three new requirements with literal IDs from `uv run --locked python -m tools.spec_traceability list` and verify `tools.spec_traceability check`.
 - [ ] 4.2 Run `uv run --locked python -m tools.contract_gate`, `tools.test_data_lint check`, `git diff --check`, and `openspec validate npc-persona-roster-cutover --strict`; confirm `tools.observability_freeze.json` and the observability catalog are untouched (no new events ship).
