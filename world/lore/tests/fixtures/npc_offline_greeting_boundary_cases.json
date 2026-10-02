@@ -53,5 +53,45 @@
     "name": "non_text_boolean_rejected",
     "greeting": true,
     "expected_valid": false
+  },
+  {
+    "name": "all_finite_boundary_characters_cleared_to_empty",
+    "greeting": "\t\n\u000b\f\r                  　﻿",
+    "expected_valid": true,
+    "expected": ""
+  },
+  {
+    "name": "feff_and_0085_trimmed_around_greeting",
+    "greeting": "﻿「歡迎光臨。」﻿",
+    "expected_valid": true,
+    "expected": "「歡迎光臨。」"
+  },
+  {
+    "name": "excluded_boundary_characters_preserved_exact_300",
+    "greeting": "\u001c\u001d\u001e\u001f᠎​⁠問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問\u001c\u001d\u001e\u001f᠎​⁠",
+    "expected_valid": true,
+    "expected": "\u001c\u001d\u001e\u001f᠎​⁠問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問\u001c\u001d\u001e\u001f᠎​⁠"
+  },
+  {
+    "name": "excluded_boundary_characters_over_limit_301",
+    "greeting": "\u001c\u001d\u001e\u001f᠎​⁠問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問問\u001c\u001d\u001e\u001f᠎​⁠",
+    "expected_valid": false
+  },
+  {
+    "name": "trailing_crlf_and_boundary_whitespace_trimmed_without_line_break",
+    "greeting": "「歡迎光臨。」\r\n﻿ ",
+    "expected_valid": true,
+    "expected": "「歡迎光臨。」"
+  },
+  {
+    "name": "internal_crlf_rejected_as_multiline",
+    "greeting": "第一行。\r\n第二行。",
+    "expected_valid": false
+  },
+  {
+    "name": "internal_unicode_separators_preserved_without_lf_conversion",
+    "greeting": "第一句 第二句 第三句",
+    "expected_valid": true,
+    "expected": "第一句 第二句 第三句"
   }
 ]

@@ -41,6 +41,28 @@ describe("NPC editor state machine", () => {
     expect(f.view().state).toBe("ready_clean"); expect(f.view().version).toBe(4);
     expect(f.store.dispatchAction.mock.calls.filter(c => c[0] === "npc.persona.update")).toHaveLength(1);
   });
+  it("treats boundary-only changes as clean and interior/excluded characters as dirty", async () => {
+    const f = fixture(); await f.open(); await f.result();
+    expect(f.view().dirty).toBe(false);
+    expect(f.view().dirtyFields).toEqual([]);
+
+    // Boundary-only whitespace (U+FEFF, U+0085, spaces, CRLF)
+    f.ed.npcPersonaSetField("habit", "\ufeff\u0085" + sample.persona.habit + "\r\n ");
+    expect(f.view().dirty).toBe(false);
+    expect(f.view().dirtyFields).toEqual([]);
+    expect(f.view().state).toBe("ready_clean");
+
+    // Interior whitespace (U+0085 inside word) or excluded character (U+200B) at boundary
+    f.ed.npcPersonaSetField("habit", sample.persona.habit + "\u200b");
+    expect(f.view().dirty).toBe(true);
+    expect(f.view().dirtyFields).toEqual(["habit"]);
+    expect(f.view().state).toBe("ready_dirty");
+
+    // Optional clear with boundary whitespace
+    f.ed.npcPersonaSetField("identity.hidden", "\ufeff\u0085 \t");
+    expect(f.view().dirty).toBe(true); // baseline had "曾是密探", normalized draft is "" -> changed!
+    expect(f.view().dirtyFields).toEqual(["identity.hidden", "habit"]);
+  });
   it.each([["speech_style", "npc_persona.required_empty.speech_style"], ["offline_greeting", "npc_persona.greeting_invalid"]])("retains rejected %s and requests field focus", async (field, code) => {
     const f = fixture(); await f.open(); await f.result(); f.ed.npcPersonaSetField(field, "修改"); f.ed.npcPersonaSave();
     await f.result(null, { outcome: "rejected", code, message: "未通過檢查" });
@@ -103,11 +125,12 @@ describe("NPC editor state machine", () => {
   it("adopts a confirmed lost save whose only draft difference is normalization", async () => {
     const f = fixture(); await f.open(); await f.result();
     f.ed.npcPersonaSetField("habit", "  草稿\r\n "); f.ed.npcPersonaSave();
+    expect(f.view().dirty).toBe(true);
     f.store.view.connected = false; await nextTick();
     f.store.view.generation = 2; f.store.view.epoch = "b"; f.store.view.connected = true; await nextTick();
     await f.result({ ...sample, persona_version: 4, persona: { ...sample.persona, habit: "草稿" } });
     expect(f.view().state).toBe("ready_clean"); expect(f.view().version).toBe(4);
-    expect(f.view().draft.habit).toBe("草稿");
+    expect(f.view().draft.habit).toBe("  草稿\r\n ");
   });
   it("clears instead of reconnecting private data when the opening character was unknown", async () => {
     const f = fixture(); f.store.view.rosterCharacters = []; await f.open(); await f.result();

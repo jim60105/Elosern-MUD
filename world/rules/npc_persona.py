@@ -464,7 +464,7 @@ def update_npc_persona(
                 return UpdateOutcome(status="unavailable", version=None, reason="corrupt_card")
 
             raw_greeting = _raw_attribute_value(npc, OFFLINE_GREETING_KEY)
-            current_greeting = raw_greeting if isinstance(raw_greeting, str) else ""
+            current_greeting = normalize_offline_greeting(raw_greeting) if isinstance(raw_greeting, str) else ""
             card_changed = current_card != new_card
             greeting_changed = current_greeting != new_greeting
 

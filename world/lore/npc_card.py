@@ -98,6 +98,29 @@ PROVENANCE_IDENTIFIER_LIMIT: int = 120
 
 _CRLF_RE = re.compile(r"\r\n|\r")
 
+# Finite boundary whitespace set: U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680,
+# U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF.
+# Explicitly excludes U+001C–U+001F, U+180E, U+200B, U+2060.
+NPC_BOUNDARY_WHITESPACE: str = (
+    "\u0009\u000a\u000b\u000c\u000d"
+    "\u0020"
+    "\u0085"
+    "\u00a0"
+    "\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029"
+    "\u202f"
+    "\u205f"
+    "\u3000"
+    "\ufeff"
+)
+NPC_BOUNDARY_WHITESPACE_CHARS: frozenset[str] = frozenset(NPC_BOUNDARY_WHITESPACE)
+
+
+def normalize_npc_text(val: str) -> str:
+    """Normalize line endings (CRLF/CR -> LF) and strip explicit finite boundary whitespace."""
+    return _CRLF_RE.sub("\n", val).strip(NPC_BOUNDARY_WHITESPACE)
+
 
 class NpcCardError(ValueError):
     """Raised when an NPC card or provenance fails validation.
@@ -167,9 +190,7 @@ def _normalize_text_leaf(val: Any, field_name: str) -> str:
     """Validate that val is a string, normalize line endings and outer whitespace."""
     if not isinstance(val, str) or isinstance(val, bool):
         raise NpcCardError("not_text", field_name)
-    # CRLF and lone CR -> LF
-    normalized = _CRLF_RE.sub("\n", val).strip()
-    return normalized
+    return normalize_npc_text(val)
 
 
 def render_identity_section(public: str, hidden: str) -> str:
@@ -332,7 +353,7 @@ def normalize_offline_greeting(raw: Any) -> str:
     """
     if not isinstance(raw, str) or isinstance(raw, bool):
         raise NpcCardError("greeting_invalid", "offline_greeting")
-    normalized = _CRLF_RE.sub("\n", raw).strip()
+    normalized = normalize_npc_text(raw)
     if "\n" in normalized or len(normalized) > OFFLINE_GREETING_LIMIT:
         raise NpcCardError("greeting_invalid", "offline_greeting")
     return normalized

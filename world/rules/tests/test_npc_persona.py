@@ -196,6 +196,68 @@ class NpcPersonaServiceTest(EvenniaTest):
         self.assertIsInstance(res, NpcPersonaSnapshot)
         self.assertEqual(res.version, 1)
 
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_boundary_only_and_crlf_card_and_greeting_resave_is_no_op(self) -> None:
+        """Boundary-only whitespace and CRLF vs LF card/greeting resave succeeds unchanged with same version."""
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        update_npc_persona(
+            self.npc,
+            self.valid_card_raw,
+            expected_version=1,
+            offline_greeting="「歡迎光臨。」",
+        )
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 2)
+
+        # Resave with boundary whitespace (U+FEFF, U+0085, etc) and CRLF line endings
+        crlf_boundary_card = dict(self.valid_card_raw)
+        crlf_boundary_card["appearance"] = "\ufeff\u0085高大威猛，身披重鎧。\r\n\u0085\ufeff "
+        boundary_greeting = "\ufeff\u0085「歡迎光臨。」\u0085\ufeff"
+
+        res = update_npc_persona(
+            self.npc,
+            crlf_boundary_card,
+            expected_version=2,
+            offline_greeting=boundary_greeting,
+        )
+        self.assertEqual(res.status, "unchanged")
+        self.assertEqual(res.version, 2)
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 2)
+
+    @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
+    def test_optional_clear_advances_once_repeat_is_unchanged_and_stale_rejects(self) -> None:
+        """Clearing optional content with boundary whitespace advances version once; repeat is unchanged; stale rejects."""
+        initialize_npc_persona(self.npc, self.valid_card_raw, self.provenance)
+        # Set initial greeting override
+        update_npc_persona(
+            self.npc,
+            self.valid_card_raw,
+            expected_version=1,
+            offline_greeting="「初始問候。」",
+        )
+        self.assertEqual(self.npc.db.npc_persona_meta["persona_version"], 2)
+        self.assertTrue(self.npc.attributes.has("npc_offline_greeting"))
+
+        # First clear: identity.hidden and offline_greeting cleared using boundary whitespace
+        card_cleared = dict(self.valid_card_raw)
+        card_cleared["identity"] = {"public": "公會守衛", "hidden": "\ufeff\u0085 \t"}
+        card_cleared["social_connection"] = "\ufeff\u0085 \t"
+        res1 = update_npc_persona(self.npc, card_cleared, expected_version=2, offline_greeting="\ufeff\u0085 ")
+        self.assertEqual(res1.status, "updated")
+        self.assertEqual(res1.version, 3)
+        self.assertEqual(self.npc.db.persona["identity"]["hidden"], "")
+        self.assertEqual(self.npc.db.persona["social_connection"], "")
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+        # Repeated clear with expected_version=3: no-op, unchanged
+        res2 = update_npc_persona(self.npc, card_cleared, expected_version=3, offline_greeting="")
+        self.assertEqual(res2.status, "unchanged")
+        self.assertEqual(res2.version, 3)
+
+        # Stale repeat with expected_version=1: rejected as version_conflict without writing
+        res3 = update_npc_persona(self.npc, card_cleared, expected_version=1, offline_greeting="")
+        self.assertEqual(res3.status, "version_conflict")
+        self.assertEqual(res3.version, 3)
+
     @covers_requirement("npc-persona-card::persona-updates-are-compare-and-set-on-persona-version")
     def test_no_op_success(self) -> None:
         """Submitting an identical card succeeds with unchanged status without advancing version."""

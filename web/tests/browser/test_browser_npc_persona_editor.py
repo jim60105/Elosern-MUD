@@ -60,15 +60,21 @@ class NpcPersonaEditorBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         greeting.fill("問" * 301)
         expect(page.get_by_test_id("npc-persona-editor-save")).to_be_disabled()
         self.assertEqual(page.get_by_test_id("npc-persona-editor-total").inner_text(), original_total)
-        greeting.fill("「渡口今日風平浪靜。」")
-        speech.fill("說話輕快，喜歡用渡船比喻。")
+        greeting.fill("\ufeff\u0085「渡口今日風平浪靜。」\u0085\ufeff")
+        speech.fill("\ufeff\u0085說話輕快，喜歡用渡船比喻。\u0085\ufeff")
         page.get_by_test_id("npc-persona-editor-save").click()
         expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_clean")
         expect(page.get_by_test_id("npc-persona-editor-version")).to_have_text("第 2 版")
         self.assertEqual(sent_action_count(page, "npc.persona.update"), 1)
         page.screenshot(path="/tmp/npc-editor-storyboard/app-saved.png")
+
+        # Boundary-only edit: add \uFEFF and spaces to greeting
+        greeting.fill("  \ufeff「渡口今日風平浪靜。」\u0085 ")
+        # Normalized-clean: no dirty state and cancel closes without confirmation dialog
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_clean")
         page.get_by_test_id("npc-persona-editor-cancel").click()
         expect(page.get_by_test_id("npc-persona-editor")).to_have_count(0)
+        expect(page.locator(".npe-confirm")).to_have_count(0)
         self._idle(page)
         # Closing restores the existing verb popover, not a new router frame.
         activate_overview_chip(page, "service-npc_persona")

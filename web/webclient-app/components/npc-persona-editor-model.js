@@ -133,7 +133,9 @@ export function sameNormalizedDraft(a, b) {
 
 export function changedFields(draft, baseline) {
   if (!draft || !baseline) return [];
-  return FIELD_KEYS.filter((key) => draft[key] !== baseline[key]);
+  return FIELD_KEYS.filter(
+    (key) => NpcPersonaCard.normalizeText(draft[key]) !== NpcPersonaCard.normalizeText(baseline[key])
+  );
 }
 
 // The local validation/budget report. Every figure counts the NORMALIZED text

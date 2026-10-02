@@ -199,10 +199,10 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
       }
       if (sameNormalizedDraft(draft, fresh)) {
         // The version moved to exactly what the draft holds (typically this
-        // editor's own save whose result was lost): adopt it as saved.
+        // editor's own save whose result was lost): adopt version and baseline,
+        // keeping the user's raw draft untouched.
         baseline.value = fresh;
         version.value = data.persona_version;
-        Object.assign(draft, fresh);
         conflict.value = null;
         announce(`連線已恢復，人物設定目前為第 ${data.persona_version} 版。`);
         return;
@@ -420,7 +420,7 @@ export function useNpcPersonaEditor(store, { shellRef = null } = {}) {
   // ------------------------------------------------------------- derived
 
   const validation = computed(() => validateDraft(draft));
-  const dirty = computed(() => baseline.value !== null && !sameDraft(draft, baseline.value));
+  const dirty = computed(() => baseline.value !== null && !sameNormalizedDraft(draft, baseline.value));
   const dirtyFields = computed(() => changedFields(draft, baseline.value));
 
   const unavailableReason = computed(() => {
