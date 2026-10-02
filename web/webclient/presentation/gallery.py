@@ -201,8 +201,10 @@ def validate_gallery(payload):
         except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire rectangle rejection is returned to the caller
             raise ProtocolValidationError("invalid face_rect") from exc
         slot_chips = [label for label in SLOT_LABELS.values() if label in chips]
-        face_chip = "預設臉框" if row["face_rect"] == gallery_api.DEFAULT_FACE_RECT else "自訂臉框"
-        expected = slot_chips + [face_chip] + (["目前預設"] if row["is_default"] else [])
+        face_chips = [c for c in chips if c in ("預設臉框", "自訂臉框")]
+        if len(face_chips) != 1:
+            raise ProtocolValidationError("exactly one face chip required")
+        expected = slot_chips + face_chips + (["目前預設"] if row["is_default"] else [])
         if chips != expected or bool(slot_chips) != row["binding_present"]:
             raise ProtocolValidationError("incoherent chips")
         if row["binding_present"] and not capability["supports_bindings"] or fields and not capability["supports_field_selection"]:
@@ -345,7 +347,7 @@ def gallery_presenter(context: PresentationContext):
         seen.add(card["image_id"])
         binding = card["binding"] if capability.supports_bindings else None
         chips = [SLOT_LABELS[slot] for slot in SLOTS if binding and slot in binding["mask"]]
-        chips.append("預設臉框" if card["face_rect"] == gallery_api.DEFAULT_FACE_RECT else "自訂臉框")
+        chips.append("預設臉框" if card["face_rect"] == gallery_api.default_face_rect(card["image_size"]) else "自訂臉框")
         is_default = card["image_id"] == default
         if is_default:
             chips.append("目前預設")

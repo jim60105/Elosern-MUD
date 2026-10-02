@@ -27,6 +27,7 @@ from world.art.fallback_keys import (
     validate_fallback_key,
 )
 from world.art.gallery_fallback import fallback_key_for, resolve_fallback
+from world.art.gallery_fallback import FALLBACK_FACE_RECTS
 from world.art.gallery_match import fallback_for
 from world.art.presenter import resolve_subject
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -141,6 +142,22 @@ class ClosedVocabularyContractTests(unittest.TestCase):
                         if mask == 255
                     ]
                     self.assertGreaterEqual(sum(core) / len(core), 250)
+
+    @covers_requirement("art-gallery-fallback::the-built-in-fallback-images-carry-a-transparent-background")
+    def test_fallback_face_rects_are_pixel_square_on_committed_files(self):
+        for key, rect in FALLBACK_FACE_RECTS.items():
+            path = DEFAULTS_DIR / f"{key}{FALLBACK_EXTENSION}"
+            with self.subTest(key=key):
+                with Image.open(path) as image:
+                    width, height = image.size
+                pixel_w = rect["w"] * width
+                pixel_h = rect["h"] * height
+                self.assertLessEqual(
+                    abs(pixel_w - pixel_h),
+                    1.0,
+                    f"FALLBACK_FACE_RECTS[{key!r}] is not pixel-square: "
+                    f"{pixel_w:.2f}px != {pixel_h:.2f}px (size={width}x{height})",
+                )
 
     @covers_requirement("art-gallery-fallback::the-built-in-fallback-set-is-a-closed-vocabulary-committed-to-the-repository")
     def test_every_key_has_exactly_one_committed_file_within_the_bound(self):

@@ -69,13 +69,13 @@ _AGE_BANDS: dict[str, dict[str, object]] = {
 # from the alpha silhouette of the current 864x1536 defaults. A key
 # without its own entry falls back to the shared ``DEFAULT_FACE_RECT``.
 FALLBACK_FACE_RECTS: dict[str, dict[str, float]] = {
-    "man": {"x": 0.37, "y": 0.02, "w": 0.26, "h": 0.16},
-    "woman": {"x": 0.36, "y": 0.03, "w": 0.28, "h": 0.16},
-    "boy": {"x": 0.35, "y": 0.03, "w": 0.30, "h": 0.17},
-    "girl": {"x": 0.36, "y": 0.02, "w": 0.28, "h": 0.16},
-    "elder": {"x": 0.36, "y": 0.03, "w": 0.28, "h": 0.16},
+    "man": {"x": 0.3576, "y": 0.02, "w": 0.2847, "h": 0.16},
+    "woman": {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16},
+    "boy": {"x": 0.3490, "y": 0.03, "w": 0.3021, "h": 0.17},
+    "girl": {"x": 0.3576, "y": 0.02, "w": 0.2847, "h": 0.16},
+    "elder": {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16},
     # The hooded void: the rect frames the hood opening, not a face.
-    "monster_anon": {"x": 0.36, "y": 0.02, "w": 0.28, "h": 0.18},
+    "monster_anon": {"x": 0.3403, "y": 0.02, "w": 0.3194, "h": 0.18},
 }
 
 # Entity-carried provenance attribute names written by the spawning/activation
