@@ -356,6 +356,17 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "no_target")
 
 
+    @covers_requirement("webclient-exploration-menu::interaction-publication-and-shared-local-target-resolution-use-visible-candidates")
+    def test_look_at_hidden_target_is_rejected_as_no_target(self):
+        target = create_object(NPC, key="路人", location=self.room1)
+        target.locks.add("view:false()")
+        with patch.object(self.player, "msg") as msg:
+            result = _look_adapter(self.player, {"target_id": int(target.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_target")
+        self.assertEqual(result["message"], "這裡沒有這個對象。")
+        msg.assert_not_called()
+
     def test_look_appearance_failure_is_rejected_without_prose(self):
         target = create_object(NPC, key="路人", location=self.room1)
         with patch.object(self.player, "at_look", side_effect=RuntimeError("boom")):

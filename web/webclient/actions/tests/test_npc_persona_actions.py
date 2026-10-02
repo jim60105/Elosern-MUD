@@ -109,6 +109,16 @@ class _NpcPersonaActionsFixture:
         results = [call for call in session.sent if "ui_action_result" in call]
         return results[-1]["ui_action_result"][0][0]
 
+    def _update(self, session, coordinator, version, card=None, greeting=None, request_id="g-up"):
+        payload = {
+            "npc_id": self.npc.id,
+            "expected_persona_version": version,
+            "persona": card or _valid_card_dict(),
+        }
+        if greeting is not None:
+            payload["offline_greeting"] = greeting
+        return self._dispatch(session, coordinator, "npc.persona.update", payload, request_id=request_id)
+
 
 class NpcPersonaActionsAdmissionAndMutationTest(_NpcPersonaActionsFixture, EvenniaTest):
     """Tests for admission, reads, updates, and deduplication of NPC persona actions."""
@@ -482,16 +492,6 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         self._registry_patch.start()
         self.addCleanup(self._registry_patch.stop)
 
-    def _update(self, session, coordinator, version, card=None, greeting=None, request_id="g-up"):
-        payload = {
-            "npc_id": self.npc.id,
-            "expected_persona_version": version,
-            "persona": card or _valid_card_dict(),
-        }
-        if greeting is not None:
-            payload["offline_greeting"] = greeting
-        return self._dispatch(session, coordinator, "npc.persona.update", payload, request_id=request_id)
-
     @covers_requirement("npc-persona-editor::npc-persona-read-returns-a-private-editor-snapshot-with-the-offline-greeting")
     def test_read_returns_exactly_seven_keys_with_field_and_profile_default(self):
         self.npc.db.npc_offline_greeting = "自訂開場白。"
@@ -599,3 +599,102 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         self._update(session, coordinator, 1, greeting="「只對愛麗絲。」")
         self.assertEqual(read_npc_persona(npc2).version, 1)
         self.assertFalse(npc2.attributes.has("npc_offline_greeting"))
+
+
+class NpcPersonaVisibilityAdmissionTest(_NpcPersonaActionsFixture, EvenniaTest):
+    """Visibility revalidation on read and update (npc-persona-visible-targets)."""
+
+    CODE_NO_TARGET = "npc_persona.no_target"
+
+    @covers_requirement("npc-persona-editor::persona-target-admission-revalidates-current-room-visibility")
+    def test_view_denied_npc_cannot_expose_card_or_accept_update(self):
+        self.npc.locks.add("view:false();search:true()")
+        session, coordinator = self._session_and_coordinator()
+
+        # Read rejected as no_target without card or data
+        res_read = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id}, request_id="v-read-1")
+        self.assertEqual(res_read["outcome"], "rejected")
+        self.assertEqual(res_read["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_read)
+
+        # Update rejected as no_target without persisting
+        card = _valid_card_dict()
+        card["habit"] = "新習慣。"
+        res_up = self._update(session, coordinator, 1, card=card, request_id="v-up-1")
+        self.assertEqual(res_up["outcome"], "rejected")
+        self.assertEqual(res_up["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_up)
+        self.assertEqual(read_npc_persona(self.npc).version, 1)
+        self.assertEqual(read_npc_persona(self.npc).card.habit, _valid_card_dict()["habit"])
+
+    @covers_requirement("npc-persona-editor::persona-target-admission-revalidates-current-room-visibility")
+    def test_search_denied_npc_cannot_expose_card_or_accept_update(self):
+        self.npc.locks.add("view:true();search:false()")
+        session, coordinator = self._session_and_coordinator()
+
+        res_read = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id}, request_id="s-read-1")
+        self.assertEqual(res_read["outcome"], "rejected")
+        self.assertEqual(res_read["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_read)
+
+        card = _valid_card_dict()
+        card["habit"] = "新習慣。"
+        res_up = self._update(session, coordinator, 1, card=card, request_id="s-up-1")
+        self.assertEqual(res_up["outcome"], "rejected")
+        self.assertEqual(res_up["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_up)
+        self.assertEqual(read_npc_persona(self.npc).version, 1)
+
+    @covers_requirement("npc-persona-editor::persona-target-admission-revalidates-current-room-visibility")
+    def test_visibility_lost_after_opening_invalidates_save(self):
+        session, coordinator = self._session_and_coordinator()
+
+        # Successfully read while visible
+        res_read = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id}, request_id="loss-read")
+        self.assertEqual(res_read["outcome"], "success")
+        self.assertIn("data", res_read)
+
+        # Deny view access before update
+        self.npc.locks.add("view:false()")
+        card = _valid_card_dict()
+        card["appearance"] = "新的外貌描述。"
+        res_up = self._update(session, coordinator, 1, card=card, greeting="「新開場白。」", request_id="loss-up-view")
+        self.assertEqual(res_up["outcome"], "rejected")
+        self.assertEqual(res_up["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_up)
+        self.assertEqual(read_npc_persona(self.npc).version, 1)
+        self.assertEqual(read_npc_persona(self.npc).card.appearance, _valid_card_dict()["appearance"])
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+        # Restore view, test search loss after opening
+        self.npc.locks.add("view:true();search:false()")
+        res_up_search = self._update(session, coordinator, 1, card=card, greeting="「新開場白。」", request_id="loss-up-search")
+        self.assertEqual(res_up_search["outcome"], "rejected")
+        self.assertEqual(res_up_search["code"], self.CODE_NO_TARGET)
+        self.assertNotIn("data", res_up_search)
+        self.assertEqual(read_npc_persona(self.npc).version, 1)
+        self.assertEqual(read_npc_persona(self.npc).card.appearance, _valid_card_dict()["appearance"])
+        self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
+
+    @covers_requirement("npc-persona-editor::persona-target-admission-revalidates-current-room-visibility")
+    def test_visible_sleeping_npc_remains_author_editable(self):
+        # Explicitly ensure permissive search (no search lock) and ordinary view
+        self.npc.locks.add("view:true()")
+        if "search" in self.npc.locks.locks:
+            del self.npc.locks.locks["search"]
+
+        # Sleeping/busy schedule blocks talking via schedule_state
+        self.npc.db.schedule_state = "resting"
+
+        session, coordinator = self._session_and_coordinator()
+        res_read = self._dispatch(session, coordinator, "npc.persona.read", {"npc_id": self.npc.id}, request_id="sleep-read")
+        self.assertEqual(res_read["outcome"], "success")
+        self.assertEqual(res_read["data"]["persona_version"], 1)
+
+        card = _valid_card_dict()
+        card["habit"] = "夢遊中擦桌子。"
+        res_up = self._update(session, coordinator, 1, card=card, greeting="「呼嚕嚕……」", request_id="sleep-up")
+        self.assertEqual(res_up["outcome"], "success")
+        self.assertEqual(res_up["data"]["persona_version"], 2)
+        self.assertEqual(res_up["data"]["persona"]["habit"], "夢遊中擦桌子。")
+        self.assertEqual(read_npc_persona(self.npc).version, 2)

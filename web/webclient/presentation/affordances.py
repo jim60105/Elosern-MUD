@@ -247,12 +247,18 @@ def _traversable(exit_obj: Any, actor: Any) -> bool:
 
 
 def _resolve_single_host(actor: Any, component_class: type) -> Any | None:
-    from world.rules.guild import GuildServiceError, resolve_local_service_host
-
-    try:
-        return resolve_local_service_host(actor, component_class)
-    except GuildServiceError:  # observability: ignore R2: "no/ambiguous local host" is the ordinary no-navigation-entry branch of every room scan, not an operational failure
+    location = getattr(actor, "location", None)
+    if location is None:
         return None
+    matches = [
+        obj
+        for obj in location.filter_visible([o for o in location.contents if getattr(o, "components", None) is not None and o.components.has(component_class.name)], actor)
+        if getattr(obj, "components", None) is not None
+        and obj.components.has(component_class.name)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
 
 
 def _present_npc(actor: Any, npc_id: int) -> Any | None:
@@ -262,9 +268,9 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
     location = getattr(actor, "location", None)
     if location is None:
         return None
-    for obj in location.contents:
-        if isinstance(obj, NPC) and int(obj.pk) == npc_id:
-            return obj
+    candidates = [obj for obj in location.contents if isinstance(obj, NPC) and int(obj.pk) == npc_id]
+    for obj in location.filter_visible(candidates, actor):
+        return obj
     return None
 
 
@@ -708,11 +714,13 @@ def _target_entries(actor: Any) -> list[AffordanceView]:
         return []
     guild_host = _resolve_single_host(actor, GuildStaff)
     shop_host = _resolve_single_host(actor, Merchant)
-    present = [
+    candidates = [
         obj
         for obj in location.contents
         if obj is not actor and isinstance(obj, (NPC, Monster))
     ]
+    visible = location.filter_visible(candidates, actor)
+    present = list(visible)
     present.sort(key=lambda obj: (int(obj.pk),))
     entries: list[AffordanceView] = []
     for obj in present[:MAX_INTERACT_TARGETS]:

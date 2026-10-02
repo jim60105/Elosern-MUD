@@ -68,6 +68,113 @@ class NpcPersonaEditorEdgesBrowserTest(ManagedServerTearDownMixin, BrowserAccept
         )
 
     @covers_requirement(
+        "npc-persona-editor::persona-target-admission-revalidates-current-room-visibility"
+    )
+    def test_visibility_denial_and_restore_protects_draft(self):
+        """Hiding the bound NPC via lock denies save and hides target; restoring access enables save."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        npc_id = self._open(page)
+
+        speech = page.get_by_test_id("npc-persona-field-speech_style")
+        speech.fill("觀察可見性草稿")
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_dirty")
+        expect(page.get_by_test_id("npc-persona-editor-save")).to_be_enabled()
+
+        # Admin page to lock view on the NPC
+        from .browser_helpers import login_and_open
+        admin_page = self.new_page()
+        login_and_open(admin_page, self.webclient_url, self.base_url, account="admin_dummy", password="AdminDummyPassword!2026")
+
+        # 1. Deny view
+        admin_page.evaluate(
+            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:false()`], {})",
+            [npc_id],
+        )
+
+        # Before refresh, attempt save via dispatch bridge while view denied
+        save_res1 = page.evaluate(
+            """([npc]) => window.__elosernBridge.dispatch('npc.persona.update', {
+                npc_id: npc,
+                expected_persona_version: 1,
+                persona: { identity: { public: '接待員', hidden: '' }, appearance: '外貌', personality: '性格', speech_style: '觀察可見性草稿', life_story: '經歷', habit: '習慣', social_connection: '' }
+            })""",
+            [npc_id],
+        )
+        self.assertEqual(save_res1.get("outcome"), "rejected")
+        self.assertEqual(save_res1.get("code"), "npc_persona.no_target")
+        page.evaluate("Evennia.msg('text', ['look'], {})")
+
+        # Target disappears from exploration interact list and editor flips to unavailable
+        wait_for_store_state(
+            page,
+            lambda s: not any(
+                t.get("identity") == npc_id
+                for t in ((s.get("panels") or {}).get("exploration") or {}).get("interact", [])
+            ),
+        )
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "unavailable")
+        expect(page.get_by_test_id("npc-persona-editor-save")).to_be_disabled()
+        expect(speech).to_have_value("觀察可見性草稿")
+
+        # 2. Deny search (view true, search false)
+        admin_page.evaluate(
+            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:all();search:false()`], {})",
+            [npc_id],
+        )
+
+        save_res2 = page.evaluate(
+            """([npc]) => window.__elosernBridge.dispatch('npc.persona.update', {
+                npc_id: npc,
+                expected_persona_version: 1,
+                persona: { identity: { public: '接待員', hidden: '' }, appearance: '外貌', personality: '性格', speech_style: '觀察可見性草稿', life_story: '經歷', habit: '習慣', social_connection: '' }
+            })""",
+            [npc_id],
+        )
+        self.assertEqual(save_res2.get("outcome"), "rejected")
+        self.assertEqual(save_res2.get("code"), "npc_persona.no_target")
+        page.evaluate("Evennia.msg('text', ['look'], {})")
+
+        wait_for_store_state(
+            page,
+            lambda s: not any(
+                t.get("identity") == npc_id
+                for t in ((s.get("panels") or {}).get("exploration") or {}).get("interact", [])
+            ),
+        )
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "unavailable")
+        expect(page.get_by_test_id("npc-persona-editor-save")).to_be_disabled()
+        expect(speech).to_have_value("觀察可見性草稿")
+
+        # 3. Restore visibility and set sleeping/resting schedule
+        admin_page.evaluate(
+            "([npc]) => Evennia.msg('text', [`@lock #${npc} = view:all();search:all()`], {})",
+            [npc_id],
+        )
+        admin_page.evaluate(
+            "([npc]) => Evennia.msg('text', [`@py evennia.search_object('#${npc}')[0].db.schedule_state = 'resting'`], {})",
+            [npc_id],
+        )
+        page.evaluate("Evennia.msg('text', ['look'], {})")
+
+        # Target reappears
+        wait_for_store_state(
+            page,
+            lambda s: any(
+                t.get("identity") == npc_id
+                for t in ((s.get("panels") or {}).get("exploration") or {}).get("interact", [])
+            ),
+        )
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_dirty")
+        expect(speech).to_have_value("觀察可見性草稿")
+        expect(page.get_by_test_id("npc-persona-editor-save")).to_be_enabled()
+
+        # Save succeeds despite resting schedule
+        page.get_by_test_id("npc-persona-editor-save").click()
+        expect(page.get_by_test_id("npc-persona-editor")).to_have_attribute("data-state", "ready_clean")
+        expect(page.get_by_test_id("npc-persona-editor-version")).to_have_text("第 2 版")
+
+    @covers_requirement(
         "webclient-npc-persona-editor::editor-state-transitions-are-correlated-and-never-fabricate-outcomes"
     )
     def test_late_read_does_not_seed_different_npc(self):
