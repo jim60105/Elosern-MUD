@@ -142,6 +142,20 @@ class DialogueExchangeHelperTests(EvenniaTest):
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(_inventory(self.player), [])
 
+    @covers_requirement("scripted-dialogue::editable-offline-greeting-text-is-literal-at-every-speech-output-boundary")
+    def test_degraded_outcome_literal_speech_and_raw_settled_line(self):
+        from evennia.utils.ansi import parse_ansi, ANSI_PARSER
+        override = "|/|r顏色|n||雙管|lcget coin|lt點擊|le|luhttps://example.com|lt網址|le"
+        self.npc.db.npc_offline_greeting = override
+        client = FakeLLMClient()
+        recorded_lines = []
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch.object(self.player, "msg") as msg:
+                await_result(self.npc.at_talked_to("你好", self.player, client, settled_line=recorded_lines.append))
+        self.assertEqual(recorded_lines, [override])
+        speech = ANSI_PARSER.strip_raw_codes(parse_ansi(_msg_texts(msg)[0], mxp=True))
+        self.assertEqual(speech, f"{self.npc.key}說：{override}")
+
     @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
     def test_degraded_outcome_yields_offline_greeting_field(self):
         self.npc.db.npc_offline_greeting = "你好呀！我是旅人。"

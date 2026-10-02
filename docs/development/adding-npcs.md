@@ -29,7 +29,7 @@
 | 對話形態 | 條件 | 降級行為 |
 |---|---|---|
 | 劇本對話（`talk` 關鍵詞查表） | NPC 帶 `ScriptedDialogue` 元件，`dialogue_key` 指向 `world/lore/dialogue/` 已登錄的表 | 未知關鍵詞回覆無理解行；查得到的表永遠可用，完全離線可玩 |
-| 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `offline_greeting_for(npc)` 的離線問候語（實例欄位優先，次為劇本／Profile）或沉默 |
+| 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `resolve_greeting(npc)` 的離線問候語（實例欄位優先，次為劇本／Profile）或沉默 |
 
 匯入器預設建 `NPC`（純劇本對話／無對話）。生成對話人物必須顯式傳 `typeclass=LLMNPC`。
 

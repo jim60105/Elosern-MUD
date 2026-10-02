@@ -24,7 +24,8 @@ from world.rules.dialogue import (
     greeting_for,
     is_dialogue_host,
     misunderstood_line_for,
-    offline_greeting_for,
+    escape_evennia_greeting,
+    resolve_greeting,
     opens_dialogue,
     resolve_dialogue_component,
     run_scripted_talk,
@@ -511,13 +512,16 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
         self.npc.db.npc_offline_greeting = "自訂覆寫問候語！"
 
         with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_voice_test_02": profile}):
-            greeting = offline_greeting_for(self.npc)
-            self.assertEqual(greeting, "自訂覆寫問候語！")
+            greeting = resolve_greeting(self.npc)
+            self.assertIsNotNone(greeting)
+            self.assertEqual(greeting.text, "自訂覆寫問候語！")
+            self.assertTrue(greeting.is_override)
 
             # Clear field -> falls back to table greeting
             self.npc.db.npc_offline_greeting = ""
-            table_greeting = offline_greeting_for(self.npc)
-            self.assertEqual(table_greeting, greeting_for(self.npc))
+            table_greeting = resolve_greeting(self.npc)
+            self.assertEqual(table_greeting.text, greeting_for(self.npc))
+            self.assertFalse(table_greeting.is_override)
 
     @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
     def test_profile_greeting_when_no_table_and_field_empty(self):
@@ -547,7 +551,10 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
             "provenance": {"kind": "profile", "profile": "t_voice_test_03"},
         }
         with patch("world.lore.npc_profiles.NPC_PROFILE_REGISTRY", {"t_voice_test_03": profile}):
-            self.assertEqual(offline_greeting_for(self.npc), "來自Profile的問候。")
+            greeting = resolve_greeting(self.npc)
+            self.assertIsNotNone(greeting)
+            self.assertEqual(greeting.text, "來自Profile的問候。")
+            self.assertFalse(greeting.is_override)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_talk_command_no_keyword_speaks_offline_greeting_field_even_without_dialogue_component(self):
@@ -563,6 +570,69 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
         plain_npc.db.npc_offline_greeting = ""
         output = self.call(CmdsTalk(), plain_npc.key, caller=self.char1)
         self.assertIn("對方沒有理會你", output)
+
+    @covers_requirement("scripted-dialogue::editable-offline-greeting-text-is-literal-at-every-speech-output-boundary")
+    def test_markup_like_override_displays_as_literal_speech(self):
+        from unittest.mock import patch
+        from evennia.utils.ansi import parse_ansi
+        from evennia.utils.ansi import ANSI_PARSER
+        from commands.talk import CmdsTalk
+
+        # Synthetic override with |/, |r, repeated pipes, MXP command link and MXP URL link
+        override = "|/|r紅字|n||雙管|lcget coin|lt點擊|le|luhttps://example.com|lt網址|le"
+        self.npc.db.npc_offline_greeting = override
+
+        # 1. CmdsTalk (scripted host)
+        host = create_object(NPC, key="腳本NPC", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+        host.db.npc_offline_greeting = override
+        out_host = self.call(CmdsTalk(), host.key, caller=self.char1, noansi=True)
+        self.assertIn(f"{host.key}說：{override}", ANSI_PARSER.strip_raw_codes(out_host))
+
+        # 2. CmdsTalk (componentless NPC)
+        plain = create_object(NPC, key="普通NPC2", location=self.room1)
+        plain.db.npc_offline_greeting = override
+        out_plain = self.call(CmdsTalk(), plain.key, caller=self.char1, noansi=True)
+        self.assertEqual(ANSI_PARSER.strip_raw_codes(out_plain), f"{plain.key}說：{override}")
+
+        # Raw storage remains untouched
+        self.assertEqual(host.db.npc_offline_greeting, override)
+        self.assertEqual(self.npc.db.npc_offline_greeting, override)
+        self.assertEqual(plain.db.npc_offline_greeting, override)
+
+        # 3. Matching default text stays literal when it is an override, restoring on clear
+        default_text = greeting_for(host)
+        host.db.npc_offline_greeting = default_text
+        resolved = resolve_greeting(host)
+        self.assertTrue(resolved.is_override)
+        self.assertEqual(resolved.text, default_text)
+
+        host.db.npc_offline_greeting = ""
+        restored = resolve_greeting(host)
+        self.assertFalse(restored.is_override)
+        self.assertEqual(restored.text, default_text)
+
+    @covers_requirement("scripted-dialogue::editable-offline-greeting-text-is-literal-at-every-speech-output-boundary")
+    def test_talk_open_preserves_raw_session_and_literal_speech(self):
+        from unittest.mock import patch
+        from evennia.utils.ansi import parse_ansi
+        from evennia.utils.ansi import ANSI_PARSER
+        from web.webclient.actions.exploration_actions import _talk_open_adapter
+
+        override = "|/|r顏色|n||雙管|lcget coin|lt點擊|le|luhttps://example.com|lt網址|le"
+        host = create_object(NPC, key="交談NPC", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+        host.db.npc_offline_greeting = override
+
+        with patch.object(self.char1, "msg") as mock_msg:
+            res = _talk_open_adapter(self.char1, {"npc_id": int(host.pk)})
+        self.assertEqual(res["outcome"], "success")
+        # Session holds raw line
+        self.assertEqual(self.char1.db.dialogue_session["line"], override)
+        # Speech in actor.msg / action message is escaped and parses literally
+        sent_msg = mock_msg.call_args[0][0]
+        parsed = parse_ansi(sent_msg, mxp=True)
+        self.assertEqual(ANSI_PARSER.strip_raw_codes(parsed), f"{host.key}說：{override}")
 
 
 class DialogueTableImmutabilityTests(unittest.TestCase):

@@ -531,7 +531,7 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
 
     @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_greeting_only_save_advances_once_and_clearing_restores_the_default(self):
-        from world.rules.dialogue import offline_greeting_for
+        from world.rules.dialogue import resolve_greeting
 
         session, coordinator = self._session_and_coordinator()
         res = self._update(session, coordinator, 1, greeting="  「今天也辛苦了。」\r\n", request_id="g-1")
@@ -539,7 +539,8 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         self.assertEqual(res["code"], "updated")
         self.assertEqual(res["data"]["persona_version"], 2)
         self.assertEqual(res["data"]["offline_greeting"], "「今天也辛苦了。」")
-        self.assertEqual(offline_greeting_for(self.npc), "「今天也辛苦了。」")
+        self.assertEqual(resolve_greeting(self.npc).text, "「今天也辛苦了。」")
+        self.assertTrue(resolve_greeting(self.npc).is_override)
         self.assertEqual(read_npc_persona(self.npc).card.to_record(), normalize_card(_valid_card_dict()).to_record())
 
         # The identical card and greeting is a no-op at the same version.
@@ -553,7 +554,8 @@ class NpcPersonaOfflineGreetingActionsTest(_NpcPersonaActionsFixture, EvenniaTes
         self.assertEqual(cleared["data"]["offline_greeting"], "")
         self.assertEqual(cleared["data"]["default_greeting"], "「歡迎來到公會。」")
         self.assertFalse(self.npc.attributes.has("npc_offline_greeting"))
-        self.assertEqual(offline_greeting_for(self.npc), "「歡迎來到公會。」")
+        self.assertEqual(resolve_greeting(self.npc).text, "「歡迎來到公會。」")
+        self.assertFalse(resolve_greeting(self.npc).is_override)
 
     @covers_requirement("npc-persona-editor::npc-persona-update-replaces-the-card-and-offline-greeting-under-a-version-check")
     def test_card_and_greeting_change_together_advances_once(self):
