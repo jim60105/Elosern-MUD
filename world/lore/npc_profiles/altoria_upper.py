@@ -56,6 +56,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "中殿對一次帳。"
             ),
         ),
+        age=40,
+        apparent_age=40,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「旅人，這句話我沒有聽明白。請再說一次，我在這裡聽著。」"
@@ -100,6 +102,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "櫃上都有人問。"
             ),
         ),
+        age=35,
+        apparent_age=35,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯？這我沒聽懂呢。你是想挑櫃上的東西，還是想問聖所的事？」"
@@ -116,7 +120,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 ),
             ),
             appearance=(
-                "四十出頭的人類男性，身形瘦高，黑髮梳得服貼，鷹鉤鼻上架著一副"
+                "四十歲上下的人類男性，身形瘦高，黑髮梳得服貼，鷹鉤鼻上架著一副"
                 "細框眼鏡。穿著擦得發亮的胸甲與深紅色衛隊披風，腰間佩劍，手上"
                 "總拿著巡邏用的登記板。"
             ),
@@ -143,6 +147,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "治安上的消息。"
             ),
         ),
+        age=40,
+        apparent_age=40,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「抱歉，訪客，這句我沒有聽明白。請再說一次。」"
@@ -160,7 +166,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 ),
             ),
             appearance=(
-                "五十多歲的人類男性，身材敦實，皮膚曬得黝黑，花白短髮，右耳缺了"
+                "四十後半的人類男性，身材敦實，皮膚曬得黝黑，花白短髮，右耳缺了"
                 "一角。穿著褪色的軍用短外套和沾滿泥的長靴，手裡常握著一根磨得"
                 "發亮的木棍。"
             ),
@@ -187,6 +193,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "他們。"
             ),
         ),
+        age=48,
+        apparent_age=48,
         voice=NpcVoiceLines(
             misunderstood="「啥？聽不懂啦。你來這裡是要練，還是要聊天？」",
         ),
@@ -215,8 +223,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "換個說法再講一次。"
             ),
             life_story=(
-                "出身王國西部一戶磨坊人家，少年時考進學院，研究元素理論四十年，"
-                "寫過幾本入門課本。前任院長退休後由他接任，至今十五年。"
+                "出身王國西部一戶磨坊人家，少年時考進學院，四十年的研究生涯裡"
+                "寫過幾本入門課本，後十五年則作為院長主持學院事務至今。"
             ),
             habit=(
                 "每天下午在示範坪親手點亮一顆照明的光球，說是替學生暖場。書庫的"
@@ -226,6 +234,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "學院與帝國的皇家魔法學院常交換研究稿，他和那邊幾位教授通信多年。"
             ),
         ),
+        age=65,
+        apparent_age=65,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「這個問題我沒有聽明白。能否換個說法，再問一次？」"

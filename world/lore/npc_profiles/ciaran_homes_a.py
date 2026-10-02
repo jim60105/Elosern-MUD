@@ -55,6 +55,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "帶著孩子來聽。"
             ),
         ),
+        age=980,
+        apparent_age=42,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯……這句我沒聽懂呢，小傢伙。不急，再說一次，我這裡有的是時間。」"
@@ -100,6 +102,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "耳上的月牙耳環出自同一批。"
             ),
         ),
+        age=420,
+        apparent_age=23,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「欸？我沒聽懂耶。你是想看飾品，還是有東西要修？」"
@@ -142,6 +146,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "找她來看。"
             ),
         ),
+        age=480,
+        apparent_age=30,
         voice=NpcVoiceLines(
             misunderstood="「嗯？沒聽懂。你想說刀的事，還是別的？」",
         ),
@@ -184,6 +190,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "到古樹下。"
             ),
         ),
+        age=390,
+        apparent_age=26,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯……我沒聽懂呢。先喝口茶，再說一次吧？」"

@@ -244,6 +244,25 @@ def _key_taken_by_other(entity: Any) -> bool:
 def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
     profile = _profile_for(target_rank)
     rank = _rank_row(target_rank)
+    examiner_profile = None
+    prof_age = None
+    prof_app_age = None
+    if rank.examiner_profile_key:
+        if rank.examiner_profile_key not in NPC_PROFILE_REGISTRY:
+            raise ValueError(
+                f"rank {target_rank!r} examiner profile {rank.examiner_profile_key!r} "
+                "is absent from the NPC profile registry"
+            )
+        examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
+        for field_name in ("age", "apparent_age"):
+            val = getattr(examiner_profile, field_name, None)
+            if type(val) is not int or not (0 <= val <= 10000):
+                raise ValueError(
+                    f"examiner profile {rank.examiner_profile_key!r} has invalid "
+                    f"{field_name} {val!r}; must be an integer in 0..10000"
+                )
+        prof_age = examiner_profile.age
+        prof_app_age = examiner_profile.apparent_age
     # Authored examiner identity is the key (npc-title-authored-identities D8);
     # the -{pk} disambiguator is applied only when another entity already
     # holds the name (audit finding F08 roster-keying stays intact).
@@ -268,9 +287,8 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         )
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
         opponent.npc_title = validate_npc_title(rank.examiner_title)
-        ensure_npc_canonical_age(opponent)
-        if rank.examiner_profile_key:
-            examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
+        ensure_npc_canonical_age(opponent, age=prof_age, apparent_age=prof_app_age)
+        if examiner_profile is not None:
             initialize_npc_persona(
                 opponent,
                 examiner_profile.card.to_record(),

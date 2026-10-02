@@ -56,11 +56,15 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         "t_host_prof": NpcProfile(
             key="t_host_prof",
             card=valid_card,
+            age=40,
+            apparent_age=40,
             voice=NpcVoiceLines(greeting=None, misunderstood="「我聽不懂你在說什麼。」"),
         ),
         "t_examiner_prof": NpcProfile(
             key="t_examiner_prof",
             card=examiner_card,
+            age=35,
+            apparent_age=35,
             voice=NpcVoiceLines(greeting=None, misunderstood=None),
         ),
     }
@@ -496,6 +500,8 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self.synth["profile_registry"]["t_orphan_prof"] = NpcProfile(
             key="t_orphan_prof",
             card=self.synth["profile_registry"]["t_host_prof"].card,
+            age=30,
+            apparent_age=30,
             voice=NpcVoiceLines(greeting=None, misunderstood=None),
         )
 

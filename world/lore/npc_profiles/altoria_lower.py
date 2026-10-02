@@ -55,6 +55,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "留一鍋湯。碼頭埠的駁船船工是他最早的一批熟客。"
             ),
         ),
+        age=52,
+        apparent_age=52,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「咦？這我聽不太懂耶，客人。我腦子裡大多是鍋子裡的事啦，換個"
@@ -104,6 +106,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "同一道火塘牆。南大道餐館的西格瑪·庫柏常替她晚到的客人留湯。"
             ),
         ),
+        age=36,
+        apparent_age=36,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯？這我聽不懂。換個問法吧，新面孔，你到底想打聽什麼？」"
@@ -151,6 +155,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "火塘牆。浴場的伊莎貝爾·葦沼會替她的客人多留幾條乾淨布巾。"
             ),
         ),
+        age=59,
+        apparent_age=59,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「哎呀，孩子，這個我不太懂。要問房間、睡覺，還是浴場怎麼走，"
@@ -198,6 +204,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "她也會替溫弗蕾德的客人多留幾條乾淨布巾。"
             ),
         ),
+        age=44,
+        apparent_age=44,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「啊？水聲太大聽不到啦！浴場的事儘管問，大聲點再說一次！」"
@@ -246,6 +254,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "兩人會互通治安上的消息。"
             ),
         ),
+        age=45,
+        apparent_age=45,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「這件事不歸駐所處理。城裡的路、治安，或是找地方過夜，這些我"

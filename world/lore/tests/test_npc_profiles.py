@@ -79,30 +79,66 @@ class NpcProfileTests(unittest.TestCase):
         "npc-profile-registry::authored-npc-profiles-are-immutable-keyed-lore-records"
     )
     def test_valid_lowercase_snake_key_passes(self):
-        profile = NpcProfile(key="t_valid_snake_123", card=_card())
+        profile = NpcProfile(key="t_valid_snake_123", card=_card(), age=20, apparent_age=20)
         self.assertEqual(profile.key, "t_valid_snake_123")
 
     def test_uppercase_key_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
-            NpcProfile(key="T_bad", card=_card())
+            NpcProfile(key="T_bad", card=_card(), age=20, apparent_age=20)
         self.assertIn("T_bad", str(caught.exception))
 
     def test_leading_digit_key_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
-            NpcProfile(key="1bad", card=_card())
+            NpcProfile(key="1bad", card=_card(), age=20, apparent_age=20)
         self.assertIn("1bad", str(caught.exception))
 
     def test_65_char_key_is_rejected(self):
         overlong = "t_" + ("a" * 63)
         self.assertEqual(len(overlong), 65)
         with self.assertRaises(ValueError) as caught:
-            NpcProfile(key=overlong, card=_card())
+            NpcProfile(key=overlong, card=_card(), age=20, apparent_age=20)
         self.assertIn(overlong, str(caught.exception))
 
     def test_non_npccard_card_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
-            NpcProfile(key="t_sample", card={"identity": {"public": "x", "hidden": ""}})
+            NpcProfile(key="t_sample", card={"identity": {"public": "x", "hidden": ""}}, age=20, apparent_age=20)
         self.assertIn("t_sample", str(caught.exception))
+
+    @covers_requirement(
+        "npc-profile-registry::every-shipped-host-and-examiner-profile-authors-a-bounded-age-pair"
+    )
+    def test_age_bounds_validation(self):
+        # 0 and 10000 are valid bounds
+        p_min = NpcProfile(key="t_min_age", card=_card(), age=0, apparent_age=0)
+        self.assertEqual(p_min.age, 0)
+        p_max = NpcProfile(key="t_max_age", card=_card(), age=10000, apparent_age=10000)
+        self.assertEqual(p_max.age, 10000)
+
+        # Booleans rejected
+        for bad_val in (True, False):
+            with self.subTest(bad_val=bad_val):
+                with self.assertRaises(ValueError) as caught:
+                    NpcProfile(key="t_bool_age", card=_card(), age=bad_val, apparent_age=20)
+                self.assertIn("t_bool_age", str(caught.exception))
+                self.assertIn("age", str(caught.exception))
+
+                with self.assertRaises(ValueError) as caught:
+                    NpcProfile(key="t_bool_app_age", card=_card(), age=20, apparent_age=bad_val)
+                self.assertIn("t_bool_app_age", str(caught.exception))
+                self.assertIn("apparent_age", str(caught.exception))
+
+        # Out of bounds (-1, 10001) rejected
+        for bad_val in (-1, 10001):
+            with self.subTest(bad_val=bad_val):
+                with self.assertRaises(ValueError) as caught:
+                    NpcProfile(key="t_oob_age", card=_card(), age=bad_val, apparent_age=20)
+                self.assertIn("t_oob_age", str(caught.exception))
+                self.assertIn("age", str(caught.exception))
+
+                with self.assertRaises(ValueError) as caught:
+                    NpcProfile(key="t_oob_app_age", card=_card(), age=20, apparent_age=bad_val)
+                self.assertIn("t_oob_app_age", str(caught.exception))
+                self.assertIn("apparent_age", str(caught.exception))
 
 
 class AssembleProfileRegistryTests(unittest.TestCase):
@@ -112,7 +148,7 @@ class AssembleProfileRegistryTests(unittest.TestCase):
         "npc-profile-registry::one-module-assembles-the-profile-registry-from-owned-slices"
     )
     def test_duplicate_key_across_slices_names_the_key_and_both_slices(self):
-        profile = NpcProfile(key="t_dup", card=_card())
+        profile = NpcProfile(key="t_dup", card=_card(), age=20, apparent_age=20)
         with self.assertRaises(ValueError) as caught:
             assemble_profile_registry(
                 (
@@ -131,7 +167,7 @@ class AssembleProfileRegistryTests(unittest.TestCase):
         self.assertIn("t_slice", str(caught.exception))
 
     def test_invalid_key_reaching_assembly_is_rejected(self):
-        profile = NpcProfile(key="t_placeholder", card=_card())
+        profile = NpcProfile(key="t_placeholder", card=_card(), age=20, apparent_age=20)
         object.__setattr__(profile, "key", "T_Bad")
         with self.assertRaises(ValueError) as caught:
             assemble_profile_registry((("t_slice", (profile,)),))
@@ -150,7 +186,7 @@ class AssembleProfileRegistryTests(unittest.TestCase):
             habit="t_習慣",
             social_connection="",
         )
-        profile = NpcProfile(key="t_broken", card=bad_card)
+        profile = NpcProfile(key="t_broken", card=bad_card, age=20, apparent_age=20)
         with self.assertRaises(ValueError) as caught:
             assemble_profile_registry((("t_slice", (profile,)),))
         message = str(caught.exception)
@@ -159,7 +195,7 @@ class AssembleProfileRegistryTests(unittest.TestCase):
         self.assertIn("speech_style", message)
 
     def test_valid_rows_assemble_into_a_plain_dict(self):
-        profile = NpcProfile(key="t_ok", card=_card())
+        profile = NpcProfile(key="t_ok", card=_card(), age=20, apparent_age=20)
         registry = assemble_profile_registry((("t_slice", (profile,)),))
         self.assertEqual(registry, {"t_ok": profile})
 

@@ -56,6 +56,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "是多年街坊，客人問起飾品或藥水，就直接請人過去找她們。"
             ),
         ),
+        age=44,
+        apparent_age=44,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯？聽不懂。說慢一點，要買什麼、要賣什麼，按順序講。」"
@@ -100,6 +102,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "吵嘴，不過她店裡鎖子甲的鐵環，全出自他的鐵砧。"
             ),
         ),
+        age=43,
+        apparent_age=43,
         voice=NpcVoiceLines(
             misunderstood="「……聽不懂。說兵器。」",
         ),
@@ -144,6 +148,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "卻每天下午替他留一壺茶。"
             ),
         ),
+        age=33,
+        apparent_age=33,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「呀，這句我沒聽懂耶。你是想做衣服，還是想問別的呢？再說一次"
@@ -190,6 +196,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "的客人指到她這裡。大神殿的聖職者偶爾會來訂光輝聖徽。"
             ),
         ),
+        age=28,
+        apparent_age=28,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯……這句我沒聽明白。你是想看哪件東西，還是想問點別的？」"
@@ -234,6 +242,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "市場街雜貨店的瑪爾特·金秤會把要買藥水的客人送過來，希碧拉也把要買止血藥草的人送回雜貨店，兩家這樣互相介紹了好些年。"
             ),
         ),
+        age=40,
+        apparent_age=40,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「這個我答不上來。說一下你哪裡受傷，或者打算什麼時候用。」"
@@ -279,6 +289,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "每到季底都會來公所清帳。"
             ),
         ),
+        age=56,
+        apparent_age=56,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「抱歉，本人沒有聽明白閣下的意思。能否請閣下換個說法，再說"

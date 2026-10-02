@@ -96,8 +96,10 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
             self.assertIsNone(place.host_subrace)
             self.assertEqual(host.subrace, place.host_subrace)
             self.assertEqual(host.sex, place.host_sex)
-            self.assertEqual(int(host.attributes.get("age")), 18)
-            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+        self.assertEqual(int(guild_host.attributes.get("age")), 50)
+        self.assertEqual(int(guild_host.attributes.get("apparent_age")), 50)
+        self.assertEqual(int(merchant_host.attributes.get("age")), 44)
+        self.assertEqual(int(merchant_host.attributes.get("apparent_age")), 44)
         self.assertEqual(guild_host.npc_title, _guild_row().title)
         self.assertEqual(merchant_host.npc_title, _merchant_row().title)
 
@@ -112,9 +114,10 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
     @covers_requirement("sample-city-altoria::guild-service-hosts-carry-canonical-age")
     def test_service_hosts_carry_canonical_ages(self):
         sync_service_content()
-        for host in (self._guild_host(), self._merchant_host()):
-            self.assertEqual(int(host.attributes.get("age")), 18)
-            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+        self.assertEqual(int(self._guild_host().attributes.get("age")), 50)
+        self.assertEqual(int(self._guild_host().attributes.get("apparent_age")), 50)
+        self.assertEqual(int(self._merchant_host().attributes.get("age")), 44)
+        self.assertEqual(int(self._merchant_host().attributes.get("apparent_age")), 44)
 
     @covers_requirement("sample-city-altoria::guild-service-hosts-carry-canonical-age")
     def test_resync_repairs_hosts_missing_canonical_ages(self):
@@ -123,9 +126,10 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
             host.attributes.remove("age")
             host.attributes.remove("apparent_age")
         sync_service_content()
-        for host in (self._guild_host(), self._merchant_host()):
-            self.assertEqual(int(host.attributes.get("age")), 18)
-            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+        self.assertEqual(int(self._guild_host().attributes.get("age")), 50)
+        self.assertEqual(int(self._guild_host().attributes.get("apparent_age")), 50)
+        self.assertEqual(int(self._merchant_host().attributes.get("age")), 44)
+        self.assertEqual(int(self._merchant_host().attributes.get("apparent_age")), 44)
 
     def test_merchant_stock_initializes_only_when_absent(self):
         sync_service_content()

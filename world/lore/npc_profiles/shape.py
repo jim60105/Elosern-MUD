@@ -58,7 +58,7 @@ class NpcVoiceLines:
 
 @dataclass(frozen=True)
 class NpcProfile:
-    """One immutable authored NPC profile: a stable key, a card, and voice lines.
+    """One immutable authored NPC profile: a stable key, a card, canonical ages, and voice lines.
 
     Profiles are referenced by this key, never by the card's display name.
     By convention a host profile's key equals its place's ``service_id``
@@ -70,6 +70,8 @@ class NpcProfile:
 
     key: str
     card: NpcCard
+    age: int
+    apparent_age: int
     voice: NpcVoiceLines = NpcVoiceLines()
 
     def __post_init__(self) -> None:
@@ -80,3 +82,9 @@ class NpcProfile:
             )
         if not isinstance(self.card, NpcCard):
             raise ValueError(f"NpcProfile {self.key!r} card must be an NpcCard instance")
+        for field_name in ("age", "apparent_age"):
+            val = getattr(self, field_name)
+            if type(val) is not int or not (0 <= val <= 10000):
+                raise ValueError(
+                    f"NpcProfile {self.key!r} {field_name} must be an integer in 0..10000, got {val!r}"
+                )
