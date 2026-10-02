@@ -245,6 +245,10 @@
       "reason": "monster behaviour rulebook contract"
     },
     {
+      "path": "world/rules/tests/test_npc_roster_validation.py",
+      "reason": "shipped NPC persona roster validation contract"
+    },
+    {
       "path": "world/rules/tests/test_npc_schedules.py",
       "reason": "npc schedule rulebook contract"
     },

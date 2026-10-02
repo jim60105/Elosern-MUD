@@ -22,6 +22,8 @@
 | 任務場景具現化 | `world/quests/scene_builder.py` 依 `world/lore/npc_tiers.py::NPC_TIER_REGISTRY` 的角色階級生成 | 任務階段場景人物 | `scene_npc` 原型（白名單限定） |
 | 同行夥伴 | `world/rules/starting_companions.py::build_starting_companion` | 預設卡 `starting_companions` 宣告的夥伴 | `LLMNPC`（`invite` 只收 `LLMNPC`） |
 
+四條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
+
 對話行為是另一個正交的決定：
 
 | 對話形態 | 條件 | 降級行為 |
@@ -49,6 +51,7 @@
 3. **需要劇本對話嗎？** `dialogue_key` 必須是 `world/lore/dialogue/`（`altoria_{lower,middle,upper}.py`／`ciaran.py`／`guild.py` 依領域分檔）`DIALOGUE_ROWS` 已登錄的鍵；新對話要先加表列，見 Step 3。
 4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入卡的職業藍圖只在列帶 `schedule_template` 時自動套排程（現行出貨列全為 `null`），其餘情況由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
 5. **數值來源在哪？** 設計文件與既有 rulebook。`stats` 是匯入卡路徑的字面基準值（永不預先乘技能倍率）；平衡數值由設計文件決定，卡作者不發明平衡表。
+6. **這是出貨的服務主人、考核官或同行夥伴嗎？** 服務主人與考核官必須在 `world/lore/npc_profiles/` 所屬切片登錄 `NpcProfile`，並在地點或公會位階填入引用鍵；同行夥伴則在夥伴預設卡填寫延伸欄位。所有出貨來源都必須登記於名冊清單，見 §3.1。
 
 ---
 
@@ -56,7 +59,7 @@
 
 ### Step 0 — 核對登錄鍵
 
-卡上點名的每個鍵都必須已登錄：`race`／`subrace`（`world/lore/races.py`）、`skills`／`passives`（`world/skills/registry.py`）、`inventory` 的物品鍵（`ITEM_REGISTRY`）、`profession`（`professions.yaml`）、`dialogue_key`（`DIALOGUE_ROWS`）。CLI 驗證器全部比對，未知鍵直接拒收。
+卡上點名的每個鍵都必須已登錄：`race`／`subrace`（`world/lore/races.py`）、`skills`／`passives`（`world/skills/registry.py`）、`inventory` 的物品鍵（`ITEM_REGISTRY`）、`profession`（`professions.yaml`）、`dialogue_key`（`DIALOGUE_ROWS`）、`host_profile_key`（`NPC_PROFILE_REGISTRY`）。CLI 驗證器全部比對，未知鍵直接拒收。
 
 ### Step 1 — 寫 JSON 角色卡
 
@@ -124,6 +127,26 @@ ROWS = {
 
 規則端 `world/rules/dialogue.py` 只是唯讀介面，`DIALOGUE_TABLE` 是唯讀包裝，`talk` 查不到鍵就回覆無理解行。`guild_staff` 表的 `回報` 關鍵詞是唯一例外，它經 `world/rules/guild.py` 解析可回報任務清單，屬規則行為，不要在自製表裡模仿。
 
+### Step 3.1 — 人物設定切片、名冊清單與啟動門禁
+
+出貨 NPC 的角色卡與台詞由切片管理，不散落在零星腳本：
+
+1. **設定檔切片與引用**：地點服務主人與考核官的角色卡定義在 `world/lore/npc_profiles/` 領域切片中（例如 `altoria_lower.py`、`ciaran_homes_a.py`），匯集於 `NPC_PROFILE_REGISTRY`。地點透過 `PlaceDefinition.host_profile_key` 引用；公會位階透過 `GuildRank.examiner_profile_key` 引用。系統禁止孤立設定檔，登錄於註冊表中的設定檔必須至少被一處地點或考核官引用。
+2. **語音台詞分配規則**：
+   - **劇本主人**：地點對話表的首句問候語（`greeting`）為唯一來源，設定檔內的 `voice.greeting` 保持 `None`，消除問候語雙頭維護的風險；設定檔必須填寫 `voice.misunderstood`（理解失敗回覆語）。
+   - **考核官**：純戰鬥考核對象不具備對話能力，其設定檔內的 `voice.greeting` 與 `voice.misunderstood` 皆設定為 `None`。
+   - **同行夥伴**：夥伴預設卡（`PlayerPreset`）直接提供 `speech_style` 與 `greeting`（離線問候語），夥伴實例化時將問候語寫入實例專屬的 `db.npc_offline_greeting`。
+3. **出貨名冊清單（Inventory）**：所有出貨來源（地點主人、對話表、公會考核官、同行夥伴、離線任務模板佔位者、匯入範例卡）必須登記在 `world/lore/npc_profiles/inventory.py` 的 `NPC_SOURCE_INVENTORY` 之中，並標記所屬內容切片。
+4. **伺服器啟動驗證門禁**：伺服器開機程序包含 `npc_persona_roster_validation` 步驟，置於 `STARTUP_STEP_ORDER` 中 `state_reaction_rules` 之後、`sync_all` 之前。驗證函式 `validate_npc_roster()` 比對名冊雙向一致性、檢驗所有角色卡契約、確認每張對話表皆由單一服務主人應答，並檢查語音覆蓋完整度。任一處不合規範即觸發例外中止開機，阻止寫入不完整資料。
+
+### Step 3.2 — 遊戲內編輯器與固定劇本不重產原則
+
+作者在遊戲內可透過目標互動面板的「編輯人物設定」開啟編輯視窗，檢視或修改 NPC 執行期角色卡與離線問候語覆寫值：
+
+1. **固定劇本不重產原則**：劇本對話（固定問候語、關鍵詞回應、服務說明）在創作時針對初始設定檔撰寫。在遊戲內編輯人物設定後，語言模型不會重新生成或改寫既有的劇本對話。關鍵詞回應與服務引導皆維持作者手寫原文；編輯器僅更新執行期精簡角色卡（供受護欄保護的生成對話使用）以及實例離線問候語覆寫欄位。
+2. **權限與版本控制**：編輯器透過單一交易提交更新，寫入時檢查版本序號以防並發衝突。
+3. **建造者旁路物件處理**：透過 Evennia 建造者指令建立的 NPC 因未經過正式初始化管線，未具備精簡卡，其編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
+
 ### Step 4 — 匯入
 
 在受控的內容載入程式中呼叫：
@@ -186,6 +209,7 @@ uv run --locked python -m tools.spec_traceability check
 | 元件缺作者身份 kwargs | 驗證＋載入雙閘（`ProfessionAssemblyError`） | `component <type> is missing authored identity kwargs <fields>` |
 | `anchor_room` 無房間／多房間／非 Room | 載入（交易內解析） | `ValueError` 點名記錄與 tag |
 | `dialogue_key` 未登錄（服務主人路徑） | `validate_service_hosts`（啟動載入） | `GuildConfigError` 點名地點與鍵 |
+| 出貨名冊不一致、卡片損壞、問候語漂移、孤立設定檔 | `npc_persona_roster_validation`（伺服器啟動門禁，`sync_all` 之前） | `NpcRosterError` 具名列出所有違規項目並中止啟動 |
 | 排程形狀／模板／狀態詞彙 | `set_npc_schedule`→`resolve_schedule` | 具名 `ScheduleError` 子類別，寫入前拒絕 |
 
 ---

@@ -158,6 +158,7 @@
       "labels": [
         "world.rules.tests.test_cross_lineage_unlock",
         "world.rules.tests.test_npc_persona",
+        "world.rules.tests.test_npc_roster_validation",
         "world.rules.tests.test_overwhelm_threshold",
         "world.rules.tests.test_party",
         "world.rules.tests.test_party_follow",
