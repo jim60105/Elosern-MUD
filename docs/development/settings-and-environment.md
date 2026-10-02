@@ -52,6 +52,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_MAX_IMAGE_DIMENSIONS` | `ART_SD_MAX_IMAGE_DIMENSIONS` | 整數 | `4096` | 正整數；解碼 PNG 邊長上限 |
 | `ART_SD_MAX_IMAGE_PIXELS` | `ART_SD_MAX_IMAGE_PIXELS` | 整數 | `16777216`（16 MiP） | 正整數；總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | `ART_SD_PREPIN_SAMPLES_FORMAT` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；⚠️ 會永久修改共用伺服器持久預設 |
+| `ART_SD_SERVER_RETAIN_IMAGES` | `ART_SD_SERVER_RETAIN_IMAGES` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False＝在 txt2img 請求加入 `do_not_save_samples` 與 `do_not_save_grid` 抑制 sd-webui 伺服器端輸出目錄留存樣本／圖網複本，僅影響遠端伺服器檔案，引擎本機 art-store 保存完全不受影響；此為單次請求控制，不修改伺服器持久設定 |
 | `ART_SD_OUTPUT_FORMAT` | `ART_SD_OUTPUT_FORMAT` | 選擇 | `png` | 不分大小寫限於封閉集合 `png/webp/jpeg/avif`；集合外值（如 `heic`）啟動即失敗；決定本機轉換格式與庫存檔副檔名 |
 | `ART_SD_OUTPUT_QUALITY` | `ART_SD_OUTPUT_QUALITY` | 整數 | `80` | 1 到 100 包含兩端（拒絕 0、負數、大於 100）；僅影響有損格式（webp/jpeg/avif）；png 為無損重存、完全忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`——latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |

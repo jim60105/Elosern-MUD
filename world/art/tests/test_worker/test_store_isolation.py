@@ -1,5 +1,6 @@
 """Slice of ``test_worker``: WorkerStoreIsolationTests.
 """
+import base64
 from contextlib import contextmanager
 import io
 from pathlib import Path
@@ -29,7 +30,7 @@ from world.art.queue import (
     settle,
     settle_generated,
 )
-from world.art.sd_worker import GeneratedImage, SDError
+from world.art.sd_worker import GeneratedImage, SDError, SDWebUIClient
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import (
@@ -70,6 +71,26 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         before = Image.open(io.BytesIO(DEFAULT_PNG)).convert("RGBA")
         after = Image.open(target.open("rb")).convert("RGBA")
         self.assertEqual(list(before.getdata()), list(after.getdata()))
+
+    @covers_requirement(
+        "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
+    )
+    def test_successful_generation_with_disabled_retention_persists_normally(self):
+        subject = self._subject()
+        self._record(subject)
+        captured = {}
+        def transport(request):
+            captured["request"] = request
+            return {"images": [base64.b64encode(DEFAULT_PNG).decode("ascii")]}
+        with override_settings(ART_SD_SERVER_RETAIN_IMAGES=False):
+            with self._client(SDWebUIClient(transport=transport)):
+                dispatched = drain_synchronous(10)
+        self.assertEqual(dispatched, 1)
+        self.assertIs(captured["request"]["do_not_save_samples"], True)
+        self.assertIs(captured["request"]["do_not_save_grid"], True)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertTrue((self.root / "scene" / "t_synth_forest.png").is_file())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_portrait_subject_writes_the_exact_portrait_identity(self):

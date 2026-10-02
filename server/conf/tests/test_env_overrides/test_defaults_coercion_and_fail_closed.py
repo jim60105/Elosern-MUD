@@ -78,6 +78,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
         env = {
             "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
             "ART_SD_PRESERVE_GENERATION_METADATA": "TRUE",
+            "ART_SD_SERVER_RETAIN_IMAGES": "False",
             "ART_REMBG_ENABLED": "TRUE",
             "ART_REMBG_DOWNLOAD_ENABLED": "Yes",
             "ART_TRANSLATE_ENABLED": "OFF",
@@ -91,6 +92,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             {
                 "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
                 "ART_SD_PRESERVE_GENERATION_METADATA": "True",
+                "ART_SD_SERVER_RETAIN_IMAGES": "False",
                 "ART_REMBG_ENABLED": "True",
                 "ART_REMBG_DOWNLOAD_ENABLED": "True",
                 "ART_TRANSLATE_ENABLED": "False",
@@ -112,6 +114,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             "ART_SD_CHECKPOINT",
             "ART_SCHEDULER_INTERVAL_SECONDS",
             "ELOSERN_VUE_CLIENT",
+            "ART_SD_SERVER_RETAIN_IMAGES",
         ]
         env = {ENV_BACKED[name]: "" for name in names}
         result = self._run(_settings_repr(names), **env)

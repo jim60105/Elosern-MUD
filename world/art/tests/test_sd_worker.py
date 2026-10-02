@@ -123,6 +123,33 @@ class RequestBuildingTests(unittest.TestCase):
         self.assertNotIn("scheduler", request)
         self.assertEqual(request["override_settings"], {"samples_format": "png"})
 
+    @covers_requirement(
+        "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
+    )
+    def test_default_retention_omits_suppression_fields(self):
+        request = build_txt2img_request(_scene(), "desc")
+        self.assertNotIn("do_not_save_samples", request)
+        self.assertNotIn("do_not_save_grid", request)
+        self.assertNotIn("do_not_save_samples", request["override_settings"])
+        self.assertNotIn("do_not_save_grid", request["override_settings"])
+
+    @covers_requirement(
+        "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
+    )
+    def test_disabled_retention_sets_top_level_suppression_fields(self):
+        with override_settings(ART_SD_SERVER_RETAIN_IMAGES=False):
+            request = build_txt2img_request(_scene(), "desc")
+        self.assertIs(request["do_not_save_samples"], True)
+        self.assertIs(request["do_not_save_grid"], True)
+        self.assertNotIn("do_not_save_samples", request["override_settings"])
+        self.assertNotIn("do_not_save_grid", request["override_settings"])
+        # Assert existing generation parameters remain intact
+        self.assertEqual(request["width"], 1344)
+        self.assertEqual(request["height"], 768)
+        self.assertEqual(request["steps"], 30)
+        self.assertEqual(request["override_settings"], {"samples_format": "png"})
+        self.assertIs(request["override_settings_restore_afterwards"], True)
+
     @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
     def test_prompt_pair_and_digest_are_deterministic(self):
         first = render_prompt_pair(_scene("t_synth_city"), "desc")
@@ -176,6 +203,21 @@ class GenerateValidationTests(unittest.TestCase):
         image = client.generate(_scene(), "desc")
         self.assertEqual(image.data, VALID_PNG)
         self.assertIsNone(image.seed)
+
+    @covers_requirement(
+        "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
+    )
+    def test_valid_response_with_disabled_retention_returns_image_bytes(self):
+        captured = {}
+        def transport(request):
+            captured["request"] = request
+            return self._ok_response()
+        client = self._client(transport)
+        with override_settings(ART_SD_SERVER_RETAIN_IMAGES=False):
+            image = client.generate(_scene(), "desc")
+        self.assertEqual(image.data, VALID_PNG)
+        self.assertIs(captured["request"]["do_not_save_samples"], True)
+        self.assertIs(captured["request"]["do_not_save_grid"], True)
 
     @covers_requirement("internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes")
     def test_empty_images_settles_sd_no_image(self):
