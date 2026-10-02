@@ -37,6 +37,7 @@ from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.generated_quest_store import append_payload, clear
 from world.rules.guild_economy import sync_service_content
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.ai.director_templates import QUEST_TEMPLATE_POOL
 from world.rules.npc_roster_validation import validate_npc_roster
 
 
@@ -61,7 +62,7 @@ class NpcPersonaFreshBootstrapTests(EvenniaTest):
         self.assertNotIn("npc_persona_cutover", STARTUP_STEP_ORDER)
 
         # 2. Roster validation passes cleanly against fresh bootstrap
-        validate_npc_roster()
+        validate_npc_roster(quest_templates=QUEST_TEMPLATE_POOL)
 
         # 3. Every shipped service host is born marked and carries a valid compact card
         npcs = list(NPC.objects.all_family())

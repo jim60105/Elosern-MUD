@@ -35,6 +35,11 @@ def graft_synth_entry_rank() -> None:
     """
     from world.lore.guild import GUILD_RANK_REGISTRY, GuildRank
 
+    existing_f = GUILD_RANK_REGISTRY.get(SYNTH_ENTRY_RANK_KEY)
+    examiner_profile_key = (
+        existing_f.examiner_profile_key if existing_f else "guild_examiner_f"
+    )
+
     row = GuildRank(
         SYNTH_ENTRY_RANK_KEY,
         # Same order as the kit's entry rank: board eligibility needs the entry
@@ -48,6 +53,7 @@ def graft_synth_entry_rank() -> None:
         "t_synth_first_hunt",
         "霧鱗・灰秤",
         "合成公會見習考官",
+        examiner_profile_key=examiner_profile_key,
     )
     GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, row)
 

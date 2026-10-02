@@ -152,8 +152,7 @@ class ShippedNpcRosterContractTests(unittest.TestCase):
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
     )
     def test_shipped_roster_validates_clean(self):
-        # Validating the shipped roster without arguments passes cleanly
-        validate_npc_roster()
+        validate_npc_roster(quest_templates=QUEST_TEMPLATE_POOL)
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
@@ -161,7 +160,7 @@ class ShippedNpcRosterContractTests(unittest.TestCase):
     def test_shipped_sources_match_inventory(self):
         from world.lore.npc_profiles.inventory import NPC_SOURCE_INVENTORY
 
-        derived = derive_shipped_sources()
+        derived = derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
         inv_pairs = {(r.kind, r.key) for r in NPC_SOURCE_INVENTORY}
         self.assertEqual(derived, frozenset(inv_pairs))
 

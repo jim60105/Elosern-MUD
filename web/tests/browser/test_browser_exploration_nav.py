@@ -265,7 +265,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # the inert overview (webclient-scene-overview-swap).
         self.assertEqual(
             target_keys,
-            ["talk-open", "look-target", "back"],
+            ["talk-open", "service-npc_persona", "look-target", "back"],
             "the popover's cells must render at depth 2",
         )
         self.assertEqual(

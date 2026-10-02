@@ -17,6 +17,7 @@ from ._support import (
     COMMISSIONER_NAME,
     COMMISSIONER_SERVICE_ID,
     GUILD_HALL_TAG,
+    GUILD_SERVICE_ID,
     IMPORTED_COMMISSIONER_SERVICE_ID,
     ServiceContentIsolation,
 )

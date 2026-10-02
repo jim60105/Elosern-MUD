@@ -240,7 +240,21 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         plain = create_object(NPC, key="路人", location=self.south_gate)
         payload = self._render()
         target = next(t for t in payload["interact"] if t["identity"] == int(plain.pk))
-        self.assertEqual(target["affordances"], [])
+        self.assertEqual(
+            target["affordances"],
+            [
+                {
+                    "kind": "navigate",
+                    "surface": "npc_persona",
+                    "label": "編輯人物設定",
+                    "enabled": False,
+                    "disabled_reason": {
+                        "code": "npc_persona.unavailable",
+                        "message": "此角色的設定目前無法編輯或尚未初始化。",
+                    },
+                }
+            ],
+        )
         action_ids = {
             a.get("action_id") for a in target["affordances"] if a.get("action_id")
         }

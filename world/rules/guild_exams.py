@@ -269,12 +269,13 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
         opponent.npc_title = validate_npc_title(rank.examiner_title)
         ensure_npc_canonical_age(opponent)
-        examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
-        initialize_npc_persona(
-            opponent,
-            examiner_profile.card.to_record(),
-            {"kind": "profile", "profile": rank.examiner_profile_key},
-        )
+        if rank.examiner_profile_key:
+            examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
+            initialize_npc_persona(
+                opponent,
+                examiner_profile.card.to_record(),
+                {"kind": "profile", "profile": rank.examiner_profile_key},
+            )
         opponent.location = actor.location
         # Occupancy check inside the same start_guild_exam transaction: no
         # check-then-create window. A later same-rank spawn always sees the
@@ -282,13 +283,15 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         if _key_taken_by_other(opponent):
             opponent.key = f"{rank.examiner_name}-{opponent.pk}"
         opponent.save()
+        log_context = {
+            "char": opponent.key,
+            "rank": target_rank,
+        }
+        if rank.examiner_profile_key:
+            log_context["profile"] = rank.examiner_profile_key
         log_info(
             "guild_exam_opponent_created",
-            context={
-                "char": opponent.key,
-                "rank": target_rank,
-                "profile": rank.examiner_profile_key,
-            },
+            context=log_context,
         )
     except Exception:
         try:

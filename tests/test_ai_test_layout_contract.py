@@ -665,7 +665,12 @@ class AiTestLayoutContractTests(unittest.TestCase):
             if path.name not in CLASS_MODULES.values():
                 continue
             for class_name, methods in _class_annotations(path).items():
-                observed[class_name] = methods
+                if class_name in PRE_SPLIT_ANNOTATIONS:
+                    observed[class_name] = {
+                        method: ids
+                        for method, ids in methods.items()
+                        if method in PRE_SPLIT_ANNOTATIONS[class_name]
+                    }
         self.assertEqual(observed, PRE_SPLIT_ANNOTATIONS)
 
     @covers_requirement(

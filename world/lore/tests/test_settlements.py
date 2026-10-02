@@ -637,7 +637,7 @@ class PlaceRegistryTests(unittest.TestCase):
         # npc-persona-host-examiner-producers: host_profile_key joins HOST_IDENTITY_FIELDS.
         # A place authoring a complete host but no host_profile_key fails load naming the
         # place and listing host_profile_key as missing.
-        complete_without_profile = replace(self.store, host_profile_key=None)
+        complete_without_profile = replace(self.store, key="t_store_place", host_profile_key=None)
         with self.assertRaises(ValueError) as caught:
             validate_place_registry({"t_store_place": complete_without_profile})
         message = str(caught.exception)

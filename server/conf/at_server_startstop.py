@@ -345,6 +345,14 @@ def _register_nomination_triggers():
     register_nomination_triggers()
 
 
+def _validate_npc_roster_step() -> None:
+    """Validate the shipped NPC roster at boot with the offline template pool."""
+    from world.rules.npc_roster_validation import validate_npc_roster
+    from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+    validate_npc_roster(quest_templates=QUEST_TEMPLATE_POOL)
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -422,7 +430,7 @@ def at_server_start():
     # equality before any world synchronization can persist partial state.
     _startup_step(
         "npc_persona_roster_validation",
-        lambda: _late("world.rules.npc_roster_validation", "validate_npc_roster"),
+        _validate_npc_roster_step,
     )
     _startup_step("sync_all", sync_all)
     _startup_step("sync_limbo", sync_limbo)

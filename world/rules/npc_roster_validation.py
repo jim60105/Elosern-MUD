@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 if TYPE_CHECKING:
     from typeclasses.npcs import NPC
-    from world.ai.director_templates import QuestBlueprint
     from world.lore.guild import GuildRank
     from world.lore.npc_profiles.inventory import NpcSource
     from world.lore.npc_profiles.shape import NpcProfile
@@ -40,7 +39,7 @@ def derive_shipped_sources(
     dialogue_rows: Mapping[str, Any] | None = None,
     guild_ranks: Mapping[str, GuildRank] | None = None,
     player_presets: Mapping[str, PlayerPreset] | None = None,
-    quest_templates: Iterable[QuestBlueprint] | None = None,
+    quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
 ) -> frozenset[tuple[str, str]]:
     """Derive the complete set of shipped NPC source (kind, key) pairs.
@@ -67,9 +66,7 @@ def derive_shipped_sources(
 
         player_presets = PLAYER_PRESET_REGISTRY
     if quest_templates is None:
-        from world.ai.director_templates import QUEST_TEMPLATE_POOL
-
-        quest_templates = QUEST_TEMPLATE_POOL
+        raise ValueError("quest_templates must be supplied by the composition root or caller")
     elif not isinstance(quest_templates, tuple):
         quest_templates = tuple(quest_templates)
     if examples_dir is None:
@@ -112,7 +109,7 @@ def validate_npc_roster(
     dialogue_rows: Mapping[str, Any] | None = None,
     guild_ranks: Mapping[str, GuildRank] | None = None,
     player_presets: Mapping[str, PlayerPreset] | None = None,
-    quest_templates: Iterable[QuestBlueprint] | None = None,
+    quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
     profile_registry: Mapping[str, NpcProfile] | None = None,
     inventory: Iterable[NpcSource] | None = None,
@@ -148,9 +145,7 @@ def validate_npc_roster(
 
         player_presets = PLAYER_PRESET_REGISTRY
     if quest_templates is None:
-        from world.ai.director_templates import QUEST_TEMPLATE_POOL
-
-        quest_templates = QUEST_TEMPLATE_POOL
+        raise ValueError("quest_templates must be supplied by the composition root or caller")
     elif not isinstance(quest_templates, tuple):
         quest_templates = tuple(quest_templates)
     if examples_dir is None:

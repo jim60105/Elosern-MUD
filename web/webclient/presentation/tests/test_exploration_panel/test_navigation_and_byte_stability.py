@@ -54,7 +54,7 @@ class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
         "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
     )
     def test_off_anchor_merchant_serializes_disabled_navigate_entry(self):
-        (entry,) = self._navigate_entries()
+        entry = next(a for a in self._navigate_entries() if a.get("surface") == "shop")
         self.assertEqual(entry["surface"], "shop")
         self.assertFalse(entry["enabled"])
         self.assertEqual(
@@ -242,7 +242,17 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                                 "label": "交談",
                                 "enabled": True,
                                 "disabled_reason": None,
-                            }
+                            },
+                            {
+                                "kind": "navigate",
+                                "surface": "npc_persona",
+                                "label": "編輯人物設定",
+                                "enabled": False,
+                                "disabled_reason": {
+                                    "code": "npc_persona.unavailable",
+                                    "message": "此角色的設定目前無法編輯或尚未初始化。",
+                                },
+                            },
                         ],
                     },
                     {
@@ -264,13 +274,34 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                                 "enabled": True,
                                 "disabled_reason": None,
                             },
+                            {
+                                "kind": "navigate",
+                                "surface": "npc_persona",
+                                "label": "編輯人物設定",
+                                "enabled": False,
+                                "disabled_reason": {
+                                    "code": "npc_persona.unavailable",
+                                    "message": "此角色的設定目前無法編輯或尚未初始化。",
+                                },
+                            },
                         ],
                     },
                     {
                         "identity": int(self.passerby.pk),
                         "display_name": "路人",
                         "portrait_ref": None,
-                        "affordances": [],
+                        "affordances": [
+                            {
+                                "kind": "navigate",
+                                "surface": "npc_persona",
+                                "label": "編輯人物設定",
+                                "enabled": False,
+                                "disabled_reason": {
+                                    "code": "npc_persona.unavailable",
+                                    "message": "此角色的設定目前無法編輯或尚未初始化。",
+                                },
+                            },
+                        ],
                     },
                     {
                         "identity": int(self.goblin.pk),

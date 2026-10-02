@@ -13,6 +13,7 @@ from tools.spec_traceability import covers_requirement
 
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.npc_profiles.inventory import NPC_SOURCE_INVENTORY
+from world.ai.director_templates import QUEST_TEMPLATE_POOL
 from world.rules.npc_roster_validation import derive_shipped_sources
 
 # The nine owning content-change slice labels bound in design.md D1.
@@ -48,7 +49,7 @@ class NpcSourceInventoryContractTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.actual = derive_shipped_sources()
+        cls.actual = derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
         cls.inventory_pairs = {(row.kind, row.key) for row in NPC_SOURCE_INVENTORY}
 
     @covers_requirement(

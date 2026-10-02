@@ -19,7 +19,7 @@ from world.rules.guild_economy import sync_service_content
 from world.rules.profession_config import get_profession
 from world.tests.synthetic_data import SYNTH_DIALOGUE
 import unittest
-from ._support import GUILD_HALL_TAG, ServiceContentIsolation
+from ._support import GUILD_HALL_TAG, GUILD_SERVICE_ID, ServiceContentIsolation
 
 #: The kit's one dialogue fixture, resolved from the mapping rather than
 #: spelled, per the synthetic-kit convention.
