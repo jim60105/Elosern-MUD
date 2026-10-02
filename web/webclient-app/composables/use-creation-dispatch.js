@@ -5,7 +5,7 @@
 import { computed, ref, watch } from "vue";
 
 export function useCreationDispatch(props, form, emit) {
-  const { conceptPending, conceptText, name, race, subrace, sex } = form;
+  const { conceptPending, rollPending = ref(false), conceptText, name, race, subrace, sex } = form;
 
   // -- Concept state -----------------------------------------------------------
   function applyConcept() {
@@ -30,7 +30,6 @@ export function useCreationDispatch(props, form, emit) {
   // apply, the loading state flips ONLY after admission (a gate-held click
   // never shows a spinner and never double-dispatches, retool-concept-fill-
   // navigation D1a semantics reused).
-  const rollPending = ref(false);
   const rollRequestId = ref(null);
 
   function rollName() {

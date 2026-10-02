@@ -16,7 +16,7 @@ export function useCreationOverlay(props, emit) {
   const custom = useCreationCustom(props, form, emit);
   const proposal = useCreationProposal(props, form, custom);
   const dispatch = useCreationDispatch(props, form, emit);
-  const stage = useCreationStage(props, form, emit);
+  const stage = useCreationStage(props, form, emit, { rollPending: dispatch.rollPending });
   // Mount-time proposal fill: a panel that already carries an unconsumed
   // proposal (a same-session remount) pre-fills the form before first paint.
   proposal.applyProposal();

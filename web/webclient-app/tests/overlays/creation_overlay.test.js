@@ -1,7 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import AppClient from "../../AppClient.vue";
 import CreationOverlay from "../../components/CreationOverlay.vue";
+import { useElosernStore } from "../../stores/elosern.js";
 import {
   CREATION_PANEL_SAMPLE,
   CREATION_PANEL_PRESET_DRAFT_SAMPLE,
@@ -9,6 +12,7 @@ import {
   CREATION_PANEL_PROPOSAL_SAMPLE,
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
+import * as fx from "../store/protocol_fixtures.js";
 
 // Payload values referenced from the committed creation sample instead of
 // restating shipped identifiers in this test's source
@@ -713,5 +717,99 @@ describe("CreationOverlay (B5 overlays family)", () => {
       payload: { race: "elf", subrace: null, sex: "male" },
     });
   });
+});
 
+describe("name roll tab pinning real-store integration (fix-creation-roll-tab-pinning)", () => {
+  let store;
+  let sender;
+  let host;
+  let appWrapper;
+  let revision;
+
+  function openCreation() {
+    store.beginTransport(1);
+    store.setConnected(true);
+    revision = 2;
+    expect(
+      store.receive(
+        1,
+        "ui_snapshot",
+        [fx.snapshot({ mode: "creation", revision, panels: { creation: { ...CREATION_PANEL_SAMPLE } } })],
+        {},
+      ).accepted,
+    ).toBe(true);
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+    revision = 2;
+  });
+
+  afterEach(() => {
+    appWrapper?.unmount();
+    document.body.innerHTML = "";
+    host = null;
+    appWrapper = null;
+    store.$dispose();
+  });
+
+  it("custom tab stays pinned through synchronous roll dispatch, settlement, and unchanged-stage publish", async () => {
+    openCreation();
+    host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    appWrapper = mount(AppClient, { attachTo: host });
+    await appWrapper.vm.$nextTick();
+
+    const overlayEl = host.querySelector('[data-testid="creation-overlay"]');
+    expect(overlayEl).not.toBeNull();
+    expect(overlayEl.getAttribute("data-mode")).toBe("preset");
+
+    // Pointer-click the custom tab without touching any form input.
+    await appWrapper.find('[data-testid="creation-mode-custom"]').trigger("click");
+    expect(overlayEl.getAttribute("data-mode")).toBe("custom");
+
+    // Click the name roll button.
+    await appWrapper.find('[data-testid="creation-roll-name"]').trigger("click");
+
+    // 1. Exactly one creation.roll_name dispatch, button disabled, data-mode stays custom.
+    expect(sender.sent.actions).toHaveLength(1);
+    const dispatchedAction = sender.sent.actions[0];
+    expect(dispatchedAction.action_id).toBe("creation.roll_name");
+    const rollButton = host.querySelector('[data-testid="creation-roll-name"]');
+    expect(rollButton.hasAttribute("disabled")).toBe(true);
+    expect(overlayEl.getAttribute("data-mode")).toBe("custom");
+
+    // 2. Deliver matching-request success action result with data.display_name.
+    const submittedRequestId = dispatchedAction.request_id;
+    expect(
+      store.receive(
+        1,
+        "ui_action_result",
+        [fx.actionResult({ request_id: submittedRequestId, outcome: "success", code: "name_rolled", data: { display_name: "加斯帕‧斯諾" } })],
+        {},
+      ).accepted,
+    ).toBe(true);
+    await appWrapper.vm.$nextTick();
+
+    // Backfill landed, button re-enabled, data-mode remains custom.
+    const nameInput = host.querySelector('[data-testid="creation-field-displayName"]');
+    expect(nameInput.value).toBe("加斯帕‧斯諾");
+    expect(rollButton.hasAttribute("disabled")).toBe(false);
+    expect(overlayEl.getAttribute("data-mode")).toBe("custom");
+
+    // 3. Additional unchanged-stage publish (fresh object identity).
+    revision += 1;
+    expect(store.receive(1, "ui_update", [fx.update({ mode: "creation", revision, panels: { creation: { ...CREATION_PANEL_SAMPLE } } })], {}).accepted).toBe(true);
+    await appWrapper.vm.$nextTick();
+    expect(overlayEl.getAttribute("data-mode")).toBe("custom");
+
+      // 4. Genuine stage change resumes mirroring.
+      store.view.creationView = { stage: "presets", confirmItems: [], confirmLabel: null, confirmAction: null, pendingPresetKey: null };
+    await appWrapper.vm.$nextTick();
+      expect(overlayEl.getAttribute("data-mode")).toBe("preset");
+  });
 });
