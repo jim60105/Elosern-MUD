@@ -152,6 +152,8 @@ This design does not convert every plain `NPC` to `LLMNPC`, invent conversation 
 
 ### 6.2 Existing-instance cutover
 
+> **[2026-10-02 Amendment]** The in-place cutover mechanism described below is superseded by §13b (user-ordered). Existing development databases are destroyed and re-initialized per `docs/development/database-reset.md`, not migrated. The cutover code, boot step, and events are not implemented. The narrative below is retained as historical context.
+
 The user authorized replacing provisional NPC persona data. Perform one bounded, deterministic content cutover after all replacement profile data and creation-path changes are available. This is an exclusive boot/lifecycle operation: do not admit gameplay, editor actions, imports, or new spawn writers while it runs. Run it before the new generated-quest restore validator reads pre-cutover payloads. Refuse concurrent attempts rather than adding network-style retries or relying on SQLite row locks.
 
 Precompute and validate replacements for every existing `NPC` family instance lacking the new content-generation marker. Resolve known provenance to its rewritten profile; for an unclassified/imported/dynamic instance, construct a complete offline card from its stable identity and existing mechanical/world facts. Do not preserve its old persona text as a fallback. Preserve object ids, location, party and quest bindings, inventory, traits, schedules, names/titles, and other gameplay state. Existing conversation transcripts are not retroactively rewritten.
@@ -308,7 +310,7 @@ No implementation, archive, feature branch, or worktree is created as part of th
 | 17 | `npc-persona-editor-window` | Visual | Vue editor window with the offline-greeting control, state machine, showcase entry, transport delta adding `offline_greeting`/`default_greeting`, core browser journey, player documentation | 9, 14, 16 |
 | 18 | `npc-persona-editor-browser-edges` | Logic | Test-only (`skip_specs`) browser edges: late results, NPC departure, puppet change, cross-tab conflict | 17 |
 | 19 | `npc-persona-roster-validation` | Logic + content | Fail-loud boot gate for full-roster completeness, roster review record, adding-NPCs guide | 3–9, 11–15 |
-| 20 | `npc-persona-roster-cutover` | Logic | One-time, exclusive, single-transaction replacement of existing NPC cards and durable generated-quest payloads | 9–13, 19 |
+| 20 | `npc-persona-roster-cutover` | Docs + tests | Database lifecycle runbook and fresh-bootstrap regression tests (supersedes §6.2 cutover per §13b) | 9–13, 19 |
 
 **Kind** marks where human editorial or visual review is needed. *Logic*: code and tests only, at most a label or one system message string. *Content*: authored character cards, dialogue lines, or offline bundles are the main deliverable. *Logic + content* / *Content + logic*: the change is primarily one and carries some of the other — 12 rewrites the shipped import example card and docs; 13 authors the offline occupant 黑鬍's card and the scenario-director prompt text; 14 adds the `npc_dialogue.persona_frame` prompt text (the voice lines themselves are authored in 3–8); 19 writes the roster review record and the adding-NPCs guide; 9 is logic with a small authored extension (four `speech_style` texts and four companion greetings under §13a). *Visual*: 17 is the only change with new UI and needs a visual check. Character writing is concentrated in 3–10 plus the cards in 12 and 13.
 
@@ -323,20 +325,20 @@ Changes within one wave touch disjoint code or only append-only shared files, so
 | W2 | 3–8, 9, 10, 14, 17 | Content slices and bundles need 2; 9 and 14 need 1 and 2; 17 needs 16 plus the field contract of 9 and the routing of 14 |
 | W3 | 11, 18 | 11 needs every host/examiner content slice; 18 needs 17 |
 | W4 | 19 | Requires all content, producers, and dialogue consumers |
-| W5 | 20 | Activation cutover, last |
+| W5 | 20 | Database lifecycle runbook and fresh-bootstrap tests, last |
 
 Merge 20 as soon as possible after 13: once 13 lands, a development database that still holds pre-change generated-quest payloads fails closed on restore until the cutover runs. No compatibility decoder is added for that window.
 
 Code-conflict hot spots for parallel work:
 
 - `typeclasses/npcs.py`: 14 and 15 modify different functions; apply them in sequence.
-- `world/rules/npc_persona.py`: created by 1; 14, 15, 16, and 20 each add separate functions.
+- `world/rules/npc_persona.py`: created by 1; 14, 15, and 16 each add separate functions.
 - `exploration_actions.py`: modified only by 15, which must keep the `_present_by_id` name because 16 imports it.
 - `places_altoria_middle.py` (4, 5), `places_ciaran.py` and `dialogue/ciaran.py` (7, 8): different rows, adjacent-hunk rebase conflicts only.
 - `world/lore/npc_profiles/__init__.py` and `world/lore/dialogue/__init__.py`: assembly owned by 2 only; `places.py` is modified by 2 and then 11.
 - `npc_dialogue.yaml` is changed only by 14; `scenario_director.yaml` only by 13.
 - Dispatcher `registry.py` and `presentation/exploration.py`: 16 only. UI router files (`AppClient.vue`, `use-dock.js`, `use-drawers.js`, `exploration_menu.js`, `command_echo.js`, stores): 17 only.
-- `at_server_startstop.py`: 19, then 20.
+- `at_server_startstop.py`: 19 only.
 - Append-only shared files (`.github/evennia-shards.json`, `.github/browser-shards.json`, `tools/test_data_freeze.json`, the observability catalog): mechanical rebase conflicts only.
 
 ## 13. Explicit architectural amendments and non-goals
@@ -360,3 +362,12 @@ The user superseded this design's companion clauses (§1, §5.1, §5.3, §6.1) f
 - The authored `greeting` is persisted to the companion's own bounded per-instance offline-greeting field (`db.npc_offline_greeting`) at build time, so dialogue reads the instance without a lore lookup. Free future NPCs (offline bundles, generated quests) have no authored registry anchor, so this instance field is the extensible mechanism for any future producer that authors a greeting.
 - The offline-greeting field is author-editable state in the editor like the card, for every NPC: a non-empty field overrides the dialogue-table/profile greeting defaults on every no-keyword surface — the `talk` command, the `explore.talk_open` dialogue panel, and the LLM-offline degraded path all resolve through one instance-field-first resolver — and clearing it restores the authored default. Keyword responses, service guidance, and quest listings stay authored-only and never consult the field; LLM dialogue always follows the card. The archived editor transport gains `offline_greeting`/`default_greeting` read keys and an atomic `offline_greeting` update component under the existing version check (`npc-persona-editor-window` owns that delta).
 - The four companion presets and 伊洛 are designed official characters: their established persona prose is **not** rewritten by this change set; only the two extension fields are newly authored per companion. This is an explicit exception to the "rewrite all provisional content" clause in §1 for these five presets.
+
+### 13b. Database lifecycle and migration cancellation amendment (2026-10-02, user-ordered)
+
+The user ordered that no database migration ships for this design set:
+
+- The one-time in-place cutover mechanism planned in §6.2 (including writer suspension, `plan_cutover()`/`apply_cutover()`, the `npc_persona_cutover` boot step, and its three observability events) is **cancelled and not implemented**. No cutover code exists in any module.
+- Pre-amendment development databases are unsupported. The supported path to adopt the NPC persona content set is to destroy and re-initialize the database following the developer runbook `docs/development/database-reset.md`.
+- The strict generated-quest payload decoder from `npc-persona-generated-quest-cards` acts as a fail-closed guard: pre-amendment stored payloads fail restore loudly and deterministically, preventing execution against stale data without a legacy decoder.
+- Change 20 (`npc-persona-roster-cutover`) delivers the database reset runbook and regression tests pinning fresh-bootstrap completeness and fail-closed payload rejection, not a data migration.

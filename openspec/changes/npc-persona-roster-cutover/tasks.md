@@ -2,7 +2,7 @@ Apply on branch `feat/npc-persona-roster-cutover` in worktree `.worktrees/npc-pe
 
 ## 1. Design-document amendment
 
-- [ ] 1.1 Add a dated §13b amendment to `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` per design D2 (user-ordered supersession: pre-amendment databases are destroyed and re-initialized, not migrated; the §6.2 cutover mechanism is not implemented), add a superseded pointer at the top of §6.2 keeping its body as historical rationale, and correct the row-20 scope text in the §12.2 table.
+- [x] 1.1 Add a dated §13b amendment to `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` per design D2 (user-ordered supersession: pre-amendment databases are destroyed and re-initialized, not migrated; the §6.2 cutover mechanism is not implemented), add a superseded pointer at the top of §6.2 keeping its body as historical rationale, and correct the row-20 scope text in the §12.2 table.
 
 ## 2. Reset runbook
 
