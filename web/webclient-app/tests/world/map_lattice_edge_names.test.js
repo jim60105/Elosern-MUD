@@ -116,7 +116,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
   it("Task 2.1: fits lone marker whole and truncates two markers to their span allocating tail first", () => {
     // Lone marker on top edge: span = 174, budget = floor(174 / (CELL_EM × 10))
-    // = 28 cells. The label is 11 wide glyphs = 22 cells <= 28 -> draws whole.
+    // = 29 cells. The label is 11 wide glyphs = 22 cells <= 29 -> draws whole.
     const lonePayload = {
       schema_version: 1,
       available: true,

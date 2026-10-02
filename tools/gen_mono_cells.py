@@ -8,8 +8,9 @@ next to its slices, so the table needs no Unicode-version agreement with the
 font build.
 
 This pure generator collapses that manifest into sorted inclusive runs and
-rewrites the block between ``// BEGIN GENERATED one-cell`` and
-``// END GENERATED one-cell`` in ``web/webclient-app/lib/mono_cells.js``.
+rewrites the ``CELL_EM`` line and the block between ``// BEGIN GENERATED
+one-cell`` and ``// END GENERATED one-cell`` in
+``web/webclient-app/lib/mono_cells.js``.
 ``tests/test_mono_cells_table.py`` rebuilds the block in memory and
 byte-compares it, so the committed table can never drift from the manifest.
 
@@ -27,6 +28,8 @@ MANIFEST_PATH = REPO_ROOT / "web/webclient-app/fonts/jimmonotc/codepoints.json"
 MANIFEST_KEY = "regular"
 OUTPUT_PATH = REPO_ROOT / "web/webclient-app/lib/mono_cells.js"
 
+CELL_MARKER = "// BEGIN GENERATED CELL_EM"
+CELL_END_MARKER = "// END GENERATED CELL_EM"
 BEGIN_MARKER = "// BEGIN GENERATED one-cell"
 END_MARKER = "// END GENERATED one-cell"
 RUNS_PER_LINE = 6
@@ -55,17 +58,44 @@ def render_block(codepoints) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_cell_em(cell: dict) -> str:
+    """Return the generated CELL_EM line, markers included, ending with a newline."""
+    advance, upem = int(cell["advance"]), int(cell["upem"])
+    lines = [
+        CELL_MARKER,
+        f"// Source: {MANIFEST_PATH.relative_to(REPO_ROOT).as_posix()} (cell_advance).",
+        f"export const CELL_EM = {advance} / {upem};",
+        CELL_END_MARKER,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def load_cell_advance(path: Path = MANIFEST_PATH) -> dict:
+    return load_manifest(path)["cell_advance"]
+
+
 def load_codepoints(path: Path = MANIFEST_PATH) -> list[int]:
-    return json.loads(path.read_text(encoding="utf-8"))[MANIFEST_KEY]
+    return load_manifest(path)[MANIFEST_KEY]
+
+
+def load_manifest(path: Path = MANIFEST_PATH) -> dict:
+    """Return the bundled face's committed code point manifest."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def splice_marker(source: str, start_marker: str, end_marker: str, block: str) -> str:
+    """Replace one generated block delimited by the given markers."""
+    start = source.index(start_marker)
+    end = source.index(end_marker, start) + len(end_marker)
+    if source[end : end + 1] == "\n":
+        end += 1
+    return source[:start] + block + source[end:]
 
 
 def splice(source: str, block: str) -> str:
     """Replace the generated block of ``source`` with ``block``."""
-    start = source.index(BEGIN_MARKER)
-    end = source.index(END_MARKER, start) + len(END_MARKER)
-    if source[end : end + 1] == "\n":
-        end += 1
-    return source[:start] + block + source[end:]
+    source = splice_marker(source, CELL_MARKER, CELL_END_MARKER, render_cell_em(load_cell_advance()))
+    return splice_marker(source, BEGIN_MARKER, END_MARKER, block)
 
 
 def main() -> int:

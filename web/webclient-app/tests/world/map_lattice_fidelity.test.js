@@ -326,13 +326,13 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       });
       // webclient-map-legibility: the label term clears the labels actually
       // drawn, measured in monospace cells — two 4-glyph CJK names (8 cells
-      // each) need ceil(((8 + 8) / 2 × CELL_EM + 0.5) × 12) = 64.
+      // each) need ceil(((8 + 8) / 2 × CELL_EM + 0.5) × 12) = 63.
       const patternDistinct = wDistinct.find("defs pattern");
-      expect(Number(patternDistinct.attributes("width"))).toBe(64);
-      expect(Number(patternDistinct.attributes("height"))).toBe(64);
+      expect(Number(patternDistinct.attributes("width"))).toBe(63);
+      expect(Number(patternDistinct.attributes("height"))).toBe(63);
 
       // A short name beside a long one needs less:
-      // ceil(((4 + 8) / 2 × CELL_EM + 0.5) × 12) = 50.
+      // ceil(((4 + 8) / 2 × CELL_EM + 0.5) × 12) = 49.
       const shortLong = {
         ...distinctAdjacentPayload,
         nodes: [
@@ -341,11 +341,11 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ],
       };
       const wShortLong = mountLattice({ localMap: localMapModelFor(shortLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
-      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(50);
+      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(49);
 
       // Two truncated names (labelMax 4 wide glyphs + the narrow "…" = 9
       // cells) are the worst case, never looser than the old
-      // (labelMax + 1) * labelFont + 3 = 63: ceil((9 × CELL_EM + 0.5) × 12) = 72.
+      // (labelMax + 1) * labelFont + 3 = 63: ceil((9 × CELL_EM + 0.5) × 12) = 70.
       const longLong = {
         ...distinctAdjacentPayload,
         nodes: [
@@ -354,8 +354,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ],
       };
       const wLongLong = mountLattice({ localMap: localMapModelFor(longLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
-      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(72);
-      expect(72).toBeGreaterThanOrEqual((4 + 1) * 12 + 3);
+      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(70);
+      expect(70).toBeGreaterThanOrEqual((4 + 1) * 12 + 3);
 
       const wOverlayDistinct = mountLattice({
         localMap: localMapModelFor(distinctAdjacentPayload),
@@ -440,9 +440,9 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(scale4).toBeCloseTo(0.75, 6);
 
       // 5. Graph cases:
-      // a. One-ring interior: a 264-unit radial canvas (R0 82 + label bottom 26
+      // a. One-ring interior: a 260-unit radial canvas (R0 80 + label bottom 26
       // + padding 24 per side), cropped to its footprint plus the 8px inset:
-      // side 232, scale ≈ 0.90
+      // side 228, scale ≈ 0.91
       const wInterior = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE),
         variant: "graph",
@@ -454,10 +454,10 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       const vb5 = svg5.attributes("viewBox").split(" ").map(Number);
       expect(vb5[0]).toBe(16);
       expect(vb5[1]).toBe(16);
-      expect(vb5[2]).toBe(232);
-      expect(vb5[3]).toBe(232);
-      const scale5 = 208 / 232;
-      expect(scale5).toBeCloseTo(0.9, 2);
+      expect(vb5[2]).toBe(228);
+      expect(vb5[3]).toBe(228);
+      const scale5 = 208 / 228;
+      expect(scale5).toBeCloseTo(0.91, 2);
 
       // b. Current-only interior: side 208 with scale 1 and current node at centre
       const singleInteriorPayload = {

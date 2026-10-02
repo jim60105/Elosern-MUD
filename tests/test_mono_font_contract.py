@@ -29,8 +29,6 @@ TOKENS_PATH = APP_ROOT / "styles" / "tokens.css"
 WEIGHTS = {400: "regular", 700: "bold"}
 ONE_CELL_GROUPS = ("latin", "latin-ext", "greek-cyrillic", "box", "symbols")
 MAX_BYTES = 65536
-# The imported release's CJK coverage per weight; a new release updates it.
-CJK_COUNT = 13283
 ARROWS = set(range(0x2190, 0x2194))
 ASCII = set(range(0x20, 0x7F))
 PRIVATE_USE = ((0xE000, 0xF8FF), (0xF0000, 0x10FFFF))
@@ -132,19 +130,20 @@ class MonoFontContractTest(unittest.TestCase):
                 self.assertEqual(cjk, set(self.manifest["cjk"][key]))
 
     @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
-    def test_the_weights_differ_only_in_the_known_one_cell_extras(self):
-        # The map cell table uses the Regular set; Bold draws the same one-cell
-        # characters except these three, plus extra latin-ext glyphs. A new
-        # release that drops more from Bold (bold HTML would then fall back to
-        # Noto Sans TC off the cell grid) fails here and must be reviewed.
+    def test_bold_one_cell_coverage_is_a_superset_of_regular(self):
+        # The map cell table classifies cells by the Regular set; any code point
+        # Regular draws one-cell must also be one-cell in Bold, or bold text on
+        # the cell grid (map labels, box-drawing) falls back off-grid. The
+        # bundled release is required to keep Bold a superset of Regular; a
+        # release that regresses fails here and must be reviewed before import.
         regular, bold = set(self.manifest["regular"]), set(self.manifest["bold"])
-        self.assertEqual(regular - bold, {0x03F6, 0x2215, 0x2219})
+        self.assertEqual(regular - bold, set())
 
     @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_both_weights_declare_the_same_cjk(self):
         cjk = self.manifest["cjk"]
         self.assertEqual(cjk["regular"], cjk["bold"])
-        self.assertEqual(len(cjk["regular"]), CJK_COUNT)
+        self.assertTrue(cjk["regular"])
 
     @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_cjk_is_the_bundled_noto_wide_coverage_minus_the_recorded_gaps(self):
@@ -183,8 +182,21 @@ class MonoFontContractTest(unittest.TestCase):
         licence = (FONT_DIR / "licenses" / "LICENSE").read_text(encoding="utf-8")
         self.assertIn("SIL OPEN FONT LICENSE", licence.upper())
         self.assertIn("Version 1.1", licence)
-        self.assertTrue((FONT_DIR / "licenses" / "NOTICE.md").is_file())
-        self.assertIn("Bitstream Vera", (FONT_DIR / "licenses" / "Hack-LICENSE.txt").read_text(encoding="utf-8"))
+        notice = (FONT_DIR / "licenses" / "NOTICE.md").read_text(encoding="utf-8")
+        self.assertIn("SIL Open Font License", notice)
+        # Which upstream families travel with the merged face is release data
+        # (the Latin base changed between releases); the notice is the audit
+        # that names them, so every licence text the notice points at must be
+        # shipped in the licences directory and at least one must be present.
+        shipped = {path.name for path in (FONT_DIR / "licenses").rglob("*") if path.is_file()}
+        relative = [t for t in re.findall(r"\]\(([^)#]+?\.(?:txt|md))\)", notice) if "://" not in t]
+        self.assertTrue(relative)
+        for target in relative:
+            # The notice's links are upstream dist-root paths; the shipped tree
+            # keeps the same filenames somewhere under licenses/.
+            self.assertIn(Path(target).name, shipped, target)
+        upstream_texts = [path for path in (FONT_DIR / "licenses").rglob("*") if path.is_file() and path.name not in {"LICENSE", "NOTICE.md"}]
+        self.assertTrue(upstream_texts)
 
     @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_monospace_token_names_only_the_bundled_faces(self):

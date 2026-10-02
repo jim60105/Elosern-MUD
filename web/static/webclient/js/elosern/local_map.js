@@ -188,15 +188,17 @@
   // Explicit geometry contract in unscaled units, taken from the renderer's
   // wave-1 footprints (design D1): a node occupies a marker box `x±9, y±9`
   // (half-extent 9 = r8 circle + stroke, shared with the diamond ladder) and
-  // a label box 69x23 spanning y in [+3, +26] under the node origin. The
+  // a label box 67x23 spanning y in [+3, +26] under the node origin. The
   // label width is the worst truncated label measured in monospace cells
   // (webclient-map-label-cell-budget D4): four wide glyphs plus the narrow
-  // "…" are 9 cells of 1233/2048 em, drawn at the island's 12-unit label step
-  // (the one surface that draws the radial at scale 1), so
-  // ceil(9 × 1233/2048 × 12) + 3 = 69. The diagonal span of one node's worst
-  // footprint pair is sqrt(69^2 + 23^2) = 72.7, so the contract declares
-  // ARC = 77 (ceil + 4) as the minimum centre-to-centre distance between ANY
-  // two nodes. Ring-to-ring and centre-to-ring clearance R0 = G = 82
+  // "…" are 9 cells at the shipped face's Latin cell advance CELL_EM
+  // (mono_cells.js, generated from the font manifest), drawn at the island's
+  // 12-unit label step (the one surface that draws the radial at scale 1),
+  // so ceil(9 × CELL_EM × 12) + 3 = 67 at CELL_EM = 1200/2048. The diagonal
+  // span of one node's worst footprint pair is
+  // sqrt(67^2 + 23^2) = 70.8, so the contract declares
+  // ARC = 75 (ceil + 4) as the minimum centre-to-centre distance between ANY
+  // two nodes. Ring-to-ring and centre-to-ring clearance R0 = G = 80
   // (>= ARC + 5); the original r0 = G = 44 was disproved by exhaustive
   // footprint sweep BEFORE implementation (two horizontally aligned
   // footprints 44 apart share part of the label box) and the amendment is
@@ -205,11 +207,11 @@
   // another heuristic.
   var RADIAL_GEOMETRY = {
     // Minimum centre-to-centre distance between any two node footprints.
-    ARC: 77,
+    ARC: 75,
     // Centre-to-ring-1 clearance.
-    R0: 82,
+    R0: 80,
     // Ring-to-ring clearance.
-    G: 82,
+    G: 80,
     // Deepest label-box offset under a node origin (baseline 26).
     LABEL_BOTTOM: 26,
     // Symmetric canvas padding beyond the deepest footprint.

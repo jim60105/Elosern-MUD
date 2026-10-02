@@ -41,7 +41,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     // plus 2.
     const expectedOverlayGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 11 + 2;
     // Pinned literal, so a drift in the cell measure itself is caught here too.
-    expect(22 * CELL_EM * 11).toBeCloseTo(145.696, 3);
+    expect(22 * CELL_EM * 11).toBeCloseTo(141.797, 3);
     expect(svgWidth).toBeCloseTo(840 + 2 * expectedOverlayGutter, 5);
     expect(svgHeight).toBeCloseTo(650 + 2 * expectedOverlayGutter, 5);
     expect(viewBox).toBe(`0 0 ${svgWidth} ${svgHeight}`);

@@ -7,7 +7,8 @@ Latin cells wide. The font's own release already cuts its web build into small
 unicode-range woff2 slices, so this tool only imports them (openspec change
 ``webclient-jim-mono-tc-font``, design D0/D1):
 
-1. download the pinned ``-web.zip`` release asset and verify its SHA-256;
+1. download the pinned ``-web.zip`` release asset and verify its SHA-256; the
+   asset name must carry the pinned release's version;
 2. keep the Regular (400) and Bold (700) slices of the one-cell groups
    (``latin``, ``latin-ext``, ``greek-cyrillic``, ``box``, ``symbols``) and the
    frequency CJK groups (``cjk-<N>``); drop the Nerd Fonts ``icons-<N>`` and the
@@ -17,13 +18,18 @@ unicode-range woff2 slices, so this tool only imports them (openspec change
 4. refuse to write anything when a kept slice exceeds 64 KB or is not woff2,
    a kept file and its rule do not pair up, one weight's ranges overlap, the
    two weights declare different CJK, an ASCII code point sits outside
-   ``latin``, or ``licenses/LICENSE`` is missing;
+   ``latin``, or ``licenses/LICENSE`` is missing, or the shipped CJK coverage
+   is not exactly the bundled Noto Sans TC wide coverage minus the font's
+   recorded gaps;
 5. clear ``fonts/jimmonotc/`` and write the kept slices, the ``licenses/``
-   tree, the ``codepoints.json`` manifest, and ``styles/fonts-mono.css``.
+   tree, the ``codepoints.json`` manifest (including the Latin cell advance
+   the map geometry budgets in), and ``styles/fonts-mono.css``.
 
 Run: ``uv run --locked python -m tools.import_mono_font`` (network needed), or
 pass a local copy of the release asset as the only argument; its SHA-256 is
-verified either way. Standard library only, and a second run is
+verified either way. Update a release by editing ``RELEASE``, ``ASSET`` and
+``ASSET_SHA256`` together, then rerun this tool and ``tools/gen_mono_cells.py``.
+Standard library only, and a second run is
 byte-identical.
 """
 
@@ -49,12 +55,17 @@ CSS_PATH = APP_ROOT / "styles/fonts-mono.css"
 MANIFEST_PATH = FONT_DIR / "codepoints.json"
 NOTO_CSS_PATH = APP_ROOT / "styles/fonts.css"
 
-RELEASE = "v0.2.0"
-ASSET = "JimMonoTC-0.2.0-web.zip"
+RELEASE = "v0.4.0"
+ASSET = "JimMonoTC-0.4.0-web.zip"
 ASSET_URL = f"https://github.com/jim60105/JimMonoTC/releases/download/{RELEASE}/{ASSET}"
 # From the release's SHA256SUMS.txt.
-ASSET_SHA256 = "ac2c338253c4d5263de747198b1ffdd7a155552fb39aaa4537e5c01a5de08dab"
+ASSET_SHA256 = "02ff346787546379156b633aca181e0a6233c00b8980dbcbe9d387c39be89856"
 
+# The Latin cell advance of the pinned release, in (advance, upem): one map
+# cell, and every CJK cell is exactly twice it (upstream verify.py gates the
+# 2x rule). gen_mono_cells.py emits it as CELL_EM in mono_cells.js; a release
+# that changes it is reviewed, so it is a reviewed constant, not a guess.
+CELL_ADVANCE = (1200, 2048)
 FAMILY = "Jim Mono TC"
 # Release style name -> (manifest key, CSS font-weight).
 STYLES = {"Regular": ("regular", 400), "Bold": ("bold", 700)}
@@ -154,7 +165,7 @@ def is_wide(cp: int) -> bool:
 
 def build_manifest(rules: list[dict], noto: set[int]) -> dict:
     """Derive the per-weight one-cell and CJK sets from the kept rules."""
-    manifest: dict = {"release": RELEASE}
+    manifest: dict = {"release": RELEASE, "cell_advance": {"advance": CELL_ADVANCE[0], "upem": CELL_ADVANCE[1]}}
     cjk: dict[str, list[int]] = {}
     for style, (key, _weight) in STYLES.items():
         mine = [rule for rule in rules if rule["style"] == style]

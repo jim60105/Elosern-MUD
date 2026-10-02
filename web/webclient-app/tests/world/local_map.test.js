@@ -487,19 +487,19 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap({ localMap: model });
 
     // With canvasSize 208 the label term binds: the adjacent 霧骨渡口 (8 cells)
-    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 12 → 68,
-    // above the 60-unit fill cap. Three columns and two rows of 68 centre in
-    // the 208 square at margins 2 (x) and 29 (y, with the 14-unit label band).
-    const P = 68;
-    const col = (c) => c * P + P / 2 + 2;
-    const row = (r) => (1 - r) * P + P / 2 + 29;
+    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 12 → 66,
+    // above the 60-unit fill cap. Three columns and two rows of 66 centre in
+    // the 208 square at margins 5 (x) and 31 (y, with the 14-unit label band).
+    const P = 66;
+    const col = (c) => c * P + P / 2 + 5;
+    const row = (r) => (1 - r) * P + P / 2 + 31;
     const centers = {
       "grid:altoria:1:1": { x: col(1), y: row(0) },
       "grid:altoria:2:1": { x: col(2), y: row(0) },
       "grid:altoria:1:2": { x: col(1), y: row(1) },
       "grid:altoria:0:1": { x: col(0), y: row(0) },
     };
-    expect(centers["grid:altoria:1:1"]).toEqual({ x: 104, y: 131 });
+    expect(centers["grid:altoria:1:1"]).toEqual({ x: 104, y: 130 });
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
@@ -565,15 +565,15 @@ describe("LocalMap (B4 world family)", () => {
 
     const e0 = w.get('[data-testid="local-map__edge--0"]');
     expect(e0.attributes("x1")).toBe("104");
-    expect(e0.attributes("y1")).toBe("131");
-    expect(e0.attributes("x2")).toBe("172");
-    expect(e0.attributes("y2")).toBe("131");
+    expect(e0.attributes("y1")).toBe("130");
+    expect(e0.attributes("x2")).toBe("170");
+    expect(e0.attributes("y2")).toBe("130");
     expect(P - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
     expect(e1.attributes("x1")).toBe("104");
-    expect(e1.attributes("y1")).toBe("131");
+    expect(e1.attributes("y1")).toBe("130");
     expect(e1.attributes("x2")).toBe("104");
-    expect(e1.attributes("y2")).toBe("63");
+    expect(e1.attributes("y2")).toBe("64");
     expect(P - 9 - 5.5).toBeGreaterThan(0);
   });
 

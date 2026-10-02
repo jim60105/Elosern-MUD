@@ -63,8 +63,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // label band; the edge-marker gutter (model value 271.6480… at the
     // overlay's name-bearing geometry, whose outward name box is 22
     // monospace cells at 11) grows it on every side (map-02 D3b).
-    expect(Number(svg.attributes("width"))).toBeCloseTo(1383.2960323504337, 6);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(769.2960323504337, 6);
+    const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 11 + 2;
+    expect(Number(svg.attributes("width"))).toBeCloseTo(840 + 2 * expectedGutter, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(226 + 2 * expectedGutter, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
     // webclient-full-map-fit-view D6: an overlay-scale mount without

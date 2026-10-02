@@ -1,21 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { labelPairPitch } from "../../composables/use-map-lattice-geometry.js";
 import { fitMarkerName } from "../../composables/use-map-lattice-render.js";
-import { textCells } from "../../lib/mono_cells.js";
+import { CELL_EM, textCells } from "../../lib/mono_cells.js";
 
 // Label term in monospace cells (webclient-map-label-cell-budget D2).
+// Expected values derive from the manifest-fed CELL_EM, never a release pin.
+const pairUnits = (cells, font) => Math.ceil(cells * CELL_EM * font + font / 2);
 describe("labelPairPitch", () => {
-  it("clears two truncated island labels of four wide glyphs at 72 units", () => {
-    expect(Math.ceil(labelPairPitch("霧骨渡口…", "霧骨渡口…", 12))).toBe(72);
+  it("clears two truncated island labels of four wide glyphs by the cell formula", () => {
+    expect(Math.ceil(labelPairPitch("霧骨渡口…", "霧骨渡口…", 12))).toBe(pairUnits(9, 12));
   });
 
-  it("clears two truncated overlay labels of ten wide glyphs at 185 units", () => {
+  it("clears two truncated overlay labels of ten wide glyphs by the cell formula", () => {
     const label = "霧骨渡口灰鬮荒原南關…";
-    expect(Math.ceil(labelPairPitch(label, label, 14))).toBe(185);
+    expect(Math.ceil(labelPairPitch(label, label, 14))).toBe(pairUnits(21, 14));
   });
 
   it("asks only for the room narrow labels occupy", () => {
-    expect(Math.ceil(labelPairPitch("Gates", "Hills", 12))).toBe(43);
+    expect(Math.ceil(labelPairPitch("Gates", "Hills", 12))).toBe(pairUnits(5, 12));
   });
 
   it("never drops below the former worst-case term for maximal wide labels", () => {

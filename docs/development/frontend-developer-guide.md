@@ -66,7 +66,7 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 ## 等寬字體（Jim Mono TC）
 
-`--f-mono` 為 `"Jim Mono TC", "Noto Sans TC", monospace`。拉丁字母、數字、箭頭、框線字元與 CJK 都由自我代管的 [Jim Mono TC](https://github.com/jim60105/JimMonoTC)（SIL OFL 1.1）繪製，不依賴玩家電腦安裝的字型。Jim Mono TC 合併了 Hack 3.003 的拉丁字形與 Noto Sans CJK TC 的 CJK 字形，每個 CJK 字元的寬度剛好是兩個拉丁字元，因此含中文的框線地圖能逐欄對齊。Noto Sans TC 只負責 Jim Mono TC 未收錄的罕用 CJK（寬 1em）。
+`--f-mono` 為 `"Jim Mono TC", "Noto Sans TC", monospace`。拉丁字母、數字、箭頭、框線字元與 CJK 都由自我代管的 [Jim Mono TC](https://github.com/jim60105/JimMonoTC)（SIL OFL 1.1）繪製，不依賴玩家電腦安裝的字型。Jim Mono TC 合併了拉丁基底字形與 Noto Sans CJK TC 的 CJK 字形，每個 CJK 字元的寬度剛好是兩個拉丁字元，因此含中文的框線地圖能逐欄對齊。地圖幾何使用的一格寬度（`CELL_EM`，拉丁字元的 advance 除以 upem）唯一來源是匯入清單 `codepoints.json` 的 `cell_advance`，由 `lib/mono_cells.js` 的產生區塊匯出；上游換版改變格寬時，所有地圖標簽預算自動隨產生值重算，不需要改寫任何常數。Noto Sans TC 只負責 Jim Mono TC 未收錄的罕用 CJK（寬 1em）。
 
 字型保留程式設計連字（例如 `->`、`==`），連字的寬度與原本的字元數相同，不會改變欄位。
 
@@ -77,7 +77,7 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 Nerd Fonts 圖示（`icons-<N>`）、罕用 CJK（`cjk-x<N>`）與斜體不匯入。每個切片不超過 64 KB，頁面只下載實際繪製到的切片。
 
-切片、`licenses/`、`codepoints.json` 與 `styles/fonts-mono.css` 皆由匯入工具輸出並提交至版本庫，請勿手動編輯。升級字型時，先更新 `tools/import_mono_font.py` 中釘選的 release 與 SHA-256，再執行：
+切片、`licenses/`、`codepoints.json` 與 `styles/fonts-mono.css` 皆由匯入工具輸出並提交至版本庫，請勿手動編輯。升級字型時，先更新 `tools/import_mono_font.py` 中釘選的 release、資產檔名、SHA-256 與拉丁 `CELL_ADVANCE`（新版的 hmtx 實測值），再執行：
 
 ```sh
 uv run --locked python -m tools.import_mono_font

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
 from pathlib import Path
+from decimal import Decimal, ROUND_HALF_UP
 import subprocess
 import threading
 import unittest
@@ -12,6 +14,20 @@ from playwright.sync_api import sync_playwright
 from tools.spec_traceability import covers_requirement
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _cell_em() -> float:
+    """The shipped face's Latin cell advance, from the font manifest."""
+    manifest = json.loads(
+        (ROOT / "web/webclient-app/fonts/jimmonotc/codepoints.json").read_text(encoding="utf-8")
+    )
+    advance = manifest["cell_advance"]
+    return advance["advance"] / advance["upem"]
+
+
+def _snap(px: float) -> int:
+    """The engine's integer-pixel glyph-advance snap at scale 1, half up."""
+    return int(Decimal(px).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
 class VueTypographyBrowserTest(unittest.TestCase):
@@ -198,7 +214,12 @@ class VueTypographyBrowserTest(unittest.TestCase):
     def test_monospace_cells_are_exact(self):
         """CJK advances two Latin cells, `…`, `─`, and a ligature run one each, in both weights."""
         self.story("core-appshell--populated-hud", ".vitals")
-        probes = {"latin": "MMMM", "cjk": "看看看看", "narrow": "……──", "ligature": "->=="}
+        # Chromium rounds integer-pixel advances at scale 1, so the absolute
+        # Latin-cell check measures one glyph at 96 px, where the rounding
+        # stays inside 0.5 px and the cell measure itself is asserted. The
+        # 20 px 4-glyph runs carry the relative invariants (CJK = two Latin
+        # cells; `…`, `─`, and a ligature run = one), immune to that rounding.
+        probes = {"cell": "M", "latin": "MMMM", "cjk": "看看看看", "narrow": "……──", "ligature": "->=="}
         for weight in (400, 700):
             with self.subTest(weight=weight):
                 # A CDP-free DOM insert (not a `.locator()` hook). Kerning and
@@ -211,14 +232,15 @@ class VueTypographyBrowserTest(unittest.TestCase):
                       for (const [key, text] of Object.entries(probes)) {
                         const span = document.createElement('span');
                         span.className = `mono-probe mono-probe--${key}-${weight}`;
-                        span.style.cssText = `font: ${weight} 20px/1 var(--f-mono); white-space: pre;`
+                        const size = key === 'cell' ? 96 : 20;
+                        span.style.cssText = `font: ${weight} ${size}px/1 var(--f-mono); white-space: pre;`
                           + ' font-kerning: none; font-synthesis: none; position: absolute; left: 0; top: 0;';
                         span.textContent = text;
                         root.append(span);
                         spans[key] = span;
                       }
                       const all = Object.values(probes).join('');
-                      return document.fonts.load(`${weight} 20px "Jim Mono TC"`, all)
+                      return document.fonts.load(`${weight} 96px "Jim Mono TC"`, all)
                         .then(() => document.fonts.ready)
                         .then(() => ({
                           widths: Object.fromEntries(Object.entries(spans).map(([k, s]) => [k, s.getBoundingClientRect().width])),
@@ -230,10 +252,23 @@ class VueTypographyBrowserTest(unittest.TestCase):
                 )
                 self.assertTrue(widths["loaded"], f"no loaded Jim Mono TC face at {weight}")
                 cells = widths["widths"]
-                self.assertAlmostEqual(cells["latin"], 4 * 20 * 1233 / 2048, delta=0.5)
-                self.assertAlmostEqual(cells["cjk"], 2 * cells["latin"], delta=0.5)
-                self.assertAlmostEqual(cells["narrow"], cells["latin"], delta=0.5)
-                self.assertAlmostEqual(cells["ligature"], cells["latin"], delta=0.5)
+                # One `M` at 96 px pins the cell measure itself: the engine's
+                # integer-pixel advance snap at scale 1 costs at most 0.5 px
+                # on the 56 px cell, so the shipped release's advance (the
+                # manifest's `cell_advance`) is asserted, not an echo.
+                self.assertAlmostEqual(cells["cell"], 96 * _cell_em(), delta=0.5)
+                # At 20 px the engine snaps every glyph advance to a whole
+                # pixel (11.72 -> 12, 23.44 -> 23), so every 4-glyph run is
+                # 4x its own snapped advance. CJK still draws exactly two
+                # cells per glyph from the bundled face (4x the snapped
+                # double cell), and `…`, `─`, and the ligature run each keep
+                # the Latin cell. A face that drifted off this model fails
+                # loudly here.
+                cell = _cell_em() * 20
+                self.assertAlmostEqual(cells["latin"], 4 * _snap(cell), delta=0.5)
+                self.assertAlmostEqual(cells["cjk"], 4 * _snap(2 * cell), delta=0.5)
+                self.assertAlmostEqual(cells["narrow"], 4 * _snap(cell), delta=0.5)
+                self.assertAlmostEqual(cells["ligature"], 4 * _snap(cell), delta=0.5)
                 for key in probes:
                     fonts = self.rendered_fonts(f".mono-probe--{key}-{weight}")
                     self.assertBundledFace(fonts, "Jim Mono TC")

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CELL_EM, ONE_CELL_RUNS, codePointCells, textCells } from "../../lib/mono_cells.js";
+import manifest from "../../fonts/jimmonotc/codepoints.json";
 
 // Monospace cell measure (webclient-map-label-cell-budget D1): one cell for a
 // code point the bundled face draws narrow, two for everything else.
 describe("mono_cells", () => {
-  it("declares one cell as 1233/2048 em", () => {
-    expect(CELL_EM).toBeCloseTo(0.60205, 5);
+  it("declares one cell as the manifest's Latin cell advance", () => {
+    expect(CELL_EM).toBeCloseTo(manifest.cell_advance.advance / manifest.cell_advance.upem, 12);
   });
 
   it("counts code points the face draws narrow as one cell", () => {

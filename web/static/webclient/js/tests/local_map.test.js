@@ -295,11 +295,22 @@ test("exitLabelFor ignores non-traversable edges and stays silent without data",
 
 const { RADIAL_GEOMETRY, variantForLayer, remoteDirection, edgeMarkersFor } = LocalMap;
 
+// The shipped face's Latin cell measure, read from the same manifest the
+// generated mono_cells.js block is derived from (the browser test proves the
+// generated block equals this ratio).
+const CELL_ADVANCE = JSON.parse(
+  require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "../../../../webclient-app/fonts/jimmonotc/codepoints.json"),
+    "utf8"
+  )
+).cell_advance;
+const CELL_EM = CELL_ADVANCE.advance / CELL_ADVANCE.upem;
+
 // Renderer-true footprint boxes from design D1: marker x±9, y±9 and label
-// 69x23 spanning y in [+3, +26] under the node origin (the worst truncated
-// label in monospace cells at the island's 12-unit step). A pair overlaps
+// CELL_EM-derived box spanning y in [+3, +26] under the node origin (the
+// worst truncated label — 9 cells — at the island's 12-unit step). A pair overlaps
 // when both axis overlaps are strict; >=1-unit separation is the contract.
-const LABEL_W = 69;
+const LABEL_W = Math.ceil(9 * CELL_EM * 12) + 3;
 const FOOTPRINTS = [
   { name: "marker/marker", dx: 9, dy: 9 },
   { name: "marker/label", dx: LABEL_W / 2, dy: 17.5 },
@@ -623,8 +634,8 @@ test("edge marker packing clears every legal input at both surfaces", () => {
     { name: "island", cw: 90, ch: 58, mh: 9, nw: 0, nh: 0 },
     { name: "island_with_names", cw: 90, ch: 58, mh: 9, nw: 0, nh: 16 },
     // The overlay's outward name box: (labelMax 10 + 1) × 2 monospace cells
-    // of 1233/2048 em at its 11-unit marker-name step.
-    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 22 * (1233 / 2048) * 11, nh: 16 },
+    // of CELL_EM em at its 11-unit marker-name step.
+    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 22 * CELL_EM * 11, nh: 16 },
   ];
   for (const s of surfaces) {
     const reach = Math.SQRT2 * s.mh;
@@ -764,11 +775,9 @@ test("edge marker packing clears every legal input at both surfaces", () => {
 
 test("radial geometry contract survives every shape the 64-node payload yields", () => {
   // Pins the D1 recurrence directly (the contract the model implements).
-  assert.equal(RADIAL_GEOMETRY.ARC, 77);
-  assert.equal(RADIAL_GEOMETRY.R0, 82);
-  assert.equal(RADIAL_GEOMETRY.G, 82);
   assert.equal(RADIAL_GEOMETRY.ARC, Math.ceil(Math.hypot(LABEL_W, 23)) + 4);
   assert.equal(RADIAL_GEOMETRY.R0, RADIAL_GEOMETRY.ARC + 5);
+  assert.equal(RADIAL_GEOMETRY.G, RADIAL_GEOMETRY.R0);
   assert.equal(RADIAL_GEOMETRY.LABEL_BOTTOM, 26);
   assert.equal(RADIAL_GEOMETRY.PAD, 24);
 
@@ -856,7 +865,7 @@ test("radial geometry contract survives every shape the 64-node payload yields",
   // (d) adversarial stress shapes: the 63-ring hop-chain and the dense ring.
   const chain = radialFor(new Array(63).fill(1));
   assert.deepEqual(footprintsViolating(chain), []);
-  // 63 hop rings at G = 82 each, plus the label bottom and padding per side.
+  // 63 hop rings at G each, plus the label bottom and padding per side.
   const chainSide = 2 * (63 * RADIAL_GEOMETRY.G + RADIAL_GEOMETRY.LABEL_BOTTOM + RADIAL_GEOMETRY.PAD);
   assert.ok(Math.abs(chain.width - chainSide) < 1e-6, `chain side ${chain.width}`);
   const dense = radialFor([63]);

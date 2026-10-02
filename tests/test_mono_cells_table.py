@@ -36,6 +36,22 @@ class MonoCellsTableTest(unittest.TestCase):
         for cp in (0x4E2D, 0xFF08, 0x2460, 0x3000):
             self.assertNotIn(cp, one_cell, hex(cp))
 
+    def test_the_committed_cell_em_is_the_manifest_advance_ratio(self):
+        # The map's cell measure has exactly one authored source: the manifest's
+        # cell_advance. The committed generated block must equal what the
+        # manifest regenerates, and the generated expression must evaluate to
+        # the manifest ratio itself, not a hand-written copy.
+        # Annotate with
+        # covers_requirement("webclient-local-map::the-shipped-font-manifest-is-the-single-source-of-the-map-cell-measure")
+        # when the decouple-map-metrics-from-font-release delta syncs into the
+        # main spec (active-change IDs are not yet in the traceability index).
+        committed = gen_mono_cells.OUTPUT_PATH.read_text(encoding="utf-8")
+        cell = gen_mono_cells.load_cell_advance()
+        block = gen_mono_cells.render_cell_em(cell)
+        self.assertIn(block, committed)
+        expression = block.split("CELL_EM = ", 1)[1].split(";", 1)[0]
+        self.assertEqual(float(eval(expression)), cell["advance"] / cell["upem"])
+
 
 if __name__ == "__main__":
     unittest.main()
