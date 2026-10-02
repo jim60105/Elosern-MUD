@@ -124,10 +124,10 @@ def _standard_gallery_request_kwargs(capability) -> dict:
     The ``appearance``-only selection belongs to the character vocabulary and
     is passed only where the declaration supports field selection; a kind
     without it requests with no selection. Every such request carries the
-    shared default face rectangle and no binding or free text.
+    fitted default face rectangle (face_rect=None) and no binding or free text.
     """
     fields = ("appearance",) if capability.supports_field_selection else ()
-    return {"fields": fields, "face_rect": dict(gallery_api.DEFAULT_FACE_RECT)}
+    return {"fields": fields, "face_rect": None}
 
 
 def _guarded_gallery_request(subject, entity) -> bool:
@@ -570,7 +570,11 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     # capability: a supplied rect is validated for every gallery kind, and
     # ``None`` keeps the shared default downstream.
     if face_rect is not None:
-        face_rect = gallery_api.validate_face_rect(face_rect)
+        planned_image_size = {
+            "width": int(settings.ART_SD_PORTRAIT_WIDTH),
+            "height": int(settings.ART_SD_PORTRAIT_HEIGHT),
+        }
+        face_rect = gallery_api.validate_face_rect(face_rect, image_size=planned_image_size)
     # 3. The declared age precondition, read immediately before the request.
     # A kind without the declaration never reads the age attribute at all.
     apparent_age = None

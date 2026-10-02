@@ -9,12 +9,12 @@ generation error, first explicit default set) — never by a startup scan — an
 a subject with no record is a legal state that reads as an empty card list.
 
 Every card carries the exact reproduction, placement, and provenance contract
-(design §3.1): the verbatim prompt pair, the server-reported seed, the
+(design §3.1, §13): the verbatim prompt pair, the server-reported seed, the
 configured checkpoint, the requested fields, a normalized face rectangle, an
-optional equipment binding, the ``generated``/``seed`` source, and the write
-timestamp. Environment-driven generation parameters are never stored. The
-server keeps one image per card and never crops, transforms, or face-detects:
-``face_rect`` is stored verbatim for the browser to apply.
+image pixel size, an optional equipment binding, the ``generated``/``seed``
+source, and the write timestamp. Environment-driven generation parameters are
+never stored. The server keeps one image per card and never crops, transforms,
+or face-detects: ``face_rect`` is stored verbatim for the browser to apply.
 
 This module is the ONLY writer of gallery records and their cards. Lock
 discipline: ``gallery_lock`` serializes every record mutation; a caller that
@@ -61,6 +61,19 @@ from world.observability import log_debug, log_info, log_warn
 # from it.
 DEFAULT_FACE_RECT: dict[str, float] = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
 
+
+def default_face_rect(image_size: Mapping[str, int]) -> dict[str, float]:
+    """Return the fitted default face rectangle for an image pixel size.
+
+    Design §3.1, D3: keep the pinned upper-half anchor's width fraction and
+    placement, deriving the height fraction so the marked box is pixel-square:
+    ``{x: 0.25, y: 0.06, w: 0.5, h: 0.5 * width / height}``. On a square image
+    it equals ``DEFAULT_FACE_RECT`` exactly.
+    """
+    width = image_size["width"]
+    height = image_size["height"]
+    return {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5 * width / height}
+
 # The declared slot order. A binding mask is always stored in this order so
 # the same selection always serializes identically, and an equipment snapshot
 # always carries exactly these four keys.
@@ -80,6 +93,7 @@ CARD_KEYS = frozenset(
         "checkpoint",
         "requested_fields",
         "face_rect",
+        "image_size",
         "binding",
         "source",
         "created_at",
@@ -191,13 +205,17 @@ def _is_list_like(value: object) -> bool:
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
 
 
-def validate_face_rect(rect: object) -> dict:
+def validate_face_rect(rect: object, image_size: Mapping | None = None) -> dict:
     """Return the rect verbatim after enforcing the placement contract.
 
     Exactly ``x``, ``y``, ``w``, ``h`` as real numbers in ``[0, 1]`` with
     ``x + w <= 1``, ``y + h <= 1``, ``w > 0``, ``h > 0``. NaN values fail the
     comparisons and are rejected. Stored values are never rounded or
     otherwise altered.
+
+    When ``image_size`` is supplied, the rectangle must be pixel-square on that
+    image: ``abs(w * width - h * height) <= 1.0``. There is no value exemption:
+    even ``DEFAULT_FACE_RECT`` rejects when evaluated against a non-square size.
     """
     if not isinstance(rect, Mapping) or set(rect) != {"x", "y", "w", "h"}:
         raise GalleryRecordError(
@@ -213,7 +231,38 @@ def validate_face_rect(rect: object) -> dict:
         raise GalleryRecordError("face_rect must lie inside the unit square")
     if rect["w"] <= 0 or rect["h"] <= 0:
         raise GalleryRecordError("face_rect w and h must be positive")
+    if image_size is not None:
+        width = image_size["width"]
+        height = image_size["height"]
+        pixel_w = rect["w"] * width
+        pixel_h = rect["h"] * height
+        if abs(pixel_w - pixel_h) > 1.0:
+            raise GalleryRecordError(
+                f"face_rect must be pixel-square on {width}x{height} (got {pixel_w:.2f}x{pixel_h:.2f})"
+            )
     return {name: rect[name] for name in ("x", "y", "w", "h")}
+
+
+def validate_image_size(size: object) -> dict[str, int]:
+    """Return validated image dimensions as ``{'width': int > 0, 'height': int > 0}``."""
+    if not isinstance(size, Mapping) or set(size) != {"width", "height"}:
+        raise GalleryRecordError(
+            "image_size must be a mapping of exactly width and height"
+        )
+    width = size["width"]
+    height = size["height"]
+    if (
+        not _is_real_number(width)
+        or not isinstance(width, int)
+        or width <= 0
+        or not _is_real_number(height)
+        or not isinstance(height, int)
+        or height <= 0
+    ):
+        raise GalleryRecordError(
+            "image_size width and height must be positive integers"
+        )
+    return {"width": width, "height": height}
 
 
 def validate_binding(binding: object) -> dict | None:
@@ -354,12 +403,13 @@ def validate_card(
 ) -> dict:
     """Return the stored-form card after enforcing the card contract.
 
-    With ``api_defaults`` (the write boundary) ``face_rect`` and
-    ``created_at`` may be omitted and are filled with ``DEFAULT_FACE_RECT``
-    and the current epoch time; every other contract key is required, no
-    extra key is tolerated, and no environment-driven generation parameter
-    can be stored. Reads pass ``api_defaults=False``, which requires the
-    complete ten-key stored contract.
+    With ``api_defaults`` (the write boundary) ``face_rect`` and ``created_at``
+    may be omitted and are filled with ``default_face_rect(image_size)`` and
+    the current epoch time. ``image_size`` must be supplied by the caller as a
+    trusted dimension mapping. Every other contract key is required, no extra
+    key is tolerated, and no environment-driven generation parameter can be
+    stored. Reads pass ``api_defaults=False``, which requires the complete
+    eleven-key stored contract.
     """
     if not isinstance(card, Mapping):
         raise GalleryRecordError("a gallery card must be a mapping")
@@ -416,6 +466,7 @@ def validate_card(
     source = card["source"]
     if not isinstance(source, str) or source not in GALLERY_CARD_SOURCES:
         raise GalleryRecordError("source must be one of generated, seed")
+    image_size = validate_image_size(card["image_size"])
 
     if api_defaults and "created_at" not in card:
         created_at = time.time()
@@ -425,9 +476,9 @@ def validate_card(
         raise GalleryRecordError("created_at must be a finite epoch timestamp")
 
     if api_defaults and "face_rect" not in card:
-        face_rect = dict(DEFAULT_FACE_RECT)
+        face_rect = default_face_rect(image_size)
     else:
-        face_rect = validate_face_rect(card["face_rect"])
+        face_rect = validate_face_rect(card["face_rect"], image_size=image_size)
     binding = validate_binding(card["binding"])
     stored_identity = _validate_stored_identity(
         card["stored_identity"], kind_directory, subject.key, image_id
@@ -440,6 +491,7 @@ def validate_card(
         "checkpoint": checkpoint,
         "requested_fields": list(requested_fields),
         "face_rect": face_rect,
+        "image_size": image_size,
         "binding": binding,
         "source": source,
         "created_at": created_at,
@@ -763,14 +815,31 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
     """Re-mark one existing card's face rectangle, stored verbatim.
 
     The placement-only in-place writer (``gallery-card-update-api``, D9):
-    the incoming rectangle passes the shared ``validate_face_rect`` before
-    any write and is stored unaltered — no crop, no second image, no file
-    write. A malformed or missing entry match is the ``remove_card`` miss
-    form, and one ``gallery_card_updated`` facade event closes a successful
-    update. Returns the updated stored card.
+    the incoming rectangle passes the shared ``validate_face_rect`` against
+    the card's recorded ``image_size`` before any write and is stored
+    unaltered — no crop, no second image, no file write. A malformed or
+    missing entry match is the ``remove_card`` miss form, and one
+    ``gallery_card_updated`` facade event closes a successful update.
+    Returns the updated stored card.
     """
+    with gallery_lock:
+        record = record_for(subject)
+        if record is None:
+            raise GalleryRecordError("this subject has no gallery record")
+        located = None
+        for entry in record.db.cards or []:
+            try:
+                validated = validate_card(entry, subject, api_defaults=False)
+            except GalleryRecordError:
+                continue
+            if validated["image_id"] == image_id:
+                located = validated
+                break
+        if located is None:
+            raise GalleryRecordError(f"no card with image_id {image_id!r} exists")
+        valid_rect = validate_face_rect(face_rect, image_size=located["image_size"])
     return _update_card_field(
-        subject, image_id, "face_rect", validate_face_rect(face_rect)
+        subject, image_id, "face_rect", valid_rect
     )
 
 

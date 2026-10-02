@@ -308,6 +308,7 @@ def _settle_one(
                 prompt={"positive": image.prompt, "negative": image.negative_prompt},
                 seed=image.seed,
                 checkpoint=image.checkpoint,
+                image_size={"width": image.decoded_width, "height": image.decoded_height},
             )
         except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
             log_warn(

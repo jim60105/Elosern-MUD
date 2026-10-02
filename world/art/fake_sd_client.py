@@ -70,4 +70,9 @@ class FakeSDWebUIClient:
         for matcher, error in self._failures:
             if matcher is None or matcher(subject, description):
                 raise error
-        return GeneratedImage(data=DEFAULT_PNG, seed=self.seed)
+        return GeneratedImage(
+            data=DEFAULT_PNG,
+            seed=self.seed,
+            decoded_width=1,
+            decoded_height=1,
+        )

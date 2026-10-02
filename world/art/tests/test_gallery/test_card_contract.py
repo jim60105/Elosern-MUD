@@ -50,7 +50,7 @@ class CardContractTests(unittest.TestCase):
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_generated_card_stores_exactly_the_contract_keys(self):
         stored = validate_card(
-            _card_fields(self.subject, face_rect=dict(DEFAULT_FACE_RECT)),
+            _card_fields(self.subject, image_size={"width": 1000, "height": 1000}, face_rect=dict(DEFAULT_FACE_RECT)),
             self.subject,
         )
         self.assertEqual(
@@ -63,6 +63,7 @@ class CardContractTests(unittest.TestCase):
                 "checkpoint",
                 "requested_fields",
                 "face_rect",
+                "image_size",
                 "binding",
                 "source",
                 "created_at",
@@ -81,7 +82,7 @@ class CardContractTests(unittest.TestCase):
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_extra_missing_and_wrongly_typed_keys_are_rejected(self):
         base = _card_fields(self.subject)
-        complete = dict(base, face_rect=dict(DEFAULT_FACE_RECT))
+        complete = dict(base, image_size={"width": 1000, "height": 1000}, face_rect=dict(DEFAULT_FACE_RECT))
         missing_created = {k: v for k, v in complete.items() if k != "created_at"}
         violations = {
             "extra_key": dict(complete, steps=20),
@@ -114,7 +115,7 @@ class CardContractTests(unittest.TestCase):
         # Corruption must never escape as a bare TypeError/ValueError from
         # the validators (readers only catch GalleryRecordError).
         base = _card_fields(self.subject)
-        complete = dict(base, face_rect=dict(DEFAULT_FACE_RECT))
+        complete = dict(base, image_size={"width": 1000, "height": 1000}, face_rect=dict(DEFAULT_FACE_RECT))
         for label, card in {
             "unhashable_source": dict(complete, source=["generated"]),
             "unhashable_created_at": dict(complete, created_at=float("nan")),
@@ -126,8 +127,9 @@ class CardContractTests(unittest.TestCase):
 
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_face_rect_and_created_at_may_be_omitted_at_the_write_boundary(self):
-        stored = validate_card(_card_fields(self.subject), self.subject)
+        stored = validate_card(_card_fields(self.subject, image_size={"width": 1000, "height": 1000}), self.subject)
         self.assertEqual(stored["face_rect"], DEFAULT_FACE_RECT)
+        self.assertEqual(stored["image_size"], {"width": 1000, "height": 1000})
         self.assertIsInstance(stored["created_at"], float)
 
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")

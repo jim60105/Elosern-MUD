@@ -148,7 +148,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         image_file = self._make_file(_identity(subject, image_id), b"bytes stay")
         append_card(subject, **_card_fields(subject, image_id=image_id))
         default_before = record_for(subject).db.default_image_id
-        rect = {"x": 0.1, "y": 0.2, "w": 0.35, "h": 0.4}
+        rect = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         with patch("world.art.gallery.log_info") as info:
             updated = update_card_face_rect(subject, image_id, rect)
         self.assertEqual(updated["face_rect"], rect)
@@ -185,16 +185,15 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
     )
     def test_an_update_never_reapplies_the_shared_default_constant(self):
         # DEFAULT_FACE_RECT is only the append-time default; an update
-        # stores the submitted rect (here: the full-coverage legal extreme)
-        # and never rewrites it back to the constant.
+        # stores the submitted rect (here: a square rect on 768x1024)
+        # and never rewrites it back to the default.
         subject = _character("rect_full")
         image_id = _new_id()
         append_card(subject, **_card_fields(subject, image_id=image_id))
-        full = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
-        update_card_face_rect(subject, image_id, full)
+        square = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}
+        update_card_face_rect(subject, image_id, square)
         stored = cards_for(subject)[0]
-        self.assertEqual(stored["face_rect"], full)
-        self.assertNotEqual(stored["face_rect"], DEFAULT_FACE_RECT)
+        self.assertEqual(stored["face_rect"], square)
 
     @covers_requirement(
         "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
@@ -207,7 +206,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         append_card(subject, **_card_fields(subject, image_id=last))
         before = _raw_cards(subject)
         default_before = record_for(subject).db.default_image_id
-        rect = {"x": 0.4, "y": 0.4, "w": 0.5, "h": 0.5}
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}
         update_card_face_rect(subject, middle, rect)
         after = _raw_cards(subject)
         self.assertEqual([entry["image_id"] for entry in after], [first, middle, last])
@@ -231,11 +230,24 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
             "zero_width": {"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.5},
             "string_value": {"x": "0.0", "y": 0.0, "w": 0.5, "h": 0.5},
             "not_a_mapping": [0.0, 0.0, 0.5, 0.5],
+            "non_square_rect": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5},
         }.items():
             with self.subTest(rect=label):
                 with self.assertRaises(GalleryRecordError):
                     update_card_face_rect(subject, image_id, rect)
                 self.assertEqual(_raw_cards(subject), before)
+
+    @covers_requirement(
+        "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
+    )
+    def test_default_constant_rejected_on_non_square_card(self):
+        subject = _character("rect_nonsquare_constant")
+        image_id = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=image_id, image_size={"width": 768, "height": 1024}))
+        with self.assertRaises(GalleryRecordError):
+            update_card_face_rect(subject, image_id, DEFAULT_FACE_RECT)
+        stored = cards_for(subject)[0]
+        self.assertNotEqual(stored["face_rect"], DEFAULT_FACE_RECT)
 
     @covers_requirement(
         "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"
@@ -247,8 +259,9 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         # A never-minted id: the remove_card miss form, record unchanged.
         missing = _new_id()
         before = _raw_cards(subject)
+        square_rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}
         with self.assertRaises(GalleryRecordError) as refused:
-            update_card_face_rect(subject, missing, dict(DEFAULT_FACE_RECT))
+            update_card_face_rect(subject, missing, square_rect)
         self.assertEqual(
             str(refused.exception), f"no card with image_id {missing!r} exists"
         )
@@ -258,7 +271,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         # reports it once, exactly as the tolerant read does.
         record = record_for(subject)
         broken = dict(
-            _card_fields(subject, face_rect=dict(DEFAULT_FACE_RECT)),
+            _card_fields(subject, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}),
             image_id=_new_id(),
             source="imported",
         )
@@ -267,7 +280,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         before_with_broken = _raw_cards(subject)
         with patch("world.art.gallery.log_warn") as warn:
             with self.assertRaises(GalleryRecordError) as refused:
-                update_card_face_rect(subject, broken_id, dict(DEFAULT_FACE_RECT))
+                update_card_face_rect(subject, broken_id, square_rect)
         self.assertEqual(
             str(refused.exception), f"no card with image_id {broken_id!r} exists"
         )
@@ -286,7 +299,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
     def test_a_subject_with_no_record_refuses_with_the_record_form(self):
         subject = _character("rect_norecord")
         with self.assertRaises(GalleryRecordError) as refused:
-            update_card_face_rect(subject, _new_id(), dict(DEFAULT_FACE_RECT))
+            update_card_face_rect(subject, _new_id(), {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3})
         self.assertEqual(str(refused.exception), "this subject has no gallery record")
         self.assertIsNone(record_for(subject))
 
@@ -304,7 +317,7 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         record = record_for(subject)
         record.db.cards = ["not a mapping", *record.db.cards]
         broken_before = _raw_cards(subject)
-        rect = {"x": 0.0, "y": 0.5, "w": 0.5, "h": 0.5}
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}
         with patch("world.art.gallery.log_warn"), patch(
             "world.art.gallery.log_info"
         ) as info:

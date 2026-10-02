@@ -445,7 +445,11 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         tier = self.tiers[0]
         folder = self.seed_root / "monster" / tier
         folder.mkdir(parents=True)
-        (folder / "sentinel.png").write_bytes(b"\x89PNG seed bytes")
+        import base64
+        valid_png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        )
+        (folder / "sentinel.png").write_bytes(valid_png)
         expected_id = derive_image_id(f"monster/{tier}/sentinel.png")
         launched: list[str] = []
         art_steps = ("art_gallery_prune", "art_seed_sync", "art_sync_all")

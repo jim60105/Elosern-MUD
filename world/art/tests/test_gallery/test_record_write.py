@@ -32,7 +32,6 @@ from world.art.gallery import (
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
-
 from ._support import (
     _character,
     _monster,
@@ -124,6 +123,21 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         with self.assertRaises(GalleryRecordError):
             append_card(subject, **_card_fields(subject, image_id=image_id))
         self.assertEqual(len(cards_for(subject)), 1)
+
+    @covers_requirement("art-gallery-model::a-card-s-image-pixel-size-is-recorded-from-verified-bytes-at-append")
+    def test_size_less_append_refuses(self):
+        subject = _character("nosize")
+        fields = _card_fields(subject)
+        fields.pop("image_size")
+        with self.assertRaises(GalleryRecordError):
+            append_card(subject, **fields)
+        self.assertEqual(cards_for(subject), [])
+
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
+    def test_append_without_rect_fills_fitted_default(self):
+        subject = _character("fitteddefault")
+        stored = append_card(subject, **_card_fields(subject, image_size={"width": 768, "height": 1024}))
+        self.assertEqual(stored["face_rect"], {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375})
 
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_seed_provenance_card_without_prompt_or_seed_is_accepted(self):
