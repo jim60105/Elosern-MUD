@@ -583,12 +583,7 @@ def settle_gallery_generated(
         face_rect = record.db.gallery_face_rect
         if face_rect:
             if image_size is not None:
-                try:
-                    gallery_api.validate_face_rect(face_rect, image_size=image_size)
-                except gallery_api.GalleryRecordError:
-                    _remove_tmp(tmp_path)
-                    _finish_gallery_job(record, ArtAssetStatus.FAILED)
-                    return None
+                gallery_api.validate_face_rect(face_rect, image_size=image_size)
             card_fields["face_rect"] = face_rect
         stored = gallery_api.append_card(subject, **card_fields)
         # The recorded error describes the LAST generation attempt, so a

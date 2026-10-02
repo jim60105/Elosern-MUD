@@ -476,7 +476,7 @@ def validate_card(
         raise GalleryRecordError("created_at must be a finite epoch timestamp")
 
     if api_defaults and "face_rect" not in card:
-        face_rect = default_face_rect(image_size)
+        face_rect = validate_face_rect(default_face_rect(image_size), image_size=image_size)
     else:
         face_rect = validate_face_rect(card["face_rect"], image_size=image_size)
     binding = validate_binding(card["binding"])
