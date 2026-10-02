@@ -43,6 +43,7 @@ import uuid
 import zipfile
 from pathlib import Path
 from urllib.request import urlopen
+from urllib.request import Request
 
 from django.conf import settings
 
@@ -87,6 +88,11 @@ _MODEL_URL = "https://argos-net.com/v1/translate-zh_en-1_9.argosmodel"
 _MAX_MODEL_BYTES = 128 * 1024 * 1024
 _DOWNLOAD_TIMEOUT_SECONDS = 30
 _DOWNLOAD_CHUNK_BYTES = 1 << 20
+# The argos-net.com edge (Cloudflare) 403-blocks the default urllib agent
+# (``Python-urllib/3.x``), which latched the whole per-process download track
+# in the field; a declared agent — what the curl-based seeder sends — is
+# accepted.
+_DOWNLOAD_USER_AGENT = "elosern-mud/1.0 (prompt-translation model fetch)"
 # The five required entries, mirroring scripts/fetch-translate-model.sh's
 # checks plus the package's provenance README, unpacked exactly (never
 # `stanza/`).
@@ -335,8 +341,13 @@ class CTranslate2Backend:
         the body was buffered. The ``timeout`` covers connect and read; there
         are no retries. Any surprise propagates to ``_populate``'s bounded
         mapping.
+
+        The request carries the declared ``_DOWNLOAD_USER_AGENT``: the
+        argos-net.com edge rejects the default ``Python-urllib/*`` agent with
+        a 403, which used to latch the whole per-process download track.
         """
-        with urlopen(_MODEL_URL, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
+        request = Request(_MODEL_URL, headers={"User-Agent": _DOWNLOAD_USER_AGENT})
+        with urlopen(request, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
             declared = response.headers.get("Content-Length")
             if declared is not None:
                 try:

@@ -881,6 +881,24 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
     @covers_requirement(
         "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
     )
+    def test_the_fetch_declares_a_user_agent_on_the_request(self):
+        # Field regression: the argos-net.com edge 403-blocks urllib's
+        # default ``Python-urllib/*`` agent, latching the whole per-process
+        # download track while curl-based seeding worked. The fetch must hand
+        # urlopen a Request carrying the declared User-Agent.
+        self._install_stack(_ScriptedStack())
+        backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
+        with self._fetch_patch() as fetch:
+            backend.translate(("漢字",))
+        request = fetch.call_args.args[0]
+        self.assertEqual(
+            request.get_header("User-agent"),
+            translate_ct2._DOWNLOAD_USER_AGENT,
+        )
+
+    @covers_requirement(
+        "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
+    )
     def test_fetch_failure_is_bounded_emits_one_warn_and_latches(self):
         # Scenario: a fetch failure degrades and latches — bounded
         # art_translate_unavailable, no library import, exactly one
