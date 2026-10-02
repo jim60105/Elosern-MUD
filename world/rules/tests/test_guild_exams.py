@@ -236,9 +236,9 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
-        self.assertEqual(int(opponent.attributes.get("age")), 18)
-        self.assertEqual(int(opponent.attributes.get("apparent_age")), 18)
-        self.assertEqual(character_ages(opponent), (18, 18))
+        self.assertEqual(int(opponent.attributes.get("age")), 26)
+        self.assertEqual(int(opponent.attributes.get("apparent_age")), 26)
+        self.assertEqual(character_ages(opponent), (26, 26))
 
     def test_npc_intent_has_no_extra_authority(self):
         # No merit -> rejected identically for both requesters.

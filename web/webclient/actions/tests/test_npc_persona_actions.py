@@ -462,6 +462,8 @@ def _t_profile(key: str, greeting: str | None):
             habit="習慣",
             social_connection="",
         ),
+        age=25,
+        apparent_age=25,
         voice=NpcVoiceLines(greeting=greeting),
     )
 

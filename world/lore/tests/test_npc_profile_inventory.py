@@ -91,3 +91,49 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             NPC_PROFILE_REGISTRY["t_injected"] = None
         self.assertEqual(dict(NPC_PROFILE_REGISTRY), before)
+
+    @covers_requirement(
+        "npc-profile-registry::every-shipped-host-and-examiner-profile-authors-a-bounded-age-pair"
+    )
+    def test_every_shipped_host_and_examiner_has_bounded_age_pair(self):
+        from world.lore.settlements.places import PLACE_REGISTRY
+        from world.lore.guild import GUILD_RANK_REGISTRY
+
+        # All 25 place hosts
+        host_keys = {
+            place.service_id
+            for place in PLACE_REGISTRY.values()
+            if place.service_id is not None
+        }
+        self.assertEqual(len(host_keys), 25)
+        for host_key in host_keys:
+            with self.subTest(host_key=host_key):
+                self.assertIn(host_key, NPC_PROFILE_REGISTRY)
+                prof = NPC_PROFILE_REGISTRY[host_key]
+                self.assertIsInstance(prof.age, int)
+                self.assertNotIsInstance(prof.age, bool)
+                self.assertIsInstance(prof.apparent_age, int)
+                self.assertNotIsInstance(prof.apparent_age, bool)
+                self.assertTrue(0 <= prof.age <= 10000)
+                self.assertTrue(0 <= prof.apparent_age <= 10000)
+
+        # All 7 examiners
+        examiner_keys = {
+            rank.examiner_profile_key
+            for rank in GUILD_RANK_REGISTRY.values()
+            if rank.examiner_profile_key is not None
+        }
+        self.assertEqual(len(examiner_keys), 7)
+        for ex_key in examiner_keys:
+            with self.subTest(examiner_key=ex_key):
+                self.assertIn(ex_key, NPC_PROFILE_REGISTRY)
+                prof = NPC_PROFILE_REGISTRY[ex_key]
+                self.assertIsInstance(prof.age, int)
+                self.assertNotIsInstance(prof.age, bool)
+                self.assertIsInstance(prof.apparent_age, int)
+                self.assertNotIsInstance(prof.apparent_age, bool)
+                self.assertTrue(0 <= prof.age <= 10000)
+                self.assertTrue(0 <= prof.apparent_age <= 10000)
+
+        # Total 32 shipped profiles
+        self.assertEqual(len(host_keys | examiner_keys), 32)

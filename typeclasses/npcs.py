@@ -20,20 +20,35 @@ _DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_power", "hp")
 NPC_DEFAULT_AGE = 18
 
 
-def ensure_npc_canonical_age(npc: Any) -> None:
+def ensure_npc_canonical_age(
+    npc: Any,
+    age: int | None = None,
+    apparent_age: int | None = None,
+) -> None:
     """Ensure an NPC persists canonical age attributes (set-if-absent).
 
-    The default age for procedurally spawned or synced NPCs: sets ``age`` to
-    ``NPC_DEFAULT_AGE`` when missing and ``apparent_age`` to ``NPC_DEFAULT_AGE``
-    when missing, independently: an existing value is never overwritten, and a
-    missing field is never filled merely because the other field is absent.
-    No-op for NPCs whose identity already carries both values
-    (import/characterization paths), so it can run unconditionally on every
-    spawn/sync site.
+    Sets ``age`` and ``apparent_age`` when missing, independently: an existing
+    value is never overwritten, and a missing field is never filled merely
+    because the other field is absent.
+
+    When explicit values (e.g. from an authored profile) are provided, each absent
+    field uses its corresponding authored value; otherwise it falls back to
+    ``NPC_DEFAULT_AGE`` (18). Any provided non-None age must be a bounded integer
+    in 0..10000 (booleans rejected).
     """
-    for key in ("age", "apparent_age"):
-        if npc.attributes.get(key) is None:
-            npc.attributes.add(key, NPC_DEFAULT_AGE)
+    candidate_ages = {"age": age, "apparent_age": apparent_age}
+    # Prevalidate all provided candidates before writing any attribute
+    for field_name, candidate in candidate_ages.items():
+        if candidate is not None:
+            if type(candidate) is not int or not (0 <= candidate <= 10000):
+                raise ValueError(
+                    f"{field_name} must be an integer in 0..10000, got {candidate!r}"
+                )
+    # Set-if-absent independently
+    for field_name, candidate in candidate_ages.items():
+        if npc.attributes.get(field_name) is None:
+            fallback = candidate if candidate is not None else NPC_DEFAULT_AGE
+            npc.attributes.add(field_name, fallback)
 
 
 @dataclass(frozen=True)

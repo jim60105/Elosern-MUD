@@ -442,6 +442,8 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
                 habit="習慣",
                 social_connection="",
             ),
+            age=30,
+            apparent_age=30,
             voice=NpcVoiceLines(
                 greeting="你好呀，旅行者！",
                 misunderstood="哎呀，這我不清楚呢。",
@@ -495,6 +497,8 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
                 habit="習慣",
                 social_connection="",
             ),
+            age=30,
+            apparent_age=30,
             voice=NpcVoiceLines(greeting="Profile問候語"),
         )
         self.npc.db.npc_persona_meta = {
@@ -532,6 +536,8 @@ class DialogueVoiceRoutingTests(EvenniaCommandTestMixin, EvenniaTest):
                 habit="習慣",
                 social_connection="",
             ),
+            age=30,
+            apparent_age=30,
             voice=NpcVoiceLines(greeting="來自Profile的問候。"),
         )
         self.npc.db.npc_persona_meta = {

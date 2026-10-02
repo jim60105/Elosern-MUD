@@ -161,6 +161,8 @@ class DialogueExchangeHelperTests(EvenniaTest):
         profile = NpcProfile(
             key="t_degrade_profile_01",
             card=NpcCard(identity=NpcCardIdentity(public="旅人", hidden=""), appearance="外觀", personality="性格", speech_style="語氣", life_story="經歷", habit="習慣", social_connection=""),
+            age=30,
+            apparent_age=30,
             voice=NpcVoiceLines(greeting="來自Profile的問候語。"),
         )
         self.npc.db.npc_persona_meta = {"format": 1, "generation": 1, "persona_version": 1, "provenance": {"kind": "profile", "profile": "t_degrade_profile_01"}}

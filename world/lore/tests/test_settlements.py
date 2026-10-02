@@ -621,6 +621,8 @@ class PlaceRegistryTests(unittest.TestCase):
                 habit="t_習慣",
                 social_connection="",
             ),
+            age=30,
+            apparent_age=30,
         )
         place = self._plant(self.store, host_profile_key="t_registered_profile")
         with mock.patch(

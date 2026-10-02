@@ -55,6 +55,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "鑄刃者海莉爾·斯塔爾法爾手上的燙傷都由她照顧，兩人為此經常拌嘴。"
             ),
         ),
+        age=460,
+        apparent_age=33,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「啊？我沒聽懂喔。你是哪裡受傷了，還是想問藥的事？」"
@@ -100,6 +102,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "拿給她試。"
             ),
         ),
+        age=620,
+        apparent_age=28,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「嗯，這句我沒聽懂。你想練，還是想問場子的事？」"
@@ -144,6 +148,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "耳上的月牙耳環出自同一批。"
             ),
         ),
+        age=370,
+        apparent_age=20,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「哎？你剛才說什麼？我又想到別的事去了，再說一次吧。」"
@@ -187,6 +193,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "蒐羅者瓦爾溫·斯蒂爾瓦特爾編的蛛絲，有一大半進了她的織機。"
             ),
         ),
+        age=450,
+        apparent_age=36,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「這句沒聽懂。你想看衣服，還是想問織布的事？」"

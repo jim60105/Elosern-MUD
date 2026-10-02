@@ -117,12 +117,17 @@ def _sync_service_host(row, room) -> NPC:
     authored_map = project_row_kwargs(row.profession, row.service_id, row.authored_kwargs)
     anchor_slot = _row_anchor_class(row).get_component_slot()
     host = _find_service_host(row.service_id, anchor_slot)
+    profile = NPC_PROFILE_REGISTRY.get(row.profile_key)
+    prof_age = profile.age if profile else None
+    prof_app_age = profile.apparent_age if profile else None
     if host is None:
         with transaction.atomic():
-            host = _create_and_initialize_host(row, room, authored_map)
+            host = _create_and_initialize_host(row, room, authored_map, profile)
     elif host.location is not room:
         host.location = room
-    ensure_npc_canonical_age(host)
+        ensure_npc_canonical_age(host, age=prof_age, apparent_age=prof_app_age)
+    else:
+        ensure_npc_canonical_age(host, age=prof_age, apparent_age=prof_app_age)
     # Binding/anchor convergence rides the shared assembly on EVERY sync,
     # reused hosts included: service_binding/anchor_room_id are authored
     # roster config re-applied idempotently, not runtime identity, so the
@@ -134,7 +139,7 @@ def _sync_service_host(row, room) -> NPC:
     return host
 
 
-def _create_and_initialize_host(row, room, authored_map) -> NPC:
+def _create_and_initialize_host(row, room, authored_map, profile=None) -> NPC:
     """Build, baseline, initialize persona, and schedule creation event."""
     from world.rules.npc_identity import validate_npc_name, validate_npc_title
 
@@ -150,7 +155,9 @@ def _create_and_initialize_host(row, room, authored_map) -> NPC:
     host.subrace = place.host_subrace
     host.sex = place.host_sex
     host.apply_race_baseline()
-    profile = NPC_PROFILE_REGISTRY[row.profile_key]
+    if profile is None:
+        profile = NPC_PROFILE_REGISTRY[row.profile_key]
+    ensure_npc_canonical_age(host, age=profile.age, apparent_age=profile.apparent_age)
     initialize_npc_persona(
         host,
         profile.card.to_record(),
@@ -283,6 +290,22 @@ def sync_service_content() -> None:
     """
     catalog = get_catalog()
     roster = catalog.service_hosts
+    # Preflight check EVERY roster row's profile and age pair BEFORE any writes,
+    # including interiors repair, convergence deletion, or host creation.
+    for row in roster:
+        if row.profile_key not in NPC_PROFILE_REGISTRY:
+            raise ServiceAnchorIntegrityError(
+                f"service {row.service_id!r} names profile_key {row.profile_key!r} "
+                "which is absent from the NPC profile registry"
+            )
+        prof = NPC_PROFILE_REGISTRY[row.profile_key]
+        for field_name in ("age", "apparent_age"):
+            val = getattr(prof, field_name, None)
+            if type(val) is not int or not (0 <= val <= 10000):
+                raise ServiceAnchorIntegrityError(
+                    f"service {row.service_id!r} profile {row.profile_key!r} has invalid "
+                    f"{field_name} {val!r}; must be an integer in 0..10000"
+                )
     rooms = {row.service_id: _room_by_tag(row.anchor_room) for row in roster}
     if any(room is None for room in rooms.values()):
         log_warn(
@@ -302,17 +325,6 @@ def sync_service_content() -> None:
                 },
             )
     processable = [row for row in roster if rooms[row.service_id] is not None]
-    # Fail closed on duplicate anchors BEFORE any mutation, convergence
-    # deletion included — the unchanged single-host invariant: a named
-    # integrity error means nothing is created, renamed, or deleted. The
-    # probe reads only live component anchors, so it covers EVERY row even
-    # when its room cannot resolve.
-    for row in roster:
-        if row.profile_key not in NPC_PROFILE_REGISTRY:
-            raise ServiceAnchorIntegrityError(
-                f"service {row.service_id!r} names profile_key {row.profile_key!r} "
-                "which is absent from the NPC profile registry"
-            )
     for row in roster:
         _find_service_host(row.service_id, _row_anchor_class(row).get_component_slot())
     _converge_service_hosts({row.service_id for row in roster})

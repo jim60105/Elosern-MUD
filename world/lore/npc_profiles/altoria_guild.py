@@ -60,6 +60,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "新人。南門衛兵隊長托瓦德·鄧堡會把進城找活的旅人指到公會來。"
             ),
         ),
+        age=50,
+        apparent_age=50,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「抱歉，我沒有聽懂。請把你要辦的事再說一次，說得具體一些。」"
@@ -102,6 +104,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "分會會長葛里安·衛登會把剛登記的新人交給雷加照看。"
             ),
         ),
+        age=33,
+        apparent_age=33,
     ),
     NpcProfile(
         key="guild_examiner_e",
@@ -140,6 +144,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "結論。"
             ),
         ),
+        age=26,
+        apparent_age=26,
     ),
     NpcProfile(
         key="guild_examiner_d",
@@ -173,6 +179,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "固定盾牌的皮帶上油。"
             ),
         ),
+        age=40,
+        apparent_age=40,
     ),
     NpcProfile(
         key="guild_examiner_c",
@@ -206,6 +214,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "考核開始前會閉上眼睛數到十。結束後獨自把場地上的腳印看一遍。"
             ),
         ),
+        age=36,
+        apparent_age=36,
     ),
     NpcProfile(
         key="guild_examiner_b",
@@ -243,6 +253,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "三天兩頭找首席考官卡珊卓·銀輝切磋，至今輸多贏少。"
             ),
         ),
+        age=45,
+        apparent_age=45,
     ),
     NpcProfile(
         key="guild_examiner_a",
@@ -279,6 +291,8 @@ ROWS: tuple[NpcProfile, ...] = (
                 "資深考官霍克·赤刃常來找卡珊卓切磋，多半敗下陣來。"
             ),
         ),
+        age=40,
+        apparent_age=40,
     ),
     NpcProfile(
         key="guild_examiner_s",
@@ -315,5 +329,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 "到了分會總是先在大廳角落坐一會兒，喝一杯白開水，看人進出。"
             ),
         ),
+        age=68,
+        apparent_age=52,
     ),
 )
