@@ -176,10 +176,10 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   update that manifest in the same change, or the CI ownership contract
   (`tests.test_evennia_test_optimization_contract`) fails on every branch after
   yours. Verify locally by running
-  `uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
-  with `MUD_TEST_SETTINGS=1` passed through the Bash tool's `env` input (an
-  inline `MUD_TEST_SETTINGS=1 ...` prefix is rejected by the Evennia test
-  guard).
+  `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
+  where `<file>` contains `MUD_TEST_SETTINGS=1`. Use the single-token
+  `--env-file=<path>` spelling: the Evennia test guard rejects both an inline
+  `MUD_TEST_SETTINGS=1 ...` prefix and the two-token `--env-file <file>` form.
 - Before handoff or archive, run `uv run --locked python -m tools.contract_gate`
   (traceability, the two lints, shard manifests, and the shard-ownership and
   frozen-audit contracts; seconds). It is not a test run to skip; CI preflight

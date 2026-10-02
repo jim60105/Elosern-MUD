@@ -455,7 +455,7 @@ function analyzeCommand(command: string): CommandAnalysis {
         return {
           kind: "unsupported",
           reason:
-            "inline environment-assignment prefixes before the Evennia test command are not supported; pass environment values through the Bash tool's env input instead",
+            "inline environment-assignment prefixes before the Evennia test command are not supported; set MUD_TEST_SETTINGS via `uv run --locked --env-file=<file>` (single-token --env-file=<path> form, file containing MUD_TEST_SETTINGS=1) instead",
         };
       }
     }

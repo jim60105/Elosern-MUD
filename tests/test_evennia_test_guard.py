@@ -572,7 +572,7 @@ class FailClosedCompositionTests(_GuardHarnessTestCase):
             self.assertIn("Run Focus Test", reason, "reason points at a standalone focused command")
 
         self.assertIn("environment-assignment prefix", by_id["inline-env"]["decision"]["reason"])
-        self.assertIn("env input", by_id["inline-env"]["decision"]["reason"])
+        self.assertIn("--env-file", by_id["inline-env"]["decision"]["reason"])
         self.assertIn("--testrunner is reserved", by_id["caller-testrunner"]["decision"]["reason"])
         self.assertIn("final shell command", by_id["trailing-segment"]["decision"]["reason"])
         self.assertIn("background", by_id["background"]["decision"]["reason"])
