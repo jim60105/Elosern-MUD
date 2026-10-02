@@ -112,6 +112,7 @@ prompts:
 | `ART_SD_MAX_RESPONSE_BYTES` | 同名 | `52428800`（50 MiB） | 回應本文／base64 上限 |
 | `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | 同名 | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：首次生成前把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次；僅在生成流程觸發，`@art health` 探測不會觸發）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 執行個體；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
+| `ART_SD_SERVER_RETAIN_IMAGES` | 同名 | `True` | 是否允許遠端 sd-webui 伺服器在輸出目錄留存生成的 sample 與 grid 圖檔。`False` 時在 txt2img 請求加入 `do_not_save_samples: true` 與 `do_not_save_grid: true` 抑制伺服器端複本，僅影響遠端伺服器磁碟、引擎本機 art-store 保存完全不受影響；此為單次請求控制，不修改伺服器持久設定 |
 | `ART_SD_OUTPUT_FORMAT` | 同名 | `png` | 本機轉碼輸出的格式（`png`／`webp`／`jpeg`／`avif`，大小寫不拘）；衍生副檔名 `.png`／`.webp`／`.jpg`／`.avif`。切換格式後既有資產照常展示與服務，直到個別主題重新生成才換檔（換檔時舊檔在新狀態提交後才刪除） |
 | `ART_SD_OUTPUT_QUALITY` | 同名 | `80` | 有損格式（webp／jpeg／avif）的品質 1–100；png 忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |

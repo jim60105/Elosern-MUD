@@ -432,6 +432,7 @@ ART_SD_MAX_IMAGE_PIXELS = _env_int("ART_SD_MAX_IMAGE_PIXELS", 16777216)
 # pre-pin permanently mutates the shared server's persistent default, so it
 # defaults to False and is meant only for a dedicated sd-webui instance.
 ART_SD_PREPIN_SAMPLES_FORMAT = _env_bool("ART_SD_PREPIN_SAMPLES_FORMAT", False)
+ART_SD_SERVER_RETAIN_IMAGES = _env_bool("ART_SD_SERVER_RETAIN_IMAGES", True)
 
 # Local output-format pipeline (art-output-format-pipeline). The wire format
 # stays PNG; these knobs govern the local conversion applied before the store

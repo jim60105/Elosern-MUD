@@ -207,6 +207,9 @@ def build_txt2img_request(subject: ArtSubject, description: str) -> dict[str, An
     styles = _split_name_list(settings.ART_SD_STYLES)
     if styles:
         request["styles"] = styles
+    if not settings.ART_SD_SERVER_RETAIN_IMAGES:
+        request["do_not_save_samples"] = True
+        request["do_not_save_grid"] = True
     return request
 
 

@@ -318,3 +318,26 @@ class TestSettingsSanitizationTests(_SubprocessSettingsTests):
         # unseeded directory.
         expected["ART_TRANSLATE_DOWNLOAD_ENABLED"] = "False"
         self.assertEqual(_printed_map(result.stdout, set(DEFAULT_REPR)), expected)
+
+    @covers_requirement(
+        "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
+    )
+    def test_test_settings_pop_inherited_server_retain_images(self):
+        code = "\n".join(
+            [
+                "import sys",
+                "sys.argv = ['evennia', 'test']",
+                "import server.conf.test_settings as t",
+                "print('ART_SD_SERVER_RETAIN_IMAGES', repr(t.ART_SD_SERVER_RETAIN_IMAGES))",
+            ]
+        )
+        for val in ("false", "maybe"):
+            with self.subTest(val=val):
+                result = self._run(
+                    code,
+                    MUD_TEST_SETTINGS="1",
+                    ART_SD_SERVER_RETAIN_IMAGES=val,
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                printed = _printed_map(result.stdout, {"ART_SD_SERVER_RETAIN_IMAGES"})
+                self.assertEqual(printed["ART_SD_SERVER_RETAIN_IMAGES"], "True")

@@ -20,6 +20,7 @@ variable, using typed conversion at settings import. The env-backed set is exact
 `ART_SD_SCENE_WIDTH`, `ART_SD_SCENE_HEIGHT`, `ART_SD_PORTRAIT_WIDTH`, `ART_SD_PORTRAIT_HEIGHT`,
 `ART_SD_MAX_RESPONSE_BYTES`, `ART_SD_MAX_IMAGE_DIMENSIONS`, `ART_SD_MAX_IMAGE_PIXELS`,
 `ART_SD_PREPIN_SAMPLES_FORMAT`, `ART_SD_OUTPUT_FORMAT`, `ART_SD_OUTPUT_QUALITY`,
+`ART_SD_SERVER_RETAIN_IMAGES`,
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`,
 `ART_REMBG_ENABLED`, `ART_REMBG_MODEL`, `ART_REMBG_DOWNLOAD_ENABLED`,
 `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`,
@@ -55,6 +56,7 @@ inclusive 1-to-10 integer for `ELOSERN_MAX_CHARACTERS`
 (values below the lower bound or above the upper bound rejected);
 a positive float for `ART_SD_CFG_SCALE`; case-insensitive boolean words (`1/true/yes/on` true,
 `0/false/no/off` false, nothing else) for `ART_SD_PREPIN_SAMPLES_FORMAT`,
+`ART_SD_SERVER_RETAIN_IMAGES` (default `true`),
 `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_REMBG_ENABLED` (default `false`),
 `ART_REMBG_DOWNLOAD_ENABLED` (default `true`), `ART_TRANSLATE_ENABLED` (default `false`),
 `ART_TRANSLATE_DOWNLOAD_ENABLED` (default `true`), `ART_SCHEDULER_ENABLED`,
@@ -173,6 +175,18 @@ model download even when the shipped backend resolves against an unseeded direct
   `=256`, then separately with `=-1`, then separately with `=257`
 - **THEN** the first two succeed producing `0` and `256`, and the last two each raise the named
   settings error identifying `ART_TRANSLATE_THREADS` and its 0-to-256 rule
+
+#### Scenario: Server-retention defaults and boolean words are typed
+- **WHEN** settings are imported with `ART_SD_SERVER_RETAIN_IMAGES` absent, then separately empty, then separately with each case-insensitive true word `1/true/yes/on` and false word `0/false/no/off`
+- **THEN** absent and empty yield `True`, all true words yield boolean `True`, and all false words yield boolean `False`
+
+#### Scenario: An invalid server-retention override fails closed
+- **WHEN** settings are imported with `ART_SD_SERVER_RETAIN_IMAGES=maybe`
+- **THEN** import raises `ImproperlyConfigured` naming `ART_SD_SERVER_RETAIN_IMAGES`, quoting `maybe`, and stating the accepted boolean-word rule, without silently using a default
+
+#### Scenario: Inherited server-retention overrides cannot perturb tests
+- **WHEN** the test-settings bootstrap imports production settings with `ART_SD_SERVER_RETAIN_IMAGES=false` or separately `ART_SD_SERVER_RETAIN_IMAGES=maybe` inherited from the shell
+- **THEN** the bootstrap removes that variable before production settings import, the effective retention setting is the code default `True`, and the invalid inherited word cannot fail the test session
 
 ### Requirement: Invalid environment values fail settings load with a named error
 An environment variable that is present but cannot be coerced to its setting's declared type or
