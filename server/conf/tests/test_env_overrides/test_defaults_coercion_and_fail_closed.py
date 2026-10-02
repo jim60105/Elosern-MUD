@@ -148,6 +148,22 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             repr("mix/Taipei_style_v2.safetensors [3f5c2a1b]"),
         )
 
+    @covers_requirement(
+        "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
+    )
+    def test_http_user_agent_blank_and_whitespace_only_fall_back_to_default(self):
+        for raw in ("", "   ", "\t  \n"):
+            with self.subTest(raw=raw):
+                result = self._run(
+                    _settings_repr(["HTTP_USER_AGENT"]),
+                    HTTP_USER_AGENT=raw,
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                self.assertEqual(
+                    _printed_map(result.stdout, {"HTTP_USER_AGENT"}),
+                    {"HTTP_USER_AGENT": DEFAULT_REPR["HTTP_USER_AGENT"]},
+                )
+
 
 class FailClosedTests(_SubprocessSettingsTests):
     @covers_requirement(

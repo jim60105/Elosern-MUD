@@ -95,6 +95,7 @@ ENV_BACKED: dict[str, str] = {
     "ELOSERN_VUE_CLIENT": "ELOSERN_VUE_CLIENT",
     "MAX_NR_CHARACTERS": "ELOSERN_MAX_CHARACTERS",
     "DEFEAT_ADULT_SCENES": "DEFEAT_ADULT_SCENES",
+    "HTTP_USER_AGENT": "HTTP_USER_AGENT",
 }
 
 
@@ -135,6 +136,7 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_SCHEDULER_LIMIT": "4",
     "ELOSERN_VUE_CLIENT": "True",
     "MAX_NR_CHARACTERS": "5",
+    "HTTP_USER_AGENT": "'elosern-mud/1.0'",
 }
 
 
@@ -205,6 +207,7 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", "1", "1"),
     ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", "10", "10"),
     ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", " 5 ", "5"),
+    ("HTTP_USER_AGENT", "HTTP_USER_AGENT", " custom-agent/9 ", "'custom-agent/9'"),
 ]
 
 
@@ -324,6 +327,7 @@ class _SubprocessSettingsTests(unittest.TestCase):
                 "SD_WEBUI_BASE_URL",
                 "ELOSERN_VUE_CLIENT",
                 "ELOSERN_MAX_CHARACTERS",
+                "HTTP_USER_AGENT",
             )
         }
 

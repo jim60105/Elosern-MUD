@@ -633,6 +633,15 @@ MAX_NR_CHARACTERS = _env_int_bounded(
     "ELOSERN_MAX_CHARACTERS", 5, low=1, high=10
 )
 
+######################################################################
+# Outbound HTTP identity (configurable-http-user-agent)
+######################################################################
+# User-Agent header emitted on outbound HTTP requests made by the server
+# (prompt translation fetch, sd-webui worker, LLM client). Safe to derive
+# from the environment: public request identity metadata, neither a secret
+# credential nor an import-executing dotted path.
+HTTP_USER_AGENT = _env_str("HTTP_USER_AGENT", "elosern-mud/1.0")
+
 # Expose the flag to the webclient templates through the project context
 # processor (Evennia's general_context does not carry it).
 TEMPLATES = [
