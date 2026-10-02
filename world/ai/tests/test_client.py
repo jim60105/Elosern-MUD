@@ -321,7 +321,11 @@ class WireBodyTests(unittest.TestCase):
             '"content": "u"}], "temperature": 0.7, "max_tokens": 250}',
         )
         self.assertEqual(
-            captured_headers(agent), {"content-type": ["application/json"]}
+            captured_headers(agent),
+            {
+                "content-type": ["application/json"],
+                "user-agent": ["elosern-mud/1.0"],
+            },
         )
 
     @covers_requirement("llm-client::openai-compatible-chat-completions-client")
@@ -511,10 +515,13 @@ class WireHeaderTests(unittest.TestCase):
         self.assertEqual(
             captured_headers(agent),
             {
-                name.decode("utf-8").lower(): [v.decode("utf-8") for v in values]
-                for name, values in Headers(
-                    wire_profile().headers
-                ).getAllRawHeaders()
+                **{
+                    name.decode("utf-8").lower(): [v.decode("utf-8") for v in values]
+                    for name, values in Headers(
+                        wire_profile().headers
+                    ).getAllRawHeaders()
+                },
+                "user-agent": ["elosern-mud/1.0"],
             },
         )
 
@@ -535,6 +542,61 @@ class WireHeaderTests(unittest.TestCase):
         # by construction: the upstream deny-set rejects it at construction.
         with self.assertRaises(ProfileValidationError):
             wire_profile(headers={"Authorization": ("Bearer sk-smuggled",)})
+
+    @covers_requirement(
+        "llm-client::request-headers-carry-authentication-and-attribution-without-leaking-the-key"
+    )
+    def test_user_agent_header_derives_and_allows_explicit_override(self):
+        # Derived User-Agent when not explicitly configured in profile
+        with override_settings(HTTP_USER_AGENT="custom-agent/9"):
+            headers = captured_headers(send_once(wire_profile()))
+            self.assertEqual(headers["user-agent"], ["custom-agent/9"])
+
+        # Explicit profile headers win over derived User-Agent without doubling
+        # Exact-case User-Agent
+        headers_exact = captured_headers(
+            send_once(
+                wire_profile(
+                    headers={
+                        "Content-Type": ("application/json",),
+                        "User-Agent": ("explicit-agent/1",),
+                    }
+                )
+            )
+        )
+        self.assertEqual(headers_exact["user-agent"], ["explicit-agent/1"])
+
+        # Lowercase user-agent
+        headers_lower = captured_headers(
+            send_once(
+                wire_profile(
+                    headers={
+                        "Content-Type": ("application/json",),
+                        "user-agent": ("explicit-lower/2",),
+                    }
+                )
+            )
+        )
+        self.assertEqual(headers_lower["user-agent"], ["explicit-lower/2"])
+
+        # Long-lived client reads setting per-request
+        client = OpenAICompatClient(wire_profile())
+        agent = StubAgent(HeadlessResponse(200, b"{}"))
+        client.agent = agent
+        with override_settings(HTTP_USER_AGENT="first-ua/1"):
+            client.get_response(ChatRequestDescriptor(messages=[{"role": "user", "content": "1"}]))
+        with override_settings(HTTP_USER_AGENT="second-ua/2"):
+            client.get_response(ChatRequestDescriptor(messages=[{"role": "user", "content": "2"}]))
+        call1_headers = {
+            name.decode("utf-8").lower(): [v.decode("utf-8") for v in values]
+            for name, values in agent.calls[0][1]["headers"].getAllRawHeaders()
+        }
+        call2_headers = {
+            name.decode("utf-8").lower(): [v.decode("utf-8") for v in values]
+            for name, values in agent.calls[1][1]["headers"].getAllRawHeaders()
+        }
+        self.assertEqual(call1_headers["user-agent"], ["first-ua/1"])
+        self.assertEqual(call2_headers["user-agent"], ["second-ua/2"])
 
     @covers_requirement(
         "llm-client::request-headers-carry-authentication-and-attribution-without-leaking-the-key"

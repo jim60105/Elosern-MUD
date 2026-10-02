@@ -48,6 +48,7 @@ from urllib.request import Request
 from django.conf import settings
 
 from world.art.translate import TranslateError
+from world.http_identity import user_agent_headers
 from world.observability import log_info, log_warn
 
 # Deterministic decoding width (design D6 of add-ctranslate2-translate-backend):
@@ -90,9 +91,6 @@ _DOWNLOAD_TIMEOUT_SECONDS = 30
 _DOWNLOAD_CHUNK_BYTES = 1 << 20
 # The argos-net.com edge (Cloudflare) 403-blocks the default urllib agent
 # (``Python-urllib/3.x``), which latched the whole per-process download track
-# in the field; a declared agent — what the curl-based seeder sends — is
-# accepted.
-_DOWNLOAD_USER_AGENT = "elosern-mud/1.0 (prompt-translation model fetch)"
 # The five required entries, mirroring scripts/fetch-translate-model.sh's
 # checks plus the package's provenance README, unpacked exactly (never
 # `stanza/`).
@@ -342,11 +340,11 @@ class CTranslate2Backend:
         are no retries. Any surprise propagates to ``_populate``'s bounded
         mapping.
 
-        The request carries the declared ``_DOWNLOAD_USER_AGENT``: the
-        argos-net.com edge rejects the default ``Python-urllib/*`` agent with
-        a 403, which used to latch the whole per-process download track.
+        The request carries the configured User-Agent: the argos-net.com
+        edge rejects the default ``Python-urllib/*`` agent with a 403, which
+        used to latch the whole per-process download track.
         """
-        request = Request(_MODEL_URL, headers={"User-Agent": _DOWNLOAD_USER_AGENT})
+        request = Request(_MODEL_URL, headers=user_agent_headers())
         with urlopen(request, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
             declared = response.headers.get("Content-Length")
             if declared is not None:

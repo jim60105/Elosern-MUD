@@ -29,6 +29,7 @@ from world.ai.schemas.descriptor import ChatRequestDescriptor
 from world.ai.schemas.registry import resolve_output_schema
 from world.ai.schemas.response import validate_chat_completion_envelope
 
+from world.http_identity import http_user_agent
 from world.observability import log_warn
 from world.observability.sanitize import safe_endpoint
 
@@ -63,6 +64,7 @@ def _request_headers(profile: LLMProfile) -> dict[str, list[str]]:
         headers["X-Title"] = [profile.app_title]
     if profile.app_url:
         headers["HTTP-Referer"] = [profile.app_url]
+    headers["User-Agent"] = [http_user_agent()]
     for name, values in profile.headers.items():
         headers[name] = list(values)
     return headers

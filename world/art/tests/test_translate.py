@@ -888,13 +888,23 @@ class CTranslate2BackendDownloadTests(_CT2BackendCase):
         # urlopen a Request carrying the declared User-Agent.
         self._install_stack(_ScriptedStack())
         backend = self._backend(ART_TRANSLATE_DOWNLOAD_ENABLED=True)
-        with self._fetch_patch() as fetch:
-            backend.translate(("漢字",))
-        request = fetch.call_args.args[0]
-        self.assertEqual(
-            request.get_header("User-agent"),
-            translate_ct2._DOWNLOAD_USER_AGENT,
-        )
+        translate_ct2._ENGINES.clear()
+        shutil.rmtree(self.model_dir, ignore_errors=True)
+        with override_settings(HTTP_USER_AGENT="custom-agent/9"):
+            with self._fetch_patch() as fetch:
+                backend.translate(("漢字",))
+            request = fetch.call_args.args[0]
+            self.assertEqual(
+                request.get_header("User-agent"),
+                "custom-agent/9",
+            )
+        translate_ct2._ENGINES.clear()
+        shutil.rmtree(self.model_dir, ignore_errors=True)
+        with override_settings(HTTP_USER_AGENT="elosern-mud/1.0"):
+            with self._fetch_patch() as fetch:
+                backend.translate(("漢字",))
+            request = fetch.call_args.args[0]
+            self.assertEqual(request.get_header("User-agent"), "elosern-mud/1.0")
 
     @covers_requirement(
         "art-prompt-translation::the-model-artifact-follows-the-dual-track-download-policy"
