@@ -17,7 +17,11 @@ The main code areas are:
   monsters, rooms, and objects.
 - `world/lore/`: immutable, registry-backed world data, mirrored idempotently
   into Evennia Scripts at startup.
-- `world/rules/`: deterministic rules and the sole writer of game state.
+- `world/rules/`: primary deterministic engine and general-purpose state resolver.
+- `world/narrative/`: deterministic narrative owner (events, memory, threads,
+  correspondence, attention, context snapshots, authoring records, validated
+  beat scheduling) as each is progressively implemented; invokes existing
+  subsystem owners for non-narrative state and never permits generative mutation.
 - `world/imports/`: versioned JSON schemas, validation, and transactional
   loading.
 - `world/ai/`: generative systems. They may read state and emit validated
@@ -33,8 +37,10 @@ The main code areas are:
   are applied by the deterministic core — `world/rules/` (the primary,
   general-purpose engine) plus the sibling packages that own one persistent
   subsystem's own data directly (`world/maps/` for room/instance lifecycle,
-  `world/quests/` for quest lifecycle; each such package is named explicitly
-  here, not implied by proximity). `world/skills/` and `world/lore/` stay
+  `world/quests/` for quest lifecycle, and `world/narrative/` for persistent
+  narrative state: events, memory, threads, correspondence, attention/context
+  snapshots, authoring records, beat scheduling; each such package is named
+  explicitly here, not implied by proximity). `world/skills/` and `world/lore/` stay
   read-only/registry-only — any mutation they trigger routes back through
   `world/rules/`. No module under `world/ai/` applies a state change under any
   circumstance; it submits schema-valid proposals through the deterministic
