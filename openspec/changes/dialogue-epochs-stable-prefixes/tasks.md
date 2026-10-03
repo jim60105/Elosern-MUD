@@ -3,6 +3,7 @@
 - [ ] 1.1 Implement explicit epochs and retained summary provenance; verify failed/successful compaction and bounded offline history.
 - [ ] 1.2 Refactor all dialogue prompt callers to stability-ordered sections and location-only current frames; verify same-epoch append-only bytes, cross-actor global prefixes and hard budgets.
 - [ ] 1.3 Integrate version/persona invalidation and observability hashes/tokens; verify stale-persona, historical revisions and provider-caching-disabled behavior.
+- [ ] 1.4 Measure rendered epoch-summary inputs and outputs for the supported profiles, commit per-profile summary soft targets/hard limits and the calibration report including completion/Deep Recall/safety reservations; verify oversized summaries remain bounded and preserve original turns.
 
 ## 2. Evidence and handoff
 
