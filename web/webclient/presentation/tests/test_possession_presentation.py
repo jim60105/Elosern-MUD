@@ -143,9 +143,14 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertFalse(self.registry.render("roster", context)["available"])
         self.npc.account = self.account
         self.npc.db.possessed_by = self.player.pk
-        self.account.characters.remove(self.player)
-        self.assertFalse(self.registry.render("roster", context)["available"])
+        self.assertTrue(self.registry.render("roster", context)["available"])
         self.npc.db.party_member = None
+        self.assertFalse(self.registry.render("roster", context)["available"])
+        self.assertFalse(self.registry.render("party", context)["available"])
+        self.assertIn(self.npc.pk, self.player.db.party)
+        self.assertIn(self.player, self.account.characters.all())
+        self.npc.db.party_member = self.player.pk
+        self.account.characters.remove(self.player)
         self.assertFalse(self.registry.render("roster", context)["available"])
         self.npc.db.possessed_by = None
 
