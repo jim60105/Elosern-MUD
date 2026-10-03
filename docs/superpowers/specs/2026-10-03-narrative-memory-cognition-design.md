@@ -3,8 +3,9 @@
 Date: 2026-10-03
 
 Status: Architecture, technical behavior, and roadmap approved in discussion.
-Written-document review is required before implementation planning. Dream-scene
-presentation has a specifically disclosed approval exception in Section 6.4.
+Written-document review is required before implementation planning. Section 6.4
+records one retracted assistant position that is overridden by the user's
+approved explicit-presentation requirement.
 
 ## 1. Purpose and decision record
 
@@ -35,6 +36,8 @@ Approved product decisions:
   scope.
 - Dream collaboration allows six completed exchanges, followed by explicit
   confirmation or draft preservation and awakening.
+- Dream collaboration is rendered with explicit sexual presentation, consistent
+  with the game's established adult tone and canonical light-faith doctrine.
 - The W1 demonstration NPC is **尤漢娜‧庫柏 (Yohanna Cooper)**. No other named
   demonstration NPC or plot is inherited from the handoff.
 
@@ -352,18 +355,52 @@ or model failure preserves committed sleep and saved session progress. Resume
 saved discussion on a later entry; never duplicate sleep settlement or creative
 submission.
 
-### 6.4 Presentation exception requiring user review
+### 6.4 Approved explicit presentation contract
 
-The user requested explicit sexual presentation. An earlier assistant incorrectly
-agreed to specify it; that agreement is not carried forward as an implementation
-contract. This document specifies the setting and technical conversation lifecycle
-only, not explicit sexual prose, sexual progression, or sexual rendering rules.
+The dream session is presented explicitly. The player and the obscured
+goddess-like counterpart have sex on the bed in the pure-white space while they
+negotiate story direction. Non-graphic presentation is rejected because it would
+conflict with the game's existing mechanics and world canon. The repository
+already defines a live sexual-state subsystem:
 
-The user has not approved a non-graphic replacement. No replacement is silently
-claimed as approved. Presentation therefore remains outside the approved scope of
-this document, and W3 must not be described as fully implementation-ready until
-its presentation boundary is resolved. The six-exchange, confirmation, and
-awakening mechanics are independently approved.
+- `world/rules/sexual_state/handler.py` owns ordered `arousal`, `wetness`,
+  `shame`, `exposure`, and `climax_phase` traits, a bounded pleasure gauge,
+  lifetime occurrence counters, and `climax_today`.
+- `world/rules/sexual_state/pleasure.py` maps pleasure `0..100` onto five
+  canonical `AROUSAL_LEVELS` bands from `world/lore/sexual_vocab.py`.
+- The religion lore in `docs/lore/skill-trees/light.md` binds pleasure to
+  vitality, and `docs/lore/overview.md` defines orgasm as a public blessing.
+
+Dream prose must use that established vocabulary for bodies, stimulation,
+arousal, and climax rather than introducing a separate sanitized register. The
+interaction is continuous conversation during sex, so each generated exchange
+carries scene prose and the counterpart's dialogue as one validated response.
+
+The session uses a separate dream arousal track. It is deterministic and bound to
+the six-exchange budget, so each completed exchange advances a configured
+pleasure delta through the same canonical five bands and may enter
+`climax_phase` during the convergence or ending sequence. The track is scoped to
+the dream session and is **not** a live `SexualState` handler: it must not write
+persistent traits, pleasure gauges, sensitivity, lifetime counters,
+`climax_today`, buffs, skill advancement, codex unlocks, or relationship state.
+The deterministic sleep settlement already committed in Section 6.1 remains the
+sole physical-restoration path; dream climax is its narrative presentation, with
+no second restoration settlement.
+
+Explicit prose is generated through the existing guardrail pipeline rather than
+being authored as fixed strings in this design. The validator accepts explicit
+sexual content for this capability while continuing to reject hidden metadata,
+system fields, spoilers supplied outside the collaborator's permitted context, and
+claims that authoritative state has changed. The model's own dream arousal track
+is server-computed; a generated response cannot silently advance it and must
+describe the server-supplied phase.
+
+Voluntary exit and the six-exchange cap both offer confirmation or draft
+preservation before the ending sequence. If the server-computed track has reached
+climax, the ending renders the canonical post-climax phase before the white space
+fades and the player awakes. If the player exits earlier, the scene fades without
+forcing a climax. The ending itself requires no additional model call, so model
+failure cannot trap the player in the dream.
 
 ## 7. Threads, attention, and directors
 
@@ -451,9 +488,11 @@ Required behavior evidence:
 4. Time-skip integration crosses delivery deadlines and establishes guaranteed NPC
    delivery, player branch-only acquisition, unrestricted rereading, and
    duplicate-settlement safety.
-5. Dream-session tests establish the sixth-exchange boundary, explicit confirmation,
-   resumability, no duplicate submission, no second sleep settlement, and no
-   persistent character effects. They do not implement excluded presentation.
+5. Dream-session tests establish the sixth-exchange boundary, explicit
+   confirmation, resumability, no duplicate submission, no second sleep
+   settlement, and no writes to a live `SexualState` handler or other persistent
+   character effects. Offline fallback establishes awakening without additional
+   model output, not suppression of explicit content.
 6. Proposal tests establish rejection of unsupported effects, stale-state conflicts,
    letter-driven quest completion, and writes across unauthorized owners.
 7. Snapshot tests establish source provenance and revision identity across retries,
@@ -535,8 +574,8 @@ it does not depend on implementing the dream interface first.
 
 Acceptance: automatic existing-story continuation and confirmed player-originated
 new directions become validated, executable beats. The dream technical workflow
-uses the approved six-exchange contract. Its presentation exception in Section
-6.4 must remain visible and prevents claiming complete W3 approval.
+uses the approved six-exchange contract with the explicit presentation contract
+of Section 6.4.
 
 ### W4 — Maintenance and expanded recall
 
@@ -558,11 +597,11 @@ change in a workstream is mutually dependent.
 
 Non-goals are cargo mechanics, vector databases, all-world NPC background
 simulation, remote quest acceptance, narrative-text quest completion, automatic
-unrelated-story creation, authoring-driven rewrites of committed history,
-age-based gameplay branching, and explicit sexual rendering specifications.
+unrelated-story creation, authoring-driven rewrites of committed history, and
+age-based gameplay branching. Explicit sexual presentation in the dream session
+is approved in Section 6.4 and is not a non-goal.
 
 Do not implement code, create scaffolds, or apply OpenSpec changes from this
-conversation. First obtain review of this written document, including its
-presentation exception. After written-spec approval, use the writing-plans
+conversation. First obtain review of this written document. After written-spec approval, use the writing-plans
 workflow to plan the selected first subproject. W0's architecture amendment
 precedes W1 feature implementation.
