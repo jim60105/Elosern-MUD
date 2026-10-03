@@ -81,6 +81,8 @@ These were settled during design. Do not relitigate them inside a change.
 │                  Buffs  Economy               │
 │  world/maps/     map layers, instance TTL     │
 │  world/quests/   quest runtime                │
+│  world/narrative/ events, memory, threads,    │
+│                  letters, context, beats      │
 └───────────────────────────────────────────────┘
               ↓
         Django ORM / SQLite
@@ -108,6 +110,19 @@ apply it.
 > carried by the `ScenarioDirector`'s `QuestBlueprint`, which already contains the scene requirements.
 > The forward-declared `scene_builder` LLM profile stays registered and unused as a seam for a future
 > generative scene-flavor layer.
+>
+> **Amended 2026-10-03 (change `narrative-subsystem-ownership`).** Explicitly authorizes
+> `world/narrative/` as a named deterministic core subsystem owning persistent narrative data,
+> encoding the approved design at `docs/superpowers/specs/2026-10-03-narrative-memory-cognition-design.md`
+> (approved commits `2c216f0e` and `41a61572`). `world/narrative/` owns events, memory/revisions,
+> threads, correspondence (letters/delivery), attention and context snapshots, authoring records,
+> and validated beat scheduling as each capability is progressively implemented per approved proposals
+> (no empty scaffold packages are created up front). Existing subsystem owners retain their exclusive
+> responsibilities: general actions and relationship changes route to `world/rules/`, quest lifecycle
+> and materialization to `world/quests/`, room and instance lifecycle to `world/maps/`, and
+> `world/lore/` and `world/skills/` remain registry/read-only systems. `world/ai/` remains strictly
+> generative: it reads state and emits schema-valid proposals only, and never mutates game state
+> directly under any circumstance.
 
 ### 3.2 Directory layout
 
@@ -125,7 +140,7 @@ mygame/
 │   │                    sexual_vocab   ordered-level vocabularies (owned by change 4,
 │   │                                   consumed by change 7 — frozen with the contract)
 │   ├── rules/           primary deterministic engine (see §3.1's amended invariant:
-│   │                    world/maps/ and world/quests/ also apply state directly)
+│   │                    world/maps/, world/quests/, and world/narrative/ also apply state directly)
 │   │                    dice · combat · combat_session · action · targeting · clock
 │   │                    traits · sexual_state · buffs · progression · guild · economy
 │   │                    rulebook/   declarative rule tables (YAML)
@@ -134,6 +149,10 @@ mygame/
 │   │                    skills carry both static definitions and resolution
 │   │                    behaviour. Path forward-declared by change 4.
 │   ├── quests/          blueprint · runtime
+│   ├── narrative/       events · memory · threads · correspondence · attention ·
+│   │                    context snapshots · authoring records · director orchestration
+│   │                    (progressive implementation per approved proposals; no empty
+│   │                    scaffolding up front)
 │   ├── ai/              client · profiles · schemas/
 │   │                    director · scene · narrator · npc_dialogue · guardrail
 │   ├── imports/         schema (age gate) · validate CLI · loader · examples/
