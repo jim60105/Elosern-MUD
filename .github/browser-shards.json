@@ -209,6 +209,7 @@
       "name": "exploration-9",
       "files_a": [
         "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
+        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_companion_lineup_dialogue_geometry_and_real_possession",
         "web.tests.browser.test_browser_exploration_frame.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_look_at_scripted_host_shows_the_affinity_stage_line",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes",

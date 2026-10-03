@@ -60,8 +60,11 @@ function validatePartySlot(value, index) {
   if (displayName.length === 0 || hasLoneSurrogate(displayName)) {
     throw new Error("slot display_name must be non-empty");
   }
-  if (value.portrait_ref !== null) {
-    throw new Error("portrait_ref must be null in this schema version");
+  var portraitRef = value.portrait_ref;
+  if (portraitRef !== null && (
+    typeof portraitRef !== "string" || portraitRef.length > 32 || !/^[0-9]+$/.test(portraitRef)
+  )) {
+    throw new Error("portrait_ref must be a bounded decimal string or null");
   }
   var hpCurrent = requireInt(value.hp_current, "hp_current", 0, MAX_SAFE_INTEGER);
   var hpMaximum = requireInt(value.hp_maximum, "hp_maximum", 0, MAX_SAFE_INTEGER);
@@ -72,7 +75,7 @@ function validatePartySlot(value, index) {
   return {
     identity: identity,
     display_name: displayName,
-    portrait_ref: null,
+    portrait_ref: portraitRef,
     hp_current: hpCurrent,
     hp_maximum: hpMaximum,
     bond_stage: bondStage,

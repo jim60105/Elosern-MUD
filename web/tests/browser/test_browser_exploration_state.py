@@ -10,6 +10,7 @@ from .browser_helpers import (
     activate_overview_chip,
     fixture_home_node_id,
     install_outbound_recorder,
+    open_dialogue_choices,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -38,12 +39,76 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # These journeys assert shipped fixture identity end to end and were
         # never migrated to kit seams.
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+        if self._testMethodName == "test_companion_lineup_dialogue_geometry_and_real_possession":
+            runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
+            runtime.env["ELOSERN_BROWSER_COMPANION_LINEUP"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
+
+    def test_companion_lineup_dialogue_geometry_and_real_possession(self):
+        page = self.logged_in_page()
+        page.set_viewport_size({"width": 1280, "height": 720})
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 4)
+        state = store_state(page)
+        rows = state["panels"]["party"]["slots"]
+        player_id = int(state["panels"]["status"]["actor"]["identity"])
+        owner_roster_row = next(row for row in state["panels"]["roster"]["characters"] if row["current"])
+        target_id = rows[1]["identity"]
+        expected = [player_id, *[row["identity"] for row in rows]]
+        page.wait_for_selector('[data-testid="companion-figure"]')
+
+        def identities():
+            return page.locator('[data-testid="companion-figure"]').evaluate_all(
+                "(els) => els.map(el => Number(el.dataset.identity))"
+            )
+
+        self.assertEqual(identities(), expected)
+        host_id = self._live_exploration_panel(page)["interact"][0]["identity"]
+        activate_overview_chip(page, f"target-{host_id}")
+        _press(page, "Enter")
+        self._wait_panel(page, "dialogue", lambda p: p.get("available"))
+        open_dialogue_choices(page)
+        page.evaluate("document.fonts.ready")
+        boxes = page.evaluate("""() => {
+          const rect = el => { const r = el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; };
+          const figures = [...document.querySelectorAll('[data-testid="companion-figure"]')].map(rect);
+          const choices = rect(document.querySelector('[data-testid="dialogue-choices"]'));
+          const foes = [...document.querySelectorAll('[data-testid="foe-slot"]')].map(rect);
+          return {figures, choices, foes, width:innerWidth};
+        }""")
+        def intersects(a, b):
+            return a["left"] < b["right"] and b["left"] < a["right"] and a["top"] < b["bottom"] and b["top"] < a["bottom"]
+        for box in boxes["figures"]:
+            self.assertGreaterEqual(box["left"], -1, boxes)
+            self.assertLessEqual(box["right"], boxes["width"] / 2 + 1, boxes)
+            self.assertFalse(intersects(box, boxes["choices"]), boxes)
+            for foe in boxes["foes"]:
+                self.assertFalse(intersects(box, foe), boxes)
+        page.locator('[data-testid="dialogue-exit"]').click()
+        wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('status')")
+        page.locator('[data-testid="character-status-drawer__open-party"]').click()
+        page.locator(f'[data-testid="party-drawer__row-{target_id}"] [data-testid="party-drawer__possess-btn"]').click()
+        self.assertEqual(sent_action_count(page, "explore.possess"), 1)
+        self._wait_panel(page, "possession_banner", lambda p: p.get("available"))
+        swapped = [target_id, rows[0]["identity"], player_id, rows[2]["identity"], rows[3]["identity"]]
+        page.wait_for_function("(ids) => [...document.querySelectorAll('[data-testid=\"companion-figure\"]')].map(el=>Number(el.dataset.identity)).join(',') === ids.join(',')", arg=swapped)
+        self.assertEqual(identities(), swapped)
+        self.assertEqual(len(store_state(page)["panels"]["party"]["slots"]), 4)
+        possessed_roster = store_state(page)["panels"]["roster"]
+        self.assertTrue(possessed_roster["available"])
+        self.assertEqual(next(row for row in possessed_roster["characters"] if row["current"]), owner_roster_row)
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
+        page.locator('[data-testid="party-drawer__release-btn"]').click()
+        self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
+        wait_for_store_state(page, lambda s: s["panels"]["status"]["actor"]["identity"] == str(player_id))
+        self.assertEqual(identities(), expected)
 
     def _live_exploration_panel(self, page):
         # The panels mapping can be observed mid-snapshot-adoption without the

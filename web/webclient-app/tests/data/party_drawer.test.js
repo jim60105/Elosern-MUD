@@ -66,7 +66,7 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
   it("offsets the companion avatar crop by the catalog face rect", () => {
     const artPanel = {
       portrait_catalog: {
-        p_reina: { url: "/media/portraits/reina.png", face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 } },
+        "101": { url: "/media/portraits/reina.png", face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 } },
       },
     };
     const w = mountDrawer({ artPanel });

@@ -7,8 +7,8 @@ entity set comes from the shared roster query
 ``world.rules.combat_view.combat_participants`` so the ``context_actions`` and
 ``art`` panels can never drift on membership or order; in exploration mode it
 comes from the current room's ``contents`` filtered to dialogue hosts and
-characters carrying an explicit named portrait policy, in deterministic
-room-contents order.
+characters carrying an explicit named portrait policy, then co-located party
+companions in party order.
 
 The module performs no writes, never lazily constructs a trait/buff/sexual
 handler, never reads ``disguised_stats`` or persona, and returns frozen values.
@@ -172,8 +172,9 @@ def _exploration_entities(location: Any, actor: Any) -> tuple[ArtEntityView, ...
     Filters ``location.contents`` to dialogue hosts and characters carrying an
     explicit named portrait policy, sorted by numeric database ID so the
     catalog order never depends on the database's content-cache iteration
-    order, capped at ``MAX_PORTRAIT_CATALOG``. The actor itself is never a
-    present focusable subject of their own exploration catalog.
+    order, then appends live co-located owner-party companions in party order,
+    deduplicated and capped at ``MAX_PORTRAIT_CATALOG``. A controlled companion
+    remains a catalog member while possessing; ordinary player actors do not.
     """
     if location is None:
         return ()
@@ -186,6 +187,18 @@ def _exploration_entities(location: Any, actor: Any) -> tuple[ArtEntityView, ...
             continue
         candidates.append(_entity_view(entity, party=None))
     candidates.sort(key=lambda view: view.identity)
+    from typeclasses.npcs import NPC
+    from world.rules.party import bound_owner_of, live_companions
+
+    owner = bound_owner_of(actor) if isinstance(actor, NPC) else actor
+    seen = {view.identity for view in candidates}
+    for companion in live_companions(owner) if owner is not None else ():
+        identity = int(companion.pk)
+        if companion.location != location or identity in seen:
+            continue
+        # The controlled NPC's party ref must resolve beside status.actor.
+        candidates.append(_entity_view(companion, party=frozenset({identity})))
+        seen.add(identity)
     return tuple(candidates[:MAX_PORTRAIT_CATALOG])
 
 

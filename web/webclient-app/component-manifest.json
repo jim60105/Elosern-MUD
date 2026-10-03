@@ -51,7 +51,7 @@
     "Overlays/LineagePanel",
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
-    "Overlays/PartyStrip",
+    "Core/CompanionLineup",
     "Overlays/PartyDrawer",
     "Overlays/ObjectiveTracker",
     "Feedback/ToastQueue",

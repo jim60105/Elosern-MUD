@@ -416,16 +416,17 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-party-quickbar-island-presents-the-committed-party-only",
+        "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor",
+        "webclient-contextual-hud::possession-moves-the-possessed-companion-to-the-group-s-front",
     )
-    def test_party_strip_node_suite_passes(self):
+    def test_companion_lineup_node_suite_passes(self):
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/data/party_strip.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/core/companion_lineup.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -435,7 +436,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "party-strip Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "companion-lineup Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

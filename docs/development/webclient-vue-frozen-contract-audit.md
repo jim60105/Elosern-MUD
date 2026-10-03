@@ -331,6 +331,8 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 
 | Hook family | Wave | Bucket |
 |---|---|---|
+| `companion-lineup`, `companion-figure` (equal-size decorative party row and per-slot geometry/identity hooks; replaces the retired party-strip surface) | companion-portrait-lineup | REMAP-TO-TESTID |
+| `character-status-drawer__open-party`, `party-drawer__possess-btn`, `party-drawer__release-btn` (existing drawer entry and possession controls exercised by the real companion swap journey) | companion-portrait-lineup | REMAP-TO-TESTID |
 | `npc-persona-editor` + `npc-persona-editor-<suffix>` and `npc-persona-field-<suffix>` (the correlated editor, budgets, notices, conflict and discard controls, named field controls; targeted by `test_browser_npc_persona_editor.py`) | npc-persona-editor-window | REMAP-TO-TESTID |
 | `topbar`, `topbar-clock`, `topbar-location` | H1 | REMAP-TO-TESTID |
 | `narrative-feed`, `narrative-fulllog-control` | H1 | REMAP-TO-TESTID |

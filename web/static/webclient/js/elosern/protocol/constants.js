@@ -338,7 +338,7 @@ var MESSAGE_NAMES = {
 // Party panel bounds (mirror of web.webclient.presentation.party,
 // webclient-align-04): at most four companion rows reusing the NPC
 // display-name bound; bond_stage is a canonical stage NAME string.
-var PARTY_SCHEMA_VERSION = 1;
+var PARTY_SCHEMA_VERSION = 2;
 var PARTY_MAX_ROWS = 4;
 var PARTY_MAX_DISPLAY_NAME = 128;
 
@@ -419,7 +419,7 @@ var PANEL_ALLOWLIST = {
   status: 2,
   context_actions: 5,
   local_map: 1,
-  party: 1,
+  party: 2,
   objectives: 1,
   services: 4,
   creation: 6,

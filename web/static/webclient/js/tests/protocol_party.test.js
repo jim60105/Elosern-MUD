@@ -1,5 +1,5 @@
 /*
- * party panel v1 mirror: slots, panel shapes, rejections.
+ * party panel v2 mirror: slots, panel shapes, rejections.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -29,13 +29,13 @@ function validPartySlot(overrides) {
 }
 
 function validPartyPanel(slots) {
-  return { schema_version: 1, available: true, slots: slots || [validPartySlot()] };
+  return { schema_version: 2, available: true, slots: slots || [validPartySlot()] };
 }
 
 test("party available form validates and empty slots is legal", () => {
   assert.deepEqual(Protocol.validatePartyPanel(validPartyPanel()), validPartyPanel());
   assert.deepEqual(Protocol.validatePartyPanel(validPartyPanel([])), {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     slots: [],
   });
@@ -43,6 +43,10 @@ test("party available form validates and empty slots is legal", () => {
   assert.doesNotThrow(() =>
     Protocol.validatePartyPanel(validPartyPanel([validPartySlot({ display_name: "薇拉\u{1F600}" })]))
   );
+  for (const portrait_ref of ["42", "1".repeat(32)]) {
+    const panel = validPartyPanel([validPartySlot({ portrait_ref })]);
+    assert.deepEqual(Protocol.validatePartyPanel(panel), panel);
+  }
 });
 
 test("party validator mirrors the server drift rejections", () => {
@@ -81,8 +85,9 @@ test("party validator mirrors the server drift rejections", () => {
     validPartyPanel([
       validPartySlot({ display_name: "同".repeat(Protocol.PARTY_MAX_DISPLAY_NAME + 1) }),
     ]),
-    // portrait_ref must stay null at version 1
-    validPartyPanel([validPartySlot({ portrait_ref: "42" })]),
+    ...[42, "4a", "", "４２", "1".repeat(33)].map(
+      (portrait_ref) => validPartyPanel([validPartySlot({ portrait_ref })]),
+    ),
     // duplicate identities
     validPartyPanel([validPartySlot({ identity: 7 }), validPartySlot({ identity: 7 })]),
     // unpaired surrogate halves are not valid JSON text (server parity)
@@ -90,25 +95,25 @@ test("party validator mirrors the server drift rejections", () => {
     validPartyPanel([validPartySlot({ display_name: "\uDC00a" })]),
     validPartyPanel([validPartySlot({ bond_stage: "\uD83D\uD83D" })]),
     // version drift
-    { schema_version: 2, available: true, slots: [] },
+    { schema_version: 1, available: true, slots: [] },
     // availability and container drift
-    { schema_version: 1, available: "yes", slots: [] },
-    { schema_version: 1, available: false, slots: [] },
-    { schema_version: 1, available: true, slots: {} },
+    { schema_version: 2, available: "yes", slots: [] },
+    { schema_version: 2, available: false, slots: [] },
+    { schema_version: 2, available: true, slots: {} },
   ]) {
     assert.throws(() => Protocol.validatePartyPanel(bad));
   }
 });
 
 test("party is in the production panel allowlist and rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.party, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.party, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
     revision: 5,
     mode: "exploration",
     panels: {
-      party: { schema_version: 1, available: true, slots: [{ ...validPartySlot(), bond_stage: 9 }] },
+      party: { schema_version: 2, available: true, slots: [{ ...validPartySlot(), bond_stage: 9 }] },
     },
     layout_version: 1,
     server_time: serverTime(),
@@ -119,7 +124,7 @@ test("party is in the production panel allowlist and rejects atomically", () => 
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
   envelope.panels = {
     party: {
-      schema_version: 1,
+      schema_version: 2,
       available: false,
       reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
     },

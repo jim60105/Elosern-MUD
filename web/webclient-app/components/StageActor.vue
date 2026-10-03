@@ -67,7 +67,7 @@ const portraitKey = computed(() => {
   if (entry?.url) {
     return entry.url;
   }
-  return entry ? `ph:${entry.placeholder?.label ?? ""}` : "none";
+  return `ph:${props.name}:${entry?.placeholder?.label ?? ""}`;
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");

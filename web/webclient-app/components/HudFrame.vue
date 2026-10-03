@@ -5,13 +5,13 @@
 // - the island anchors named by their content
 //   (webclient-avg-stage-hud-anchors design D1): `vitals`, the lower-left
 //   dock standing on the band's top edge (vitals-bar-redesign design D1:
-//   the chromeless condition icons over the three compact bars, then the
-//   interim compact party island; it may cover the player portrait's lowest
+//   the chromeless condition icons over the three compact bars;
+//   it may cover the player portrait's lowest
 //   strip, never its face) and
 //   `map` at the top-right (the place card first — place-card-relocation
 //   design D2 — then the minimap, the one-line objective, the combat
 //   participant frame, and the title ballot);
-// - the portrait anchors `actor-left` (the player's stage actor) and
+// - the portrait anchors `actor-left` (the controlled figure and companions) and
 //   `actor-right` (the dialogue host's stage actor while the mode is
 //   dialogue, the foe line-up while it is combat —
 //   webclient-combat-foes-on-stage), standing on the bottom band's top edge.
@@ -333,7 +333,7 @@ defineExpose({ menuOpen });
    grown where the island column on that side would cover the figure's face
    (`--actor-left-inset` / `--actor-right-inset` in tokens.css; exactly 6% at
    1920x1080). */
-.elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); }
+.elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); overflow: visible; }
 .elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
 /* The foe line-up (webclient-combat-foes-on-stage D2) grows leftward from
    this box's right edge and steps in to the combat inset; the anchor keeps

@@ -487,6 +487,32 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(entry["face_rect"])
         self.assertNotIn("portrait rejected", repr(payload))
 
+    def test_party_catalog_keeps_present_order_cap_and_controlled_companion(self):
+        from world.rules.art_view import MAX_PORTRAIT_CATALOG
+        from world.rules.party import join_party
+
+        companions = [
+            create_object(NPC, key=f"測試同行{index}", location=self.room)
+            for index in range(3)
+        ]
+        for npc in companions:
+            join_party(npc, self.player)
+        companions[2].location = create_object(Room, key="測試遠室")
+        host = create_object(NPC, key="測試職員", location=self.room)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+        catalog = self._render()["portrait_catalog"]
+        self.assertEqual(list(catalog), [str(host.pk), *[str(n.pk) for n in companions[:2]]])
+        self.assertIsNone(catalog[str(companions[0].pk)]["url"])
+        context = PresentationContext(actor=companions[1], protocol_version=1)
+        self.assertIn(str(companions[1].pk), self.registry.render("art", context)["portrait_catalog"])
+        for index in range(MAX_PORTRAIT_CATALOG - 1):
+            named = create_object(NPC, key=f"測試人物{index}", location=self.room)
+            named.db.portrait_policy = {"mode": "named", "stable_key": f"t_cap_{index}"}
+        catalog = self._render()["portrait_catalog"]
+        self.assertEqual(len(catalog), MAX_PORTRAIT_CATALOG)
+        self.assertNotIn(str(companions[0].pk), catalog)
+        self.assertNotIn(str(companions[1].pk), catalog)
+
     def test_creation_mode_renders_unavailable_form(self):
         self.player.db.creation_pending = True
         payload = self._render()

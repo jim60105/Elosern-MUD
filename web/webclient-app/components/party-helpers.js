@@ -1,6 +1,5 @@
 // party-helpers.js (webclient-align-05-party-hud)
-// Shared display helpers for the party quickbar (.comps) and the
-// companions drawer (dr-party).
+// Shared display helpers for the standing lineup and companion drawer.
 import { portraitGlyph } from "./character-identity.js";
 
 /**
@@ -20,7 +19,7 @@ export function hpFillRatio(hpCurrent, hpMaximum) {
 
 /**
  * Resolve an art catalog entry for a companion row.
- * Returns the catalog entry (with url) or null when unresolvable / null ref.
+ * Returns the raw catalog entry or null when unresolvable / null ref.
  */
 export function portraitFor(artPanel, portraitRef) {
   if (portraitRef === null || portraitRef === undefined) {
@@ -28,7 +27,7 @@ export function portraitFor(artPanel, portraitRef) {
   }
   const catalog = (artPanel && artPanel.portrait_catalog) || {};
   const entry = catalog[portraitRef];
-  return (entry && entry.url) ? entry : null;
+  return entry ?? null;
 }
 
 /**

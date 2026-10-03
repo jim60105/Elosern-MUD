@@ -22,6 +22,7 @@ import {
 } from "../stories/fixtures.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { PARTY_PANEL_FULL_SAMPLE } from "../stories/fixtures/party_panels.js";
 
 describe("H4 reference-drawer layer (task 7.7)", () => {
   let store;
@@ -516,7 +517,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     ]);
   });
 
-  it("renders the party quickbar in the vitals anchor when party panel is available", async () => {
+  it("renders companions on stage and keeps the drawer reachable", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -528,32 +529,24 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: {
-              schema_version: 1,
-              available: true,
-              slots: [
-                {
-                  identity: 101,
-                  display_name: "蕾娜",
-                  portrait_ref: null,
-                  hp_current: 180,
-                  hp_maximum: 220,
-                  bond_stage: "親睦",
-                },
-              ],
-            },
+            party: { schema_version: 2, available: true, slots: [
+              {
+                identity: 101,
+                display_name: "蕾娜",
+                portrait_ref: null,
+                hp_current: 180,
+                hp_maximum: 220,
+                bond_stage: "親睦",
+              },
+            ] },
           },
         }),
       ],
     );
     await wrapper.vm.$nextTick();
 
-    // PartyStrip renders in the `vitals` anchor
-    expect(wrapper.find('[data-anchor="vitals"] [data-testid="party-strip"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="party-strip__count"]').text()).toBe("1 / 4");
-
-    // Clicking the strip opens the party drawer
-    await wrapper.get('[data-testid="party-strip"]').trigger("click");
+    expect(wrapper.findAll('[data-anchor="actor-left"] [data-testid="companion-figure"]')).toHaveLength(2);
+    store.openHudDrawer("party");
     await wrapper.vm.$nextTick();
     expect(store.view.hudDrawer).toBe("party");
     expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
@@ -561,7 +554,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.get('.drawer-header__subtitle').text()).toBe("1 / 4");
   });
 
-  it("hides the party quickbar in creation mode or when party panel is unavailable", async () => {
+  it("keeps a solo figure for unavailable party and hides the lineup in creation", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -576,7 +569,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           panels: {
             status: fx.statusPanel(),
             party: {
-              schema_version: 1,
+              schema_version: 2,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },
@@ -585,7 +578,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       ],
     );
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="companion-figure"]')).toHaveLength(1);
 
     // Creation mode
     store.receive(
@@ -596,17 +589,13 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 2,
           mode: "creation",
           panels: {
-            party: {
-              schema_version: 1,
-              available: true,
-              slots: [],
-            },
+            party: { schema_version: 2, available: true, slots: [] },
           },
         }),
       ],
     );
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="companion-lineup"]').exists()).toBe(false);
   });
 
   it("closes open party drawer when party panel becomes unavailable or mode switches to creation", async () => {
@@ -623,20 +612,16 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: {
-              schema_version: 1,
-              available: true,
-              slots: [
-                {
-                  identity: 101,
-                  display_name: "蕾娜",
-                  portrait_ref: null,
-                  hp_current: 180,
-                  hp_maximum: 220,
-                  bond_stage: "親睦",
-                },
-              ],
-            },
+            party: { schema_version: 2, available: true, slots: [
+              {
+                identity: 101,
+                display_name: "蕾娜",
+                portrait_ref: null,
+                hp_current: 180,
+                hp_maximum: 220,
+                bond_stage: "親睦",
+              },
+            ] },
           },
         }),
       ],
@@ -658,7 +643,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 2,
           panels: {
             party: {
-              schema_version: 1,
+              schema_version: 2,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },
@@ -880,7 +865,53 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(document.activeElement?.id).toBe("action-dock");
   });
 
-  it("with an available, empty party panel, no party-strip is rendered in the HUD", async () => {
+  it("joins the committed string status identity for possession and clears dialogue companion focus", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    const roster = {
+      schema_version: 2, available: true,
+      characters: [{ identity: 1, name: "測試主角", current: true, pending: false, portrait: {
+        subject_key: null, status: null, url: null, aspect_ratio: null, alt: "測試主角",
+        placeholder: { kind: "missing", label: "無肖像" }, face_rect: null, stage: null,
+      } }],
+      max_characters: 5, can_create: true, switch_locked: false, lock_reason: null,
+    };
+    store.receive(1, "ui_snapshot", [fx.snapshot({ panels: {
+      party: PARTY_PANEL_FULL_SAMPLE, roster,
+      status: fx.statusPanel({ actor: { identity: "1" } }),
+    } })]);
+    await wrapper.vm.$nextTick();
+    const ids = () => wrapper.findAll('[data-testid="companion-figure"]').map((slot) => slot.attributes("data-identity"));
+    expect(ids()).toEqual(["1", "101", "102", "103", "104"]);
+    store.receive(1, "ui_update", [fx.update({ revision: 2, panels: {
+      status: fx.statusPanel({ actor: { identity: "102" } }),
+      possession_banner: { schema_version: 1, available: true, host_name: "測試宿主", since_tick: 1 },
+    } })]);
+    await wrapper.vm.$nextTick();
+    expect(ids()).toEqual(["102", "101", "1", "103", "104"]);
+    store.receive(1, "ui_update", [fx.update({ revision: 3, mode: "dialogue", panels: {
+      status: fx.statusPanel({ actor: { identity: "102" } }),
+      dialogue: { schema_version: 2, available: true, kind: "dialogue",
+        host: { identity: 103, display_name: "測試同行", portrait_ref: null },
+        bond_stage: null, line: "測試台詞。", choices: [] },
+    } })]);
+    await wrapper.vm.$nextTick();
+    const speaker = wrapper.get('[data-slot="3"]');
+    expect(speaker.element.style.zIndex).toBe("6");
+    expect(speaker.get('[data-testid="stage-actor"]').attributes("data-speaking")).toBe("true");
+    expect(wrapper.find('[data-anchor="actor-right"] [data-testid="stage-actor"]').exists()).toBe(false);
+    store.receive(1, "ui_update", [fx.update({ revision: 4, mode: "exploration", panels: {
+      status: fx.statusPanel({ actor: { identity: "1" } }),
+      possession_banner: { schema_version: 1, available: false, reason: { code: "unavailable", message: "無附身" } },
+    } })]);
+    await wrapper.vm.$nextTick();
+    expect(ids()).toEqual(["1", "101", "102", "103", "104"]);
+    expect(speaker.element.style.zIndex).toBe("2");
+    expect(speaker.get('[data-testid="stage-actor"]').attributes("data-speaking")).toBe("false");
+  });
+
+  it("with an available empty party, renders only the controlled standing figure", async () => {
     mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -894,11 +925,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: {
-              schema_version: 1,
-              available: true,
-              slots: [],
-            },
+            party: { schema_version: 2, available: true, slots: [] },
             status: fx.statusPanel(),
           },
         }),
@@ -908,7 +935,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
 
     expect(store.partyAvailable).toBe(true);
-    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="companion-figure"]')).toHaveLength(1);
   });
 
   it("with an empty party, opens the status drawer, activates the open-party button, and opens party drawer", async () => {
@@ -926,11 +953,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: {
-              schema_version: 1,
-              available: true,
-              slots: [],
-            },
+            party: { schema_version: 2, available: true, slots: [] },
             status: fx.statusPanel(),
             character: fx.characterPanel ? fx.characterPanel() : CHARACTER_PANEL_SAMPLE,
           },

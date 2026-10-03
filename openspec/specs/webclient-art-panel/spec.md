@@ -70,21 +70,27 @@ store root, and SHALL derive its URL only from a validated stored identity.
 ### Requirement: The portrait catalog is server-authored, age-checked, and bounded
 The art panel `portrait_catalog` SHALL be a bounded object keyed by the opaque IDs of currently
 present focusable entities: the combat-session participant identities in combat mode, and the
-dialogue hosts and explicit named-portrait-policy characters present in the current room in
-exploration mode, in deterministic order. Each catalog value SHALL contain the server-resolved
-subject key, asset status, same-origin media URL or placeholder, aspect ratio, alternative text, and
-bounded display context (name plus role/target label), and the resolved normalized face rectangle and stage triple. Stage SHALL be an exact finite bounded `{scale, x, y}` mapping for assets and null for placeholders; malformed stored card stage SHALL degrade to identity rather than fail a snapshot. The face rectangle SHALL be a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the entry carries a media URL, and SHALL be `null` whenever the entry is a placeholder, so a client never offsets a frame it has no image for. The catalog SHALL carry no face-detection result, no crop, and no second image reference. Portrait subject resolution SHALL dispatch by
-entity kind: a named character SHALL resolve `portrait:character:<stable-key>` only from an explicit
-named `portrait_policy` through the canonical-age check; a generic monster SHALL resolve
-`portrait:monster:<archetype>` from its bestiary `MONSTER_TIER_REGISTRY` archetype without any
-character age gate; and anything else SHALL be the unavailable placeholder. Eligibility SHALL NOT be
-inferred from display name, key shape, or LLM authorship. The canonical-age check SHALL reject a
-character when either `age` or `apparent_age` is missing or malformed (non-integer); a rejected
-subject SHALL appear as the unavailable placeholder with no subject key, no URL, and no prompt
-content, and SHALL NOT be enqueued or reach a worker. The catalog SHALL contain only currently
-present focusable identities and SHALL NOT contain persona text, disguised stats, combat resources,
-or any subject that
-is not currently present.
+dialogue hosts, explicit named-portrait-policy characters, and live party companions of the player
+character present in the current room in exploration mode, in deterministic order. Each catalog
+value SHALL contain the server-resolved subject key, asset status, same-origin media URL or
+placeholder, aspect ratio, alternative text, and bounded display context (name plus role/target
+label), and the resolved normalized face rectangle and stage triple. Stage SHALL be an exact finite
+bounded `{scale, x, y}` mapping for assets and null for placeholders; malformed stored card stage
+SHALL degrade to identity rather than fail a snapshot. The face rectangle SHALL be a mapping of
+exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the entry carries a media URL, and SHALL be `null`
+whenever the entry is a placeholder, so a client never offsets a frame it has no image for. The
+catalog SHALL carry no face-detection result, no crop, and no second image reference. Portrait
+subject resolution SHALL dispatch by entity kind: a named character SHALL resolve
+`portrait:character:<stable-key>` only from an explicit named `portrait_policy` through the
+canonical-age check; a generic monster SHALL resolve `portrait:monster:<archetype>` from its
+bestiary `MONSTER_TIER_REGISTRY` archetype without any character age gate; and anything else SHALL
+be the unavailable placeholder. Eligibility SHALL NOT be inferred from display name, key shape, or
+LLM authorship. The canonical-age check SHALL reject a character when either `age` or
+`apparent_age` is missing or malformed (non-integer); a rejected subject SHALL appear as the
+unavailable placeholder with no subject key, no URL, and no prompt content, and SHALL NOT be
+enqueued or reach a worker. The catalog SHALL contain only currently present focusable identities
+and SHALL NOT contain persona text, disguised stats, combat resources, or any subject that is not
+currently present.
 
 #### Scenario: Combat catalog mirrors the context_actions participants
 - **WHEN** combat presentation resolves participants and the art panel resolves its portrait catalog
@@ -108,9 +114,13 @@ is not currently present.
 - **THEN** the subject resolves to the unavailable placeholder, nothing is enqueued, and no prompt,
   subject key, or URL is produced
 
+#### Scenario: A live party companion is catalogued even without a dialogue policy
+- **WHEN** a present companion carries no explicit named portrait policy and is not a dialogue host, and the exploration art panel resolves its portrait catalog
+- **THEN** the companion's identity appears in the catalog keyed like any other entry, so a party `portrait_ref` joined by the companion standing figures resolves in the same committed snapshot that carries it
+
 #### Scenario: Non-present entities are excluded
 - **WHEN** a room contains entities that are not present (e.g. in another room) or carry no explicit
-  named policy and are not dialogue hosts
+  named policy, are not dialogue hosts, and are not live party companions
 - **THEN** none of them appears in the portrait catalog
 
 #### Scenario: A resolved catalog entry carries its face rectangle

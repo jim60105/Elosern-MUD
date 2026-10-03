@@ -4,19 +4,19 @@
 // webclient-align-05-party-hud: party panel fixtures.
 // ---------------------------------------------------------------------------
 export const PARTY_PANEL_EMPTY_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   slots: [],
 };
 
 export const PARTY_PANEL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   slots: [
     {
       identity: 101,
       display_name: "蕾娜",
-      portrait_ref: "p_reina",
+      portrait_ref: "101",
       hp_current: 180,
       hp_maximum: 220,
       bond_stage: "親睦",
@@ -33,13 +33,13 @@ export const PARTY_PANEL_SAMPLE = {
 };
 
 export const PARTY_PANEL_FULL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   slots: [
     {
       identity: 101,
       display_name: "蕾娜",
-      portrait_ref: "p_reina",
+      portrait_ref: "101",
       hp_current: 180,
       hp_maximum: 220,
       bond_stage: "親睦",
@@ -70,6 +70,18 @@ export const PARTY_PANEL_FULL_SAMPLE = {
     },
   ],
 };
+
+// Existing bundled fixture art only; production never constructs these refs.
+export const COMPANION_PORTRAIT_CATALOG = Object.fromEntries(
+  PARTY_PANEL_FULL_SAMPLE.slots.map((row, index) => [String(row.identity), {
+    subject_key: `portrait:character:t_companion_${index}`,
+    status: "done", url: `/art/defaults/${["woman", "elder", "man", "girl"][index]}.webp`,
+    aspect_ratio: "3:4", alt: row.display_name, placeholder: null,
+    face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+    stage: { scale: 1, x: 0, y: 0 },
+    context: { name: row.display_name, role: "隊友" },
+  }]),
+);
 
 export const PARTY_COMBAT_PARTICIPANTS_SAMPLE = [
   { identity: 101, token: "a2", display_name: "蕾娜", team: "party", state: "active" },

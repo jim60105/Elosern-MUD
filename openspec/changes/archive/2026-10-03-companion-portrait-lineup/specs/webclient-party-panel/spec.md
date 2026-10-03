@@ -14,7 +14,8 @@ shared field set, reason, and semantics. Each slot row SHALL contain exactly `id
 the companion's positive integer database identity — the same field a combat participant row
 carries, so a client can join the two panels; `display_name` SHALL be the canonical NPC display
 name truncated to the shared display-name bound; `portrait_ref` SHALL be the opaque string key of
-the companion NPC's default gallery portrait — the key that resolves through the art panel's
+the companion NPC's default gallery portrait — an ASCII decimal string of 1–32 characters
+that resolves through the art panel's
 `portrait_catalog`, emitted by the same reference format the art panel presenter uses — or `null`
 when the companion has no gallery record or no default card, in which case the client renders its
 truthful initial-letter placeholder; `hp_current` and `hp_maximum` SHALL
@@ -60,7 +61,7 @@ error and the panel SHALL take the shared unavailable form.
 #### Scenario: Validation rejects row-shape drift
 - **WHEN** a candidate party payload carries a fifth row, an unknown or missing row key, a
   numeric `bond_stage`, a negative HP value, an over-bound display name, or a non-string
-  non-null `portrait_ref`
+  non-null `portrait_ref`, an empty/non-decimal ref, or a ref longer than 32 characters
 - **THEN** the server validator rejects it and the client mirror rejects it identically
 
 #### Scenario: Creation-pending puppets see the unavailable form
