@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AppShell from "../components/AppShell.vue";
 import HudFrame from "../components/HudFrame.vue";
 import ActionDock from "../components/ActionDock.vue";
@@ -149,12 +149,8 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     });
   });
 
-  it("collapses the command region in dialogue mode and keeps the rest of the cockpit (matrix dialogue column)", () => {
-    // webclient-dialogue-stage-actors (design D4): dialogue hides only the
-    // command region (with the still-mounted dock inside it) and the band
-    // turns into one column, so the message region spans it. The message
-    // window, the island stack, the minimap, both portrait anchors, and the
-    // command line stay rendered.
+  it("collapses the command region and hides cockpit anchors in dialogue", () => {
+    // Anchors stay mounted, but mode gates remove cockpit layout and access.
     const dialogue = mountShell("dialogue", true);
     expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
     for (const anchor of ["band-message", "actor-left", "actor-right", "vitals", "map", "command-line", "band-command"]) {
@@ -185,12 +181,70 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(extractRule(css, '.elosern-stage[data-elosern-mode="dialogue"] .stage-band')).toContain(
       "grid-template-columns: minmax(0, 1fr)",
     );
-    // No other surface is gated on the dialogue mode.
-    const dialogueArms = css.match(/\.elosern-stage\[data-elosern-mode="dialogue"\][^{]*\{/g) || [];
-    expect(dialogueArms.map((arm) => arm.trim())).toEqual([
-      '.elosern-stage[data-elosern-mode="dialogue"] .stage-band {',
-      '.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="band-command"] {',
-    ]);
+    for (const anchor of ["vitals", "map"]) {
+      expect(dialogue.get(`[data-anchor="${anchor}"]`).attributes("inert")).toBeDefined();
+      expect(dialogue.get(`[data-anchor="${anchor}"]`).attributes("aria-hidden")).toBe("true");
+      for (const source of [css, readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf-8")]) {
+        // Match the grouped gate, including both selector arms.
+        expect(source).toContain('.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="vitals"],\n.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="map"] {\n  display: none !important;');
+      }
+    }
+  });
+
+  it.each(["map", "vitals"])("rescues %s focus before the dialogue DOM patch", async (anchor) => {
+    const shell = mountShell("exploration", true);
+    const target = anchor === "map"
+      ? shell.get('[data-anchor="map"] [data-node]').element
+      : document.createElement("button");
+    target.setAttribute("tabindex", "0");
+    if (anchor === "vitals") {
+      shell.get('[data-anchor="vitals"]').element.appendChild(target);
+    }
+    target.focus();
+    expect(document.activeElement).toBe(target);
+    const page = shell.get('[data-testid="message-page"]').element;
+    const observed = [];
+    const originalFocus = page.focus.bind(page);
+    const spy = vi.spyOn(page, "focus").mockImplementation((options) => {
+      observed.push({
+        mode: shell.get('[data-testid="elosern-stage"]').attributes("data-elosern-mode"),
+        active: document.activeElement,
+      });
+      originalFocus(options);
+    });
+    await shell.setProps({ mode: "dialogue" });
+    await nextTick();
+    expect(observed[0]).toEqual({ mode: "exploration", active: target });
+    expect(document.activeElement).toBe(page);
+    expect(document.activeElement).not.toBe(document.body);
+    spy.mockRestore();
+  });
+
+  it("mode hide wins over injured vitals and restores both anchors on exit", async () => {
+    const style = document.createElement("style");
+    style.textContent = styleBlock("components/HudFrame.vue").replace(/<\/?style[^>]*>/g, "");
+    document.body.appendChild(style);
+    const shell = mountShell("exploration", true);
+    const status = document.createElement("div");
+    status.dataset.testid = "status-panel";
+    status.textContent = "HP 80/100";
+    status.style.display = "block";
+    shell.get('[data-anchor="vitals"]').element.appendChild(status);
+    const anchors = ["vitals", "map"].map((name) => shell.get(`[data-anchor="${name}"]`).element);
+    await shell.setProps({ mode: "dialogue", vitalsVisible: true });
+    for (const anchor of anchors) {
+      expect(getComputedStyle(anchor).display).toBe("none");
+    }
+    // A data revision cannot reveal a mode-hidden ancestor.
+    status.textContent = "HP 70/100";
+    expect(getComputedStyle(anchors[0]).display).toBe("none");
+    await shell.setProps({ mode: "exploration" });
+    for (const anchor of anchors) {
+      expect(getComputedStyle(anchor).display).not.toBe("none");
+      expect(anchor.hasAttribute("inert")).toBe(false);
+      expect(anchor.hasAttribute("aria-hidden")).toBe(false);
+    }
+    expect(status.style.display).toBe("block");
   });
 
   describe("the dialogue focus home (webclient-dialogue-stage-actors D5; webclient-dialogue-choices-overlay D7)", () => {

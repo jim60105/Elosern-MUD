@@ -105,8 +105,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     self.assertAlmostEqual(inset, 0.06 * 1920, delta=1.0)
                 else:
                     self.assertGreaterEqual(inset, 0.06 * viewport[0] - 1)
-                self.assertIsNotNone(geo["mapLeft"])
-                self.assertLess(geo["hostCentre"], geo["mapLeft"], f"the host's face is under the minimap at {viewport}")
+                for name in ("map", "vitals"):
+                    island = page.locator(f'[data-anchor="{name}"]')
+                    island.wait_for(state="hidden")
+                    self.assertFalse(island.is_visible())
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap in dialogue at {viewport}")
                 # The conversation reads down from the player's figure: the
                 # paged line's column starts at the player anchor's left edge.

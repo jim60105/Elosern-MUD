@@ -153,6 +153,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(anchor.get_attribute("data-expanded"), "false")
         self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
         self.assertFalse(field.is_visible(), "the command field stays collapsed in dialogue")
+        for name in ("map", "vitals"):
+            island = page.locator(f'[data-anchor="{name}"]')
+            island.wait_for(state="hidden")
+            self.assertFalse(island.is_visible())
 
         # Expand the command line, then commit creation: focus is rescued to
         # the action dock, both the command line and its toggle are hidden in

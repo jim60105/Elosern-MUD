@@ -148,7 +148,7 @@ introduced into the band this way.
 - **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
 ### Requirement: Surface visibility is gated by the committed game mode
-This requirement carries the `place-card-relocation` amendment; the party-quickbar row is removed and the portrait row names the companion line.
+This requirement carries the amendments from `place-card-relocation` (place card in the `map` anchor), `vitals-bar-redesign` (the vitals dock at the lower left), and `companion-portrait-lineup` (the party quickbar row removed, the portrait row naming the companion line). Dialogue mode now hides the cockpit and navigation surfaces: the place card, the minimap island, and the vitals dock are hidden while the committed mode is `dialogue`.
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
 visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
 removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves
@@ -161,18 +161,21 @@ choreographed on the stage at the motion level" defines, the decorative combat v
 MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, and the
 scene backdrop SHALL keep presenting the combat stage (its combat gradient and, where a bundled sample
 wash accompanies a degraded scene, the combat sample), until the round ends; every other surface
-follows the committed mode at the commit. The matrix SHALL be:
+follows the committed mode at the commit. Dialogue's `vitals` and `map` anchors MAY retain exit paint
+over the existing reveal duration while inert, outside the accessibility tree and pointer hit-testing
+from commit, and SHALL settle at `display:none`. Mount, reconnect, motion-off, and browsers without
+discrete display transitions SHALL hide them immediately. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
-| place card (location, world time; `map` anchor, above the minimap) | visible | visible | visible | hidden |
+| place card (location, world time; `map` anchor, above the minimap) | visible | visible | **hidden** | hidden |
 | message window (band message region) | visible | visible | visible (whole band width, paged, name plate) | hidden |
 | dialogue choice list (`choices` anchor, centred over the stage) | not rendered | not rendered | once the current response's last page is fully shown, while no action is in flight | not rendered |
-| vitals dock (condition icons + vitals bars; `vitals` anchor, lower-left) | by the vitals rule | visible | by the vitals rule | hidden |
-| minimap island | visible | **hidden** | visible | hidden |
+| vitals dock (condition icons + vitals bars; `vitals` anchor, lower-left) | by the vitals rule | visible | **hidden** | hidden |
+| minimap island | visible | **hidden** | **hidden** | hidden |
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
 | controlled character and companion standing portraits (`actor-left`) | visible | visible | visible (listeners dimmed while the host speaks; the party line stays) | hidden |
-| dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while `dialogue` is available and its host is not already in the committed party/controlled lineup (dimmed while the player speaks) | not rendered |
+| dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
 | foe line-up (`actor-right`, at most three active foes) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
 | action dock (band command region) | visible | visible | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
@@ -188,10 +191,16 @@ the surface is shown in that mode only while its own requirement's rule holds fo
 and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
 says so). The command line's `while expanded` cell is such a rule: its own requirement defines when the
 row is expanded, and a collapsed row is hidden with `display:none` exactly like a mode-hidden surface.
-The place card's visibility SHALL follow this matrix exactly as it did while it stood in the left
-column: it is shown in every playing mode and hidden in creation, and moving it into the `map` anchor
-SHALL NOT make it inherit the minimap's combat hiding — in combat the card stays visible above the
-participant frame.
+The place card's visibility SHALL follow this matrix exactly: it is shown in exploration and combat,
+hidden in dialogue and creation; hiding the `map` anchor in dialogue hides the place card with the
+minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change.
+The vitals dock SHALL be hidden in dialogue mode through the mode gate regardless of its data rule:
+a committed revision while dialogue holds — a vital dropping below its maximum, a new condition —
+SHALL NOT reveal the dock, and the dock's reveal transition SHALL NOT play until the mode leaves
+dialogue. The dialogue's attention surface is the message window and the name plate; the dock returns
+through its normal reveal when the mode commits back to exploration or combat. The low-HP stage
+vignette is not mode-gated and keeps rendering in dialogue, so a critical HP state is still conveyed
+through the stage frame.
 Each playing mode has one focus home: the action dock in exploration, combat, and creation mode, and
 the message window's focus target in dialogue mode, as "The command region collapses in dialogue mode
 and the message window spans the band" defines. When a mode change, a committed revision that turns a
@@ -231,9 +240,19 @@ collapse the command line, so leaving creation never reveals an expanded row.
 
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue with an available `dialogue` panel
-- **THEN** the place card, message window, minimap, the player's front figure, the companion standing portraits, command-line toggle, and log control all
-  remain rendered, the dialogue host's standing portrait renders once (in its existing lineup slot when a party/controlled figure, otherwise in `actor-right`), the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals island keeps following the same data rule as in
-  exploration, the action dock is out of the accessibility tree and the tab order together with the band's command region from the commit and is `visibility: hidden` once the region's slide ends, while the message window spans the whole band with the host's name plate, and the `#action-dock` element is not removed from the document
+- **THEN** the message window spans the whole band with the host's name plate, the dialogue host's standing portrait is rendered in `actor-right`, the player's front figure and the companion standing portraits remain rendered in `actor-left` dimmed as listeners, the command-line toggle and the log control remain rendered, the command line keeps its expanded or collapsed state, the action dock is out of the accessibility tree and the tab order together with the band's command region from the commit and is `visibility: hidden` once the region's slide ends, and the `#action-dock` element is not removed from the document
+
+#### Scenario: Dialogue mode hides the cockpit and navigation islands
+- **WHEN** the committed mode changes from exploration to dialogue with a committed location, a committed `local_map` panel, and a vital below its maximum
+- **THEN** the place card, the minimap island, the objective line, and the vitals dock are absent from the accessibility tree and the tab order, and once each surface's exit transition has finished it is `display:none`
+
+#### Scenario: A vital change during dialogue does not reveal the dock
+- **WHEN** the committed mode is dialogue with the dock hidden and a committed revision lowers `hp` below its maximum
+- **THEN** the vitals dock stays `display:none`, no reveal transition plays, and the numerals are not visible anywhere on the stage
+
+#### Scenario: Returning from dialogue restores the hidden surfaces
+- **WHEN** the committed mode changes from dialogue back to exploration with a vital below its maximum
+- **THEN** the place card and the minimap island render again at the commit, and the vitals dock enters through its reveal transition because the vitals rule holds
 
 #### Scenario: Dialogue backdrop keeps its committed art
 - **WHEN** the committed mode is dialogue
@@ -2057,10 +2076,14 @@ as well as their gold or warm-red emphasis.
   itself paints no background, border, or shadow
 
 ### Requirement: The place card names the current location and the world time
+This requirement carries the `place-card-relocation` amendment; the visible-mode set below narrows to exploration and combat with this change, matching the visibility matrix's dialogue `hidden` cells.
 The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's
 top-right corner directly below the top band and directly above the minimap island, while the
-committed mode is exploration, dialogue, or combat, and SHALL NOT render it in
-creation mode. The card SHALL state the current location as its heading and the world date/time
+committed mode is exploration or combat, and SHALL NOT render it in
+creation mode or settled dialogue mode. During live dialogue entry it MAY retain only the inert exit
+paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility
+tree and tab order from commit, and SHALL become `display:none` when the anchor's fade ends.
+The card SHALL state the current location as its heading and the world date/time
 beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
 The location SHALL be the best server-authored place name the client already holds, resolved in a
 fixed order: the committed `local_map` panel's `current_node` label when that panel is available,
@@ -2106,8 +2129,8 @@ fixed height.
 - **THEN** the card reads `位置：--` and `時間：--`
 
 #### Scenario: The card keeps its size and is absent in creation
-- **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation
-- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode the place card is not rendered and holds no tab stop
+- **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation, and later dialogue
+- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode and in settled dialogue mode the place card is not rendered and holds no tab stop; during live dialogue entry only its inert exit paint may remain until the map anchor's fade ends
 
 #### Scenario: No prefix exists
 - **WHEN** a time line has no preceding qualifier

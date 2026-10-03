@@ -5,7 +5,10 @@ This requirement carries the `place-card-relocation` amendment; the visible-mode
 The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's
 top-right corner directly below the top band and directly above the minimap island, while the
 committed mode is exploration or combat, and SHALL NOT render it in
-dialogue or creation mode. The card SHALL state the current location as its heading and the world date/time
+creation mode or settled dialogue mode. During live dialogue entry it MAY retain only the inert exit
+paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility
+tree and tab order from commit, and SHALL become `display:none` when the anchor's fade ends.
+The card SHALL state the current location as its heading and the world date/time
 beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
 The location SHALL be the best server-authored place name the client already holds, resolved in a
 fixed order: the committed `local_map` panel's `current_node` label when that panel is available,
@@ -52,7 +55,7 @@ fixed height.
 
 #### Scenario: The card keeps its size and is absent in creation
 - **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation, and later dialogue
-- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode and in dialogue mode the place card is not rendered and holds no tab stop
+- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode and in settled dialogue mode the place card is not rendered and holds no tab stop; during live dialogue entry only its inert exit paint may remain until the map anchor's fade ends
 
 #### Scenario: No prefix exists
 - **WHEN** a time line has no preceding qualifier
@@ -78,7 +81,10 @@ choreographed on the stage at the motion level" defines, the decorative combat v
 MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, and the
 scene backdrop SHALL keep presenting the combat stage (its combat gradient and, where a bundled sample
 wash accompanies a degraded scene, the combat sample), until the round ends; every other surface
-follows the committed mode at the commit. The matrix SHALL be:
+follows the committed mode at the commit. Dialogue's `vitals` and `map` anchors MAY retain exit paint
+over the existing reveal duration while inert, outside the accessibility tree and pointer hit-testing
+from commit, and SHALL settle at `display:none`. Mount, reconnect, motion-off, and browsers without
+discrete display transitions SHALL hide them immediately. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
