@@ -146,3 +146,57 @@ class MemoryRevision(models.Model):
 
     def __str__(self) -> str:
         return f"MemoryRevision(record={self.record_id}, rev={self.revision_number}, {self.availability}, tier={self.tier})"
+
+
+class NarrativeContextSnapshot(models.Model):
+    """An immutable context snapshot captured for a generative cognition call."""
+
+    class AppendOnlyQuerySet(models.QuerySet):
+        """QuerySet that refuses every bulk mutation or bulk delete path."""
+
+        def update(self, *args, **kwargs):
+            raise ValueError(
+                "NarrativeContextSnapshot records are immutable and cannot be updated."
+            )
+
+        def delete(self, *args, **kwargs):
+            raise ValueError(
+                "NarrativeContextSnapshot records are immutable and cannot be deleted."
+            )
+
+        def _bulk_update(self, *args, **kwargs):
+            raise ValueError(
+                "NarrativeContextSnapshot records are immutable and cannot be bulk-updated."
+            )
+
+    objects = AppendOnlyQuerySet.as_manager()
+
+    snapshot_id = models.CharField(max_length=128, unique=True, db_index=True)
+    capability = models.CharField(max_length=64, db_index=True)
+    prompt_version = models.CharField(max_length=64)
+    schema_version = models.CharField(max_length=64, blank=True, default="")
+    rendering_version = models.CharField(max_length=64)
+    owner_id = models.CharField(max_length=64, db_index=True)
+    owner_generation = models.BigIntegerField(default=0)
+    sources = models.JSONField(default=list)
+    section_hashes = models.JSONField(default=dict)
+    budget_accounting = models.JSONField(default=dict)
+    truncation_decisions = models.JSONField(default=list)
+    rendered_payload = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("NarrativeContextSnapshot records are immutable and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("NarrativeContextSnapshot records are immutable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_context_snapshots"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"NarrativeContextSnapshot({self.snapshot_id}, capability={self.capability}, owner={self.owner_id}, gen={self.owner_generation})"
