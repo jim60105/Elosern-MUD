@@ -15,18 +15,20 @@ Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions a
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
-named stage anchors — the top-left `place` and `vitals` anchors, the top-right `map` anchor, the portrait anchors
+named stage anchors — the top-left `vitals` anchor, the top-right `map` anchor, the portrait anchors
 `actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, the dialogue `choices` anchor, and
 the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
-required surface out of view.
+required surface out of view. The stage SHALL carry no separate `place` anchor: the place card is an
+island of the `map` anchor.
 
 The top band SHALL be 48px tall at every supported viewport and SHALL carry only the brand, the top
 navigation bar, the possession banner when present, the character switcher, and the connection
-state; it SHALL carry no location label and no time label. The `place` anchor SHALL sit at the stage
-box's top-left corner, below the top band, at a fixed height that does not depend on the label
-lengths it holds, and the `vitals` anchor SHALL begin below it. The `map` anchor SHALL sit at the stage
-box's top-right corner, below the top band; its content column (the minimap island, then the
-objective line, then any other island this capability places there) SHALL be right-aligned to the
+state; it SHALL carry no location label and no time label. The `vitals` anchor SHALL sit at the stage
+box's top-left corner, directly below the top band — it SHALL NOT be offset by the place card's
+height, which no longer stands above it — and SHALL be a fixed width that does not depend on the
+content it holds. The `map` anchor SHALL sit at the stage
+box's top-right corner, below the top band; its content column (the place card, then the
+minimap island, then the objective line, then any other island this capability places there) SHALL be right-aligned to the
 stage's right gutter and bounded above the bottom band.
 
 The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
@@ -47,9 +49,11 @@ band-height token so that none of them overlaps the band.
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
 SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
 stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
-(the anchor's horizontal centre) under the island column on its side — the place card and vitals on
-the left, the minimap card on the right — the inset SHALL grow just enough to clear that column; at
-the 1920x1080 reference viewport both insets are exactly 6%. The `actor-left` anchor SHALL carry the
+(the anchor's horizontal centre) under the island column on its side — the vitals stack on
+the left, the place card and the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%, and moving the place card from the left
+column to the right column SHALL NOT widen either inset, because each column's outer edge is
+unchanged and the place card shares the width of the islands beneath it. The `actor-left` anchor SHALL carry the
 player's stage actor — the current roster character's portrait, resolved exactly as the stage
 portrait was before this requirement, with the truthful placeholder when no image exists — in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
@@ -72,7 +76,7 @@ expanded command line; when its content is taller
 than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
 command-line row, or the bottom band.
 
-At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`place`, `vitals`, `map`,
+At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`vitals`, `map`,
 `band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
 and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
 anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
@@ -123,7 +127,11 @@ introduced into the band this way.
 
 #### Scenario: The top band carries no location or time
 - **WHEN** the shell renders in exploration mode with a committed location label and world time
-- **THEN** the top band's rendered height is 48px, no element inside the top band states the location label or the world time, and the place anchor below the top band states both
+- **THEN** the top band's rendered height is 48px, no element inside the top band states the location label or the world time, and the place card in the `map` anchor below the top band states both
+
+#### Scenario: The left column carries no place card
+- **WHEN** the shell renders in exploration mode with a committed location and world time
+- **THEN** no place card renders anywhere in the stage's left column, and the `vitals` anchor's box is not offset by any place card's height
 
 #### Scenario: The dialogue host stands opposite the player
 - **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
@@ -131,11 +139,11 @@ introduced into the band this way.
 
 #### Scenario: The host's face clears the minimap at the smaller viewports
 - **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
-- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the minimap card's left edge, and no interactive stage anchor overlaps another
+- **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the leftmost edge of the right-hand island column — the place card and the minimap card, which share that column's width — and no interactive stage anchor overlaps another
 
 #### Scenario: The choice list sits over the stage between the portraits
 - **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080, 1440x900, and 1280x720 with the minimap island present and the command line expanded
-- **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `place`, `vitals`, `map`, band, or command-line anchor, and every row is reachable
+- **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
@@ -154,7 +162,7 @@ follows the committed mode at the commit. The matrix SHALL be:
 
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
-| place card (location, world time) | visible | visible | visible | hidden |
+| place card (location, world time; `map` anchor, above the minimap) | visible | visible | visible | hidden |
 | message window (band message region) | visible | visible | visible (whole band width, paged, name plate) | hidden |
 | dialogue choice list (`choices` anchor, centred over the stage) | not rendered | not rendered | once the current response's last page is fully shown, while no action is in flight | not rendered |
 | vitals island (vitals/conditions) | by the vitals rule | visible | by the vitals rule | hidden |
@@ -178,6 +186,10 @@ the surface is shown in that mode only while its own requirement's rule holds fo
 and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
 says so). The command line's `while expanded` cell is such a rule: its own requirement defines when the
 row is expanded, and a collapsed row is hidden with `display:none` exactly like a mode-hidden surface.
+The place card's visibility SHALL follow this matrix exactly as it did while it stood in the left
+column: it is shown in every playing mode and hidden in creation, and moving it into the `map` anchor
+SHALL NOT make it inherit the minimap's combat hiding — in combat the card stays visible above the
+participant frame.
 Each playing mode has one focus home: the action dock in exploration, combat, and creation mode, and
 the message window's focus target in dialogue mode, as "The command region collapses in dialogue mode
 and the message window spans the band" defines. When a mode change, a committed revision that turns a
@@ -188,7 +200,11 @@ collapse the command line, so leaving creation never reveals an expanded row.
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
-- **THEN** the minimap island is absent from the DOM layout and from the tab order, and it is not merely dimmed, while the participant frame renders in the `map` anchor and the foe line-up renders in `actor-right`
+- **THEN** the minimap island is absent from the DOM layout and from the tab order, and it is not merely dimmed, while the participant frame renders in the `map` anchor below the still-visible place card and the foe line-up renders in `actor-right`
+
+#### Scenario: The place card stays visible through combat
+- **WHEN** the committed mode changes from exploration to combat with a committed location and world time
+- **THEN** the place card remains rendered above the participant frame, and returns to standing above the minimap island when the mode returns to exploration
 
 #### Scenario: The minimap returns on leaving combat
 - **WHEN** the committed mode changes from combat back to exploration, including by a round whose beats
@@ -454,10 +470,11 @@ the recessed state itself still applies.
 The surfaces placed in the stage's `vitals` and `map` anchors SHALL render as floating HUD
 islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and
 the shared drop shadow, each island a separate box separated by the anchor's gap — never a single
-boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor,
-under the place card, SHALL carry the vitals, the conditions, and the compact party quickbar as sibling
+boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor, at the
+stage box's top-left below the top band, SHALL carry the vitals, the conditions, and the compact party quickbar as sibling
 islands in that fixed order, each present only while its own requirement renders it, and SHALL carry
-no character head card and no portrait catalog strip. The `map` anchor SHALL carry, in this order, the
+neither the place card nor a character head card nor a portrait catalog strip. The `map` anchor SHALL carry, in this order, the
+place card, the
 minimap island, the objective line, the combat participant frame while it is mounted, and the title
 ballot menu while it is mounted, each present only while its own requirement renders it; no reference
 panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
@@ -467,11 +484,11 @@ reduced-motion block reaches all of them at once.
 
 #### Scenario: The left anchor renders separate islands
 - **WHEN** the shell renders in exploration mode with a vital below its maximum, a committed `harmful` condition, and a non-empty party
-- **THEN** the vitals, the conditions, and the party quickbar render as three separately-chromed islands in that order, each with the translucent blurred panel chrome, none of them is a single opaque column card, and no head card or portrait catalog strip is rendered
+- **THEN** the vitals, the conditions, and the party quickbar render as three separately-chromed islands in that order, each with the translucent blurred panel chrome, none of them is a single opaque column card, and no head card, place card, or portrait catalog strip is rendered
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
-- **THEN** each island anchor's stack fits inside its anchor, the `vitals` stack does not intersect the place card, and neither stack intersects the bottom band, the command line, or the other island anchor's content
+- **THEN** each island anchor's stack fits inside its anchor, the place card's rendered box does not intersect the minimap island below it, and neither stack intersects the bottom band, the command line, or the other island anchor's content
 
 #### Scenario: Island chrome comes from the shared tokens
 - **WHEN** an island renders
@@ -479,7 +496,7 @@ reduced-motion block reaches all of them at once.
 
 #### Scenario: The map anchor stacks its islands in order
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel, a non-empty `objectives` panel, and title-ballot candidates, and later in combat mode
-- **THEN** exploration renders the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the participant frame there with no minimap and no objective line
+- **THEN** exploration renders the place card, the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the place card above the participant frame there with no minimap and no objective line
 
 ### Requirement: The vitals island is shown only in combat or while a vital or a condition needs attention
 The HUD SHALL show the vitals island — the vitals rows together with the conditions island beneath
@@ -683,8 +700,8 @@ emptied surface.
   original values appear verbatim with their signs and units
 
 ### Requirement: The minimap island states only its own drawing convention
-The minimap SHALL render as a bounded HUD island at the top of the stage's `map` anchor, directly
-below the top band and above the objective line, carrying the committed `local_map` payload's title. Where the resolved layout variant is the
+The minimap SHALL render as a bounded HUD island in the stage's `map` anchor, directly
+below the place card and above the objective line, carrying the committed `local_map` payload's title. The island SHALL share the anchor's content-column width with the place card above it, so the two read as one column. Where the resolved layout variant is the
 coordinate lattice — which exactly the coordinate-bearing layers (`grid`, `wilderness`) select — the
 island SHALL state the renderer's own axis convention as orientation marks in its header following the
 redesign draft's header treatment (the letterspaced title style and the `北↑ 東→` marks the draft's
@@ -703,7 +720,8 @@ vignette pictures the limit of what the payload knows. On a coordinate-bearing l
 committed, with no unit, delta, or derived quantity — as the entire content of its readout line, so
 the island's position statement is the drawing convention plus the current cell's world coordinates
 and nothing else. The readout SHALL NOT restate the current node's place name, its visibility state,
-or a movement destination: the place name belongs to the stage's place card, and a
+or a movement destination: the place name belongs to the stage's place card, which stands directly
+above this island in the same column, and a
 minimap shows the current position by definition. The readout SHALL NOT be driven by hover or by
 selection, and the island SHALL keep no hovered-node or selected-node state; a node's own name stays
 available as its on-canvas accessible name and, for a remembered node, as visible text on the surface
@@ -827,6 +845,11 @@ existing per-node movement submission SHALL be unchanged.
   technology — with the marker's octant direction word on the lattice variant and no direction on the
   graph variant — and in neither case does the island offer a second tab stop beyond its full-map
   affordance
+
+#### Scenario: The island sits under the place card at the column's width
+- **WHEN** the shell renders in exploration mode with a committed `local_map` panel
+- **THEN** the minimap island's top edge lies directly below the place card's bottom edge across the
+  anchor's gap, and the two islands' left and right edges coincide
 
 ### Requirement: The combat dock root renders as a vertical command window with a truthful skills count
 In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. It SHALL preserve the existing resolver item order, identities, availability and confirmation routes. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. Up/Down SHALL traverse and wrap in rendered order; Left/Right SHALL be no-ops at root. At deeper levels the root list SHALL be replaced by the current frame, with the existing breadcrumb/back path and only one active row container. No other mode SHALL render this combat root. Glyphs SHALL retain the existing concept mapping.
@@ -2136,8 +2159,9 @@ as well as their gold or warm-red emphasis.
   itself paints no background, border, or shadow
 
 ### Requirement: The place card names the current location and the world time
-The stage SHALL carry a place card in its `place` anchor, at the stage box's top-left corner below the
-top band, while the committed mode is exploration, dialogue, or combat, and SHALL NOT render it in
+The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's
+top-right corner directly below the top band and directly above the minimap island, while the
+committed mode is exploration, dialogue, or combat, and SHALL NOT render it in
 creation mode. The card SHALL state the current location as its heading and the world date/time
 beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
 The location SHALL be the best server-authored place name the client already holds, resolved in a
@@ -2151,14 +2175,16 @@ render a raw room key while a committed panel carries the authored place name fo
 SHALL render no raw mode label in place of the location.
 
 The card SHALL wear the HUD island chrome (the translucent panel fill, the backdrop blur, the
-hairline border, the shared radius and shadow, all from the shared design tokens), SHALL keep a fixed
+hairline border, the shared radius and shadow, all from the shared design tokens), SHALL span the same
+content-column width as the minimap island beneath it, SHALL keep a fixed
 height whatever the label lengths, and SHALL truncate a label that exceeds its width with an overflow
 indicator while keeping the full label as its accessible text. It SHALL be display-only: no control,
 no tab stop, and no dispatch.
 
-The card SHALL set its two values on two levels: the location heading in the serif face, then a
-quiet decorative gold rule, hidden from assistive technology, then the world-time line. The
-world-time line SHALL carry no leading separator glyph or rule before its first value, SHALL use the
+The card SHALL set its two values on two levels: the location heading in the serif face at the
+`--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the
+world-time line. The world-time line SHALL carry no leading separator glyph or rule before its first
+value, SHALL use the
 numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 12px chrome
 floor), and SHALL render the committed world-time label (or its placeholder) verbatim, with every
 date and time value intact: all time values SHALL remain server-authored, and the card SHALL NOT
@@ -2168,6 +2194,10 @@ fixed height.
 #### Scenario: The card names the location and the time
 - **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 ‧ 12:00`, and no `local_map` panel
 - **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 ‧ 12:00`, and no other stage or top-band element states either string
+
+#### Scenario: The card heads the map column
+- **WHEN** the shell renders in exploration mode with a committed `local_map` panel
+- **THEN** the place card is the first island of the `map` anchor, its rendered width equals the minimap island's rendered width, and the stage renders no place card in its left column
 
 #### Scenario: The card names the region, not the raw room key
 - **WHEN** the player stands in a wilderness cell whose status location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
@@ -2187,7 +2217,9 @@ fixed height.
 
 #### Scenario: The heading and the time read as two levels
 - **WHEN** the place card renders a location and a committed world time
-- **THEN** a decorative gold rule lies between the heading and the time line, the time line's numerals are tabular lining figures in the numeral face, and the card keeps its fixed height
+- **THEN** a decorative gold rule lies between the heading and the time line, the heading is set one
+  step below the display size the stage's island chrome uses at `--text-lg`, the time line's numerals
+  are tabular lining figures in the numeral face, and the card keeps its fixed height
 
 ### Requirement: Text speed and auto-advance are client-local reading preferences the settings surface owns
 The settings surface's reading section SHALL offer a text-speed control with the four steps `慢`
