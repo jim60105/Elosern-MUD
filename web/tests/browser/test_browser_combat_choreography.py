@@ -300,7 +300,7 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
-        "webclient-contextual-hud::vitals-pair-an-icon-a-label-and-numerals-with-a-trailing-damage-bar",
+        "webclient-contextual-hud::vitals-read-as-one-numeral-readout-over-three-thin-trailing-bar-lines",
         "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
     )
     def test_beat_gestures_full_motion(self):

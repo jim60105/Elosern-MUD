@@ -123,7 +123,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::theme-and-controls-remain-accessible"
     )
     @covers_requirement(
-        "webclient-contextual-hud::vitals-pair-an-icon-a-label-and-numerals-with-a-trailing-damage-bar",
+        "webclient-contextual-hud::vitals-read-as-one-numeral-readout-over-three-thin-trailing-bar-lines",
     )
     def test_unavailable_placeholders_and_numeric_status(self):
         page = self.logged_in_page()
@@ -492,7 +492,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
-        "webclient-contextual-hud::condition-chips-carry-a-severity-glyph-a-payload-duration-and-a-bounded-overflow",
+        "webclient-contextual-hud::condition-icons-float-without-a-window-and-disclose-their-detail-in-a-tooltip",
+        "webclient-contextual-hud::the-vitals-dock-stands-at-the-stage-s-lower-left-above-the-band",
     )
     def test_vitals_dock_stands_on_the_band_edge_with_chromeless_icons(self):
         """vitals-bar-redesign: the vitals dock stands on the bottom band's top

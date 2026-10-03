@@ -372,7 +372,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-combat-menu::combat-browser-acceptance-is-keyboard-only-and-desktop-bounded")
     @covers_requirement(
-        "webclient-contextual-hud::condition-chips-carry-a-severity-glyph-a-payload-duration-and-a-bounded-overflow",
+        "webclient-contextual-hud::condition-icons-float-without-a-window-and-disclose-their-detail-in-a-tooltip",
     )
     def test_combat_renders_at_minimum_viewport(self):
         page = self.logged_in_page(viewport=(1280, 720))
