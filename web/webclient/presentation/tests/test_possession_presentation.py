@@ -77,6 +77,7 @@ class PossessionPresentationTests(EvenniaTest):
         get_world_clock()
         self.player = create_object(PlayerCharacter, key="勇者", location=self.room1)
         self.player.account = self.account
+        self.account.characters.add(self.player)
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.db.wallet = 5000
@@ -100,12 +101,19 @@ class PossessionPresentationTests(EvenniaTest):
             real_msg(*args, **kwargs)
         self.session.msg = _recording_msg
 
+    @covers_requirement(
+        "webclient-character-roster::each-roster-row-reports-only-canonical-owned-character-facts",
+        "webclient-character-roster::the-account-roster-is-a-committed-presentation-panel-available-in-every-mode",
+    )
     def test_real_possession_retains_the_owner_party_and_catalog_identity(self):
         other = create_object(LLMNPC, key="測試同行乙", location=self.room1)
         other.race = "human"
         other.apply_race_baseline()
         join_party(other, self.player)
         before = party_presenter(PresentationContext(self.player, 1))
+        roster_before = self.registry.render("roster", PresentationContext(self.player, 1))
+        self.assertTrue(roster_before["available"])
+        owner_before = next(row for row in roster_before["characters"] if row["current"])
         enter_possession(self.player, self.npc)
         context = PresentationContext(self.npc, 1)
         self.assertEqual(party_presenter(context), before)
@@ -113,8 +121,33 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertIn(str(self.npc.pk), catalog)
         self.assertIn(str(other.pk), catalog)
         self.assertEqual(status_presenter(context)["actor"]["identity"], str(self.npc.pk))
+        roster = self.registry.render("roster", context)
+        self.assertTrue(roster["available"])
+        owner_row = next(row for row in roster["characters"] if row["current"])
+        self.assertEqual(owner_row, owner_before)
+        self.assertEqual(owner_row["identity"], self.player.pk)
+        self.assertFalse(any(row["identity"] == self.npc.pk for row in roster["characters"]))
+        self.assertFalse(roster["switch_locked"])
+        self.assertIsNone(roster["lock_reason"])
+        with patch("world.rules.account_roster.is_in_active_session", side_effect=lambda actor: actor == self.npc):
+            combat_roster = self.registry.render("roster", context)
+        self.assertTrue(combat_roster["switch_locked"])
+        self.assertEqual(combat_roster["lock_reason"], "戰鬥中無法切換角色")
+        self.assertEqual(combat_roster["characters"], roster["characters"])
         release_possession(self.player)
         self.assertEqual(party_presenter(PresentationContext(self.player, 1)), before)
+        self.assertEqual(self.registry.render("roster", PresentationContext(self.player, 1)), roster_before)
+
+    def test_possessed_roster_rejects_foreign_or_unbound_owner(self):
+        context = PresentationContext(self.npc, 1)
+        self.assertFalse(self.registry.render("roster", context)["available"])
+        self.npc.account = self.account
+        self.npc.db.possessed_by = self.player.pk
+        self.account.characters.remove(self.player)
+        self.assertFalse(self.registry.render("roster", context)["available"])
+        self.npc.db.party_member = None
+        self.assertFalse(self.registry.render("roster", context)["available"])
+        self.npc.db.possessed_by = None
 
     def tearDown(self):
         try:

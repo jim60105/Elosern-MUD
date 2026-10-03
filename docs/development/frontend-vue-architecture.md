@@ -83,6 +83,12 @@ possession); party identities remain safe integers, normalized to decimal
 strings for this join. Other status fields retain their owner-keyed hybrid
 contract.
 
+While possessing, the roster stays rooted in the authenticated puppet's account.
+The live bound owner must belong to that account; A remains roster-current with
+its existing portrait/pending marker, and B never becomes an account character.
+Roster switch lock/reason still follow B's combat predicate, not A's; possession
+alone creates no new switch lock or payload fields.
+
 Companions reuse StageActor's listener dim. A companion whose identity matches
 the committed dialogue host while the existing speaker signal is `host`
 temporarily receives the highest paint z and full brightness. Speaker changes,

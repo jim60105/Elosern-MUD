@@ -32,7 +32,8 @@ class RosterCharacterView:
     Attributes:
         identity: Stable integer database ID of the character.
         name: The character's current object key (bounded).
-        current: True if this character is the session's live puppet.
+        current: True for the owned active character (the possessor while
+            its companion is the session's live puppet).
         pending: True if character creation is still pending.
     """
 
@@ -83,9 +84,20 @@ def build_account_roster(actor: Any) -> AccountRosterView:
     if actor is None:
         raise AccountRosterError("actor is None")
 
-    account = getattr(actor, "account", None)
+    session_actor = actor
+    # The authenticated puppet's account remains the sole disclosure boundary;
+    # never use a party back-reference to select a different account.
+    account = getattr(session_actor, "account", None)
     if account is None:
         raise AccountRosterError("actor has no resolvable owning account")
+    possessed_by = getattr(getattr(session_actor, "db", None), "possessed_by", None)
+    if possessed_by is not None:
+        from world.rules.party import bound_owner_of
+
+        owner = bound_owner_of(session_actor)
+        if owner is None or type(possessed_by) is not int or owner.pk != possessed_by:
+            raise AccountRosterError("possessed actor has no live bound owner")
+        actor = owner
 
     # Materialize once inside a strict try block to avoid inconsistent reads.
     try:
@@ -156,7 +168,7 @@ def build_account_roster(actor: Any) -> AccountRosterView:
     can_create = len(raw_characters) < max_characters
 
     # Lock facts: switching is locked exactly when the live puppet is in combat.
-    switch_locked = is_in_active_session(actor)
+    switch_locked = is_in_active_session(session_actor)
     lock_reason = ROSTER_LOCK_REASON if switch_locked else None
 
     return AccountRosterView(

@@ -7,6 +7,7 @@
 - [x] 1.3 In `_validate_slot()`, accept `portrait_ref` as either `None` or an ASCII decimal string matching `[0-9]+`, length 1–32, at schema version 2.
 - [x] 1.4 In `party.py`, resolve the party OWNER before listing companions (design D6): when the session actor is a character whose `party_member` back-reference names a live player, use that player as the party root for `live_companions()` and owner-keyed `stage_for()` bond stages; when the back-reference resolves to no live player, raise the registry-unavailable error so the panel takes the shared unavailable form. A non-possessing player puppet is unaffected (actor is already the root).
 - [x] 1.5 Extend `world.rules.art_view._exploration_entities()` membership to include the owner's live, co-located companions (design D7), including the controlled companion while possessing, in party order after dialogue hosts and named-policy characters, honoring the 32-entry cap. Cap eviction uses the client placeholder.
+- [x] 1.6 Preserve the owner's current roster row/portrait during real possession, using only the authenticated puppet's account and verified live owner membership; keep pending/capacity facts owned, combat switch lock keyed to the actual session actor, stranger/foreign paths unavailable, and roster v2 shape unchanged. Verify possession, account-roster builder and roster presenter tests.
 
 ## 2. Client: UMD and Vue validator mirrors
 

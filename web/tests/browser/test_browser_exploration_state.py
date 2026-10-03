@@ -58,6 +58,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         state = store_state(page)
         rows = state["panels"]["party"]["slots"]
         player_id = int(state["panels"]["status"]["actor"]["identity"])
+        owner_roster_row = next(row for row in state["panels"]["roster"]["characters"] if row["current"])
         target_id = rows[1]["identity"]
         expected = [player_id, *[row["identity"] for row in rows]]
         page.wait_for_selector('[data-testid="companion-figure"]')
@@ -100,6 +101,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_function("(ids) => [...document.querySelectorAll('[data-testid=\"companion-figure\"]')].map(el=>Number(el.dataset.identity)).join(',') === ids.join(',')", arg=swapped)
         self.assertEqual(identities(), swapped)
         self.assertEqual(len(store_state(page)["panels"]["party"]["slots"]), 4)
+        possessed_roster = store_state(page)["panels"]["roster"]
+        self.assertTrue(possessed_roster["available"])
+        self.assertEqual(next(row for row in possessed_roster["characters"] if row["current"]), owner_roster_row)
         page.evaluate("window.__elosernBridge.store.openHudDrawer('party')")
         page.locator('[data-testid="party-drawer__release-btn"]').click()
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)

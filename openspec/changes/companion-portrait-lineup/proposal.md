@@ -25,6 +25,7 @@ _None._
 - `webclient-party-panel`: schema v2 accepts null or 1–32 ASCII decimal digits for portrait refs; v1 is unsupported, with no shim.
 - `webclient-art-panel`: exploration membership adds live co-located companions after existing members, preserving the cap and truthful unavailable entries.
 - `webclient-possession-presentation`: status identity addresses the controlled session actor while all other hybrid fields retain their existing contract.
+- `webclient-character-roster`: preserve the authenticated account's owned A/current portrait while B is possessed; keep pending/capacity facts owned and combat lock keyed to the actual session actor.
 
 ## Impact
 
