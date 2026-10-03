@@ -572,11 +572,13 @@ def _scan_gallery_states() -> list[GallerySubjectState]:
 
     The shared scan behind the two cross-record accessors below. Raw and
     write-free: card entries are validated straight off the record
-    (``validate_card`` with ``api_defaults=False``) so a malformed entry is
-    skipped exactly as ``cards_for`` skips it, and no per-subject fetch —
-    which consolidates duplicate records — runs during a listing. A record
-    whose persisted kind/subject no longer parses is skipped, so one corrupt
-    row can never blind an operator surface.
+    (``validate_card`` with ``api_defaults=False`` after the same stage-only
+    identity normalization ``cards_for`` applies, so a stage-less legacy card
+    counts there and here alike) and a malformed entry is skipped exactly as
+    ``cards_for`` skips it. No per-subject fetch — which consolidates
+    duplicate records — runs during a listing. A record whose persisted
+    kind/subject no longer parses is skipped, so one corrupt row can never
+    blind an operator surface.
     """
     states: list[GallerySubjectState] = []
     for record in GalleryRecord.objects.all():
@@ -587,7 +589,7 @@ def _scan_gallery_states() -> list[GallerySubjectState]:
         card_count = 0
         for entry in record.db.cards or []:
             try:
-                validate_card(entry, subject, api_defaults=False)
+                validate_card(_normalize_stored_stage(entry), subject, api_defaults=False)
             except GalleryRecordError:
                 log_warn(
                     "gallery_card_invalid",
