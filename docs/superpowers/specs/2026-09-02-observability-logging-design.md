@@ -188,6 +188,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `npc_voice_profile_missing` | `npc`、`profile`（error 級；dangling profile reference） |
 | `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |
 | `guild_exam_opponent_created` | `char`、`rank`、`profile` |
+| `narrative_event_recorded` | `source_id`、`event_type`、`tick`、`participants` |
+| `narrative_projection_pending_scanned` | `projector_version`、`count` |
 
 ### 4.3 AI／外部服務邊界
 

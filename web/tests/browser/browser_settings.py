@@ -46,6 +46,8 @@ MAX_NR_CHARACTERS = 5
 
 # The production settings register the project-authored trait types that the
 # combat/sexual handlers require; without them any materialization of a
+
+INSTALLED_APPS = list(INSTALLED_APPS) + ["world.narrative.apps.NarrativeConfig"]
 # project trait (for example ``SexualState``'s ``ordered_level``) fails.
 TRAIT_CLASS_PATHS = [
     "world.rules.sexual_state.OrderedLevelTrait",

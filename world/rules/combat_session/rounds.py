@@ -528,7 +528,7 @@ def _submit_request(
                             )
 
             result = _continue_or_settle(
-                actor, new_record, battlefield, logs, notification_count=len(notifications)
+                actor, new_record, battlefield, logs, notification_count=len(notifications), opening=opening
             )
             if opening == "round":
                 # Internal slot only: the dispatcher reads it into the

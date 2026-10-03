@@ -227,6 +227,7 @@
         "world.quests",
         "world.skills",
         "world.art",
+        "world.narrative",
         "world.ai",
         "world.lore"
       ]

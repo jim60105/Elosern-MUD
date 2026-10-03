@@ -263,6 +263,8 @@ EXTRA_LAUNCHER_COMMANDS["xyzgrid"] = "evennia.contrib.grid.xyzgrid.launchcmd.xyz
 # contrib's module is appended without duplicating the project module.
 PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototypes"]
 
+INSTALLED_APPS = list(INSTALLED_APPS) + ["world.narrative.apps.NarrativeConfig"]
+
 # Portal WebSocket protocol: preserves the shared-login uid across abnormal
 # closes so the same browser tab can re-authenticate on reconnect without a
 # page reload (server/conf/websocket_protocol.py).
