@@ -304,10 +304,12 @@ def get_owner_memories(
     # Exclude private authoring from in-world cognition views
     qs = qs.exclude(category__in=PRIVATE_AUTHORING_CATEGORIES)
 
-    if not include_superseded and not include_inactive:
-        qs = qs.filter(effective_availability="active")
-    elif not include_inactive:
-        qs = qs.filter(effective_availability__in=["active", "superseded"])
+    allowed_avail = {"active"}
+    if include_superseded:
+        allowed_avail.add("superseded")
+    if include_inactive:
+        allowed_avail.add("inactive")
+    qs = qs.filter(effective_availability__in=allowed_avail)
 
     if tier:
         qs = qs.filter(effective_tier=str(tier).strip())
@@ -444,6 +446,12 @@ def project_narrative_event_to_memories(
                 records.append(rec)
 
         else:
+            # Exclude private authoring events from cognition projection
+            if event.event_type in PRIVATE_AUTHORING_CATEGORIES or event.visibility == "private":
+                progress.status = "completed"
+                progress.save(update_fields=["status", "updated_at"])
+                return []
+
             # Generic event projection for public or participant awareness
             for p_id in [str(p) for p in event.participants]:
                 rec, _, _ = record_memory(
@@ -483,6 +491,10 @@ def process_pending_narrative_memory_projections(projector_version: int = 1) -> 
     Safe for restart recovery.
     Returns the count of successfully processed sources.
     """
+    from world.narrative.events import scan_pending_narrative_projections
+    # Emit cataloged pending scanned event first
+    scan_pending_narrative_projections(projector_version=projector_version)
+
     pending_items = list(
         ProjectionProgress.objects.filter(
             projector_version=projector_version,

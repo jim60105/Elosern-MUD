@@ -102,7 +102,10 @@ class MemoryRecord(models.Model):
         if self.pk:
             # Check if attempting to update immutable fields
             orig = MemoryRecord.objects.get(pk=self.pk)
-            if orig.owner_id != self.owner_id or orig.tick != self.tick or orig.content != self.content or orig.knowledge_scope != self.knowledge_scope or orig.source_id != self.source_id or orig.projector_version != self.projector_version:
+            if (orig.owner_id != self.owner_id or orig.tick != self.tick or orig.content != self.content or
+                orig.knowledge_scope != self.knowledge_scope or orig.source_id != self.source_id or
+                orig.projector_version != self.projector_version or orig.category != self.category or
+                orig.subjects != self.subjects or orig.derived_generation != self.derived_generation):
                 raise ValueError("MemoryRecord content and provenance are immutable. Use revisions for effective metadata.")
         super().save(*args, **kwargs)
 
@@ -121,6 +124,14 @@ class MemoryRevision(models.Model):
     supersedes_record_id = models.CharField(max_length=64, blank=True, default="")
     relations = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("MemoryRevision records are append-only and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("MemoryRevision records cannot be deleted.")
 
     class Meta:
         app_label = "narrative"

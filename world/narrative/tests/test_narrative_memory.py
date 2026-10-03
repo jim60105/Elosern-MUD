@@ -28,6 +28,7 @@ from world.narrative.models import (
     OwnerMemoryGeneration,
     ProjectionProgress,
 )
+from world.observability import log_info
 
 
 class NarrativeOwnerMemoryTests(EvenniaTestCase):
@@ -61,10 +62,23 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         self.assertEqual(revision.availability, "active")
         self.assertEqual(get_owner_generation(str(self.player.pk)), 1)
 
-        # Verify attempting to mutate immutable fields raises ValueError
+        # Verify attempting to mutate immutable fields on MemoryRecord raises ValueError
         record.content = {"summary": "Altered memory text"}
         with self.assertRaises(ValueError):
             record.save()
+
+        record.refresh_from_db()
+        record.subjects = ["altered_subject"]
+        with self.assertRaises(ValueError):
+            record.save()
+
+        # Verify MemoryRevision is append-only: cannot be modified or deleted
+        revision.availability = "inactive"
+        with self.assertRaises(ValueError):
+            revision.save()
+
+        with self.assertRaises(ValueError):
+            revision.delete()
 
     def test_revisions_and_supersession(self):
         """Scenario: Supersession changes normal results.
@@ -120,6 +134,17 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         self.assertEqual(rec1_view.availability, "superseded")
         self.assertEqual(rec1_view.knowledge_scope, "inferred")
 
+        # Test availability flags independence
+        # include_inactive=True, include_superseded=False -> should NOT include superseded
+        inactive_only_views = get_owner_memories(
+            owner_id=owner,
+            requester_id=owner,
+            include_superseded=False,
+            include_inactive=True,
+        )
+        inactive_ids = [v.id for v in inactive_only_views]
+        self.assertNotIn(rec1.id, inactive_ids)
+
     def test_permission_and_privacy_boundaries(self):
         """Access distinguishes knowledge scopes and excludes private authoring or other owners' private cognition."""
         owner = str(self.observer_npc.pk)
@@ -163,6 +188,20 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         views_public = get_owner_memories(owner_id=owner, requester_id=other, scope="public")
         self.assertEqual(len(views_public), 1)
         self.assertEqual(views_public[0].content["notice"], "Town hall announcement")
+
+        # End-to-end: private authoring event projection test
+        authoring_event, _, _ = record_narrative_event(
+            source_id="authoring:session:1",
+            event_type="private_authoring",
+            content={"draft": "Private session notes"},
+            participants=[owner],
+            visibility="private",
+            projector_version=1,
+        )
+        project_narrative_event_to_memories(authoring_event, projector_version=1)
+        # Should not create any memory records for owner
+        auth_mems = get_owner_memories(owner_id=owner, requester_id=owner)
+        self.assertFalse(any("Private session notes" in str(m.content) for m in auth_mems))
 
     def test_scenario_only_an_observer_learns_protection(self):
         """Scenario: Only an observer learns protection.
@@ -260,32 +299,35 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         WHEN projection fails before its transaction commits and restarts
         THEN progress stays pending and success creates one record per eligible owner/source.
         """
-        source_id = "encounter:restart_fail_sess:round:1"
+        source_id = "encounter:restart_fail_multi:round:1"
+        p1 = str(self.player.pk)
+        p2 = str(self.observer_npc.pk)
+
         event, progress, _ = record_narrative_event(
             source_id=source_id,
             event_type="encounter_protection",
             content={"encounter_outcome": "victory"},
-            participants=[str(self.player.pk)],
+            participants=[p1, p2],
             tick=200,
             projector_version=1,
         )
         self.assertEqual(progress.status, "pending")
 
-        # Simulate a crash during projection: transaction rolls back
-        try:
-            with transaction.atomic():
-                # Call record_memory then fail
-                record_memory(
-                    owner_id=str(self.player.pk),
-                    content={"test": 1},
-                    source_id=source_id,
-                    projector_version=1,
-                )
-                raise RuntimeError("Simulated mid-flight crash/restart")
-        except RuntimeError:
-            pass
+        # Simulate failure inside project_narrative_event_to_memories during record_memory
+        call_count = [0]
+        original_record_memory = record_memory
 
-        # Progress should still be pending and zero records committed
+        def faulty_record_memory(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:  # Fail on second participant
+                raise RuntimeError("Injected projector failure")
+            return original_record_memory(*args, **kwargs)
+
+        with patch("world.narrative.memory.record_memory", side_effect=faulty_record_memory):
+            with self.assertRaises(RuntimeError):
+                project_narrative_event_to_memories(event, projector_version=1)
+
+        # Ensure atomicity: first participant's memory must be rolled back too!
         progress.refresh_from_db()
         self.assertEqual(progress.status, "pending")
         self.assertEqual(
@@ -293,21 +335,21 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
             0,
         )
 
-        # Restart runner scans and processes pending projections
+        # Restart / pending scanner resumes
         processed = process_pending_narrative_memory_projections(projector_version=1)
-        self.assertGreaterEqual(processed, 1)
+        self.assertEqual(processed, 1)
 
         progress.refresh_from_db()
         self.assertEqual(progress.status, "completed")
         self.assertEqual(
             MemoryRecord.objects.filter(source_id=source_id, projector_version=1).count(),
-            1,
+            2,
         )
 
-        # Reprocessing again produces no duplicate records
+        # Reprocessing again produces zero duplicates
         processed_again = process_pending_narrative_memory_projections(projector_version=1)
         self.assertEqual(processed_again, 0)
         self.assertEqual(
             MemoryRecord.objects.filter(source_id=source_id, projector_version=1).count(),
-            1,
+            2,
         )

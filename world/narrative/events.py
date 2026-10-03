@@ -86,6 +86,11 @@ def record_narrative_event(
         transaction.on_commit(
             lambda b=boundary: log_info("narrative_event_recorded", context=b)
         )
+        # Settle memory projection via on_commit of the outermost transaction
+        from world.narrative.memory import project_narrative_event_to_memories
+        transaction.on_commit(
+            lambda e=event, pv=projector_version: project_narrative_event_to_memories(e, projector_version=pv)
+        )
         return event, progress, True
 
 
