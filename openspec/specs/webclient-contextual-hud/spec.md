@@ -11,11 +11,12 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 ## Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
+This requirement carries the `place-card-relocation` amendment; the vitals-anchor wording below moves the anchor from the stage box's top-left corner to the stage's lower-left dock, and the command-line row now begins past that dock.
 Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 1080px tall or 1920px wide. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
-named stage anchors — the top-left `vitals` anchor, the top-right `map` anchor, the portrait anchors
+named stage anchors — the lower-left `vitals` anchor, the top-right `map` anchor, the portrait anchors
 `actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, the dialogue `choices` anchor, and
 the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
 required surface out of view. The stage SHALL carry no separate `place` anchor: the place card is an
@@ -23,9 +24,8 @@ island of the `map` anchor.
 
 The top band SHALL be 48px tall at every supported viewport and SHALL carry only the brand, the top
 navigation bar, the possession banner when present, the character switcher, and the connection
-state; it SHALL carry no location label and no time label. The `vitals` anchor SHALL sit at the stage
-box's top-left corner, directly below the top band — it SHALL NOT be offset by the place card's
-height, which no longer stands above it — and SHALL be a fixed width that does not depend on the
+state; it SHALL carry no location label and no time label. The `vitals` anchor is the stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band"
+defines: bottom-anchored on the band's upper edge in the left gutter, at a quarter of the viewport's width that does not depend on the
 content it holds. The `map` anchor SHALL sit at the stage
 box's top-right corner, below the top band; its content column (the place card, then the
 minimap island, then the objective line, then any other island this capability places there) SHALL be right-aligned to the
@@ -49,11 +49,10 @@ band-height token so that none of them overlaps the band.
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
 SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
 stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
-(the anchor's horizontal centre) under the island column on its side — the vitals stack on
-the left, the place card and the minimap card on the right — the inset SHALL grow just enough to clear that column; at
-the 1920x1080 reference viewport both insets are exactly 6%, and moving the place card from the left
-column to the right column SHALL NOT widen either inset, because each column's outer edge is
-unchanged and the place card shares the width of the islands beneath it. The `actor-left` anchor SHALL carry the
+(the anchor's horizontal centre) under the island column on its side — the vitals dock's left
+gutter on the left, the place card and the minimap card on the right — the inset SHALL grow just enough to clear that column; at
+the 1920x1080 reference viewport both insets are exactly 6%, and the compact lower-left dock never
+reaches the portrait's face height, so neither inset needs to grow for it. The `actor-left` anchor SHALL carry the
 player's stage actor — the current roster character's portrait, resolved exactly as the stage
 portrait was before this requirement, with the truthful placeholder when no image exists — in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
@@ -467,28 +466,32 @@ the recessed state itself still applies.
 - **THEN** the stage stays recessed until the last open surface closes
 
 ### Requirement: The HUD island stack renders as bounded floating islands, not column cards
-The surfaces placed in the stage's `vitals` and `map` anchors SHALL render as floating HUD
+This requirement carries the `place-card-relocation` amendment; the party quickbar keeps its interim
+island inside the dock until `companion-portrait-lineup` removes it.
+The surfaces placed in the stage's island anchors SHALL render as floating HUD
 islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and
 the shared drop shadow, each island a separate box separated by the anchor's gap — never a single
-boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor, at the
-stage box's top-left below the top band, SHALL carry the vitals, the conditions, and the compact party quickbar as sibling
-islands in that fixed order, each present only while its own requirement renders it, and SHALL carry
-neither the place card nor a character head card nor a portrait catalog strip. The `map` anchor SHALL carry, in this order, the
+boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor is the
+stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band"
+defines: it carries the condition icon row and the vitals bars as one dock, and SHALL carry
+no character head card, no portrait catalog strip, and no top-anchored island; the party quickbar keeps
+its compact island in the anchor below the dock until `companion-portrait-lineup` removes it. The dock
+itself replaces the boxed island chrome with the feathered instrument plate that "The vitals dock stands at the stage's lower-left above the band" defines. The `map` anchor SHALL carry, in this order, the
 place card, the
 minimap island, the objective line, the combat participant frame while it is mounted, and the title
 ballot menu while it is mounted, each present only while its own requirement renders it; no reference
-panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
+panel and no portrait anchor content SHALL be placed in either island anchor. Each stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
 every island populated, so no required island depends on scrolling the anchor to be seen. Every
 island's chrome SHALL be expressed through the shared design tokens, so a token change or the
 reduced-motion block reaches all of them at once.
 
 #### Scenario: The left anchor renders separate islands
-- **WHEN** the shell renders in exploration mode with a vital below its maximum, a committed `harmful` condition, and a non-empty party
-- **THEN** the vitals, the conditions, and the party quickbar render as three separately-chromed islands in that order, each with the translucent blurred panel chrome, none of them is a single opaque column card, and no head card, place card, or portrait catalog strip is rendered
+- **WHEN** the shell renders in exploration mode with a vital below its maximum and a committed `harmful` condition
+- **THEN** the condition icon row and the vitals bars render as the lower-left dock's two surfaces in that order, the dock carries the feathered, blurred panel ink on its brass spine, and no head card, place card, portrait catalog strip, or top-anchored vitals island is rendered; the interim party quickbar, when a party is committed, stands below the dock
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
-- **THEN** each island anchor's stack fits inside its anchor, the place card's rendered box does not intersect the minimap island below it, and neither stack intersects the bottom band, the command line, or the other island anchor's content
+- **THEN** each anchor's content fits inside its anchor, the place card's rendered box does not intersect the minimap island below it, and neither the dock nor the map stack intersects the bottom band, the command line, or the other island anchor's content
 
 #### Scenario: Island chrome comes from the shared tokens
 - **WHEN** an island renders
@@ -499,86 +502,52 @@ reduced-motion block reaches all of them at once.
 - **THEN** exploration renders the place card, the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the place card above the participant frame there with no minimap and no objective line
 
 ### Requirement: The vitals island is shown only in combat or while a vital or a condition needs attention
-The HUD SHALL show the vitals island — the vitals rows together with the conditions island beneath
-them — only while at least one of these holds for the committed state: the committed mode is
-`combat`; the derived low-HP presentation state is true; any `status.resources` vital (hp, mp, sp)
-carries a numeric `current` below its numeric `maximum`; or `status.conditions` carries at least one
-entry whose `severity` is `warning`, `harmful`, or `critical`. A condition whose `severity` is
-`beneficial` or `informational` — including a passive `skill_owned` combat-modifier row — SHALL NOT
-by itself make the island visible, and neither SHALL an entry with a missing or unknown `severity`.
-While the island is visible its condition chips SHALL render every committed condition, whatever its
-severity. Otherwise the island SHALL be hidden: from the moment the committed revision turns the rule false it
-SHALL leave the accessibility tree, the tab order, and pointer hit-testing, and once its exit transition
-has finished it SHALL be `display:none` and contribute no visible box. The island SHALL enter and leave
-with a fade and a 12px slide at the client's motion level (`webclient-contextual-hud` "Location,
-appearance, and vitals changes transition at the motion level"); at `off` it is shown and hidden in the
-same frame as the commit. The rule SHALL be derived client-side from the committed
-`status` panel and the committed mode alone: no server field, request, or timer is involved, and a
-vital that is absent from the payload or carries a non-numeric field SHALL NOT count as below its
-maximum. Dialogue mode SHALL follow the same rule as exploration; creation mode hides the island
-through the visibility matrix; an unavailable `status` panel renders no vitals island at all.
+The HUD SHALL show the vitals dock — the condition icon row together with the vitals bars — only while at least one of these holds for the committed state: the committed mode is `combat`; the derived low-HP presentation state is true; any `status.resources` vital (hp, mp, sp) carries a numeric `current` below its numeric `maximum`; or `status.conditions` carries at least one entry whose `severity` is `warning`, `harmful`, or `critical`. A condition whose `severity` is `beneficial` or `informational` — including a passive `skill_owned` combat-modifier row — SHALL NOT by itself make the dock visible, and neither SHALL an entry with a missing or unknown `severity`. While the dock is visible its condition icons SHALL render every committed condition, whatever its severity. Otherwise the dock SHALL be hidden: from the moment the committed revision turns the rule false it SHALL leave the accessibility tree, the tab order, and pointer hit-testing, and once its exit transition has finished it SHALL be `display:none` and contribute no visible box. The dock SHALL enter and leave with a fade and a 12px slide at the client's motion level (`webclient-contextual-hud` "Location, appearance, and vitals changes transition at the motion level"); at `off` it is shown and hidden in the same frame as the commit. The rule SHALL be derived client-side from the committed `status` panel and the committed mode alone: no server field, request, or timer is involved, and a vital that is absent from the payload or carries a non-numeric field SHALL NOT count as below its maximum. Dialogue mode SHALL follow the same rule as exploration; creation mode hides the dock through the visibility matrix; an unavailable `status` panel renders no vitals dock at all.
 
-While hidden, the island SHALL keep its trailing-bar memory, so the first committed revision that
-lowers a vital from full shows the island with the trailing bar lagging from the previously committed
-ratio exactly as an always-visible island would. When a committed revision turns the rule false while
-focus is inside the island, focus SHALL move to the action dock before the island is hidden, through
-the same focus-restore path a mode change uses.
+While hidden, the dock SHALL keep its trailing-bar memory, so the first committed revision that lowers a vital from full shows the dock with the trailing bar lagging from the previously committed ratio exactly as an always-visible dock would. When a committed revision turns the rule false while focus is inside the dock, focus SHALL move to the action dock before the dock is hidden, through the same focus-restore path a mode change uses.
 
 #### Scenario: Full health outside combat hides the island
 - **WHEN** the committed mode is exploration, every committed vital's `current` equals its `maximum`, and `status.conditions` is empty
-- **THEN** the vitals island is absent from the accessibility tree and the tab order, and once any exit transition has finished it is hidden with `display:none` and no vitals, numerals, or low-HP marker are visible
+- **THEN** the vitals dock is absent from the accessibility tree and the tab order, and once any exit transition has finished it is hidden with `display:none` and no bars, numerals, icons, or low-HP marker are visible
 
 #### Scenario: A vital below its maximum shows the island
 - **WHEN** a committed revision in exploration mode carries `mp` at 40 of 60 with no condition
-- **THEN** the vitals island renders with every vital's icon, label, and `current / maximum` numerals
+- **THEN** the vitals dock renders with every vital's icon, label, and on-track `current / maximum` numerals
 
 #### Scenario: A condition shows the island at full health
 - **WHEN** a committed revision in exploration mode carries full vitals and one condition whose `severity` is `harmful`
-- **THEN** the vitals island renders with its vitals rows and the condition chip
+- **THEN** the dock renders its bars and the condition icon
 
 #### Scenario: A beneficial-only condition keeps the island hidden at full health
 - **WHEN** a committed revision in exploration mode carries full vitals and only conditions whose `severity` is `beneficial`, such as a passive `skill_owned` combat-modifier row
-- **THEN** the vitals island stays hidden with `display:none` and none of its condition chips is visible or focusable, and no enter transition plays
+- **THEN** the dock stays hidden with `display:none` and none of its condition icons is visible or focusable, and no enter transition plays
 
 #### Scenario: Visible island renders every condition chip
-- **WHEN** the vitals island is visible because a vital is below its maximum and the committed conditions carry one `beneficial` and one `informational` entry
-- **THEN** the island renders both condition chips
+- **WHEN** the dock is visible because a vital is below its maximum and the committed conditions carry one `beneficial` and one `informational` entry
+- **THEN** the icon row renders both condition icons
 
 #### Scenario: Combat always shows the island
 - **WHEN** the committed mode is combat with every vital full and no condition
-- **THEN** the vitals island renders
+- **THEN** the vitals dock renders
 
 #### Scenario: The first hit from full health keeps its trailing bar
-- **WHEN** the island is hidden at full health and the next committed revision in the same epoch lowers `hp`
-- **THEN** the island renders, the hp fill shows the new ratio, and the trailing bar starts from the previously committed full ratio
+- **WHEN** the dock is hidden at full health and the next committed revision in the same epoch lowers `hp`
+- **THEN** the dock renders, the hp fill shows the new ratio, and the trailing bar starts from the previously committed full ratio
 
 #### Scenario: Focus is rescued before the island hides
-- **WHEN** focus is on a `harmful` condition chip outside combat with every vital full, and a committed revision clears that condition, leaving only `beneficial` conditions
-- **THEN** focus moves to the action dock before the island is hidden, and no focus is lost to the document body
+- **WHEN** focus is on a `harmful` condition icon outside combat with every vital full, and a committed revision clears that condition, leaving only `beneficial` conditions
+- **THEN** focus moves to the action dock before the dock is hidden, and no focus is lost to the document body
 
-### Requirement: Vitals pair an icon, a label, and numerals with a trailing damage bar
-Each of hp, mp, and sp SHALL render as one vital row carrying an icon, a Traditional Chinese label,
-and the `current / maximum` numerals from `status.resources` — or, for hp while a combat round plays,
-the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines — above a track containing a trailing bar
-and a fill. The numerals SHALL render at every value, so no vital state is conveyed by the coloured
-fill alone. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
+### Requirement: Vitals read as one numeral readout over three thin trailing-bar lines
+Each of hp, mp, and sp SHALL render as one thin trailing-bar line, the three laid almost edge to edge — parted by a hairline seam, in hp, mp, sp order from the top — under one numeral readout row that states, in the same order, each gauge's icon and its `current / maximum` numerals — or, for hp while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines. The icons SHALL be three distinct shapes in their gauge's hue, so the readings are told apart without colour; each gauge's Traditional Chinese label (生命, 魔力, 耐力) SHALL be its reading's accessible name and SHALL NOT be rendered as visible text. The 危險 low marker SHALL render with the hp reading. The current value SHALL lead in the brightest paper ink at tabular figures and the maximum SHALL recede a step, every value in a contrast that keeps it legible over the dock, so no vital state is conveyed by the coloured fill alone. The lines SHALL NOT read as square boxes: each SHALL taper to a point at its far end, and each line SHALL run a little shorter than the one above it, so the set fans out rather than ending on one hard edge. The readout and the three lines together SHALL occupy well under half the previous vitals island's row block. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
 
-The trailing bar SHALL exist to make damage taken visible: it SHALL lag the fill when the ratio falls
-and SHALL be overtaken by the fill when the ratio rises. It SHALL be decorative — hidden from the
-accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already
-carry on the same revision. It SHALL NOT render any value that was not a previously displayed ratio of
-that same gauge, where a displayed ratio comes only from the committed `status` or from a committed
-beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result,
-and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect.
-Its motion SHALL be token-gated so the reduced-motion block disables it. At the `full` motion level the
-trailing bar SHALL start following a drop 300ms after the fill moves.
+The trailing bar SHALL exist to make damage taken visible: it SHALL lag the fill when the ratio falls and SHALL be overtaken by the fill when the ratio rises. It SHALL be decorative — hidden from the accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already carry on the same revision. It SHALL NOT render any value that was not a previously displayed ratio of that same gauge, where a displayed ratio comes only from the committed `status` or from a committed beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result, and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect. Its motion SHALL be token-gated so the reduced-motion block disables it. At the `full` motion level the trailing bar SHALL start following a drop 300ms after the fill moves.
 
-A vital at or below the client's display threshold SHALL be marked by both a recolour and an explicit
-text marker, never by the recolour alone.
+A vital at or below the client's display threshold SHALL be marked by both a recolour and an explicit text marker, never by the recolour alone.
 
 #### Scenario: Each vital is legible without colour
-- **WHEN** the vitals island renders with the `status` panel committed
-- **THEN** each of hp, mp, and sp shows an icon, a text label, and its `current / maximum` numerals, and the sp fill is distinguishable from hp and mp by texture rather than by hue
+- **WHEN** the vitals dock renders with the `status` panel committed
+- **THEN** the readout states hp, mp, and sp in that order, each as a distinct icon shape with its `current / maximum` numerals and its gauge label as the reading's accessible name, no gauge label is visible text, the three lines below carry no text, and the sp fill is distinguishable from hp and mp by texture rather than by hue
 
 #### Scenario: Damage leaves a visible trailing bar
 - **WHEN** a committed revision lowers a gauge's ratio
@@ -590,9 +559,7 @@ text marker, never by the recolour alone.
 
 #### Scenario: The trailing bar follows a round's displayed hit points
 - **WHEN** a playing combat round shows the player's hp stepping from 40 to 28 and then to 15 of 60
-- **THEN** the numerals and the fill show each displayed value in turn, the trailing bar lags each drop
-  from the previously displayed ratio, and once the round ends the numerals and fill show the committed
-  value
+- **THEN** the numerals and the fill show each displayed value in turn, the trailing bar lags each drop from the previously displayed ratio, and once the round ends the numerals and fill show the committed value
 
 #### Scenario: The trailing bar never shows an uncommitted value
 - **WHEN** the trailing bar renders at any point
@@ -604,7 +571,11 @@ text marker, never by the recolour alone.
 
 #### Scenario: A low vital is marked by text as well as colour
 - **WHEN** a vital falls to or below the client's display threshold
-- **THEN** the row carries both the low recolour and an explicit text marker, and the numerals continue to render
+- **THEN** the hp reading carries both the low recolour and the explicit 危險 text marker, and the numerals continue to render
+
+#### Scenario: The three lines read as one instrument
+- **WHEN** the vitals dock renders three gauges
+- **THEN** the three lines are parted by a 1px seam, each tapers to a point at its far end and runs shorter than the one above it, and the readout plus the three lines render in a height no greater than half of the previous island's three header-plus-track rows
 
 ### Requirement: The low-HP presentation state is derived client-side and drives the stage hook
 The client SHALL derive a low-HP presentation state from the committed `status.resources.hp` ratio
@@ -635,69 +606,52 @@ motion while the marker and the numerals still apply.
 - **WHEN** `prefers-reduced-motion` is set and the hp ratio is below the threshold
 - **THEN** the pulse animation is disabled while the low text marker, the numerals, and the recoloured row still render
 
-### Requirement: Condition chips carry a severity glyph, a payload duration, and a bounded overflow
-Each entry in `status.conditions` SHALL render as one chip pairing a per-severity shape glyph with the
-condition's readable name — its label, or its code only when no label is supplied — shown whole or
-ellipsised at the island width, never abbreviated to invented characters, and with an accessible name
-carrying the condition's full label, its remaining duration when the payload supplies one, and every
-derived modifier the payload provides. Each modifier SHALL be named in the game's stat vocabulary
-(for example 攻擊, 敏捷, 防禦, 準度, 每回合行動, 魔力消耗) rather than by its raw adjustment key, with
-its value verbatim — no sign, unit or digit added or dropped — and a key outside that vocabulary
-SHALL be named by the neutral 其他修正 and keep its value. The five severities SHALL each map to a distinct
-glyph shape, so two severities are never separated by colour alone, and the beneficial and harmful
-directions SHALL be readable from the glyph itself. Because the chip may
-ellipsise its name and carries no modifier text, the island SHALL also present the full label,
-duration, and modifier text visibly when a chip is focused or hovered, so the information in its
-accessible name stays reachable by pointer and by keyboard; the overflow surface names modifiers the
-same way.
+### Requirement: Condition icons float without a window and disclose their detail in a tooltip
+The active conditions SHALL NOT render as a chipped island with a background window, header, or border. Each entry in `status.conditions` SHALL instead render as a standalone small icon in a row directly above the vitals readout, carrying only its per-severity shape glyph — the five severities each mapping to a distinct glyph so no two are separated by colour alone, with the beneficial and harmful directions readable from the glyph itself. The row SHALL carry no panel fill, no backdrop blur, and no `狀態` label.
 
-The duration SHALL render as a small secondary badge after the name, and only when the payload carries
-`remaining_seconds` for that condition;
-a condition without one SHALL render no badge and no substitute value. The badge SHALL show the
-payload's integer verbatim and SHALL NOT be decremented, animated down, or otherwise advanced by the
-client between committed revisions.
+The condition's readable name — its label, or its code only when no label is supplied — its remaining duration, and every derived modifier SHALL NOT be shown on the icon; they SHALL appear in a tooltip opened when the icon is hovered or when keyboard focus reaches it, and closed on pointer leave, blur, or Escape. The tooltip SHALL state the full label, the duration when the payload supplies one, and every derived modifier the payload provides, each modifier named in the game's stat vocabulary (for example 攻擊, 敏捷, 防禦, 準度, 每回合行動, 魔力消耗) rather than by its raw adjustment key, with its value verbatim — no sign, unit or digit added or dropped — and a key outside that vocabulary SHALL be named by the neutral 其他修正 and keep its value. The icon SHALL also carry this content as its accessible name, so the information is reachable by assistive technology without the pointer. The duration the tooltip states is the payload's `remaining_seconds` value as committed; the client SHALL run no countdown and SHALL NOT re-render the tooltip between commits.
 
-Visible chips SHALL be bounded, and the remainder SHALL be reachable in one action through an overflow
-chip stating how many are hidden. The overflow surface SHALL be bounded and scrollable and SHALL close
-on Escape, so no committed condition becomes unreachable at any condition count the payload permits.
-An empty condition list SHALL render no condition island at all — no placeholder island, no
-`無條件` text — consistent with the contextual-hiding rule that an absent surface is not a dimmed or
-emptied surface.
+Icons SHALL be bounded to the row's width, and the remainder SHALL stay reachable in one action through a trailing `+N` icon stating how many are hidden, which discloses the hidden conditions as the same tooltip content for each. An empty condition list SHALL render no icon row at all — no placeholder, no `無條件` text — consistent with the contextual-hiding rule that an absent surface is not a dimmed or emptied surface.
 
 #### Scenario: A chip carries its label, duration, and modifiers
-- **WHEN** a condition with a label, a remaining duration, and a derived modifier is committed
-- **THEN** its chip renders the severity glyph, the readable name, and a duration badge, and its accessible name states the label, the remaining duration, and the modifier's readable name with its verbatim value
+- **WHEN** a beneficial and a harmful condition are committed
+- **THEN** the row above the vitals readout renders exactly two glyphs of distinct shapes with no panel chrome, no condition names, and no duration text visible, and each icon's accessible name states its label, remaining duration, and every modifier's readable name with its verbatim value
 
 #### Scenario: Two severities are distinguishable without colour
 - **WHEN** a warning condition and a harmful condition are committed together
-- **THEN** their chips carry different glyph shapes and remain distinguishable with colour removed
+- **THEN** their icons carry different glyph shapes and remain distinguishable with colour removed
+
+#### Scenario: Hovering a condition icon discloses its detail
+- **WHEN** the pointer rests on a condition icon whose payload carries a label, a remaining duration, and a derived modifier
+- **THEN** a tooltip appears stating the full label, the duration, and the modifier's readable name with its verbatim value, and it closes when the pointer leaves or Escape is pressed
+
+#### Scenario: Keyboard focus reaches the same tooltip
+- **WHEN** keyboard focus reaches a condition icon
+- **THEN** the same tooltip opens, and Escape closes it without stealing the shell's drawer or dock Escape when no tooltip is open
 
 #### Scenario: A condition without a duration renders no badge
 - **WHEN** a committed condition carries no `remaining_seconds`
-- **THEN** its chip renders no duration badge and no substitute value in its place
+- **THEN** its tooltip renders no duration text and no substitute value
 
 #### Scenario: The duration does not tick between revisions
-- **WHEN** a chip with a duration badge is displayed and no new revision commits
-- **THEN** the badge continues to show the payload's value unchanged, and the client runs no countdown
+- **WHEN** a tooltip showing a duration is displayed and no new revision commits
+- **THEN** the tooltip continues to show the payload's value unchanged, and the client runs no countdown
 
 #### Scenario: Overflowing conditions stay reachable
-- **WHEN** more conditions are committed than the island shows as chips
-- **THEN** an overflow chip states the hidden count and reveals every remaining condition in one action, within a bounded scrollable surface that closes on Escape
+- **WHEN** more conditions are committed than the row shows
+- **THEN** a trailing `+N` icon states the hidden count and discloses every hidden condition's full tooltip content in one action, and no committed condition becomes unreachable at any count the payload permits
 
 #### Scenario: No conditions renders no island
 - **WHEN** the committed condition list is empty
-- **THEN** no condition island is rendered anywhere in the HUD
+- **THEN** no condition icon or row is rendered anywhere in the HUD
 
 #### Scenario: Long names stay bounded and complete
-- **WHEN** six conditions with long labels and a seventh condition are committed
-- **THEN** each of the six chips shows its own name, bounded by the island width without covering the
-  vitals, its full label and localized modifiers remain in its accessible name and focus detail, and
-  the overflow control reaches the seventh
+- **WHEN** conditions with long labels are committed
+- **THEN** no icon is sized by its label, and every icon's tooltip states its full label and localized modifiers without truncation
 
 #### Scenario: Unknown modifier keys keep their values
 - **WHEN** a condition carries a known and an unknown modifier key
-- **THEN** the known key is named in the stat vocabulary, the unknown key reads 其他修正, and both
-  original values appear verbatim with their signs and units
+- **THEN** the tooltip names the known key in the stat vocabulary, names the unknown key 其他修正, and keeps both original values verbatim with their signs and units
 
 ### Requirement: The minimap island states only its own drawing convention
 The minimap SHALL render as a bounded HUD island in the stage's `map` anchor, directly
@@ -2575,8 +2529,10 @@ preference that governs every client animation":
 - **A new portrait source** on a stage actor (a new image URL, or a switch between an image and a
   placeholder) SHALL crossfade over the portrait duration (400ms at `full`), and a change of the speaking
   state SHALL ease the dim.
-- **The vitals island** SHALL fade in and slide 12px into place when it becomes visible, and SHALL fade
-  out and slide away when it hides.
+- **The vitals dock** — the condition icon row and the vitals bars as one surface — SHALL fade in while
+  rising 12px into its bottom-anchored resting position (entering from 12px below it, so it reads as
+  rising out of the band's edge), and SHALL fade out while sinking 12px back toward the band when it
+  hides.
 
 At `reduced`, each of these SHALL play as an opacity fade of at most 150ms with no slide, no pan, and no
 marker travel, and the dim SHALL change instantly. At `off`, each SHALL render its final state in the commit's frame. No
@@ -2616,8 +2572,8 @@ timing never gates committed state or input" requires.
 #### Scenario: The vitals island fades and slides in and out
 - **WHEN** the effective level is `full` and a committed revision lowers `hp` from full outside combat,
   and a later revision restores it
-- **THEN** the island fades in while sliding 12px into place, and on restore it fades out while sliding
-  away and ends hidden with `display:none`
+- **THEN** the dock fades in while rising 12px from 12px below its resting position, and on
+  restore it fades out while sinking 12px toward the band and ends hidden with `display:none`
 
 #### Scenario: Reduced plays short fades with no travel
 - **WHEN** the effective level is `reduced` and a move commits a new scene, location, and current node
@@ -2628,7 +2584,7 @@ timing never gates committed state or input" requires.
 - **WHEN** the effective level is `off` and a move commits a new scene, location, current node, portrait,
   and vitals state
 - **THEN** in the commit's frame the backdrop holds only the new image once decoded, and the place card,
-  the minimap, the message window, the stage actor, and the vitals island each hold only their final
+  the minimap, the message window, the stage actor, and the vitals dock each hold only their final
   state
 
 ### Requirement: A leaving element is out of reach while it animates out
@@ -3019,3 +2975,18 @@ drawer's follow rules SHALL name affinity by the established term 羈絆.
 #### Scenario: An unknown skill enum reads neutrally
 - **WHEN** the combat detail pane shows a skill whose target type or element is outside the known sets
 - **THEN** it reads 未知目標類型 or 未知屬性 and shows no raw identifier
+
+### Requirement: The vitals dock stands at the stage's lower-left above the band
+The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide (a viewport-relative width, not multiplied by the chrome factor), and at whatever compact height its content takes. The dock SHALL NOT be top-anchored and SHALL NOT claim the stage's upper-left corner: at the top of the left column the stage shows only the standing portrait line. The condition icon row SHALL be the dock's topmost content, directly above the bars. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge. The dock MAY overlap the lowest strip of the `actor-left` standing portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them. The dock SHALL NOT read as a rectangular box: its ground is the shared panel ink with the backdrop blur, feathered out towards its right and top edges so the scene reads through them, and it is mounted on a hairline brass spine down its left side capped by the band's lozenge ornament, with a hairline brass crown fading out along its top; it carries no full border and no square corners. Every island chrome the dock carries SHALL come from the shared design tokens. The command-line row docked on the same band edge SHALL begin past the dock's right edge, so the two never intersect. Until `companion-portrait-lineup` removes it, the interim party quickbar island stands in the `vitals` anchor between the dock and the band.
+
+#### Scenario: The dock stands on the band's edge
+- **WHEN** the shell renders in exploration mode with the vitals dock visible at 1920x1080
+- **THEN** the `vitals` anchor's bottom edge coincides with the bottom band's top edge (the dock's own bottom edge does too whenever no interim party quickbar stands below it), the dock's left edge sits at the stage's left gutter and its width is a quarter of the viewport's width (±1.5px), its rendered height is the compact height of the icon row, the readout, and the three lines, and the stage's upper-left corner holds no vitals surface
+
+#### Scenario: The dock covers only the portraits' lowest strip
+- **WHEN** the dock is visible and the player's standing portrait renders at 1920x1080 and at 1280x720
+- **THEN** the overlap of the two rendered boxes reaches no higher than the portrait's lowest quarter, the portrait's face and torso are fully visible, and neither box moves the other
+
+#### Scenario: The dock stays bounded at the minimum viewport
+- **WHEN** the shell renders at 1280x720 with the dock visible and conditions overflowing the row
+- **THEN** the dock's box stays inside the left gutter between the top band and the band's top edge, its content scrolls within that bound, and it intersects no other interactive anchor's content

@@ -1,11 +1,12 @@
-import { h } from "vue";
+import { h, nextTick, onMounted, ref } from "vue";
 import ConditionChips from "../../components/ConditionChips.vue";
 
-// ConditionChips (H2, webclient-hud-02-status-islands, design D6/D7/D8):
-// the conditions island stories — none / one / six / thirty-two conditions,
-// every severity, with and without durations and modifiers. The `+N`
-// overflow chip discloses the remainder in a bounded, scrollable in-island
-// region (H4 re-points this control at the character-status drawer).
+// ConditionChips (H2, webclient-hud-02-status-islands, design D6/D7/D8;
+// vitals-bar-redesign design D3): the chromeless condition icon row stories —
+// none / one / six / thirty-two conditions, every severity, with and without
+// durations and modifiers, framed at the dock's 25vw width on the dock's ink.
+// Hover or focus an icon for its tooltip; the `+N` icon discloses the
+// remainder in a bounded, scrollable column (FocusedTooltip opens one).
 
 function condition(code, severity, label, remainingSeconds, modifiers) {
   const c = { code, severity, label };
@@ -46,9 +47,13 @@ const SIX_CONDITIONS = SEVERITY_SET.concat([
 const ONE_CONDITION = [SEVERITY_SET[3]]; // the harmful poisoned buff.
 const NONE_CONDITIONS = [];
 
+// The dock frame: the row is chromeless; StatusPanel's root carries the dock
+// chrome. The top margin leaves room for the tooltip hung above an icon.
+const DOCK_FRAME = "margin-top: 120px; width: 25vw; min-width: 320px; box-sizing: border-box; padding: 10px 18px 10px 26px; background: var(--panel);";
+
 const renderChips = (args) => ({
   render: () =>
-    h("div", { style: "width: 262px;" }, [h(ConditionChips, args)]),
+    h("div", { style: DOCK_FRAME }, [h(ConditionChips, args)]),
 });
 
 export default {
@@ -81,10 +86,9 @@ export const ThirtyTwo = {
   args: { conditions: MANY_CONDITIONS },
 };
 
-// Long server labels (webclient-zh-tw-copy-and-labels): six readable names,
-// the longest ellipsised at the island width, plus one in the overflow; the
-// full names and localized modifiers stay in each chip's accessible name and
-// focus detail.
+// Long server labels (webclient-zh-tw-copy-and-labels): no icon is sized by
+// its label; the full names and localized modifiers stay in each icon's
+// accessible name and tooltip, plus one in the overflow.
 export const LongNames = {
   render: renderChips,
   args: {
@@ -98,4 +102,19 @@ export const LongNames = {
       condition("long_more", "informational", "轉生祝福‧悠花敏捷提升", null, { agility_flat: 3 }),
     ],
   },
+};
+
+// The tooltip open state: keyboard focus on the harmful icon opens the same
+// tooltip a hover does — its label, verbatim duration, and readable modifiers.
+export const FocusedTooltip = {
+  render: () => ({
+    setup() {
+      const frame = ref(null);
+      onMounted(async () => {
+        await nextTick();
+        frame.value?.querySelector('[data-testid="status-panel__condition--poisoned"]')?.focus();
+      });
+      return () => h("div", { ref: frame, style: DOCK_FRAME }, [h(ConditionChips, { conditions: SEVERITY_SET })]);
+    },
+  }),
 };

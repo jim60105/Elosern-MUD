@@ -3,8 +3,10 @@ import VitalsTrack from "../../components/VitalsTrack.vue";
 import ShopPanel from "../../components/ShopPanel.vue";
 import { SERVICES_PANEL_SAMPLE, STATUS_PANEL_SAMPLE } from "../fixtures.js";
 
-// VitalsTrack (H2, webclient-hud-02-status-islands, design D4/D5): the
-// vitals island stories — full / damaged / low / empty for each of hp/mp/sp,
+// VitalsTrack (H2, webclient-hud-02-status-islands, design D4/D5;
+// vitals-bar-redesign design D2): the dock's three compact bars with the
+// numerals on each track, framed at the dock's 25vw width on the dock's ink —
+// full / damaged / low / empty for each of hp/mp/sp,
 // plus a reduced-motion note (the token block in tokens.css disables the
 // motion; the numerals and the 危險 marker still render).
 
@@ -25,9 +27,13 @@ const LOW_RESOURCES = {
 };
 const EMPTY_RESOURCES = {};
 
+// The dock frame: VitalsTrack is transparent; StatusPanel's root carries the
+// dock chrome, so the stories show the bars on the same ink.
+const DOCK_FRAME = "width: 25vw; min-width: 320px; box-sizing: border-box; padding: 10px 18px 10px 26px; background: var(--panel);";
+
 const renderVitals = (args) => ({
   render: () =>
-    h("div", { style: "width: 262px;" }, [h(VitalsTrack, args)]),
+    h("div", { style: DOCK_FRAME }, [h(VitalsTrack, args)]),
 });
 
 export default {
@@ -138,7 +144,7 @@ export const ChangingNumerals = {
             "data-testid": "change-numerals",
             onClick: () => { changed.value = !changed.value; },
           }, "Change values"),
-          h("div", { style: "width: 262px; margin: 16px 0;" }, [
+          h("div", { style: `${DOCK_FRAME} margin: 16px 0;` }, [
             h(VitalsTrack, { status: statusWith(resources), revision: changed.value ? 2 : 1, epoch: 0 }),
           ]),
           h(ShopPanel, { services }),

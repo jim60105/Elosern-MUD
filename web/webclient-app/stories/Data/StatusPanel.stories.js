@@ -6,12 +6,14 @@ import {
   STATUS_PANEL_SAMPLE,
 } from "../fixtures.js";
 
-// StatusPanel: the expanded status surface. Props: status (the committed `status`
-// v1 panel payload — gauges, conditions, combat) and visible. Read-only: no events.
+// StatusPanel: the lower-left vitals dock (vitals-bar-redesign) — the
+// chromeless condition icons over the three compact bars, on one chromed
+// plate at the dock's width. Props: status (the committed `status` v1 panel
+// payload — gauges, conditions, combat) and visible. Read-only: no events.
 
 const renderPanel = (args) => ({
   render: () =>
-    h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; padding: 12px;" }, [
+    h("div", { style: "width: 25vw; min-width: 320px; padding: 12px;" }, [
       h(StatusPanel, args),
     ]),
 });
@@ -54,9 +56,9 @@ export const HiddenAtFullHealth = {
 };
 
 // The vitals reveal (webclient-scene-transitions, design D6): every few
-// seconds the island is shown or hidden — it fades in while dropping 12px
-// into place, and fades out while lifting away, keeping its trailing-bar
-// memory while hidden.
+// seconds the dock is shown or hidden — it fades in while rising 12px out of
+// the band's edge, and fades out while sinking back, keeping its trailing-bar
+// memory while hidden. The frame bottom-aligns the dock as the stage does.
 export const RevealToggle = {
   render: () => ({
     setup() {
@@ -69,7 +71,7 @@ export const RevealToggle = {
       });
       onBeforeUnmount(() => clearInterval(timer));
       return () =>
-        h("div", { style: "width: 262px; padding: 12px; min-height: 260px;" }, [
+        h("div", { style: "width: 25vw; min-width: 320px; padding: 12px; min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end;" }, [
           h(StatusPanel, { status: STATUS_PANEL_SAMPLE, visible: visible.value }),
         ]);
     },

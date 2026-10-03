@@ -3,8 +3,11 @@
 // webclient-avg-stage-shell design D1/D3/D4/D7): the full-bleed cinematic
 // stage. A `position:absolute; overflow:clip` root with named anchors:
 // - the island anchors named by their content
-//   (webclient-avg-stage-hud-anchors design D1): `vitals` directly below
-//   the top band (the vitals, conditions, and compact party islands) and
+//   (webclient-avg-stage-hud-anchors design D1): `vitals`, the lower-left
+//   dock standing on the band's top edge (vitals-bar-redesign design D1:
+//   the chromeless condition icons over the three compact bars, then the
+//   interim compact party island; it may cover the player portrait's lowest
+//   strip, never its face) and
 //   `map` at the top-right (the place card first — place-card-relocation
 //   design D2 — then the minimap, the one-line objective, the combat
 //   participant frame, and the title ballot);
@@ -282,15 +285,17 @@ defineExpose({ menuOpen });
   box-sizing: border-box;
 }
 
-/* vitals / map: the island stacks. Bounded above the bottom band (never the
-   band's content) and scrolling internally. Both begin directly below the
-   top band. The
+/* vitals / map: the island stacks. Bounded between the top band and the
+   bottom band (never the band's content) and scrolling internally. `map`
+   begins directly below the top band; `vitals` is the lower-left dock
+   (vitals-bar-redesign design D1): bottom-anchored on the band's top edge,
+   growing upward only as far as its compact content. The
    `.elosern-root` override in app-shell.css repeats these offsets (it sets
    the column widths); keep the two in step. */
 .elosern-stage [data-anchor="vitals"] {
-  top: calc(var(--header-h) + var(--stage-inset-y));
+  bottom: var(--band-h);
   left: calc(16px * var(--ui-scale));
-  width: calc(262px * var(--ui-scale));
+  width: var(--vitals-dock-w);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -451,10 +456,11 @@ defineExpose({ menuOpen });
 }
 
 /* command-line: one row docked on the message region's top edge (design
-   D3), from the left island column's edge to the message region's right
-   edge. It overlays the lowest strip of the stage box, never the band. */
+   D3), from 16px past the vitals dock's right edge (the dock stands on the
+   same band edge — vitals-bar-redesign design D1) to the message region's
+   right edge. It overlays the lowest strip of the stage box, never the band. */
 .elosern-stage [data-anchor="command-line"] {
-  left: var(--left-column);
+  left: calc(var(--vitals-dock-w) + 32px * var(--ui-scale));
   right: 33.3333%;
   bottom: var(--band-h);
   height: var(--command-line-h);

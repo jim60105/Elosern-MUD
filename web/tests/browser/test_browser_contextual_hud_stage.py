@@ -721,8 +721,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (band && Math.abs(cmd.bottom - band.top) > 1) {
                         hits.push("not-on-band-top");
                       }
-                      // The left HUD island column's right edge (`vitals` is
-                      // inset 16px on each side of `--left-column`).
+                      // The vitals dock stands on the same band edge
+                      // (vitals-bar-redesign): the row starts 16px past the
+                      // dock anchor's right edge.
                       const vitalsCol = targets.vitals;
                       const leftCol = vitalsCol ? vitalsCol.right + 16 : null;
                       return {
@@ -743,7 +744,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     ),
                 )
                 self.assertAlmostEqual(geo["height"], 44.0, delta=1.0, msg=f"expanded row is 44px at {viewport}")
-                self.assertAlmostEqual(geo["left"], geo["leftCol"], delta=1.5, msg=f"row starts at --left-column at {viewport}")
+                self.assertAlmostEqual(geo["left"], geo["leftCol"], delta=1.5, msg=f"row starts 16px past the vitals dock at {viewport}")
                 self.assertAlmostEqual(geo["right"], geo["messageRight"], delta=1.5, msg=f"row ends at message region's right edge at {viewport}")
             # Dialogue (webclient-dialogue-stage-actors): the message region
             # spans the band, but the row keeps its geometry — it ends at the

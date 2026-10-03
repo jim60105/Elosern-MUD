@@ -377,7 +377,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 # typography, and proportional-scale browser tests already
                 # use before measuring).
                 page.evaluate("document.fonts.ready")
-                # Park the pointer off the islands so no hover detail line is open.
+                # Park the pointer off the islands so no condition tooltip is open.
                 page.mouse.move(viewport[0] // 2, viewport[1] // 2)
                 page.wait_for_timeout(200)
 
@@ -489,6 +489,97 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         page.wait_for_timeout(200)
         self.assertTrue(panel.is_visible(), "vitals island visible when mp below max")
         page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
+        "webclient-contextual-hud::condition-chips-carry-a-severity-glyph-a-payload-duration-and-a-bounded-overflow",
+    )
+    def test_vitals_dock_stands_on_the_band_edge_with_chromeless_icons(self):
+        """vitals-bar-redesign: the vitals dock stands on the bottom band's top
+        edge in the left gutter at a quarter of the viewport's width, the stage's
+        upper-left corner holds no vitals surface, the dock covers only the
+        player portrait's lowest quarter, the expanded command line starts past
+        it, and a condition icon shows only its glyph while hovering it opens a
+        tooltip with the full label and duration that Escape closes."""
+        for viewport in ((1920, 1080), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.logged_in_page(viewport)
+                status = valid_status_panel("艾倫‧灰誓", "char-42")
+                status["resources"]["hp"]["current"] = 80
+                status["conditions"] = [
+                    {"code": "poison", "label": "中毒", "severity": "harmful", "remaining_seconds": 40},
+                ]
+                inject_snapshot(page, {"status": status, "art": valid_art_panel()}, mode="exploration")
+                page.wait_for_selector('[data-testid="status-panel"]', state="visible", timeout=15000)
+                open_command_line(page)
+                page.evaluate("document.fonts.ready")
+                page.mouse.move(viewport[0] // 2, 10)
+                page.wait_for_timeout(400)
+                geo = page.evaluate(
+                    """() => {
+                      const r = (sel) => {
+                        const el = document.querySelector(sel);
+                        if (!el) return null;
+                        const b = el.getBoundingClientRect();
+                        if (b.height === 0) return null;
+                        return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, height: b.height };
+                      };
+                      return {
+                        anchor: r('[data-anchor="vitals"]'),
+                        dock: r('[data-testid="status-panel"]'),
+                        band: r('[data-testid="stage-band"]'),
+                        header: r('[data-testid="topbar"]'),
+                        actor: r('[data-anchor="actor-left"]'),
+                        cmd: r('[data-anchor="command-line"]'),
+                        party: r('[data-testid="party-strip"]'),
+                        width: window.innerWidth,
+                      };
+                    }"""
+                )
+                anchor, dock, band = geo["anchor"], geo["dock"], geo["band"]
+                # Standing on the band's top edge, in the left gutter, 25vw wide
+                # (the interim party quickbar, when the session has a party,
+                # stands between the bars and the band until
+                # companion-portrait-lineup removes it).
+                self.assertAlmostEqual(anchor["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
+                floor = geo["party"]["top"] if geo["party"] else band["top"]
+                self.assertLessEqual(dock["bottom"], floor + 1, f"{viewport}: {geo}")
+                if not geo["party"]:
+                    self.assertAlmostEqual(dock["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
+                self.assertAlmostEqual(dock["left"], 16, delta=1.0)
+                self.assertAlmostEqual(dock["right"] - dock["left"], geo["width"] * 0.25, delta=1.5)
+                # Not top-anchored: the dock's top is far below the top band.
+                self.assertGreater(dock["top"], geo["header"]["bottom"] + 100, f"{viewport}: {geo}")
+                # Only the portrait's lowest quarter is covered by the dock.
+                actor = geo["actor"]
+                dock_height = dock["bottom"] - dock["top"]
+                self.assertGreaterEqual(
+                    band["top"] - dock_height, actor["top"] + actor["height"] * 0.75 - 1, f"{viewport}: {geo}"
+                )
+                # The expanded command line starts past the dock, never over it.
+                self.assertGreaterEqual(geo["cmd"]["left"], dock["right"] + 15, f"{viewport}: {geo}")
+
+                # The condition icon shows only its glyph; hovering opens the
+                # tooltip with its full label and verbatim duration.
+                icon = page.locator('[data-testid="status-panel__condition--poison"]')
+                self.assertEqual(icon.inner_text().strip(), "▼")
+                self.assertIn("中毒", icon.get_attribute("aria-label"))
+                icon.hover()
+                tip = page.locator('[data-testid="status-panel__condition-tooltip"]')
+                tip.wait_for(state="visible", timeout=5000)
+                self.assertEqual(tip.get_attribute("role"), "tooltip")
+                self.assertIn("中毒", tip.inner_text())
+                self.assertIn("剩 40 秒", tip.inner_text())
+                tip_box = tip.bounding_box()
+                self.assertLessEqual(tip_box["y"] + tip_box["height"], icon.bounding_box()["y"] + 1)
+                page.mouse.move(viewport[0] // 2, 10)
+                tip.wait_for(state="detached", timeout=5000)
+                # Keyboard focus opens the same tooltip; Escape closes it.
+                icon.focus()
+                tip.wait_for(state="visible", timeout=5000)
+                page.keyboard.press("Escape")
+                tip.wait_for(state="detached", timeout=5000)
+                page.close()
 
     @covers_requirement(
         "webclient-contextual-hud::the-low-hp-presentation-state-is-derived-client-side-and-drives-the-stage-hook",
