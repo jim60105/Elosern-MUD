@@ -416,7 +416,8 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-party-quickbar-island-presents-the-committed-party-only",
+        "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor",
+        "webclient-contextual-hud::possession-moves-the-possessed-companion-to-the-group-s-front",
     )
     def test_companion_lineup_node_suite_passes(self):
         result = subprocess.run(

@@ -194,7 +194,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertEqual(self.registry.render("party", context), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_two_companion_rows_follow_party_order_and_exact_vocabulary(self):
         first = _companion("薇拉", self.room, hp_current=60, hp_maximum=120)
@@ -250,7 +250,7 @@ class PartyPresenterTests(EvenniaTest):
             self.assertNotIn(affinity_value, row.values())
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_empty_party_is_available_with_no_slots(self):
         payload = self._render()
@@ -259,7 +259,7 @@ class PartyPresenterTests(EvenniaTest):
         self.assertNotIn("reason", payload)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_stale_membership_dbid_is_omitted_without_error(self):
         companion = _companion("薇拉", self.room)
@@ -272,21 +272,21 @@ class PartyPresenterTests(EvenniaTest):
         validate_party(payload)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_creation_pending_puppet_sees_the_shared_unavailable_form(self):
         self.player.creation_pending = True
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_no_location_puppet_sees_the_shared_unavailable_form(self):
         self.player.location = None
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_rows_cap_at_four_and_presenting_twice_is_read_only(self):
         companions = [
@@ -319,7 +319,7 @@ class PartyValidatorTests(unittest.TestCase):
         return {"schema_version": PARTY_SCHEMA_VERSION, "available": True, "slots": slots}
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_valid_forms_normalize_identically(self):
         self.assertEqual(
@@ -335,7 +335,7 @@ class PartyValidatorTests(unittest.TestCase):
             )
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_bounds_only_hp_semantics(self):
         # Zero is legal and no current/maximum cross assertion exists — traits
@@ -344,7 +344,7 @@ class PartyValidatorTests(unittest.TestCase):
         validate_party(self._panel([_slot(hp_current=500, hp_maximum=1)]))
 
     @covers_requirement(
-        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_drift_rejections(self):
         cases = {
