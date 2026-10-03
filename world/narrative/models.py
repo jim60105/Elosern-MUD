@@ -45,3 +45,104 @@ class ProjectionProgress(models.Model):
 
     def __str__(self) -> str:
         return f"ProjectionProgress({self.source_id}, v={self.projector_version}, {self.status})"
+
+
+class OwnerMemoryGeneration(models.Model):
+    """Atomic monotonic generation counter for an owner's effective narrative memories."""
+
+    owner_id = models.CharField(max_length=64, unique=True, db_index=True)
+    generation = models.BigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_owner_memory_generations"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"OwnerMemoryGeneration({self.owner_id}, gen={self.generation})"
+
+
+class MemoryRecord(models.Model):
+    """An immutable narrative memory record owned by an entity."""
+
+    owner_id = models.CharField(max_length=64, db_index=True)
+    tick = models.IntegerField(default=0, db_index=True)
+    category = models.CharField(max_length=64, default="observation", db_index=True)
+    content = models.JSONField(default=dict)
+    salience = models.IntegerField(default=1)
+    knowledge_scope = models.CharField(max_length=32, default="witnessed", db_index=True)
+    confidence = models.FloatField(default=1.0)
+    subjects = models.JSONField(default=list)
+    source_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+    projector_version = models.IntegerField(null=True, blank=True, db_index=True)
+    derived_generation = models.IntegerField(null=True, blank=True)
+
+    # Materialized effective metadata from latest revision
+    effective_tier = models.CharField(max_length=32, default="working", db_index=True)
+    effective_availability = models.CharField(max_length=32, default="active", db_index=True)
+    latest_revision_number = models.IntegerField(default=1)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_memory_records"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_id", "source_id", "projector_version"],
+                name="unique_owner_source_projector",
+                condition=models.Q(projector_version__isnull=False),
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            # Check if attempting to update immutable fields
+            orig = MemoryRecord.objects.get(pk=self.pk)
+            if (orig.owner_id != self.owner_id or orig.tick != self.tick or orig.content != self.content or
+                orig.knowledge_scope != self.knowledge_scope or orig.source_id != self.source_id or
+                orig.projector_version != self.projector_version or orig.category != self.category or
+                orig.subjects != self.subjects or orig.derived_generation != self.derived_generation):
+                raise ValueError("MemoryRecord content and provenance are immutable. Use revisions for effective metadata.")
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"MemoryRecord({self.id}, owner={self.owner_id}, scope={self.knowledge_scope}, status={self.effective_availability})"
+
+
+class MemoryRevision(models.Model):
+    """An append-only revision record for memory metadata, tier, decay, and supersession."""
+
+    record = models.ForeignKey(MemoryRecord, on_delete=models.PROTECT, related_name="revisions")
+    revision_number = models.IntegerField(default=1)
+    availability = models.CharField(max_length=32, default="active")
+    tier = models.CharField(max_length=32, default="working")
+    decay_metadata = models.JSONField(default=dict)
+    supersedes_record_id = models.CharField(max_length=64, blank=True, default="")
+    relations = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("MemoryRevision records are append-only and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("MemoryRevision records cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_memory_revisions"
+        ordering = ["record", "revision_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["record", "revision_number"],
+                name="unique_memory_record_revision",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"MemoryRevision(record={self.record_id}, rev={self.revision_number}, {self.availability}, tier={self.tier})"

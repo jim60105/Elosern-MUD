@@ -1,6 +1,7 @@
 """Tests for durable narrative event storage, idempotent projection progress, and commit boundaries."""
 
 from unittest.mock import patch
+from tools.spec_traceability import covers_requirement
 
 from django.db import transaction
 from evennia.utils.create import create_object
@@ -36,6 +37,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.player.db.active_combat = {}
         self.companion.db.active_combat = {}
 
+    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay")
     def test_record_narrative_event_round_trip(self):
         """Test basic creation and round-trip persistence of narrative event and progress."""
         source_id = "test:encounter:1:round:1"
@@ -56,6 +58,8 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertEqual(progress.status, "pending")
         self.assertEqual(progress.projector_version, 1)
 
+    @covers_requirement("narrative-events::durable-source-identity-makes-projection-recoverable")
+    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay")
     def test_idempotent_reprocessing_preserves_immutable_facts(self):
         """Scenario: Reprocessing a source SHALL NOT duplicate facts or progress."""
         source_id = "test:encounter:idempotent:1"
@@ -83,6 +87,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertEqual(prog2.status, "completed")
         self.assertEqual(NarrativeEvent.objects.filter(source_id=source_id).count(), 1)
 
+    @covers_requirement("narrative-events::durable-source-identity-makes-projection-recoverable")
     def test_equal_prose_distinct_sources(self):
         """Scenario: Equal prose is repeated - distinct committed occurrences have distinct source IDs."""
         source_a = build_encounter_source_id("sess_1", kind="settlement", ordinal=1)
@@ -105,6 +110,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertNotEqual(ev_a.pk, ev_b.pk)
         self.assertEqual(ev_a.content["rendered_text"], ev_b.content["rendered_text"])
 
+    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay")
     def test_failed_outer_transaction_rolls_back_narrative_events(self):
         """Scenario: Outer settlement fails -> events, progress roll back with transaction."""
         source_id = "test:rollback:source:1"
@@ -123,6 +129,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertFalse(NarrativeEvent.objects.filter(source_id=source_id).exists())
         self.assertFalse(ProjectionProgress.objects.filter(source_id=source_id).exists())
 
+    @covers_requirement("narrative-events::durable-source-identity-makes-projection-recoverable")
     def test_callback_never_runs_restart_discovers_pending(self):
         """Scenario: Callback never runs -> restart discovers the pending source."""
         source_id = "test:pending:restart:1"
@@ -140,6 +147,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         pending_items = list(get_pending_projections(projector_version=1))
         self.assertTrue(any(item.source_id == source_id for item in pending_items))
 
+    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay")
     def test_compressed_encounter_retains_sources(self):
         """Scenario: Compressed encounter retains sources."""
         record = CombatSessionRecord(
@@ -179,6 +187,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertEqual(event.content["opening"], "overwhelm")
         self.assertIn(str(self.companion.pk), event.participants)
 
+    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay")
     def test_rejected_or_defeated_action_produces_no_protection_fact(self):
         """Defeated outcome or knocked-out companion records no protection event."""
         record = CombatSessionRecord(
