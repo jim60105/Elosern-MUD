@@ -20,9 +20,9 @@
 - **WHEN** a prompt is built for an NPC with a persona record and a speaking player with a persona record
 - **THEN** the system message contains the NPC's flattened persona block through `{persona}` and the user payload carries `player.persona` with the player's block, both capped
 
-#### Scenario: Absent persona omits persona within the current rendering version
+#### Scenario: Absent persona keeps the byte-identical baseline
 - **WHEN** a prompt is built without NPC or player persona records
-- **THEN** `persona=""` is substituted, the player persona block is absent, and unrelated memory/context sections remain valid
+- **THEN** `persona=""` is substituted and no player persona token/block is present; the output equals the persona-free baseline for the current context/rendering version, including the same memory sections
 
 #### Scenario: A reply that echoes the secret value is retried
 - **WHEN** a reply's speech contains the affinity value, the cap, or a bound disguise true value as a decimal integer substring
@@ -67,9 +67,9 @@ apply an intent.
 - **WHEN** the player talks to an `LLMNPC` with an existing affinity record and the prompt is built
 - **THEN** the user payload carries the true affinity value, cap, and stage, and the NPC's stored affinity data is unchanged by the talk
 
-#### Scenario: Prompt selection does not delete durable history
+#### Scenario: Memory is trimmed to the configured window
 - **WHEN** pair history exceeds the configured rendered window
-- **THEN** the prompt is bounded but all original turns remain recoverable under narrative ownership
+- **THEN** only the rendered memory view is trimmed to the configured window; all original turns remain recoverable under narrative ownership and no durable exchange is dropped
 
 #### Scenario: Thinking feedback is bounded and cancelled on a terminal result
 - **WHEN** the LLM reply takes longer than the configured thinking timeout
