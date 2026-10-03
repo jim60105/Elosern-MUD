@@ -256,6 +256,7 @@ const renderPlayer = (args) => ({
                   subject_key: "char_1", status: args.grounding,
                   url: null, aspect_ratio: null, alt: "艾莉亞的肖像",
                   placeholder: { kind: "missing", label: "無肖像" }, face_rect: null,
+                  stage: null,
                 } : {
                   subject_key: "char_1",
                   status: "done",
@@ -264,6 +265,7 @@ const renderPlayer = (args) => ({
                   alt: "艾莉亞的肖像",
                   placeholder: null,
                   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+                  stage: { scale: 1, x: 0, y: 0 },
                 },
               },
             ],
@@ -324,6 +326,7 @@ const renderPlayer = (args) => ({
         snapshot.panels.art.portrait_catalog["32"] = {
           ...FOE_PORTRAIT_CATALOG["32"], url: null, status: "pending", face_rect: null, aspect_ratio: null,
           placeholder: { kind: "missing", label: "肖像生成中" },
+          stage: null,
         };
       }
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
