@@ -6,14 +6,14 @@ import PlaceCard from "../../components/PlaceCard.vue";
 // `local_map` current-node label, else the status location) and timeLabel
 // (the committed world time); null renders the `位置：--` / `時間：--`
 // placeholders. Display-only: no control and no emitted events. The frame
-// below sizes it like its `place` anchor at the 1920x1080 reference
-// (`--left-column` 330px minus the 16px gutters, `--place-h` tall).
+// below sizes it like its island slot at the head of the `map` anchor
+// (the minimap column's width, content-sized height).
 
 const renderCard = (args) => ({
   render: () =>
     h(
       "div",
-      { style: "width:298px;height:var(--place-h);padding:0;" },
+      { style: "width:calc(230px * var(--ui-scale));padding:0;" },
       [h(PlaceCard, args)],
     ),
 });
@@ -66,7 +66,7 @@ function renderLocationChange() {
       return () => {
         const place = WALK[Math.floor(tick.value / 2) % WALK.length];
         const minute = String((tick.value * 5) % 60).padStart(2, "0");
-        return h("div", { style: "width:298px;height:var(--place-h);padding:0;" }, [
+        return h("div", { style: "width:calc(230px * var(--ui-scale));padding:0;" }, [
           h(PlaceCard, { locationLabel: place, timeLabel: `春季 3 日 ‧ 12:${minute}` }),
         ]);
       };

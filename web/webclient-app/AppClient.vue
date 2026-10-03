@@ -347,7 +347,7 @@ function onFoeLineupGone() {
           />
         </template>
         <!-- The `vitals` anchor (webclient-avg-stage-hud-anchors design D1),
-             under the place card: the vitals and conditions islands, then
+             directly below the top band: the vitals and conditions islands, then
              the compact party quickbar. -->
         <template #vitals>
         <StatusPanel

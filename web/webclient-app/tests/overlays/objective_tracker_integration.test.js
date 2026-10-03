@@ -131,7 +131,7 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
     return [...w.get('[data-anchor="map"]').element.children].map((el) => el.getAttribute("data-testid"));
   }
 
-  it("stacks the minimap, the objective line, and the title ballot in that order", async () => {
+  it("stacks the place card, the minimap, the objective line, and the title ballot in that order", async () => {
     const w = await mountClient({
       status: fx.statusPanel(),
       exploration: fx.explorationPanel(),
@@ -145,7 +145,7 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
         candidates: [{ index: 1, display: "異名1", basis: "第1條事蹟引用。" }],
       },
     });
-    expect(mapChildren(w)).toEqual(["local-map", "objective-tracker", "title-ballot-menu"]);
+    expect(mapChildren(w)).toEqual(["place-card", "local-map", "objective-tracker", "title-ballot-menu"]);
     expect(w.find('[data-anchor="vitals"] [data-testid="objective-tracker"]').exists()).toBe(false);
   });
 

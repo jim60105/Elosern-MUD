@@ -721,10 +721,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                       if (band && Math.abs(cmd.bottom - band.top) > 1) {
                         hits.push("not-on-band-top");
                       }
-                      // The left HUD island column's right edge (`place` is
+                      // The left HUD island column's right edge (`vitals` is
                       // inset 16px on each side of `--left-column`).
-                      const place = byId('[data-testid="anchor-place"]');
-                      const leftCol = place ? place.right + 16 : null;
+                      const vitalsCol = targets.vitals;
+                      const leftCol = vitalsCol ? vitalsCol.right + 16 : null;
                       return {
                         hits,
                         height: cmd.height,
@@ -1263,7 +1263,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
               const box = (sel) => document.querySelector(sel).getBoundingClientRect();
               const header = parseFloat(getComputedStyle(document.querySelector('.elosern-root'), '::before').height);
               const band = box('[data-testid="stage-band"]');
-              const place = box('[data-testid="anchor-place"]');
+              const place = box('[data-testid="place-card"]');
               const location = document.querySelector('[data-testid="place-card__location"]').textContent.trim();
               const time = document.querySelector('[data-testid="place-card__time"]').textContent.trim();
               const topBand = ['.topbar-brand', '.topbar-right', '.desktop-navigation']

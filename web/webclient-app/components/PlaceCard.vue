@@ -1,6 +1,7 @@
 <script setup>
-// PlaceCard (webclient-avg-place-card-top-bar design D3): the stage's place
-// card in the `place` anchor at the stage box's top-left corner. It states
+// PlaceCard (webclient-avg-place-card-top-bar design D3;
+// place-card-relocation design D2): the place card in the `map` anchor at
+// the top of the right-hand island column. It states
 // the current location as the stage's one top-level heading and the world
 // date/time beneath it — the only surface that states either value. The
 // location is resolved by the store (`statusSlice.locationLabel`: the
@@ -8,8 +9,8 @@
 // location); the card only renders it, with the `位置：--` / `時間：--`
 // placeholders when nothing is committed.
 //
-// Display-only: no control, no tab stop, no dispatch. The card fills its
-// fixed-height anchor whatever the label lengths; an overlong label is
+// Display-only: no control, no tab stop, no dispatch. The card sizes to its
+// content (heading, rule, time) at the column's width; an overlong label is
 // truncated with an ellipsis while the heading keeps the full text for
 // assistive technology (and as its `title`).
 //
@@ -61,18 +62,20 @@ const transitionCss = computed(() => props.motionLevel !== "off");
    title, the time a subordinate line in the numeral face. */
 .place-card {
   box-sizing: border-box;
-  height: 100%;
   width: 100%;
-  /* Three rows centred in the fixed anchor: the heading, the rule, then the
+  /* An island in the `map` column's flex stack: never squeezed below its
+     content when the column is short (the column scrolls instead). */
+  flex: none;
+  /* Three content-sized rows: the heading, the rule, then the
      time. The heading row is one grid cell that an entering and a leaving
      heading share during a location change, so neither moves the time
      line. */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
-  align-content: center;
-  row-gap: calc(5px * var(--ui-scale));
-  padding: 0 calc(16px * var(--ui-scale));
+  align-content: start;
+  row-gap: calc(6px * var(--ui-scale));
+  padding: calc(11px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(10px * var(--ui-scale));
   overflow: hidden;
   background: linear-gradient(90deg, #bda47714, transparent 55%), var(--panel);
   backdrop-filter: blur(calc(9px * var(--ui-scale)));
@@ -91,7 +94,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 }
 .place-card__location {
   grid-area: 1 / 1;
-  font: 400 var(--text-xl)/1.25 var(--f-serif);
+  font: 400 var(--text-lg)/1.25 var(--f-serif);
   letter-spacing: 0.12em;
   color: #ead8b9;
   text-shadow: 0 1px calc(6px * var(--ui-scale)) #000c;
@@ -99,7 +102,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 .place-card__rule {
   grid-area: 2 / 1;
   display: block;
-  width: calc(64px * var(--ui-scale));
+  width: calc(40px * var(--ui-scale));
   height: 1px;
   background: linear-gradient(90deg, var(--gold-400), #d8bb7800);
   opacity: 0.75;
@@ -112,7 +115,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
   font: var(--text-sm)/1.35 var(--f-num);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.06em;
-  color: var(--paper-300);
+  color: var(--paper-500);
 }
 
 /* The location change (webclient-scene-transitions, design D3). The two

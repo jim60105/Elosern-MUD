@@ -36,7 +36,7 @@ MEASURE = """() => {
     scale: getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim(),
     nav: box('[data-testid="nav-settings"]'),
     map: box('svg.local-map__lattice'),
-    place: box('[data-anchor="place"]'),
+    place: box('[data-anchor="map"] [data-testid="place-card"]'),
     command: box('[data-anchor="band-command"]'),
     band: box('[data-anchor="band-message"]'),
     actor: box('[data-anchor="actor-left"]'),
