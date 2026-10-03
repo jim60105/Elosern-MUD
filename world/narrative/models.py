@@ -169,6 +169,14 @@ class NarrativeContextSnapshot(models.Model):
                 "NarrativeContextSnapshot records are immutable and cannot be bulk-updated."
             )
 
+        def bulk_create(self, objs, **kwargs):
+            if kwargs.get("update_conflicts"):
+                raise ValueError(
+                    "NarrativeContextSnapshot records are immutable and cannot be "
+                    "conflict-updated through bulk insert."
+                )
+            return super().bulk_create(objs, **kwargs)
+
     objects = AppendOnlyQuerySet.as_manager()
 
     snapshot_id = models.CharField(max_length=128, unique=True, db_index=True)

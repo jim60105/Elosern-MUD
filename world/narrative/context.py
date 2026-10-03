@@ -52,7 +52,7 @@ from world.observability import log_info, log_warn
 
 # Rendering and estimator versions
 RENDERING_VERSION = "rendering_v1"
-ESTIMATOR_VERSION = "token_est_v2"
+ESTIMATOR_VERSION = "token_est_v3"
 
 # Configured reservation defaults (in estimated tokens), per-profile overridable
 DEFAULT_PROFILE_CONTEXT_WINDOW = 4096
@@ -99,12 +99,14 @@ _WORD_REGEX = re.compile(r"[a-zA-Z0-9_-]+")
 
 
 def estimate_tokens(text: str) -> int:
-    """Deterministic, conservative token estimator (token_est_v2).
+    """Deterministic, conservative token estimator (token_est_v3).
 
-    Length-sensitive on every run so no input can undercount without bound:
+    Length-sensitive on every character class so no input can undercount without
+    bound (fractions carry inside one call; the value floors once):
     - CJK characters: 2.0 tokens per character.
     - Latin/alphanumeric runs: max(1.3, 0.25 * length) tokens per run.
-    - Whitespace / punctuation / symbols: 1.0 token per character.
+    - Punctuation / symbols: 1.0 token per character.
+    - Whitespace: 0.25 token per character.
     """
     if not text:
         return 0
@@ -115,8 +117,9 @@ def estimate_tokens(text: str) -> int:
     word_est = sum(max(1.3, 0.25 * len(word)) for word in words)
     symbols = _WORD_REGEX.sub("", non_cjk)
     symbol_count = len([c for c in symbols if not c.isspace()])
+    whitespace_count = len(symbols) - symbol_count
 
-    est = int(cjk_count * 2.0 + word_est) + symbol_count
+    est = int(cjk_count * 2.0 + word_est + symbol_count + whitespace_count * 0.25)
     return max(1, est) if text.strip() else 0
 
 
@@ -521,28 +524,54 @@ def assemble_narrative_context(
         else:
             truncation_decisions.append(f"omitted_entire_section:{name}")
 
-    # Build final sections in stable order
-    total_rendered_tokens = 0
-    section_accounting: dict[str, int] = {}
-
+    # Final assembly in stable order: system prompt = global_rules + world_digest +
+    # capability_contract + character_anchor; user prompt = epoch_summary + turn_frames.
     for name in SECTION_ORDER:
         if name in mandatory_sections_map:
-            sec = mandatory_sections_map[name]
+            final_sections.append(mandatory_sections_map[name])
         elif name in optional_sections_map:
-            sec = optional_sections_map[name]
-        else:
-            continue
-        final_sections.append(sec)
-        total_rendered_tokens += sec.token_count
-        section_accounting[name] = sec.token_count
+            final_sections.append(optional_sections_map[name])
 
-    # System prompt = global_rules + world_digest + capability_contract + character_anchor
-    # User prompt = epoch_summary + turn_frames
-    sys_sections = [s.rendered_text for s in final_sections if s.name in {"global_rules", "world_digest", "capability_contract", "character_anchor"}]
-    user_sections = [s.rendered_text for s in final_sections if s.name in {"epoch_summary", "turn_frames"}]
+    def _join(sections: list[RenderedSection]) -> tuple[str, str]:
+        sys_text = "\n\n".join(
+            s.rendered_text for s in sections
+            if s.name in {"global_rules", "world_digest", "capability_contract", "character_anchor"}
+        )
+        user_text = "\n\n".join(
+            s.rendered_text for s in sections if s.name in {"epoch_summary", "turn_frames"}
+        )
+        return sys_text, user_text
 
-    system_prompt = "\n\n".join(sys_sections)
-    user_prompt = "\n\n".join(user_sections)
+    # Authoritative aggregate bound on the EXACT joined messages that will be sent
+    # (per-section estimates floor independently, so their sum can understate the
+    # joined representation): least-stable optional sections drop deterministically
+    # until the sent representation fits. Mandatory-only overflow rejects rather than
+    # silently removing mandatory content.
+    system_prompt, user_prompt = _join(final_sections)
+    total_rendered_tokens = estimate_tokens(system_prompt) + estimate_tokens(user_prompt)
+    while total_rendered_tokens > max_input_budget:
+        droppable = [s for s in final_sections if not s.mandatory]
+        if not droppable:
+            log_warn(
+                "narrative_context_budget_exceeded",
+                context={
+                    "capability": capability,
+                    "mandatory_tokens": total_rendered_tokens,
+                    "bound": max_input_budget,
+                    "mandatory": True,
+                },
+            )
+            raise ContextBudgetExceededError(
+                f"Mandatory joined prompt ({total_rendered_tokens} tokens) exceeds "
+                f"max input budget ({max_input_budget})"
+            )
+        victim = droppable[-1]
+        final_sections.remove(victim)
+        truncation_decisions.append(f"omitted_entire_section:{victim.name}")
+        system_prompt, user_prompt = _join(final_sections)
+        total_rendered_tokens = estimate_tokens(system_prompt) + estimate_tokens(user_prompt)
+
+    section_accounting: dict[str, int] = {s.name: s.token_count for s in final_sections}
 
     budget_accounting: dict[str, Any] = {
         "context_window": budget_profile.context_window,
@@ -725,9 +754,16 @@ def build_request_descriptor(
     schema_id: str | None = None,
     semantic_validators: Mapping[str, Callable[[Any], list[str]]] | None = None,
 ) -> NarrativeRequestDescriptor:
-    """Create a thin request descriptor binding messages, validators, and snapshot provenance."""
+    """Create a thin request descriptor binding messages, validators, and snapshot provenance.
+
+    The authoritative persisted row is re-read and BOTH its provenance metadata and
+    its captured messages must agree with the supplied context, so a caller cannot
+    pair a context with a same-metadata-but-different-content snapshot and obtain
+    descriptors whose first request and retries disagree.
+    """
+    authoritative = get_context_snapshot(snapshot.snapshot_id)
     _check_descriptor_provenance(
-        snapshot,
+        authoritative,
         capability=context.capability,
         owner_id=context.owner_id,
         owner_generation=context.owner_generation,
@@ -735,6 +771,12 @@ def build_request_descriptor(
         schema_version=context.schema_version,
         rendering_version=context.rendering_version,
     )
+    captured = _snapshot_messages(authoritative)
+    if tuple(context.to_messages()) != captured:
+        raise ContextProvenanceError(
+            f"Snapshot {authoritative.snapshot_id!r} captured messages do not match "
+            "the supplied assembled context"
+        )
     actual_trace_id = trace_id or f"trace_{uuid.uuid4().hex}"
 
     chat_desc = ChatRequestDescriptor(
@@ -746,11 +788,11 @@ def build_request_descriptor(
 
     return NarrativeRequestDescriptor(
         chat_descriptor=chat_desc,
-        capability=context.capability,
-        prompt_version=context.prompt_version,
-        schema_version=context.schema_version,
-        rendering_version=context.rendering_version,
-        snapshot_id=snapshot.snapshot_id,
+        capability=authoritative.capability,
+        prompt_version=authoritative.prompt_version,
+        schema_version=authoritative.schema_version,
+        rendering_version=authoritative.rendering_version,
+        snapshot_id=authoritative.snapshot_id,
         trace_id=actual_trace_id,
         owner_id=context.owner_id,
         owner_generation=context.owner_generation,

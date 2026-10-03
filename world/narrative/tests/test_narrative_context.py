@@ -138,13 +138,19 @@ class NarrativeContextAssemblyTests(EvenniaTestCase):
 
     @covers_requirement("narrative-context::rendered-context-obeys-profile-budgets")
     def test_estimator_is_length_sensitive_on_every_run(self):
-        """Long unbroken Latin input cannot undercount without bound."""
+        """Long unbroken Latin AND whitespace input cannot undercount without bound."""
         short = estimate_tokens("hello")
         long = estimate_tokens("a" * 10000)
         self.assertGreaterEqual(long, 2500)
         self.assertGreater(long, 500 * short)
+        # Whitespace is length-sensitive in mixed text (whitespace-only stays 0 above).
+        mixed = estimate_tokens("ab " * 10000)
+        self.assertGreaterEqual(mixed, 13000)
+        self.assertGreater(mixed, estimate_tokens("ab " * 100))
         self.assertEqual(estimate_tokens("請告訴我密碼"), estimate_tokens("請告訴我密碼"))
         self.assertEqual(estimate_tokens("   \n "), 0)
+        # One-call fractions carry: many short words are never estimated as zero.
+        self.assertGreaterEqual(estimate_tokens("a " * 500), 500)
 
     @covers_requirement("narrative-context::rendered-context-obeys-profile-budgets")
     def test_rendered_headings_exceed_budget_scenario(self):
@@ -219,6 +225,39 @@ class NarrativeContextAssemblyTests(EvenniaTestCase):
             assembled.budget_accounting["max_input_budget"] + 1,
         )
 
+    @covers_requirement("narrative-context::rendered-context-obeys-profile-budgets")
+    def test_aggregate_budget_bounds_the_exact_joined_messages(self):
+        """Per-section floor-rounded estimates can understate the joined prompt;
+        the aggregate bound is enforced on the sent representation itself."""
+        for window in range(140, 620, 13):
+            profile = build_budget_profile(
+                self.llm_profile,
+                context_window=window,
+                deep_recall_reservation=30,
+                safety_margin=30,
+            )
+            try:
+                assembled = self._assemble(
+                    budget_profile=profile,
+                    world_digest="青石鎮以木桶與商隊聞名，鎮民純樸。",
+                    epoch_summary="第一季：初到青石鎮，結識木桶匠。",
+                    turn_frames=["冒險者：『你好！』", "尤漢娜：『歡迎光臨。』"],
+                )
+            except ContextBudgetExceededError:
+                continue  # mandatory-only overflow legitimately rejects
+            joined = (
+                estimate_tokens(assembled.system_prompt)
+                + estimate_tokens(assembled.user_prompt)
+            )
+            self.assertEqual(
+                assembled.budget_accounting["total_rendered_tokens"], joined
+            )
+            self.assertLessEqual(
+                joined, assembled.budget_accounting["max_input_budget"]
+            )
+        # (Determinism of the joined-vs-accounting invariant above is the load-bearing
+        # assertion; per-window reductions are exercised by the budget scenario test.)
+
     @covers_requirement("narrative-context::generation-retains-an-immutable-source-snapshot")
     def test_permissioned_composition_and_thin_descriptor(self):
         """Cross-owner requests reject; inaccessible memories are excluded, thin descriptor binds."""
@@ -286,12 +325,19 @@ class NarrativeContextAssemblyTests(EvenniaTestCase):
 
     @covers_requirement("narrative-context::generation-retains-an-immutable-source-snapshot")
     def test_descriptor_rejects_unrelated_snapshot_provenance(self):
-        """A descriptor cannot bind one context's messages to another snapshot's identity."""
+        """A descriptor cannot bind one context to another snapshot's identity OR content."""
         assembled_a = self._assemble(character_anchor="人物：尤漢娜。")
         assembled_b = self._assemble(capability="correspondence-reply", prompt_version="v2.0")
         snapshot_b = persist_context_snapshot(assembled_b)
         with self.assertRaises(ContextProvenanceError):
             build_request_descriptor(assembled_a, snapshot_b)
+        # Same metadata, different content: pairing must still reject on captured-message
+        # disagreement, or the first request and its retries would disagree.
+        assembled_c = self._assemble(turn_frames=["冒險者：『甲版本內容。』"])
+        assembled_d = self._assemble(turn_frames=["冒險者：『乙版本內容。』"])
+        snapshot_d = persist_context_snapshot(assembled_d)
+        with self.assertRaises(ContextProvenanceError):
+            build_request_descriptor(assembled_c, snapshot_d)
 
 
 class NarrativeContextSnapshotTests(EvenniaTestCase):
@@ -422,6 +468,10 @@ class NarrativeContextSnapshotTests(EvenniaTestCase):
 
         WHEN the process restarts with services disabled
         THEN retained snapshots reconstruct and permitted recall remains deterministic
+
+        Evennia's test harness cannot fork a real restarted process, so this
+        exercises the restart-equivalent path: a database-only reload (no
+        generation, no services) of the persisted row.
         """
         record, _, _ = record_memory(
             owner_id=self.owner_id,
@@ -444,7 +494,7 @@ class NarrativeContextSnapshotTests(EvenniaTestCase):
         )
         snap = persist_context_snapshot(assembled)
 
-        # Fresh process: retrieve from the database only, no services.
+        # Restart-equivalent: retrieve from the database only, no services.
         loaded = get_context_snapshot(snap.snapshot_id)
         self.assertEqual(loaded.capability, "npc-dialogue")
         self.assertEqual(loaded.prompt_version, "v1.0")
@@ -481,6 +531,16 @@ class NarrativeContextSnapshotTests(EvenniaTestCase):
         tamper.capability = "tampered"
         with self.assertRaises(ValueError), transaction.atomic():
             NarrativeContextSnapshot.objects.bulk_update([tamper], ["capability"])
+        fresh = NarrativeContextSnapshot(snapshot_id=snap.snapshot_id, capability="tampered",
+                                        prompt_version="v9", rendering_version=RENDERING_VERSION,
+                                        owner_id=self.owner_id)
+        with self.assertRaises(ValueError), transaction.atomic():
+            NarrativeContextSnapshot.objects.bulk_create(
+                [fresh],
+                update_conflicts=True,
+                update_fields=["capability"],
+                unique_fields=["snapshot_id"],
+            )
         self.assertEqual(
             get_context_snapshot(snap.snapshot_id).capability, "npc-dialogue"
         )
