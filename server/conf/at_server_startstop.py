@@ -74,6 +74,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "art_seed_sync",
     "art_sync_all",
     "connect_art_push",
+    "narrative_projection_init",
 )
 
 # Any-unexpected-error tolerance, used by steps that were broadly guarded
@@ -549,6 +550,10 @@ def at_server_start():
     _startup_step(
         "connect_art_push",
         lambda: _late("web.webclient.presentation.art_push", "connect_art_push"),
+    )
+    _startup_step(
+        "narrative_projection_init",
+        lambda: _late("world.narrative.events", "scan_pending_narrative_projections"),
     )
 
 

@@ -95,6 +95,7 @@ def _continue_or_settle(
     logs,
     *,
     notification_count: int = 0,
+    opening: str = "round",
 ) -> dict[str, Any]:
     outcome = _terminal_outcome(actor, battlefield, record)
     if outcome is None:
@@ -108,7 +109,7 @@ def _continue_or_settle(
     # transaction, so the aftermath arms its undo for that transaction's
     # own failure boundary.
     return settle_session(
-        actor, record, battlefield, outcome, logs, nested_round=True
+        actor, record, battlefield, outcome, logs, nested_round=True, opening=opening
     )
 
 
@@ -121,6 +122,7 @@ def settle_session(
     *,
     notification_count: int = 0,
     nested_round: bool = False,
+    opening: str = "round",
 ) -> dict[str, Any]:
     """Settle accumulated round time once and clear session state (D-6).
 
@@ -213,6 +215,17 @@ def settle_session(
             # spent and a later defeat in another session can never fire it.
             settled_record = replace(
                 record, settled_tick=get_world_clock().tick
+            )
+            # Record durable narrative event for covered protection encounters inside this same atomic unit
+            from world.narrative.projector import select_and_record_protection_event
+            select_and_record_protection_event(
+                actor=actor,
+                record=record,
+                battlefield=battlefield,
+                outcome=outcome,
+                opening=opening,
+                rounds_elapsed=record.rounds_elapsed,
+                settled_tick=int(settled_record.settled_tick or 0),
             )
             if outcome == "victory" and settled_record.martyr_key is not None:
                 settled_record = replace(
