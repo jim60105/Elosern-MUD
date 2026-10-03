@@ -20,9 +20,9 @@
 - **WHEN** a prompt is built for an NPC with a persona record and a speaking player with a persona record
 - **THEN** the system message contains the NPC's flattened persona block through `{persona}` and the user payload carries `player.persona` with the player's block, both capped
 
-#### Scenario: Absent persona omits persona within the current rendering version
+#### Scenario: Absent persona keeps the byte-identical baseline
 - **WHEN** a prompt is built without NPC or player persona records
-- **THEN** `persona=""` is substituted, the player persona block is absent, and unrelated memory/context sections remain valid
+- **THEN** `persona=""` is substituted and no player persona token/block is present; the output equals the persona-free baseline for the current context/rendering version, including the same memory sections
 
 #### Scenario: A reply that echoes the secret value is retried
 - **WHEN** a reply's speech contains the affinity value, the cap, or a bound disguise true value as a decimal integer substring
