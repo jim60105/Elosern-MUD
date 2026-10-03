@@ -2,10 +2,10 @@
 
 Date: 2026-10-03
 
-Status: Architecture, technical behavior, and roadmap approved in discussion.
-Written-document review is required before implementation planning. Section 6.4
-records one retracted assistant position that is overridden by the user's
-approved explicit-presentation requirement.
+Status: Written review approved. Nineteen OpenSpec proposals for W0–W3 are
+committed on master; Section 10 records the proposal register and parallel
+batches. Section 6.4 records one retracted assistant position that is overridden
+by the user's approved explicit-presentation requirement.
 
 ## 1. Purpose and decision record
 
@@ -511,8 +511,12 @@ and complete evidence gates remain CI-owned.
 
 ## 10. Roadmap and dependency boundaries
 
-There are **five workstreams, W0 through W4**. Each is decomposed into bounded
-OpenSpec changes later; this design does not create or apply those changes.
+There are **five workstreams, W0 through W4**. W0 through W3 are decomposed into
+**nineteen OpenSpec change proposals committed on master** (validated with
+`openspec validate --all --strict`: 284 passed, 0 failed). W4 remains deferred
+without artifacts; its prerequisites are documented in
+`openspec/changes/narrative-subsystem-ownership/design.md`. Proposals exist;
+none is applied or implemented yet.
 
 ### W0 — Explicit architecture amendment
 
@@ -593,6 +597,78 @@ foundations it actually uses and need not block W2 or W3. Individual proposals m
 identify their real prerequisites; workstream labels do not imply that every
 change in a workstream is mutually dependent.
 
+### Proposal register
+
+| Change | WS | Responsibility | Depends on |
+| --- | --- | --- | --- |
+| `narrative-subsystem-ownership` | W0 | Authorize `world/narrative/` as owner of persistent narrative data (documentation-only, `skip_specs`) | — |
+| `narrative-event-commit` | W1 | Persist selected encounter facts and restart-safe projection work at real gameplay commits | ownership |
+| `narrative-owner-memory` | W1 | Owner-scoped cognition with immutable provenance and recoverable revisions | event-commit |
+| `narrative-fast-recall` | W1 | Precision-first Traditional Chinese BM25 recall with labeled calibration fixtures | owner-memory |
+| `narrative-context-snapshots` | W1 | Rendered cognition budgets, immutable source snapshots, cache invalidation | fast-recall |
+| `yohanna-memory-dialogue` | W1 | Durable NPC dialogue integration and the Yohanna protection/revisit demonstration | context-snapshots |
+| `correspondence-delivery` | W2 | Fixed one-game-hour scheduling and atomic guaranteed delivery settlement | yohanna-memory-dialogue (rollout gate) |
+| `correspondence-player-surface` | W2 | Branch send/collect and portable reading of collected letters | delivery |
+| `correspondence-npc-replies` | W2 | Optional pending NPC replies with channel-specific effect gates | player-surface |
+| `correspondence-memory-projection` | W2 | Delivered/read letter cognition, claims kept distinct from facts | npc-replies |
+| `narrative-story-threads` | W3 | Factual thread lifecycle and real event/memory/letter/dialogue linkage | memory-projection |
+| `dialogue-epochs-stable-prefixes` | W3 | Dialogue compaction epochs and stable versioned prompt prefixes | yohanna-memory-dialogue |
+| `dream-authoring-records` | W3 | Private drafts and explicitly confirmed validated request versions | story-threads |
+| `dream-session-lifecycle` | W3 | Durable six-completed-exchange accounting and confirm/draft departure | authoring-records |
+| `dream-explicit-presentation` | W3 | Approved explicit exchanges using a server-owned session arousal track | session-lifecycle, context-snapshots |
+| `dream-sleep-surface` | W3 | Optional dream attached to sleep; browser/text confirm-draft-awaken surfaces | explicit-presentation |
+| `narrative-attention` | W3 | Deterministic filter/rank of invested-story and confirmed-request candidates | authoring-records |
+| `story-director-beats` | W3 | At most one validated executable beat per decision, idempotent scheduling | attention |
+| `scenario-beat-compilation` | W3 | Beat-scoped ScenarioDirector entry with no-content degradation | story-director-beats |
+
+Main-spec reconciliations recorded during proposal: destructive replacement of
+`npc-dialogue` bounded-window and byte-identical-payload contracts (W1, refined
+by epochs); `world-clock` stage-order insertion of a correspondence settlement
+stage; beat-scoped no-template-fallback entry beside the generic
+`scenario-director` degradation contract; layer-scoped guardrail acceptance for
+the approved explicit dream capability without touching the live
+`SexualState` handler.
+
+### Parallel batches
+
+Topological waves; within a wave, changes are dependency-independent.
+
+| Batch | Changes (parallel-capable) | Notes |
+| --- | --- | --- |
+| 1 | `narrative-subsystem-ownership` | Single documentation gate |
+| 2 | `narrative-event-commit` | |
+| 3 | `narrative-owner-memory` | |
+| 4 | `narrative-fast-recall` | |
+| 5 | `narrative-context-snapshots` | |
+| 6 | `yohanna-memory-dialogue` | |
+| 7 | `correspondence-delivery` ∥ `dialogue-epochs-stable-prefixes` | Disjoint conflict groups; epochs stay independent of the dream UI |
+| 8 | `correspondence-player-surface` | |
+| 9 | `correspondence-npc-replies` | |
+| 10 | `correspondence-memory-projection` | |
+| 11 | `narrative-story-threads` | |
+| 12 | `dream-authoring-records` | |
+| 13 | `dream-session-lifecycle` ∥ `narrative-attention` | Disjoint conflict groups |
+| 14 | `dream-explicit-presentation` ∥ `story-director-beats` | Share prompt-registry/composition and authoring-lifecycle surfaces: serialize or use one integration owner |
+| 15 | `dream-sleep-surface` ∥ `scenario-beat-compilation` | Disjoint conflict groups |
+
+Every change additionally touches the shared repository files
+`.github/evennia-shards.json`, spec-traceability annotations, and the
+observability event catalog. Those are merge-coordination points for any
+parallel pair, not dependency edges.
+
+Shared code-surface conflict groups across waves: projection
+progress/linkage (event-commit, owner-memory, delivery, memory-projection,
+story-threads); context/history (context-snapshots, yohanna-memory-dialogue,
+npc-replies, memory-projection, story-threads, epochs, explicit-presentation);
+prompt registry/composition (yohanna-memory-dialogue, epochs, npc-replies,
+explicit-presentation, story-director-beats, beat-compilation); authoring
+lifecycle (authoring-records, session-lifecycle, explicit-presentation,
+sleep-surface, story-director-beats); beat execution registry
+(story-director-beats, beat-compilation).
+
+Public W3 acceptance requires both the complete dream branch and the complete
+director branch.
+
 ## 11. Non-goals and planning gate
 
 Non-goals are cargo mechanics, vector databases, all-world NPC background
@@ -601,7 +677,7 @@ unrelated-story creation, authoring-driven rewrites of committed history, and
 age-based gameplay branching. Explicit sexual presentation in the dream session
 is approved in Section 6.4 and is not a non-goal.
 
-Do not implement code, create scaffolds, or apply OpenSpec changes from this
-conversation. First obtain review of this written document. After written-spec approval, use the writing-plans
-workflow to plan the selected first subproject. W0's architecture amendment
-precedes W1 feature implementation.
+The nineteen proposals above are committed and strictly validated, and none is
+implemented. Implementation follows the batch order in Section 10: apply
+`narrative-subsystem-ownership` (W0) first, and never start a change before its
+listed dependencies are applied.
