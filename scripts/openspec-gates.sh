@@ -23,8 +23,8 @@ case "$phase" in
     print -u2 "gate: openspec validate --all --strict"
     uv run --locked openspec validate --all --strict
     if [[ -n "$change" ]]; then
-      print -u2 "gate: openspec validate ${change} --strict"
-      uv run --locked openspec validate "${change}" --strict
+      print -u2 "gate: openspec validate ${change} --type change --strict"
+      uv run --locked openspec validate "${change}" --type change --strict
     fi
     ;;
   *)

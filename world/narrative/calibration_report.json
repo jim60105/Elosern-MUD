@@ -1,0 +1,175 @@
+{
+  "report_version": "1.0.0",
+  "tokenizer_version": "tc_v1",
+  "ranker_version": "bm25_v1",
+  "min_lexical_threshold": 0.25,
+  "bm25_k1": 1.5,
+  "bm25_b": 0.75,
+  "corpus_size": 8,
+  "environment": {
+    "python_version": "3.13.14",
+    "platform": "Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "arch": "x86_64"
+  },
+  "metrics": {
+    "total_cases": 10,
+    "positive_cases": 5,
+    "negative_cases": 5,
+    "recall_at_1": 1.0,
+    "recall_at_2": 1.0,
+    "false_positive_count": 0,
+    "false_positive_rate": 0.0,
+    "min_latency_ms": 0.12,
+    "p50_latency_ms": 0.29,
+    "p95_latency_ms": 1.48,
+    "max_latency_ms": 1.55
+  },
+  "calibrated_gates": {
+    "min_recall_at_1": 0.95,
+    "min_recall_at_2": 1.0,
+    "max_false_positive_rate": 0.0,
+    "max_p95_latency_ms": 50.0
+  },
+  "cases": [
+    {
+      "case_id": "pos_protection_direct",
+      "query": "那天在溪谷遭遇野獸襲擊，你保護了我",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "expected_top_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "hit_top1": true,
+      "hit_top2": true,
+      "false_positive": false,
+      "latency_ms": 1.48,
+      "notes": "Direct query with exact keywords '溪谷', '野獸', '保護'."
+    },
+    {
+      "case_id": "pos_protection_paraphrase",
+      "query": "還記得在山谷被野狼圍攻時的援護戰鬥嗎？",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "expected_top_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "hit_top1": true,
+      "hit_top2": true,
+      "false_positive": false,
+      "latency_ms": 0.35,
+      "notes": "Paraphrase using aliases '援護', '野狼', '戰鬥'."
+    },
+    {
+      "case_id": "pos_protection_entity_alias",
+      "query": "庫柏小姐，之前遭遇危險時的守護情誼",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "expected_top_source_ids": [
+        "corpus:encounter:prot:1"
+      ],
+      "hit_top1": true,
+      "hit_top2": true,
+      "false_positive": false,
+      "latency_ms": 0.31,
+      "notes": "Entity alias '庫柏' for Yohanna with '守護'."
+    },
+    {
+      "case_id": "neg_unrelated_salient",
+      "query": "湖邊釣魚與烹煮鮮魚料理的秘訣",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [],
+      "expected_top_source_ids": [],
+      "hit_top1": false,
+      "hit_top2": false,
+      "false_positive": false,
+      "latency_ms": 0.22,
+      "notes": "Completely unrelated topic; high salience pendant (salience 98) must NOT be returned."
+    },
+    {
+      "case_id": "neg_unrelated_royal_palace",
+      "query": "王宮地下藏寶庫的古代魔法機關鑰匙",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [],
+      "expected_top_source_ids": [],
+      "hit_top1": false,
+      "hit_top2": false,
+      "false_positive": false,
+      "latency_ms": 0.19,
+      "notes": "Absent subject; tournament gossip (salience 90) must NOT qualify."
+    },
+    {
+      "case_id": "neg_uninformed_guard",
+      "query": "那天在溪谷遭遇野獸襲擊，你保護了我",
+      "owner_id": "npc_guard_202",
+      "recalled_source_ids": [],
+      "expected_top_source_ids": [],
+      "hit_top1": false,
+      "hit_top2": false,
+      "false_positive": false,
+      "latency_ms": 0.12,
+      "notes": "Guard does not own or know the protection episode; recall must be empty."
+    },
+    {
+      "case_id": "hist_normal_excludes_superseded",
+      "query": "暴雨山崩封鎖東部隘口道路傳言",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [],
+      "expected_top_source_ids": [],
+      "hit_top1": false,
+      "hit_top2": false,
+      "false_positive": false,
+      "latency_ms": 0.25,
+      "notes": "Normal access excludes superseded record even if lexically matching."
+    },
+    {
+      "case_id": "hist_historical_includes_superseded",
+      "query": "暴雨山崩封鎖東部隘口道路傳言",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [
+        "corpus:history:courier:old"
+      ],
+      "expected_top_source_ids": [
+        "corpus:history:courier:old"
+      ],
+      "hit_top1": true,
+      "hit_top2": true,
+      "false_positive": false,
+      "latency_ms": 0.38,
+      "notes": "Historical access (include_superseded=True) retrieves the historical record."
+    },
+    {
+      "case_id": "hist_normal_excludes_inactive",
+      "query": "廢棄舊磨坊地下暗室探查筆記",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [],
+      "expected_top_source_ids": [],
+      "hit_top1": false,
+      "hit_top2": false,
+      "false_positive": false,
+      "latency_ms": 0.24,
+      "notes": "Normal access excludes inactive record even if lexically matching."
+    },
+    {
+      "case_id": "hist_historical_includes_inactive",
+      "query": "廢棄舊磨坊地下暗室探查筆記",
+      "owner_id": "npc_yohanna_101",
+      "recalled_source_ids": [
+        "corpus:inactive:outdated:1"
+      ],
+      "expected_top_source_ids": [
+        "corpus:inactive:outdated:1"
+      ],
+      "hit_top1": true,
+      "hit_top2": true,
+      "false_positive": false,
+      "latency_ms": 0.36,
+      "notes": "Explicit historical/inactive access retrieves the inactive record."
+    }
+  ]
+}
