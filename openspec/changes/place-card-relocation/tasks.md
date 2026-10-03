@@ -6,7 +6,7 @@
 - [ ] 1.2 Simplify the `[data-anchor="vitals"]` CSS: change `top` from `calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px * var(--ui-scale))` to `calc(var(--header-h) + var(--stage-inset-y))`. Update `max-height` to remove the `var(--place-h)` term.
 - [ ] 1.3 Remove the creation-mode hide rule for `[data-anchor="place"]` from HudFrame's mode-gated visibility block (the `map` anchor is already hidden in creation, which covers the relocated PlaceCard).
 - [ ] 1.4 Remove `place` from the HudFrame header comments (anchor list, layer descriptions). Update any comment that says "below the place card" to "directly below the top band".
-- [ ] 1.5 Update the `HudFrame.stories.js` story description, which names the `place` anchor ("the place card (`place`, top-left, fixed `--place-h`)") and `--place-h`: describe the place card as an island of the top-right `map` anchor with no fixed height token.
+- [ ] 1.5 Update `HudFrame.stories.js`: the `renderFrame` story passes a `place: () => sample("place ‧ 地點卡")` slot — delete that slot key and fold the place-card sample into the `map:` slot (stacked above the minimap sample so the story shows the island grouping). Update the header/story description, which names the `place` anchor ("the place card (`place`, top-left, fixed `--place-h`)") and `--place-h`: describe the place card as an island of the top-right `map` anchor with no fixed height token.
 
 ## 2. AppShell slot reassignment
 
@@ -33,9 +33,11 @@
 
 - [ ] 6.1 Update `place_card.test.js`'s wiring pin: it asserts HudFrame's creation-mode hide line for `[data-anchor="place"]`, `AppShell.vue`'s `creation: "[data-anchor='place']…` string, and that `tokens.css` contains `--place-h: calc(68px * var(--ui-scale));`. Re-point it at the post-change truth (no `place` anchor in HudFrame or AppShell; no `--place-h` token; the map anchor hides in creation).
 - [ ] 6.2 Update `app.test.js` / `hud_frame.test.js` if they assert the existence of the `place` anchor div or test the slot assignment.
-- [ ] 6.3 Update the browser tests that measure `[data-anchor="place"]`: `web/tests/browser/test_browser_layout.py` (mode-visibility selector list), `test_browser_proportional_ui_scale.py` (the `place: box(...)` entry — replace with the place card inside the `map` anchor), and `test_browser_shell_surfaces.py` (the `place: rect(...)` blocker probe — measure the place card element or drop the entry, keeping the band/commandLine blockers).
-- [ ] 6.4 Run the Vitest component suite (`pnpm test`) and the Node test gate (`node --test web/static/webclient/js/tests/*.test.js`) to verify no regressions.
+- [ ] 6.3 Update the browser-test assertions that measure `[data-anchor="place"]`: `web/tests/browser/test_browser_layout.py` (mode-visibility selector list), `test_browser_proportional_ui_scale.py` (the `place: box(...)` entry — replace with the place card inside the `map` anchor), and `test_browser_shell_surfaces.py` (the `place: rect(...)` blocker probe — measure the place card element or drop the entry, keeping the band/commandLine blockers). These are managed-suite files: edit them here, execution is CI-owned; do not run the managed browser suite locally.
+- [ ] 6.4 Run the focused Vitest tests (`pnpm test` scoped to the touched test files) and the Node gate (`node --test web/static/webclient/js/tests/*.test.js`, fast per AGENTS.md) to verify no regressions. No full-suite runs.
 
 ## 7. Spec delta sync
 
 - [ ] 7.1 Verify `openspec validate place-card-relocation --strict` passes after implementation.
+- [ ] 7.2 Run `uv run --locked python -m tools.contract_gate` (seconds; traceability + lints + shard manifests — not a test run; required before handoff).
+- [ ] 7.3 Run the Storybook gates: `pnpm run build-storybook` (offline showcase builds with the relocated card) and `pnpm run showcase-coverage` (component-coverage check against the frozen required-set manifest — PlaceCard stays covered, nothing added/removed).

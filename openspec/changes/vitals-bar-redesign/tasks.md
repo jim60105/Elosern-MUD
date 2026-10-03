@@ -37,9 +37,11 @@
 - [ ] 5.1 Update `status_panel.test.js`: numerals hook lives on the track overlay (assert `current / maximum` text still resolves via `status-panel__gauge-value--hp`); conditions render as glyph-only buttons with the full prose in `aria-label`; no chip name text visible.
 - [ ] 5.2 Add tooltip behavior tests: focus opens, blur closes, Escape closes and is not consumed when no tooltip is open.
 - [ ] 5.3 Update `VitalsTrack.stories.js`, `ConditionChips.stories.js`, `StatusPanel.stories.js` wrapper frames to the compact dock width; keep full/damaged/low/empty coverage and the changing-numerals unequal-digit story.
-- [ ] 5.4 Run focused Vitest (`pnpm test` on the touched files) and the Node gate; then the browser vitals journey class locally.
+- [ ] 5.4 Run the focused Vitest tests (`pnpm test` scoped to the touched test files) and the Node gate (`node --test web/static/webclient/js/tests/*.test.js`, fast per AGENTS.md). No full-suite runs; if any managed browser test measures the vitals anchor geometry, update its assertions here — execution of managed browser tests is CI-owned.
 
 ## 6. Verify
 
 - [ ] 6.1 Visual smoke at 1920x1080 and 1280x720: dock on the band's edge, feet strip overlap only, numerals legible at full/empty fill, 32-condition overflow reachable.
 - [ ] 6.2 `openspec validate vitals-bar-redesign --strict` passes.
+- [ ] 6.3 Run `uv run --locked python -m tools.contract_gate` (seconds; traceability + lints + shard manifests — not a test run; required before handoff).
+- [ ] 6.4 Run the Storybook gates: `pnpm run build-storybook` and `pnpm run showcase-coverage` (frozen required-set manifest unchanged — VitalsTrack/ConditionChips/StatusPanel stay covered in their restyled dock forms; inspect the updated stories visually in the built showcase: damaged/low numerals over the fill, empty track, 32-condition overflow with +N disclosure, tooltip open state via a focused-chip story variant if added in 5.2).

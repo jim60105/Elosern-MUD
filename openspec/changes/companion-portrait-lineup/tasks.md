@@ -23,6 +23,7 @@
 - [ ] 3.4 Remove `party_strip.test.js` if it exists.
 - [ ] 3.5 Update `app_client_drawers.test.js` or any test asserting PartyStrip rendering.
 - [ ] 3.6 Update the `deferred_surfaces_absent.test.js` surface manifest if it lists PartyStrip.
+- [ ] 3.7 Update the storybook fixtures in `web/webclient-app/stories/fixtures/party_panels.js` (and any story importing them — `PartyDrawer.stories.js`) to the v2 party payload: `schema_version: 2` and per-slot `portrait_ref` (a decimal catalog-key string for portrait-having companions, `null` for the rest). The showcase derives shapes exactly as AppClient does, so no story may keep a v1 row.
 
 ## 4. Client: companion lineup geometry helper
 
@@ -32,7 +33,7 @@
 ## 5. Client: CompanionLineup.vue component
 
 - [ ] 5.1 Create `web/webclient-app/components/CompanionLineup.vue`: takes a `slots` prop (array of `{ portrait, displayName, isControlled }` objects, pre-ordered: controlled first, then companions in party order), renders each slot as a StageActor instance positioned by `companionSlots()`. Each StageActor receives `portrait`, `dimmed`, and `gesture: null` (companions) or the beat gesture (controlled). All figures are decorative: `aria-hidden="true"`, no pointer events.
-- [ ] 5.2 Register the component in `component-manifest.json` and add `CompanionLineup.stories.js` with 0/1/2/4 companion variants, possession swap variant, and placeholder-only variant.
+- [ ] 5.2 Register the component in `component-manifest.json` and add `CompanionLineup.stories.js` with 0/1/2/4 companion variants, possession swap variant, and placeholder-only variant — deterministic fixture portraits (the `stage_journey.js`/`art_panels.js` fixture precedent), each variant framed at the actor-left anchor size and at 1280x720 so the left-half geometry claim is inspectable in the offline showcase.
 
 ## 6. Client: AppClient wiring
 
@@ -51,11 +52,13 @@
 - [ ] 8.1 Update `web/webclient/presentation/tests/test_party_panel.py`: add test for v2 portrait_ref resolution (companion with gallery portrait → non-null ref, companion without → null). Verify the emitted ref resolves through the art panel's portrait_catalog.
 - [ ] 8.2 Verify validator tests at schema v2: accept non-null portrait_ref string, reject non-string non-null values.
 - [ ] 8.3 Update the `@covers_requirement` slugs in `test_party_panel.py` and `test_possession_presentation.py`: the renamed requirement's canonical ID changes from `…version-1-presentation-panel` to `…version-2-presentation-panel` (verify with `uv run --locked python -m tools.spec_traceability list` after the delta syncs). Add owner-keyed-possession coverage (design D6): possessing a companion keeps both slots with owner-keyed bond stages; a partyless possessed actor sees the unavailable form. Cover the new `portrait_catalog` exploration membership (companion without policy appears in the catalog) in the art panel test module.
-- [ ] 8.4 Add a browser acceptance journey (managed suite, existing exploration-journey file): at 1280x720 with four companions and an open dialogue choice list, the companion figures stay within the left half, no figure box intersects the choice list or the foe line-up, and the front figure swaps on `explore.possess` and back on release.
+- [ ] 8.4 Add a browser acceptance journey to the existing managed-suite exploration-journey file: at 1280x720 with four companions and an open dialogue choice list, the companion figures stay within the left half, no figure box intersects the choice list or the foe line-up, and the front figure swaps on `explore.possess` and back on release. Author the assertions here; execution of the managed browser suite is CI-owned.
 
 ## 9. Verify
 
-- [ ] 9.1 Run the focused server tests (party panel test module) with `uv run --locked --env-file=... evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_party_panel`.
-- [ ] 9.2 Run the focused Vitest suite (`pnpm test` on touched files) and Node gate.
+- [ ] 9.1 Run the focused server test modules (party panel, possession presentation, and the art-panel presenter module touched by 1.5/8.3) with `uv run --locked --env-file=<file-with-MUD_TEST_SETTINGS=1> evennia test --settings test_settings.py --keepdb <label>` per module (single-token `--env-file=`). Focused labels only — never the full non-browser suite.
+- [ ] 9.2 Run the focused Vitest tests (`pnpm test` scoped to the touched test files) and the Node gate (`node --test web/static/webclient/js/tests/*.test.js`, fast per AGENTS.md). No full-suite runs.
 - [ ] 9.3 Visual smoke: 1920x1080 with 0/2/4 companions; possession swap; placeholder fallback.
-- [ ] 9.4 `openspec validate companion-portrait-lineup --strict` passes.
+- [ ] 9.4 Run `uv run --locked python -m tools.contract_gate` (seconds; traceability + lints + shard manifests — not a test run; required before handoff).
+- [ ] 9.5 `openspec validate companion-portrait-lineup --strict` passes.
+- [ ] 9.6 Run the Storybook gates: `pnpm run build-storybook` and `pnpm run showcase-coverage`. This change moves components in the frozen required-set manifest (PartyStrip out, CompanionLineup in) — update the manifest in the same change per the coverage-check contract, and eyeball the built showcase: possession swap, placeholder-only, and the four-companion 1280x720 variant.
