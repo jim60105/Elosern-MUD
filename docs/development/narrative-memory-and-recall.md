@@ -36,3 +36,11 @@ The `world/narrative` subsystem manages persistent narrative events, character m
 6. **`world/narrative/calibration_runner.py` & `world/narrative/calibration_corpus.py`**:
    - Offline synthetic labeled fixtures and evaluation runner measuring Recall@1, Recall@2, false positive rate, and latency.
    - Committed report at `world/narrative/calibration_report.json`.
+
+7. **`world/narrative/context.py`**:
+   - Reproducible permission-filtered cognition context assembly with enforceable rendered budgets and immutable source snapshots.
+   - Stable ordering: global rules, world digest, capability contract, character anchor, epoch summary, turn frames (recall items and affordances).
+   - Budget profiles with completion reservation, future Deep Recall reservation, and estimation safety margins; selection and assembly share one rendered representation (headings included), and mandatory-section overflow rejects before generation.
+   - Immutable `NarrativeContextSnapshot` model (append-only manager plus instance guards) tracking source IDs, read revisions, section hashes, budget accounting, truncation decisions, and the reconstructible rendered payload.
+   - Thin `NarrativeRequestDescriptor` binding prompt messages, validators, and snapshot/trace identities, rejecting mismatched context/snapshot provenance.
+   - Every fresh assembly reads the owner memory generation, so effective-memory changes surface to new generations while retries re-read the authoritative persisted snapshot instead of rewriting it.

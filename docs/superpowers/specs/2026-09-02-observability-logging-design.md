@@ -195,6 +195,10 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_memory_projected` | `source_id`、`projector_version`、`records_count` |
 | `narrative_memory_projection_failed` | `source_id`、`projector_version`、`exc` |
 | `narrative_fast_recall_executed` | `owner_id`、`generation`、`query_length`、`recalled_count`、`core_count`、`working_count`、`duration_ms` |
+| `narrative_context_assembled` | `capability`、`owner_id`、`generation`、`sections_count`、`sources_count`、`rejected_sources`、`rendered_tokens`、`truncations`、`trace_id` |
+| `narrative_snapshot_persisted` | `snapshot_id`、`capability`、`owner_id`、`generation`、`sources_count` |
+| `narrative_snapshot_reused` | `snapshot_id`、`capability`、`owner_id`、`generation`、`attempt`、`trace_id` |
+| `narrative_context_budget_exceeded` | `capability`、`section` 或 `mandatory_tokens`、`tokens`、`bound`、`mandatory`（重試回饋溢位時另含 `snapshot_id`、`attempt`） |
 
 ### 4.3 AI／外部服務邊界
 
