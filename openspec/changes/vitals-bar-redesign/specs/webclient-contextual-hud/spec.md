@@ -1,7 +1,7 @@
 ## RENAMED Requirements
 
 - FROM: `### Requirement: Vitals pair an icon, a label, and numerals with a trailing damage bar`
-- TO: `### Requirement: Vitals pair an icon and a label with numerals on a compact trailing-bar track`
+- TO: `### Requirement: Vitals read as one numeral readout over three thin trailing-bar lines`
 
 - FROM: `### Requirement: Condition chips carry a severity glyph, a payload duration, and a bounded overflow`
 - TO: `### Requirement: Condition icons float without a window and disclose their detail in a tooltip`
@@ -9,15 +9,15 @@
 ## ADDED Requirements
 
 ### Requirement: The vitals dock stands at the stage's lower-left above the band
-The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, at the left column's width, and at whatever compact height its content takes. The dock SHALL NOT be top-anchored and SHALL NOT claim the stage's upper-left corner: at the top of the left column the stage shows only the standing portrait line. The condition icon row SHALL be the dock's topmost content, directly above the bars. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge. The dock MAY overlap the lowest strip of the `actor-left` standing portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them. Every island chrome the dock carries SHALL come from the shared design tokens.
+The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide (a viewport-relative width, not multiplied by the chrome factor), and at whatever compact height its content takes. The dock SHALL NOT be top-anchored and SHALL NOT claim the stage's upper-left corner: at the top of the left column the stage shows only the standing portrait line. The condition icon row SHALL be the dock's topmost content, directly above the bars. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge. The dock MAY overlap the lowest strip of the `actor-left` standing portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them. The dock SHALL NOT read as a rectangular box: its ground is the shared panel ink with the backdrop blur, feathered out towards its right and top edges so the scene reads through them, and it is mounted on a hairline brass spine down its left side capped by the band's lozenge ornament, with a hairline brass crown fading out along its top; it carries no full border and no square corners. Every island chrome the dock carries SHALL come from the shared design tokens. The command-line row docked on the same band edge SHALL begin past the dock's right edge, so the two never intersect. Until `companion-portrait-lineup` removes it, the interim party quickbar island stands in the `vitals` anchor between the dock and the band.
 
 #### Scenario: The dock stands on the band's edge
 - **WHEN** the shell renders in exploration mode with the vitals dock visible at 1920x1080
-- **THEN** the dock's bottom edge coincides with the bottom band's top edge, its left edge sits at the stage's left gutter, its rendered height is the compact height of the icon row plus the three bars, and the stage's upper-left corner holds no vitals surface
+- **THEN** the `vitals` anchor's bottom edge coincides with the bottom band's top edge (the dock's own bottom edge does too whenever no interim party quickbar stands below it), the dock's left edge sits at the stage's left gutter and its width is a quarter of the viewport's width (±1.5px), its rendered height is the compact height of the icon row, the readout, and the three lines, and the stage's upper-left corner holds no vitals surface
 
 #### Scenario: The dock covers only the portraits' lowest strip
-- **WHEN** the dock is visible and the party standing-portrait line renders at 1920x1080
-- **THEN** the overlap of the two rendered boxes reaches no higher than the portraits' lowest tenth, every portrait's face and torso are fully visible, and neither box moves the other
+- **WHEN** the dock is visible and the player's standing portrait renders at 1920x1080 and at 1280x720
+- **THEN** the overlap of the two rendered boxes reaches no higher than the portrait's lowest quarter, the portrait's face and torso are fully visible, and neither box moves the other
 
 #### Scenario: The dock stays bounded at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with the dock visible and conditions overflowing the row
@@ -26,7 +26,7 @@ The stage SHALL render the vitals surfaces — the condition icon row and the vi
 ## MODIFIED Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-This requirement carries the `place-card-relocation` amendment; the vitals-anchor wording below moves the anchor from the stage box's top-left corner to the stage's lower-left dock.
+This requirement carries the `place-card-relocation` amendment; the vitals-anchor wording below moves the anchor from the stage box's top-left corner to the stage's lower-left dock, and the command-line row now begins past that dock.
 Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 1080px tall or 1920px wide. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
@@ -40,7 +40,7 @@ island of the `map` anchor.
 The top band SHALL be 48px tall at every supported viewport and SHALL carry only the brand, the top
 navigation bar, the possession banner when present, the character switcher, and the connection
 state; it SHALL carry no location label and no time label. The `vitals` anchor is the stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band"
-defines: bottom-anchored on the band's upper edge in the left gutter, at the left column's fixed width that does not depend on the
+defines: bottom-anchored on the band's upper edge in the left gutter, at a quarter of the viewport's width that does not depend on the
 content it holds. The `map` anchor SHALL sit at the stage
 box's top-right corner, below the top band; its content column (the place card, then the
 minimap island, then the objective line, then any other island this capability places there) SHALL be right-aligned to the
@@ -252,7 +252,8 @@ boxed column card and never an opaque `<aside>` stacked in a layout column. The 
 stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band"
 defines: it carries the condition icon row and the vitals bars as one dock, and SHALL carry
 no character head card, no portrait catalog strip, and no top-anchored island; the party quickbar keeps
-its compact island in the dock below the bars until `companion-portrait-lineup` removes it. The `map` anchor SHALL carry, in this order, the
+its compact island in the anchor below the dock until `companion-portrait-lineup` removes it. The dock
+itself replaces the boxed island chrome with the feathered instrument plate that "The vitals dock stands at the stage's lower-left above the band" defines. The `map` anchor SHALL carry, in this order, the
 place card, the
 minimap island, the objective line, the combat participant frame while it is mounted, and the title
 ballot menu while it is mounted, each present only while its own requirement renders it; no reference
@@ -263,7 +264,7 @@ reduced-motion block reaches all of them at once.
 
 #### Scenario: The left anchor renders separate islands
 - **WHEN** the shell renders in exploration mode with a vital below its maximum and a committed `harmful` condition
-- **THEN** the condition icon row and the vitals bars render as the lower-left dock's two surfaces in that order, the dock carries the translucent blurred panel chrome, and no head card, place card, portrait catalog strip, party quickbar, or top-anchored vitals island is rendered
+- **THEN** the condition icon row and the vitals bars render as the lower-left dock's two surfaces in that order, the dock carries the feathered, blurred panel ink on its brass spine, and no head card, place card, portrait catalog strip, or top-anchored vitals island is rendered; the interim party quickbar, when a party is committed, stands below the dock
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
 - **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
@@ -314,8 +315,8 @@ While hidden, the dock SHALL keep its trailing-bar memory, so the first committe
 - **WHEN** focus is on a `harmful` condition icon outside combat with every vital full, and a committed revision clears that condition, leaving only `beneficial` conditions
 - **THEN** focus moves to the action dock before the dock is hidden, and no focus is lost to the document body
 
-### Requirement: Vitals pair an icon and a label with numerals on a compact trailing-bar track
-Each of hp, mp, and sp SHALL render as one compact bar row carrying an icon, a Traditional Chinese label, and a track; the `current / maximum` numerals — or, for hp while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines — SHALL render on the track itself rather than on a separate header line, and the 危險 low marker SHALL render on the row with them. The numerals SHALL render at every value in a contrast that keeps them legible over both the filled and unfilled parts of the track, so no vital state is conveyed by the coloured fill alone. The three bar rows SHALL sit at a compact vertical rhythm — a small fixed gap well under half the gap between the previous spaced-out rows — so the three bars occupy well under half the previous vitals island's row block. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
+### Requirement: Vitals read as one numeral readout over three thin trailing-bar lines
+Each of hp, mp, and sp SHALL render as one thin trailing-bar line, the three laid almost edge to edge — parted by a hairline seam, in hp, mp, sp order from the top — under one numeral readout row that states, in the same order, each gauge's icon and its `current / maximum` numerals — or, for hp while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines. The icons SHALL be three distinct shapes in their gauge's hue, so the readings are told apart without colour; each gauge's Traditional Chinese label (生命, 魔力, 耐力) SHALL be its reading's accessible name and SHALL NOT be rendered as visible text. The 危險 low marker SHALL render with the hp reading. The current value SHALL lead in the brightest paper ink at tabular figures and the maximum SHALL recede a step, every value in a contrast that keeps it legible over the dock, so no vital state is conveyed by the coloured fill alone. The lines SHALL NOT read as square boxes: each SHALL taper to a point at its far end, and each line SHALL run a little shorter than the one above it, so the set fans out rather than ending on one hard edge. The readout and the three lines together SHALL occupy well under half the previous vitals island's row block. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
 
 The trailing bar SHALL exist to make damage taken visible: it SHALL lag the fill when the ratio falls and SHALL be overtaken by the fill when the ratio rises. It SHALL be decorative — hidden from the accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already carry on the same revision. It SHALL NOT render any value that was not a previously displayed ratio of that same gauge, where a displayed ratio comes only from the committed `status` or from a committed beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result, and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect. Its motion SHALL be token-gated so the reduced-motion block disables it. At the `full` motion level the trailing bar SHALL start following a drop 300ms after the fill moves.
 
@@ -323,7 +324,7 @@ A vital at or below the client's display threshold SHALL be marked by both a rec
 
 #### Scenario: Each vital is legible without colour
 - **WHEN** the vitals dock renders with the `status` panel committed
-- **THEN** each of hp, mp, and sp shows an icon, a text label, and its `current / maximum` numerals rendered on the track, and the sp fill is distinguishable from hp and mp by texture rather than by hue
+- **THEN** the readout states hp, mp, and sp in that order, each as a distinct icon shape with its `current / maximum` numerals and its gauge label as the reading's accessible name, no gauge label is visible text, the three lines below carry no text, and the sp fill is distinguishable from hp and mp by texture rather than by hue
 
 #### Scenario: Damage leaves a visible trailing bar
 - **WHEN** a committed revision lowers a gauge's ratio
@@ -347,14 +348,14 @@ A vital at or below the client's display threshold SHALL be marked by both a rec
 
 #### Scenario: A low vital is marked by text as well as colour
 - **WHEN** a vital falls to or below the client's display threshold
-- **THEN** the row carries both the low recolour and the explicit 危險 text marker on the row, and the numerals continue to render
+- **THEN** the hp reading carries both the low recolour and the explicit 危險 text marker, and the numerals continue to render
 
-#### Scenario: The three bars read as one compact group
+#### Scenario: The three lines read as one instrument
 - **WHEN** the vitals dock renders three gauges
-- **THEN** the gap between the bar rows is the compact token gap and the whole three-bar block renders in a height no greater than half of the previous island's three header-plus-track rows
+- **THEN** the three lines are parted by a 1px seam, each tapers to a point at its far end and runs shorter than the one above it, and the readout plus the three lines render in a height no greater than half of the previous island's three header-plus-track rows
 
 ### Requirement: Condition icons float without a window and disclose their detail in a tooltip
-The active conditions SHALL NOT render as a chipped island with a background window, header, or border. Each entry in `status.conditions` SHALL instead render as a standalone small icon in a row directly above the vitals bars, carrying only its per-severity shape glyph — the five severities each mapping to a distinct glyph so no two are separated by colour alone, with the beneficial and harmful directions readable from the glyph itself. The row SHALL carry no panel fill, no backdrop blur, and no `狀態` label.
+The active conditions SHALL NOT render as a chipped island with a background window, header, or border. Each entry in `status.conditions` SHALL instead render as a standalone small icon in a row directly above the vitals readout, carrying only its per-severity shape glyph — the five severities each mapping to a distinct glyph so no two are separated by colour alone, with the beneficial and harmful directions readable from the glyph itself. The row SHALL carry no panel fill, no backdrop blur, and no `狀態` label.
 
 The condition's readable name — its label, or its code only when no label is supplied — its remaining duration, and every derived modifier SHALL NOT be shown on the icon; they SHALL appear in a tooltip opened when the icon is hovered or when keyboard focus reaches it, and closed on pointer leave, blur, or Escape. The tooltip SHALL state the full label, the duration when the payload supplies one, and every derived modifier the payload provides, each modifier named in the game's stat vocabulary (for example 攻擊, 敏捷, 防禦, 準度, 每回合行動, 魔力消耗) rather than by its raw adjustment key, with its value verbatim — no sign, unit or digit added or dropped — and a key outside that vocabulary SHALL be named by the neutral 其他修正 and keep its value. The icon SHALL also carry this content as its accessible name, so the information is reachable by assistive technology without the pointer. The duration the tooltip states is the payload's `remaining_seconds` value as committed; the client SHALL run no countdown and SHALL NOT re-render the tooltip between commits.
 
@@ -362,7 +363,7 @@ Icons SHALL be bounded to the row's width, and the remainder SHALL stay reachabl
 
 #### Scenario: A chip carries its label, duration, and modifiers
 - **WHEN** a beneficial and a harmful condition are committed
-- **THEN** the row above the vitals bars renders exactly two glyphs of distinct shapes with no panel chrome, no condition names, and no duration text visible, and each icon's accessible name states its label, remaining duration, and every modifier's readable name with its verbatim value
+- **THEN** the row above the vitals readout renders exactly two glyphs of distinct shapes with no panel chrome, no condition names, and no duration text visible, and each icon's accessible name states its label, remaining duration, and every modifier's readable name with its verbatim value
 
 #### Scenario: Two severities are distinguishable without colour
 - **WHEN** a warning condition and a harmful condition are committed together

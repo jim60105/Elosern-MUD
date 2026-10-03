@@ -174,15 +174,16 @@ body {
   --actor-label-left: max(18%, calc(var(--left-column) - var(--actor-left-inset)));
 }
 /* The island stacks at the column widths (webclient-avg-stage-hud-anchors
-   design D1). Both begin directly below the top band; these offsets repeat
-   HudFrame.vue's own rules, which govern where no `.elosern-root` wraps the
-   stage — keep the two in step. */
+   design D1). `map` begins directly below the top band; `vitals` is the
+   lower-left dock standing on the band's top edge (vitals-bar-redesign
+   design D1). These offsets repeat HudFrame.vue's own rules, which govern
+   where no `.elosern-root` wraps the stage — keep the two in step. */
 .elosern-root .elosern-stage [data-anchor="vitals"] {
-  top: calc(var(--header-h) + var(--stage-inset-y));
+  bottom: var(--band-h);
   left: calc(16px * var(--ui-scale));
-  width: calc(var(--left-column) - 32px * var(--ui-scale));
+  width: var(--vitals-dock-w);
   max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
-  gap: calc(12px * var(--ui-scale));
+  gap: calc(8px * var(--ui-scale));
 }
 .elosern-root .elosern-stage [data-anchor="map"] {
   top: calc(var(--header-h) + var(--stage-inset-y));

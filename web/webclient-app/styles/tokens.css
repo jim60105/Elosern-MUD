@@ -292,6 +292,12 @@
     --stage-inset-y: calc(16px * var(--ui-scale));
     --left-column: clamp(220px * var(--ui-scale), 20vw, 330px * var(--ui-scale));
     --right-column: clamp(230px * var(--ui-scale), 22vw, 360px * var(--ui-scale));
+    /* The lower-left vitals dock's width (vitals-bar-redesign design D1): a
+       quarter of the viewport, wide enough for the three thin lines to read
+       as a long instrument and for the readout to spread out in one row. A
+       viewport-relative width, so it is not multiplied by the chrome factor.
+       The command-line row docked on the same band edge starts past it. */
+    --vitals-dock-w: 25vw;
     /* The AVG stage's bottom band (design §5.1): the message region and the
        command region share this one fixed height. It scales with the
        viewport height only and never depends on content, frame, or mode. */

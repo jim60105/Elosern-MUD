@@ -346,9 +346,10 @@ function onFoeLineupGone() {
             @leave="onDialogueLeave"
           />
         </template>
-        <!-- The `vitals` anchor (webclient-avg-stage-hud-anchors design D1),
-             directly below the top band: the vitals and conditions islands, then
-             the compact party quickbar. -->
+        <!-- The `vitals` anchor (vitals-bar-redesign design D1): the lower-left
+             dock standing on the band's top edge — the condition icons over the
+             vitals bars — then the interim compact party quickbar
+             (companion-portrait-lineup removes it). -->
         <template #vitals>
         <StatusPanel
           v-if="panelAvailable('status')"

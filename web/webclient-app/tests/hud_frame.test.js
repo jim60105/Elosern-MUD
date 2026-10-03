@@ -391,6 +391,34 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     expect(shellCss).not.toContain("stage-portrait");
   });
 
+  it("docks the vitals anchor on the band's top edge in both geometry copies, rising out of it", () => {
+    // vitals-bar-redesign design D1: the `vitals` anchor is bottom-anchored
+    // on the band's upper edge in the left gutter, never top-anchored, and
+    // bounded below the top band. app-shell.css mirrors HudFrame's offsets.
+    const frame = extractRule(styleBlock("components/HudFrame.vue"), '.elosern-stage [data-anchor="vitals"]');
+    const shell = extractRule(
+      readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8"),
+      '.elosern-root .elosern-stage [data-anchor="vitals"]',
+    );
+    for (const rule of [frame, shell]) {
+      expect(rule, "the vitals anchor rule exists").not.toBe("");
+      expect(rule).toContain("bottom: var(--band-h);");
+      expect(rule).not.toMatch(/\btop:/);
+      expect(rule).toContain("left: calc(16px * var(--ui-scale));");
+      expect(rule).toContain("max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));");
+    }
+    expect(frame).toContain("overflow-y: auto;");
+    expect(frame).toContain("z-index: 4;");
+    // The dock's reveal enters from 12px BELOW its resting place and leaves
+    // the same way (task 1.5): a positive Y travel, scaled by the travel token.
+    const reveal = extractRule(
+      styleBlock("components/StatusPanel.vue"),
+      ".vitals-reveal-enter-from,\n.vitals-reveal-leave-to",
+    );
+    expect(reveal).toContain("transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));");
+    expect(reveal).not.toContain("-1 *");
+  });
+
   it("stands the scene caption on the stage floor between the portrait anchors", () => {
     // The backdrop box already ends at the band's top edge, so the caption
     // clears only the command-line row: no band-sized offset on top.

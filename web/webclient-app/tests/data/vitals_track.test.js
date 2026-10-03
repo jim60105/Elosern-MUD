@@ -7,10 +7,12 @@ import {
   STATUS_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 
-// H2 (webclient-hud-02-status-islands), design D4/D5: the vitals island.
-// Each vital row pairs an icon, a Traditional Chinese label, and the
-// current / maximum numerals (the preserved `status-panel__gauge-value--*`
-// hooks). The SP fill carries a stripe texture so it is distinguishable
+// H2 (webclient-hud-02-status-islands), design D4/D5; vitals-bar-redesign
+// design D2: the dock's gauges. One readout row pairs each gauge's icon with
+// its current / maximum numerals (the preserved `status-panel__gauge-value--*`
+// hooks), named by the gauge's Traditional Chinese label, over three thin
+// trailing-bar lines laid almost edge to edge.
+// The SP fill carries a stripe texture so it is distinguishable
 // without colour; a low vital is marked by both a recolour and an explicit
 // 危險 text marker; the trailing (ghost) bar holds only previously committed
 // ratios and resets on an epoch change.
@@ -37,20 +39,34 @@ describe("VitalsTrack (H2 vitals island)", () => {
     return wrapper;
   }
 
-  it("pairs every gauge with an icon, a label, and explicit current / maximum numerals", () => {
+  it("pairs every gauge's icon and current / maximum numerals in one readout over three thin lines", () => {
     const w = mountTrack();
+    const readout = w.get(".readout");
+    const lines = w.get(".lines");
+    // The readout precedes the lines, and both keep the hp, mp, sp order.
+    expect(readout.element.compareDocumentPosition(lines.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(readout.findAll(".reading").map((r) => r.attributes("aria-label"))).toEqual(["生命", "魔力", "耐力"]);
+    expect(lines.findAll(".vital").map((r) => r.attributes("data-testid"))).toEqual([
+      "status-panel__gauge--hp",
+      "status-panel__gauge--mp",
+      "status-panel__gauge--sp",
+    ]);
+    // No visible gauge label: the label is the reading's accessible name.
+    expect(w.text()).not.toMatch(/生命|魔力|耐力/);
     for (const key of ["hp", "mp", "sp"]) {
-      const gauge = w.get(`[data-testid="status-panel__gauge--${key}"]`);
-      expect(gauge.find("svg.ic").exists()).toBe(true);
-      expect(gauge.text()).toContain({ hp: "生命", mp: "魔力", sp: "耐力" }[key]);
+      const reading = w.get(`[data-testid="status-panel__reading--${key}"]`);
+      expect(reading.find("svg.ic").exists()).toBe(true);
+      expect(reading.attributes("role")).toBe("group");
       const expected = {
         hp: "231 / 405",
         mp: "139 / 420",
         sp: "68 / 68",
       }[key];
-      expect(
-        w.get(`[data-testid="status-panel__gauge-value--${key}"]`).text(),
-      ).toBe(expected);
+      expect(reading.get(`[data-testid="status-panel__gauge-value--${key}"]`).text()).toBe(expected);
+      // Each line is the bare track: no text of its own.
+      const line = w.get(`[data-testid="status-panel__gauge--${key}"]`);
+      expect(line.text()).toBe("");
+      expect(line.find(".track .fill").exists()).toBe(true);
     }
   });
 
@@ -66,7 +82,10 @@ describe("VitalsTrack (H2 vitals island)", () => {
     const w = mountTrack({ status: lowStatus, lowHp: true });
     const hpRow = w.get('[data-testid="status-panel__gauge--hp"]');
     expect(hpRow.classes()).toContain("low");
-    expect(w.get('[data-testid="vitals-low-marker"]').text()).toBe("危險");
+    // The marker joins the hp reading, whose value recolours too.
+    const reading = w.get('[data-testid="status-panel__reading--hp"]');
+    expect(reading.classes()).toContain("low");
+    expect(reading.get('[data-testid="vitals-low-marker"]').text()).toBe("危險");
     // The numerals still carry the value — the marker is reinforcement.
     expect(w.get('[data-testid="status-panel__gauge-value--hp"]').text()).toBe(
       "100 / 405",

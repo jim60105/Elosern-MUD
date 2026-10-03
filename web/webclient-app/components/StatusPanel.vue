@@ -1,13 +1,15 @@
 <script setup>
-// StatusPanel: the `vitals` anchor's island stack. It composes two separately-chromed
-// islands — VitalsTrack and ConditionChips. The preserved
-// `data-testid="status-panel"` root and the three
-// `status-panel__gauge-value--{hp,mp,sp}` hooks (carried by the VitalsTrack
-// rows) keep the combat and transport-mount browser journeys unchanged.
+// StatusPanel: the lower-left vitals dock (vitals-bar-redesign design D4).
+// One chromed surface standing on the band's top edge: the chromeless
+// condition icon row (ConditionChips) over the three compact bars
+// (VitalsTrack). The dock chrome lives on this root only; both children are
+// transparent. The preserved `data-testid="status-panel"` root and the three
+// `status-panel__gauge-value--{hp,mp,sp}` hooks (now the on-track numerals)
+// keep the combat and transport-mount browser journeys unchanged.
 //
 // The reveal (webclient-scene-transitions, design D6): the `v-show` root sits
-// inside a `<Transition>`, so the island fades and slides 12px into place
-// when it shows and back out when it hides. From the hiding commit on it is
+// inside a `<Transition>`, so the dock fades in while rising 12px out of the
+// band's edge and sinks back into it when it hides. From the hiding commit on it is
 // inert (the shell's pre-flush rescue has already moved focus out), and it
 // reaches `display: none` when its exit ends; shown again mid-exit, it is in
 // reach again at once.
@@ -47,6 +49,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 <template>
   <Transition name="vitals-reveal" :css="transitionCss" v-bind="inertWhileLeaving">
     <div v-show="visible" class="island-stack" data-testid="status-panel">
+      <ConditionChips :conditions="status.conditions || []" :revealed="visible" />
       <VitalsTrack
         :status="status"
         :low-hp="lowHp"
@@ -54,34 +57,73 @@ const transitionCss = computed(() => props.motionLevel !== "off");
         :epoch="epoch"
         :display-hp="displayHp"
       />
-      <ConditionChips :conditions="status.conditions || []" />
     </div>
   </Transition>
 </template>
 
 <style scoped>
-/* The stack root is a transparent container; each child island carries
-   the shared island chrome (design D2.1). The anchor's own 9px gap
-   separates the islands. */
+/* The dock (vitals-bar-redesign design D4): not a box but a mounted
+   instrument. Its ground is a smoke of the shared panel ink that is densest
+   at the brass spine and thins out to the right and towards the top, so the
+   art reads through its far edge; the backdrop blur thins with it. A brass
+   lozenge — the band's own ornament — caps a hairline spine that runs down
+   the dock's left side towards the band, and a hairline crown runs from it
+   along the top, fading out before the right end. The content stands to the
+   right of the spine; both children stay transparent. */
 .island-stack {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: calc(12px * var(--ui-scale));
+  gap: calc(6px * var(--ui-scale));
   min-width: 0;
   width: 100%;
+  padding: calc(15px * var(--ui-scale)) calc(18px * var(--ui-scale)) calc(10px * var(--ui-scale)) calc(26px * var(--ui-scale));
   color: var(--paper-100);
   overflow-wrap: anywhere;
-  /* The stack root is a transparent container; each child island carries
-     the shared island chrome (design D2.1). The anchor's own 9px gap
-     separates the islands. `min-height: 0` lets the whole stack compress
-     inside the capped vitals anchor instead of overflowing the budget. */
+  /* `min-height: 0` lets the dock compress inside the capped vitals anchor
+     instead of overflowing the budget. */
   min-height: 0;
   font-family: var(--f-sans);
 }
+.island-stack::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--panel);
+  backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-mask-image:
+    linear-gradient(90deg, #000 0%, #000 52%, rgba(0, 0, 0, 0.55) 78%, transparent 100%),
+    linear-gradient(0deg, #000 0%, #000 62%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, #000 0%, #000 52%, rgba(0, 0, 0, 0.55) 78%, transparent 100%),
+    linear-gradient(0deg, #000 0%, #000 62%, transparent 100%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+.island-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    var(--band-ornament) 0 0 / calc(30px * var(--ui-scale)) calc(11px * var(--ui-scale)) no-repeat,
+    linear-gradient(90deg, var(--band-edge), var(--band-edge-dim) 45%, transparent)
+      calc(30px * var(--ui-scale)) calc(5px * var(--ui-scale)) / calc(72% - 30px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(180deg, var(--band-edge), var(--band-edge-dim) 55%, transparent)
+      calc(15px * var(--ui-scale)) calc(11px * var(--ui-scale)) / 1px calc(100% - 11px * var(--ui-scale)) no-repeat;
+  pointer-events: none;
+}
 
-/* The reveal (webclient-scene-transitions, design D6): the island drops
-   12px into place below the top band as it fades in, and lifts back as it
-   fades out. Without travel (the reduced level) it only fades. */
+/* The reveal (webclient-scene-transitions, design D6; vitals-bar-redesign
+   task 1.5): the bottom-anchored dock rises 12px out of the band's edge as
+   it fades in, and sinks 12px back toward the band as it fades out — the
+   enter/exit easing curves, never an overshoot. Without travel (the reduced
+   level) it only fades. */
 .vitals-reveal-enter-active {
   transition:
     opacity var(--motion-reveal) var(--ease-enter),
@@ -95,6 +137,6 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 .vitals-reveal-enter-from,
 .vitals-reveal-leave-to {
   opacity: 0;
-  transform: translateY(calc(-1 * var(--motion-shift-sm) * var(--motion-travel)));
+  transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));
 }
 </style>
