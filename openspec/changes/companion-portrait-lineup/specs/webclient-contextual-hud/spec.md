@@ -7,15 +7,15 @@
 ## ADDED Requirements
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's frontmost (rightmost) figure, and SHALL render each companion in the committed `party.slots` order as a standing portrait behind it (to its left), forming a depth-staged row that grows leftward from the anchor's natural standing position. Each companion portrait SHALL be resolved from `party.slots[].portrait_ref` through the art panel's `portrait_catalog`, falling back to the display name's initial-letter placeholder — the same truthful fallback the existing stage actor uses — when the reference is null or names no catalog entry. Each figure SHALL follow "Stage actors present the player and the dialogue host with a speaking state" for its rendering and SHALL be non-interactive decorative art: no focusable element, no pointer events.
+The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each companion portrait SHALL resolve from `portrait_ref` through `art.portrait_catalog`, falling back to its display name's initial-letter placeholder when null or unresolved. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
 
-The depth staging SHALL mirror the foe line-up's pattern: each figure behind the front one SHALL be progressively smaller, shifted leftward with a fixed exposed fraction, and lifted slightly to suggest depth. The group SHALL right-align to the anchor's standard standing position so the controlled character occupies the position the player's solo portrait occupies today, and the row SHALL stay within the stage's left half: when the group count grows, the overlap SHALL compress so every figure remains at least partially visible at 1920x1080, 1440x900, and 1280x720. A zero-companion party SHALL render only the controlled character's solo portrait, identical to the solo layout. The `actor-left` anchor SHALL carry `overflow: visible` so the row may extend beyond the anchor's own box, and the vitals dock MAY overlap the lowest strip of every figure's feet.
+Every figure, including the controlled character, SHALL have the same full anchor size and ground line: no progressively smaller scale, lift ramp or depth dimming. Horizontal overlap SHALL compress as necessary to keep the row inside the stage's left half at 1920x1080, 1440x900 and 1280x720, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half. In dialogue the group SHALL compress overlap to clear the choice list without resizing figures. Zero companions SHALL render the existing solo portrait at its standard anchor position. The anchor SHALL have `overflow: visible`; the vitals dock MAY cover the lowest strip of feet, never face or torso.
 
-The lineup SHALL be visible in exploration, combat, and dialogue mode and hidden in creation mode, following the portrait anchor's mode-visibility contract; in dialogue the figures dim as listeners exactly as the player's portrait does. No figure's rendered box SHALL cross the stage's horizontal centre, so the companion line and the foe line-up never intersect.
+The lineup SHALL be visible in exploration, combat and dialogue, hidden in creation. Companions SHALL use the existing StageActor listener dim unless their committed dialogue host identity is the active host speaker in dialogue mode. That speaking companion SHALL temporarily receive z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes. Speaking focus SHALL change only dim and z, never position, lift or size, and SHALL remain correct at off/reduced motion. The controlled figure SHALL retain its existing speaking and beat behavior. No figure box SHALL cross the stage's horizontal centre; the foe lineup is unchanged.
 
 #### Scenario: A two-companion party renders a three-figure group
 - **WHEN** the committed `party` panel carries two resolved-portrait slots at 1920x1080 in exploration mode
-- **THEN** the `actor-left` anchor renders three figures — the player's portrait frontmost at the group's right, two companion portraits behind it going left, each progressively smaller with a slight upward lift — no figure crosses the stage's horizontal centre, and no figure carries a focusable element
+- **THEN** three equally sized figures share a ground line, the player is rightmost with highest baseline z, the companions overlap leftward in party order, no box crosses the horizontal centre and no figure is focusable
 
 #### Scenario: A zero-companion party renders only the player
 - **WHEN** the committed `party` panel is available with an empty `slots` list
@@ -27,14 +27,18 @@ The lineup SHALL be visible in exploration, combat, and dialogue mode and hidden
 
 #### Scenario: The full party fits the left half at every viewport
 - **WHEN** the committed party carries four slots and the shell renders at 1920x1080, 1440x900, and 1280x720
-- **THEN** all five figures render with compressed overlap, every figure stays within the stage's left half, and each figure's face region is at least partially visible
+- **THEN** all five equally sized figures render with compressed horizontal overlap inside the left half; in exploration/combat each face is at least partially visible, and in dialogue a speaking companion is brought above the overlapping listeners without moving its slot
+
+#### Scenario: A speaking companion rises temporarily without moving
+- **WHEN** the committed dialogue host is a companion and the existing speaker signal changes from player to host and back
+- **THEN** that companion changes from dim baseline z to lit highest z and back, preserving its exact geometry; possession swaps, lineup changes and off motion cannot retain stale speaking z
 
 #### Scenario: The companion line and the foe line-up do not overlap
 - **WHEN** the committed mode is combat with two companions and three active foes at 1280x720
 - **THEN** no companion figure's rendered box intersects any foe figure's rendered box
 
 ### Requirement: Possession moves the possessed companion to the group's front
-While the possession banner is available, the possessed companion SHALL stand at the group's front (rightmost position), rendered from that companion's party slot portrait, and the player character SHALL move into the companion row at the position the possessed companion formerly held, rendered as a companion figure. The remaining companions SHALL keep their party-order positions. On release the player character SHALL return to the front and the released companion to its companion position. The swap SHALL follow the committed state through the established epoch transition, with no interpolated guess: the front figure SHALL be resolved by joining the committed `status` panel's `actor.identity` to the committed `party.slots[].identity` — while possessing, the session actor is the possessed NPC, whose identity appears among the owner-keyed party slots the party panel keeps listing — and the figures come from the committed `party.slots`, the committed roster portrait, and the committed possession banner alone. When the join finds no slot — a party the client has not yet learned or a companion dismissed at the same commit — the front SHALL be the stage actor the portrait resolution already yields from the committed actor, and no invented portrait SHALL stand in.
+While the possession banner is available, the possessed companion SHALL occupy the rightmost slot and A SHALL occupy exactly that companion's former slot, without moving the remaining companions. Release SHALL restore both original positions. Join the committed bounded-string `status.actor.identity` (the controlled session actor, not the hybrid resource owner) to decimal-string-normalized integer party identities. Resolve only committed catalog references and the roster portrait. When no party row matches, the controlled front SHALL use a truthful null-art placeholder labelled by the committed banner's host name, never A's portrait or an invented catalog key.
 
 #### Scenario: Possessing a companion moves it to the front
 - **WHEN** the possession banner becomes available for the party's second companion 蕾娜 while the party has two slots
@@ -98,7 +102,7 @@ companion's while the possession banner is available — with the committed part
 actors lined up behind it as "Companion standing portraits line up behind the controlled character in
 the actor-left anchor" defines, each with the truthful placeholder when no image exists, in
 exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
-actor while the committed mode is `dialogue` and the committed `dialogue` panel is available, SHALL carry
+actor while the committed mode is `dialogue`, the committed `dialogue` panel is available, and its host identity does not already join to a committed party or controlled lineup figure, SHALL carry
 the foe line-up that "Foes stand opposite the player during combat" defines while the committed mode is
 `combat` and at least one foe is active, or while a round that ended the fight still plays as "Combat
 beats are choreographed on the stage at the motion level" defines, and SHALL carry no content in every
@@ -176,7 +180,7 @@ introduced into the band this way.
 - **THEN** no place card renders anywhere in the stage's left column, and the `vitals` anchor's box is not offset by any place card's height
 
 #### Scenario: The dialogue host stands opposite the player
-- **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel
+- **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel whose host is not already in the party lineup
 - **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
 
 #### Scenario: The host's face clears the minimap at the smaller viewports
@@ -212,7 +216,7 @@ follows the committed mode at the commit. The matrix SHALL be:
 | minimap island | visible | **hidden** | visible | hidden |
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
 | controlled character and companion standing portraits (`actor-left`) | visible | visible | visible (listeners dimmed while the host speaks; the party line stays) | hidden |
-| dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
+| dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while `dialogue` is available and its host is not already in the committed party/controlled lineup (dimmed while the player speaks) | not rendered |
 | foe line-up (`actor-right`, at most three active foes) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
 | action dock (band command region) | visible | visible | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
@@ -272,7 +276,7 @@ collapse the command line, so leaving creation never reveals an expanded row.
 #### Scenario: Dialogue mode keeps the cockpit visible
 - **WHEN** the committed mode changes from exploration to dialogue with an available `dialogue` panel
 - **THEN** the place card, message window, minimap, the player's front figure, the companion standing portraits, command-line toggle, and log control all
-  remain rendered, the dialogue host's standing portrait is rendered in `actor-right`, the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals island keeps following the same data rule as in
+  remain rendered, the dialogue host's standing portrait renders once (in its existing lineup slot when a party/controlled figure, otherwise in `actor-right`), the command line keeps its expanded or collapsed state, the objective line is hidden with `display:none` because only exploration shows it, the vitals island keeps following the same data rule as in
   exploration, the action dock is out of the accessibility tree and the tab order together with the band's command region from the commit and is `visibility: hidden` once the region's slide ends, while the message window spans the whole band with the host's name plate, and the `#action-dock` element is not removed from the document
 
 #### Scenario: Dialogue backdrop keeps its committed art
@@ -324,3 +328,58 @@ reduced-motion block reaches all of them at once.
 #### Scenario: The map anchor stacks its islands in order
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel, a non-empty `objectives` panel, and title-ballot candidates, and later in combat mode
 - **THEN** exploration renders the place card, the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the place card above the participant frame there with no minimap and no objective line
+
+### Requirement: Stage actors present the player and the dialogue host with a speaking state
+Each standing portrait on the stage SHALL be rendered by one stage-actor component. The controlled
+figure and companions in `actor-left` SHALL follow the companion-lineup rule. The dialogue host SHALL
+render once: when its committed identity joins to a committed party slot or controlled lineup figure,
+its existing lineup StageActor is the host and no duplicate renders in `actor-right`; otherwise the
+host's stage actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry
+named by `dialogue.host.portrait_ref` — the complete image bottom-aligned with contain fit, and a
+grounded silhouette with host identity and authoritative availability when the entry is a placeholder.
+When `portrait_ref` is null or names no catalog entry, the host's stage actor SHALL render the truthful
+placeholder: the display name's initial and display name, never a stock or guessed image. The client
+SHALL NOT construct a catalog key from host identity or any other field. Each foe's stage actor SHALL
+present its committed catalog entry under the same complete-image, grounded-silhouette and
+display-name-placeholder rule.
+
+While committed mode is dialogue and the available host renders, stage actors SHALL carry a speaking
+state. The speaker SHALL be at full brightness and listeners dimmed to 60% through the shared dim token.
+The host SHALL speak except while an `explore.talk_scripted` or `explore.talk_freeform` action submitted
+by the player is in flight — from dispatch until its result is handled and declared presentation revision
+accepted, or until rejection — when the player SHALL speak. Derive this state from dispatch state,
+committed mode and panel availability, never prose. Companions SHALL remain listeners unless their
+identity matches that active host; a speaking companion temporarily receives the highest z without
+moving, then restores baseline z. Outside dialogue, or while its panel is unavailable, the controlled
+figure SHALL remain lit; foes SHALL never be dimmed. No other dialogue behavior changes: the name plate,
+pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts.
+The dim SHALL NOT be the only speaking cue: the name plate names the host and each actor exposes its
+speaking data attribute. Actors remain decorative, with no focusable element; motion owns transitions.
+
+#### Scenario: The host portrait comes from the art catalog
+- **WHEN** a non-party host's dialogue panel names ref `"41"` and its catalog entry carries an image and face rectangle
+- **THEN** the actor-right host renders that complete image bottom-aligned with contain fit and requests no other image source
+
+#### Scenario: A pending or missing portrait shows the truthful placeholder
+- **WHEN** the host's catalog entry is pending, and later a host named `葛里安‧衛登` has a null ref
+- **THEN** the first actor shows its grounded silhouette, identity and pending state; the second shows initial `葛`, identity and missing state, with neither inventing an image
+
+#### Scenario: The host speaks and the player is dimmed
+- **WHEN** a conversation opens and its greeting commits
+- **THEN** the host renders lit with `data-speaking="true"` and the player dimmed with `data-speaking="false"`; a companion host appears only in its raised existing slot
+
+#### Scenario: The player is lit until the reply commits
+- **WHEN** the player's scripted pick remains in flight until its reply revision is accepted
+- **THEN** the player is lit and the host dim until that revision, then the host is lit and the player dim again
+
+#### Scenario: A rejected choice returns the light to the host
+- **WHEN** the player's freeform speech is rejected
+- **THEN** rejection handling restores the host's light and the player's dim
+
+#### Scenario: Nothing is dimmed outside dialogue
+- **WHEN** mode is exploration and later combat with two active foes
+- **THEN** the controlled figure is lit in both and both foes are lit in combat; companions retain their listener dim, and actor-right carries no exploration actor
+
+#### Scenario: A companion host is not duplicated on the opposite anchor
+- **WHEN** dialogue host identity joins to a committed party or controlled lineup figure
+- **THEN** that identity has exactly one standing figure in actor-left, actor-right has no duplicate host, and the name plate, pagination and focus retain their existing behavior

@@ -27,41 +27,43 @@ A pure JS helper (`companion-lineup.js`) computes per-slot geometry: scale, x-of
 
 **Alternative:** Inline the geometry in the Vue component. Rejected — the pure-function testability of `foe-lineup.js` is proven; copy the pattern.
 
-### D2 — The controlled character is always slot index 0 (rightmost, largest, highest z)
+### D2 — The controlled character is slot index 0 (rightmost, highest baseline z)
 
-In the geometry helper, slot 0 = controlled character; slots 1..N = companions in party order. During possession, slot 0 becomes the possessed NPC; the player character A moves to the companion's slot position. The AppClient builds the slot list: `[controlledPortrait, ...companions.filter(c => c.identity !== controlledIdentity)]`. When not possessing, controlledPortrait = the roster's current portrait. When possessing, controlledPortrait = the possessed NPC's portrait (resolved from `party.slots[].portrait_ref` by identity join), and A's portrait becomes a companion slot. This logic lives in AppClient's computed properties.
+Slot 0 is the controlled character; slots 1..N follow party order. AppClient's pure `companionFigures()` mapping exchanges slot 0 and exactly the possessed companion's former slot, without filtering/re-appending or disturbing other companions. It joins the committed `status.actor.identity` to party rows only while the possession banner is available, resolving every portrait via the catalog.
+
+**Live-contract correction:** the old status presenter emitted the owner's identity while possessing, contrary to the proposed join. `status.actor.identity` now always addresses `context.actor.pk`. Its existing bounded-string wire type is mandatory in the UMD status validator, status read model and client fixtures; changing it to an integer would change a separate panel schema. Party identities remain safe integers, so the join compares `String(row.identity)` to the string status identity. Status name/resources/conditions and every other hybrid field remain owner-keyed verbatim. The possession-presentation delta explicitly records this exception.
 
 ### D3 — Party v2 portrait_ref: server presenter resolves the NPC's default gallery card
 
-The party presenter calls `record_for(ArtSubject(kind=SubjectKind.npc, key=str(npc.id)), create=False)`, reads `record.db.default_image_id`, and emits the same catalog ref key the art panel's `portrait_catalog_for()` uses. The ref is opaque to the client; resolution through `portrait_catalog` is unchanged. The validator at v2 accepts `portrait_ref` as either null or a bounded string (same bound as the exploration vocabulary uses for portrait_ref on the dialogue host). The UMD and Vue mirrors update to v2 in lockstep.
+The actual art API is `world.art.subjects.character_subject_for(npc)`; there is no `SubjectKind.npc`. Resolve that canonical named-character policy, call `record_for(subject, create=False)`, and confirm the default card belongs to `cards_for(record)`. Emit `portrait_catalog_key(npc.pk)`, or null for absent/malformed policy, record or default card. Gallery reads never create records or enqueue generation; catalog resolution retains its age gate. The v2 validator accepts null or 1–32 ASCII decimal digits (`[0-9]+`), matching the combat-ref bound. UMD validation is shared by Vue; no second mirror is introduced.
 
 ### D4 — Actor-left anchor: overflow visible when companions present
 
 `HudFrame.vue` already sets `overflow: visible` on actor-right in combat. The companion lineup extends leftward beyond the actor-left anchor box, so the same rule applies: the anchor is `overflow: visible` unconditionally (or gated by a data-attribute prop). Simpler: set `overflow: visible` on actor-left unconditionally — a solo portrait fits inside the anchor anyway, so no visual change.
 
-### D5 — Lineup scales: overlap compresses as group count grows
+### D5 — Equal-size horizontal party stance; compress overlap, never scale
 
-Rough table (mirroring FOE_SCALES but for the left side):
-```
-count 1: [1.0]                              (solo)
-count 2: [0.95, 0.82]                       (player + 1 companion)
-count 3: [0.90, 0.78, 0.68]                 (player + 2 companions)
-count 4: [0.85, 0.74, 0.64, 0.56]           (player + 3 companions)
-count 5: [0.80, 0.70, 0.62, 0.55, 0.48]     (player + 4 companions)
-```
-Exposed fraction: 0.42 (slightly less than FOE_EXPOSED=0.46, since the group has up to 5 members). Lift: 0.03 per step behind.
+The user's revised directive supersedes the original depth-shrinking table: **every figure, including the controlled character, is scale 1 with lift 0**, sharing the portrait anchor's full height and ground line. No rear-depth brightness ramp is used. Baseline z is count minus slot index. Horizontal exposed fractions for counts 1–5 are 0, .42, .30, .24, .22. These produce a maximum span of 1.88 anchor widths; the real anchor width is two thirds of `--actor-h`, not the original rough estimate. A multi-figure row translates right only enough to preserve a 16px scaled left gutter, remaining in the stage's left half. Solo remains at its existing anchor without translation.
+
+In dialogue, the equal-size row compresses its horizontal step to the room left of the real choice column (`max(30vw, 50vw - 280px * --ui-scale)`), keeping scaled 16px gutters on both sides. The whole row is aligned to the left gutter. No measurement observer, size change or foe-lineup edit is needed. The pure helper optionally accepts a maximum span for deterministic geometry assertions. Rear fallback initials sit in each exposed shoulder rather than being hidden beneath the next portrait; no invented image or URL is supplied.
 
 ### D6 — The party presenter resolves the bound owner while possessing
 
-`present_party()` currently keys off the session actor: `live_companions(actor)` reads `player.db.party`. While possessing, `status.actor.identity` is the possessed NPC's identity and the NPC has no `db.party` binding, so the naive panel would present an empty party at exactly the moment the lineup needs `party.slots` for the front figure. The presenter resolves the OWNER first: when the actor is a character with a `party_member` back-reference to a live player, that player is the party root, and companion bond stages (`relations.stage_for`) stay owner-keyed as they are today. The possessed companion therefore remains listed among the slots and the client can join `status.actor.identity` to `party.slots[].identity`. A possessed NPC with no live `party_member` owner (never happens through gameplay, so it is a tamper/edge path) takes the shared unavailable form — an available empty list would lie about the party. This is presenter plumbing, not a schema change: the six-key row contract is untouched.
+The NPC has no `db.party` binding. Resolve the owner through existing `bound_owner_of()` (live player plus bidirectional party membership) before `live_companions()` and owner-keyed `relations.stage_for()`. The controlled companion remains in the party rows and can join the corrected status identity. No live owner raises the registry-unavailable error, never an available empty party. The six-key row contract is untouched.
 
 ### D7 — Party companions join the exploration portrait catalog; eviction degrades to the placeholder
 
-`portrait_ref` only paints when the same committed snapshot's `art.portrait_catalog` carries the key. The exploration catalog today emits dialogue hosts and explicit named-policy characters from `location.contents`; companions with neither fall out, and the party slot would resolve to nothing while its ref is non-null. The exploration catalog's membership therefore also includes the player's live companions (the art-panel delta). The 32-entry catalog cap can still evict a companion behind dialogue hosts; that is the dialogue-host precedent — the client's initial-letter placeholder covers any ref that does not resolve, and no snapshot ever shows a half-resolved portrait.
+The exploration art view appends the owner's live, co-located companions in party order after existing dialogue hosts/named-policy entries, deduplicated, including the controlled companion while possessing. Companions without an eligible policy still receive truthful unavailable catalog entries. The 32-entry cap can evict a companion; an unresolved ref falls back to its initial rather than invented art.
+
+### D8 — A speaking companion receives temporary paint-only focus
+
+The user's AVG directive applies the existing `StageActor` speaking dim (`--actor-dim`) to companions: they are listeners unless the committed dialogue host identity equals their party identity and the existing `dialogueSpeaker` signal is `"host"` in dialogue mode. That companion is lit and temporarily gets z 6, above every baseline slot. Speaker changes, dialogue exit, possession swaps and count changes derive fresh baseline z immediately; no remembered focus can leak. Focus changes neither x, scale nor lift. The controlled figure keeps its existing player speaking-dim and beat behavior. No prose inference or combat-speaking state is added; motion off/reduced motion still applies correct z immediately.
+
+**Optical polish:** a party/controlled dialogue host already has a standing figure in the lineup, so suppress only its duplicate actor-right host, by committed identity join. Non-party hosts retain their existing actor-right portrait/motion; name plate, pagination, focus and keyboard paths are untouched. The existing contextual-HUD stage-actor speaking requirement is explicitly MODIFIED in the delta to cover this exception and companion listener dim outside dialogue.
 
 ## Risks / Trade-offs
 
-- **[Five figures crowd the left half]** At 1280x720 the left half is ~640px; 5 figures with 42% exposure is tight. → The scales table keeps the farthest figure at 48% anchor height; the total span is about 2.2 anchor-widths, which at 720 is ~280px — fits within 640px.
+- **[Five equal-size figures crowd dialogue]** Choice clearance can require strong overlap, especially at 1440x900. → Compress horizontal exposure only; temporarily lift the active companion so the speaking face is unobscured. Never reduce a rear figure's size.
 - **[Possession swap looks abrupt]** The epoch transition re-paints the entire lineup. → The lineup is keyed by its slot list; Vue's `<Transition>` handles crossfade per slot. At `off` motion level, the swap is instant — acceptable, matching the foe lineup's behavior on combat exit.
 - **[No combat gestures on companions]** The gesture props are only forwarded to the controlled character's StageActor; companions get `gesture: null`. → Companions don't act in combat. The controlled character (slot 0) gets gestures via `beatStage`.
-- **[Party portrait_ref latency]** The art panel's portrait_catalog may not contain the companion's ref on the very first snapshot. → The catalog is populated in the same push as the party panel; the catalog includes every ref any panel emits.
+- **[Missing or cap-evicted art]** A catalog key need not resolve in every snapshot. → Use the shared truthful initial-letter placeholder, retaining authoritative pending/unavailable entries when present.
