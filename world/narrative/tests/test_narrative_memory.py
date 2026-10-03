@@ -41,6 +41,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         self.observer_npc = create_object(NPC, key="ObserverNPC", location=self.room)
         self.uninformed_npc = create_object(NPC, key="UninformedNPC", location=self.room)
 
+    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
     def test_record_memory_basic_and_immutability(self):
         """Owner cognition preserves immutable content and provenance."""
         record, revision, created = record_memory(
@@ -80,6 +81,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             revision.delete()
 
+    @covers_requirement("narrative-memory::revision-history-remains-recoverable")
     def test_revisions_and_supersession(self):
         """Scenario: Supersession changes normal results.
 
@@ -145,6 +147,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         inactive_ids = [v.id for v in inactive_only_views]
         self.assertNotIn(rec1.id, inactive_ids)
 
+    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
     def test_permission_and_privacy_boundaries(self):
         """Access distinguishes knowledge scopes and excludes private authoring or other owners' private cognition."""
         owner = str(self.observer_npc.pk)
@@ -203,6 +206,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         auth_mems = get_owner_memories(owner_id=owner, requester_id=owner)
         self.assertFalse(any("Private session notes" in str(m.content) for m in auth_mems))
 
+    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
     def test_scenario_only_an_observer_learns_protection(self):
         """Scenario: Only an observer learns protection.
 
@@ -254,6 +258,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         )
         self.assertEqual(len(uninformed_memories), 0)
 
+    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
     def test_scenario_claim_is_not_fact(self):
         """Scenario: Claim is not fact.
 
@@ -293,6 +298,7 @@ class NarrativeOwnerMemoryTests(EvenniaTestCase):
         from typeclasses.characters import Character
         self.assertFalse(Character.objects.filter(db_key__icontains="dragon").exists())
 
+    @covers_requirement("narrative-memory::memory-projection-is-idempotent-and-restart-safe")
     def test_scenario_restart_after_failed_projection(self):
         """Scenario: Restart after failed projection.
 
