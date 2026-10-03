@@ -29,10 +29,10 @@ REQUIRED_SURFACES = (
 
 
 def _party_panel(count: int) -> dict:
-    """A committed party v1 panel with ``count`` slots (no bound portraits)."""
+    """A committed party v2 panel with ``count`` slots (no bound portraits)."""
     names = ("蕾娜", "幽", "艾德蒙", "雪莉")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "slots": [
             {
@@ -365,7 +365,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     },
                     mode="exploration",
                 )
-                page.wait_for_selector('[data-testid="party-strip"]', timeout=15000)
+                page.wait_for_selector('[data-testid="companion-lineup"]', timeout=15000)
                 page.wait_for_selector('[data-testid="objective-tracker"]', timeout=15000)
                 overflow = page.locator('[data-testid="status-panel__condition-overflow"]')
                 self.assertEqual(overflow.count(), 1, f"the +N overflow chip renders at {viewport}")
@@ -396,7 +396,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                         const el = document.querySelector(sel);
                         return el ? { scroll: el.scrollHeight, client: el.clientHeight } : null;
                       };
-                      const vitalsIslands = ['[data-testid="status-panel"]', '[data-testid="party-strip"]'];
+                      const vitalsIslands = ['[data-testid="status-panel"]'];
                       const mapIslands = ['[data-testid="place-card"]', '[data-testid="local-map"]', '[data-testid="objective-tracker"]'];
                       const blockers = {
                         band: rect('[data-testid="stage-band"]'),
@@ -532,21 +532,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                         header: r('[data-testid="topbar"]'),
                         actor: r('[data-anchor="actor-left"]'),
                         cmd: r('[data-anchor="command-line"]'),
-                        party: r('[data-testid="party-strip"]'),
                         width: window.innerWidth,
                       };
                     }"""
                 )
                 anchor, dock, band = geo["anchor"], geo["dock"], geo["band"]
                 # Standing on the band's top edge, in the left gutter, 25vw wide
-                # (the interim party quickbar, when the session has a party,
-                # stands between the bars and the band until
-                # companion-portrait-lineup removes it).
                 self.assertAlmostEqual(anchor["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
-                floor = geo["party"]["top"] if geo["party"] else band["top"]
-                self.assertLessEqual(dock["bottom"], floor + 1, f"{viewport}: {geo}")
-                if not geo["party"]:
-                    self.assertAlmostEqual(dock["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
+                self.assertAlmostEqual(dock["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
                 self.assertAlmostEqual(dock["left"], 16, delta=1.0)
                 self.assertAlmostEqual(dock["right"] - dock["left"], geo["width"] * 0.25, delta=1.5)
                 # Not top-anchored: the dock's top is far below the top band.

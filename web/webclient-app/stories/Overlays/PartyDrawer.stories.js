@@ -1,6 +1,7 @@
 import { h } from "vue";
 import HudDrawer from "../../components/HudDrawer.vue";
 import PartyDrawer from "../../components/PartyDrawer.vue";
+import { COMPANION_PORTRAIT_CATALOG } from "../fixtures/party_panels.js";
 import {
   PARTY_PANEL_EMPTY_SAMPLE,
   PARTY_PANEL_SAMPLE,
@@ -45,9 +46,11 @@ function renderDrawer(args) {
                 h(PartyDrawer, {
                   slots,
                   combatParticipants: args.combatParticipants || [],
-                  artPanel: args.artPanel || null,
+                  artPanel: args.artPanel ? { ...args.artPanel, portrait_catalog: { ...args.artPanel.portrait_catalog, ...COMPANION_PORTRAIT_CATALOG } } : null,
                   interactTargets: args.interactTargets || [],
                   mode: args.mode || "exploration",
+                  affordances: args.affordances || [],
+                  releaseAffordance: args.releaseAffordance || null,
                   onAction: () => {},
                   onClose: () => {},
                 }),

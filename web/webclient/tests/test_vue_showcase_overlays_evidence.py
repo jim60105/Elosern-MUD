@@ -54,7 +54,6 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/OverlayHost",
     "Overlays/ObjectiveTracker",
     "Overlays/PartyDrawer",
-    "Overlays/PartyStrip",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -81,9 +80,6 @@ OVERLAYS_STORY_IDS = {
     "overlays-partydrawer--empty-party",
     "overlays-partydrawer--full-party",
     "overlays-partydrawer--combat-mode",
-    "overlays-partystrip--two-companions",
-    "overlays-partystrip--empty-party",
-    "overlays-partystrip--full-party",
     "overlays-objectivetracker--active-objectives",
     "overlays-objectivetracker--single-completed",
     "overlays-objectivetracker--progress-counter",
@@ -337,7 +333,7 @@ class VueShowcaseOverlaysEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
-                "ObjectiveTracker", "PartyDrawer", "PartyStrip",
+                "ObjectiveTracker", "PartyDrawer",
             )},
         )
 

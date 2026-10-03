@@ -192,7 +192,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Overlays/HelpOverlay",
      "Overlays/OverlayHost",
      "Overlays/CreationOverlay",
-     "Overlays/PartyStrip",
+     "Core/CompanionLineup",
      "Overlays/PartyDrawer",
      "Overlays/ObjectiveTracker",
      "Core/CommandLine",
@@ -309,8 +309,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
   it("documents the party quickbar and drawer are now backed by the party read model, so the party/companion deferred patterns are retired", () => {
     // webclient-align-05-party-hud: the party surfaces are NO LONGER deferred —
     // the `party` read model (webclient-party-panel) backs the four-slot party listing.
-    // `Overlays/PartyStrip` and `Overlays/PartyDrawer` render that listing.
-    expect(manifest.required).toContain("Overlays/PartyStrip");
+    // The standing lineup and party drawer render the committed listing.
+    expect(manifest.required).toContain("Core/CompanionLineup");
     expect(manifest.required).toContain("Overlays/PartyDrawer");
   });
 

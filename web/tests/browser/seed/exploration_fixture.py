@@ -76,6 +76,16 @@ def _exploration_fixture(character) -> None:
 
     apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
 
+    if os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1":
+        from world.rules.party import join_party
+
+        for index in range(4):
+            npc = create_object(LLMNPC, key=f"測試同行{index}", location=south_gate)
+            npc.race = "human"
+            npc.apply_race_baseline()
+            npc.db.age = npc.db.apparent_age = 30
+            join_party(npc, character)
+
     bard = create_object(LLMNPC, key=SYNTH_BARD_KEY if synth else "吟遊詩人", location=south_gate)
     bard.components.add(
         ScriptedDialogue.create(

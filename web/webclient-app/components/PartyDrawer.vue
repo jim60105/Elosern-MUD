@@ -250,7 +250,7 @@ function onInviteCurrentNpc() {
     >
       <div class="av" data-testid="party-drawer__avatar">
         <img
-          v-if="portraitEntry(slot)"
+          v-if="portraitEntry(slot)?.url"
           class="av-img"
           :src="portraitEntry(slot).url"
           :alt="slot.display_name"

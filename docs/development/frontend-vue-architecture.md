@@ -65,6 +65,35 @@ Vue 應用程式保持相同的穩定公開契約介面：`window.Elosern.Protoc
 - **穩定非雜湊的進入點名稱** → Evennia 自身的 `/static` 服務無需特殊處理；若部署環境後續置於長期快取 `/static` 的反向代理之後，請為 `app/dist/index.js` 與 `index.css` 設定 `no-cache`（或較短的 TTL），或加入建置版本查詢字串，於 C4（正式切換）時再次檢視。
 - **持久化 `.static` 磁碟卷殘留過期雜湊資產** → 進入點的 `collectstatic`（未帶 `--clear`）會留下被取代的 `assets/*`；此為無害現象（進入點會引用目前的雜湊）。在確認多副本行為之前，切勿加入 `--clear`。
 
+## Companion portrait lineup
+
+`CompanionLineup` replaces the former party quickbar. The party drawer remains
+reachable through the character-status drawer. Party schema v2 retains its six
+row keys; `portrait_ref` is null or 1–32 ASCII decimal digits, resolved only
+through the committed art catalog. Missing/default-less/cap-evicted art uses the
+shared initial-letter placeholder. Presenters never create gallery records or
+request generation.
+
+The controlled figure is rightmost; party order extends leftward with equal
+full-size figures on one ground line. Only horizontal overlap compresses,
+including to clear dialogue choices. Possession exchanges the controlled
+companion and the roster character's exact positions. `status.actor.identity`
+is the controlled session actor's bounded **string** identity (also during
+possession); party identities remain safe integers, normalized to decimal
+strings for this join. Other status fields retain their owner-keyed hybrid
+contract.
+
+Companions reuse StageActor's listener dim. A companion whose identity matches
+the committed dialogue host while the existing speaker signal is `host`
+temporarily receives the highest paint z and full brightness. Speaker changes,
+dialogue exit, possession and count changes restore baseline z without moving
+the figure. Only the controlled figure receives combat beats. Motion off and
+reduced-motion preserve these state changes without animation. A dialogue host
+already present in the committed party/controlled lineup is not duplicated in
+actor-right; non-party hosts retain their existing portrait and motion, with
+name plate, pagination and focus unchanged. The foe lineup,
+vitals dock and place-card column are unchanged.
+
 ## Store 切片契約（固定供 C1 與 Wave B 使用）
 
 Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相同的介面：

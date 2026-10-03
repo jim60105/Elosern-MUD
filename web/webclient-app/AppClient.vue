@@ -39,7 +39,9 @@ import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
 import ToastQueue from "./components/ToastQueue.vue";
-import PartyStrip from "./components/PartyStrip.vue";
+import CompanionLineup from "./components/CompanionLineup.vue";
+import { companionFigures } from "./components/companion-lineup.js";
+import { portraitFor } from "./components/party-helpers.js";
 import PartyDrawer from "./components/PartyDrawer.vue";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
@@ -95,6 +97,22 @@ const hostPortrait = computed(() => {
   const key = dialogueVM.value?.host.portraitRef;
   return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
 });
+const hostAlreadyInLineup = computed(() =>
+  !!dialogueVM.value && companionLineupSlots.value.some((slot) => String(slot.identity) === String(dialogueVM.value.host.identity)),
+);
+const isControllingCompanion = computed(() => !!possessionBanner.value?.available);
+const companionLineupSlots = computed(() => companionFigures({
+  player: {
+    identity: currentCharacter.value?.identity,
+    portrait: currentPortrait.value,
+    displayName: currentCharacter.value?.name || panel("status")?.actor?.name || "",
+  },
+  companions: store.partyAvailable ? store.partySlots : [],
+  actorIdentity: panel("status")?.actor?.identity,
+  possessing: isControllingCompanion.value,
+  controlledName: possessionBanner.value?.host_name || "",
+  artPanel: panel("art"), portraitFor,
+}));
 // The player's displayed hit points while a combat round plays
 // (webclient-combat-beat-queue D7): the published playback value keyed by the
 // committed actor identity, else null, so the vitals island reads the
@@ -268,11 +286,11 @@ function onFoeLineupGone() {
              band's top edge in the `actor-left` anchor, outside creation,
              dimmed while the dialogue host speaks. -->
         <template #actor-left>
-          <StageActor
+          <CompanionLineup
             v-if="store.view.mode !== 'creation'"
-            side="left"
-            :portrait="currentPortrait"
-            :name="currentCharacter?.name || ''"
+            :slots="companionLineupSlots"
+            :compact="inDialogue"
+            :speaking-identity="inDialogue && dialogueVM && store.view.dialogueSpeaker === 'host' ? panel('dialogue')?.host?.identity : null"
             :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
             :motion-level="store.view.motionLevel"
             :gesture="playerGesture?.gesture ?? null"
@@ -290,7 +308,7 @@ function onFoeLineupGone() {
                host is StageActor's own crossfade. -->
           <Transition name="actor-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving">
             <StageActor
-              v-if="inDialogue && dialogueVM"
+              v-if="inDialogue && dialogueVM && !hostAlreadyInLineup"
               :key="dialogueVM.host.identity"
               side="right"
               :portrait="hostPortrait"
@@ -346,10 +364,7 @@ function onFoeLineupGone() {
             @leave="onDialogueLeave"
           />
         </template>
-        <!-- The `vitals` anchor (vitals-bar-redesign design D1): the lower-left
-             dock standing on the band's top edge — the condition icons over the
-             vitals bars — then the interim compact party quickbar
-             (companion-portrait-lineup removes it). -->
+        <!-- The lower-left dock carries conditions and vitals only. -->
         <template #vitals>
         <StatusPanel
           v-if="panelAvailable('status')"
@@ -360,13 +375,6 @@ function onFoeLineupGone() {
           :revision="store.view.revision"
           :epoch="store.view.epoch"
           :display-hp="playerDisplayHp"
-        />
-        <PartyStrip
-          v-if="store.partyAvailable && store.view.mode !== 'creation'"
-          :slots="store.partySlots"
-          :combat-participants="store.combatParticipants"
-          :art-panel="panel('art')"
-          @open-drawer="() => store.openHudDrawer('party')"
         />
       </template>
       <!-- The `map` anchor (webclient-avg-stage-hud-anchors design D1/D4),

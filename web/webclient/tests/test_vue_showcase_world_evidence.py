@@ -155,7 +155,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Feedback/ToastQueue",
     "Overlays/ObjectiveTracker",
     "Overlays/PartyDrawer",
-    "Overlays/PartyStrip",
+    "Core/CompanionLineup",
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
     # desktop redesign, World/TitleBallotMenu from the dock-workspace

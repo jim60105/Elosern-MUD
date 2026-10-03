@@ -6,6 +6,7 @@ import { useElosernStore } from "../../stores/elosern.js";
 import { createWindowBridge } from "../../bridge.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import * as protocolFixtures from "../../tests/store/protocol_fixtures.js";
+import { COMPANION_PORTRAIT_CATALOG, PARTY_PANEL_FULL_SAMPLE } from "../fixtures/party_panels.js";
 import {
   ART_PANEL_PENDING_SAMPLE,
   ART_PANEL_SAMPLE,
@@ -207,13 +208,17 @@ const renderPlayer = (args) => ({
             ],
           } : undefined),
           // The populated island stacks (webclient-avg-stage-hud-anchors):
-          // a two-slot party under the vitals and three tracked objectives,
+          // standing companions and three tracked objectives,
           // so the `map` anchor shows the objective line with `+2`.
           ...(args.populated || args.combat ? {
-            // party v1 carries no bound portrait (`portrait_ref` null).
-            party: { ...PARTY_PANEL_SAMPLE, slots: PARTY_PANEL_SAMPLE.slots.map((s) => ({ ...s, portrait_ref: null })) },
+            party: {
+              ...PARTY_PANEL_FULL_SAMPLE,
+              slots: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, args.companions ?? 2).map((s) => ({ ...s, portrait_ref: args.placeholders ? null : String(s.identity) })),
+            },
             objectives: OBJECTIVES_PANEL_SAMPLE,
-            art: args.combat ? combatArt(ART_PANEL_SAMPLE) : ART_PANEL_SAMPLE,
+            art: args.combat ? combatArt(ART_PANEL_SAMPLE) : {
+              ...ART_PANEL_SAMPLE, portrait_catalog: { ...ART_PANEL_SAMPLE.portrait_catalog, ...COMPANION_PORTRAIT_CATALOG },
+            },
           } : {}),
           exploration: protocolFixtures.explorationPanel({
             // Exits labelled by direction, as the server labels them: the
@@ -282,6 +287,7 @@ const renderPlayer = (args) => ({
             // A local scene image for layout review (optional arg).
             ...(args.sceneUrl ? { scene: { ...ART_PANEL_SAMPLE.scene, url: args.sceneUrl } } : {}),
             portrait_catalog: {
+              ...(args.populated ? COMPANION_PORTRAIT_CATALOG : {}),
               "7": args.dialogue === "pending" ? {
                 subject_key: "npc_7", status: "pending", url: null, aspect_ratio: null,
                 alt: "店長的肖像", placeholder: { kind: "missing", label: "肖像生成中" },
@@ -309,6 +315,13 @@ const renderPlayer = (args) => ({
           } } : {}),
         },
       });
+      if (args.companionSpeaks) {
+        snapshot.panels.dialogue.host = { identity: 102, display_name: PARTY_PANEL_FULL_SAMPLE.slots[1].display_name, portrait_ref: "102" };
+      }
+      if (args.possession) {
+        snapshot.panels.status.actor.identity = "102";
+        snapshot.panels.possession_banner = { schema_version: 1, available: true, host_name: PARTY_PANEL_FULL_SAMPLE.slots[1].display_name, since_tick: 0 };
+      }
       if (args.participantPolish) {
         const participants = [...PARTY_PARTICIPANTS, ...foeParticipants(4, {
           31: { display_name: "灰袍盜賊與北境巡防隊長的漫長稱號" },
@@ -514,9 +527,15 @@ export const DialogueHostMissing = { render: renderPlayer, args: { dialogue: "mi
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
 export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
 // The island anchors populated (webclient-avg-stage-hud-anchors): vitals,
-// a harmful condition, and the compact party at the top-left; the place
+// a harmful condition, and the standing party at the left; the place
 // card, the minimap, and the one-line objective at the top-right.
 export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
+export const PopulatedFullParty = { render: renderPlayer, args: { populated: true, companions: 4 } };
+export const PopulatedSolo = { render: renderPlayer, args: { populated: true, companions: 0 } };
+export const PopulatedPossession = { render: renderPlayer, args: { populated: true, companions: 4, possession: true } };
+export const PopulatedPlaceholders = { render: renderPlayer, args: { populated: true, companions: 4, placeholders: true } };
+export const DialogueFullParty = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true } };
+export const DialogueCompanionSpeaks = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true, companionSpeaks: true } };
 // Combat: the minimap and the objective line are hidden, and the participant
 // frame takes the `map` anchor.
 export const CombatHud = { render: renderPlayer, args: { combat: true } };

@@ -418,14 +418,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-contextual-hud::the-party-quickbar-island-presents-the-committed-party-only",
     )
-    def test_party_strip_node_suite_passes(self):
+    def test_companion_lineup_node_suite_passes(self):
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/data/party_strip.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/core/companion_lineup.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -435,7 +435,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "party-strip Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "companion-lineup Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

@@ -556,20 +556,16 @@ describe("store view slices", () => {
     expect(store.partySlots).toEqual([]);
 
     // Commit party panel with slots
-    const partyData = {
-      schema_version: 1,
-      available: true,
-      slots: [
-        {
-          identity: 101,
-          display_name: "蕾娜",
-          portrait_ref: null,
-          hp_current: 180,
-          hp_maximum: 220,
-          bond_stage: "親睦",
-        },
-      ],
-    };
+    const partyData = { schema_version: 2, available: true, slots: [
+      {
+        identity: 101,
+        display_name: "蕾娜",
+        portrait_ref: null,
+        hp_current: 180,
+        hp_maximum: 220,
+        bond_stage: "親睦",
+      },
+    ] };
     const r1 = store.receive(
       1,
       "ui_update",
@@ -591,7 +587,7 @@ describe("store view slices", () => {
           revision: 3,
           panels: {
             party: {
-              schema_version: 1,
+              schema_version: 2,
               available: false,
               reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
             },
