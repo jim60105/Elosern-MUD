@@ -1,10 +1,10 @@
 <script setup>
 // AppShell (H1 contextual HUD, webclient-hud-01-shell-and-scene): the
 // full-bleed cinematic stage (design D1). `HudFrame` is a
-// `position:absolute; overflow:clip` stage with named anchors: the place
-// card (`place`, holding PlaceCard — location and world time,
-// webclient-avg-place-card-top-bar design D3), the island anchors `vitals`
-// and `map` (webclient-avg-stage-hud-anchors design D1), the portrait
+// `position:absolute; overflow:clip` stage with named anchors: the island
+// anchors `vitals` and `map` (webclient-avg-stage-hud-anchors design D1;
+// `map` opens with PlaceCard — location and world time,
+// place-card-relocation design D2), the portrait
 // anchors (`actor-left`,
 // `actor-right`), the dialogue `choices` anchor (webclient-dialogue-choices-
 // overlay D6), the fixed-height bottom band's message and command
@@ -289,7 +289,7 @@ function onWindowKeydown(event) {
 // so the rescue must happen in the pre-update phase of the watcher (the
 // prop is already the new mode; the DOM still shows the old one).
 const HIDDEN_BY_MODE = {
-  creation: "[data-anchor='place'], [data-anchor='band-message'], [data-anchor='vitals'], [data-anchor='map'], [data-anchor='command-line']",
+  creation: "[data-anchor='band-message'], [data-anchor='vitals'], [data-anchor='map'], [data-anchor='command-line']",
   combat: ".local-map",
   exploration: "",
   // webclient-dialogue-stage-actors (design D4): dialogue collapses the
@@ -422,13 +422,11 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       <template #backdrop>
         <slot name="backdrop" />
       </template>
-      <template #place>
-        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" :motion-level="props.motionLevel" />
-      </template>
       <template #vitals>
         <slot name="vitals" />
       </template>
       <template #map>
+        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" :motion-level="props.motionLevel" />
         <slot name="map" />
       </template>
       <template #actor-left>

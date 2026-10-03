@@ -20,7 +20,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def _stage_anchor_rects(self, page):
         return page.evaluate(
             """() => {
-              const ids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-choices", "anchor-command-line"];
+              const ids = ["anchor-vitals", "anchor-map", "anchor-band-message", "anchor-band-command", "anchor-choices", "anchor-command-line"];
               return ids.map((id) => {
                 const el = document.querySelector('[data-testid="' + id + '"]');
                 if (!el) return { id, rect: null };

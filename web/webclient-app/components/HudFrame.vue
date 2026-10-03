@@ -2,12 +2,11 @@
 // HudFrame (H1, webclient-hud-01-shell-and-scene; AVG stage shell,
 // webclient-avg-stage-shell design D1/D3/D4/D7): the full-bleed cinematic
 // stage. A `position:absolute; overflow:clip` root with named anchors:
-// - the `place` anchor (webclient-avg-place-card-top-bar design D4): the
-//   place card at the stage box's top-left, at the fixed `--place-h`;
 // - the island anchors named by their content
-//   (webclient-avg-stage-hud-anchors design D1): `vitals` below the place
-//   card (the vitals, conditions, and compact party islands) and `map` at
-//   the top-right (the minimap, the one-line objective, the combat
+//   (webclient-avg-stage-hud-anchors design D1): `vitals` directly below
+//   the top band (the vitals, conditions, and compact party islands) and
+//   `map` at the top-right (the place card first — place-card-relocation
+//   design D2 — then the minimap, the one-line objective, the combat
 //   participant frame, and the title ballot);
 // - the portrait anchors `actor-left` (the player's stage actor) and
 //   `actor-right` (the dialogue host's stage actor while the mode is
@@ -33,7 +32,7 @@
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
 // the veil in DOM order, so the player stays bright in combat), the combat
-// flash 3, the place card, the island anchors, and the choices anchor 4,
+// flash 3, the island anchors and the choices anchor 4,
 // band 5, command line 6.
 //
 // Mode transitions (webclient-mode-transitions, AVG stage design §9.3): the
@@ -143,13 +142,6 @@ defineExpose({ menuOpen });
     <!-- The combat entry flash (design D2): decorative, above the backdrop
          and the portraits, under every island and the band. -->
     <div class="stage-flash" data-testid="stage-flash" aria-hidden="true"></div>
-    <div
-      class="stage-anchor"
-      data-anchor="place"
-      data-testid="anchor-place"
-    >
-      <slot name="place" />
-    </div>
     <div
       class="stage-anchor"
       data-anchor="vitals"
@@ -290,31 +282,20 @@ defineExpose({ menuOpen });
   box-sizing: border-box;
 }
 
-/* place: the place card's anchor at the stage box's top-left corner, one
-   fixed height whatever the labels (webclient-avg-place-card-top-bar design
-   D4), aligned to the brand column above it. */
-.elosern-stage [data-anchor="place"] {
-  top: calc(var(--header-h) + var(--stage-inset-y));
-  left: calc(16px * var(--ui-scale));
-  width: calc(var(--left-column) - 32px * var(--ui-scale));
-  height: var(--place-h);
-  z-index: 4;
-}
-
 /* vitals / map: the island stacks. Bounded above the bottom band (never the
-   band's content) and scrolling internally. vitals begins below the place
-   card; map clears only the top bar. The
+   band's content) and scrolling internally. Both begin directly below the
+   top band. The
    `.elosern-root` override in app-shell.css repeats these offsets (it sets
    the column widths); keep the two in step. */
 .elosern-stage [data-anchor="vitals"] {
-  top: calc(var(--header-h) + var(--stage-inset-y) + var(--place-h) + 12px * var(--ui-scale));
+  top: calc(var(--header-h) + var(--stage-inset-y));
   left: calc(16px * var(--ui-scale));
   width: calc(262px * var(--ui-scale));
   z-index: 4;
   display: flex;
   flex-direction: column;
   gap: calc(9px * var(--ui-scale));
-  max-height: calc(100% - var(--header-h) - var(--band-h) - var(--place-h) - 12px * var(--ui-scale) - 2 * var(--stage-inset-y));
+  max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -485,13 +466,12 @@ defineExpose({ menuOpen });
 
 /* Mode-gated visibility (design D2/D7): CSS-only on data-elosern-mode,
    display:none so hidden surfaces leave the a11y tree and tab order. The
-   matrix: the place card, the message region, both island anchors (`vitals`
-   and `map`, with every island in them), and the command line are hidden in
+   matrix: the message region, both island anchors (`vitals` and `map`, with
+   every island in them, the place card included), and the command line are hidden in
    creation, where the command region spans the whole band; the command
    region is hidden in dialogue, where the message region spans the whole
    band; the minimap is hidden in combat; the objective line shows only in
    exploration; the scene backdrop stays visible in every mode. */
-.elosern-stage[data-elosern-mode="creation"] [data-anchor="place"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="vitals"],
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="map"],

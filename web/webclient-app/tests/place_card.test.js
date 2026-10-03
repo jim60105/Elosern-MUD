@@ -1,6 +1,7 @@
-// webclient-avg-place-card-top-bar (design D3/D4): the stage's place card
-// states the location and the world time — the only surface that does — in
-// the fixed-height `place` anchor, display-only, hidden in creation.
+// webclient-avg-place-card-top-bar (design D3); place-card-relocation (design
+// D2): the stage's place card states the location and the world time — the
+// only surface that does — at the head of the `map` anchor, content-sized,
+// display-only, hidden in creation.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mount } from "@vue/test-utils";
@@ -58,14 +59,14 @@ describe("PlaceCard", () => {
     expect(heading.text()).toBe(long);
     expect(heading.attributes("title")).toBe(long);
     expect(wrapper.element.querySelectorAll(FOCUSABLE)).toHaveLength(0);
-    // The truncation is CSS (ellipsis inside a fixed-height anchor), never
-    // a shortened string.
+    // The truncation is CSS (ellipsis at the column's width), never a
+    // shortened string; the card sizes to its content.
     const css = readFileSync(join(APP_ROOT, "components/PlaceCard.vue"), "utf8");
     expect(css).toContain("text-overflow: ellipsis");
-    expect(css).toContain("height: 100%");
+    expect(css).not.toContain("height: 100%");
   });
 
-  it("renders inside AppShell's place anchor from the labels AppShell receives, hidden in creation", () => {
+  it("heads AppShell's map anchor from the labels AppShell receives, hidden in creation", () => {
     const host = document.createElement("div");
     host.id = "elosern-app";
     document.body.appendChild(host);
@@ -73,21 +74,26 @@ describe("PlaceCard", () => {
       attachTo: host,
       props: { mode: "exploration", locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" },
     });
-    const card = wrapper.get('[data-testid="anchor-place"] [data-testid="place-card"]');
+    const card = wrapper.get('[data-testid="anchor-map"] > [data-testid="place-card"]:first-child');
     expect(card.get('[data-testid="place-card__location"]').text()).toBe("石板廣場");
     expect(card.get('[data-testid="place-card__time"]').text()).toBe("春季 3 日 ‧ 12:00");
     // The top band states neither value.
     expect(wrapper.get('[data-testid="topbar"]').text()).not.toContain("石板廣場");
     expect(wrapper.get('[data-testid="topbar"]').text()).not.toContain("12:00");
 
-    // Creation hides the anchor with display:none (the HudFrame gate) and
-    // the shell's focus-rescue map names it.
+    // No `place` anchor or `--place-h` token remains; creation hides the
+    // card with its `map` anchor (the HudFrame gate and the focus-rescue map).
+    expect(wrapper.find('[data-anchor="place"]').exists()).toBe(false);
     const hud = readFileSync(join(APP_ROOT, "components/HudFrame.vue"), "utf8");
-    expect(hud).toMatch(/\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="place"\],/);
+    expect(hud).not.toContain('data-anchor="place"');
+    expect(hud).toMatch(/\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="map"\],/);
     const shell = readFileSync(join(APP_ROOT, "components/AppShell.vue"), "utf8");
-    expect(shell).toMatch(/creation: "\[data-anchor='place'\]/);
+    expect(shell).not.toContain("data-anchor='place'");
+    expect(shell).toMatch(/creation: "[^"]*\[data-anchor='map'\]/);
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
-    expect(tokens).toContain("--place-h: calc(68px * var(--ui-scale));");
+    expect(tokens).not.toContain("--place-h");
+    const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    expect(shellCss).not.toContain("--place-h");
     expect(tokens).toContain("--header-h: calc(48px * var(--ui-scale));");
   });
 });

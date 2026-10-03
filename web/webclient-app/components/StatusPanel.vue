@@ -80,7 +80,7 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 }
 
 /* The reveal (webclient-scene-transitions, design D6): the island drops
-   12px into place under the place card as it fades in, and lifts back as it
+   12px into place below the top band as it fades in, and lifts back as it
    fades out. Without travel (the reduced level) it only fades. */
 .vitals-reveal-enter-active {
   transition:

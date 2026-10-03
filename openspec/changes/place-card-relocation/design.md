@@ -37,9 +37,9 @@ The `map` anchor is `display: flex; flex-direction: column; gap: calc(9px * var(
 
 At 230px width, `--text-xl` is too wide for most location names. `--text-lg` is one step down, still visually prominent as a heading. The time line stays at `--text-sm` (already compact). The gold rule between them shortens to `calc(40px * var(--ui-scale))` to fit proportionally.
 
-### D4 — `--place-h` token shrinks, vitals top offset simplifies
+### D4 — `--place-h` token is deleted, vitals top offset simplifies
 
-The vitals anchor's `top` currently includes `var(--place-h) + 12px`. With the place card gone from the left column, `top` simplifies to `calc(var(--header-h) + var(--stage-inset-y))` — the same formula the map anchor uses. `--place-h` still exists but is smaller (for the narrower card in the map column) and referenced only by the PlaceCard's own `height: 100%` on its flex item.
+The vitals anchor's `top` currently includes `var(--place-h) + 12px`. With the place card gone from the left column, `top` simplifies to `calc(var(--header-h) + var(--stage-inset-y))` — the same formula the map anchor uses. The card sizes to its content in the map column (vertical island padding replaces the fixed height), so `--place-h` has no consumer and is deleted from `tokens.css` and from the short-viewport override in `app-shell.css`.
 
 ### D5 — Combat visibility: PlaceCard stays visible, minimap hides
 

@@ -255,7 +255,7 @@
      fills the viewport) and each side's inset. The inset is 6% of the stage
      width, grown where the island column on that side would cover the
      figure's face (the anchor's centre, a third of its height in): the
-     place card column on the left, the 218px minimap card 16px from the
+     vitals island column on the left, the 218px minimap card 16px from the
      right edge (+ ~46px of air) on the right. At 1920x1080 both are 6%. The
      dialogue text column aligns to the left inset. */
   --actor-h: min(62vh, 680px * var(--ui-scale), calc(100vh - var(--header-h) - var(--band-h)));
@@ -286,9 +286,6 @@
     /* The slim top bar (webclient-avg-place-card-top-bar design D1): one
        48px row at every supported viewport. */
     --header-h: calc(48px * var(--ui-scale));
-    /* The place card's fixed height (design D3/D4): a 20px serif heading and
-       a 12px time line inside the island padding. */
-    --place-h: calc(68px * var(--ui-scale));
     /* The stage's vertical gutter above the top islands and below the
        island stacks (webclient-avg-stage-hud-anchors design D6); short
        viewports tighten it. */

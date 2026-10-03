@@ -514,8 +514,8 @@ export const DialogueHostMissing = { render: renderPlayer, args: { dialogue: "mi
 export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
 export const PracticeScreen = { render: renderPlayer, args: { practice: true } };
 // The island anchors populated (webclient-avg-stage-hud-anchors): vitals,
-// a harmful condition, and the compact party under the place card; the
-// minimap and the one-line objective at the top-right.
+// a harmful condition, and the compact party at the top-left; the place
+// card, the minimap, and the one-line objective at the top-right.
 export const PopulatedHud = { render: renderPlayer, args: { populated: true } };
 // Combat: the minimap and the objective line are hidden, and the participant
 // frame takes the `map` anchor.

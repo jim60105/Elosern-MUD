@@ -166,7 +166,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
                   const style = getComputedStyle(time);
                   return {
                     card: box('[data-testid="place-card"]'),
-                    anchor: box('[data-testid="anchor-place"]'),
+                    anchor: box('[data-testid="anchor-map"]'),
                     heading: box('[data-testid="place-card__location"]'),
                     rule: box('[data-testid="place-card__rule"]'),
                     time: box('[data-testid="place-card__time"]'),
@@ -178,9 +178,10 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
                     numeric: style.fontVariantNumeric,
                   };
                 }""")
-                # The card fills its fixed anchor (68px, 56px on short viewports).
-                self.assertAlmostEqual(card["card"]["height"], card["anchor"]["height"], delta=0.5)
-                self.assertIn(round(card["anchor"]["height"]), (56, 68))
+                # The card heads the `map` anchor's column at its full width,
+                # sized to its content (place-card-relocation design D2).
+                self.assertAlmostEqual(card["card"]["top"], card["anchor"]["top"], delta=0.5)
+                self.assertAlmostEqual(card["card"]["width"], card["anchor"]["width"], delta=0.5)
                 self.assertGreaterEqual(card["heading"]["top"], card["card"]["top"])
                 self.assertLessEqual(card["heading"]["bottom"], card["rule"]["top"])
                 self.assertLessEqual(card["rule"]["bottom"], card["time"]["top"])

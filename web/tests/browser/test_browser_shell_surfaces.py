@@ -253,7 +253,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             overlap = page.evaluate(
                 """() => {
-                  const testids = ["anchor-place", "anchor-vitals", "anchor-map", "anchor-band-message",
+                  const testids = ["anchor-vitals", "anchor-map", "anchor-band-message",
                                    "anchor-band-command", "anchor-command-line"];
                   const anchors = testids
                     .map((t) => {
@@ -332,8 +332,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         1440x900 and 1280x720, with every island populated — eight conditions
         with the overflow disclosed, a party of four, the minimap, and a
         three-row objective line — each island anchor's stack fits its anchor
-        without scrolling, the `vitals` stack clears the place card, and
-        neither stack intersects the bottom band, the command line, or the
+        without scrolling, and neither stack (the place card heading the
+        `map` stack) intersects the bottom band, the command line, or the
         other anchor's islands."""
         for viewport in ((1440, 900), (1280, 720)):
             with self.subTest(viewport=viewport):
@@ -397,9 +397,8 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                         return el ? { scroll: el.scrollHeight, client: el.clientHeight } : null;
                       };
                       const vitalsIslands = ['[data-testid="status-panel"]', '[data-testid="party-strip"]'];
-                      const mapIslands = ['[data-testid="local-map"]', '[data-testid="objective-tracker"]'];
+                      const mapIslands = ['[data-testid="place-card"]', '[data-testid="local-map"]', '[data-testid="objective-tracker"]'];
                       const blockers = {
-                        place: rect('[data-anchor="place"]'),
                         band: rect('[data-testid="stage-band"]'),
                         commandLine: rect('[data-anchor="command-line"]'),
                       };
