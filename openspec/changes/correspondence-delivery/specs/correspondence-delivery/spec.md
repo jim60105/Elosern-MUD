@@ -18,7 +18,7 @@ A valid bounded letter SHALL be addressed to an established recipient persistent
 
 ### Requirement: Delivery follows only committed authoritative time
 
-Settlement SHALL process due letters once using actual committed world ticks crossed by command, combat or skip. Player recipients SHALL become available-for-collection, not collected/read. Delivery and pending downstream work SHALL commit with clock advance and roll back with it.
+Settlement SHALL process due letters once using actual committed world ticks crossed by command, combat or skip, with deadline inclusion `start_tick < due_tick <= end_tick`. Player recipients SHALL become available-for-collection, not collected/read. Delivery and pending downstream work SHALL commit with clock advance and roll back with it.
 
 #### Scenario: Interrupted or rejected skip
 - **WHEN** a requested sleep/wait interval is rejected or commits less than requested

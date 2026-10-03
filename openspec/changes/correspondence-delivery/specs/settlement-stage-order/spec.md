@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, practice settlement,
-daily resets, then the five declared world-event seams
+daily resets, then the six declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
 `npc_schedules`, `correspondence_delivery`, `instance_reclamation` — matching design doc §6.5's four built stages plus

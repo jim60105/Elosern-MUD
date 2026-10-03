@@ -29,5 +29,7 @@ depends-on: yohanna-memory-dialogue
 
 Workstream: W2. Scope target: one engineer-day; one responsibility, with its focused tests/docs. Prerequisites refer to completed implementations, not merely proposal commits.
 
+This edge is the explicitly required W1-before-W2 rollout gate, not a claim that letter scheduling reads Yohanna's dialogue. Its runtime foundation is the narrative ownership amendment and durable narrative source/projection progress from narrative-event-commit (transitively supplied by W1). The approved delivery sequence requires the W1 demo acceptance chain to finish before W2 delivery begins; do not infer additional dependencies among independent changes within either workstream.
+
 Code-conflict notes: projection progress/linkage with narrative-event-commit, narrative-owner-memory, correspondence-memory-projection, narrative-story-threads.
 All feature changes also touch shared shard ownership, traceability annotations, and potentially the observability catalog; serialize/reconcile those small shared surfaces even for independent domain work. These are code conflicts, not artificial runtime prerequisites.
