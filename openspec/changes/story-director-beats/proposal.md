@@ -25,9 +25,10 @@ Main-spec reconciliation: No main-spec behavior conflict; additive capability.
 ## Batch:
 
 depends-on: narrative-attention
-depends-on: dream-sleep-surface
 
 Workstream: W3. Scope target: one engineer-day; one responsibility, with its focused tests/docs. Prerequisites refer to completed implementations, not merely proposal commits.
+
+The executor consumes validated request records through narrative-attention's authoring prerequisites; it does not require the sleep UI. Public W3 acceptance still includes the completed dream-sleep-surface alongside this director path, but that rollout check is not an additional executor dependency.
 
 Code-conflict notes: prompt registry/composition with yohanna-memory-dialogue, dialogue-epochs-stable-prefixes, correspondence-npc-replies, dream-explicit-presentation, scenario-beat-compilation; authoring lifecycle with dream-authoring-records, dream-session-lifecycle, dream-explicit-presentation, dream-sleep-surface; beat execution registry with scenario-beat-compilation.
 All feature changes also touch shared shard ownership, traceability annotations, and potentially the observability catalog; serialize/reconcile those small shared surfaces even for independent domain work. These are code conflicts, not artificial runtime prerequisites.
