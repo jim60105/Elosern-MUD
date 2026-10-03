@@ -6,6 +6,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
+import { createPinia, setActivePinia } from "pinia";
+import AppClient from "../AppClient.vue";
+import { useElosernStore } from "../stores/elosern.js";
+import * as fx from "./store/protocol_fixtures.js";
 import MapLattice from "../components/MapLattice.vue";
 import MessageWindow from "../components/MessageWindow.vue";
 import PlaceCard from "../components/PlaceCard.vue";
@@ -238,6 +242,41 @@ describe("StageActor portrait crossfade", () => {
 });
 
 describe("StatusPanel reveal", () => {
+  it("suppresses injured vitals during dialogue revisions and reuses the dock reveal on exit", async () => {
+    setActivePinia(createPinia());
+    const store = useElosernStore();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    let revision = 0;
+    const commit = (mode, hp = 80) => {
+      expect(store.receive(1, "ui_snapshot", [fx.snapshot({
+        revision: ++revision, mode,
+        panels: { status: fx.statusPanel({ resources: { hp: { current: hp, maximum: 100 } } }) },
+      })], {}).accepted).toBe(true);
+    };
+    commit("exploration");
+    wrapper = mount(AppClient, REAL);
+    const panel = () => wrapper.getComponent(StatusPanel);
+    expect(panel().props("visible")).toBe(true);
+    commit("dialogue");
+    await nextTick();
+    expect(panel().props("visible")).toBe(false);
+    await frames();
+    expect(panel().get('[data-testid="status-panel"]').element.style.display).toBe("none");
+    commit("dialogue", 70);
+    await nextTick();
+    expect(panel().props("visible")).toBe(false);
+    expect(panel().get('[data-testid="status-panel"]').classes()).not.toContain("vitals-reveal-enter-active");
+    commit("exploration", 70);
+    await nextTick();
+    expect(panel().props("visible")).toBe(true);
+    const dock = panel().get('[data-testid="status-panel"]');
+    expect(dock.element.style.display).not.toBe("none");
+    expect(dock.classes()).toContain("vitals-reveal-enter-active");
+    expect(dock.classes()).toContain("vitals-reveal-enter-from");
+    await frames();
+  });
   it("is inert while it leaves, and in reach again the moment it is shown mid-leave", async () => {
     wrapper = mount(StatusPanel, { ...REAL, props: { status: STATUS_PANEL_SAMPLE, visible: true } });
     const panel = () => wrapper.get('[data-testid="status-panel"]').element;

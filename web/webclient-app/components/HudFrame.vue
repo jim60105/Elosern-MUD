@@ -149,6 +149,8 @@ defineExpose({ menuOpen });
       class="stage-anchor"
       data-anchor="vitals"
       data-testid="anchor-vitals"
+      :inert="mode === 'dialogue' || null"
+      :aria-hidden="mode === 'dialogue' ? 'true' : null"
     >
       <slot name="vitals" />
     </div>
@@ -156,6 +158,8 @@ defineExpose({ menuOpen });
       class="stage-anchor"
       data-anchor="map"
       data-testid="anchor-map"
+      :inert="mode === 'dialogue' || null"
+      :aria-hidden="mode === 'dialogue' ? 'true' : null"
     >
       <slot name="map" />
     </div>
@@ -475,7 +479,7 @@ defineExpose({ menuOpen });
    matrix: the message region, both island anchors (`vitals` and `map`, with
    every island in them, the place card included), and the command line are hidden in
    creation, where the command region spans the whole band; the command
-   region is hidden in dialogue, where the message region spans the whole
+   region and both island anchors are hidden in dialogue, where the message region spans the whole
    band; the minimap is hidden in combat; the objective line shows only in
    exploration; the scene backdrop stays visible in every mode. */
 .elosern-stage[data-elosern-mode="creation"] [data-anchor="band-message"],
@@ -486,6 +490,21 @@ defineExpose({ menuOpen });
 }
 .elosern-stage[data-elosern-mode="creation"] .stage-band {
   grid-template-columns: minmax(0, 1fr);
+}
+/* Cockpit islands recede around the conversation. Discrete display keeps
+   the exit paint alive only for the existing reveal duration; inert and
+   aria-hidden remove interaction at commit. Mount/reconnect hide at once.
+   Older browsers without discrete transitions also hide at once. */
+.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="vitals"],
+.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="map"] {
+  display: none !important;
+  opacity: 0;
+}
+.elosern-stage[data-mode-change][data-elosern-mode="dialogue"] [data-anchor="vitals"],
+.elosern-stage[data-mode-change][data-elosern-mode="dialogue"] [data-anchor="map"] {
+  transition:
+    opacity var(--motion-reveal) var(--ease-exit),
+    display var(--motion-reveal) allow-discrete;
 }
 /* Dialogue (webclient-dialogue-stage-actors design D4): the message region
    spans the whole band at the same fixed height, from the commit's frame.

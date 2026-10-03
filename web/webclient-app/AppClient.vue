@@ -370,7 +370,7 @@ function onFoeLineupGone() {
           v-if="panelAvailable('status')"
           :status="panel('status') || {}"
           :low-hp="store.view.vitals.lowHp"
-          :visible="store.view.vitals.visible"
+          :visible="store.view.mode !== 'dialogue' && store.view.vitals.visible"
           :motion-level="store.view.motionLevel"
           :revision="store.view.revision"
           :epoch="store.view.epoch"

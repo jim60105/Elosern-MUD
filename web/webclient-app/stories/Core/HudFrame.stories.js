@@ -80,7 +80,7 @@ export default {
           "in exploration; dialogue collapses the command region " +
           "(inert at once, then a slide out over the widened message region " +
           "ending `visibility: hidden`; the dock stays mounted) so the message region " +
-          "spans the band, `actor-right` carries the dialogue host, and the " +
+          "spans the band, cockpit anchors (vitals and map) recede and hide, `actor-right` carries the dialogue host, and the " +
           "`choices` anchor centres the dialogue choice list over the stage, " +
           "above the expanded command-line row. The " +
           "open-surface registry drives the stage recession behind open " +

@@ -197,6 +197,12 @@ body {
 .elosern-root [data-anchor="map"] > * { flex-shrink: 0; }
 .elosern-root [data-anchor="vitals"],
 .elosern-root [data-anchor="map"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
+/* Mirror HudFrame's dialogue gate; the frame owns its live exit fade. */
+.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="vitals"],
+.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="map"] {
+  display: none !important;
+  opacity: 0;
+}
 /* Short viewports (webclient-avg-stage-hud-anchors design D6): at 720px the
    island gaps tighten; the islands compact themselves under the same query. */
 @media (max-height: 820px) {

@@ -294,8 +294,8 @@ const HIDDEN_BY_MODE = {
   exploration: "",
   // webclient-dialogue-stage-actors (design D4): dialogue collapses the
   // command region together with the dock inside it. (The objective line is
-  // hidden too, but carries no tab stop.)
-  dialogue: "[data-anchor='band-command']",
+  // hidden too, but carries no tab stop.) Cockpit anchors leave with it.
+  dialogue: "[data-anchor='band-command'], [data-anchor='vitals'], [data-anchor='map']",
 };
 
 // Focus fell out of the rendered layout: the body, a removed element, or an
@@ -317,12 +317,12 @@ watch(
     const active = document.activeElement;
     if (nextMode === "dialogue" && prevMode !== "dialogue") {
       // Entering dialogue (design D5), in two phases. Pre-flush: focus held in
-      // the command region moves to the page surface, visible in both
+      // any outgoing anchor moves to the page surface, visible in both
       // variants' layout, so the browser never blurs it to the body. After
       // the flush the dialogue rows exist: the window's focus home takes it.
       // A drawer or the command field that holds focus keeps it.
-      const band = active?.closest?.(HIDDEN_BY_MODE.dialogue);
-      if (band) {
+      const outgoing = active?.closest?.(HIDDEN_BY_MODE.dialogue);
+      if (outgoing) {
         focusMessagePage();
       }
       await nextTick();
