@@ -54,6 +54,64 @@ is not currently present.
 - **WHEN** a present entity resolves to any truthful placeholder
 - **THEN** its catalog entry carries a null URL and a null face rectangle
 
+### Requirement: The browser maps each framed portrait's carried face rectangle to a centered cover crop through one shared pure function
+Each framed-portrait surface named below SHALL crop its cover-fitted portrait images through one
+shared pure mapping from the committed entry's normalized `face_rect` to a CSS `object-position`
+percentage pair, exported by `web/webclient-app/components/face-rect.js`, so the server's authored
+composition stays centered in a frame of any aspect ratio. Under cover fit the mapping SHALL align
+the image's p% point with the frame's p% point, which centers the rectangle's center.
+The mapping SHALL return the centered `50% 50%` pair — never a throw and never an off-frame
+percentage — for a `null` or `undefined` rectangle and for any rectangle with a non-finite field,
+a field outside `[0, 1]`, an `x + w` greater than 1, a `y + h` greater than 1, or a non-positive
+`w` or `h`, so one corrupt card cannot blank a portrait surface. A URL-bearing entry whose rectangle
+is missing or malformed SHALL still render its image with that centered crop; only a placeholder
+entry (a null URL) SHALL render its labelled placeholder with no image element.
+Each avatar surface — the combat participant frame, the party strip and the party drawer's
+avatar thumbnails, the dialogue host avatar in the narrative feed, the interact target avatars
+and the dock's target rows, and the top-bar character switcher — SHALL apply the mapping to that
+entry's rectangle and SHALL ignore stage. The drawer's full-figure art slot uses the separate
+stage render contract and is excluded from this cover rule. Scene backdrops consume scene media,
+not portrait entries, and are outside this requirement.
+
+#### Scenario: A well-formed rectangle centers its face region
+- **WHEN** a framed portrait renders a catalog entry whose rectangle is `{x: 0.25, y: 0.06, w: 0.5, h: 0.5}`
+- **THEN** the image element's object-position centers that rectangle's center (vertically the 31% line), and the image keeps its cover fit
+
+#### Scenario: A malformed rectangle degrades to the centered crop
+- **WHEN** the mapping receives null, a non-finite field, an out-of-bounds field, an edge-crossing rectangle or non-positive width/height
+- **THEN** it returns centered `50% 50%`, a URL-bearing surface renders that centered cover crop and a null-URL placeholder renders its label without an image
+
+#### Scenario: Every framed portrait honors the carried rectangle
+- **WHEN** the same entry is rendered by the combat participant frame, party strip, party drawer avatar thumbnails, dialogue host avatar, interact target avatar, dock target row and character switcher
+- **THEN** each cover-cropped image applies the shared mapping to its face rectangle, even when the entry carries a nonidentity stage triple
+
+### Requirement: The reference artwork frame presents a portrait entry truthfully through cover fit and rect crop
+The ReferenceArtwork component SHALL retain separate cover and stage modes. Its cover mode SHALL
+render one URL-bearing image with the shared face_rect crop. The drawer's full-figure art slot
+SHALL explicitly use stage mode instead: contain fit, center-bottom positioning and bottom-center
+stage scale/translation, without a face_rect crop. A null entry or placeholder entry (null URL)
+SHALL render its truthful labelled placeholder with no image; a failed load SHALL degrade to
+that mode's labelled placeholder, and a changed URL SHALL re-attempt the new image without
+remounting the surface. Stage-mode placeholders SHALL retain the existing inline standing
+silhouette and accessible state. The component SHALL remain manifest-listed as
+Core/ReferenceArtwork in the frozen required set and covered by the deterministic coverage gate.
+
+#### Scenario: A resolved entry renders the cropped image
+- **WHEN** cover mode receives an entry with a media URL and a well-formed rectangle
+- **THEN** it renders exactly that URL cover-fitted with the shared rect crop and no placeholder
+
+#### Scenario: The drawer full figure consumes stage while avatars retain face crops
+- **WHEN** the drawer art slot and avatar thumbnails receive the same URL-bearing portrait with stage `{scale: 0.6, x: 0.1, y: -0.2}`
+- **THEN** the drawer figure uses contain/bottom alignment, scale 0.6 and frame offsets 10%/-20%, while avatar cover crops remain face_rect-driven and unchanged
+
+#### Scenario: A placeholder entry renders no image
+- **WHEN** either mode receives a null entry or null URL with a placeholder label
+- **THEN** no image element exists and the truthful placeholder state is rendered, retaining the existing standing silhouette in stage mode
+
+#### Scenario: A failed load degrades and a URL change recovers
+- **WHEN** an image fails to load and the frame later receives a different URL
+- **THEN** failure replaces the image with the labelled placeholder and the changed URL renders a new image element with the replacement URL
+
 ## ADDED Requirements
 
 ### Requirement: Resolved artwork carries stage without changing asset or placeholder truth

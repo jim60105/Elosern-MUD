@@ -1,3 +1,25 @@
+## MODIFIED Requirements
+
+### Requirement: The gallery has an offline interactive storyboard
+The gallery component Storybook families SHALL include an interactive storyboard
+under Data/GalleryPanel covering browse, generation, pending and failure, binding, face editing,
+stage transform editing/reset/save/rejection, default selection and delete confirmation.
+A frame guide SHALL reference the four existing design images, state each transition and
+recovery path and distinguish fixture publications from live behavior. The stage editor SHALL
+reuse existing local assets without requiring a new reference image.
+
+#### Scenario: The storyboard runs without game or AI services
+- **WHEN** the player opens the built Storybook gallery storyboard offline
+- **THEN** the real components expose every documented frame with deterministic fixtures and no game-server or AI-service requests
+
+#### Scenario: Context changes invalidate an editor
+- **WHEN** the selected subject changes, its card disappears or the panel becomes unavailable
+- **THEN** stale drafts are discarded and cannot dispatch against the replacement context
+
+#### Scenario: An unrelated pending job does not complete a submission
+- **WHEN** another pending row is published before this editor's correlated result
+- **THEN** the editor remains open and a rejected result preserves its draft
+
 ## ADDED Requirements
 
 ### Requirement: Stage transforms affect full figures and never avatar cover crops

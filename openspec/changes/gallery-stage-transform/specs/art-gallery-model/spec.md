@@ -81,7 +81,7 @@ carrying `subject`, `image_id`, `kind`, and the updated field in `context`.
 
 ### Requirement: Malformed stored cards are skipped, never fatal
 Every read of a record's cards SHALL first supply identity stage for a missing or malformed stored `stage`, without writing storage. Other malformed fields SHALL retain the existing skip discipline. Every read of a record's cards SHALL be tolerant: a stored entry that is not a mapping, or that
-fails the card contract, SHALL be skipped and reported once through the `world.observability`
+still fails the card contract after stage-only normalization, SHALL be skipped and reported once through the `world.observability`
 facade as a `gallery_card_invalid` event carrying the subject and, when readable, the offending
 `image_id`. A malformed entry SHALL NEVER raise out of a read, SHALL NEVER be returned to a caller,
 and SHALL NOT prevent the record's valid cards from being returned.
@@ -91,7 +91,7 @@ and SHALL NOT prevent the record's valid cards from being returned.
 - **THEN** the read returns exactly the valid card and one `gallery_card_invalid` event is logged
 
 #### Scenario: A record of only malformed cards reads as empty
-- **WHEN** every stored entry of a record fails the card contract
+- **WHEN** every stored entry of a record still fails the card contract after stage-only normalization, such as non-mapping entries or entries with invalid image_size
 - **THEN** the read returns an empty list and no exception propagates
 
 ## ADDED Requirements
