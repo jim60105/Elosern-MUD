@@ -2,7 +2,7 @@
 
 ## Context
 
-The stage's mode-visibility rules are already implemented as CSS selectors on `.elosern-stage[data-elosern-mode="<mode>"]` combined with anchor `data-anchor` selectors. Creation mode already hides the `vitals` and `map` anchors this way. The minimap is hidden in combat via `.elosern-stage[data-elosern-mode="combat"] .local-map { display: none !important; }`. Extending the same pattern to dialogue mode is a CSS-only change.
+The stage's mode-visibility rules are CSS selectors on `.elosern-stage[data-elosern-mode="<mode>"]` combined with anchor `data-anchor` selectors. Creation already hides the `vitals` and `map` anchors; combat hides `.local-map`. Dialogue extends the anchor gate, its pre-flush focus selector, and the dock's effective reveal visibility.
 
 ## Goals / Non-Goals
 
@@ -30,7 +30,13 @@ The vitals rule (show dock when a vital is below max, or a condition needs atten
 
 ### D3 — Focus rescue on mode change to dialogue
 
-If focus is inside the vitals dock or map anchor when the mode changes to dialogue, focus must be rescued. The existing mode-change focus-rescue path (used for creation mode) already handles this: on mode commit, if `document.activeElement` is inside a now-hidden anchor, focus moves to the message window. No new rescue logic needed.
+Extend `HIDDEN_BY_MODE.dialogue` to include `vitals` and `map`. The existing entering-dialogue pre-flush `active.closest()` branch then moves focus to the message page while the DOM still carries the previous mode. The post-flush heuristic is not the rescue mechanism; it only promotes focus to the choice list when appropriate.
+
+### D4 — Reuse reveal timing without changing mode choreography
+
+Live dialogue entry fades the outgoing anchors with the existing `--motion-reveal` and exit easing. CSS `display` transitions use `allow-discrete` to retain exit paint until the fade settles at `display:none`; both anchors become inert and `aria-hidden` at commit. Mounts, reconnects, motion-off, and browsers without discrete transition support hide immediately. No mode-transition timing or backdrop treatment changes.
+
+The real dock also receives effective visibility `mode !== "dialogue" && vitals.visible`, so its existing reveal sinks toward the band on exit and rises from positive `translateY` on return. Data updates during dialogue cannot start that reveal. The map column restores at commit; the dock alone owns its normal return motion.
 
 ## Risks / Trade-offs
 

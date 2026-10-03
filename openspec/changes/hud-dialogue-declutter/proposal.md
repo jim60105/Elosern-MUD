@@ -25,4 +25,6 @@ _None._
 
 - `web/webclient-app/components/HudFrame.vue`: dialogue-mode hide rule for `[data-anchor="vitals"]` and `[data-anchor="map"]` (CSS: `.elosern-stage[data-elosern-mode="dialogue"] [data-anchor="vitals"], .elosern-stage[data-elosern-mode="dialogue"] [data-anchor="map"] { display: none !important; }`).
 - `web/webclient-app/styles/app-shell.css`: mirrored hide rule if the file repeats anchor mode hides.
+- `web/webclient-app/components/AppShell.vue`: extend the existing pre-flush dialogue focus-rescue selector to both outgoing anchors.
+- `web/webclient-app/AppClient.vue`: forward mode-gated effective visibility to the dock so its existing reveal is suppressed during dialogue and restored on exit.
 - Tests: update `scene_transitions.test.js` or `mode_visibility.test.js` assertions for the dialogue mode's hidden anchors; update any browser journey that expects the vitals dock or minimap during dialogue.
