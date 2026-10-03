@@ -1,7 +1,7 @@
 ## 1. Implement the bounded behavior
 
 - [ ] 1.1 Register separate collaborator capability, prompt/schema and permission validators; verify recorded explicit acceptance, secret/metadata/mutation rejection and no shared director history.
-- [ ] 1.2 Implement session-only server track using canonical bands and measured/configured deltas; verify six-step progression, prospective-phase retries and duplicate/failure no-increment.
+- [ ] 1.2 Implement session-only server track using canonical bands; commit the initial pleasure value, six calibrated deltas and progression report as versioned configuration/evidence; verify six-step band progression, convergence climax, prospective-phase retries and duplicate/failure no-increment.
 - [ ] 1.3 Validate combined scene/dialogue and convergence semantics; verify fifth/sixth responses and generated arbitrary phase rejection.
 - [ ] 1.4 Implement generation-free phase-aware ending and forbidden-write tests; verify live SexualState/counters/traits unchanged and offline awakening at early exit and climax.
 
