@@ -553,7 +553,7 @@ def at_server_start():
     )
     _startup_step(
         "narrative_projection_init",
-        lambda: _late("world.narrative.events", "scan_pending_narrative_projections"),
+        lambda: _late("world.narrative.memory", "process_pending_narrative_memory_projections"),
     )
 
 
