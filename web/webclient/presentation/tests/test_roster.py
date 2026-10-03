@@ -89,11 +89,13 @@ class RosterPresenterTests(EvenniaTest):
                 "alt",
                 "placeholder",
                 "face_rect",
+                "stage",
             },
         )
         # A placeholder row carries a null URL and a null rectangle.
         self.assertIsNone(portrait["url"])
         self.assertIsNone(portrait["face_rect"])
+        self.assertIsNone(portrait["stage"])
 
     @covers_requirement(
         "webclient-character-roster::the-account-roster-is-a-committed-presentation-panel-available-in-every-mode"
@@ -179,6 +181,7 @@ class RosterPresenterTests(EvenniaTest):
                     "alt": "完成的肖像",
                     "subject_key": f"character:{self.char1.pk}",
                     "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
+                    "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
                 }
             elif entity.pk == char_active2.pk:
                 return {
@@ -190,6 +193,7 @@ class RosterPresenterTests(EvenniaTest):
                     "alt": "未生成",
                     "subject_key": f"character:{char_active2.pk}",
                     "face_rect": None,
+                    "stage": None,
                 }
             else:
                 return {
@@ -201,6 +205,7 @@ class RosterPresenterTests(EvenniaTest):
                     "alt": "無肖像",
                     "subject_key": None,
                     "face_rect": None,
+                    "stage": None,
                 }
 
         with patch("web.webclient.presentation.roster.resolve_character", side_effect=mock_resolve):
@@ -312,6 +317,7 @@ class RosterValidatorTests(unittest.TestCase):
             "alt": "英雄肖像",
             "placeholder": None,
             "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
         }
         portrait.update(overrides)
         return portrait
@@ -424,10 +430,12 @@ class RosterValidatorTests(unittest.TestCase):
                 alt="無肖像",
                 placeholder={"kind": "unavailable", "label": "無肖像"},
                 face_rect=None,
+                stage=None,
             ),
         )
         normalized = validate_roster(self._valid_payload(characters=[placeholder_row]))
         self.assertIsNone(normalized["characters"][0]["portrait"]["face_rect"])
+        self.assertIsNone(normalized["characters"][0]["portrait"]["stage"])
         # The media URL bound admits the worst-case gallery identity.
         worst = "/art/gallery/character/" + "k" * 64 + "/" + "0" * 36 + ".avif"
         longest_row = self._valid_row(

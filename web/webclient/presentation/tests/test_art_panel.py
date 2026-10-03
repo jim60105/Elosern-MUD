@@ -51,6 +51,7 @@ def _valid_scene(**overrides):
         "subject_key": "scene:t_synth_bazaar",
         "status": "done",
         "url": "/art/scene/t_synth_bazaar.png",
+        "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
         "aspect_ratio": "16:9",
         "alt": T_BAZAAR_LABEL,
         "placeholder": None,
@@ -68,6 +69,7 @@ def _valid_catalog_entry(**overrides):
         "alt": "低階魔物",
         "placeholder": None,
         "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+        "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
         "context": {"name": "哥布林", "role": "敵方"},
     }
     value.update(overrides)
@@ -177,6 +179,7 @@ class ArtSchemaTests(unittest.TestCase):
             url=None,
             placeholder={"kind": "unavailable", "label": "無法提供"},
             face_rect=None,
+            stage=None,
         )
         normalized = validate_art(
             _valid_payload(portrait_catalog={"42": placeholder_entry})

@@ -333,3 +333,32 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertTrue(state.has_default)
         self.assertEqual(state.error_code, "sd_timeout")
         self.assertIsInstance(state.error_at, float)
+
+    @covers_requirement(
+        "art-gallery-model::per-card-stage-transforms-are-bounded-atomic-presentation-metadata"
+    )
+    def test_stageless_legacy_cards_count_in_operator_reads_like_every_other_read(self):
+        subject = _character("legacy")
+        fields = _card_fields(subject)
+        append_card(subject, **fields)
+        record = record_for(subject)
+        # Simulate a pre-change eleven-key card: commit it through the writer,
+        # then strip the persisted stage key exactly as old storage looks.
+        second = append_card(subject, **_card_fields(subject))
+        stored = [dict(entry) for entry in record.db.cards]
+        for entry in stored:
+            if entry["image_id"] == second["image_id"]:
+                entry.pop("stage")
+        record.db.cards = stored
+        self.assertEqual(len(cards_for(subject)), 2)
+        states = gallery_states()
+        self.assertEqual([state.card_count for state in states], [2])
+        # A malformed stored triple likewise counts through the same tolerance.
+        third = append_card(subject, **_card_fields(subject))
+        stored = [dict(entry) for entry in record.db.cards]
+        for entry in stored:
+            if entry["image_id"] == third["image_id"]:
+                entry["stage"] = {"scale": 3.5}
+        record.db.cards = stored
+        self.assertEqual(len(cards_for(subject)), 3)
+        self.assertEqual([state.card_count for state in gallery_states()], [3])

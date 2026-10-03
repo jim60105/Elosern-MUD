@@ -12,7 +12,7 @@ const props = defineProps({
   // The host gallery's minute clock (epoch ms) for the relative date.
   now: { type: Number, default: () => Date.now() },
 });
-const emit = defineEmits(["default", "delete", "generate", "binding", "face"]);
+const emit = defineEmits(["default", "delete", "generate", "binding", "face", "stage"]);
 const confirming = ref(false);
 const conditions = computed(() => props.warnings.find((row) => row.image_id === props.card?.image_id)?.conditions);
 const date = computed(() => galleryDate(props.card?.created_at, props.now));
@@ -47,6 +47,7 @@ function confirmDelete() {
         <div class="gallery-actions">
           <button v-if="capabilities.supports_bindings" :disabled="disabled" @click="emit('binding')">編輯設定</button>
           <button :disabled="disabled" @click="emit('face')">臉部框選</button>
+          <button :disabled="disabled" @click="emit('stage')">比例調整</button>
           <button class="gallery-danger" :disabled="disabled" @click="confirming = true">刪除</button>
         </div>
         <div v-if="confirming" class="gallery-note gallery-detail__confirm" role="group" aria-label="刪除確認">

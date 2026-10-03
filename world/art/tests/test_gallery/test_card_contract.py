@@ -47,6 +47,13 @@ class CardContractTests(unittest.TestCase):
     def setUp(self):
         self.subject = _character()
 
+    def test_stage_defaults_only_at_write_boundary(self):
+        stored = validate_card(_card_fields(self.subject), self.subject)
+        self.assertEqual(stored["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+        incomplete = {key: value for key, value in stored.items() if key != "stage"}
+        with self.assertRaises(GalleryRecordError):
+            validate_card(incomplete, self.subject, api_defaults=False)
+
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_generated_card_stores_exactly_the_contract_keys(self):
         stored = validate_card(
@@ -64,6 +71,7 @@ class CardContractTests(unittest.TestCase):
                 "requested_fields",
                 "face_rect",
                 "image_size",
+                "stage",
                 "binding",
                 "source",
                 "created_at",

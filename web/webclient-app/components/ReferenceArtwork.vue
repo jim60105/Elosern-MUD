@@ -18,6 +18,12 @@ const props = defineProps({
   motionLevel: { type: String, default: "full" },
 });
 const failedUrl = ref(null);
+const placementStyle = computed(() => props.stage ? {
+  objectPosition: "center bottom",
+  "--stage-scale": props.portrait?.stage?.scale ?? 1,
+  "--stage-x": props.portrait?.stage?.x ?? 0,
+  "--stage-y": props.portrait?.stage?.y ?? 0,
+} : { objectPosition: faceObjectPosition(props.portrait?.face_rect) });
 const portraitUrl = computed(() => {
   const url = props.portrait?.url;
   return url && url !== failedUrl.value ? url : null;
@@ -57,7 +63,7 @@ function onImageError() {
     <img
       v-if="portraitUrl"
       :src="portraitUrl"
-      :style="{ objectPosition: stage ? 'center bottom' : faceObjectPosition(portrait.face_rect) }"
+      :style="placementStyle"
       alt=""
       aria-hidden="true"
       @error="onImageError"
@@ -133,6 +139,11 @@ function onImageError() {
 }
 .reference-artwork--stage { height: 100%; overflow: visible; }
 .reference-artwork--stage img {
+  --stage-scale: 1;
+  --stage-x: 0;
+  --stage-y: 0;
+  transform: translate(calc(var(--stage-x) * 100%), calc(var(--stage-y) * 100%)) scale(var(--stage-scale));
+  transform-origin: 50% 100%;
   object-fit: contain;
   mask-image: none;
   filter: drop-shadow(0 calc(5px * var(--ui-scale)) calc(9px * var(--ui-scale)) rgba(0, 0, 0, .55));

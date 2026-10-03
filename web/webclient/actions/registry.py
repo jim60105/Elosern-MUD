@@ -177,11 +177,13 @@ def build_production_action_registry() -> ActionRegistry:
         _gallery_default_set_adapter,
         _gallery_card_delete_adapter,
         _gallery_face_rect_update_adapter,
+        _gallery_stage_update_adapter,
         _gallery_binding_save_adapter,
         validate_gallery_subject_select_payload,
         validate_gallery_generate_payload,
         validate_gallery_card_payload,
         validate_gallery_face_rect_update_payload,
+        validate_gallery_stage_update_payload,
         validate_gallery_binding_save_payload,
     )
     from web.webclient.actions.service_actions import (
@@ -619,6 +621,10 @@ def build_production_action_registry() -> ActionRegistry:
     registry.register(ActionSpec(
         "gallery.binding.save", validate_gallery_binding_save_payload,
         _gallery_binding_save_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.stage.update", validate_gallery_stage_update_payload,
+        _gallery_stage_update_adapter, ("gallery",),
     ))
     registry.register(ActionSpec(
         "npc.persona.read", validate_read_payload,

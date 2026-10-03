@@ -21,6 +21,7 @@ function validScene(overrides) {
   return Object.assign(
     {
       archetype: "t_hearth_hollow",
+      stage: { scale: 1, x: 0, y: 0 },
       label: "爐火合成廳",
       subject_key: "scene:t_hearth_hollow",
       status: "done",
@@ -43,6 +44,7 @@ function validEntry(overrides) {
       alt: "低階魔物",
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      stage: { scale: 1, x: 0, y: 0 },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides

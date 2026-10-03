@@ -154,6 +154,7 @@ const MODE_JOURNEY_CATALOG = {
     subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
     alt: "店長的肖像", placeholder: null,
     face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
+    stage: { scale: 1, x: 0, y: 0 },
   },
 };
 const MODE_JOURNEY_DIALOGUE = {
@@ -283,10 +284,12 @@ const renderPlayer = (args) => ({
                 subject_key: "npc_7", status: "pending", url: null, aspect_ratio: null,
                 alt: "店長的肖像", placeholder: { kind: "missing", label: "肖像生成中" },
                 face_rect: null, context: { name: "店長", role: "對話對象" },
+                stage: null,
               } : {
                 subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
                 alt: "店長的肖像", placeholder: null,
                 face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
+                stage: { scale: 1, x: 0, y: 0 },
               },
             },
           } } : {}),

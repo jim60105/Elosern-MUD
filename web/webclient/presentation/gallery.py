@@ -43,7 +43,7 @@ SLOTS = gallery_api.SLOT_ORDER
 FIELDS = GALLERY_PROMPT_FIELDS
 CAPABILITY_FIELDS = ("supports_bindings", "supports_field_selection", "supports_free_text", "max_cards")
 CARD_FIELDS = {
-    "image_id", "status", "label", "url", "face_rect", "is_default", "chips",
+    "image_id", "status", "label", "url", "face_rect", "stage", "is_default", "chips",
     "requested_fields", "binding_present", "created_at",
 }
 PANEL_FIELDS = {
@@ -188,7 +188,7 @@ def validate_gallery(payload):
         if len(set(chips)) != len(chips) or len(set(fields)) != len(fields):
             raise ProtocolValidationError("duplicate chip/field")
         if row["status"] != "card":
-            if row["url"] is not None or row["face_rect"] is not None or row["is_default"] or row["binding_present"] or chips or fields:
+            if row["url"] is not None or row["face_rect"] is not None or row["stage"] is not None or row["is_default"] or row["binding_present"] or chips or fields:
                 raise ProtocolValidationError("synthetic row fabricated card data")
             continue
         url = _text(row["url"], GALLERY_MAX_URL, "gallery url")
@@ -198,8 +198,9 @@ def validate_gallery(payload):
             raise ProtocolValidationError("url must name selected subject and image")
         try:
             gallery_api.validate_face_rect(row["face_rect"])
+            gallery_api.validate_stage(row["stage"])
         except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire rectangle rejection is returned to the caller
-            raise ProtocolValidationError("invalid face_rect") from exc
+            raise ProtocolValidationError("invalid face_rect or stage") from exc
         slot_chips = [label for label in SLOT_LABELS.values() if label in chips]
         face_chips = [c for c in chips if c in ("預設臉框", "自訂臉框")]
         if len(face_chips) != 1:
@@ -317,7 +318,7 @@ PENDING_LABEL = "肖像（生成中）"
 def _synthetic(image_id, timestamp, status, label):
     return {
         "image_id": image_id, "status": status, "label": label, "url": None,
-        "face_rect": None, "is_default": False, "chips": [], "requested_fields": [],
+        "face_rect": None, "stage": None, "is_default": False, "chips": [], "requested_fields": [],
         "binding_present": False, "created_at": timestamp,
     }
 
@@ -355,6 +356,7 @@ def gallery_presenter(context: PresentationContext):
         rows.append({
             "image_id": card["image_id"], "status": "card", "label": label,
             "url": media_url_for(identity), "face_rect": card["face_rect"],
+            "stage": card["stage"],
             "is_default": is_default, "chips": chips,
             "requested_fields": card["requested_fields"], "binding_present": binding is not None,
             "created_at": card["created_at"],

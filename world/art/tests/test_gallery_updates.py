@@ -31,6 +31,7 @@ from world.art.gallery import (
     record_for,
     update_card_binding,
     update_card_face_rect,
+    set_stage,
 )
 from world.art.service import resolve_gallery_subject_by_key
 from world.art.subjects import (
@@ -96,6 +97,7 @@ def _card_fields(subject, image_id=None, **overrides):
         "binding": None,
         "source": "generated",
         "image_size": {"width": 768, "height": 1024},
+        "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
     }
     fields.update(overrides)
     return fields
@@ -139,6 +141,56 @@ class CardFaceRectUpdateTests(EvenniaTestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
         return target
+
+    @covers_requirement("art-gallery-model::per-card-stage-transforms-are-bounded-atomic-presentation-metadata")
+    def test_stage_replacement_preserves_siblings_default_and_source(self):
+        subject = _character("stage_atomic")
+        first, second = _new_id(), _new_id()
+        source = self._make_file(_identity(subject, first), b"unchanged")
+        append_card(subject, **_card_fields(subject, image_id=first))
+        append_card(subject, **_card_fields(subject, image_id=second))
+        before = _raw_cards(subject)
+        default = record_for(subject).db.default_image_id
+        value = {"scale": 0.6, "x": 0.1, "y": -0.2}
+        with patch("world.art.gallery.log_info") as info:
+            updated = set_stage(subject, first, value)
+        after = _raw_cards(subject)
+        self.assertEqual(updated["stage"], value)
+        self.assertEqual(after[0], dict(before[0], stage=value))
+        self.assertEqual(after[1], before[1])
+        self.assertEqual(record_for(subject).db.default_image_id, default)
+        self.assertEqual(source.read_bytes(), b"unchanged")
+        events = [call for call in info.call_args_list if call.args[0] == "gallery_stage_set"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"], {"subject": subject.full(), "image_id": first, **value})
+        for image_id, invalid in ((_new_id(), value), (first, {"scale": 3, "x": 0, "y": 0})):
+            with self.assertRaises(GalleryRecordError):
+                set_stage(subject, image_id, invalid)
+            self.assertEqual(_raw_cards(subject), after)
+
+    @covers_requirement("art-gallery-model::per-card-stage-transforms-are-bounded-atomic-presentation-metadata")
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
+    def test_old_stage_read_is_nonpersistent_and_face_validation_stays_strict(self):
+        subject = _character("stage_old")
+        image_id = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        valid = _raw_cards(subject)[0]
+        for stage in (None, {"scale": False, "x": 0, "y": 0}):
+            old = dict(valid)
+            if stage is None:
+                old.pop("stage")
+            else:
+                old["stage"] = stage
+            record_for(subject).db.cards = [old, {"image_id": _new_id()}]
+            before = _raw_cards(subject)
+            self.assertEqual(cards_for(subject)[0]["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+            self.assertEqual(_raw_cards(subject), before)
+            with self.assertRaises(GalleryRecordError):
+                update_card_face_rect(subject, image_id, {"x": 0, "y": 0, "w": 0.4, "h": 0.4})
+            self.assertEqual(_raw_cards(subject), before)
+            update_card_face_rect(subject, image_id, {"x": 0, "y": 0, "w": 0.4, "h": 0.3})
+            set_stage(subject, image_id, {"scale": 0.6, "x": 0.1, "y": 0})
+            self.assertEqual(cards_for(subject)[0]["stage"]["scale"], 0.6)
 
     @covers_requirement(
         "art-gallery-model::existing-cards-accept-in-place-face-rect-and-binding-updates-through-the-sole-writer"

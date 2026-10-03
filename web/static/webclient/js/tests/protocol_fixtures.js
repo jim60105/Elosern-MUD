@@ -430,6 +430,7 @@ function validRosterPortrait(overrides) {
       alt: "英雄肖像",
       placeholder: null,
       face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+      stage: { scale: 1, x: 0, y: 0 },
     },
     overrides || {}
   );

@@ -94,6 +94,7 @@ CARD_KEYS = frozenset(
         "requested_fields",
         "face_rect",
         "image_size",
+        "stage",
         "binding",
         "source",
         "created_at",
@@ -203,6 +204,34 @@ def _is_list_like(value: object) -> bool:
     strings and bytes included.
     """
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+
+
+def validate_stage(stage: object) -> dict:
+    """Return a fresh exact bounded presentation triple without coercion."""
+    if not isinstance(stage, Mapping) or set(stage) != {"scale", "x", "y"}:
+        raise GalleryRecordError("stage must be a mapping of exactly scale, x, y")
+    for name, lower, upper in (("scale", 0.2, 2.0), ("x", -0.5, 0.5), ("y", -0.5, 0.5)):
+        value = stage[name]
+        if not _is_real_number(value) or not lower <= value <= upper:
+            raise GalleryRecordError(f"stage.{name} must be a finite real number in [{lower}, {upper}]")
+    return {name: stage[name] for name in ("scale", "x", "y")}
+
+
+def identity_stage() -> dict:
+    """Return fresh full-figure identity placement."""
+    return {"scale": 1.0, "x": 0.0, "y": 0.0}
+
+
+def _normalize_stored_stage(entry: object) -> object:
+    """Repair only placement on a copy; tolerant reads never persist repairs."""
+    if not isinstance(entry, Mapping):
+        return entry
+    copied = dict(entry)
+    try:
+        copied["stage"] = validate_stage(copied.get("stage"))
+    except GalleryRecordError:  # observability: ignore R2: stage-only tolerant read intentionally supplies identity
+        copied["stage"] = identity_stage()
+    return copied
 
 
 def validate_face_rect(rect: object, image_size: Mapping | None = None) -> dict:
@@ -409,7 +438,7 @@ def validate_card(
     trusted dimension mapping. Every other contract key is required, no extra
     key is tolerated, and no environment-driven generation parameter can be
     stored. Reads pass ``api_defaults=False``, which requires the complete
-    eleven-key stored contract.
+    twelve-key stored contract.
     """
     if not isinstance(card, Mapping):
         raise GalleryRecordError("a gallery card must be a mapping")
@@ -417,7 +446,7 @@ def validate_card(
     missing = CARD_KEYS - keys
     extra = keys - CARD_KEYS
     if api_defaults:
-        missing -= {"face_rect", "created_at"}
+        missing -= {"face_rect", "created_at", "stage"}
     if missing or extra:
         raise GalleryRecordError(
             "gallery card keys must be exactly the contract set"
@@ -492,6 +521,7 @@ def validate_card(
         "requested_fields": list(requested_fields),
         "face_rect": face_rect,
         "image_size": image_size,
+        "stage": validate_stage(card.get("stage", identity_stage()) if api_defaults else card["stage"]),
         "binding": binding,
         "source": source,
         "created_at": created_at,
@@ -542,11 +572,13 @@ def _scan_gallery_states() -> list[GallerySubjectState]:
 
     The shared scan behind the two cross-record accessors below. Raw and
     write-free: card entries are validated straight off the record
-    (``validate_card`` with ``api_defaults=False``) so a malformed entry is
-    skipped exactly as ``cards_for`` skips it, and no per-subject fetch —
-    which consolidates duplicate records — runs during a listing. A record
-    whose persisted kind/subject no longer parses is skipped, so one corrupt
-    row can never blind an operator surface.
+    (``validate_card`` with ``api_defaults=False`` after the same stage-only
+    identity normalization ``cards_for`` applies, so a stage-less legacy card
+    counts there and here alike) and a malformed entry is skipped exactly as
+    ``cards_for`` skips it. No per-subject fetch — which consolidates
+    duplicate records — runs during a listing. A record whose persisted
+    kind/subject no longer parses is skipped, so one corrupt row can never
+    blind an operator surface.
     """
     states: list[GallerySubjectState] = []
     for record in GalleryRecord.objects.all():
@@ -557,7 +589,7 @@ def _scan_gallery_states() -> list[GallerySubjectState]:
         card_count = 0
         for entry in record.db.cards or []:
             try:
-                validate_card(entry, subject, api_defaults=False)
+                validate_card(_normalize_stored_stage(entry), subject, api_defaults=False)
             except GalleryRecordError:
                 log_warn(
                     "gallery_card_invalid",
@@ -774,7 +806,7 @@ def _update_card_field(subject: ArtSubject, image_id: str, field: str, value) ->
         located: dict | None = None
         for index, entry in enumerate(entries):
             try:
-                validated = validate_card(entry, subject, api_defaults=False)
+                validated = validate_card(_normalize_stored_stage(entry), subject, api_defaults=False)
             except GalleryRecordError:  # observability: ignore R2: tolerant locate reports the malformed entry and refuses to update it
                 log_warn(
                     "gallery_card_invalid",
@@ -811,6 +843,18 @@ def _update_card_field(subject: ArtSubject, image_id: str, field: str, value) ->
         return dict(updated)
 
 
+def set_stage(subject: ArtSubject, image_id: str, stage: object) -> dict:
+    """Replace one card's whole presentation triple through the sole writer."""
+    validated = validate_stage(stage)
+    with gallery_lock:
+        updated = _update_card_field(subject, image_id, "stage", validated)
+        log_info(
+            "gallery_stage_set",
+            context={"subject": subject.full(), "image_id": image_id, **validated},
+        )
+        return updated
+
+
 def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict:
     """Re-mark one existing card's face rectangle, stored verbatim.
 
@@ -830,7 +874,7 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
         located = None
         for entry in record.db.cards or []:
             try:
-                validated = validate_card(entry, subject, api_defaults=False)
+                validated = validate_card(_normalize_stored_stage(entry), subject, api_defaults=False)
             except GalleryRecordError:  # observability: ignore R2: tolerant locate ignores malformed cards
                 continue
             if validated["image_id"] == image_id:
@@ -887,7 +931,7 @@ def cards_for(subject: ArtSubject) -> list[dict]:
     for entry in record.db.cards or []:
         try:
             cards.append(
-                validate_card(entry, subject, api_defaults=False)
+                validate_card(_normalize_stored_stage(entry), subject, api_defaults=False)
             )
         except GalleryRecordError:
             log_warn(

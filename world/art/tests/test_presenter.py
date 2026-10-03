@@ -422,8 +422,8 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIsNone(payload["subject_key"])
 
 
-class FaceRectPayloadTests(EvenniaTestCase):
-    """``face_rect`` on every payload (art-gallery-resolution)."""
+class _CardPayloadCase(EvenniaTestCase):
+    """Shared card-with-file harness for per-field payload assertions."""
 
     def setUp(self):
         super().setUp()
@@ -470,6 +470,51 @@ class FaceRectPayloadTests(EvenniaTestCase):
         fields.update(overrides)
         append_card(subject, **fields)
         return subject, image_id, identity
+
+
+class StagePayloadTests(_CardPayloadCase):
+    """``stage`` rides every asset payload and null on placeholders."""
+
+    @covers_requirement(
+        "webclient-art-panel::resolved-artwork-carries-stage-without-changing-asset-or-placeholder-truth"
+    )
+    def test_resolved_card_carries_its_stage_verbatim(self):
+        triple = {"scale": 0.6, "x": -0.2, "y": 0.1}
+        subject, image_id, identity = self._append_card_with_file(stage=triple)
+        payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["stage"], triple)
+        # The stage never disturbs the asset truth it rides on.
+        self.assertEqual(payload["url"], f"/art/{identity}")
+
+    @covers_requirement(
+        "webclient-art-panel::resolved-artwork-carries-stage-without-changing-asset-or-placeholder-truth"
+    )
+    def test_missing_or_malformed_stored_stage_degrades_to_identity(self):
+        subject = self._subject()
+        self._append_card_with_file()
+        # A card stored without the key reads as identity.
+        card = dict(cards_for(subject)[0])
+        card.pop("stage")
+        with patch("world.art.presenter.resolve_card", return_value=card):
+            payload = resolve_character(self.player)
+        self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+        # A malformed stored triple degrades to identity with one diagnostic,
+        # and the asset itself still resolves.
+        broken = dict(cards_for(subject)[0])
+        broken["stage"] = {"scale": 3.5, "x": 0, "y": 0}
+        with patch("world.art.presenter.resolve_card", return_value=broken), patch(
+            "world.art.presenter.log_warn"
+        ) as warn:
+            payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+        events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_stage_invalid"]
+        self.assertEqual(len(events), 1, events)
+
+
+class FaceRectPayloadTests(_CardPayloadCase):
+    """``face_rect`` on every payload (art-gallery-resolution)."""
 
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"

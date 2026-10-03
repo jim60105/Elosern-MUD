@@ -42,6 +42,7 @@ var ROSTER_MAX_STATUS = C.ROSTER_MAX_STATUS;
 var ROSTER_LOCK_REASON = C.ROSTER_LOCK_REASON;
 var art = require("./art.js");
 var validateArtFaceRect = art.validateArtFaceRect;
+var validateArtStage = art.validateArtStage;
 var validateArtPlaceholder = art.validateArtPlaceholder;
 var questLog = require("./quest_log.js");
 var validateQuestLogPanel = questLog.validateQuestLogPanel;
@@ -348,7 +349,7 @@ function validateRosterPortrait(value) {
   requireExactFields(
     value,
     "roster portrait",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect"],
+    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage"],
     []
   );
   if (value.subject_key !== null) {
@@ -383,6 +384,7 @@ function validateRosterPortrait(value) {
     throw new Error("portrait must carry either url or placeholder");
   }
   var faceRect = validateArtFaceRect(value.face_rect);
+  var stage = validateArtStage(value.stage, url);
   if (url !== null && faceRect === null) {
     throw new Error("a portrait with a url carries a face_rect");
   }
@@ -397,6 +399,7 @@ function validateRosterPortrait(value) {
     alt: alt,
     placeholder: placeholder,
     face_rect: faceRect,
+    stage: stage,
   };
 }
 

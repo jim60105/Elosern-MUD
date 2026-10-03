@@ -1,0 +1,12 @@
+import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
+import { galleryStoryModel } from "../gallery-fixtures.js";
+const card = (stage = { scale: 1, x: 0, y: 0 }) => ({ ...galleryStoryModel().cards[0], stage });
+export default { title: "Overlays/GalleryStageTransformModal", component: GalleryStageTransformModal };
+export const Identity = { args: { card: card() } };
+export const Child = { args: { card: card({ scale: 0.6, x: 0, y: 0 }) } };
+export const Translated = { args: { card: card({ scale: 0.6, x: 0.1, y: -0.2 }) } };
+export const Boundary = { args: { card: card({ scale: 2, x: 0.5, y: -0.5 }) } };
+export const Pending = { args: { card: card(), disabled: true } };
+export const Rejected = { args: { card: card({ scale: 0.6, x: 0.1, y: -0.2 }), rejected: true } };
+export const FailedLoad = { args: { card: { ...card(), url: "/art/missing-stage-story.png" } } };
+export const ReducedMotion = { args: { card: card() }, parameters: { reducedMotion: "reduce" } };

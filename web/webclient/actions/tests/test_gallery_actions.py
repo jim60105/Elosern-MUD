@@ -41,6 +41,7 @@ PAYLOADS = {
     "gallery.default.set": {"subject_key": SUBJECT, "image_id": IMAGE},
     "gallery.card.delete": {"subject_key": SUBJECT, "image_id": IMAGE},
     "gallery.face_rect.update": {"subject_key": SUBJECT, "image_id": IMAGE, "face_rect": {"x": 0.125, "y": 0.25, "w": 0.5, "h": 0.5}},
+    "gallery.stage.update": {"subject_key": SUBJECT, "image_id": IMAGE, "stage": {"scale": 0.6, "x": -0.2, "y": 0.1}},
     "gallery.binding.save": {"subject_key": SUBJECT, "image_id": IMAGE, "slots": ["accessories", "weapon_off"]},
 }
 
@@ -80,12 +81,16 @@ def wire_cases():
     for value in (None, {}, {"x": 0, "y": 0, "w": 1, "h": 1, "z": 0}, {"x": True, "y": 0, "w": 1, "h": 1}, {"x": 0, "y": 0, "w": 0, "h": 1}, {"x": 0.75, "y": 0, "w": 0.5, "h": 1}, {"x": 0, "y": 0.75, "w": 1, "h": 0.5}, {"x": -0.1, "y": 0, "w": 1, "h": 1}):
         add(rect, "rect " + repr(value), lambda p, value=value: p.update(face_rect=value))
     add(rect, "full image", lambda p: p.update(face_rect={"x": 0, "y": 0, "w": 1, "h": 1}), True)
+    stage = "gallery.stage.update"
+    for value in (None, {}, {"scale": 1, "x": 0, "y": 0, "z": 0}, {"scale": 1, "x": 0}, {"scale": True, "x": 0, "y": 0}, {"scale": "nan", "x": 0, "y": 0}, {"scale": 0.1, "x": 0, "y": 0}, {"scale": 2.5, "x": 0, "y": 0}, {"scale": 1, "x": -0.6, "y": 0}, {"scale": 1, "x": 0, "y": 0.51}):
+        add(stage, "stage " + repr(value), lambda p, value=value: p.update(stage=value))
+    add(stage, "stage bounds", lambda p: p.update(stage={"scale": 0.2, "x": -0.5, "y": 0.5}), True)
     return cases
 
 
 class GalleryActionWireTests(unittest.TestCase):
     @covers_requirement(
-        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
     def test_python_node_bidirectional_boundaries(self):
         registry = build_production_action_registry()
@@ -189,9 +194,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         return result
 
     @covers_requirement(
-        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
-    def test_all_six_actions_declare_uniform_affected_panels_registered_in_production(self):
+    def test_all_seven_actions_declare_uniform_affected_panels_registered_in_production(self):
         self.assertEqual(actions.AFFECTED_GALLERY_PANELS, ("gallery", "art", "roster"))
         registry = build_production_registry()
         for name in actions.AFFECTED_GALLERY_PANELS:
@@ -203,6 +208,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
             ("gallery.generate", {"subject_key": SUBJECT, "fields": [], "custom_prompt": ""}),
             ("gallery.default.set", pair),
             ("gallery.face_rect.update", dict(pair, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3})),
+            ("gallery.stage.update", dict(pair, stage={"scale": 0.6, "x": -0.2, "y": 0})),
             ("gallery.binding.save", dict(pair, slots=["armor"])),
             ("gallery.card.delete", pair),
         ]
@@ -345,6 +351,45 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(result["message"], "無法更新這張肖像。")
 
     @covers_requirement(
+        "webclient-gallery-management-actions::stage-save-accepts-one-exact-triple-and-preserves-gallery-publication-discipline"
+    )
+    def test_stage_save_stores_verbatim_publishes_and_replays_idempotently(self):
+        first = self.card()
+        second = self.card(2)
+        triple = {"scale": 0.6, "x": 0.1, "y": -0.2}
+        payload = {"subject_key": SUBJECT, "image_id": first["image_id"], "stage": triple}
+        envelope = self.envelope("gallery.stage.update", payload)
+        with patch.object(actions, "log_info") as info, patch("world.art.gallery.log_info") as service_info:
+            result = self.dispatch("gallery.stage.update", payload, envelope=envelope)
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "gallery_stage_updated")
+        # Stored verbatim: the triple lands unchanged and siblings, default,
+        # provenance and order survive the atomic replacement.
+        self.assertEqual(
+            api.cards_for(self.subject),
+            [dict(first, stage=triple), second],
+        )
+        # The committed fact reaches the gallery presentation for the editor's
+        # revision-correlated close gate.
+        row = next(r for r in self.panel()["cards"] if r["image_id"] == first["image_id"])
+        self.assertEqual(row["stage"], triple)
+        self.assertIn(
+            "gallery_stage_set",
+            [call.args[0] for call in service_info.call_args_list if call.args],
+        )
+        # Replaying the same envelope is idempotent: one send, no re-write.
+        self.assertEqual(self.dispatch("gallery.stage.update", payload, envelope=envelope), result)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(api.cards_for(self.subject), [dict(first, stage=triple), second])
+        # An unknown card never mutates anything and speaks the ladder message.
+        with patch.object(actions, "log_warn") as warn:
+            missing = self.dispatch("gallery.stage.update", {"subject_key": SUBJECT, "image_id": IMAGE, "stage": {"scale": 1, "x": 0, "y": 0}})
+        self.assertEqual(missing["outcome"], "rejected")
+        self.assertEqual(missing["code"], "unknown_card")
+        self.assertEqual(api.cards_for(self.subject), [dict(first, stage=triple), second])
+        warn.assert_called_once()
+
+    @covers_requirement(
         "art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots",
         "webclient-gallery-management-actions::binding-save-captures-the-current-snapshot-and-never-accepts-item-keys",
     )
@@ -426,7 +471,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(api.cards_for(self.companion_subject), [card])
 
     @covers_requirement(
-        "webclient-gallery-management-actions::six-gallery-management-actions-are-registered-with-exact-payload-validators"
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
     def test_malformed_payloads_never_reach_adapter_or_create_state(self):
         before = (api.GalleryRecord.objects.count(), ArtAssetRecord.objects.count())
