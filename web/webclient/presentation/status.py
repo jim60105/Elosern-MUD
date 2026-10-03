@@ -48,7 +48,9 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         conditions.append(entry)
     actor_field: dict[str, Any] = {
         "name": model.actor_name,
-        "identity": model.actor_identity,
+        # Resources remain owner-keyed under possession; identity addresses
+        # the session's controlled figure, not the source of those resources.
+        "identity": str(actor.pk),
     }
     # The composed full title (fixed　epithet); the wire field is optional and
     # omitted when empty, so a pre-creation character keeps the v1 shape

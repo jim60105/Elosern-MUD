@@ -100,6 +100,22 @@ class PossessionPresentationTests(EvenniaTest):
             real_msg(*args, **kwargs)
         self.session.msg = _recording_msg
 
+    def test_real_possession_retains_the_owner_party_and_catalog_identity(self):
+        other = create_object(LLMNPC, key="測試同行乙", location=self.room1)
+        other.race = "human"
+        other.apply_race_baseline()
+        join_party(other, self.player)
+        before = party_presenter(PresentationContext(self.player, 1))
+        enter_possession(self.player, self.npc)
+        context = PresentationContext(self.npc, 1)
+        self.assertEqual(party_presenter(context), before)
+        catalog = self.registry.render("art", context)["portrait_catalog"]
+        self.assertIn(str(self.npc.pk), catalog)
+        self.assertIn(str(other.pk), catalog)
+        self.assertEqual(status_presenter(context)["actor"]["identity"], str(self.npc.pk))
+        release_possession(self.player)
+        self.assertEqual(party_presenter(PresentationContext(self.player, 1)), before)
+
     def tearDown(self):
         try:
             set_clock_for_testing(None)
@@ -209,6 +225,9 @@ class PossessionPresentationTests(EvenniaTest):
         char_panel_before = character_presenter(ctx_player)
         wallet_before = char_panel_before["wallet"]
         self.assertEqual(wallet_before, 5000)
+        self.player.traits.hp.current = 37
+        self.npc.traits.hp.current = 81
+        status_before = status_presenter(ctx_player)
 
         # Enter possession
         enter_possession(self.player, self.npc)
@@ -234,6 +253,9 @@ class PossessionPresentationTests(EvenniaTest):
         stat_panel = status_presenter(ctx_npc)
         self.assertTrue(stat_panel["available"])
         self.assertEqual(stat_panel["actor"]["name"], self.player.key)
+        self.assertEqual(stat_panel["actor"]["identity"], str(self.npc.pk))
+        self.assertEqual(stat_panel["resources"], status_before["resources"])
+        self.assertEqual(stat_panel["conditions"], status_before["conditions"])
 
         # 4. objectives_presenter: available without error
         obj_panel = objectives_presenter(ctx_npc)
@@ -387,10 +409,10 @@ class PossessionPresentationTests(EvenniaTest):
     )
     def test_party_panel_schema_untouched_and_companion_affordance_present(self):
         """party panel payload schema carries no possession field; vocabulary offers possess."""
-        # party panel schema version 1 untouched
+        # The party v2 six-key shape carries no possession-specific field.
         ctx = PresentationContext(actor=self.player, protocol_version=1)
         panel = party_presenter(ctx)
-        self.assertEqual(panel["schema_version"], 1)
+        self.assertEqual(panel["schema_version"], 2)
         self.assertTrue(panel["available"])
         self.assertEqual(set(panel.keys()), {"schema_version", "available", "slots"})
 

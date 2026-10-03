@@ -1,4 +1,4 @@
-"""Tests for the version-1 ``party`` presentation panel (webclient-align-04).
+"""Tests for the version-2 ``party`` presentation panel.
 
 Presenter shape (party-list order, exact row vocabulary, canonical bond-stage
 names only, true-trait HP), empty-party availability, stale-dbid omission,
@@ -10,9 +10,12 @@ checker resolves IDs only from ``openspec/specs/``).
 """
 
 from copy import deepcopy
+from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 import unittest
 
+from django.test import override_settings
 from tools.spec_traceability import covers_requirement
 
 from evennia.server.serversession import ServerSession
@@ -40,6 +43,8 @@ from web.webclient.presentation.party import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.quests.catalog import register_catalog
+from world.art.gallery import append_card, record_for
+from world.art.subjects import character_subject_for
 from world.rules.action import stored_gauge_pair
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
@@ -134,6 +139,59 @@ class PartyPresenterTests(EvenniaTest):
 
     def _render(self):
         return self.registry.render("party", self.context)
+
+    def test_default_gallery_ref_resolves_in_same_snapshot_and_reads_only(self):
+        first = _companion("測試同行甲", self.room)
+        second = _companion("測試同行乙", self.room)
+        for npc in (first, second):
+            join_party(npc, self.player)
+        first.db.portrait_policy = {"mode": "named", "stable_key": "t_party_portrait"}
+        first.db.age = first.db.apparent_age = 30
+        subject = character_subject_for(first)
+        image_id = "aaaaaaaa-1111-4111-8111-111111111111"
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        with tempfile.TemporaryDirectory() as root, override_settings(ART_STORE_ROOT=root):
+            target = Path(root) / identity
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"synthetic image")
+            append_card(
+                subject, image_id=image_id, stored_identity=identity, prompt=None,
+                seed=None, checkpoint=None, requested_fields=[], binding=None,
+                source="seed", created_at=100, image_size={"width": 768, "height": 1024},
+            )
+            record = record_for(subject, create=False)
+            before = deepcopy(record.db.cards)
+            rows = self._render()["slots"]
+            self.assertEqual(rows[0]["portrait_ref"], str(first.pk))
+            self.assertIsNone(rows[1]["portrait_ref"])
+            catalog = self.registry.render("art", self.context)["portrait_catalog"]
+            self.assertEqual(catalog[rows[0]["portrait_ref"]]["url"], f"/art/{identity}")
+            self.assertEqual(record.db.cards, before)
+            record.db.default_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
+            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            record.db.default_image_id = None
+            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            record.delete()
+            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            self.assertIsNone(record_for(subject, create=False))
+
+    def test_possessed_companion_keeps_owner_order_and_owner_bond_stages(self):
+        first = _companion("測試同行甲", self.room)
+        second = _companion("測試同行乙", self.room)
+        for npc in (first, second):
+            join_party(npc, self.player)
+        apply_affinity_change(first, self.player, AffinitySource.QUEST_COMPLETION, 47)
+        expected = self._render()
+        possessed = PresentationContext(actor=second, protocol_version=1)
+        self.assertEqual(self.registry.render("party", possessed), expected)
+        self.assertNotEqual(first.relations.stage_for(self.player).name, first.relations.stage_for(second).name)
+
+    def test_possessed_stranger_or_stale_owner_is_unavailable_not_empty(self):
+        npc = _companion("測試陌客", self.room)
+        context = PresentationContext(actor=npc, protocol_version=1)
+        for owner in (None, 999_999, "broken"):
+            npc.db.party_member = owner
+            self.assertEqual(self.registry.render("party", context), UNAVAILABLE_PAYLOAD)
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
@@ -271,6 +329,10 @@ class PartyValidatorTests(unittest.TestCase):
         # Paired astral code points (surrogate pairs in UTF-16 terms) are
         # legal text on both mirrors.
         validate_party(self._panel([_slot(display_name="薇拉\U0001F600")]))
+        for ref in ("42", "1" * 32):
+            self.assertEqual(
+                validate_party(self._panel([_slot(portrait_ref=ref)]))["slots"][0]["portrait_ref"], ref
+            )
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
@@ -301,7 +363,12 @@ class PartyValidatorTests(unittest.TestCase):
             "negative hp_current": self._panel([_slot(hp_current=-1)]),
             "bool identity": self._panel([_slot(identity=True)]),
             "zero identity": self._panel([_slot(identity=0)]),
-            "non-null portrait_ref": self._panel([_slot(portrait_ref="42")]),
+            "numeric portrait_ref": self._panel([_slot(portrait_ref=42)]),
+            "non-decimal portrait_ref": self._panel([_slot(portrait_ref="4a")]),
+            "unicode decimal portrait_ref": self._panel([_slot(portrait_ref="４２")]),
+            "empty portrait_ref": self._panel([_slot(portrait_ref="")]),
+            "over-bound portrait_ref": self._panel([_slot(portrait_ref="1" * 33)]),
+            "old version": {"schema_version": 1, "available": True, "slots": []},
             "duplicate identities": self._panel(
                 [_slot(identity=7), _slot(identity=7)]
             ),

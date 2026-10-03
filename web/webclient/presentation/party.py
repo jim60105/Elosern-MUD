@@ -1,4 +1,4 @@
-"""Version-1 read-only ``party`` presentation panel (webclient-align-04).
+"""Version-2 read-only ``party`` presentation panel.
 
 The presenter serializes the player's live companions into the exact
 ``{schema_version, available, slots}`` shape: row vocabulary is the existing
@@ -15,7 +15,7 @@ TRUE stored traits through the shared ``stored_gauge_pair`` rules helper
 (never ``disguised_stats`` — display disguise must not leak into party
 truth), and the bond stage comes from the rulebook-backed
 ``npc.relations.stage_for`` reader. An empty party is an available panel with
-``slots: []`` so the client renders its dashed invite slot instead of an
+``slots: []`` so the client renders the controlled figure alone instead of an
 unavailable branch. Creation-pending and no-location puppets raise
 :class:`PanelUnavailableError` and receive the registry-owned shared
 unavailable form.
@@ -26,6 +26,7 @@ overrides the proposal's "positive" wording; the combat participant row keeps
 its own stricter cross assertion).
 """
 
+import re
 from typing import Any
 
 from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
@@ -41,14 +42,19 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.art.gallery import cards_for, record_for
+from world.art.subjects import ArtSubjectError, character_subject_for
 from world.rules.action import stored_gauge_pair
+from world.rules.art_view import portrait_catalog_key
 from world.rules.npc_identity import npc_display_name
+from world.rules.party import bound_owner_of, live_companions
 
-PARTY_SCHEMA_VERSION = 1
+PARTY_SCHEMA_VERSION = 2
 
 # Mirrors ``world.rules.party.PARTY_MAX_COMPANIONS``; the row cap is pinned in
 # the spec so drift between the rules bound and the wire bound fails loudly.
 PARTY_MAX_ROWS = 4
+MAX_PARTY_PORTRAIT_REF = 32
 
 
 class PartyPanelError(ProtocolValidationError):
@@ -97,8 +103,13 @@ def _validate_slot(value: Any) -> dict[str, Any]:
         _require_str(value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
         "slot display_name",
     )
-    if value["portrait_ref"] is not None:
-        raise PartyPanelError("portrait_ref must be null in this schema version")
+    portrait_ref = value["portrait_ref"]
+    if portrait_ref is not None and (
+        not isinstance(portrait_ref, str)
+        or not 1 <= len(portrait_ref) <= MAX_PARTY_PORTRAIT_REF
+        or re.fullmatch(r"[0-9]+", portrait_ref) is None
+    ):
+        raise PartyPanelError("portrait_ref must be a bounded decimal string or null")
     # Bounds only — zero HP is legal (a knocked-out companion's stored gauge)
     # and the current/maximum ordering is trait truth, never a validator rule.
     hp_current = _require_int(
@@ -114,7 +125,7 @@ def _validate_slot(value: Any) -> dict[str, Any]:
     return {
         "identity": identity,
         "display_name": display_name,
-        "portrait_ref": None,
+        "portrait_ref": portrait_ref,
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
         "bond_stage": bond_stage,
@@ -157,6 +168,22 @@ def validate_party(payload: Any) -> dict[str, Any]:
     return result
 
 
+def _resolve_portrait_ref(npc: Any) -> str | None:
+    """Read the canonical named gallery's default, never create or generate."""
+    try:
+        subject = character_subject_for(npc)
+    except ArtSubjectError:  # observability: ignore R2: malformed policy has the existing truthful no-portrait fallback
+        return None
+    if subject is None:
+        return None
+    record = record_for(subject, create=False)
+    if record is None or not record.db.default_image_id:
+        return None
+    if not any(card["image_id"] == record.db.default_image_id for card in cards_for(subject)):
+        return None
+    return portrait_catalog_key(npc.pk)
+
+
 def party_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``party`` panel for the authenticated puppet."""
     actor = context.actor
@@ -164,10 +191,14 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
         raise PanelUnavailableError
     if getattr(actor, "location", None) is None:
         raise PanelUnavailableError
-    from world.rules.party import live_companions
+    from typeclasses.npcs import NPC
+
+    owner = bound_owner_of(actor) if isinstance(actor, NPC) else actor
+    if owner is None:
+        raise PanelUnavailableError
 
     slots: list[dict[str, Any]] = []
-    for npc in live_companions(actor)[:PARTY_MAX_ROWS]:
+    for npc in live_companions(owner)[:PARTY_MAX_ROWS]:
         hp_current, hp_maximum = stored_gauge_pair(npc, "hp")
         slots.append(
             {
@@ -175,10 +206,10 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "display_name": npc_display_name(npc)[
                     :MAX_DISPLAY_NAME_CODE_POINTS
                 ],
-                "portrait_ref": None,
+                "portrait_ref": _resolve_portrait_ref(npc),
                 "hp_current": hp_current,
                 "hp_maximum": hp_maximum,
-                "bond_stage": npc.relations.stage_for(actor).name,
+                "bond_stage": npc.relations.stage_for(owner).name,
             }
         )
     return validate_party(

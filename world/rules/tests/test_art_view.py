@@ -68,7 +68,7 @@ def _actor(location=None, active_combat=None, pk=0):
     return SimpleNamespace(
         pk=pk,
         location=location,
-        db=SimpleNamespace(active_combat=active_combat),
+        db=SimpleNamespace(active_combat=active_combat, party=None),
     )
 
 
