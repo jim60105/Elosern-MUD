@@ -14,6 +14,7 @@ function foeEntry(ref, url, name) {
     alt: `${name}的肖像`,
     placeholder: null,
     face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
+    stage: { scale: 1, x: 0, y: 0 },
     context: { name, role: "敵方" },
   };
 }

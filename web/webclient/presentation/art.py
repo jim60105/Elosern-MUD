@@ -34,6 +34,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.art.presenter import resolve_entity, resolve_scene
+from world.art.gallery import GalleryRecordError, validate_stage
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.art_view import (
     MAX_PORTRAIT_CATALOG,
@@ -92,6 +93,18 @@ def _validate_face_rect(value: Any) -> dict[str, float] | None:
     return rect
 
 
+def _validate_stage(value: Any, url: str | None) -> dict | None:
+    """Enforce asset placement and truthful placeholder nullability."""
+    if url is None:
+        if value is not None:
+            raise ProtocolValidationError("a placeholder carries no stage")
+        return None
+    try:
+        return validate_stage(value)
+    except GalleryRecordError as exc:  # observability: ignore R2: wire validation returns a typed refusal
+        raise ProtocolValidationError("invalid asset stage") from exc
+
+
 def _validate_placeholder(value: Any) -> dict[str, Any] | None:
     if value is None:
         return None
@@ -111,6 +124,7 @@ def _validate_scene(value: Any) -> dict[str, Any]:
         "art scene",
         {
             "archetype",
+            "stage",
             "label",
             "subject_key",
             "status",
@@ -153,6 +167,7 @@ def _validate_scene(value: Any) -> dict[str, Any]:
     if not alt.strip():
         raise ProtocolValidationError("scene alt must be non-empty")
     placeholder = _validate_placeholder(value["placeholder"])
+    stage = _validate_stage(value["stage"], url)
     if placeholder is None and status != "done":
         # An unavailable scene without a placeholder is not truthful.
         raise ProtocolValidationError("scene placeholder must be present unless done")
@@ -160,6 +175,7 @@ def _validate_scene(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("a done scene must not carry a placeholder")
     return {
         "archetype": archetype,
+        "stage": stage,
         "label": label,
         "subject_key": subject_key,
         "status": status,
@@ -193,6 +209,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
             "alt",
             "placeholder",
             "face_rect",
+            "stage",
             "context",
         },
         {},
@@ -223,6 +240,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
     placeholder = _validate_placeholder(value["placeholder"])
     context = _validate_context(value["context"])
     face_rect = _validate_face_rect(value["face_rect"])
+    stage = _validate_stage(value["stage"], url)
     # A client never offsets a frame it has no image for: the rectangle is
     # present exactly when the entry carries a media URL.
     if url is not None and face_rect is None:
@@ -237,6 +255,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
         "alt": alt,
         "placeholder": placeholder,
         "face_rect": face_rect,
+        "stage": stage,
         "context": context,
     }
 
@@ -308,6 +327,7 @@ def _serialize_scene(archetype: str | None) -> dict[str, Any]:
     if archetype is None:
         return {
             "archetype": None,
+            "stage": None,
             "label": "無法提供",
             "subject_key": None,
             "status": None,
@@ -321,6 +341,7 @@ def _serialize_scene(archetype: str | None) -> dict[str, Any]:
     resolved = resolve_scene(archetype)
     return {
         "archetype": archetype,
+        "stage": resolved.get("stage"),
         "label": label,
         "subject_key": resolved.get("subject_key"),
         "status": resolved.get("status"),
@@ -345,6 +366,7 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
             "alt": "無法提供",
             "subject_key": None,
             "face_rect": None,
+            "stage": None,
         }
     else:
         resolved = resolve_entity(entity)
@@ -356,6 +378,7 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
         "alt": resolved.get("alt") or "無法提供",
         "placeholder": _placeholder_for(resolved),
         "face_rect": resolved.get("face_rect"),
+        "stage": resolved.get("stage"),
         "context": {
             "name": entity_view.display_name,
             "role": entity_view.role,

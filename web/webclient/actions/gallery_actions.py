@@ -33,12 +33,14 @@ REJECTION_MESSAGES = {
     "invalid_prompt": "生成資料或補充提示詞格式錯誤。",
     "subject_ineligible": "角色資料不符合肖像生成條件。",
     "gallery_rejected": "無法更新這張肖像。",
+    "stage_rejected": "無法儲存比例調整。",
 }
 _SUCCESS = {
     "gallery.generate": ("gallery_queued", "已加入肖像生成佇列。"),
     "gallery.default.set": ("gallery_default_set", "已設為預設肖像。"),
     "gallery.card.delete": ("gallery_card_deleted", "已刪除肖像。"),
     "gallery.face_rect.update": ("gallery_face_rect_updated", "已儲存臉部框選。"),
+    "gallery.stage.update": ("gallery_stage_updated", "已儲存比例調整。"),
     "gallery.binding.save": ("gallery_binding_saved", "已儲存裝備綁定。"),
 }
 
@@ -83,6 +85,13 @@ def validate_gallery_face_rect_update_payload(payload):
     """The art API owns rectangle bounds; acceptance never changes coordinates."""
     result = _payload(payload, ("subject_key", "image_id", "face_rect"))
     gallery_api.validate_face_rect(payload["face_rect"])
+    return result
+
+
+def validate_gallery_stage_update_payload(payload):
+    """Admit an exact whole triple; the gallery API owns placement bounds."""
+    result = _payload(payload, ("subject_key", "image_id", "stage"))
+    gallery_api.validate_stage(payload["stage"])
     return result
 
 
@@ -135,6 +144,8 @@ def _error_code(error, *, resolved):
         return "binding_unsupported"
     if text == "this subject has no gallery record" or text.startswith(("no card with image_id ", "no valid card with image_id ")):
         return "unknown_card"
+    if text.startswith("stage"):
+        return "stage_rejected"
     return "gallery_rejected"
 
 
@@ -186,6 +197,8 @@ def _mutate(action_id, payload):
             gallery_api.remove_card(subject, image_id)
         elif action_id == "gallery.face_rect.update":
             gallery_api.update_card_face_rect(subject, image_id, payload["face_rect"])
+        elif action_id == "gallery.stage.update":
+            gallery_api.set_stage(subject, image_id, payload["stage"])
         elif action_id == "gallery.binding.save":
             snapshot = gallery_api.snapshot_for(entity)
             mask = [slot for slot in gallery_api.SLOT_ORDER if slot in payload["slots"]]
@@ -219,6 +232,10 @@ def _gallery_card_delete_adapter(actor, payload, session=None):
 
 def _gallery_face_rect_update_adapter(actor, payload, session=None):
     return _mutate("gallery.face_rect.update", payload)
+
+
+def _gallery_stage_update_adapter(actor, payload, session=None):
+    return _mutate("gallery.stage.update", payload)
 
 
 def _gallery_binding_save_adapter(actor, payload, session=None):

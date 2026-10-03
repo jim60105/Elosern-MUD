@@ -525,6 +525,7 @@ function onFoeLineupGone() {
         <ReferenceArtwork
           :portrait="currentPortrait"
           :initial-of="currentCharacter?.name || ''"
+          stage
         />
       </template>
       <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />

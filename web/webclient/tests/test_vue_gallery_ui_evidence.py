@@ -29,6 +29,7 @@ from ._showcase_build import ShowcaseEvidenceMixin, showcase_build_lock
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
 GALLERY_COMPONENTS = TESTS_DIR / "components" / "gallery.test.js"
+GALLERY_STAGE = TESTS_DIR / "components" / "stage_transform.test.js"
 GALLERY_APP_CLIENT = TESTS_DIR / "app_client_gallery.test.js"
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 FRAME_GUIDE = REPO_ROOT / "docs/design/elosern-redesign2/gallery-storyboard.md"
@@ -53,6 +54,14 @@ GALLERY_STORY_IDS = frozenset(
         "overlays-gallerybindingdrawer--unmatched",
         "overlays-galleryfacerectmodal--edit-portrait",
         "overlays-galleryfacerectmodal--rejected",
+        "overlays-gallerystagetransformmodal--identity",
+        "overlays-gallerystagetransformmodal--child",
+        "overlays-gallerystagetransformmodal--translated",
+        "overlays-gallerystagetransformmodal--boundary",
+        "overlays-gallerystagetransformmodal--pending",
+        "overlays-gallerystagetransformmodal--rejected",
+        "overlays-gallerystagetransformmodal--failed-load",
+        "overlays-gallerystagetransformmodal--reduced-motion",
     }
 )
 
@@ -69,6 +78,7 @@ FRAME_GUIDE_FRAMES = (
     "7. Default",
     "8. Delete",
     "9. Monster",
+    "10. Transform",
 )
 
 # The four reference design images the guide must link (spec: "reference the
@@ -177,6 +187,43 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         )
 
     @covers_requirement(
+        "webclient-gallery-ui::stage-transforms-affect-full-figures-and-never-avatar-cover-crops"
+    )
+    def test_stage_transforms_full_figures_only(self):
+        # 'A child stays on the same ground line', 'Translation uses frame
+        # dimensions at every scale', and 'Null stage and cover crop remain
+        # unchanged' pin the bottom-center custom-property transform, the
+        # null normalization, and the untouched faceObjectPosition cover path.
+        _assert_vitest_passes(
+            _run_vitest_once(GALLERY_STAGE), "stage transform rendering"
+        )
+
+    @covers_requirement(
+        "webclient-gallery-ui::the-stage-editor-previews-a-local-triple-against-a-static-adult-reference"
+    )
+    def test_stage_editor_local_preview(self):
+        # 'Slider and number edits synchronize', 'Drag uses frame fractions
+        # and clamps', 'Reset does not save', and 'Adult comparison stays
+        # static' pin the local-only draft, the frame-fraction drag mapping
+        # with bounds, and the transform-free static reference layer.
+        _assert_vitest_passes(
+            _run_vitest_once(GALLERY_STAGE), "stage editor preview"
+        )
+
+    @covers_requirement(
+        "webclient-gallery-ui::stage-saves-reuse-correlated-lifecycle-and-accessible-gallery-chrome"
+    )
+    def test_stage_save_lifecycle(self):
+        # 'Save waits for image load', 'Save closes only on its correlated
+        # revision', 'Rejection preserves editable intent', and 'Non-card and
+        # stale contexts cannot save' pin the load gate, the one-submit
+        # payload, the revision-correlated close, the retained rejected
+        # draft with the log link, and the pending-row refusal.
+        _assert_vitest_passes(
+            _run_vitest_once(GALLERY_APP_CLIENT), "stage save lifecycle"
+        )
+
+    @covers_requirement(
         "webclient-gallery-ui::gallery-mutations-ride-the-single-dispatch-entry-and-its-gates"
     )
     def test_mutations_single_dispatch_gates(self):
@@ -251,6 +298,44 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             "story-only publication driver",
             guide,
             "frame guide does not distinguish fixture publications from live behavior",
+        )
+
+    @covers_requirement(
+        "webclient-gallery-ui::stage-transform-stories-document-visual-and-state-behavior-offline"
+    )
+    def test_stage_transform_stories_offline(self):
+        # 'Showcase covers the complete editor offline' pins the registered
+        # modal family (identity, child, translated, boundary, pending,
+        # rejected, failed-load, reduced-motion) present in the built
+        # showcase index with no game or AI server.
+        with showcase_build_lock():
+            self.assertTrue(
+                (STORYBOOK_OUT / "index.json").is_file(),
+                "missing storybook index.json",
+            )
+            index = json.loads(
+                (STORYBOOK_OUT / "index.json").read_text(encoding="utf-8")
+            )
+        entries = index.get("entries", {})
+        missing = {
+            story_id
+            for story_id in GALLERY_STORY_IDS
+            if story_id.startswith("overlays-gallerystagetransformmodal--")
+        } - set(entries)
+        # The five stage-transform artwork states are asserted here even
+        # though they sit outside the frozen required-set manifest.
+        missing |= {
+            "core-referenceartwork--stage-identity",
+            "core-referenceartwork--stage-null-default",
+            "core-referenceartwork--stage-child-scale",
+            "core-referenceartwork--stage-offsets",
+            "core-referenceartwork--stage-enlarged-overflow",
+        } - set(entries)
+        self.assertEqual(
+            missing,
+            set(),
+            "stage transform stories missing from the showcase: "
+            + ", ".join(sorted(missing)),
         )
 
 

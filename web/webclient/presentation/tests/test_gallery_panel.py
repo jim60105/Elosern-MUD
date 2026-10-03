@@ -48,6 +48,7 @@ def payload():
             "image_id": image_id(1), "status": "card", "label": "測試肖像",
             "url": f"/art/gallery/character/t_gallery/{image_id(1)}.png",
             "face_rect": dict(api.DEFAULT_FACE_RECT), "is_default": True,
+            "stage": {"scale": 1, "x": 0, "y": 0},
             "chips": ["預設臉框", "目前預設"], "requested_fields": ["appearance"],
             "binding_present": False, "created_at": 100,
         }],
@@ -85,6 +86,11 @@ class GalleryWireTests(unittest.TestCase):
         add("rect zero", lambda p: p["cards"][0]["face_rect"].update(w=0))
         add("rect overflow", lambda p: p["cards"][0]["face_rect"].update(x=0.9))
         add("rect boolean", lambda p: p["cards"][0]["face_rect"].update(x=True))
+        add("stage boundary", lambda p: p["cards"][0].update(stage={"scale": 0.2, "x": -0.5, "y": 0.5}), True)
+        add("stage scale too large", lambda p: p["cards"][0]["stage"].update(scale=2.01))
+        add("stage bool", lambda p: p["cards"][0]["stage"].update(x=True))
+        add("stage missing", lambda p: p["cards"][0].pop("stage"))
+        add("stage null on card", lambda p: p["cards"][0].update(stage=None))
         add("fractional timestamp", lambda p: p["cards"][0].update(created_at=100.125), True)
         add("timestamp boolean", lambda p: p["cards"][0].update(created_at=True))
         add("unsafe timestamp", lambda p: p["cards"][0].update(created_at=2**53))
@@ -124,7 +130,7 @@ class GalleryWireTests(unittest.TestCase):
         add("accessories unsorted", lambda p: accessories(p, ["t_z", "t_a"]))
         add("Unicode sort", lambda p: accessories(p, ["\ue000", "𠮷"]), True)
         def failed(p):
-            p["cards"] = [{"image_id": image_id(2), "status": "failed", "label": "暫時無法生成，稍後再試", "url": None, "face_rect": None, "is_default": False, "chips": [], "requested_fields": [], "binding_present": False, "created_at": 200}]
+            p["cards"] = [{"image_id": image_id(2), "status": "failed", "label": "暫時無法生成，稍後再試", "url": None, "face_rect": None, "stage": None, "is_default": False, "chips": [], "requested_fields": [], "binding_present": False, "created_at": 200}]
             p["filters"] = {"all": 1, "defaults": 0, "bound": 0, "pending": 0, "failed": 1}
             p["error_state"] = {"code": "sd_connection_error", "at": 200}
         add("failed row", failed, True)

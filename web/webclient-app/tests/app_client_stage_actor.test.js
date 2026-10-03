@@ -25,6 +25,7 @@ const HOST_ENTRY = {
   alt: "店長的肖像",
   placeholder: null,
   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+  stage: { scale: 1, x: 0, y: 0 },
   context: { name: "店長", role: "對話對象" },
 };
 

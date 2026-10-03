@@ -19,6 +19,8 @@ from world.art.gallery import (
     GalleryRecordError,
     default_face_rect,
     validate_face_rect,
+    validate_stage,
+    identity_stage,
 )
 from world.art.gallery_match import fallback_for, resolve_card
 from world.art.paths import resolved_under_store_root
@@ -130,6 +132,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
             "alt": subject.full(),
             "subject_key": subject.full(),
             "face_rect": dict(DEFAULT_FACE_RECT),
+            "stage": identity_stage(),
         }
     # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
     # EVERY fall-through path — no record, an unfinished record, and an
@@ -153,6 +156,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
             "alt": PLACEHOLDER_LABELS[kind],
             "subject_key": subject.full(),
             "face_rect": None,
+            "stage": None,
         }
     return _placeholder_unavailable("無法提供")
 
@@ -170,6 +174,11 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
         log_warn("art_face_rect_invalid", context={"subject": subject.full()})
         face_rect = default_face_rect(card["image_size"]) if card.get("image_size") else dict(DEFAULT_FACE_RECT)
+    try:
+        stage = validate_stage(card.get("stage"))
+    except GalleryRecordError:  # observability: ignore R2: malformed placement degrades with its bounded diagnostic
+        log_warn("art_stage_invalid", context={"subject": subject.full(), "image_id": card.get("image_id")})
+        stage = identity_stage()
     return {
         "kind": "asset",
         "label": "已生成",
@@ -179,6 +188,7 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
         "alt": subject.full(),
         "subject_key": subject.full(),
         "face_rect": face_rect,
+        "stage": stage,
     }
 
 
@@ -209,6 +219,7 @@ def _fallback_payload(subject: ArtSubject, fallback: dict) -> dict:
         "alt": subject.full(),
         "subject_key": subject.full(),
         "face_rect": face_rect,
+        "stage": identity_stage(),
     }
 
 
@@ -276,4 +287,5 @@ def _placeholder_unavailable(label: str) -> dict:
         "alt": label,
         "subject_key": None,
         "face_rect": None,
+        "stage": None,
     }

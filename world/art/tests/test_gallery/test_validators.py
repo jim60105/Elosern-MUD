@@ -30,10 +30,34 @@ from world.art.gallery import (
     validate_face_rect,
     validate_image_size,
     default_face_rect,
+    validate_stage,
 )
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
+
+class StageValidationTests(unittest.TestCase):
+    @covers_requirement("art-gallery-model::per-card-stage-transforms-are-bounded-atomic-presentation-metadata")
+    def test_inclusive_bounds_preserve_values_in_fresh_plain_mapping(self):
+        for value in ({"scale": 0.2, "x": -0.5, "y": 0.5}, {"scale": 2, "x": 0.5, "y": -0.5}):
+            result = validate_stage(value)
+            self.assertEqual(result, value)
+            self.assertIs(type(result), dict)
+            self.assertIsNot(result, value)
+
+    @covers_requirement("art-gallery-model::per-card-stage-transforms-are-bounded-atomic-presentation-metadata")
+    def test_hostile_shapes_types_and_bounds_refuse(self):
+        for field in ("scale", "x", "y"):
+            for invalid in (True, False, float("nan"), float("inf"), -float("inf"), None, "0", [], 3, -1):
+                with self.subTest(field=field, invalid=invalid):
+                    value = {"scale": 1, "x": 0, "y": 0}
+                    value[field] = invalid
+                    with self.assertRaises(GalleryRecordError):
+                        validate_stage(value)
+        for value in (None, [], {}, {"scale": 1, "x": 0}, {"scale": 1, "x": 0, "y": 0, "z": 0}):
+            with self.subTest(value=value), self.assertRaises(GalleryRecordError):
+                validate_stage(value)
+
 
 class StoreRootConfinementTests(unittest.TestCase):
     def setUp(self):

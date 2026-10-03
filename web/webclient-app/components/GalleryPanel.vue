@@ -4,6 +4,7 @@ import GalleryDetailRail from "./GalleryDetailRail.vue";
 import GalleryGenerateDrawer from "./GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "./GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "./GalleryFaceRectModal.vue";
+import GalleryStageTransformModal from "./GalleryStageTransformModal.vue";
 import { GALLERY_FILTERS, galleryCardName, galleryDate } from "./gallery-copy.js";
 import { faceObjectPosition } from "./face-rect.js";
 import "./gallery.css";
@@ -62,13 +63,13 @@ watch(() => [props.result, props.revision], () => {
   if (result.outcome !== "success") {
     pending.value = null;
     rejected.value = true;
-  } else if (result.presentationRevision == null || props.revision >= result.presentationRevision) {
+  } else if (result.presentationRevision != null && props.revision >= result.presentationRevision) {
     pending.value = null;
     if (request.editor && request.editor === editor.value) closeEditor();
   }
 });
 function openEditor(name) {
-  if (locked.value) return;
+  if (locked.value || pending.value || (name !== "generate" && selectedCard.value?.status !== "card")) return;
   opener = document.activeElement;
   rejected.value = false;
   editor.value = name;
@@ -89,7 +90,7 @@ function selectCard(id) {
   selected.value = id;
 }
 function send(action, extra = {}) {
-  if (locked.value || !props.dispatch) return;
+  if (locked.value || pending.value || !props.dispatch) return;
   const isCard = !["gallery.generate", "gallery.subject.select"].includes(action);
   if (isCard && selectedCard.value?.status !== "card") return;
   const payload = { subject_key: props.model.selected, ...extra };
@@ -150,7 +151,7 @@ function selectSubject(subject) {
       </div>
       <GalleryDetailRail :card="selectedCard" :now="now" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
         @default="send('gallery.default.set')" @delete="send('gallery.card.delete')"
-        @generate="openEditor('generate')" @binding="openEditor('binding')" @face="openEditor('face')" />
+        @generate="openEditor('generate')" @binding="openEditor('binding')" @face="openEditor('face')" @stage="openEditor('stage')" />
       <Teleport to="body">
         <GalleryGenerateDrawer v-if="editor === 'generate'" :model="model" :preview="selectedCard" :disabled="locked" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.generate', $event)" @character="emit('character')" @log="emit('log')" />
@@ -158,6 +159,8 @@ function selectSubject(subject) {
           @close="closeEditor" @submit="send('gallery.binding.save', $event)" @select-card="selectCard" @log="emit('log')" />
         <GalleryFaceRectModal v-if="editor === 'face' && selectedCard" :card="selectedCard" :disabled="locked" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.face_rect.update', $event)" @log="emit('log')" />
+        <GalleryStageTransformModal v-if="editor === 'stage' && selectedCard?.status === 'card'" :card="selectedCard" :disabled="locked || !!pending" :rejected="rejected"
+          @close="closeEditor" @submit="send('gallery.stage.update', $event)" @log="emit('log')" />
       </Teleport>
     </template>
   </section>

@@ -46,7 +46,7 @@ function validateArtScene(value) {
   requireExactFields(
     value,
     "art scene",
-    ["archetype", "label", "subject_key", "status", "url", "aspect_ratio", "alt", "placeholder"],
+    ["archetype", "label", "subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "stage"],
     []
   );
   if (value.archetype !== null) {
@@ -84,6 +84,7 @@ function validateArtScene(value) {
     throw new Error("scene alt must be non-empty");
   }
   var placeholder = validateArtPlaceholder(value.placeholder);
+  var stage = validateArtStage(value.stage, url);
   if (placeholder === null && status !== "done") {
     throw new Error("scene placeholder must be present unless done");
   }
@@ -92,6 +93,7 @@ function validateArtScene(value) {
   }
   return {
     archetype: value.archetype,
+    stage: stage,
     label: label,
     subject_key: value.subject_key,
     status: status,
@@ -100,6 +102,23 @@ function validateArtScene(value) {
     alt: alt,
     placeholder: placeholder,
   };
+}
+
+function validateArtStage(value, url) {
+  if (url === null) {
+    if (value !== null) throw new Error("a placeholder carries no stage");
+    return null;
+  }
+  requireExactFields(value, "stage", ["scale", "x", "y"], []);
+  ["scale", "x", "y"].forEach(function (name) {
+    var coordinate = value[name];
+    var lower = name === "scale" ? 0.2 : -0.5;
+    var upper = name === "scale" ? 2 : 0.5;
+    if (typeof coordinate !== "number" || !Number.isFinite(coordinate) || coordinate < lower || coordinate > upper) {
+      throw new Error("invalid stage." + name);
+    }
+  });
+  return { scale: value.scale, x: value.x, y: value.y };
 }
 
 function validateArtContext(value) {
@@ -141,7 +160,7 @@ function validateArtCatalogEntry(value) {
   requireExactFields(
     value,
     "art catalog entry",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "context"],
+    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "context"],
     []
   );
   if (value.subject_key !== null) {
@@ -171,6 +190,7 @@ function validateArtCatalogEntry(value) {
   validateArtPlaceholder(value.placeholder);
   validateArtContext(value.context);
   var faceRect = validateArtFaceRect(value.face_rect);
+  validateArtStage(value.stage, url);
   if (url !== null && faceRect === null) {
     throw new Error("a catalog entry with a url carries a face_rect");
   }
@@ -242,6 +262,8 @@ function validateGalleryActionPayload(actionId, payload) {
     keys.push("image_id");
   } else if (actionId === "gallery.face_rect.update") {
     keys = keys.concat(["image_id", "face_rect"]);
+  } else if (actionId === "gallery.stage.update") {
+    keys = keys.concat(["image_id", "stage"]);
   } else if (actionId === "gallery.binding.save") {
     keys = keys.concat(["image_id", "slots"]);
   } else if (actionId !== "gallery.subject.select") {
@@ -269,6 +291,7 @@ function validateGalleryActionPayload(actionId, payload) {
     }
   }
   if (actionId === "gallery.face_rect.update") validateGalleryFaceRect(payload.face_rect);
+  if (actionId === "gallery.stage.update") validateArtStage(payload.stage, true);
   return Object.assign({}, payload);
 }
 
@@ -347,7 +370,7 @@ function validateGalleryPanel(payload) {
   var counts = { all: payload.cards.length, defaults: 0, bound: 0, pending: 0, failed: 0 };
   payload.cards.forEach(function (row) {
     requireExactFields(row, "gallery row", [
-      "image_id", "status", "label", "url", "face_rect", "is_default", "chips",
+      "image_id", "status", "label", "url", "face_rect", "stage", "is_default", "chips",
       "requested_fields", "binding_present", "created_at"
     ], []);
     galleryUuid(row.image_id);
@@ -375,7 +398,7 @@ function validateGalleryPanel(payload) {
     });
     if (new Set(chips).size !== chips.length || new Set(fields).size !== fields.length) throw new Error("duplicate chip/field");
     if (row.status !== "card") {
-      if (row.url !== null || row.face_rect !== null || row.is_default || row.binding_present || chips.length || fields.length) {
+      if (row.url !== null || row.face_rect !== null || row.stage !== null || row.is_default || row.binding_present || chips.length || fields.length) {
         throw new Error("synthetic row fabricated card data");
       }
       return;
@@ -386,6 +409,7 @@ function validateGalleryPanel(payload) {
       throw new Error("url must name selected subject and image");
     }
     var rect = validateGalleryFaceRect(row.face_rect);
+    validateArtStage(row.stage, row.url);
     var slotChips = GALLERY_SLOT_LABELS.filter(function (label) { return chips.indexOf(label) !== -1; });
     var faceChips = chips.filter(function (c) { return c === "預設臉框" || c === "自訂臉框"; });
     if (faceChips.length !== 1) throw new Error("exactly one face chip required");
@@ -489,6 +513,7 @@ module.exports = {
   validateGalleryPanel: validateGalleryPanel,
   validateGalleryActionPayload: validateGalleryActionPayload,
   validateArtFaceRect: validateArtFaceRect,
+  validateArtStage: validateArtStage,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
   GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
   GALLERY_MAX_LABEL: GALLERY_MAX_LABEL,

@@ -4,7 +4,7 @@
 
 Define the gallery record model that later gallery changes build on: one
 lazily created `GalleryRecord` per portrait subject (`world/art/gallery.py`,
-the sole writer), the exact ten-key image-card contract with its reproduction,
+the sole writer), the exact twelve-key image-card contract with its reproduction,
 placement, and provenance fields, the shared `DEFAULT_FACE_RECT`, the
 slot-masked equipment binding with the no-create snapshot reader, the monster
 one-card cap, the `world/art/paths.py` store-root confinement helper behind
@@ -47,13 +47,13 @@ inside its record), `stored_identity` (the store-relative path
 `character` or `monster` — scenes have no gallery), `prompt` (either `None` or a mapping of exactly
 `positive` and `negative` verbatim prompt text), `seed` (a non-negative integer or `None`),
 `checkpoint` (a non-empty string or `None`), `requested_fields` (a list of field ids, possibly
-empty), `face_rect`, `image_size`, `binding`, `source` (one of `generated`, `seed`), and
+empty), `face_rect`, `image_size`, `stage`, `binding`, `source` (one of `generated`, `seed`), and
 `created_at` (a float epoch timestamp). `image_size` is the pixel size of the card's stored image:
-a mapping of exactly `width` and `height`, each a positive integer. A write MAY omit `face_rect`,
+a mapping of exactly `width` and `height`, each a positive integer. A write MAY omit `stage`, `face_rect`,
 `image_size`, and `created_at`, which the API fills with the fitted default rectangle for the
 established image size (see the face-rectangle requirement), the trusted image size supplied by
 the append caller, and the current epoch time respectively; every other contract key is required
-on the write. A caller-supplied `face_rect` SHALL be validated against the same record's
+on the write. Omitted `stage` defaults to `{scale: 1.0, x: 0.0, y: 0.0}`; strict card validation requires the complete twelve-key contract. A caller-supplied `face_rect` SHALL be validated against the same record's
 `image_size`, whichever order the two arrive in. Environment-driven generation parameters — steps,
 CFG scale, dimension-setting values, sampler, scheduler — SHALL NOT be stored on a card;
 `image_size` records the fact of the appended image's own decoded pixels, not a settings value. A
@@ -70,7 +70,7 @@ and SHALL NOT be persisted.
 
 #### Scenario: A card with an unknown or missing key is rejected
 - **WHEN** a card write carries an extra key, omits a contract key other than the API-defaulted
-  `face_rect`, `image_size`, and `created_at`, or carries a wrongly typed value
+  `stage`, `face_rect`, `image_size`, and `created_at`, or carries a wrongly typed value
 - **THEN** a typed validation error is raised and no card is persisted
 
 #### Scenario: A duplicate image id is rejected
@@ -243,8 +243,8 @@ removal committed rather than raising. Deleting the card named by `default_image
 - **THEN** only `world/art/gallery.py` creates, mutates, or deletes a `GalleryRecord` or its cards
 
 ### Requirement: Malformed stored cards are skipped, never fatal
-Every read of a record's cards SHALL be tolerant: a stored entry that is not a mapping, or that
-fails the card contract, SHALL be skipped and reported once through the `world.observability`
+Every read of a record's cards SHALL first supply identity stage for a missing or malformed stored `stage`, without writing storage. Other malformed fields SHALL retain the existing skip discipline. Every read of a record's cards SHALL be tolerant: a stored entry that is not a mapping, or that
+still fails the card contract after stage-only normalization, SHALL be skipped and reported once through the `world.observability`
 facade as a `gallery_card_invalid` event carrying the subject and, when readable, the offending
 `image_id`. A malformed entry SHALL NEVER raise out of a read, SHALL NEVER be returned to a caller,
 and SHALL NOT prevent the record's valid cards from being returned.
@@ -254,7 +254,7 @@ and SHALL NOT prevent the record's valid cards from being returned.
 - **THEN** the read returns exactly the valid card and one `gallery_card_invalid` event is logged
 
 #### Scenario: A record of only malformed cards reads as empty
-- **WHEN** every stored entry of a record fails the card contract
+- **WHEN** every stored entry of a record still fails the card contract after stage-only normalization, such as non-mapping entries or entries with invalid image_size
 - **THEN** the read returns an empty list and no exception propagates
 
 ### Requirement: The recorded generation error is last-attempt state, not a permanent mark
@@ -303,8 +303,8 @@ corrupt row can never blind the whole surface.
 ### Requirement: Existing cards accept in-place face-rect and binding updates through the sole writer
 
 `world/art/gallery.py` SHALL expose `update_card_face_rect(subject, image_id,
-face_rect)` and `update_card_binding(subject, image_id, binding)` as the ONLY
-mutations of an existing card's fields. Each SHALL run under the existing
+face_rect)` and `update_card_binding(subject, image_id, binding)` as the face-rect and binding
+mutations of an existing card's fields; the stage update seam is governed by the stage-transform requirement. Each SHALL run under the existing
 `gallery_lock`, locate the entry through the tolerant card read (a missing or
 malformed match SHALL raise the same typed `GalleryRecordError` form
 `remove_card` raises for a miss), validate the incoming value through
@@ -411,3 +411,34 @@ error) rather than silently checked against a guessed size.
 #### Scenario: A pixel-square update against the recorded size commits verbatim
 - **WHEN** `update_card_face_rect` is called with a rect that is pixel-square for the card's recorded `image_size`
 - **THEN** the stored rect matches field for field and every other card field is unchanged
+
+### Requirement: Per-card stage transforms are bounded atomic presentation metadata
+A gallery card SHALL own one `stage` mapping with exactly `scale`, `x`, `y`. Values SHALL be finite real numbers, never bool; scale SHALL be within [0.2, 2.0], x and y within [-0.5, 0.5], inclusively. Validation SHALL return a fresh plain mapping and preserve accepted values. The sole writer SHALL replace the entire triple atomically under the gallery lock after validation, preserve every other card field, card order, default and source file, and emit `gallery_stage_set` with subject, image id and all three values. An unknown card SHALL raise a typed record error without a write. Stage SHALL be presentation-only, with no subject-level inheritance or rules/appraisal influence. Missing or malformed stored stage SHALL read as identity without migration or persistent repair; unrelated corruption SHALL remain invalid.
+
+#### Scenario: Inclusive endpoints are accepted verbatim
+- **WHEN** stage is `{scale: 0.2, x: -0.5, y: 0.5}` or `{scale: 2.0, x: 0.5, y: -0.5}`
+- **THEN** validation returns the same values in a distinct plain mapping
+
+#### Scenario: Hostile types and shapes reject before persistence
+- **WHEN** a stage write supplies bool, NaN, infinity, non-numbers, an extra/missing key or a value beyond any bound
+- **THEN** a typed record error occurs and the stored record and files remain unchanged
+
+#### Scenario: One save replaces all coordinates
+- **WHEN** an existing card saves `{scale: 0.6, x: 0.1, y: -0.2}`
+- **THEN** the complete triple is stored, no intermediate partial triple is visible, every other field/default/order/file remains unchanged and the stage event carries the subject, image id and triple
+
+#### Scenario: Unknown card refuses atomically
+- **WHEN** a valid stage triple names an image id absent from the subject's cards
+- **THEN** a typed record error occurs and no card, record or file is changed
+
+#### Scenario: API defaults differ from strict card validation
+- **WHEN** a write-defaulted card omits stage and the same incomplete card is strictly validated
+- **THEN** the write-defaulted form gains identity stage and the strict form is rejected for its missing twelfth key
+
+#### Scenario: Old or hand-edited stage remains readable and editable
+- **WHEN** otherwise valid stored cards lack stage or carry malformed stage
+- **THEN** tolerant reads return those cards with identity stage without modifying storage, and an explicit valid stage save can locate and update the card
+
+#### Scenario: Stage changes have no rules effect
+- **WHEN** only a card's stage triple changes
+- **THEN** combat, resolution, appraisal and integer-copper money state remain unchanged

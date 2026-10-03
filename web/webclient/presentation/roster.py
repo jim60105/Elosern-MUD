@@ -23,6 +23,7 @@ from web.webclient.presentation.art import (
     MAX_SUBJECT_KEY,
     PLACEHOLDER_KINDS,
     _validate_face_rect,
+    _validate_stage,
     _placeholder_for,
 )
 from web.webclient.presentation.context import PresentationContext
@@ -82,6 +83,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
             "alt",
             "placeholder",
             "face_rect",
+            "stage",
         },
         {},
     )
@@ -121,6 +123,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
     if url is None and placeholder is None:
         raise RosterPanelError("portrait must have either url or placeholder")
     face_rect = _validate_face_rect(value["face_rect"])
+    stage = _validate_stage(value["stage"], url)
     # Same rule as the art catalog: the rectangle exists exactly when the
     # row carries a media URL, never for a placeholder.
     if url is not None and face_rect is None:
@@ -136,6 +139,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
         "alt": alt,
         "placeholder": placeholder,
         "face_rect": face_rect,
+        "stage": stage,
     }
 
 
@@ -290,6 +294,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
                 "alt": "無法提供",
                 "subject_key": None,
                 "face_rect": None,
+                "stage": None,
             }
         else:
             resolved = resolve_character(entity)
@@ -302,6 +307,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
             "alt": resolved.get("alt") or "無法提供",
             "placeholder": _placeholder_for(resolved),
             "face_rect": resolved.get("face_rect"),
+            "stage": resolved.get("stage"),
         }
 
         character_rows.append(

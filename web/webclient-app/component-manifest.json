@@ -60,6 +60,7 @@
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",
+    "Overlays/GalleryStageTransformModal",
     "Overlays/NpcPersonaEditor"
   ],
   "frozen": true

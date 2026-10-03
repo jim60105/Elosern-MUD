@@ -152,6 +152,36 @@ export const AppearanceChange = {
   }),
 };
 
+// A stage-triple change on the SAME url (gallery-stage-transform D5): the
+// figure re-scales and slides on its own style, never a crossfade — the
+// portrait key ignores `stage`, so every frame below is the same mounted
+// image. Cycles identity -> child 0.6 -> translated child -> back.
+const STAGE_CYCLES = [
+  PLAYER_PORTRAIT,
+  { ...PLAYER_PORTRAIT, stage: { scale: 0.6, x: 0, y: 0 } },
+  { ...PLAYER_PORTRAIT, stage: { scale: 0.6, x: -0.25, y: 0 } },
+];
+
+export const StageTransformChange = {
+  render: () => ({
+    components: { StageActor },
+    setup() {
+      const tick = ref(0);
+      let timer = null;
+      onMounted(() => {
+        timer = setInterval(() => {
+          tick.value += 1;
+        }, 1800);
+      });
+      onBeforeUnmount(() => clearInterval(timer));
+      return { tick, STAGE_CYCLES };
+    },
+    template:
+      '<div style="width:420px;height:630px;padding:0;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
+      '<StageActor :portrait="STAGE_CYCLES[tick % STAGE_CYCLES.length]" name="艾莉亞" side="left" /></div>',
+  }),
+};
+
 // The combat beat gestures (webclient-combat-beat-choreography design D4):
 // the figure replays its gesture every beat, keyed by the step so each
 // replay restarts the animation, with a rest beat in between. Durations and

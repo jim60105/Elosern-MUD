@@ -16,6 +16,7 @@ export const ART_PANEL_SAMPLE = {
     aspect_ratio: "16:9",
     alt: "河畔清晨的場景",
     placeholder: null,
+    stage: { scale: 1, x: 0, y: 0 },
   },
   portrait_catalog: {
     "101": {
@@ -26,6 +27,7 @@ export const ART_PANEL_SAMPLE = {
       alt: "碼頭船長的肖像",
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      stage: { scale: 1.1, x: -0.1, y: 0 },
       context: { name: "老周", role: "對話對象" },
     },
     "217": {
@@ -36,6 +38,7 @@ export const ART_PANEL_SAMPLE = {
       alt: "河灣巨魔的肖像",
       placeholder: null,
       face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+      stage: { scale: 1, x: 0, y: 0 },
       context: { name: "河灣巨魔", role: "敵方" },
     },
   },
@@ -57,6 +60,7 @@ export const ART_PANEL_PENDING_SAMPLE = {
     aspect_ratio: null,
     alt: "河畔清晨的場景",
     placeholder: { kind: "missing", label: "場景圖像尚未生成" },
+    stage: null,
   },
   portrait_catalog: {
     "101": {
@@ -67,6 +71,7 @@ export const ART_PANEL_PENDING_SAMPLE = {
       alt: "碼頭船長的肖像",
       placeholder: { kind: "missing", label: "肖像圖像尚未生成" },
       face_rect: null,
+      stage: null,
       context: { name: "老周", role: "對話對象" },
     },
   },

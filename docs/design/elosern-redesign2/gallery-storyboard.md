@@ -45,11 +45,18 @@ bounded two-column modal rather than replacing the game shell.
 | 7. Default | Select a non-default completed card, choose **設為預設**, publish success | The next story publication moves the default marker | Rejection leaves the published marker unchanged |
 | 8. Delete | Choose **刪除** | An inline confirmation identifies the destructive action | **取消** sends nothing; **確認刪除** submits once. The card disappears only after publication |
 | 9. Monster | Select **測試魔物**, publish success | Single-card replacement explanation; generation has no field selection or free text; no equipment binding | Switch back through subject selection; all visibility follows published capabilities |
+| 10. Transform | Select a completed card and choose **比例調整** | Live preview of the figure against the static adult reference; paired slider/number controls, drag-to-offset, local-only **重設**; the storyboard publishes the save result and the updated card row itself | Save is gated on image load; publish rejection retains the draft with **查看伺服器訊息**; Escape or **取消** dispatches nothing and restores the opener |
 
 Standalone stories also cover locked, unavailable, empty, unmatched-binding,
 and rejected-editor states. The production character-data shortcut opens the
 existing puppet status drawer directly; the isolated storyboard describes that
 transition instead of pretending to contain live character data.
+
+The transform frame's entry button, reset, save, and rejection states are
+fixture publications in the storyboard: the slider edits, drag offsets, and
+reset are pure local draft state that never dispatch anything, exactly as in
+production, while the save round-trip and the committed row are driven by the
+story's publication controls rather than a live server.
 
 ## Deliberate differences from the reference pictures
 

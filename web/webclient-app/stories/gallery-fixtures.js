@@ -6,6 +6,7 @@ const card = (index, changes = {}) => ({
   url: `/art/gallery/character/7001/${GALLERY_IDS[index]}.webp`,
   // On 768x1024 portrait aspect: w=0.5 => h=0.375
   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.375 },
+  stage: { scale: 1, x: 0, y: 0 },
   is_default: false, chips: ["預設臉框"], requested_fields: ["appearance"],
   binding_present: false, created_at: 1700000800 - index * 100,
   ...changes,
@@ -24,9 +25,10 @@ export const GALLERY_SAMPLE = {
     card(0, { is_default: true, binding_present: true, chips: ["主手", "防具", "預設臉框", "目前預設"] }),
     card(1, { binding_present: true, chips: ["飾品", "預設臉框"] }),
     card(2, { binding_present: true, chips: ["防具", "預設臉框"] }),
-    card(3), card(4), card(5),
-    { image_id: GALLERY_IDS[6], status: "pending", label: "肖像（生成中）", url: null, face_rect: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000200 },
-    { image_id: GALLERY_IDS[7], status: "failed", label: "暫時無法生成，稍後再試（sd_connection_error）", url: null, face_rect: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000100 },
+    card(3), card(4),
+    card(5, { stage: { scale: 0.6, x: -0.2, y: 0.1 } }),
+    { image_id: GALLERY_IDS[6], status: "pending", label: "肖像（生成中）", url: null, face_rect: null, stage: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000200 },
+    { image_id: GALLERY_IDS[7], status: "failed", label: "暫時無法生成，稍後再試（sd_connection_error）", url: null, face_rect: null, stage: null, is_default: false, binding_present: false, chips: [], requested_fields: [], created_at: 1700000100 },
   ],
   equipment_summary: {
     weapon_main: { value: "synthetic_sword", display_name: "暗影劍刃" },

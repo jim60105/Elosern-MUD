@@ -98,7 +98,7 @@ Each entry of `cards` SHALL contain exactly `image_id`, `status` (`"card"`,
 `"pending"`, or `"failed"`), `label` (the server-authored zh-TW display line for
 the row — stored cards carry no name, so a card row reads 「肖像」 and a pending
 row 「肖像（生成中）」; the label SHALL NOT embed a timestamp, because
-`created_at` already carries the instant and the client presents it), `url` or null, `face_rect` or null, `is_default`,
+`created_at` already carries the instant and the client presents it), `url` or null, `face_rect` or null, `stage` or null, `is_default`,
 `chips`, `requested_fields`, `binding_present`, and `created_at`. Card rows come
 only from the tolerant card read; a media URL SHALL be built only from a card's
 stored identity validated against the subject's own gallery prefix, the closed
@@ -141,6 +141,10 @@ newest-first by `created_at` with append order as the stable tiebreaker.
 - **WHEN** any card row is checked for the key `image_size`
 - **THEN** it fails the exact-key validation — the squareness reference never crosses the wire
 
+#### Scenario: Real rows carry stage without new chips
+- **WHEN** a stored card with stage `{scale: 0.6, x: 0.1, y: -0.2}` is projected
+- **THEN** its row carries that validated triple and the existing exactly-one-face-chip contract is unchanged, with no stage chip or filter
+
 ### Requirement: Pending jobs and the recorded error render as truthful synthetic rows
 
 One read-only accessor over the art queue surface SHALL supply a subject's
@@ -149,7 +153,7 @@ render as one `status: "pending"` row (spinner state) ordered with the cards by
 timestamp. A `GalleryRecord` carrying `last_error_code` SHALL render as exactly
 one `status: "failed"` row whose server-authored message is the bounded
 「暫時無法生成，稍後再試」 line carrying the stable code, placed newest by
-`last_error_at`. A failed row SHALL NOT fabricate a card: `url` and `face_rect`
+`last_error_at`. A failed row SHALL NOT fabricate a card: `url`, `face_rect` and `stage`
 are null and its `image_id` SHALL be deterministic synthetic state (uuid5 over
 the subject, the error timestamp, and the code), never a stored card's id. A
 pending row whose `image_id` also names a listed card (same-pass settle race)
@@ -238,7 +242,7 @@ subject keys, selected membership, puppet-first ordering, positive confined
 face rectangles, gallery URLs bound to the selected subject and image with the
 closed store extensions, coherent status/flags/chips/provenance, and exact
 nonnegative filter counts. Pending rows SHALL be bounded to eight and failed
-rows to one; synthetic rows SHALL have null URL/rectangle, false flags, and empty
+rows to one; synthetic rows SHALL have null URL/rectangle/stage, false flags, and empty
 chips/provenance. Defaults SHALL be at most one. Labels SHALL be at most 128
 code points, chips at most 16, URLs at most 129, and warning conditions at most
 four nonempty lines of at most 512 code points. Warnings SHALL name unique
@@ -250,3 +254,13 @@ an oversized character gallery SHALL fail closed, not silently truncate cards.
 
 - **WHEN** a gallery payload carries a field outside the mirrored exact schema
 - **THEN** both the Python validator and the JavaScript validator reject it and the panel degrades to that renderer's recovery path
+
+Real card stage SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL reject a missing stage key, null stage on a real card or non-null stage on a synthetic row. Schema version SHALL remain 1; server and client SHALL ship together.
+
+#### Scenario: Invalid stage fails both wire validators
+- **WHEN** a real row has out-of-range stage, a missing stage key or null stage, or a pending/failed row carries a fabricated triple
+- **THEN** both Python and dependency-free Node validators reject the payload
+
+#### Scenario: Null synthetic stage is accepted at the existing version
+- **WHEN** otherwise valid pending and failed rows carry stage null
+- **THEN** both validators accept at schema version 1 without new chips or counts

@@ -106,5 +106,6 @@ export function stageJourneyScene(stop) {
     aspect_ratio: "16:9",
     alt: stop.scene.alt,
     placeholder: null,
+    stage: { scale: 1, x: 0, y: 0 },
   };
 }

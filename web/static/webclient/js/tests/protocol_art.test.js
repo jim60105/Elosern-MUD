@@ -19,6 +19,7 @@ function validArtScene(overrides) {
   return deepMerge(
     {
       archetype: T_SCENE,
+      stage: { scale: 1, x: 0, y: 0 },
       label: T_SCENE_LABEL,
       subject_key: `scene:${T_SCENE}`,
       status: "done",
@@ -41,6 +42,7 @@ function validArtCatalogEntry(overrides) {
       alt: "低階魔物",
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      stage: { scale: 1, x: 0, y: 0 },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides
@@ -70,6 +72,7 @@ test("art is in the production panel allowlist and validates the available paylo
           archetype: "t_fen_walk",
           status: "pending",
           url: null,
+          stage: null,
           placeholder: { kind: "missing", label: "未生成" },
         }),
         portrait_catalog: {
@@ -79,6 +82,7 @@ test("art is in the production panel allowlist and validates the available paylo
             url: null,
             aspect_ratio: null,
             face_rect: null,
+            stage: null,
             placeholder: { kind: "unavailable", label: "無法提供" },
             context: { name: "旅店主人", role: "對話對象" },
           }),

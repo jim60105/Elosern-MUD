@@ -735,6 +735,7 @@ describe("store view slices", () => {
             alt: "英雄肖像",
             placeholder: null,
             face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+            stage: { scale: 1, x: 0, y: 0 },
           },
         },
         {
@@ -750,6 +751,7 @@ describe("store view slices", () => {
             alt: "無肖像",
             placeholder: { kind: "unavailable", label: "無肖像" },
             face_rect: null,
+            stage: null,
           },
         },
       ],
