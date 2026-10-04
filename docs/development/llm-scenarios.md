@@ -275,10 +275,37 @@ LLM 必須輸出 JSON 格式：
 ### 效果路由（確定性核心決定）
 * `follow_up`／`clue`／`invitation` $\rightarrow$ `narrative_statement`：敘事擁有者寫入敘事事件並登錄故事線發展。
 * `letter` $\rightarrow$ `letter_send`：敘事擁有者以 `send_letter` 送出並登錄為故事線陳述。
-* `quest_seed` $\rightarrow$ `quest_seed`：目前**未註冊**執行處理器（待 `scenario-beat-compilation` 提供真正的任務邊界），因此以 `unsupported_effect` 拒絕，不排定任何橋段、不留假處理器。
+* `quest_seed` → `generate_beat_quest_blueprint()` → deterministic quest compilation and linked publication. Missing or degraded beat blueprints produce `no_content`, never an authored-template replacement.
 * `relation_delta`：關係屬於規則擁有者的資料，敘事僅把提案值路由給規則套用器；失敗則整筆拒絕且不留部分狀態。
 
 ---
+
+### Quest-beat compilation boundary (2026-10-04)
+
+`attempt_decision()` captures the permitted immutable director frame, then
+requests a quest blueprint outside the settlement transaction. The beat-specific
+ScenarioDirector entry uses the existing profile, guardrail, schema and semantic
+validators. Unlike generic `generate_quest_blueprint()`, it returns no content on
+disabled transport, exhausted validation, context misfit or an oversized frame.
+The generic entry retains its authored offline templates.
+
+The issuer is either the owner's registered guild branch or an authorized NPC
+participant explicitly named by the beat. Publication rechecks source/request
+version, thread revision/access, current rank, issuer identity and location
+anchor. The quest compiler remains authoritative for rewards, lore references,
+scene requirements and issuer authorization. No prose can accept a commission,
+advance an objective, assert a completed action, or create a room.
+
+`ScheduledBeat.payload.quest` retains the normalized blueprint, definition key,
+issuer key and context snapshot ID. The beat and durable generated-quest mirror
+commit together; quest-owner publication scopes restore process registries and
+Evennia attribute caches after a failed savepoint. Replaying the captured source
+identity returns the existing decision without another model call. SceneBuilder,
+instance reclamation, contact-based acceptance and quest runtime are unchanged.
+
+Change log: enabled real quest-seed publication, added no-filler generation and
+source revalidation, and retained generic offline behavior. No player command or
+browser action changed.
 
 ## 相關延伸閱讀
 

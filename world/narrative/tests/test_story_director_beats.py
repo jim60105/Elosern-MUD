@@ -212,10 +212,10 @@ class SingleBeatTests(StoryDirectorBeatsTestCase):
         "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
         "story-director-beats::director-schedules-at-most-one-eligible-beat",
     )
-    def test_unsupported_quest_seed_is_rejected_without_placeholder(self):
+    def test_unprepared_quest_seed_is_rejected_without_placeholder(self):
         revision = get_thread_revision(self.thread.thread_id)
         outcome = self.settle([self.proposal("quest_seed")])
-        self.assertEqual(outcome.outcome, OUTCOME_UNSUPPORTED_EFFECT)
+        self.assertEqual(outcome.outcome, OUTCOME_NO_CONTENT)
         self.assertIsNone(outcome.beat)
         self.assertEqual(ScheduledBeat.objects.count(), 0)
         self.assertEqual(self.story_beat_events().count(), 0)
@@ -492,7 +492,7 @@ class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
             request=request,
             now_tick=self.now,
         ).result
-        self.assertEqual(outcome.outcome, OUTCOME_UNSUPPORTED_EFFECT)
+        self.assertEqual(outcome.outcome, OUTCOME_NO_CONTENT)
         self.assertIsNone(outcome.beat)
         self.assertEqual(StoryThread.objects.count(), threads_before)
         self.assertEqual(outcome.decision.thread_id, "")
@@ -626,7 +626,7 @@ class ContextSeparationTests(StoryDirectorBeatsTestCase):
         ), self.captureOnCommitCallbacks(execute=True):
             self.settle([self.proposal("quest_seed")])
         self.assertEqual(events[0][0], "story_director_decision_rejected")
-        self.assertEqual(events[0][1]["reason"], OUTCOME_UNSUPPORTED_EFFECT)
+        self.assertEqual(events[0][1]["reason"], OUTCOME_NO_CONTENT)
 
 
 if __name__ == "__main__":

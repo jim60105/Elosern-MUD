@@ -257,6 +257,9 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `story_director_decision_stale` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`captured_revision`、`current_revision`、`tick`（warn 級；套用前重驗修訂衝突，不留部分狀態） |
 | `story_director_decision_conflict` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`arrangement_revision`、`tick`（warn 級；同一 thread 修訂已被既有橋段佔用，唯一約束裁決） |
 
+| `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
+| `quest_beat_publication_rejected` | `beat_id`, `snapshot_id`, `owner`; warning with exception chain, no blueprint or prose |
+
 ### 4.3 AI／外部服務邊界
 
 | event | context |

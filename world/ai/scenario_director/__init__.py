@@ -9,7 +9,8 @@ touches the runtime registry. On any degrade trigger (disabled profile,
 transport failure, exhausted retries, or a schema-valid-but-context-misfitting
 proposal) the call resolves to a deterministic draw from the hand-written
 template pool that also fits the request context, never to invalid output or
-``None``.
+``None``. The separate ``generate_beat_quest_blueprint`` capability instead
+returns no content on degradation; it never draws a generic template.
 
 Boundary contract (``tests/test_ai_transport_contract.py``): no module of this
 package imports a state writer, a typeclass, a live transport, or a socket. The
@@ -136,6 +137,7 @@ from world.ai.scenario_director.generation import (
     _require_registered,
     _uninstall_schema,
     generate_quest_blueprint,
+    generate_beat_quest_blueprint,
     get_template_pool,
     register_scenario_director,
 )
