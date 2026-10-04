@@ -86,8 +86,12 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
 
     @covers_requirement("webclient-vue-application::desktop-chrome-scales-once-from-the-reference-viewport")
     def test_large_desktop_renders_the_reference_at_four_thirds(self):
-        ref = self.story("core-appshell--dialogue-selector", '[data-testid="message-page"]', REFERENCE)
-        big = self.story("core-appshell--dialogue-selector", '[data-testid="message-page"]', LARGE)
+        # The populated exploration cockpit: hud-dialogue-declutter made the
+        # map island recede during dialogue, so the minimap canvas that this
+        # test magnifies only renders in the exploration mode's full island
+        # stack (the vitals island rides along, as the dialogue story once did).
+        ref = self.story("core-appshell--populated-hud", '[data-testid="nav-settings"]', REFERENCE)
+        big = self.story("core-appshell--populated-hud", '[data-testid="nav-settings"]', LARGE)
         self.assertEqual(ref["scale"], "1")
         self.assertAlmostEqual(float(big["scale"]), RATIO, places=3)
         # Chrome: navigation control, place card, minimap canvas.
