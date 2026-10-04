@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
@@ -505,11 +505,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
     def _assert_workspace_frame(self, probe, what, viewport):
         vw, vh = viewport
+        scale = ui_scale(viewport)
         r = probe["rect"]
-        self.assertAlmostEqual(r["top"], probe["navBottom"] + 12, delta=1, msg=f"{what} top at {viewport}")
-        self.assertAlmostEqual(r["left"], 16, delta=1, msg=f"{what} left at {viewport}")
-        self.assertAlmostEqual(r["right"], vw - 16, delta=1, msg=f"{what} right at {viewport}")
-        self.assertAlmostEqual(r["bottom"], vh - 56, delta=1, msg=f"{what} bottom at {viewport}")
+        # The frame's insets are chrome: header + 12px * S, 16px * S on each
+        # side, and --workspace-bottom (44px + 12px, both * S) above the edge.
+        self.assertAlmostEqual(r["top"], probe["navBottom"] + 12 * scale, delta=1, msg=f"{what} top at {viewport}")
+        self.assertAlmostEqual(r["left"], 16 * scale, delta=1, msg=f"{what} left at {viewport}")
+        self.assertAlmostEqual(r["right"], vw - 16 * scale, delta=1, msg=f"{what} right at {viewport}")
+        self.assertAlmostEqual(r["bottom"], vh - 56 * scale, delta=1, msg=f"{what} bottom at {viewport}")
         self.assertTrue(probe["opaqueGradient"], f"{what} panel is fully opaque at {viewport}: {probe['paint']}")
         self.assertTrue(probe["lineCovered"], f"{what} covers the expanded command-line row at {viewport}")
         self.assertEqual(probe["headers"], 1, f"{what} carries exactly one shared header")

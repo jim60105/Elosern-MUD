@@ -352,18 +352,23 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # Open the settings overlay through the top navigation bar's 設定 control.
         page.locator('[data-testid="nav-settings"]').click()
         page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
-        # The three-step prose-scale selector renders; the current step is marked
-        # by a non-colour indicator (aria-pressed / the `on` class).
+        # The three-step prose-scale selector renders; the step matching the
+        # committed preference is marked by a non-colour indicator
+        # (aria-pressed / the `on` class).
         for testid in ("settings-overlay-scale-A−", "settings-overlay-scale-A", "settings-overlay-scale-A+"):
             self.assertEqual(
                 page.locator('[data-testid="%s"]' % testid).count(),
                 1,
                 f"{testid} renders",
             )
+        current = page.evaluate("() => window.__elosernBridge.store.view.fontScale")
+        marked = {1: "A−", 1.125: "A", 1.25: "A+"}.get(current)
+        self.assertIsNotNone(marked, f"the committed prose scale {current} is one of the three steps")
         self.assertTrue(
             page.evaluate(
-                "() => { const el = document.querySelector('[data-testid=\"settings-overlay-scale-A\"]');"
-                " return el && (el.getAttribute('aria-pressed') === 'true' || el.classList.contains('on')); }"
+                "(sel) => { const el = document.querySelector(sel);"
+                " return el && (el.getAttribute('aria-pressed') === 'true' || el.classList.contains('on')); }",
+                '[data-testid="settings-overlay-scale-%s"]' % marked,
             ),
             "the current prose-scale step is marked without colour alone",
         )
@@ -644,6 +649,10 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # pins the reader to 瞬間), so a preview that moved the reading
         # position would show as a changed page.
         _append_multipage_response(page)
+        self.assertEqual(
+            self._live_reader(page)["page"], "1",
+            "the reader starts on page 1 of the multi-page response",
+        )
         self._open_settings(page)
         self.assertEqual(self._sample_typing(page), "false")
         self.assertIn("瞬間", page.locator('[data-testid="settings-sample-caption"]').inner_text())
@@ -694,7 +703,6 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="settings-sample"]').count(), 0)
         after = self._live_reader(page)
         self.assertEqual(after, before)
-        self.assertEqual(after["page"], "1", "the reader stays on page 1 of the multi-page response")
         self.assertEqual(sent_action_count(page), 0, "the preview dispatches no ui_action")
         page.close()
 
@@ -711,6 +719,8 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                 top: scroll.scrollTop,
                 atEnd: scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4,
                 lastInside: last.top >= box.top - 1 && last.bottom <= box.bottom + 1,
+                lastTop: last.top, lastBottom: last.bottom,
+                boxTop: box.top, boxBottom: box.bottom,
                 focused: document.activeElement === scroll,
               };
             }"""
@@ -1005,7 +1015,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_message_window_repages_on_resize(self):
-        page = self.logged_in_page((1451, 790))
+        page = self.logged_in_page((2560, 1440))
         _append_multipage_response(page)
         surface = page.locator('[data-testid="message-page"]')
         page.locator('[data-testid="message-window"]').click()
@@ -1031,9 +1041,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         live_before = page.locator('[data-testid="message-live"]').inner_text()
 
-        # Resize the viewport from 1451x790 to 2560x1440 and wait for the
+        # Shrink the viewport from 2560x1440 to the 1451x790 reference and wait for the
         # ResizeObserver re-page pass to settle across two consecutive reads.
-        page.set_viewport_size({"width": 2560, "height": 1440})
+        page.set_viewport_size({"width": 1451, "height": 790})
         page.wait_for_timeout(150)
         previous_sig = None
         for _ in range(20):
@@ -1727,7 +1737,9 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertEqual(surface.get_attribute("data-page"), "1")
         self.assertEqual(marker.inner_text(), "▼")
 
-        # At 1451x790 with the default prose scale (A = 1.125), computed font size is 18px (±0.5px),
+        # At 1451x790 with the seeded A− step (the harness commits the reading
+        # floor), the computed font size is the 16px floor token (±0.5px); the
+        # default A step's 18px is asserted by the storybook journey.
         # every line's content box is at most 42em wide, and the control strip's
         # marker, 日誌, and ⌨ rects are pairwise disjoint left-to-right.
         metrics = page.evaluate(
@@ -1751,7 +1763,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
               };
             }"""
         )
-        self.assertAlmostEqual(metrics["fontSize"], 18.0, delta=0.5)
+        self.assertAlmostEqual(metrics["fontSize"], 16.0, delta=0.5)
         self.assertLessEqual(metrics["contentWidth"], metrics["fontSize"] * 42.0 + 1.0)
         self.assertLessEqual(metrics["maxLineWidth"], metrics["fontSize"] * 42.0 + 1.0)
         self.assertLessEqual(metrics["markerRight"], metrics["logLeft"])

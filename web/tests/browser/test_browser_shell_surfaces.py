@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
@@ -540,7 +540,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 # Standing on the band's top edge, in the left gutter, 25vw wide
                 self.assertAlmostEqual(anchor["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
                 self.assertAlmostEqual(dock["bottom"], band["top"], delta=1.0, msg=f"{viewport}: {geo}")
-                self.assertAlmostEqual(dock["left"], 16, delta=1.0)
+                self.assertAlmostEqual(dock["left"], 16 * ui_scale(viewport), delta=1.0)
                 self.assertAlmostEqual(dock["right"] - dock["left"], geo["width"] * 0.25, delta=1.5)
                 # Not top-anchored: the dock's top is far below the top band.
                 self.assertGreater(dock["top"], geo["header"]["bottom"] + 100, f"{viewport}: {geo}")
