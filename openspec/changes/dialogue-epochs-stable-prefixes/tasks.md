@@ -27,3 +27,14 @@
   IDs are intentionally obtained by the future sync/archive owner only after
   delta synchronization; this apply does not edit canonical main specs.
 - Browser suites and complete evidence verification remain CI-owned.
+- Pre-implementation review findings were adopted: model-visible historical
+  affinity secrets remain guarded; failed compaction keeps the active epoch;
+  required current state cannot disappear; boundaries are serialized and
+  summary validation is separate from NPC reply validation.
+- The single post-implementation review raised unsubstantiated concerns about
+  cutover, section accounting and owner documentation, and explicitly declined
+  to flag them without proof. Disposition: source cutover uses the maximum
+  actually included turn ID (later rows remain eligible); the complete user
+  envelope intentionally shares the conservative 2000-token frame bound;
+  prefix parts follow the library's four-section layout; owner invocation and
+  failed-summary behavior are documented. No confirmed blocking finding remains.
