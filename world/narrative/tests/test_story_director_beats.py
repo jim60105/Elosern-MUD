@@ -177,7 +177,10 @@ class StoryDirectorBeatsTestCase(EvenniaTest):
 
 
 class SingleBeatTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "story-director-beats::director-schedules-at-most-one-eligible-beat",
+    )
     def test_two_competing_proposals_schedule_exactly_one_beat(self):
         outcome = self.settle([self.proposal("follow_up"), self.proposal("clue")])
         self.assertEqual(outcome.outcome, OUTCOME_SCHEDULED)
@@ -192,7 +195,10 @@ class SingleBeatTests(StoryDirectorBeatsTestCase):
             ).exists()
         )
 
-    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "story-director-beats::director-schedules-at-most-one-eligible-beat",
+    )
     def test_nothing_validates_leaves_the_thread_intact(self):
         revision = get_thread_revision(self.thread.thread_id)
         outcome = self.settle(())
@@ -202,7 +208,10 @@ class SingleBeatTests(StoryDirectorBeatsTestCase):
         self.assertEqual(self.story_beat_events().count(), 0)
         self.assertEqual(get_thread_revision(self.thread.thread_id), revision)
 
-    @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
+    @covers_requirement(
+        "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+        "story-director-beats::director-schedules-at-most-one-eligible-beat",
+    )
     def test_unsupported_quest_seed_is_rejected_without_placeholder(self):
         revision = get_thread_revision(self.thread.thread_id)
         outcome = self.settle([self.proposal("quest_seed")])
@@ -215,7 +224,10 @@ class SingleBeatTests(StoryDirectorBeatsTestCase):
             StoryDirectorDecision.objects.get(decision_id=outcome.decision.decision_id).scheduled
         )
 
-    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_generator_write_claim_is_rejected_and_no_state_changes(self):
         before = (
             self.owner.db.relations_data,
@@ -236,7 +248,10 @@ class SingleBeatTests(StoryDirectorBeatsTestCase):
 
 
 class StaleAndConcurrencyTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_old_snapshot_conflict_is_rejected_without_partial_state(self):
         invocation = self.prepare()
         record_thread_development(thread_id=self.thread.thread_id, tick=self.now + 1)
@@ -248,7 +263,10 @@ class StaleAndConcurrencyTests(StoryDirectorBeatsTestCase):
         self.assertEqual(self.story_beat_events().count(), 0)
         self.assertEqual(get_thread_revision(self.thread.thread_id), revision)
 
-    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_same_thread_revision_permits_no_conflicting_arrangement(self):
         revision = get_thread_revision(self.thread.thread_id)
         prior = StoryDirectorDecision.objects.create(
@@ -279,7 +297,10 @@ class StaleAndConcurrencyTests(StoryDirectorBeatsTestCase):
         self.assertEqual(ScheduledBeat.objects.count(), 1)
         self.assertEqual(self.story_beat_events().count(), 0)
 
-    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    @covers_requirement(
+        "dream-authoring::explicit-version-confirmation-submits-once",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_repeated_source_after_restart_is_one_beat(self):
         # "The same accepted decision source" is one captured source revision:
         # re-settling that exact identity (a restart replay) deduplicates.
@@ -309,7 +330,10 @@ class StaleAndConcurrencyTests(StoryDirectorBeatsTestCase):
 
 
 class EffectRoutingTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
+    @covers_requirement(
+        "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_letter_beat_sends_a_narrative_owned_letter(self):
         outcome = self.settle(
             [self.proposal("letter", recipient=str(self.npc.pk))]
@@ -326,7 +350,10 @@ class EffectRoutingTests(StoryDirectorBeatsTestCase):
             ).exists()
         )
 
-    @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
+    @covers_requirement(
+        "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries",
+    )
     def test_relationship_proposal_routes_through_the_rules_owner(self):
         self.assertIsNone(self.npc.db.relations_data)
         outcome = self.settle(
@@ -376,7 +403,10 @@ class EffectRoutingTests(StoryDirectorBeatsTestCase):
 
 
 class SourceGatingTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
+    @covers_requirement(
+        "narrative-attention::eligibility-precedes-attention-scoring",
+        "story-director-beats::director-schedules-at-most-one-eligible-beat",
+    )
     def test_automatic_candidate_cannot_start_an_unrelated_story(self):
         request_candidate = AttentionCandidate(
             candidate_id="request:synthetic",
@@ -427,7 +457,10 @@ class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
             draft_id=draft.draft_id, owner_id=str(self.owner.pk), tick=self.now
         )
 
-    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    @covers_requirement(
+        "dream-authoring::explicit-version-confirmation-submits-once",
+        "story-director-beats::director-schedules-at-most-one-eligible-beat",
+    )
     def test_confirmed_request_settles_a_new_story_beat(self):
         request = self._confirmed_new_story_request()
         outcome = attempt_decision(
@@ -507,7 +540,10 @@ class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
 
 
 class ContextSeparationTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("dream-authoring::creative-discussion-remains-private-authoring-data")
+    @covers_requirement(
+        "dream-authoring::creative-discussion-remains-private-authoring-data",
+        "story-director-beats::collaborator-and-director-contexts-remain-separate",
+    )
     def test_director_snapshot_is_separate_from_the_collaborator_brief(self):
         draft = save_draft(
             owner_id=str(self.owner.pk),
