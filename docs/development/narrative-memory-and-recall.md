@@ -653,3 +653,50 @@ snapshot hash only — never player prose, thread summaries, or direction text.
 Delta-only coverage IDs for this boundary are obtained and annotated by the
 later spec-sync owner after the delta spec reaches `openspec/specs/`; this change
 annotates its substantive tests against existing canonical main IDs.
+
+## Deterministic story-director beat settlement (W3)
+
+`world.narrative.director` is the deterministic half of the story-director
+boundary; `world/ai/story_director/` supplies the generation half and is
+proposal-only. A decision starts from exactly one bounded source: an eligible
+attention selection over an existing invested thread, or an explicit confirmed
+`CreativeRequest` version (`new_story` or `thread_direction`). An automatic
+candidate can never originate an unrelated new story — that requires explicit
+confirmation — and the owner, thread visibility, and non-terminal state are all
+revalidated at resolve time and again before apply.
+
+`prepare_decision` captures the permissioned context through
+`assemble_narrative_context` (capability `story_director`, its own prompt
+version and output schema) and persists an immutable snapshot; generation runs
+against the captured messages, so a later read cannot change what was proposed.
+The bounded frame carries only owner-permitted thread facts, the source
+identity/revision, and the allowed kinds.
+
+`settle_decision` schedules **at most one** beat per decision and may schedule
+none. Routing is deterministic and central: a kind maps to one effect
+(`follow_up`/`clue`/`invitation` → `narrative_statement`, `letter` →
+`letter_send`, `quest_seed` → `quest_seed`), and only registered effects are
+materialized. `quest_seed` has no registered handler until
+`scenario-beat-compilation` supplies the real quest boundary, so it is rejected
+with `unsupported_effect` — never stubbed. Narrative writes only its own data (a
+narrative event plus a thread development link, or a `send_letter`); a
+`relation_delta` proposal is routed to the rules owner
+(`apply_letter_relationship`), never written by narrative.
+
+Decision identity is the captured source *revision* (`decision_id_for`), so a
+restart replay of that exact identity returns the durable decision and its
+single beat without a second model call, while a later attention run over the
+same thread captures a higher revision and is a genuinely new decision. Each
+decision records exactly one outcome — `scheduled`, `no_content`,
+`unsupported_effect`, `unauthorized_write`, `unsupported_target`,
+`invalid_proposal`, `stale`, `thread_unavailable`, or `conflict` — and the
+unique `(owner, source kind, source ref, source revision)` and
+`(thread, arrangement_revision)` constraints are the durable backstops against
+duplicate sources and conflicting arrangements at one thread revision.
+Rejections leave the thread and every unauthorized owner untouched.
+
+Boundary events (`story_director_decision_prepared`, `story_director_beat_scheduled`,
+`story_director_decision_reused`, and the warn-level
+`story_director_decision_rejected` / `story_director_decision_stale` /
+`story_director_decision_conflict`) carry identifiers, revisions, counts and
+reason codes only — never the proposal summary or any story prose.

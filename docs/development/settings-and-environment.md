@@ -188,7 +188,7 @@ profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Eve
 | `LLM_REASONING_EFFORT` | `LLM_PROFILES[*].reasoning_effort` | 可省略選擇 | 省略 | 閉集合 `minimal/low/medium/high`（不分大小寫，存小寫） |
 | `LLM_REASONING_STYLE` | `LLM_PROFILES[*].reasoning_style` | 選擇 | `openrouter` | 閉集合 `openrouter/vllm/off`（不分大小寫） |
 | `LLM_MAX_COMPLETION_TOKENS` | `LLM_PROFILES[*].max_completion_tokens` | 可省略整數 | 省略 | 正整數；空白＝省略 |
-| `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`action_options` 320、`title_nomination` 640、`scenario_director` 8192、`dialogue_summary` 與 `correspondence` 1024、`dream` 3072） | 正整數；未設定時各層保留自己的程式碼預設值 |
+| `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`action_options` 320、`title_nomination` 640、`scenario_director` 8192、`story_director` 1536、`dialogue_summary` 與 `correspondence` 1024、`dream` 3072） | 正整數；未設定時各層保留自己的程式碼預設值 |
 | `LLM_TIMEOUT_SECONDS` | `LLM_PROFILES[*].timeout_seconds` | 整數 | `60` | 正整數 |
 | `LLM_MAX_RETRIES` | `LLM_PROFILES[*].max_retries` | 整數 | `2` | 非負整數 |
 | `LLM_SUPPORTS_RESPONSE_FORMAT` | `LLM_PROFILES[*].supports_response_format` | 布林字 | `False` | 布林字彙表；`action_options` 被強制為 True，企圖用覆寫清除會開機失敗 |
@@ -247,7 +247,7 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `OPENSPEC_TEST_EVIDENCE`、`COVERAGE_FILE` | `tools/spec_traceability`／CI | 追溯證據與覆蓋率資料檔（quality-gate workflow 設定） |
 | `ELOSERN_BROWSER_*` | `web/tests/browser/` | 受管理瀏覽器測試 harness 的隔離根、埠、身分、場景開關 |
 
-**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆蓋名稱、以及 `llm_env_names()` 產生的全部 230 個 LLM knob 名稱（23 個全域 + 23 × 9 層）從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*`／`LLM_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
+**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆蓋名稱、以及 `llm_env_names()` 產生的全部 253 個 LLM knob 名稱（23 個全域 + 23 × 10 層）從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*`／`LLM_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
 
 ## 必須留在 secret_settings.py 的內容
 

@@ -25,6 +25,7 @@
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |
 | **`action_options`** | `world/ai/action_options.py` | 移動進房、行動結算、登入 | JSON（3～5 張行動卡片） | 回傳 `None`（前端僅呈現原生按鈕） |
 | **`title_nomination`** | `world/ai/title_nomination.py` | 登出、休息結算、公會升階、任務通關 | JSON（候選異名與事蹟引用） | 回傳空選票（不生成新稱號） |
+| **`story_director`** | `world/ai/story_director/` | 決定性敘事核心排定故事橋段（`world/narrative/director.py`） | JSON（單一橋段提案：後續／線索／邀請／信件／任務種子） | 回傳 `None`（不排定任何橋段，不生成替代內容） |
 
 ---
 
@@ -247,6 +248,35 @@ LLM 必須輸出 JSON 格式：
   2. 絕對不得包含玩家角色姓名。
   3. 排除登錄表既有固定稱號、已獲得稱號或歷史名單。
   4. 批次去重後挑選前 3 名建立候選選票，推送至前端供玩家點選。
+
+---
+
+## 8. 故事導演層 (`story_director`)
+
+### 業務定位
+由確定性敘事核心（`world/narrative/director.py`）驅動的故事橋段排定：每次決策最多排定一個橋段，也可以選擇不排定。生成層只提出值（value-only）提案，路由、驗證與寫入一律由確定性擁有者執行。
+
+### 呼叫鏈路
+```text
+決定性注意力候選 或 已確認創作請求 (CreativeRequest)
+  └── world/narrative/director.py: attempt_decision()
+        └── 擷取不可變脈絡快照 (capability=story_director)
+              └── world/ai/story_director/: generate_beat_proposal()
+                    └── guarded_call("story_director", ...)
+                          ├── 成功 ──> settle_decision() 依 kind 決定效果
+                          └── 降級 ──> 回傳 None：不排定任何內容，不留替代填充
+```
+
+### 輸入與提示詞
+* **提示詞鍵值**：`prompts/story_director.yaml` $\rightarrow$ `story_director.system`。
+* **占位符**：無（有界的候選／請求脈絡以使用者訊息中的確定性 JSON 影格傳入）。
+* **輸出欄位**：`kind`（`follow_up`／`clue`／`invitation`／`letter`／`quest_seed`）、`summary`（1–600 字正體中文），可選 `recipient`、`relation_delta`（0–10）、`writes`（必須為空陣列）。
+
+### 效果路由（確定性核心決定）
+* `follow_up`／`clue`／`invitation` $\rightarrow$ `narrative_statement`：敘事擁有者寫入敘事事件並登錄故事線發展。
+* `letter` $\rightarrow$ `letter_send`：敘事擁有者以 `send_letter` 送出並登錄為故事線陳述。
+* `quest_seed` $\rightarrow$ `quest_seed`：目前**未註冊**執行處理器（待 `scenario-beat-compilation` 提供真正的任務邊界），因此以 `unsupported_effect` 拒絕，不排定任何橋段、不留假處理器。
+* `relation_delta`：關係屬於規則擁有者的資料，敘事僅把提案值路由給規則套用器；失敗則整筆拒絕且不留部分狀態。
 
 ---
 
