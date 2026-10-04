@@ -1,10 +1,9 @@
 """Synthetic behavior tests for durable six-exchange dream session accounting.
 
 Everything here is deterministic and offline: synthetic actors, a fixed clock,
-no model or image service. Substantive tests are annotated against the existing
-canonical main requirement ids they establish; delta-only ids for this new
-capability are obtained and annotated by the spec-sync owner once the delta
-spec reaches ``openspec/specs/``.
+no model or image service. Substantive tests are annotated against the
+canonical main requirement ids they establish, including the
+``dream-session-lifecycle`` ids published when the delta spec synced.
 """
 
 from __future__ import annotations
@@ -141,6 +140,7 @@ class DreamSessionTestCase(EvenniaTest):
 class DreamSessionBudgetTests(DreamSessionTestCase):
     """Only a successfully delivered validated response consumes an exchange."""
 
+    @covers_requirement("dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget")
     def test_retry_and_duplicate_do_not_consume_twice(self):
         session = self.open()
         first = begin_turn(
@@ -197,6 +197,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
             get_session(session.session_id, self.owner_id).completed_exchanges, 1
         )
 
+    @covers_requirement("dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget")
     def test_reconnect_after_five_keeps_the_count_and_remaining(self):
         session = self.open(session_id="dream_session_reconnect")
         self.complete_exchanges(session, 5)
@@ -209,6 +210,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
         self.assertFalse(view.at_cap)
         self.assertTrue(view.free_text_allowed)
 
+    @covers_requirement("dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget")
     def test_oversized_message_rejects_without_generation_or_consumption(self):
         session = self.open()
         with self.assertRaises(DreamInputRejected) as caught:
@@ -257,6 +259,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
             "字" * MAX_RENDERED_INPUT_CHARS,
         )
 
+    @covers_requirement("dream-session-lifecycle::convergence-and-exit-require-explicit-choices")
     def test_sixth_completes_and_free_text_stops(self):
         session = self.open()
         self.complete_exchanges(session, MAX_EXCHANGES)
@@ -285,6 +288,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
             get_session(session.session_id, self.owner_id).completed_exchanges, 6
         )
 
+    @covers_requirement("dream-session-lifecycle::convergence-and-exit-require-explicit-choices")
     def test_exit_before_cap_offers_same_choices_and_schedules_nothing(self):
         session = self.open()
         self.complete_exchanges(session, 2)
@@ -330,6 +334,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
 class DreamSessionFailureTests(DreamSessionTestCase):
     """Failure and restart preserve progress and never settle twice."""
 
+    @covers_requirement("dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening")
     def test_failure_after_five_preserves_count_and_allows_offline_end(self):
         session = self.open()
         self.complete_exchanges(session, 5)
@@ -372,6 +377,7 @@ class DreamSessionFailureTests(DreamSessionTestCase):
             get_session(session.session_id, self.owner_id).state, "ended"
         )
 
+    @covers_requirement("dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening")
     def test_restart_during_delivery_replays_without_a_second_exchange(self):
         session = self.open()
         begin_turn(
@@ -452,6 +458,7 @@ class DreamSessionFailureTests(DreamSessionTestCase):
                 tick=101,
             )
 
+    @covers_requirement("dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening")
     def test_awaken_is_idempotent_and_ends_without_a_model(self):
         session = self.open()
         self.complete_exchanges(session, 2)
