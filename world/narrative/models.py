@@ -666,3 +666,154 @@ class CreativeRequest(models.Model):
 
     def __str__(self) -> str:
         return f"CreativeRequest({self.submission_key}, owner={self.owner_id}, v={self.version})"
+
+
+class DreamSessionQuerySet(models.QuerySet):
+    """Dream sessions change only through the dream-session operations."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Dream sessions change only through the dream-session operations.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Dream sessions change only through the dream-session operations.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dream sessions are durable and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Dream sessions cannot be conflict-updated through bulk insert.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class DreamSession(models.Model):
+    """Durable accounting for one six-exchange dream collaboration session.
+
+    ``session_id``, ``owner_id`` and ``created_tick`` are immutable. The
+    mutable lifecycle fields advance only through ``world.narrative.dream_session``:
+    ``completed_exchanges`` counts successfully delivered validated exchanges
+    (never opening text, confirmation, transport failures, validation retries or
+    duplicate submissions), ``pending_submission_id`` holds the at-most-one
+    outstanding turn, and ``saved_input`` keeps that turn's bounded rendered
+    input so a disconnect resumes it. ``state`` is ``open`` or ``ended`` and
+    ``outcome`` records how a terminal choice was made (``draft``/``confirmed``).
+    ``revision`` is a monotonic row revision for durable change ordering;
+    concurrency safety rests on the unique constraints and the pending-turn
+    check, not on the row lock.
+    """
+
+    objects = DreamSessionQuerySet.as_manager()
+
+    session_id = models.CharField(max_length=64, unique=True, db_index=True)
+    owner_id = models.CharField(max_length=255, db_index=True)
+    completed_exchanges = models.BigIntegerField(default=0)
+    revision = models.BigIntegerField(default=1)
+    state = models.CharField(max_length=16, default="open")
+    outcome = models.CharField(max_length=16, default="")
+    pending_submission_id = models.CharField(max_length=64, default="")
+    saved_input = models.TextField(default="")
+    draft_id = models.CharField(max_length=128, default="")
+    request_key = models.CharField(max_length=160, default="")
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = DreamSession.objects.get(pk=self.pk)
+            if (
+                original.session_id != self.session_id
+                or original.owner_id != self.owner_id
+                or original.created_tick != self.created_tick
+            ):
+                raise ValueError(
+                    "DreamSession identity, owner and creation tick are immutable."
+                )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dream sessions are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_dream_sessions"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return (
+            f"DreamSession({self.session_id}, owner={self.owner_id}, "
+            f"{self.completed_exchanges}/{6}, {self.state})"
+        )
+
+
+class ImmutableDreamExchangeQuerySet(models.QuerySet):
+    """Delivered dream exchanges are append-only durable evidence."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Dream exchanges are append-only.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Dream exchanges are append-only.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dream exchanges are append-only.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Dream exchanges are append-only.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class DreamExchange(models.Model):
+    """One successfully delivered validated response, durably counted once.
+
+    ``delivery_id`` is the unique response-delivery identity at the presentation
+    acceptance boundary, so replaying the same delivery after a restart returns
+    this row instead of creating a second exchange. The unique
+    ``(session, exchange_number)`` and ``(session, submission_id)`` constraints
+    make the count and the delivered-response identity idempotent even without
+    a working row lock; ``response_ref`` references the recoverable delivered
+    response record without storing its content.
+    """
+
+    objects = ImmutableDreamExchangeQuerySet.as_manager()
+
+    delivery_id = models.CharField(max_length=160, unique=True, db_index=True)
+    session = models.ForeignKey(
+        DreamSession, on_delete=models.PROTECT, related_name="exchanges"
+    )
+    owner_id = models.CharField(max_length=255, db_index=True)
+    exchange_number = models.BigIntegerField()
+    submission_id = models.CharField(max_length=64, db_index=True)
+    response_ref = models.CharField(max_length=255, default="")
+    tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Dream exchanges are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dream exchanges are append-only.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_dream_exchanges"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "exchange_number"],
+                name="unique_dream_exchange_number",
+            ),
+            models.UniqueConstraint(
+                fields=["session", "submission_id"],
+                name="unique_dream_exchange_submission",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"DreamExchange({self.delivery_id}, session={self.session_id}, "
+            f"#{self.exchange_number})"
+        )

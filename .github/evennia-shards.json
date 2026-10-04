@@ -240,6 +240,7 @@
         "world.narrative.tests.test_narrative_memory",
         "world.narrative.tests.test_narrative_threads",
         "world.narrative.tests.test_dream_authoring",
+        "world.narrative.tests.test_dream_session",
         "world.ai",
         "world.lore"
       ]

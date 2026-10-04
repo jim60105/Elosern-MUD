@@ -216,6 +216,93 @@ Delta-only coverage IDs for this boundary are obtained and annotated by the
 later spec-sync owner after the delta spec reaches `openspec/specs/`; this
 change annotates its substantive tests against existing canonical main IDs.
 
+## Durable six-exchange dream sessions (W3)
+
+`world.narrative.dream_session` owns the durable accounting for one
+collaborative dream conversation: the six-exchange budget, the single
+outstanding turn, and the deterministic confirm/draft/awaken choices. It stores
+identifiers, counts and references only — a `DreamSession` row (session/owner
+identity, `completed_exchanges`, `revision`, `state`, `outcome`,
+`pending_submission_id`, bounded `saved_input`, `draft_id`, `request_key`) and
+append-only `DreamExchange` rows (the delivered-response identity, exchange
+number, submission identity, and a `response_ref`). It never stores generated
+prose, never opens a transport, and imports nothing from `world.ai`, so every
+operation works with all generative services offline. Opening the dream,
+presenting the scene, the server-computed arousal track and the sleep
+settlement belong to other capabilities; this boundary only counts and records.
+
+One exchange is one player message plus one successfully delivered validated
+response. `begin_turn` records the player message identity and its bounded
+rendered text as the single outstanding turn and consumes nothing;
+`settle_exchange` is the only operation that increments the persisted count and
+appends a `DreamExchange`. The count is capped at six and is never reset by
+reconnect (`open_session_for` returns the same durable row); the remaining
+count comes from `remaining_exchanges`/`progress`. Exchange five begins
+convergence (`progress(...).converging`), exchange six reaches the cap
+(`progress(...).at_cap`), `choices(...)` reports `can_input = False` and
+confirm/draft/awaken availability, and `begin_turn` refuses free text once the
+session is ended or at the cap. Opening text, confirmation actions, transport
+failures, validation retries, abandoned turns and duplicate submissions never
+consume an exchange. Rendered input has its own independent hard bound
+(`MAX_RENDERED_INPUT_CHARS`, the ingress bound owned here; the model-side
+rendered-response bound belongs to the presentation capability): blank or
+oversized input is refused before any state change, so one large message cannot
+bypass the session budget.
+
+Accounting is durable and idempotent. `settle_exchange` returns the existing
+row for a repeated `delivery_id` (restart replay) and for a repeated
+`(session, submission_id)` (duplicate submission, where the first delivered
+response stands), so neither can consume a second exchange. The unique
+`delivery_id`, `(session, exchange_number)` and `(session, submission_id)`
+constraints are the durable backstop — `select_for_update` is kept for backends
+that support it, SQLite ignores it — and a lost concurrency race resolves to
+the row that won it. The exchange insert and the session count update commit in
+one transaction, so the persisted count never advances without the durable
+evidence. `abandon_turn` releases the single outstanding slot on transport
+failure, cancellation or a validation retry without consuming anything and
+keeps `saved_input` recoverable for the next entry; the terminal choices and
+awakening clear the slot.
+
+Two callers' contracts follow from that. Successful delivery is the existing
+presentation acceptance boundary: the validated response is already committed
+to a recoverable player response record and dispatched by that identity, and
+`settle_exchange` is called only once that outcome is final — a late delivery
+arriving after `abandon_turn` is refused rather than counted, so the budget can
+under-count a genuinely lost settlement but can never over-count. And the
+session's draft handle is deterministic per session, so `preserve_draft` and
+`confirm_session(direction=...)` assume one writer per owner, the same
+caller-supplied `draft_id` contract `world.narrative.authoring` documents.
+
+Confirm/draft/awaken are deterministic and generation-free. `preserve_draft`
+saves or updates the session's deterministic private `AuthoringDraft` handle
+(`dream:<session_id>`) and schedules nothing — no `CreativeRequest` is created
+— while `confirm_session` delegates validation and single submission to
+`world.narrative.authoring.confirm_draft`; it accepts a direction to
+save-and-confirm in one step or confirms the preserved draft, raises
+`DreamSessionNotDraftedError` when there is nothing to confirm, and repeating
+the confirmation of an already-confirmed session returns the same durable
+request. An invalid direction raises there with concrete reasons, leaves the
+draft unconfirmed and the session open, and changes no durable state.
+`awaken_session` ends the session with no model call and no sleep write, and is
+idempotent (an already-ended session is a pure no-op with no event and no
+revision change), so a reconnect or repeated awakening can never double-settle.
+Owner-scoped reads (`get_session`, `open_session_for`, `list_open_sessions`,
+`list_exchanges`) raise `DreamSessionAccessError` for a foreign or missing
+session.
+
+Boundary events (`dream_session_opened`, `dream_session_submission_accepted`,
+`dream_session_exchange_completed`, `dream_session_turn_abandoned`,
+`dream_session_draft_preserved`, `dream_session_confirmed`,
+`dream_session_awakened`, plus the warn-level rejections
+`dream_session_input_rejected`, `dream_session_closed`,
+`dream_session_turn_conflict`, `dream_session_exchange_conflict`,
+`dream_session_delivery_duplicate`, `dream_session_not_drafted` and the
+constraint-race events) carry identifiers, counts, ticks and stable reason
+codes only — never the player message or a direction summary. Delta-only
+coverage IDs for this boundary are obtained and annotated by the later
+spec-sync owner after the delta spec reaches `openspec/specs/`; this change
+annotates its substantive tests against existing canonical main IDs.
+
 ## Durable face-to-face dialogue (W1)
 
 `world.narrative.dialogue` replaces the destructive NPC Attribute history.

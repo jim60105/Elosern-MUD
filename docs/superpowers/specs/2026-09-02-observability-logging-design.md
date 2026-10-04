@@ -234,6 +234,22 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_attention_ranked` | `owner_id`、`config_version`、`tick`、`candidate_count`、`eligible_count`、`selected_count`、`excluded_count`、`focus_limit`、`snapshot_hash`；僅識別碼、計數與雜湊，不含玩家文案、故事摘要或方向內文 |
 | `narrative_attention_candidates_truncated` | `owner_id`、`truncated_count`、`considered`、`tick`（warn 級；讀取上限截斷，唯讀且不刪除任何故事狀態） |
 | `narrative_attention_engagement_truncated` | `owner_id`、`scanned`、`tick`（warn 級；參與掃描上限截斷，僅計數） |
+| `dream_session_opened` | `session_id`、`owner`、`tick`；六次交換會話的建立邊界，不含任何訊息或方向文字 |
+| `dream_session_submission_accepted` | `session_id`、`submission_id`、`owner`、`completed`、`remaining`、`tick`；僅接受一則尚未交付的訊息，不消耗交換次數、不含訊息文字 |
+| `dream_session_exchange_completed` | `session_id`、`submission_id`、`delivery_id`、`owner`、`completed`、`remaining`、`tick`；只有成功交付且通過驗證的回應才遞增計數，計數與交付證據同交易提交 |
+| `dream_session_turn_abandoned` | `session_id`、`owner`、`submission_id`、`reason`、`completed`、`tick`；失敗／取消釋放待處理回合，不消耗交換次數，保留未送出的輸入供續談 |
+| `dream_session_draft_preserved` | `session_id`、`owner`、`draft_id`、`revision`、`tick`；保留未確認的私人草稿，不排程任何工作 |
+| `dream_session_confirmed` | `session_id`、`owner`、`draft_id`、`submission_key`、`version`、`tick`；已確認版本僅提交一次，不含方向摘要 |
+| `dream_session_awakened` | `session_id`、`owner`、`completed`、`outcome`、`tick`；無模型呼叫、不重複結算既有的睡眠結果 |
+| `dream_session_input_rejected` | `session_id`、`owner`、`reason`、`message_length`、`bound`、`tick`（warn 級；空白或超長輸入在動用生成與額度前拒絕，不改動任何持久狀態、不含訊息文字） |
+| `dream_session_closed` | `session_id`、`owner`、`completed`、`reason`、`tick`（warn 級；會話已結束或已達六次上限時拒絕自由文字） |
+| `dream_session_turn_conflict` | `session_id`、`owner`、`submission_id`、`reason`、`tick`（warn 級；已有待處理回合，或同一提交識別碼對應不同訊息） |
+| `dream_session_exchange_conflict` | `session_id`、`owner`、`submission_id`、`delivery_id`、`reason`、`tick`（warn 級；交付／提交識別碼不屬於此會話或沒有待處理回合） |
+| `dream_session_delivery_duplicate` | `session_id`、`owner`、`submission_id`、`delivery_id`、`tick`（warn 級；同一提交以新的交付識別碼重送，第一次交付為準且不重複計數） |
+| `dream_session_not_drafted` | `session_id`、`owner`、`tick`（warn 級；尚未保留草稿方向即要求確認） |
+| `dream_session_open_raced` | `session_id`、`owner`、`tick`（warn 級；並行建立由唯一約束裁決，第一個持久列為準並以重播回傳） |
+| `dream_session_exchange_raced` | `session_id`、`owner`、`submission_id`、`exchange_number`、`tick`（warn 級；並行結算由唯一約束裁決，第一個持久列為準且不重複計數） |
+| `dream_session_draft_raced` | `session_id`、`owner`、`draft_id`、`tick`（warn 級；並行草稿寫入由唯一約束裁決，既有草稿列為準） |
 
 ### 4.3 AI／外部服務邊界
 
