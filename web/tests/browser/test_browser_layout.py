@@ -597,10 +597,24 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
                 )
                 for selector in (
                     '[data-testid="message-window"]',
-                    '[data-testid="local-map"]',
                     '[data-testid="command-line-toggle"]',
                 ):
                     self.assertTrue(page.locator(selector).is_visible(), f"{selector} stays visible in dialogue")
+                # hud-dialogue-declutter: the cockpit islands (the vitals dock
+                # and the local map) recede around the conversation — hidden,
+                # inert, and aria-hidden from the commit, so the stage belongs
+                # to the dialogue.
+                self.assertFalse(
+                    page.locator('[data-testid="local-map"]').is_visible(),
+                    "the local map recedes (hidden) in dialogue",
+                )
+                self.assertTrue(
+                    page.evaluate(
+                        "() => { const el = document.querySelector('[data-anchor=\"map\"]'); "
+                        "return !!el && el.inert && el.getAttribute('aria-hidden') === 'true'; }"
+                    ),
+                    "the map island anchor is inert and aria-hidden in dialogue",
+                )
                 self.assertTrue(
                     page.evaluate(
                         "() => document.activeElement === document.querySelector('[data-anchor=\"choices\"] [data-testid=\"dialogue-choices\"]')"
