@@ -5,11 +5,11 @@ Establishes the offline loading contract for the WebClient's Vue 3 single-page a
 ## Requirements
 
 ### Requirement: Chrome type is legible and numerals are stable
-At the reference scale chrome text SHALL render at least 12 CSS pixels using the shared local design faces, including the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list. The only text outside that floor is the drawn map itself — the node labels and edge-marker names inside the island's and the full map's SVG drawing — whose sizes follow the `webclient-local-map` fitted label contract (island node labels at a 12-unit step drawn at 12 × the drawing's scale, island marker names at a 10-unit step). Resource values, costs, counts and prices outside the drawn map SHALL use proportional sans tabular lining numerals. Monospace SHALL remain reserved for command input, ASCII/box-drawing content, key names and the map's own coordinate and label type; prose SHALL retain its existing reader sizing contract, including viewport-relative sizing and prose-scale preferences.
+Every visible text in the client — chrome text, the drawn-map text, and the message/log prose — SHALL render at the reference scale at 16 CSS pixels or more using the shared local design faces; no shared type token, and no surface, SHALL carry a reference-scale type step below 16 CSS px, including the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list. The drawn map itself — the node labels and edge-marker names inside the island's and the full map's SVG drawing — meets the same floor through the `webclient-local-map` fitted label contract (island node labels at a 16-unit step drawn at 16 × the drawing's scale at the reference scale, island marker names at the matching 16-unit marker step). Resource values, costs, counts and prices outside the drawn map SHALL use proportional sans tabular lining numerals. Monospace SHALL remain the face of command input, ASCII/box-drawing content, key names and the map's own coordinate and label type, and SHALL additionally be the face of the message window's page text and the full log's lines as `webclient-contextual-hud` and `webclient-input-narrative` define; prose SHALL retain its existing reader sizing contract, including its prose-scale preference. The floor is on every rendered size: a treatment that expresses its size relative to the surrounding prose (an `em` step such as a `sys` line's or the box-drawing art path's) SHALL be re-stepped so its computed size at the reference scale with the default prose scale is at least 16 CSS px, and no reader-selectable step may drive visible text below it; `visibility: hidden` spacing glyphs are not visible text and are exempt.
 
 #### Scenario: Dense chrome remains readable
-- **WHEN** exploration, dialogue, combat and reference surfaces, the minimap island and the full-map overlay render at 1920x1080
-- **THEN** chrome text outside the drawn map meets the 12px floor without clipping controls or losing labels
+- **WHEN** exploration, dialogue, combat and reference surfaces, the minimap island and the full-map overlay render at the 1451x790 reference viewport
+- **THEN** every visible text — chrome text, drawn-map node labels and edge-marker names, and message/log prose — computes to at least 16 CSS px without clipping controls or losing labels
 
 #### Scenario: Values change without terminal styling
 - **WHEN** resource/count values change digit widths
@@ -19,8 +19,8 @@ At the reference scale chrome text SHALL render at least 12 CSS pixels using the
 The project WebClient SHALL load a locally built, self-contained Vue 3 single-page application produced
 by a Vite build and served entirely from the project origin. The page SHALL make no remote request for
 a runtime UI dependency (no CDN JavaScript, CSS, or font). The application SHALL target desktop only and
-SHALL NOT claim mobile acceptance; every required surface SHALL be visible and usable at 1440x900 and
-at 1280x720. When the application mounts into its container, the stock and pre-Js text fallback it
+SHALL NOT claim mobile acceptance; every required surface SHALL be visible and usable at the
+1451x790 reference viewport. When the application mounts into its container, the stock and pre-Js text fallback it
 replaces SHALL be retired so it cannot stack in document flow and push required surfaces below the
 visible viewport. (The live evennia-transport mount and the always-playable text path are established by
 later changes in this migration; this change establishes the offline build and render of the app.)
@@ -30,7 +30,7 @@ later changes in this migration; this change establishes the offline build and r
 - **THEN** the Vite-built Vue bundle, its styles, and its self-hosted fonts load from the project origin without a CDN failure
 
 #### Scenario: Desktop-only bounded render at each supported viewport
-- **WHEN** the Vue application renders at 1440x900 and at 1280x720
+- **WHEN** the Vue application renders at the 1451x790 reference viewport
 - **THEN** every required surface is visible and usable without overlapping the input path, and the application makes no mobile-behavior claim
 
 #### Scenario: Mount retires the replaced text fallback
@@ -216,11 +216,15 @@ chip fallback exists only as direct-render defense in the component.
   value line stays correct
 
 ### Requirement: Desktop chrome scales once from the reference viewport
-At 1920x1080 the client SHALL use its reference chrome dimensions; at 2560x1440 comparable chrome text, controls, spacing and bounded islands SHALL render at four thirds of their reference dimensions within rounding tolerance. Below the reference height, or on a viewport narrower than its height would imply at 16:9, chrome SHALL not shrink below its reference readability floor nor grow beyond the width's own ratio to the 1920px reference. Viewport-responsive prose, stage art and band geometry SHALL NOT be multiplied a second time.
+At the 1451x790 reference viewport the client SHALL use its reference chrome dimensions. Above the reference, comparable chrome text, controls, spacing and bounded islands SHALL render at one desktop chrome factor, `S = clamp(1, min(viewportHeight / 790, viewportWidth / 1451), 1.4)`, times their reference dimensions within rounding tolerance; at 2560x1440, where both raw ratios exceed the cap, they SHALL render at 1.4 times their reference dimensions. Below the reference, or on a viewport narrower than its height would imply at the reference's own aspect ratio, chrome SHALL not shrink below its reference readability floor nor grow beyond the width's own ratio to the 1451px reference. Viewport-responsive prose, stage art and band geometry SHALL NOT be multiplied a second time.
 
 #### Scenario: Large desktop is proportional
-- **WHEN** the same scene renders at 1920x1080 and 2560x1440 with the same reader preference
-- **THEN** top navigation, control targets, map island and drawer header dimensions have a 4/3 ratio within 2 CSS pixels while art and prose scale exactly once
+- **WHEN** the same scene renders at 1451x790 and at 2560x1440 with the same reader preference
+- **THEN** top navigation, control targets, map island and drawer header dimensions have the cap's 1.4 ratio within 2 CSS pixels while art and prose scale exactly once
+
+#### Scenario: An uncapped large viewport is proportional
+- **WHEN** the same scene renders at 1451x790 and at 1741x948 (a viewport whose height and width ratios are both 1.2, below the cap)
+- **THEN** the same comparable dimensions have a 1.2 ratio within 2 CSS pixels
 
 #### Scenario: Reader preference is independent
 - **WHEN** the player changes only prose scale at fixed viewport size
@@ -232,7 +236,8 @@ At 1920x1080 the client SHALL use its reference chrome dimensions; at 2560x1440 
 
 ### Requirement: The monospace type role is a self-hosted, sliced Jim Mono TC face
 The Vue application SHALL render its monospace type role (the command line, keycaps, option and badge
-numerals, local-map labels, and box-drawing map art) with the Jim Mono TC typeface served from the
+numerals, local-map labels, box-drawing map art, and the message window's page text and the full
+log's lines) with the Jim Mono TC typeface served from the
 project origin, so Latin, digits, box drawing, and CJK in a monospace surface come from one bundled
 family in which every East Asian Wide or Fullwidth character is exactly two Latin cells wide, in both
 the regular and the bold weight. The monospace stack SHALL NOT name any machine-installed font family
@@ -270,5 +275,5 @@ and the upstream licence texts SHALL be shipped next to the font files.
 - **THEN** each slice is at most 64 KB, the declared unicode ranges of one weight do not overlap, both weights declare the same CJK code points, the CJK code points equal the bundled Noto Sans TC coverage's East Asian Wide and Fullwidth code points minus the recorded ones the font lacks, and the licence files are present beside the font files
 
 #### Scenario: Map labels keep their layout under Jim Mono TC
-- **WHEN** the local-map island and the full map overlay render a dense neighbourhood with CJK labels at 1440x900 and 1280x720
+- **WHEN** the local-map island and the full map overlay render a dense neighbourhood with CJK labels at 1451x790 and 2560x1440
 - **THEN** every drawn node label and edge-marker name stays inside its reserved box, no two labels overlap, and the island keeps its anchored size

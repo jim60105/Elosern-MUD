@@ -516,7 +516,7 @@ any request.
 
 #### Scenario: A resize keeps the reader's text on screen
 - **WHEN** the player is on page 2 with its typing position at a known character, and the viewport
-  shrinks from 1920x1080 to 1280x720
+  shrinks from 1451x790 to an off-contract 1200x700 window
 - **THEN** the window shows the page of the new paging that holds that character, the text before
   it on that page is shown at once, and typing continues from it
 
@@ -632,8 +632,10 @@ header SHALL only lend markup: the surface SHALL keep its own focus trap, Escape
 to the opening control, and SHALL NOT nest a second modal host. A pointer press on the frame's
 non-focusable chrome or the scrim SHALL leave focus inside the surface, so Escape still closes it.
 
-The lines SHALL read as one centred column with a 42em measure at the log's reading size, which the
-narrative prose scale multiplies; the header, footer and their controls are chrome and SHALL NOT scale.
+The lines SHALL read as one centred column with a 42em measure at the log's reading size — the
+message window's page size, 18px at the 1451x790 reference scale with the same leading, which the
+narrative prose scale multiplies — set in the same bundled monospace reading face the message
+window's page text uses; the header, footer and their controls are chrome and SHALL NOT scale.
 The column SHALL reuse the message window's prose styling — the `sys` aside, the `err` line, the
 progressive CJK spacing — and every line SHALL share the column's edge. A box-drawing map line SHALL keep
 its monospace grid and SHALL scroll horizontally inside its own block rather than widen the column.

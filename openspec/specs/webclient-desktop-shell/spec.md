@@ -36,8 +36,7 @@ missing, pending without a prior image, failed, invalid, or the OOB channel is u
 The narrative SHALL occupy the bottom band's message region as the bounded message window, whose
 complete log is reachable in one action through its `日誌` control, with the brand, the top-meta pill, the
 place card, the action dock (in every playing mode except dialogue, where the command region collapses)
-and the command-line toggle visible at 1920x1080, 1440x900, and
-1280x720, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
+and the command-line toggle visible at 1451x790 and at every larger viewport up to the chrome factor's cap, and with each HUD island visible whenever its own contextual-HUD rule renders it (the vitals
 island in combat or while a vital or a `warning`, `harmful`, or `critical` condition needs attention, the party island while the party is
 non-empty). The action dock and the message window SHALL NOT be permanently closable; the dock's collapse in
 dialogue mode lasts exactly as long as the committed mode is `dialogue`. The command
@@ -87,33 +86,33 @@ overlap and neither clips the other at a supported viewport. A frame whose rows 
 SHALL scroll inside the pane host while the dock's chrome (the breadcrumb and
 the legend strip) stays fixed around it. In dialogue
 mode the message window SHALL span the whole band at the band's fixed height and carry the host's name
-plate and the paged line, reachable at 1280x720 by paging inside the window, never by growing it; the
+plate and the paged line, reachable at the 1451x790 reference viewport by paging inside the window, never by growing it; the
 choice rows, the free-dialogue row, the move row and the exit row SHALL render in the dialogue choice
 list centred over the stage (the contextual-HUD dialogue-choices requirement), never inside the message
-window, and SHALL fit the stage above the band at 1280x720 without document-level scrolling.
+window, and SHALL fit the stage above the band at the 1451x790 reference viewport without document-level scrolling.
 
 #### Scenario: Standard desktop viewport contains every required surface
-- **WHEN** the shell renders at 1440x900
+- **WHEN** the shell renders at 1451x790
 - **THEN** the message window, the brand, the top-meta surface, the top navigation bar with its tool group, the place card, every HUD island its own rule renders, the action dock, and the command-line toggle are present without overlapping the narrative input path, and one `/` press renders the command line with its input field focused
 
 #### Scenario: Minimum desktop viewport remains usable
-- **WHEN** the shell renders at 1280x720
+- **WHEN** the shell renders at 2560x1440
 - **THEN** every required surface remains reachable and the player can read narrative, open the complete log, open the character-status drawer to inspect status, and type a command after exactly one opening action (`/` or the ⌨ toggle)
 
 #### Scenario: The reference surfaces are demand-opened, not permanently visible
-- **WHEN** the shell renders at 1440x900 or 1280x720 with no drawer open
+- **WHEN** the shell renders at 1451x790 or 2560x1440 with no drawer open
 - **THEN** no skill book, bag, shop, quest board, lore reference, or character-status surface is present in the layout or the tab order, and no permanently visible column of reference panels is rendered
 
 #### Scenario: An open drawer is always one action from closed
-- **WHEN** a reference drawer is open at either supported viewport
+- **WHEN** a reference drawer is open at the 1451x790 reference viewport
 - **THEN** Escape, its labelled close control, and the scrim each close it in one action and return focus to the control that opened it, and the dock, the message window, and the command-line toggle remain present behind it
 
 #### Scenario: The map, settings and help surfaces are reachable and closable
-- **WHEN** the shell renders in exploration mode at either supported viewport with the command line collapsed
+- **WHEN** the shell renders in exploration mode at the 1451x790 reference viewport with the command line collapsed
 - **THEN** a labelled control opens each of the map, settings and help surfaces, and Escape or its close control closes the open one in one action with focus returned to the control that opened it
 
 #### Scenario: The top navigation bar carries the persistent surface entry points
-- **WHEN** the shell renders in exploration mode at either supported viewport
+- **WHEN** the shell renders in exploration mode at the 1451x790 reference viewport
 - **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's scene overview
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
@@ -141,7 +140,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 - **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
 
 #### Scenario: A tall frame grows the band without touching the narrative
-- **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1440x900 or 1280x720
+- **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1451x790 or 2560x1440
 - **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the message window's box is unchanged, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
@@ -149,7 +148,7 @@ window, and SHALL fit the stage above the band at 1280x720 without document-leve
 - **THEN** the rows scroll within the pane host, the dock's chrome (the breadcrumb and the legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
-- **WHEN** the committed mode is dialogue at 1280x720
+- **WHEN** the committed mode is dialogue at 1451x790
 - **THEN** the message window spans the whole band and carries the host's name plate and the paged line, the command region is not rendered, and once the line is fully shown every choice row, the free-dialogue row, the move row and the exit row are reachable in the choice list centred over the stage, never inside the message window, without document-level scrolling and without the window or the band changing size
 
 ### Requirement: Narrative output remains the authoritative text surface and is read page by page
@@ -312,7 +311,7 @@ focus to that control. The 角色肖像圖庫 control SHALL render only while th
 available. The group SHALL render in every mode that renders the top navigation bar, whether the
 command line is expanded or collapsed, and SHALL NOT push a keyboard menu frame. No other surface
 SHALL carry a second opener for these five surfaces, and the command line SHALL carry none. The group
-SHALL fit the 48px bar: at 1280x720, with every navigation entry, the gallery control, and a
+SHALL fit the 48px bar: at the 1451x790 reference viewport, with every navigation entry, the gallery control, and a
 maximum-length character name present, the navigation bar's controls SHALL NOT intersect the top-meta
 and character-switcher cluster.
 
@@ -333,7 +332,7 @@ and character-switcher cluster.
 - **THEN** focus reaches every tool-group control in order, each exposes its label as its accessible name, and Enter on a focused control opens its surface
 
 #### Scenario: The tool group fits the 48px bar at the minimum viewport
-- **WHEN** the shell renders in exploration mode at 1280x720 with every navigation entry, the gallery control, and a maximum-length character name present
+- **WHEN** the shell renders in exploration mode at 1451x790 with every navigation entry, the gallery control, and a maximum-length character name present
 - **THEN** every tool-group control lies inside the 48px bar, and no navigation control intersects the top-meta or character-switcher cluster
 
 #### Scenario: The command line carries no tool opener
@@ -364,7 +363,7 @@ Local browser storage SHALL contain only a bounded wrapper with project layout v
 - **THEN** the wrapper loads with no stored motion level and keeps the prose scale
 
 ### Requirement: Theme and controls remain accessible
-The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent retained for its semantic roles (decisive primary action, danger affordances, selection, status markers) alongside a muted-gold navigation, focus, and emphasis accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for narrative and headings with a legible UI face for controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.
+The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent retained for its semantic roles (decisive primary action, danger affordances, selection, status markers) alongside a muted-gold navigation, focus, and emphasis accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for headings, the bundled monospace face for the narrative's message-window page text and full-log lines, and a legible UI face for the remaining controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.
 
 #### Scenario: Keyboard focus does not depend on color alone
 - **WHEN** keyboard focus moves between action controls
@@ -634,7 +633,7 @@ absent from rendering, the accessibility tree, and the tab order, and SHALL NOT 
 disabled, `aria-disabled`, `visibility: hidden`, or otherwise present placeholder. The DOM order of
 the present controls SHALL equal their visual order. A disabled primary entry keeps its disabled
 reason as its `title`. At viewports up to 1350px wide the controls SHALL use compact padding, and at
-1280x720 no navigation control SHALL intersect the top-meta or character-switcher cluster.
+the 1451x790 reference viewport no navigation control SHALL intersect the top-meta or character-switcher cluster.
 
 Each icon-only `工具` control SHALL disclose its label visually in one shared tooltip treatment,
 shown while the pointer rests on the control or on the tooltip itself, and when keyboard focus
@@ -649,7 +648,7 @@ tooltip shown by the pointer SHALL hide on any Escape without consuming it. The 
 focus SHALL show the tooltip again.
 
 #### Scenario: Combat removes unavailable entries
-- **WHEN** the committed mode changes from exploration to combat at a fixed viewport of 1920x1080, 1440x900, or 1280x720
+- **WHEN** the committed mode changes from exploration to combat at a fixed viewport of 1451x790, 1741x948, or 2560x1440
 - **THEN** the 角色狀態, 任務, and 地圖 controls are absent from rendering and the tab order, the combat 背包 control stands immediately before 設定, and the left edges of the 設定 control and of the `工具` group differ from their exploration positions by at most 1px
 
 #### Scenario: An unavailable panel leaves no placeholder
@@ -673,7 +672,7 @@ focus SHALL show the tooltip again.
 - **THEN** the label appears as a visible tooltip and stays visible, and activating the control hides it
 
 ### Requirement: Reading settings preview preferences without touching play
-The settings surface SHALL offer a local reading sample: one fixed line of prose set in the message window's page face, page size and leading at the chosen prose scale, above both groups of settings controls, with a replay control. The sample SHALL type at the rate the message window would use for the chosen text speed and the effective motion level, so it SHALL show at once for `瞬間` and whenever the effective motion level is not `完整`, and it SHALL name that rule in a visible caption. It SHALL play once when the settings surface opens, SHALL restart once when the prose scale, the text speed or the motion level changes, SHALL play again only through replay, and SHALL NOT loop. Its whole line SHALL stay laid out while it types, so the sample never re-wraps or changes height mid-line, and assistive technology SHALL read the complete line rather than a partly typed one. Updating or replaying the sample SHALL NOT append narrative, send an action, change the live message window's page or reading position, consume or arm its auto-advance, or change gameplay. Closing the settings surface SHALL stop all preview work.
+The settings surface SHALL offer a local reading sample: one fixed line of prose set in the message window's page face — the bundled monospace reading face — at the page size and leading of the chosen prose scale, above both groups of settings controls, with a replay control. The sample SHALL type at the rate the message window would use for the chosen text speed and the effective motion level, so it SHALL show at once for `瞬間` and whenever the effective motion level is not `完整`, and it SHALL name that rule in a visible caption. It SHALL play once when the settings surface opens, SHALL restart once when the prose scale, the text speed or the motion level changes, SHALL play again only through replay, and SHALL NOT loop. Its whole line SHALL stay laid out while it types, so the sample never re-wraps or changes height mid-line, and assistive technology SHALL read the complete line rather than a partly typed one. Updating or replaying the sample SHALL NOT append narrative, send an action, change the live message window's page or reading position, consume or arm its auto-advance, or change gameplay. Closing the settings surface SHALL stop all preview work.
 
 #### Scenario: Preference changes are visible locally
 - **WHEN** the player changes the prose scale or the text speed
@@ -688,7 +687,7 @@ The settings surface SHALL offer a local reading sample: one fixed line of prose
 - **THEN** preview timers stop and no later preview content reaches the live reader
 
 ### Requirement: Settings switches preserve native accessible operation
-Settings toggle controls SHALL be native checkboxes exposed as switches, named by their visible label and described by their help line, with a checked state marked by both the knob's position and the track's fill. Their labels and help SHALL render through the shared type tokens at or above the 12px chrome floor, they SHALL remain keyboard operable with Space, and they SHALL use the existing preference persistence path. The settings cards SHALL share equal column tracks while each takes its own content height.
+Settings toggle controls SHALL be native checkboxes exposed as switches, named by their visible label and described by their help line, with a checked state marked by both the knob's position and the track's fill. Their labels and help SHALL render through the shared type tokens at or above the 16px chrome floor, they SHALL remain keyboard operable with Space, and they SHALL use the existing preference persistence path. The settings cards SHALL share equal column tracks while each takes its own content height.
 
 #### Scenario: Keyboard toggles a preference
 - **WHEN** the focused switch receives Space
