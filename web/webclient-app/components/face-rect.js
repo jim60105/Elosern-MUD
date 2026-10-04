@@ -64,7 +64,14 @@ export function faceObjectPosition(rect) {
 // The enlarge-and-anchor crop style for the small-avatar set. A rejected rect
 // carries the caller's centered `objectPosition` alone, so a malformed rect
 // renders exactly the centered cover crop those surfaces showed before this
-// mapping existed.
+// mapping existed: the caller's frame clips with `overflow: hidden` and its
+// image class rule sizes the absolute box to that frame's padding box, so no
+// container alignment and no inline property can displace or resize it.
+//
+// The sizes and anchors land the rectangle's region on the frame's box exactly
+// for the pixel-square rectangle the authoring path enforces; for a legacy
+// non-square rectangle the same anchor composes the frame from the rectangle,
+// with a bounded sliver cropped on the one overflowing axis.
 export function faceCropStyle(rect, fallbackPosition = "50% 50%") {
   const normalized = normalizedRect(rect);
   if (!normalized) {

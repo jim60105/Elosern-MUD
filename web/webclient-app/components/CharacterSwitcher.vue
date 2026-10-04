@@ -370,9 +370,8 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* Absolutely positioned so the zoom offsets anchor against the wrapper; the
-   class size is the centered-crop fallback box, because an inline style only
-   overrides the axes the mapping actually binds. */
+/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
+   is exactly that wrapper's padding box. */
 .character-switcher__thumb {
   position: absolute;
   width: 100%;
@@ -485,6 +484,8 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
+   is exactly that wrapper's padding box. */
 .character-switcher__row-thumb {
   position: absolute;
   width: 100%;

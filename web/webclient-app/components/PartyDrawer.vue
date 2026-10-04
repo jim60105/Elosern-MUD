@@ -451,9 +451,8 @@ function onInviteCurrentNpc() {
   background: var(--ink-820);
 }
 
-/* Absolutely positioned so the zoom offsets anchor against the .av frame; the
-   class size is the centered-crop fallback box, because an inline style only
-   overrides the axes the mapping actually binds. */
+/* Absolute so a bound zoom anchors against the .av frame; unbound, the 100% box
+   is exactly that frame's padding box. */
 .av-img {
   position: absolute;
   width: 100%;
