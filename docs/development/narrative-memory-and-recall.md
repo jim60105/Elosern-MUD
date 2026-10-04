@@ -108,6 +108,13 @@ Session/character replacement drops local private data and never automatically
 replays a send. The tool group's envelope opens the shared focus-trapped drawer;
 its ruled folio uses shared ink/paper/brass tokens without nested card boxes.
 
+Each text command invocation is a new send, not an identified request replay.
+Identical intentional letters must remain possible: deduplicating by body/name
+would incorrectly suppress legitimate correspondence. Text clients must not
+automatically retry an uncertain send after a lost acknowledgement. Both player
+references state this distinction. An identified text retry protocol would be
+a new command contract, outside this boundary's existing text conventions.
+
 Offline smoke: run
 `world.narrative.tests.test_player_correspondence.PlayerCorrespondenceTests.test_real_text_and_browser_offline_smoke_and_log_privacy`
 through the guarded Evennia test entry. It exercises actual text send, committed

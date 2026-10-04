@@ -34,3 +34,14 @@
   New delta IDs remain the later sync/archive owner's responsibility, obtained
   from that same tool after sync. No main spec is changed here.
 - Broad managed browser and evidence-verification gates remain CI-owned.
+
+## Single final review disposition
+
+The final rubber-duck review found no blockers and no suggestions. Its one
+non-blocking finding was that separate text command invocations have no stable
+retry identity. Both player references and the owning developer guide now
+explicitly document text sends as new letters and prohibit automatic uncertain
+resubmission. An additional identified text-retry command is not introduced:
+body-based deduplication would suppress intentional identical letters, and
+transport retries cannot be inferred from separate text commands. Browser
+identified retries and transactional first-read deduplication remain covered.
