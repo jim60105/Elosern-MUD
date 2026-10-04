@@ -89,16 +89,48 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     expect(img.attributes("alt")).toBe("艾莉亞的肖像");
   });
 
-  it("offsets portrait crops by the payload face rect in both thumbnails", async () => {
+  it("zoom-crops portrait thumbnails to the payload face rect in both thumbnails", async () => {
     wrapper = mount(CharacterSwitcher, {
       props: { available: true, characters: SAMPLE_CHARACTERS },
     });
-    // Rect {x: 0.3, y: 0.1, w: 0.4, h: 0.4} centers at (50%, 30%).
+    // Rect {x: 0.3, y: 0.1, w: 0.4, h: 0.4}: a 2.5x enlargement anchored at
+    // -x * 2.5 and -y * 2.5, so the marked face fills the 22/24px frame.
     const thumb = wrapper.get("img.character-switcher__thumb");
-    expect(thumb.element.style.objectPosition).toBe("50% 30%");
+    expect(thumb.element.style.width).toBe("250%");
+    expect(thumb.element.style.height).toBe("250%");
+    expect(thumb.element.style.left).toBe("-75%");
+    expect(thumb.element.style.top).toBe("-25%");
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
     const rowThumb = wrapper.get("img.character-switcher__row-thumb");
-    expect(rowThumb.element.style.objectPosition).toBe("50% 30%");
+    expect(rowThumb.element.style.width).toBe("250%");
+    expect(rowThumb.element.style.height).toBe("250%");
+    expect(rowThumb.element.style.left).toBe("-75%");
+    expect(rowThumb.element.style.top).toBe("-25%");
+  });
+
+  it("falls back to the centered cover crop for a URL-bearing portrait with no face rect", async () => {
+    const chars = [
+      {
+        ...SAMPLE_CHARACTERS[0],
+        portrait: { ...SAMPLE_CHARACTERS[0].portrait, face_rect: null },
+      },
+    ];
+    wrapper = mount(CharacterSwitcher, {
+      props: { available: true, characters: chars },
+    });
+    // The class rule supplies width/height: 100%; the inline style carries no
+    // zoom property at all, so the frame renders today's centered crop.
+    const thumb = wrapper.get("img.character-switcher__thumb");
+    expect(thumb.element.style.objectPosition).toBe("50% 50%");
+    expect(thumb.element.style.width).toBe("");
+    expect(thumb.element.style.height).toBe("");
+    expect(thumb.element.style.left).toBe("");
+    expect(thumb.element.style.top).toBe("");
+    await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
+    const rowThumb = wrapper.get("img.character-switcher__row-thumb");
+    expect(rowThumb.element.style.objectPosition).toBe("50% 50%");
+    expect(rowThumb.element.style.width).toBe("");
+    expect(rowThumb.element.style.left).toBe("");
   });
 
   it("collapsed pill uses placeholder when current character has no url", () => {
