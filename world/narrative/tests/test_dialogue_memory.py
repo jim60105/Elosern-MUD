@@ -137,7 +137,8 @@ class DurableDialogueTests(BattlefieldIsolation, EvenniaTestCase):
         snapshot = NarrativeContextSnapshot.objects.get(snapshot_id=snapshot_id)
         self.assertEqual([source["source_id"] for source in snapshot.sources], ["test:core"])
 
-    @covers_requirement("narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
+    @covers_requirement("npc-dialogue::npc-context-recalls-only-permitted-committed-experience",
+                        "narrative-events::narrative-facts-commit-atomically-with-covered-gameplay",
                         "narrative-context::generation-retains-an-immutable-source-snapshot")
     def test_real_protection_commit_multi_day_revisit_and_permissioned_recall(self):
         self.npc.delete()
