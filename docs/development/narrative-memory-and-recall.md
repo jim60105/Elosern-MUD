@@ -205,8 +205,12 @@ settles once and a replay returns the original records instead of duplicating
 memories, and both versions keep independent rows. Boundary events carry only
 source/owner/version/count identifiers — `correspondence_memory_projected`,
 `correspondence_memory_projection_skipped` (a pending source with no durable
-event stays pending and is reported), `correspondence_memory_projection_failed`
-— never letter text.
+event stays pending and is reported) and `correspondence_memory_projection_failed`
+— never letter text. A source whose projection fails keeps its pending row by
+design (the durable work is never dropped) and is retried at the next drain
+boundary, each attempt reporting the exception chain; there is no give-up
+threshold. Only the startup recovery entry announces the cataloged pending
+scan, so the hot dialogue and reply drains stay quiet.
 
 Delta-only coverage IDs for this boundary are obtained and annotated by the
 later spec-sync owner after the delta spec reaches `openspec/specs/`; this
