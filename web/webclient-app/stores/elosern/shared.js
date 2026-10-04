@@ -42,6 +42,7 @@ export const PANEL_ALLOWLIST = [
   "lore_codex",
   "quest_log",
   "combat_beats",
+  "dream",
 ];
 
 // D5 (webclient-minimap-04-island-single-affordance): the place card's locationLabel

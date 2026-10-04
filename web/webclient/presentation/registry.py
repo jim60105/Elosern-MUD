@@ -400,9 +400,9 @@ def build_production_registry() -> PresentationRegistry:
             presenter=combat_beats_presenter,
         )
     )
-    from web.webclient.presentation.dream import dream_presenter
+    from web.webclient.presentation.dream import DREAM_SCHEMA_VERSION, dream_presenter
     registry.register(PresenterSpec(
-        name="dream", schema_version=1,
+        name="dream", schema_version=DREAM_SCHEMA_VERSION,
         unavailable_reason=("dream_unavailable", "夢境目前無法顯示"),
         presenter=dream_presenter,
     ))

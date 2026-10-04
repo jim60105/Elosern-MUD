@@ -58,6 +58,7 @@ _PANEL_MODULES = (
     ("lore_codex", "lore_codex.py"),
     ("quest_log", "quest_log.py"),
     ("combat_beats", "combat_beats.py"),
+    ("dream", "dream.py"),
 )
 
 
