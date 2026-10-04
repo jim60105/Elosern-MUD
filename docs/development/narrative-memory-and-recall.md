@@ -45,6 +45,40 @@ The `world/narrative` subsystem manages persistent narrative events, character m
    - Thin `NarrativeRequestDescriptor` binding prompt messages, validators, and snapshot/trace identities, rejecting mismatched context/snapshot provenance.
    - Every fresh assembly reads the owner memory generation, so effective-memory changes surface to new generations while retries re-read the authoritative persisted snapshot instead of rewriting it.
 
+## Fixed-hour correspondence delivery (W2)
+
+`world.narrative.correspondence.send_letter` accepts persistent character primary
+keys, a nonblank body of at most 8000 characters, and an optional stable source
+identity and reply-to source identity. Preflight rejects unknown/non-character
+recipients before persistence. Reusing the source identity is idempotent only
+for the same sender, recipient, body, and reply link. Accepted `LetterSend` rows
+are immutable; indexed `LetterState` rows own transitions separately.
+
+The send fixes the current authoritative tick and a due tick exactly
+`CLOCK_YAML["seconds_per_hour"]` later. Deterministic startup registers
+`correspondence_delivery` after `npc_schedules` and before
+`instance_reclamation`. Command, combat, and skip advances all settle exact
+deadlines in `(start_tick, end_tick]`, including non-calendar-aligned sends.
+Rejected skips do not advance; settlement never assumes the requested interval.
+
+NPC recipients become `delivered`; player recipients become `available`, without
+collection/read ticks. Delivery performs no recipient lookup, trait mutation,
+quest transition, model call, or image call. Movement and absent live locations
+cannot affect accepted delivery. Collection, reading, memory projection, replies,
+and player command/menu surfaces belong to subsequent changes; command docs
+remain unchanged because this change introduces no player command.
+
+Each transition atomically records a private `NarrativeEvent` with a stable
+`correspondence:<send-source>:<status>` identity and pending `ProjectionProgress`.
+`CORRESPONDENCE_PROJECTOR_VERSION = 2` reserves these progress rows for the later
+correspondence-owned consumer; the generic live-memory projector's version-1
+startup queue cannot consume them. Later correspondence projection owns that
+source. Tables share the clock transaction.
+The declared surface contract has no cached entities: ordinary Django rows are
+queried fresh, updated through querysets, and returned only as detached frozen
+values. No cached mutable row survives rollback. Boundary logs run on durable
+commit and include identifiers/ticks/status only, never letter bodies.
+
 ## Durable face-to-face dialogue (W1)
 
 `world.narrative.dialogue` replaces the destructive NPC Attribute history.

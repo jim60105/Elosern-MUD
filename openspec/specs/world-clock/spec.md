@@ -227,7 +227,7 @@ per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_po
 final `tick` increment inside a single durable transaction with snapshot/restore of the touched
 entity attributes **and of every durable surface any registered boundary-stage source may write
 (through its declared advance-surface contract, including quest logs and room pins, merchant
-components, NPC schedule state and location, instance-room state, and pruned map knowledge)**, so a
+components, NPC schedule state and location, instance-room state, pruned map knowledge, narrative letter rows, and durable delivery projection progress)**, so a
 process termination or a failure inside the call can never leave character state advanced without
 the matching tick (or the reverse), and no observer can see or persist an uncommitted settlement.
 
@@ -252,7 +252,7 @@ the matching tick (or the reverse), and no observer can see or persist an uncomm
 - **WHEN** the stage sequence and `MAX_ADVANCE_SECONDS` are inspected after this change
 - **THEN** the stage sequence is still exactly `("gauge_regen", "buff_ticks", "sexual_decay",
   "practice_settlement", "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines",
-  "npc_schedules", "instance_reclamation")`, an oversized call still raises before any write, and
+  "npc_schedules", "correspondence_delivery", "instance_reclamation")`, an oversized call still raises before any write, and
   contracts run before any stage write
 
 ### Requirement: Every registered boundary-stage source declares the durable surfaces it may write
@@ -359,3 +359,11 @@ change the atomic persistence or restore semantics.
 - **THEN** a `rollback_restore_failed` warn event identifies the key, the
   object, and the exception in context, and the original exception still
   propagates unchanged
+
+### Requirement: Delivery table changes participate in clock rollback
+
+Letter and durable derived-work table changes SHALL share the clock transaction. Cached row instances SHALL be discarded or refreshed after rollback; delivery SHALL NOT cause mutations of recipient live traits or quest state.
+
+#### Scenario: Rollback after due transition
+- **WHEN** a later clock stage fails after a due letter changes state
+- **THEN** letter/progress tables and any cached read models equal pre-advance state
