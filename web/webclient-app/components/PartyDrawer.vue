@@ -13,7 +13,7 @@ import {
   portraitFor,
   portraitGlyph,
 } from "./party-helpers.js";
-import { faceObjectPosition } from "./face-rect.js";
+import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   // The committed `party.slots` array.
@@ -254,7 +254,12 @@ function onInviteCurrentNpc() {
           class="av-img"
           :src="portraitEntry(slot).url"
           :alt="slot.display_name"
-          :style="{ objectPosition: faceObjectPosition(portraitEntry(slot).face_rect) }"
+          :style="
+            faceCropStyle(
+              portraitEntry(slot).face_rect,
+              faceObjectPosition(portraitEntry(slot).face_rect),
+            )
+          "
         />
         <span v-else class="mono av-glyph">{{ portraitGlyph(slot.display_name) }}</span>
       </div>
@@ -436,6 +441,8 @@ function onInviteCurrentNpc() {
   font-size: var(--text-2xl);
   color: var(--gold-400);
   border: 1px solid var(--ink-600);
+  /* The faceCropStyle offsets anchor against this clipping frame. */
+  position: relative;
   overflow: hidden;
 }
 
@@ -444,7 +451,11 @@ function onInviteCurrentNpc() {
   background: var(--ink-820);
 }
 
+/* Absolutely positioned so the zoom offsets anchor against the .av frame; the
+   class size is the centered-crop fallback box, because an inline style only
+   overrides the axes the mapping actually binds. */
 .av-img {
+  position: absolute;
   width: 100%;
   height: 100%;
   object-fit: cover;
