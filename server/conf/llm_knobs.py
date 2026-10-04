@@ -19,6 +19,7 @@ from dataclasses import dataclass
 LAYER_NAMES: tuple[str, ...] = (
     "narrator",
     "npc_dialogue",
+    "dialogue_summary",
     "scenario_director",
     "scene_builder",
     "character_creation",
@@ -171,7 +172,7 @@ LLM_KNOBS: tuple[LlmKnob, ...] = (
         250,
         minimum=0,
         rule="expected a positive integer",
-        layer_defaults={"action_options": 320, "title_nomination": 640},
+        layer_defaults={"action_options": 320, "title_nomination": 640, "dialogue_summary": 1024},
     ),
     LlmKnob(
         "timeout_seconds",
@@ -206,7 +207,7 @@ def llm_layer_env_names(layer: str) -> frozenset[str]:
 
 
 def llm_env_names() -> frozenset[str]:
-    """Every generated name: 23 globals plus 23 per layer for all seven layers."""
+    """Every generated name: 23 globals plus 23 per registered layer."""
     names: set[str] = set(llm_global_env_names())
     for layer in LAYER_NAMES:
         names |= llm_layer_env_names(layer)

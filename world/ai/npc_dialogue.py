@@ -453,30 +453,6 @@ def _serialize(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, ensure_ascii=False)
 
 
-def _bounded_serialization(payload: Mapping[str, Any]) -> str:
-    """Serialize the user payload deterministically within the total-size bound.
-
-    Every input field is already hard-capped, so the text always fits on the
-    first pass; the memory drop loop is a defensive last resort that removes
-    the oldest memory lines (updating the marker) until the text fits.
-    """
-    text = _serialize(payload)
-    if len(text) <= MAX_TOTAL_SIZE:
-        return text
-    memory = list(payload.get("memory", []))
-    dropped = 0
-    while True:
-        if not memory:
-            return _serialize({"player": {}, "memory": []})
-        memory = memory[1:]
-        dropped += 1
-        candidate = dict(payload)
-        candidate["memory"] = [f"（省略了較早的 {dropped} 則對話）", *memory]
-        text = _serialize(candidate)
-        if len(text) <= MAX_TOTAL_SIZE:
-            return text
-
-
 def _system_message(
     npc_context: Mapping[str, Any], npc_persona: str | None = None
 ) -> str:
@@ -489,7 +465,7 @@ def _system_message(
     """
     name = _cap_string(str(npc_context.get("name", "")))
     desc = _cap_string(str(npc_context.get("desc", "")))
-    location = _cap_string(str(npc_context.get("location", "")))
+    location = ""
     if npc_persona:
         try:
             framed_persona = render_prompt("npc_dialogue.persona_frame", block=npc_persona)
@@ -517,6 +493,10 @@ def build_npc_dialogue_prompt(
     cognition: str = "",
     omitted_memory_lines: int = 0,
     cognition_sources: tuple[dict[str, Any], ...] = (),
+    epoch_summary: str = "",
+    historical_frames: tuple[str, ...] = (),
+    tick: int = 0,
+    affordances: tuple[str, ...] = (),
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build a deterministic (system, user) message pair for NPC dialogue.
 
@@ -543,7 +523,11 @@ def build_npc_dialogue_prompt(
     output when absent. Identical input always produces byte-identical prompts
     with no live entity references.
     """
-    system = {"role": "system", "content": _system_message(npc_context, npc_persona)}
+    system = {"role": "system", "content": "\n\n".join((
+        render_prompt("npc_dialogue.global_rules"),
+        render_prompt("npc_dialogue.world_digest"),
+        _system_message(npc_context, npc_persona),
+    ))}
     player = {
         "name": _cap_string(str(player_context.get("name", ""))),
         "disguised_stats": _cap_value(player_context.get("disguised_stats", {})),
@@ -561,7 +545,12 @@ def build_npc_dialogue_prompt(
     payload = {
         "player": player,
         "memory": _bounded_memory(memory, omitted_memory_lines),
+        "location": _cap_string(str(npc_context.get("location", ""))),
+        "tick": tick,
+        "authority": "Current state supersedes historical frame state; history retains its original tick.",
     }
+    if affordances:
+        payload["affordances"] = [_cap_string(str(item)) for item in affordances[:12]]
     if cognition:
         payload["cognition"] = cognition
         payload["cognition_sources"] = [
@@ -571,7 +560,29 @@ def build_npc_dialogue_prompt(
              "knowledge_scope": str(source["knowledge_scope"])[:32]}
             for source in cognition_sources[:13]
         ]
-    user = {"role": "user", "content": _bounded_serialization(payload)}
+    # Current state is required; optional material is removed before rejection.
+    from world.narrative.context import ContextBudgetExceededError
+
+    while len(_serialize(payload)) > MAX_TOTAL_SIZE and payload["memory"]:
+        payload["memory"].pop(0)
+    if len(_serialize(payload)) > MAX_TOTAL_SIZE:
+        payload.pop("cognition", None)
+        payload.pop("cognition_sources", None)
+    if len(_serialize(payload)) > MAX_TOTAL_SIZE:
+        raise ContextBudgetExceededError("Required current dialogue frame exceeds size bound.")
+    current = _serialize(payload)
+    if historical_frames or epoch_summary:
+        # String values preserve the exact canonical bytes of earlier frames.
+        envelope = {"epoch_summary": epoch_summary, "frames": list(historical_frames),
+                    "current": current}
+        while len(_serialize(envelope)) > MAX_TOTAL_SIZE and envelope["frames"]:
+            envelope["frames"].pop(0)
+        if len(_serialize(envelope)) > MAX_TOTAL_SIZE:
+            envelope["epoch_summary"] = ""
+        if len(_serialize(envelope)) > MAX_TOTAL_SIZE:
+            raise ContextBudgetExceededError("Required current frame envelope exceeds size bound.")
+        current = _serialize(envelope)
+    user = {"role": "user", "content": current}
     return system, user
 
 
@@ -687,6 +698,21 @@ def generate_npc_reply(
     except PromptUnavailableError:
         return None
     extra_validators = None
+    # Replayed frames can contain affinity numbers no longer current.
+    visible_secrets = set(no_leak_secrets or ())
+    if prepared_messages:
+        supplied = json.loads(user["content"])
+        frames = [supplied]
+        if "current" in supplied:
+            frames = [json.loads(frame) for frame in supplied.get("frames", ())]
+            frames.append(json.loads(supplied["current"]))
+        for frame in frames:
+            affinity = frame.get("player", {}).get("affinity", {})
+            for key in ("value", "cap"):
+                number = affinity.get(key)
+                if isinstance(number, int) and not isinstance(number, bool):
+                    visible_secrets.add(str(number))
+    no_leak_secrets = frozenset(visible_secrets)
     if no_leak_secrets:
         extra_validators = {
             "no_leak": _make_no_leak_validator(no_leak_secrets)

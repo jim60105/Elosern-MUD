@@ -304,6 +304,10 @@ def default_profiles(
         **profiles["title_nomination"],
         "max_tokens": TITLE_NOMINATION_MAX_TOKENS,
     }
+    profiles["dialogue_summary"] = {
+        **profiles["dialogue_summary"],
+        "max_tokens": 1024,
+    }
     profiles["scenario_director"] = {
         **profiles["scenario_director"],
         "max_tokens": SCENARIO_DIRECTOR_MAX_TOKENS,
@@ -326,9 +330,9 @@ def build_profiles(
 
     Accepts either a mapping or an iterable of ``(layer, values)`` pairs so
     duplicate layer keys can be detected. Unknown layers are rejected, every
-    profile is validated against every bound, and any of the seven layers missing
+    profile is validated against every bound, and any registered layer missing
     from the source falls back to the local-first default so the registry maps
-    exactly the seven layer names. Per-layer required flags (``action_options``
+    exactly the registered layer names. Per-layer required flags (``action_options``
     must declare structured output) are enforced after the generic bounds.
     """
     if isinstance(raw_profiles, Mapping):
