@@ -373,10 +373,12 @@ class AltoriaLearningExchangeTests(ServiceContentIsolation, EvenniaTestCase):
                 # several names.
                 self.assertEqual(len(interiors), len(co_residents))
                 # The cardinality this change is responsible for: the stalls
-                # made 市場街 three doors, the hall made 東市 two.
+                # made 市場街 three doors, the hall made 東市 two. The 銀羽
+                # 驛站王都分站 later joined 市場街 as its fourth distinct
+                # door, and the correspondence letter service owns that key.
                 self.assertGreaterEqual(len(co_residents), 2)
                 if anchor.kind == "market":
-                    self.assertEqual(len(co_residents), 3, "市場街 lost a door")
+                    self.assertEqual(len(co_residents), 4, "市場街 lost a door")
                 else:
                     self.assertEqual(len(co_residents), 2, "東市 lost a door")
 

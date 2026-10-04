@@ -658,8 +658,20 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # again with the host-less 聖潔王都市集棚 — host-less on the document's
         # authority (a market street's trade hangs on its stallholders, not a
         # fixed street-chief NPC), the second emptiness meant to stay empty.
+        # The silver-feather correspondence change widens it a third time with
+        # the two 銀羽驛站 branches: institution-run courier outposts whose
+        # service runs from the ledger behind the counter, not a resident NPC
+        # host, so they reach the rooms-only outcome hostless-places reserved.
+        # Their letter_service flag, not a host row, drives the surface.
         self.assertEqual(
-            hostless, {"ciaran_shelter", "altoria_palace", "altoria_market_stalls"}
+            hostless,
+            {
+                "ciaran_shelter",
+                "altoria_palace",
+                "altoria_market_stalls",
+                "ciaran_silverfeather",
+                "altoria_silverfeather",
+            },
         )
         for place in PLACE_REGISTRY.values():
             if place_is_hostless(place):
