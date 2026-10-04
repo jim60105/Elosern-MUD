@@ -14,10 +14,10 @@
 
 ## Exercised evidence
 
-- Focused Evennia run: 82 tests passed (`test_dream_surface`,
+- Focused Evennia run: 84 tests passed (`test_dream_surface`,
   `test_dream_session`, `test_skip_commands`, `tests.test_command_docs`).
 - Browser-adapter/presenter/skip-command focused run: 26 tests passed.
-- Focused Vitest dream and waiting surfaces: 8 tests passed.
+- Focused Vitest dream and waiting surfaces: 9 tests passed.
 - Dependency-free Node protocol/echo gate: 479 tests passed.
 - The recorded/offline changed-path smoke is
   `DreamSurfaceTests.test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke`:
@@ -28,3 +28,30 @@
 - `openspec validate dream-sleep-surface --strict` passed.
 - Broad managed-browser, aggregate coverage and complete evidence gates remain
   CI-owned. Delta-only requirement annotations remain archive-sync owned.
+
+## Review dispositions
+
+The preimplementation critique was folded into actual-tick association, explicit
+zero-duration opt-in, authoritative session association, shared owner identity,
+pending-submission callback gates rather than revision equality, confirmed-draft
+authority, generation-free escape and late-delivery/control tests. Its assertion
+that the text command already used `advance_skip` was incorrect; the existing
+text and browser settlement seams were preserved instead of introducing a
+gratuitous physical-path migration. The actual catalog remains the existing
+documentation table. Interrupted results use a synthetic short-commit seam
+because the real clock is all-or-nothing.
+
+The single final critique found no blocking issues. Both non-blocking findings
+and four suggestions were fixed with focused regressions:
+
+- NB-1: bare confirmation now reads the authoritative durable draft; subsequent
+  chat cannot silently replace a saved thread direction or its preferences.
+- NB-2: ended surfaces do not query story-thread choices.
+- S-1: changed same-session draft fields rehydrate without clearing unsent chat.
+- S-2: empty bare confirmation is refused concretely; empty awakening does not
+  create a meaningless draft.
+- S-4: empty/oversized text input reports its specific stable refusal code.
+- S-5: text confirm/awakening delivers its ending once.
+- S-3 is deliberately retained: the initial refresh is needed when `dream say`
+  is a typed WebSocket command, where no action dispatcher publishes pending
+  state. The final refresh publishes completion; neither calls another model.

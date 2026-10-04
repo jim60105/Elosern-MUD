@@ -58,4 +58,19 @@ describe("server-authored dream surface", () => {
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
   });
+  it("rehydrates a same-session external draft change without clearing unsent chat", async () => {
+    const { wrapper, store } = fixture();
+    await wrapper.find("form textarea").setValue("尚未送出的交流");
+    await wrapper.setProps({ state: state({
+      revision: 8, direction_parts: ["伺服器保存的故事方向"], thread_choices: ["synthetic-thread"],
+      draft_preferences: { kind: "thread_direction", thread_id: "synthetic-thread", themes: ["鐘聲"], exclusions: ["暴力"] },
+    }) });
+    expect(wrapper.find("form textarea").element.value).toBe("尚未送出的交流");
+    expect(wrapper.find("select").element.value).toBe("synthetic-thread");
+    await wrapper.findAll("button")[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
+      session_id: "synthetic-dream", revision: 8,
+      direction: { kind: "thread_direction", thread_id: "synthetic-thread", summary: "伺服器保存的故事方向", themes: ["鐘聲"], exclusions: ["暴力"] },
+    }, null);
+  });
 });

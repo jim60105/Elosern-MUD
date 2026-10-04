@@ -741,6 +741,10 @@ non-terminal thread choices are server-authored (at most 32), and confirmation
 revalidates changed thread state. Invalid directions stay unconfirmed drafts
 and return the deterministic concrete reason messages. Text accepts direction
 JSON; browser sends the same object, with an 8192-byte surface bound.
+Further chat preserves an explicitly saved structured draft; bare confirmation
+never silently turns a thread direction into a new-story chat summary. The
+browser rehydrates changed draft fields within the same session without clearing
+unsent chat, and ended panels skip the thread-choice query entirely.
 The ending uses `dream_track.render_ending`, never another model call.
 
 The `dream` OOB panel has a strict mirrored browser schema. `dream.say`

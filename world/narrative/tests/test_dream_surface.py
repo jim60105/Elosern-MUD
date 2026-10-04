@@ -359,3 +359,42 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertNotIn("合成秘密方向", str(info.call_args_list))
         command.args = "awaken"
         self.assertEqual(command.func().result["outcome"], "success")
+
+    def test_saved_structured_draft_survives_chat_and_bare_confirmation(self):
+        self.enter()
+        thread = create_thread(thread_id="synthetic-retained-thread", origin="synthetic-origin", participants=[str(self.actor.pk)])
+        direction = {"kind": "thread_direction", "thread_id": thread.thread_id,
+                     "summary": "在既有故事中尋找鐘聲。", "themes": ["鐘聲"],
+                     "exclusions": ["暴力"]}
+        self.assertEqual(self.request("draft", direction=direction).result["outcome"], "success")
+        self.assertEqual(self.request("say", message="我還想繼續討論。", client=self.delivered()).result["outcome"], "success")
+        state = service.dream_state(self.actor)
+        self.assertEqual("".join(state["direction_parts"]), direction["summary"])
+        self.assertEqual(state["draft_preferences"]["thread_id"], thread.thread_id)
+        self.assertEqual(self.request("confirm").result["outcome"], "success")
+        stored = CreativeRequest.objects.get()
+        self.assertEqual(stored.direction["kind"], "thread_direction")
+        self.assertEqual(stored.direction["thread_id"], thread.thread_id)
+        self.assertEqual(stored.direction["summary"], direction["summary"])
+        self.assertEqual(stored.direction["exclusions"], ["暴力"])
+        with patch("world.narrative.dream_surface.StoryThread.objects.exclude") as query:
+            self.assertEqual(service.dream_state(self.actor)["thread_choices"], [])
+            query.assert_not_called()
+
+    def test_blank_confirmation_concrete_input_refusals_and_single_text_ending(self):
+        self.enter()
+        self.assertEqual(self.request("confirm").result["code"], "empty_direction")
+        self.assertFalse(surface.associated_session(self.actor).draft_id)
+        client = self.delivered()
+        self.assertEqual(self.request("say", message="", client=client).result["code"], "empty_input")
+        self.assertEqual(self.request("say", message="界" * 4001, client=client).result["code"], "oversized_input")
+        self.assertEqual(client.calls, [])
+        command = CmdDream()
+        command.caller = self.actor
+        command.session = None
+        command.args = "awaken"
+        self.actor.msg.reset_mock()
+        self.assertEqual(command.func().result["outcome"], "success")
+        ending = service.dream_state(self.actor)["ending"]
+        self.assertEqual([call.args[0] for call in self.actor.msg.call_args_list].count(ending), 1)
+        self.assertFalse(surface.associated_session(self.actor).draft_id)

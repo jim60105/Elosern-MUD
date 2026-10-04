@@ -7,8 +7,8 @@ const thread = ref("");
 const preferences = ref("");
 const refusal = ref("");
 const transportLocked = computed(() => !props.store.view.connected || !!props.store.view.dispatch.inFlight);
-watch(() => props.state.session_id, () => {
-  message.value = "";
+watch(() => props.state.session_id, () => { message.value = ""; });
+watch(() => JSON.stringify([props.state.session_id, props.state.draft_preferences, props.state.direction_parts]), () => {
   const saved = (props.state.direction_parts || []).join("");
   direction.value = Array.from(saved).length <= 2000 ? saved : "";
   thread.value = props.state.draft_preferences?.thread_id || "";
@@ -55,7 +55,7 @@ function send(action) {
       <button type="submit" :disabled="transportLocked || !message.trim()">交流</button>
     </form>
     <label v-if="state.can_confirm || state.can_draft">要保存的故事方向
-      <textarea v-model="direction" maxlength="2000" :disabled="transportLocked" placeholder="留白會沿用最近提出的方向或已保存的草稿。" />
+      <textarea v-model="direction" maxlength="2000" :disabled="transportLocked" placeholder="留白會優先沿用已保存的草稿，尚無草稿時才使用最近提出的方向。" />
     </label>
     <template v-if="state.can_confirm || state.can_draft">
       <label>方向適用的故事

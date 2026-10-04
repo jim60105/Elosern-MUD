@@ -10,7 +10,7 @@ from twisted.internet import defer
 from web.webclient.presentation.protocol import check_json_safety, json_byte_size, ProtocolValidationError
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
-from world.narrative.authoring import AuthoringError, DIRECTION_KEYS, MAX_SUMMARY_CHARACTERS, collaborator_creative_brief, validate_direction
+from world.narrative.authoring import AuthoringError, DIRECTION_KEYS, MAX_SUMMARY_CHARACTERS, collaborator_creative_brief, get_draft, validate_direction
 from world.observability import log_info, log_warn
 
 enter_after_sleep = surface.enter_after_sleep
@@ -71,31 +71,38 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                         return _result("rejected", "direction_too_large", "故事方向摘要上限為 2000 字。")
                     payload = {"kind": "new_story", "summary": direction.strip()}
                 else:
-                    payload = saved.get("draft_direction") or {"kind": "new_story", "summary": saved.get("direction", "")}
+                    payload = (get_draft(current.draft_id, owner).direction if current.draft_id
+                               else {"kind": "new_story", "summary": saved.get("direction", "")})
                 summary = str(payload.get("summary", ""))
                 if action == "draft":
                     lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
-                    surface.store_direction(actor, summary, draft_direction=payload)
+                    surface.store_direction(actor, summary)
                     surface.bump_revision_if_unchanged(actor, revision)
                 elif action == "confirm":
+                    if not summary.strip():
+                        return _result("rejected", "empty_direction", "請先提出要確認的故事方向。")
                     validation = validate_direction(payload, owner_id=owner)
                     if not validation.valid:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
-                        surface.store_direction(actor, summary, draft_direction=payload)
+                        surface.store_direction(actor, summary)
                         surface.bump_revision_if_unchanged(actor, revision)
                         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_direction", "reason_codes": validation.reason_codes})
                         return _result("rejected", "invalid_direction", "；".join(reason.message for reason in validation.reasons))
                     lifecycle.confirm_session(session_id, owner, direction=payload, tick=tick)
                 else:
-                    if not current.draft_id and current.state == lifecycle.STATE_OPEN:
+                    if not current.draft_id and summary.strip() and current.state == lifecycle.STATE_OPEN:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
-                        surface.store_direction(actor, summary, draft_direction=payload)
+                        surface.store_direction(actor, summary)
                     lifecycle.awaken_session(session_id, owner, tick=tick)
                 state = dream_state(actor)
                 text = state["ending"] or "故事方向已存為私人草稿。"
                 actor.msg(text)
                 log_info("dream_surface_action", context={**boundary, "completed": state["completed"], "tick": tick})
                 return _result("success", "dream_" + action, text)
+    except lifecycle.DreamInputRejected as error:
+        log_warn("dream_surface_rejected", context={**boundary, "reason": error.code}, exc=error)
+        text = "交流文字不可空白。" if error.code == lifecycle.REASON_EMPTY_INPUT else "交流文字上限為 4000 字。"
+        return _result("rejected", error.code, text)
     except (lifecycle.DreamSessionError, AuthoringError, ProtocolValidationError) as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_state_or_direction"}, exc=error)
         return _result("rejected", "dream_refused", "目前無法接受這個操作，請確認故事方向與夢境狀態。")

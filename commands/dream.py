@@ -65,7 +65,9 @@ class CmdDream(Command):
         def completed(value):
             if value["outcome"] == "rejected":
                 self.caller.msg(value["message"])
-            self.caller.msg(render_state(dream_state(self.caller)))
+            current = dream_state(self.caller)
+            if current["open"]:
+                self.caller.msg(render_state(current))
             return value
 
         result.addCallback(completed)

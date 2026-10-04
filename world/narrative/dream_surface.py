@@ -59,7 +59,6 @@ def enter_after_sleep(actor, *, tick_from, tick_to, requested_seconds, events=()
             "scene": retained.get("scene", ""),
             "dialogue": retained.get("dialogue", ""),
             "direction": retained.get("direction", ""),
-            "draft_direction": retained.get("draft_direction"),
             "failure": False,
         }
         if retained:
@@ -73,10 +72,9 @@ def enter_after_sleep(actor, *, tick_from, tick_to, requested_seconds, events=()
     return dream_state(actor)
 
 
-def store_direction(actor, message, *, draft_direction=None):
+def store_direction(actor, message):
     value = association(actor)
     value["direction"] = message
-    value["draft_direction"] = draft_direction
     value["failure"] = False
     actor.db.dream_surface = value
 
@@ -112,13 +110,17 @@ def dream_state(actor):
     view = lifecycle.progress(session)
     opened = session.state == lifecycle.STATE_OPEN
     ending = render_ending(view.completed) if not opened else None
-    confirmed = bool(session.draft_id and draft_is_confirmed(get_draft(session.draft_id, owner_id(actor))))
+    draft = get_draft(session.draft_id, owner_id(actor)) if session.draft_id else None
+    confirmed = bool(draft and draft_is_confirmed(draft))
+    draft_direction = draft.direction if draft else None
     threads = []
-    for thread in StoryThread.objects.exclude(state__in=TERMINAL_THREAD_STATES).order_by("-pk").iterator():
-        if thread_accessible(thread, owner_id(actor)):
-            threads.append(thread.thread_id)
-            if len(threads) == 32:
-                break
+    if opened:
+        for thread in StoryThread.objects.exclude(state__in=TERMINAL_THREAD_STATES).order_by("-pk").iterator():
+            if thread_accessible(thread, owner_id(actor)):
+                threads.append(thread.thread_id)
+                if len(threads) == 32:
+                    break
+    displayed_direction = (draft_direction or {}).get("summary", value.get("direction", ""))
     return {
         "session_id": session.session_id, "revision": int(session.revision),
         "completed": view.completed, "remaining": view.remaining,
@@ -127,12 +129,12 @@ def dream_state(actor):
         "pending": bool(session.pending_submission_id), "open": opened,
         "confirmed": confirmed, "failure": bool(value.get("failure")),
         "thread_choices": threads,
-        "draft_preferences": {key: item for key, item in (value.get("draft_direction") or {}).items()
-                              if key != "summary"} if value.get("draft_direction") else None,
+        "draft_preferences": {key: item for key, item in (draft_direction or {}).items()
+                              if key != "summary"} if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
         "dialogue": value.get("dialogue", ""),
-        "direction_parts": [value.get("direction", "")[offset:offset + 2000]
-                            for offset in range(0, len(value.get("direction", "")), 2000)],
+        "direction_parts": [displayed_direction[offset:offset + 2000]
+                            for offset in range(0, len(displayed_direction), 2000)],
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
         "ending": (f"{ending.phase}，餘韻漸漸平息，純白的夢境淡去，你醒了。" if ending and ending.climax_reached else "純白的夢境漸漸淡去，你醒了。") if ending else "",
         "ending_phase": ending.phase if ending else "",
