@@ -1,5 +1,6 @@
 """Synthetic correspondence cognition projection across both channel boundaries."""
 
+import json
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -211,12 +212,14 @@ class CorrespondenceCognitionProjectionTests(EvenniaTest):
         source_id = correspondence_event_source_id(letter.source_id, "delivered")
 
         def state():
-            return (
+            # A serialized snapshot, so an in-place mutation of a stored value
+            # cannot compare equal to its own mutated self.
+            return json.dumps([
                 self.sender.db.quest_records, self.sender.db.inventory,
                 self.sender.db.appointments, self.npc.db.relations_data,
                 NarrativeEvent.objects.count(), LetterSend.objects.count(),
                 LetterState.objects.get(letter__source_id=letter.source_id).status,
-            )
+            ], default=repr, sort_keys=True)
 
         before = state()
         self.assertEqual(process_pending_correspondence_projections(), 1)
@@ -281,7 +284,11 @@ class CorrespondenceFaceToFaceTests(EvenniaTestCase):
 
         speech = "請說說那封信"
         submit_turn(self.npc, self.player, speech)
-        messages, snapshot_id = build_dialogue_context(self.npc, self.player, speech)
+        with patch("world.narrative.events.log_info") as scanned:
+            messages, snapshot_id = build_dialogue_context(self.npc, self.player, speech)
+        # The recall-boundary drain is quiet: only the startup recovery entry
+        # announces the pending scan.
+        self.assertEqual(scanned.call_args_list, [])
         cognition = messages[1]["content"]
         self.assertIn("北方森林的龍。", cognition)
         self.assertNotIn(tail, cognition)
