@@ -48,6 +48,16 @@ Accounting durability
 - A failed or abandoned turn releases the pending slot through
   :func:`abandon_turn` while keeping ``saved_input`` recoverable; the terminal
   choices and awakening clear the pending slot.
+- Successful delivery is the existing presentation acceptance boundary: the
+  validated response is already committed to a recoverable player response
+  record and dispatched by that identity, and :func:`settle_exchange` is called
+  only once that outcome is final. A late delivery arriving after
+  :func:`abandon_turn` is refused rather than counted, so the budget can
+  under-count a genuinely lost settlement but can never over-count.
+- The session's draft handle is deterministic per session, so
+  :func:`preserve_draft` and ``confirm_session(direction=...)`` assume one
+  writer per owner — the same caller-supplied ``draft_id`` contract
+  ``world.narrative.authoring`` documents for its own drafts.
 
 Boundary events carry session/submission/delivery identifiers, counts, ticks and
 stable reason codes only. Player prose, direction summaries and reason messages

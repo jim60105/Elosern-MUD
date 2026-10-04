@@ -263,6 +263,16 @@ failure, cancellation or a validation retry without consuming anything and
 keeps `saved_input` recoverable for the next entry; the terminal choices and
 awakening clear the slot.
 
+Two callers' contracts follow from that. Successful delivery is the existing
+presentation acceptance boundary: the validated response is already committed
+to a recoverable player response record and dispatched by that identity, and
+`settle_exchange` is called only once that outcome is final — a late delivery
+arriving after `abandon_turn` is refused rather than counted, so the budget can
+under-count a genuinely lost settlement but can never over-count. And the
+session's draft handle is deterministic per session, so `preserve_draft` and
+`confirm_session(direction=...)` assume one writer per owner, the same
+caller-supplied `draft_id` contract `world.narrative.authoring` documents.
+
 Confirm/draft/awaken are deterministic and generation-free. `preserve_draft`
 saves or updates the session's deterministic private `AuthoringDraft` handle
 (`dream:<session_id>`) and schedules nothing — no `CreativeRequest` is created
