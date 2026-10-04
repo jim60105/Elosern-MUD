@@ -1,7 +1,7 @@
 ## 1. Implement the bounded behavior
 
 - [x] 1.1 Wire explicit optional choice to real sleep outcomes in text/browser adapters; verify zero-duration, rejection, ordinary sleep and actual interrupted results.
-- [x] 1.2 Expose server-authored dream state/remaining count and confirm/draft/awaken actions with text parity; verify forged owner/stale request rejection and sixth cap.
+- [x] 1.2 Expose server-authored dream state/remaining count and confirm/draft/awaken actions with text parity and a core-design-aligned narrative folio; verify forged owner/stale request rejection, sixth cap and the interactive offline storyboard with agent-browser.
 - [x] 1.3 Preserve sleep association and generation-free escape across reconnect/failure; verify tick/gauges/live effects unchanged after departure.
 - [x] 1.4 Update both command docs and contract tests, then run changed-path offline sleep→dream→draft/confirm→awaken smoke; verify the complete approved presentation contract.
 
@@ -17,7 +17,8 @@
 - Focused Evennia run: 84 tests passed (`test_dream_surface`,
   `test_dream_session`, `test_skip_commands`, `tests.test_command_docs`).
 - Browser-adapter/presenter/skip-command focused run: 26 tests passed.
-- Focused Vitest dream and waiting surfaces: 9 tests passed.
+- Focused Vitest dream and waiting surfaces: 10 tests passed, including shared
+  core button classes, disclosure focus and the real stage-mounted storyboard.
 - Dependency-free Node protocol/echo gate: 479 tests passed.
 - The recorded/offline changed-path smoke is
   `DreamSurfaceTests.test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke`:
@@ -26,6 +27,62 @@
 - `tools.contract_gate` passed (1859 requirements covered; zero traceability,
   observability, test-data or manifest violations; 18 contracts passed).
 - `openspec validate dream-sleep-surface --strict` passed.
+- User-requested frontend follow-through uses the `agent-browser` skill and
+  `World / DreamPanel / Storyboard`: pending input, generation failure without
+  counting, successful scene/dialogue with count decrement, cap, saved thread
+  direction, reconnect, explicit confirmation and awakening were exercised
+  against the offline Storybook build. The synthetic sleep stayed at 100 → 100.
+  Story-only publication controls and production actions both reuse core
+  `ui-btn` chrome; confirmation is the only primary action.
+- The user-requested UX correction replaces simultaneously exposed inputs and
+  raw JSON with one conversational entry, a saved-direction preview, optional
+  plain-language preferences and owner-visible factual story labels. The
+  sticky footer explicitly distinguishes confirmation/departure, draft storage
+  and immediate awakening. Agent-browser exercised the corrected flow and
+  captured desktop/narrow screenshots; the 390px viewport had a 390px page
+  width (no horizontal overflow).
+- The user-requested immersive artwork uses the supplied image-generator and
+  natural-language prompt-builder skills and the full `.env` scene profile.
+  A reviewed, bundled 1536×864 AVIF supplies the white-bed/adult-goddess
+  dream stage; no permanent test or runtime UI calls sd-webui.
+- The supplied core-panel notes replace the framed drawer with a full artwork
+  stage and a bottom-left feathered-ink/brass-mounted dialogue instrument.
+  Native keyboard focus remains trapped, closed disclosure fields are excluded,
+  and Escape uses the existing revision-gated awakening action.
+- The frozen showcase manifest remains frozen with 64 registered components.
+  The four existing showcase evidence modules were exercised and six assertions
+  expose legacy drift unrelated to DreamPanel: every one names only
+  `World/LettersPanel`, `Overlays/GalleryStageTransformModal`, and (the overlay
+  coverage assertion only) `Core/CompanionLineup`, plus the World and Overlays
+  story-directory partitions that omit `LettersPanel.stories.js` and
+  `GalleryStageTransformModal.stories.js`. Master's manifest already carries
+  those keys while the frozen baselines omit them, so the assertions fail
+  identically on master. DreamPanel is registered in each affected assertion,
+  and those unrelated frozen baselines are intentionally unchanged.
+- Resume verification completed the browser action-catalog lockstep the
+  committed dream surface implied: the four `dream.*` adapters now appear in
+  `command_echo_coverage_manifest.json`, the dependency-free Node coverage
+  fixture (`command_echo.test.js`), the Vitest per-surface behavioral table
+  (`web/webclient-app/tests/store/command_echo_surfaces.test.js`), and the
+  exact production-registry pin
+  (`web/webclient/actions/tests/test_dispatcher/test_registry.py`), and the
+  `dream` panel in the exact panel-name pin
+  (`web/webclient/presentation/tests/test_combat_panel/test_presenter.py`).
+  The `webclient-action-dispatch` requirement is carried as a MODIFIED delta.
+- Focused Evennia rerun: `world.narrative.tests.test_dream_surface` 15 tests
+  passed; `test_dispatcher.test_registry`, `test_combat_panel.test_presenter`
+  and `test_action_catalog_coverage` ran 23 tests with two failures that now
+  name only the pre-existing `letters.list`, `letters.collect`, `letters.read`,
+  `letters.send` and `gallery.stage.update` registry drift. Those five ids were
+  registered on master by the correspondence and gallery-stage-transform
+  changes without catalog entries, so both pins fail identically on master;
+  this change no longer contributes to either diff and the unrelated ids are
+  intentionally unchanged.
+- Final gate rerun: full Vitest suite 136 files / 1523 tests passed, the
+  dependency-free Node gate 479 tests passed, `pnpm run build`,
+  `pnpm run build-storybook` and the 64-component `showcase-coverage` gate
+  passed, `openspec validate dream-sleep-surface --strict` passed, and
+  `tools.contract_gate` passed.
 - Broad managed-browser, aggregate coverage and complete evidence gates remain
   CI-owned. Delta-only requirement annotations remain archive-sync owned.
 

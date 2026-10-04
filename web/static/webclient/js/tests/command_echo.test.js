@@ -648,6 +648,33 @@ const REGISTERED_MUTATION_ACTIONS = {
   "creation.preset": { payload: { preset_key: "elf_mage" }, display: {} },
   "creation.reset": { payload: {}, display: { actionLabel: "清除草稿" } },
   "creation.roll_name": null,
+  // The collaborative dream surface (dream-sleep-surface): the browser panel
+  // dispatches the same lifecycle the text client types, so each action keeps
+  // its typed-command echo.
+  "dream.say": {
+    payload: { session_id: "session:synthetic-dream", revision: 1, message_parts: ["合成", "方向"] },
+    display: {},
+  },
+  "dream.draft": {
+    payload: {
+      session_id: "session:synthetic-dream",
+      revision: 1,
+      direction: { kind: "new_story", summary: "合成方向" },
+    },
+    display: {},
+  },
+  "dream.confirm": {
+    payload: {
+      session_id: "session:synthetic-dream",
+      revision: 1,
+      direction: { kind: "new_story", summary: "合成方向" },
+    },
+    display: {},
+  },
+  "dream.awaken": {
+    payload: { session_id: "session:synthetic-dream", revision: 1 },
+    display: {},
+  },
   "explore.engage": { payload: {}, display: { targetLabel: "哥布林" } },
   "explore.deliver": {
     payload: { npc_id: "granny", item_key: SYNTH_ITEM.id },

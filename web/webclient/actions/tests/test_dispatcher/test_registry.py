@@ -99,6 +99,10 @@ class RegistryTests(unittest.TestCase):
                     "gallery.binding.save",
                     "npc.persona.read",
                     "npc.persona.update",
+                    "dream.say",
+                    "dream.draft",
+                    "dream.confirm",
+                    "dream.awaken",
                 }
             ),
         )

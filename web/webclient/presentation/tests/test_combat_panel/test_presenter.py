@@ -469,6 +469,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "possession_banner",
                     "lore_codex",
                     "combat_beats",
+                    "dream",
                 }
             ),
         )
