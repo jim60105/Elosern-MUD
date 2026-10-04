@@ -33,3 +33,20 @@ Update both command docs and tests/test_command_docs.py when keys, aliases, synt
 - Scope expansion → implement only the listed boundary; future behavior gets its own real proposal rather than a stub or compatibility path.
 
 Main-spec reconciliation: No main-spec behavior conflict; additive capability.
+
+## Implementation selections
+
+The text command is `信件` / `letters`, with explicit `寄`, `領取`, `讀`
+and metadata-page `更多` subcommands. Browser operations use the existing
+correlated result-data channel (`letters.list/send/collect/read`), avoiding a
+parallel panel protocol. Twenty-row metadata pages never carry bodies; only an
+authorized explicit opening returns body parts (at most four 2000-code-point
+leaves), retaining both the existing transport bound and the 8000-character
+letter bound. A place-owned `letter_service` capability authorizes the unique
+tagged permanent interior; descriptive kind never grants access.
+
+The personal tool group opens the shared focus-trapped drawer. Its envelope
+glyph, ruled folio and receding metadata follow `tmp/core-panel-design-notes.md`
+without nested boxes, new color tokens or unrelated art. The body remains the
+primary reading surface; composition is branch-only. Tasks retain the approved
+behavior and evidence scope.
