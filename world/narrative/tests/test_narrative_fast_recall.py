@@ -37,6 +37,7 @@ from world.narrative.ranker import (
     DocumentTokens,
 )
 from world.narrative.recall import fast_recall
+from world.narrative.threads import create_thread
 from world.narrative.tokenizer import extract_entities, tokenize
 from world.observability import log_info
 
@@ -113,7 +114,11 @@ class NarrativeFastRecallTests(EvenniaTestCase):
 
     @covers_requirement("narrative-fast-recall::permissions-and-explicit-scope-precede-recall-scoring")
     def test_explicit_thread_scope_filtering(self):
-        """Explicit thread scope filters candidate memories before scoring."""
+        """Explicit thread scope filters candidate memories before scoring.
+
+        A thread is a real owner row: an unknown or inaccessible thread is a
+        denial, not a bare relation-string match.
+        """
         # Create a record with explicit thread relation
         rec, _, _ = record_memory(
             owner_id="npc_yohanna_101",
@@ -124,6 +129,18 @@ class NarrativeFastRecallTests(EvenniaTestCase):
             tier="working",
             source_id="corpus:thread:caravan:1",
             relations={"thread_id": "thread_caravan_99"},
+        )
+        create_thread(
+            thread_id="thread_caravan_99",
+            origin="corpus:thread:caravan:1",
+            participants=["npc_yohanna_101"],
+            tick=150,
+        )
+        create_thread(
+            thread_id="thread_private_00",
+            origin="corpus:thread:private:1",
+            participants=["npc_someone_else"],
+            tick=150,
         )
 
         query = "商隊前往驛站的行程安排"
@@ -136,14 +153,25 @@ class NarrativeFastRecallTests(EvenniaTestCase):
         )
         recalled_ids = [sm.view.source_id for sm in res_matching.recalled]
         self.assertIn("corpus:thread:caravan:1", recalled_ids)
+        self.assertEqual(res_matching.thread_revision, 1)
 
-        # Query with non-matching thread_id
+        # Query with an unknown thread_id: the scope is unknown, so it denies.
         res_other_thread = fast_recall(
             owner_id="npc_yohanna_101",
             query=query,
             thread_id="thread_other_00",
         )
         self.assertEqual(len(res_other_thread.recalled), 0)
+        self.assertEqual(res_other_thread.all_selected, ())
+
+        # Query a thread the owner cannot access: no thread/source content enters recall.
+        res_private = fast_recall(
+            owner_id="npc_yohanna_101",
+            query=query,
+            thread_id="thread_private_00",
+        )
+        self.assertEqual(len(res_private.recalled), 0)
+        self.assertEqual(res_private.all_selected, ())
 
     @covers_requirement("narrative-fast-recall::permissions-and-explicit-scope-precede-recall-scoring")
     def test_actual_projected_protection_event_is_recalled(self):

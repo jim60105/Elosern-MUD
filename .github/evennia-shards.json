@@ -237,6 +237,7 @@
         "world.narrative.tests.test_narrative_events",
         "world.narrative.tests.test_narrative_fast_recall",
         "world.narrative.tests.test_narrative_memory",
+        "world.narrative.tests.test_narrative_threads",
         "world.ai",
         "world.lore"
       ]
