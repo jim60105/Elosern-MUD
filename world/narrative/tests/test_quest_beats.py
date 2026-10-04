@@ -49,6 +49,7 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         return PreparedQuestBeat(json.dumps(context, ensure_ascii=False, sort_keys=True),
                                  json.dumps(payload or self.payload, ensure_ascii=False), issuer_id)
 
+    @covers_requirement("narrative-quest-compilation::quest-seed-beats-compile-only-through-existing-owners")
     def test_recorded_publication_and_restart_replay_leave_gameplay_untouched(self):
         selection = self.candidate()
         client = self.recorded()
@@ -87,7 +88,8 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         }, sources=[], tick=self.now)
         return confirm_draft(draft_id=draft.draft_id, owner_id=str(self.owner.pk), tick=self.now)
 
-    @covers_requirement("story-director-beats::director-schedules-at-most-one-eligible-beat")
+    @covers_requirement("story-director-beats::director-schedules-at-most-one-eligible-beat",
+                        "narrative-quest-compilation::quest-seed-beats-compile-only-through-existing-owners")
     def test_confirmed_direction_compiles_one_linked_quest(self):
         request = self.confirmed_request()
         client = self.recorded()
@@ -113,6 +115,7 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(StoryThread.objects.count(), before)
         self.assertEqual(list_payloads(), [])
 
+    @covers_requirement("narrative-quest-compilation::quest-seed-beats-compile-only-through-existing-owners")
     def test_stale_rank_rejects_without_publication(self):
         invocation = self.prepare()
         prepared = self.prepared(invocation)
@@ -191,7 +194,9 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         retry = settle_decision(invocation=invocation, proposals=[self.proposal("quest_seed")], prepared_quest=self.prepared(invocation))
         self.assertTrue(retry.scheduled)
 
-    @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
+    @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation",
+                        "narrative-quest-compilation::beat-context-failure-creates-no-template-replacement",
+                        "scenario-director::beat-scoped-blueprint-generation-does-not-substitute-template-filler")
     def test_offline_beat_no_content_generic_template_stays(self):
         context, _ = quest_context(self.prepare(), self.proposal("quest_seed"))
         client = FakeLLMClient()
@@ -203,6 +208,8 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
             self.assertIsInstance(generate_quest_blueprint(client, context=context).result, QuestBlueprint)
         self.assertEqual(client.calls, [])
 
+    @covers_requirement("narrative-quest-compilation::beat-context-failure-creates-no-template-replacement",
+                        "scenario-director::beat-scoped-blueprint-generation-does-not-substitute-template-filler")
     def test_misfit_and_exhaustion_never_draw_templates(self):
         context, _ = quest_context(self.prepare(), self.proposal("quest_seed"))
         for payload in ({**self.payload, "rank": "E"}, {"not": "a blueprint"}):
@@ -212,6 +219,7 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
                     self.assertIsNone(generate_beat_quest_blueprint(client, context=context).result)
         self.assertEqual(list_payloads(), [])
 
+    @covers_requirement("narrative-quest-compilation::beat-context-failure-creates-no-template-replacement")
     def test_unreachable_generation_keeps_thread_and_creates_no_filler(self):
         client = _recorded("quest_seed")
         client.add_connection_error(lambda request: request.schema_id == "scenario_director")
@@ -225,6 +233,7 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(list_payloads(), [])
         self.assertEqual(read_records(self.owner), [])
 
+    @covers_requirement("narrative-quest-compilation::beat-context-failure-creates-no-template-replacement")
     def test_disabled_beat_generation_leaves_no_publication(self):
         client = _recorded("quest_seed")
         with override_settings(LLM_PROFILES=_raw(scenario_director={"enabled": False})):
@@ -233,6 +242,7 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(list_payloads(), [])
 
+    @covers_requirement("narrative-quest-compilation::quest-seed-beats-compile-only-through-existing-owners")
     def test_completion_prose_cannot_accept_or_progress_a_quest(self):
         from world.ai.story_director import BeatProposal
 
