@@ -50,7 +50,7 @@ def _wait_narrative_grew(page, before_len, timeout=30000):
 
 
 class ShellAcceptanceTest(BrowserAcceptanceTest):
-    """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
+    """Every required surface at 1451x790 and 2560x1440, plus keyboard journeys."""
     @covers_requirement(
         "webclient-narrative-markup::the-narrative-renders-the-transport-stream-through-a-strict-allowlist-markup-pipeline"
     )

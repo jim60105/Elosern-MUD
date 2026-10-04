@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     activate_overview_chip,
     focus_action_dock,
@@ -55,13 +55,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """The dock fills the bottom band's command region at a fixed size
         (webclient-avg-stage-shell design D1/D5).
 
-        The band (``stage-band``) is ``clamp(260px, 27.8vh, 400px)`` tall and
+        The band (``stage-band``) is ``clamp(190px*S, 27.85vh, 400px*S)`` tall
+        (retarget-desktop-viewport-contract D2: 220px at the reference) and
         paints the draft's `.dockwrap` chrome (gradient, hairline top border,
         upward shadow); its right third is the command region, which holds
         ``#action-dock`` — a content column that paints nothing itself. No
         frame (the interaction workspace with a target selected, the waiting
         frame) moves or resizes the region. Verified across the scenario's
-        viewport range (1280x720 through 1920x1080).
+        viewport range (1451x790 through 2560x1440).
         """
         measure = """() => {
           const band = document.querySelector('[data-testid="stage-band"]');
@@ -87,7 +88,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             viewportHeight: window.innerHeight,
           };
         }"""
-        for viewport in ((1280, 720), (1600, 900), (1920, 1080)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_selectable_target(11, "小販")])
             _inject_snapshot(
@@ -108,10 +109,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertTrue(dock.is_visible(), "the action dock is visible")
 
             geometry = page.evaluate(measure)
-            expected_band = min(max(260.0, geometry["viewportHeight"] * 0.278), 400.0)
+            scale = ui_scale(viewport)
+            expected_band = min(
+                max(190.0 * scale, geometry["viewportHeight"] * 0.2785), 400.0 * scale
+            )
             self.assertAlmostEqual(
                 geometry["bandHeight"], expected_band, delta=1.0,
-                msg=f"the band is clamp(260px, 27.8vh, 400px) tall at {viewport}",
+                msg=f"the band is clamp(190px*S, 27.85vh, 400px*S) tall at {viewport}",
             )
             self.assertAlmostEqual(
                 geometry["bandBottom"], geometry["viewportHeight"], delta=1.0,
@@ -655,7 +659,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             band: rect('[data-testid="stage-band"]'),
           };
         }"""
-        page = self.logged_in_page((1440, 900))
+        page = self.logged_in_page((1451, 790))
         exploration = _exploration_panel([_interact_target(11, "小販")])
         _inject_snapshot(
             page,

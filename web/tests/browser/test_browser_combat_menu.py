@@ -357,13 +357,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits"
     )
     def test_dock_and_participant_frame_geometry_at_both_desktop_viewports(self):
-        # H3 task 8.8: at both 1440x900 and 1280x720, the dock panel must
+        # H3 task 8.8: at both 1451x790 and 2560x1440, the dock panel must
         # stay inside its anchor, the deepest combat frame's cast/confirm
         # control must be reachable without clipping, and the participant
         # frame must sit in the `map` anchor (never a portrait anchor) and
         # intersect neither the dock, the narrative caption, nor the command
         # line (webclient-avg-stage-hud-anchors design D4).
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 install_outbound_recorder(page)

@@ -310,7 +310,7 @@ scene label and alternative text SHALL remain visible as text outside the bitmap
 SHALL be meaningful, and no required information SHALL exist only inside an image. Server-authored
 labels SHALL be inserted as text, not trusted HTML, and reduced-motion preference SHALL disable
 nonessential transitions. The stage backdrop and the framed portraits SHALL remain usable at both
-1440x900 and 1280x720 without the backdrop covering the scene label, the HUD islands, or required
+1451x790 and 2560x1440 without the backdrop covering the scene label, the HUD islands, or required
 status.
 
 #### Scenario: Keyboard-only full view opens and closes
@@ -318,7 +318,7 @@ status.
 - **THEN** the full view opens on Enter and closes on Escape with focus restored
 
 #### Scenario: Both supported viewports keep art usable
-- **WHEN** the stage renders at 1440x900 and at 1280x720
+- **WHEN** the stage renders at 1451x790 and at 2560x1440
 - **THEN** the backdrop, the scene label and alternative text, the portrait presentation (including the stage actors), and the status text remain visible and non-overlapping
 
 #### Scenario: Player-authored text is not executed as markup

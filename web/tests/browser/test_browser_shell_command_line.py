@@ -110,7 +110,7 @@ def _append_multipage_response(page):
 
 
 class ShellAcceptanceTest(BrowserAcceptanceTest):
-    """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
+    """Every required surface at 1451x790 and 2560x1440, plus keyboard journeys."""
     @covers_requirement(
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow",
         "webclient-contextual-hud::the-command-line-is-a-collapsible-row-docked-on-the-message-region-s-top-edge",
@@ -371,7 +371,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         reset awaiting its first snapshot, injected through the bridge), Enter
         submits nothing, the field keeps the speech and the focus, the row
         stays expanded, and the borrow stays bound to the host."""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         inject_snapshot(
             page,
@@ -538,7 +538,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::the-collapsible-command-line-preserves-ordinary-text-control-and-the-dialogue-s-free-form-borrow"
     )
     def test_command_line_field_button_alignment_at_both_viewports(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             page = self.logged_in_page(viewport)
             # H5 (design D1/D2): focus lands on the action dock after sync;
             # the command field never auto-focuses. Establish the design's

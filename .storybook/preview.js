@@ -6,7 +6,7 @@ import "../web/webclient-app/styles/app-shell.css";
 import "../web/static/webclient/css/ansi_palette.css";
 import { installUiScale } from "../web/webclient-app/lib/ui_scale.js";
 
-// The live client's chrome factor, so a story viewed above 1080px height
+// The live client's chrome factor, so a story viewed above 790px height
 // renders at the same proportional scale (webclient-proportional-ui-scale).
 installUiScale();
 

@@ -28,8 +28,8 @@ class ViewportCreationJourney(CreationBrowserTest):
         "webclient-character-creation-ui::creation-controls-preserve-native-entry-and-existing-authority",
         "webclient-character-creation-ui::creation-resource-and-offense-labels-are-distinguishable",
     )
-    def test_1280x720_keeps_creation_essentials_visible_and_literal(self):
-        page = self._login_creation((1280, 720))
+    def test_reference_viewport_keeps_creation_essentials_visible_and_literal(self):
+        page = self._login_creation((1451, 790))
         install_outbound_recorder(page)
         self._wait_creation_available(page)
         self.assertEqual(self._dock_mode(page), "creation")
@@ -63,7 +63,7 @@ class ViewportCreationJourney(CreationBrowserTest):
             self.assertTrue(controls.nth(index).is_visible())
         # Reach every field through the bounded scroll regions at all desktop
         # acceptance sizes. Focus must reveal the entire control above actions.
-        for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
+        for width, height in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=(width, height)):
                 page.set_viewport_size({"width": width, "height": height})
                 self.assertLessEqual(

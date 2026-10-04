@@ -99,7 +99,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(payload["exit_ref"])
 
     def test_minimap_visible_and_keyboard_usable_at_both_viewports(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -362,7 +362,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         back; Tab reveals an off-window actionable node; and the legend popover
         is the topmost disclosure with a reset-to-fitted reopen.
         """
-        page = self.logged_in_page(viewport=(1920, 1080))
+        page = self.logged_in_page(viewport=(1451, 790))
         from .browser_helpers import install_outbound_recorder, sent_action_count
 
         install_outbound_recorder(page)

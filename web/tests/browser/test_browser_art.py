@@ -267,10 +267,10 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         self.assertEqual(caption, SCENE_LABEL)
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
-    def test_scene_caption_and_status_usable_at_1280x720(self):
-        page = self.logged_in_page((1280, 720))
+    def test_scene_caption_and_status_usable_at_the_reference_viewport(self):
+        page = self.logged_in_page((1451, 790))
         # The done scene image, its caption label and alt, and the pending
-        # status line remain visible at the smaller supported viewport.
+        # status line remain visible at the reference viewport.
         img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.is_visible())
@@ -283,9 +283,9 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         """The done scene's caption plate stands on the stage's lower edge just
         above the expanded command-line row, centred between the portraits and
         covered by nothing, at every supported viewport."""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         open_command_line(page)
-        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
                 page.wait_for_function(
@@ -319,7 +319,7 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         notice; its bounding box stays above the action dock's and the command
         line's top edges at both supported viewports.
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 panel = store_state(page)["panels"]["art"]
@@ -484,7 +484,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         standing on the stage floor is the done-scene journey's assertion
         (test_scene_caption_sits_on_the_stage_floor_between_the_portraits).
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 # The missing-scene placeholder is gated on the committed art-panel
@@ -740,8 +740,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         self.assertEqual(sent_action_count(page, None), 0)
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
-    def test_portrait_overlay_usable_at_1280x720(self):
-        page = self.logged_in_page((1280, 720))
+    def test_portrait_overlay_usable_at_the_reference_viewport(self):
+        page = self.logged_in_page((1451, 790))
         self._engage(page)
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
         # H3: the combat portrait renders in the ParticipantFrame; scope the

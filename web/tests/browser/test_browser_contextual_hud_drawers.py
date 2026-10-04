@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
@@ -81,7 +81,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """H4 (task 9.5): at both viewports an open drawer closes in one
         action, Escape restores focus, and no reference surface is in the DOM
         while every drawer is closed."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 # The focus-restoration contract: the drawer is opened while the
@@ -357,7 +357,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         roster spanning all five severities (more than the H2 island's 6-item
         cap), including a multi-modifier condition and several durations.
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 focus_action_dock(page)
@@ -466,7 +466,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(fit["pillCount"], 9, "all 9 conditions render as pills")
                 self.assertEqual(fit["tileCount"], 6, "3 vitals + 1 trait + 2 guild tiles render")
                 # Visual evidence for the design-alignment check (task 6.5).
-                if viewport == (1440, 900):
+                if viewport == (1451, 790):
                     page.screenshot(path=f"tmp/status_drawer_{viewport[0]}x{viewport[1]}.png")
                 page.close()
 
@@ -505,11 +505,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
     def _assert_workspace_frame(self, probe, what, viewport):
         vw, vh = viewport
+        scale = ui_scale(viewport)
         r = probe["rect"]
-        self.assertAlmostEqual(r["top"], probe["navBottom"] + 12, delta=1, msg=f"{what} top at {viewport}")
-        self.assertAlmostEqual(r["left"], 16, delta=1, msg=f"{what} left at {viewport}")
-        self.assertAlmostEqual(r["right"], vw - 16, delta=1, msg=f"{what} right at {viewport}")
-        self.assertAlmostEqual(r["bottom"], vh - 56, delta=1, msg=f"{what} bottom at {viewport}")
+        # The frame's insets are chrome: header + 12px * S, 16px * S on each
+        # side, and --workspace-bottom (44px + 12px, both * S) above the edge.
+        self.assertAlmostEqual(r["top"], probe["navBottom"] + 12 * scale, delta=1, msg=f"{what} top at {viewport}")
+        self.assertAlmostEqual(r["left"], 16 * scale, delta=1, msg=f"{what} left at {viewport}")
+        self.assertAlmostEqual(r["right"], vw - 16 * scale, delta=1, msg=f"{what} right at {viewport}")
+        self.assertAlmostEqual(r["bottom"], vh - 56 * scale, delta=1, msg=f"{what} bottom at {viewport}")
         self.assertTrue(probe["opaqueGradient"], f"{what} panel is fully opaque at {viewport}: {probe['paint']}")
         self.assertTrue(probe["lineCovered"], f"{what} covers the expanded command-line row at {viewport}")
         self.assertEqual(probe["headers"], 1, f"{what} carries exactly one shared header")
@@ -525,7 +528,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         that covers the expanded command-line row and leaves only the band's
         lowest strip under a scrim; the overlay scrim absorbs pointer input
         below the navigation while the navigation still switches overlays."""
-        for viewport in ((1280, 720), (1440, 900), (1920, 1080)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")

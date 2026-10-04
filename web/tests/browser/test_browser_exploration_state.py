@@ -51,7 +51,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def test_companion_lineup_dialogue_geometry_and_real_possession(self):
         page = self.logged_in_page()
-        page.set_viewport_size({"width": 1280, "height": 720})
+        page.set_viewport_size({"width": 1451, "height": 790})
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 4)

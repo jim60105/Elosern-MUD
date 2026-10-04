@@ -64,8 +64,8 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
-    def test_viewport_1280x720_keeps_controls_visible(self):
-        page = self.logged_in_page((1280, 720))
+    def test_viewport_reference_keeps_controls_visible(self):
+        page = self.logged_in_page((1451, 790))
         panel = self._wait_services_available(page)
         self._open_guild_menu(page)
         self.assertTrue(page.locator('[data-testid="quest-drawer"]').is_visible())

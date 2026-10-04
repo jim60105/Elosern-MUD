@@ -73,7 +73,7 @@ class ActionFeedbackBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTes
     # -- helpers --------------------------------------------------------------
 
     def _login_creation(self):
-        page = self.new_page((1440, 900))
+        page = self.new_page((1451, 790))
         login_url = f"{self.base_url}/auth/login/"
         attempts = 4
         for attempt in range(attempts):

@@ -500,7 +500,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-exploration-menu::exploration-browser-acceptance-is-keyboard-only-and-desktop-bounded")
     def test_no_take_or_drop_control_is_rendered(self):
-        page = self.logged_in_page((1280, 720))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         # The exploration dock renders no take/drop or generic object-mutation

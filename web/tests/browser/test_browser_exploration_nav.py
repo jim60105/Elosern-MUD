@@ -366,12 +366,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
     )
     def test_keyboard_only_journey_walks_the_overview(self):
-        """A pure arrows-and-Enter journey at 1920x1080: the overview's chips
+        """A pure arrows-and-Enter journey at 1451x790: the overview's chips
         are reachable, an exit chip moves, a person chip opens the verb
         popover (Escape returns with that chip focused), and a move from the
         minimap returns the dock to the new room's overview
         (webclient-scene-overview-swap, design D2/D6)."""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         focus_action_dock(page)

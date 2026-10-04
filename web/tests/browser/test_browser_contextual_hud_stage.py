@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     activate_overview_chip,
     focus_action_dock,
@@ -688,7 +688,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         anchors, and it sits on the band's top edge (webclient-avg-stage-shell
         design D3).
         """
-        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_interact_target(11, "小販")])
             _inject_snapshot(
@@ -704,10 +704,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             )
             _wait_mode(page, "exploration")
             open_command_line(page)
-            for scale in (0.92, 1, 1.12):
+            for scale in (1, 1.125, 1.25):
                 page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
                 geo = page.evaluate(
-                    """() => {
+                    """(S) => {
                       const byId = (sel) => {
                         const el = document.querySelector(sel);
                         return el && el.getBoundingClientRect();
@@ -738,10 +738,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         hits.push("not-on-band-top");
                       }
                       // The vitals dock stands on the same band edge
-                      // (vitals-bar-redesign): the row starts 16px past the
-                      // dock anchor's right edge.
+                      // (vitals-bar-redesign): the row starts 16px * S past
+                      // the dock anchor's right edge, a chrome gap.
                       const vitalsCol = targets.vitals;
-                      const leftCol = vitalsCol ? vitalsCol.right + 16 : null;
+                      const leftCol = vitalsCol ? vitalsCol.right + 16 * S : null;
                       return {
                         hits,
                         height: cmd.height,
@@ -750,7 +750,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         leftCol,
                         messageRight: targets.messageRegion ? targets.messageRegion.right : null,
                       };
-                    }"""
+                    }""",
+                    ui_scale(viewport),
                 )
                 self.assertEqual(
                     geo["hits"],
@@ -759,7 +760,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         ", ".join(geo["hits"]), viewport[0], viewport[1], scale,
                     ),
                 )
-                self.assertAlmostEqual(geo["height"], 44.0, delta=1.0, msg=f"expanded row is 44px at {viewport}")
+                self.assertAlmostEqual(
+                    geo["height"], 44.0 * ui_scale(viewport), delta=1.0,
+                    msg=f"the expanded row is 44px * S at {viewport}",
+                )
                 self.assertAlmostEqual(geo["left"], geo["leftCol"], delta=1.5, msg=f"row starts 16px past the vitals dock at {viewport}")
                 self.assertAlmostEqual(geo["right"], geo["messageRight"], delta=1.5, msg=f"row ends at message region's right edge at {viewport}")
             # Dialogue (webclient-dialogue-stage-actors): the message region
@@ -803,7 +807,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                   };
                 }"""
             )
-            self.assertAlmostEqual(talk["height"], 44.0, delta=1.0, msg=f"dialogue row is 44px at {viewport}")
+            self.assertAlmostEqual(
+                talk["height"], 44.0 * ui_scale(viewport), delta=1.0,
+                msg=f"the dialogue row is 44px * S at {viewport}",
+            )
             self.assertAlmostEqual(talk["bottom"], talk["bandTop"], delta=1.0, msg=f"dialogue row sits on the band at {viewport}")
             self.assertAlmostEqual(talk["right"], talk["twoThirds"], delta=1.5, msg=f"dialogue row ends at two thirds at {viewport}")
             self.assertFalse(talk["hitsHost"], f"the dialogue row covers the host at {viewport}")
@@ -825,7 +832,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             for i in range(1, 9)
         )
         map_rows = ["┌───┬───┐", "│ @ │ # │", "└───┴───┘"]
-        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_interact_target(11, "小販")])
             panels = {
@@ -847,7 +854,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 }""",
                 [prose, "<br>".join(map_rows)],
             )
-            for scale in (1, 1.12):
+            for scale in (1, 1.25):
                 page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
                 page.wait_for_timeout(250)
                 # Read every page from the first: Enter on the focused page
@@ -906,11 +913,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     self.assertGreaterEqual(m["top"], strip["top"] - 0.5, where)
                     self.assertLessEqual(m["bottom"], strip["bottom"] + 0.5, where)
                     self.assertGreaterEqual(m["left"], strip["left"], where)
-                    self.assertLessEqual(m["right"], geo["logLeft"] - 4, f"marker touches 日誌 at {where}")
+                    # The strip's own clamp (--band-strip-actions-w) keeps the
+                    # marker off the 日誌 control; at the A+ prose step the
+                    # clamp binds, and the contract is pairwise disjointness
+                    # with the suite's 1px rounding slack.
+                    self.assertLessEqual(m["right"], geo["logLeft"] - 1, f"marker touches 日誌 at {where}")
                     # The marker ends at the centred column's edge, or at the
-                    # controls' clamp when the column runs under them.
+                    # controls' clamp when the column runs under them
+                    # (--band-strip-actions-w = 104px * S).
                     self.assertAlmostEqual(
-                        m["right"], min(geo["columnRight"], strip["right"] - 104), delta=3,
+                        m["right"],
+                        min(geo["columnRight"], strip["right"] - 104 * ui_scale(viewport)),
+                        delta=3,
                         msg=f"marker edge at {where}",
                     )
                     if scale == 1 and geo["page"] == 1:
@@ -1013,7 +1027,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             })(),
           };
         }"""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         exploration = _exploration_panel([_selectable_target(11, "小販")])
         _inject_snapshot(
             page,
@@ -1086,7 +1100,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         states["dialogue"] = page.evaluate(measure)
 
         baseline = states["root"]
-        self.assertAlmostEqual(baseline["band"][3] - baseline["band"][1], 300.24, delta=1.0)
+        self.assertAlmostEqual(baseline["band"][3] - baseline["band"][1], 220.0, delta=1.0)
         # Dialogue collapses the command region (webclient-dialogue-stage-
         # actors): the band keeps its box, the message region spans it at the
         # same height, and the command region is collapsed out of reach.
@@ -1107,7 +1121,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         msg=f"the {key} box moved or resized in the {label} state",
                     )
 
-        # The portrait stands on the band (exploration, 1920x1080).
+        # The portrait stands on the band (exploration, 1451x790).
         _inject_snapshot(
             page,
             {
@@ -1130,11 +1144,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(portrait["holds"], "actor-left holds the player portrait")
         self.assertEqual(portrait["focusable"], 0, "the portrait anchor holds no focusable element")
         self.assertAlmostEqual(portrait["bottom"], portrait["bandTop"], delta=1.0)
-        self.assertAlmostEqual(portrait["height"], min(0.62 * 1080, 680), delta=1.0)
-        self.assertAlmostEqual(portrait["left"], 0.06 * 1920, delta=1.0)
+        # --actor-h = min(62vh, 680px * S, stage box): at the reference the
+        # 62vh term owns (489.8px, inside the 522px stage box).
+        self.assertAlmostEqual(portrait["height"], min(0.62 * 790, 680), delta=1.0)
+        # --actor-left-inset = max(6vw, --left-column + 8px * S - actor-h / 3):
+        # at the reference the column-clearance term owns it
+        # (clamp(220px, 20vw, 330px) = 290.2px → 134.9px).
+        chrome = ui_scale((1451, 790))
+        left_column = min(max(220.0 * chrome, 0.20 * 1451), 330.0 * chrome)
+        actor_h = min(0.62 * 790, 680.0 * chrome, 790 - 48.0 * chrome - 220.0)
+        self.assertAlmostEqual(
+            portrait["left"],
+            max(0.06 * 1451, left_column + 8.0 * chrome - actor_h / 3),
+            delta=1.5,
+        )
 
-        # At 1280x720 the portrait is clamped to the stage box.
-        small = self.logged_in_page((1280, 720))
+        # The portrait never passes under the top bar at the reference.
+        small = self.logged_in_page((1451, 790))
         clamp = small.evaluate(
             """() => {
               const a = document.querySelector('[data-testid="anchor-actor-left"]').getBoundingClientRect();
@@ -1211,7 +1237,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             more: (el.querySelector('[data-testid="objective-tracker__more"]') || {}).textContent,
           };
         }"""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         _inject_snapshot(page, explore_panels, mode="exploration")
         _wait_mode(page, "exploration")
         page.wait_for_selector('[data-testid="objective-tracker"]', timeout=15000)
@@ -1267,13 +1293,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
     )
     def test_stage_box_is_at_least_65_percent_at_the_reference_viewport(self):
-        """webclient-avg-place-card-top-bar (design D1/D6): at 1920x1080 the
-        48px top band and the 300px bottom band leave a stage box of at least
-        65% of the viewport; the top band states no location, no time, and no
-        home entry, and the place card states both. At 1280x720 the one-row
-        brand fits its column without reaching the navigation.
+        """webclient-avg-place-card-top-bar (design D1/D6): at the 1451x790
+        reference viewport the 48px top band and the 220px bottom band leave a
+        stage box of at least 65% of the viewport (513.5px); the top band
+        states no location, no time, and no home entry, and the place card
+        states both. The one-row brand fits its column without reaching the
+        navigation.
         """
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         page.wait_for_selector('[data-testid="place-card"]', timeout=15000)
         state = page.evaluate(
             """() => {
@@ -1292,8 +1319,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertAlmostEqual(state["header"], 48, delta=1.0, msg="the top band is 48px")
-        self.assertAlmostEqual(state["bandHeight"], 300, delta=1.0, msg="the bottom band is 300px")
-        self.assertGreaterEqual(state["bandTop"] - state["header"], 702, "the stage box is at least 65% of 1080")
+        self.assertAlmostEqual(state["bandHeight"], 220, delta=1.0, msg="the bottom band is 220px")
+        self.assertGreaterEqual(
+            state["bandTop"] - state["header"], 513.5,
+            "the stage box is at least 65% of 790",
+        )
         self.assertGreaterEqual(state["placeTop"], state["header"], "the place card sits below the top band")
         self.assertTrue(state["location"] and state["location"] != "位置：--", "the place card states the location")
         self.assertNotIn(state["location"], state["topBand"], "the top band states no location")
@@ -1301,7 +1331,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertNotIn("探索", state["navLabels"])
         self.assertNotIn("戰鬥", state["navLabels"])
 
-        small = self.logged_in_page((1280, 720))
+        small = self.logged_in_page((1451, 790))
         brand = small.evaluate(
             """() => {
               const brand = document.querySelector('.topbar-brand');
@@ -1429,14 +1459,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-pointer-activation::keyboard-input-is-dispatched-through-the-webclient-plugin-contract",
     )
     def test_top_bar_tool_group_fits_and_opens_with_line_collapsed(self):
-        """webclient-collapsible-command-line (design D6): at 1280x720 with a
+        """webclient-collapsible-command-line (design D6): at 1451x790 with a
         maximum-length character name and an available gallery panel, every
         `nav-tools` button lies inside the 48px bar without intersecting
         `.topbar-right`; Tab reaches each tool in order, Enter opens its
         surface and Escape returns focus to it while the command line stays
         collapsed; and ArrowUp on the dock with the line collapsed is claimed
         by the router, while `/` then ArrowUp in the field walks history."""
-        page = self.logged_in_page((1280, 720))
+        page = self.logged_in_page((1451, 790))
         exploration = _exploration_panel([_selectable_target(11, "小販")])
         _inject_snapshot(
             page,

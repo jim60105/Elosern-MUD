@@ -169,8 +169,8 @@
         "web.tests.browser.test_browser_lineage.LineagePanelBrowserTest"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_1280x720",
-        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_1440x900",
+        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_capped_viewport",
+        "web.tests.browser.test_browser_creation_concept.ConceptCreationJourneys.test_concept_field_journey_to_activation_at_the_reference_viewport",
         "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_bag_is_the_three_section_stack_with_description_column_and_wallet_row",
         "web.tests.browser.test_browser_inventory_grid.InventoryGridJourneys.test_grid_renders_only_committed_rows_without_invented_total_or_rarity"
       ]
@@ -197,8 +197,8 @@
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_page_surface_keyboard_advance_and_dock_isolation",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_paging_marker_and_append_keep_page",
         "web.tests.browser.test_browser_shell_command_line.ShellAcceptanceTest.test_pointer_focused_field_sends_on_enter",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_1280x720",
-        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_1440x900",
+        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_capped_viewport",
+        "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_surfaces_visible_at_the_reference_viewport",
         "web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_unavailable_placeholders_and_numeric_status",
         "web.tests.browser.test_browser_wait_helper",
         "web.tests.browser.test_harness_mixins"
@@ -255,7 +255,7 @@
       "files_b": [
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_alternative_text_is_present_outside_the_bitmap",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
-        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_1280x720",
+        "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_and_status_usable_at_the_reference_viewport",
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_scene_caption_sits_on_the_stage_floor_between_the_portraits",
         "web.tests.browser.test_browser_layout.LayoutMigrationTest"
       ]
@@ -357,7 +357,7 @@
         "web.tests.browser.test_browser_layout.ProtocolMismatchTest",
         "web.tests.browser.test_browser_reconnect.ReconnectTest",
         "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_register_and_idempotent_reregister",
-        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_1280x720_keeps_controls_visible",
+        "web.tests.browser.test_browser_services_guild.GuildRegistrationJourneys.test_viewport_reference_keeps_controls_visible",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_dialogue_enter_and_leave_full",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_no_stage_ancestor_scrolls_horizontally_full",
@@ -367,7 +367,7 @@
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_duplicate_request_executes_custom_once",
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_custom_preserves_typed_values_and_asks_for_review",
         "web.tests.browser.test_browser_creation_dispatch.CreationDispatchJourneys.test_stale_revision_returns_stale_without_mutation",
-        "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_1280x720_keeps_creation_essentials_visible_and_literal",
+        "web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney.test_reference_viewport_keeps_creation_essentials_visible_and_literal",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced",
         "web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off"
@@ -379,7 +379,7 @@
       "files_a": [
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
-        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_1280x720",
+        "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_the_reference_viewport",
         "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",

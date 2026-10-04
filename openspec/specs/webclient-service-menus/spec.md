@@ -1,7 +1,9 @@
 ## Purpose
 
 The read-only version-2 `services` panel payload (host resolution, player summary, guild/quest/shop/inventory surfaces, pagination), the seven exact allowlisted service action adapters, the no-mutation service read model, service surfaces rendering in frameless reference drawers with bounded quantity entries and an abandon confirmation, and the Node/browser acceptance boundary.
+
 ## Requirements
+
 ### Requirement: The services panel is an exact read-only exploration-mode panel
 The production presentation registry SHALL register `services` schema version 4. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and `pagination`; `available` SHALL be true and `kind` SHALL be `services`. `schema_version` SHALL be integer 4. `host` SHALL be null or contain exactly `identity` (1..64 opaque ASCII characters) and `display_name` (1..256 Unicode code points) and SHALL be display-only reconciliation metadata that never enters a `ui_action` payload. `pagination` SHALL contain exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and equal to the number of rows shipped in that surface (zero when the surface is null). `player` SHALL contain exactly `wallet`, `guild_registered`, `guild_rank`, `guild_merit`, `next_rank`, and `next_threshold`: wallet SHALL be a non-negative JavaScript-safe integer, `guild_registered` a boolean, `guild_rank` null or a 1..8-character rank key, `guild_merit` a non-negative safe integer, and `next_rank`/`next_threshold` null when the actor holds the top rank, otherwise the next rank key and its positive catalog merit threshold. `guild`, `shop`, and `inventory` SHALL each be null or an exact section object. In exploration mode all sections SHALL retain their ordinary availability. In active combat `host`, `guild`, and `shop` SHALL be null, their pagination totals SHALL be zero, and canonical `player` plus `inventory` SHALL remain available so personal item actions expose no remote service. The presenter SHALL strictly read canonical records and registries through the no-mutation service read model, SHALL emit no live object reference and no filesystem path, and SHALL NOT mutate registration, quests, wallet, inventory, equipment, merchant stock, rank, merit, traits, location, combat, or world time. The whole panel SHALL use the registered common unavailable form only when a global prerequisite fails — the actor is creation-pending or the actor/player/inventory summary cannot be read without mutation; a failure confined to one exploration surface SHALL make only that surface unavailable with a stable reason while the other surfaces and narrative stay healthy.
 
@@ -239,7 +241,7 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost browser suite SHALL exercise, using keyboard controls at 1440x900 and 1280x720, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. The guild services SHALL be reached through the frameless quest drawer and the shop through the frameless shop drawer; neither drawer SHALL render a `dock-menu` or `dock-detail` element in any journey. The journeys SHALL assert the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and bounded drawer dimensions.
+The managed localhost browser suite SHALL exercise, using keyboard controls at 1451x790 and 2560x1440, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both acceptance viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. The guild services SHALL be reached through the frameless quest drawer and the shop through the frameless shop drawer; neither drawer SHALL render a `dock-menu` or `dock-detail` element in any journey. The journeys SHALL assert the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and bounded drawer dimensions.
 
 #### Scenario: Guild board journey completes in Chromium
 - **WHEN** a seeded registered member opens the quest drawer from the guild clerk's navigate row and uses Tab and Enter to reach and activate an eligible board offer's accept control
@@ -254,7 +256,7 @@ The managed localhost browser suite SHALL exercise, using keyboard controls at 1
 - **THEN** no mutation is sent, cancel or Escape returns without abandoning, and confirm is the only submit path
 
 #### Scenario: Item use requires confirmation at both viewports
-- **WHEN** an eligible potion tile is activated by keyboard at 1440x900 or 1280x720
+- **WHEN** an eligible potion tile is activated by keyboard at 1451x790 or 2560x1440
 - **THEN** the accessible confirmation remains fully operable, no request precedes confirm, and focus returns to the tile on cancel
 
 #### Scenario: Equipment and cap behavior are enforced deterministically
@@ -262,7 +264,7 @@ The managed localhost browser suite SHALL exercise, using keyboard controls at 1
 - **THEN** singleton replacement dispatches once, five accessories can be equipped, a sixth refuses with the committed warning without dispatch, and the showcase renders the capped state
 
 #### Scenario: Minimum viewport retains service essentials
-- **WHEN** shop, quest, or bag is open at 1280x720 with a disabled action focused
+- **WHEN** shop, quest, or bag is open at the 1451x790 reference viewport with a disabled action focused
 - **THEN** committed values, disabled reason, controls, and close path remain readable and operable without overlap
 
 #### Scenario: No service surface is mounted while its drawer is closed
@@ -368,4 +370,3 @@ the panel carries one and SHALL render nothing in its place when the panel carri
 #### Scenario: A missing reward line renders nothing rather than a placeholder
 - **WHEN** a row's `reward_line` is `null`
 - **THEN** no reward text and no placeholder appears on that row
-

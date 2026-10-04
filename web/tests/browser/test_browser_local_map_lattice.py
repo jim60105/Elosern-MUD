@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import store_state, wait_for_store_state
 
 
@@ -148,12 +148,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     )
     def test_densely_populated_lattice_scales_down_without_reintroducing_overlap(self):
         # A densely populated lattice (2 cols × 64 rows) must scale the
-        # canvas down to fit the island's bounded height — pre-scale
+        # canvas down to fit the island's 240px square — pre-scale
         # geometry satisfies the non-overlap invariant, and the scaled-down
         # render keeps markers and labels non-intersecting. Verified at
-        # both supported viewports (the 296px cap was computed from the
-        # 1280×720 budget, so that smaller viewport is the binding case).
-        for viewport in ((1440, 900), (1280, 720)):
+        # both acceptance viewports (the reference's 240px square is the
+        # binding case; the capped viewport only magnifies the same drawing).
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -173,22 +173,26 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     timeout=30000,
                 )
 
-            # The canvas is capped by the island's bounded height: the
-            # natural 116×2830 SVG scales down to the dynamically measured
-            # max-height cap (≤296px + 2px border) — at the smaller viewport
-            # the cap can be tighter than 296px, so assert the scaled-down
-            # size rather than a fixed lower bound.
+            # The canvas is the island's fixed 240px square (scaled once by
+            # the chrome factor): the tall lattice cannot fit it, so the
+            # island shows the drawing through its 0.75-floor window, and the
+            # drawing itself is never magnified past the square's own scale.
             lattice_box = page.locator('[data-testid="local-map__lattice"]').bounding_box()
             self.assertIsNotNone(lattice_box)
-            self.assertAlmostEqual(lattice_box["width"], 208.0, delta=1.0)
-            self.assertAlmostEqual(lattice_box["height"], 208.0, delta=1.0)
+            canvas_side = 240.0 * ui_scale(viewport)
+            self.assertAlmostEqual(lattice_box["width"], canvas_side, delta=1.0)
+            self.assertAlmostEqual(lattice_box["height"], canvas_side, delta=1.0)
             scale = page.evaluate(
                 """() => {
                   const svg = document.querySelector('[data-testid="local-map__lattice"]');
                   return svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
                 }"""
             )
-            self.assertLess(scale, 1.0)
+            self.assertLessEqual(
+                scale,
+                ui_scale(viewport) + 1e-6,
+                "the drawing is never magnified past the island's own scale",
+            )
 
             # Pre-scale (viewBox) non-intersection: compute every marker/label
             # bounding box in the SVG's root (viewBox) coordinates — the
@@ -302,8 +306,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_long_remembered_list_never_resizes_the_island(self):
         # Task 5.2: adding remembered nodes never resizes the island or its
-        # 208x208 canvas, renders no local-map-remembered, and mirrors all entries.
-        for viewport in ((1440, 900), (1280, 720)):
+        # 240x240 canvas, renders no local-map-remembered, and mirrors all entries.
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -340,11 +344,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 mirror_entries = page.locator('[data-testid="local-map-edge-markers-mirror"] li').count()
                 self.assertEqual(mirror_entries, 16)
 
-                # - 208 x 208 canvas
+                # - 240 x 240 canvas (scaled once by the chrome factor)
                 canvas_box = page.locator('[data-testid="local-map__lattice"]').bounding_box()
                 self.assertIsNotNone(canvas_box)
-                self.assertAlmostEqual(canvas_box["width"], 208.0, delta=1.0)
-                self.assertAlmostEqual(canvas_box["height"], 208.0, delta=1.0)
+                canvas_side = 240.0 * ui_scale(viewport)
+                self.assertAlmostEqual(canvas_box["width"], canvas_side, delta=1.0)
+                self.assertAlmostEqual(canvas_box["height"], canvas_side, delta=1.0)
 
                 # - island box equal to that of the same payload without remembered nodes
                 with_rem_island_box = page.locator('[data-testid="local-map"]').bounding_box()
@@ -482,6 +487,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(result["insideCanvasCount"], 0)
         for text in result["texts"]:
             self.assertIn("…", text)
-            self.assertEqual(len(text), 11)
+            # The overlay's marker-name step is the shared 16-unit legibility
+            # floor (retarget D7); against the same, unchanged gutter the
+            # 14-glyph names truncate to eight glyphs plus the ellipsis.
+            self.assertEqual(len(text), 9)
 
         page.close()

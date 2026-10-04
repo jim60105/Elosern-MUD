@@ -446,7 +446,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-contextual-hud::a-fixed-column-dock-pane-stays-inside-the-command-region"
     )
     def test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region(self):
-        """The fixed-column skill pane stays inside the command region (1280x720).
+        """The fixed-column skill pane stays inside the command region (1451x790).
 
         Relocated from the exploration keyword frame (C8c's nav pane, retired
         with the frame): the combat skill frame carries the requirement's
@@ -456,7 +456,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         (webclient-talk-open-dock retired the content-sized track rule with the
         nav pane; the skill rows are a flex form).
         """
-        page = self.logged_in_page((1280, 720))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._engage(page)
         self._open_skills(page)  # skills row -> category frame
@@ -468,7 +468,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             rows.count(), 0, "the skill pane must render at least one row"
         )
         pane_box = page.locator(pane_selector).bounding_box()
-        self.assertIsNotNone(pane_box, "the skill pane must be visible at 1280x720")
+        self.assertIsNotNone(pane_box, "the skill pane must be visible at 1451x790")
         pane_right_edge = pane_box["x"] + pane_box["width"]
         for i in range(rows.count()):
             box = rows.nth(i).bounding_box()

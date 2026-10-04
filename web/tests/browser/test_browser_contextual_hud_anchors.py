@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import open_dialogue_choices, valid_local_map_panel
 from ._journey_support import (
     _art_panel,
@@ -53,12 +53,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     )
     def test_dialogue_host_stands_opposite_the_player(self):
         """webclient-dialogue-stage-actors: in dialogue the host's stage actor
-        stands in `actor-right` on the band, as tall as the player, 6% in
-        from the right at 1920x1080 and far enough in at 1440x900 and
-        1280x720 that its face (the anchor's centre) clears the minimap; the
-        paged line's column starts under the player anchor's left edge; no
-        interactive anchor overlaps another; the return to exploration empties
-        `actor-right`."""
+        stands in `actor-right` on the band, as tall as the player, inset from
+        the right by the column-clearance term (`312px * S - actor-h / 3`, at
+        least 6% of the width) so its face (the anchor's centre) clears the
+        minimap column at every acceptance viewport; the paged line's column
+        starts under the player anchor's left edge; no interactive anchor
+        overlaps another; the return to exploration empties `actor-right`."""
         dialogue = {
             "schema_version": 2,
             "available": True,
@@ -68,7 +68,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "line": "歡迎光臨。",
             "choices": [{"keyword_id": "goods", "label": "有什麼貨？"}],
         }
-        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 _inject_snapshot(page, {"local_map": valid_local_map_panel(), "dialogue": dialogue}, mode="dialogue")
@@ -101,10 +101,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertAlmostEqual(geo["hostHeight"], geo["playerHeight"], delta=1.0)
                 self.assertEqual(geo["focusable"], 0)
                 inset = geo["width"] - geo["hostRight"]
-                if viewport == (1920, 1080):
-                    self.assertAlmostEqual(inset, 0.06 * 1920, delta=1.0)
-                else:
-                    self.assertGreaterEqual(inset, 0.06 * viewport[0] - 1)
+                # The right inset token: max(6vw, 312px * S - actor-h / 3),
+                # with the portrait's own min(62vh, 680px * S, stage box).
+                scale = ui_scale(viewport)
+                band = min(max(190.0 * scale, 0.2785 * viewport[1]), 400.0 * scale)
+                actor_h = min(0.62 * viewport[1], 680.0 * scale, viewport[1] - 48.0 * scale - band)
+                expected_inset = max(0.06 * viewport[0], 312.0 * scale - actor_h / 3)
+                self.assertAlmostEqual(inset, expected_inset, delta=1.5)
                 for name in ("map", "vitals"):
                     island = page.locator(f'[data-anchor="{name}"]')
                     island.wait_for(state="hidden")
@@ -158,7 +161,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "label": "伊洛瑟恩外城南門外的石板市集廣場與遠方的鐘樓" * 2,
             "alt": "午後陽光斜斜落在石板上，市集的紅色遮篷在風裡輕輕鼓動，遠處鐘樓的影子橫過廣場。" * 3,
         }
-        for viewport in ((1920, 1080), (1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 # The caption row renders only with an actual scene image on
@@ -197,7 +200,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         card: r('[data-testid="dialogue-choices"]'),
                         band: r('[data-testid="stage-band"]'),
                         commandLine: r('[data-anchor="command-line"]'),
-                        caption: r('.scene-backdrop__plate'),
+                        caption: (() => {
+                          const el = document.querySelector('.scene-backdrop__plate');
+                          if (!el) return null;
+                          const b = el.getBoundingClientRect();
+                          const cs = getComputedStyle(el);
+                          const kids = [...el.children].map((k) => k.getBoundingClientRect().height);
+                          return {
+                            left: b.left, right: b.right, top: b.top, bottom: b.bottom,
+                            chrome: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+                              + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth),
+                            contentMax: kids.length ? Math.max(...kids) : 0,
+                          };
+                        })(),
                         rows: document.querySelectorAll('[data-testid="dialogue-choices"] [role="menuitem"]').length,
                         scrollable: rows.scrollHeight > rows.clientHeight + 1,
                         width: innerWidth,
@@ -207,7 +222,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(geo["rows"], 7)
                 self.assertAlmostEqual((geo["anchor"]["left"] + geo["anchor"]["right"]) / 2, geo["width"] / 2, delta=1.0)
                 self.assertAlmostEqual((geo["card"]["left"] + geo["card"]["right"]) / 2, geo["width"] / 2, delta=1.0)
-                self.assertLessEqual(geo["card"]["right"] - geo["card"]["left"], min(560, 0.4 * geo["width"]) + 1)
+                # The choices anchor is min(560px * S, 40%) wide (HudFrame D6).
+                self.assertLessEqual(
+                    geo["card"]["right"] - geo["card"]["left"],
+                    min(560 * ui_scale(viewport), 0.4 * geo["width"]) + 1,
+                )
                 self.assertGreaterEqual(geo["card"]["top"], 48)
                 self.assertLessEqual(geo["card"]["bottom"], geo["commandLine"]["top"], "the list clears the expanded command line")
                 self.assertLessEqual(geo["anchor"]["bottom"], geo["commandLine"]["top"])
@@ -215,7 +234,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 # command line, so the caption is never painted over; the
                 # over-long label and alt keep that row one line tall.
                 self.assertIsNotNone(geo["caption"], "the committed scene's caption renders")
-                self.assertLessEqual(geo["caption"]["bottom"] - geo["caption"]["top"], 34.5)
+                # One line tall: the plate is its content's line box plus its
+                # own padding and border (the `--scene-caption-h` floor is a
+                # min-height, and the type ramp's 16px step lifts the line).
+                self.assertLessEqual(
+                    geo["caption"]["bottom"] - geo["caption"]["top"],
+                    geo["caption"]["chrome"] + geo["caption"]["contentMax"] + 1,
+                    "the caption row stays one line tall",
+                )
                 self.assertLessEqual(geo["card"]["bottom"], geo["caption"]["top"], "the list covers the scene caption")
                 self.assertLessEqual(geo["caption"]["bottom"], geo["commandLine"]["top"])
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap with the choice list at {viewport}")
@@ -231,7 +257,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """H4 (task 9.7): with `#panel-right` emptied into drawers, the
         message window is wider at both viewports and no stage anchor
         overlaps another."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 feed_width = page.evaluate(

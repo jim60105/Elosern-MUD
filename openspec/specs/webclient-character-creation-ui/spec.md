@@ -9,10 +9,10 @@ authoritative age-range gate, and the atomic exploration hand-off after activati
 ## Requirements
 
 ### Requirement: Creation presents a bounded desktop identity form and allocation workspace
-The creation wizard SHALL organize identity/race context, a bounded-width form and allocation preview into three desktop regions. All current required and optional fields, errors and confirmation actions SHALL remain reachable at 1280x720, 1440x900 and 1920x1080 without page-level horizontal scrolling. Preset cards SHALL use the available grid evenly and SHALL NOT claim unprovided portrait art.
+The creation wizard SHALL organize identity/race context, a bounded-width form and allocation preview into three desktop regions. All current required and optional fields, errors and confirmation actions SHALL remain reachable at 1451x790 and 2560x1440 without page-level horizontal scrolling. Preset cards SHALL use the available grid evenly and SHALL NOT claim unprovided portrait art.
 
 #### Scenario: Custom form remains complete
-- **WHEN** a keyboard user completes creation at 1280x720
+- **WHEN** a keyboard user completes creation at the 1451x790 reference viewport
 - **THEN** name, sex, both ages, race/subrace, allocations and optional fields are reachable in logical order, with visible errors and confirmation controls
 
 #### Scenario: Preset lacks artwork
@@ -399,7 +399,7 @@ No canonical service or creation state SHALL be stored in localStorage.
 
 ### Requirement: Creation browser acceptance is keyboard-only and desktop-bounded
 The managed localhost Playwright suite SHALL exercise, using keyboard controls only at
-1440x900 and 1280x720: preset selection, confirmation, activation, and the exploration
+1451x790 and 2560x1440: preset selection, confirmation, activation, and the exploration
 snapshot; custom finite controls and free-text field focus; reconnect at each saved draft
 stage; server rejection of both out-of-range age fields despite bypassed client validation; the
 destructive reset confirmation; and stale and duplicate submission behavior. Tests SHALL use
@@ -428,7 +428,7 @@ suite stays stable under a loaded CI runner.
 - **THEN** the new-epoch snapshot rebuilds the form at the `custom_filled` stage and no automatic activation is sent
 
 #### Scenario: Minimum viewport retains creation essentials
-- **WHEN** the creation dock renders at 1280x720 with a focused disabled control
+- **WHEN** the creation dock renders at the 1451x790 reference viewport with a focused disabled control
 - **THEN** the player can read the preset cards, the form fields, the disabled explanation, and the confirmation controls without overlap preventing operation
 
 #### Scenario: Creation dock is the sole owner in creation mode and re-renders in exploration

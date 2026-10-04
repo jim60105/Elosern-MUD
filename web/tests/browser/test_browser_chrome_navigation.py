@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 from tools.spec_traceability import covers_requirement
 
 ROOT = Path(__file__).resolve().parents[3]
-VIEWPORTS = ((1920, 1080), (1440, 900), (1280, 720))
+VIEWPORTS = ((1451, 790), (1741, 948), (2560, 1440))
 
 MEASURE_NAV = """() => {
   const box = (el) => el ? el.getBoundingClientRect() : null;
@@ -29,8 +29,11 @@ MEASURE_NAV = """() => {
     tools: tools && tools.left,
     slots: [...document.querySelectorAll('[data-testid="nav-primary"] > *')].map((e) => e.dataset.navSlot),
     placeholders: document.querySelectorAll('.desktop-navigation [aria-disabled], .desktop-navigation [hidden], .desktop-navigation button:disabled').length,
+    // scrollWidth/clientWidth are integers, so a fractional chrome factor can
+    // leave a label that fits (its rect is inside its box) rounding to a 1px
+    // difference. The suite's geometry tolerance is 1px.
     clipped: [...document.querySelectorAll('[data-testid="nav-primary"] > button > span')]
-      .filter((e) => e.scrollWidth > e.clientWidth + 0.5).map((e) => e.textContent),
+      .filter((e) => e.scrollWidth > e.clientWidth + 1.5).map((e) => e.textContent),
     overlap: cluster ? buttons.filter((b) => b.getBoundingClientRect().right > cluster.left).map((b) => b.textContent.trim() || b.getAttribute('aria-label')) : [],
   };
 }"""
@@ -110,7 +113,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
 
     @covers_requirement("webclient-desktop-shell::top-navigation-retains-stable-tool-placement-while-respecting-mode-availability")
     def test_tab_focus_tooltip_dismisses_on_escape_and_the_next_escape_reaches_the_dock(self):
-        self.page.set_viewport_size({"width": 1280, "height": 720})
+        self.page.set_viewport_size({"width": 1451, "height": 790})
         self.story("core-appshell--populated-hud", '[data-testid="nav-tools"]')
         # The dock's keyboard bridge listens for keydown on the document in
         # the bubble phase (bridge.js installKeyRouting); a probe in the same
@@ -129,7 +132,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
         # The tooltip hangs under the 48px bar, inside the viewport.
         box = tip.bounding_box()
         self.assertGreaterEqual(box["y"], 47)
-        self.assertLessEqual(box["x"] + box["width"], 1280)
+        self.assertLessEqual(box["x"] + box["width"], 1451)
 
         self.page.keyboard.press("Escape")
         self.assertEqual(tip.count(), 0)
@@ -141,7 +144,7 @@ class ChromeNavigationBrowserTest(unittest.TestCase):
 
     @covers_requirement("webclient-desktop-shell::top-navigation-retains-stable-tool-placement-while-respecting-mode-availability")
     def test_pointer_tooltip_is_hoverable_and_hides_on_activation(self):
-        self.page.set_viewport_size({"width": 1920, "height": 1080})
+        self.page.set_viewport_size({"width": 1451, "height": 790})
         self.story("core-appshell--populated-hud", '[data-testid="nav-tools"]')
         self.page.hover('[data-testid="nav-tool-codex"]')
         tip = self.page.locator('[data-testid="nav-tooltip"]')

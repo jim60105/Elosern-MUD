@@ -93,7 +93,7 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         """The status drawer bounds its portrait column and names the
         committed character; the quest and codex drawers carry no art and
         use the whole workspace width; the stat cards share equal tracks."""
-        for viewport in ((1280, 720), (1920, 1080)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 status = valid_status_panel("燼行者", "42")
@@ -205,7 +205,7 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         """Two chains sharing an element label read apart by their supplied
         root names, each compact row placing its meter (at most 320px) right
         after the shared identity column."""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         _inject_snapshot(page, {"lineage": _same_label_lineage_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
         page.locator('[data-testid="nav-tool-lineage"]').click()

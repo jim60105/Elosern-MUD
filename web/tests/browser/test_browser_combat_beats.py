@@ -189,7 +189,7 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-contextual-hud::playback-lock-is-visible-without-inventing-progress")
     def test_round_plays_and_skips_reduced(self):
         """At `reduced` the round plays itself, holds the dock, and a click ends it."""
-        page = self.logged_in_page((1920, 1080), motion_level="reduced")
+        page = self.logged_in_page((1451, 790), motion_level="reduced")
         self.assertEqual(
             page.evaluate("() => document.documentElement.getAttribute('data-motion')"),
             "reduced",

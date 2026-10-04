@@ -13,18 +13,25 @@ tuples, assertions, and the acceptance requirements that are pure viewport enume
 
 **Goals:**
 - CI proves the contract at the sizes the contract names: the reference (1451x790), an uncapped
-  large display (1741x948, S = 1.2), and the capped display (2560x1440, S = 1.4).
+  large display (1741x948, S = 1.1999), and the capped display (2560x1440, S = 1.4).
 - Every acceptance requirement keeps its assertions; only the viewport enumerations and the
   reference values they compare against move.
 - One clean partition from the dependency change: requirements amended there are never touched
   here, because a MODIFIED delta replaces its whole requirement block.
+- The journeys the retarget turns red because the dependency change's sweep missed a floor or a
+  fit rule are fixed at the source, against the amended requirement text (D2 below).
 
 **Non-Goals:**
 - No new fixtures, journeys, or frameworks (`openspec/config.yaml` forbids new test frameworks);
   the tuple elements change, the journeys do not.
-- No `web/webclient-app` source edits — if a journey's expected geometry differs from the
-  dependency change's spec values, the bug is in whichever side is wrong against the spec, not
-  in this change's scope to paper over.
+- No general `web/webclient-app` rework: this change does not re-derive geometry, redesign a
+  surface, or sweep the source for stale comments. The one carve-out is a defect the dependency
+  change's floor sweep left behind — a visible text step that misses the amended 16px floor
+  (whether a retargeted journey surfaces it or the suite's legibility probe reaches it at the
+  reference), or a surface that overflows at an acceptance viewport. Those are fixed at the source
+  against the amended requirement text (never by relaxing the assertion), and reported as
+  cross-change fixes against the already-archived dependency change. Latent same-class defects the
+  acceptance journeys cannot reach are recorded in this change's report, not silently changed.
 
 ## Decisions
 
@@ -34,10 +41,11 @@ Two-element requirements (prose "at X and Y") take the pair: the reference is th
 size every surface must fit; 2560x1440 is the capped extreme where chrome stops growing while
 the viewport keeps growing — the failure mode a scale-once contract can introduce. Three-element
 iterations (the tuples in the Playwright modules) additionally keep a middle, uncapped display:
-1741x948, whose height and width ratios are both exactly 1.2, is the cheapest viewport that
-proves chrome scales proportionally *below* the cap (the old tuple's 1920x1080 did that job
-against the old reference). 1440x900 and 1280x720 leave the tuple entirely — they remain valid
-windows (S = 1 floor) but prove nothing the pair does not.
+1741x948, whose height ratio is exactly 1.2 and whose width ratio is 1.1999 (1741 / 1451, the
+value the engine's four-decimal rounding writes), is the cheapest viewport that proves chrome
+scales proportionally *below* the cap (the old tuple's 1920x1080 did that job against the old
+reference). 1440x900 and 1280x720 leave the tuple entirely — they remain valid windows (S = 1
+floor) but prove nothing the pair does not.
 
 ### D2: Assertion values come from the amended specs, not from measuring renders
 
@@ -45,7 +53,14 @@ Where a journey asserts an absolute (band height 220px at reference, island canv
 text 18px at default prose scale, 336px island at the 1.4 cap), the expected value is copied from
 the dependency change's amended requirement text — the spec stays the single source; if a test
 and the spec disagree, the spec wins and the failure is investigated, never re-pinned to the
-render. Tolerances stay as written (±1px geometry, ±0.5px font).
+render. Tolerances stay as written (±1px geometry, ±0.5px font). Where a module iterates more
+than one acceptance viewport, the expected value is derived per viewport from the requirement's
+own mechanism (`S = clamp(1, min(h / 790, w / 1451), 1.4)`, the `clamp(190px * S, 27.85vh,
+400px * S)` band, `--actor-h = min(62vh, 680px * S, stage box)`), because the three acceptance
+viewports render at three different chrome factors; a single absolute cannot state all three.
+Assertions must also respect the two active media-query branches: `max-height: 820px` is active
+at the reference and inactive at 1741x948/2560x1440, so cross-viewport comparisons are made
+within a branch (the reference against itself; the two taller sizes against each other).
 
 ### D3: Partition by requirement ownership
 

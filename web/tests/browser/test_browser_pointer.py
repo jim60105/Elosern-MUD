@@ -397,7 +397,7 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate"
     )
     def test_composite_widget_semantics_are_dom_observable(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -435,7 +435,7 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-pointer-activation::pointer-parity-is-verified-in-the-browser-without-weakening-keyboard-only-acceptance"
     )
     def test_pointer_exploration_journey_at_both_viewports(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open

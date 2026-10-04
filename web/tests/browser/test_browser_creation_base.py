@@ -71,7 +71,7 @@ class CreationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def _login_creation(self, viewport=None):
         """Open a guarded page, log in as the pending account, wait for creation."""
-        page = self.new_page(viewport if viewport else (1440, 900))
+        page = self.new_page(viewport if viewport else (1451, 790))
         login_url = f"{self.base_url}/auth/login/"
         attempts = 4
         for attempt in range(attempts):

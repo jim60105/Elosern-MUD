@@ -7,7 +7,7 @@ import json
 
 from tools.spec_traceability import covers_requirement
 from web.browser_support.browser_fixtures_data import SHIPPED_DIALOGUE_KEY
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     activate_first_overview_exit,
     activate_overview_chip,
@@ -190,7 +190,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def test_talk_open_enters_the_dialogue_in_one_step(self):
         """webclient-talk-open-dock: 交談 is one step.
 
-        A keyboard-driven journey at 1920x1080: the overview's person chip
+        A keyboard-driven journey at 1451x790: the overview's person chip
         opens the host's verb popover, ONE Enter on 交談 submits exactly one
         `explore.talk_open` and never a scripted-keyword dispatch, and the
         commit that opens the conversation carries mode `dialogue`, the
@@ -198,7 +198,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         overview. The exit row then ends the session through the deterministic
         leave seam.
         """
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
@@ -282,17 +282,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-contextual-hud::stage-actors-present-the-player-and-the-dialogue-host-with-a-speaking-state"
     )
     def test_dialogue_stage_collapses_the_band_and_stands_both_actors(self):
-        """webclient-dialogue-stage-actors at 1920x1080.
+        """webclient-dialogue-stage-actors at 1451x790.
 
         交談 collapses the command region (the dock stays mounted, hidden),
-        the message window spans the 300px band under the host's name plate,
+        the message window spans the 220px band under the host's name plate,
         the host stands in `actor-right` lit while the player is dimmed, a
         pick from the choice list lights the player until its reply commits,
         `/` then Escape returns focus to the dialogue's focus home (the choice
         list once the reply is read), and 結束對話 brings the dock back at the
         overview with focus on it.
         """
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         dock_handle = page.evaluate_handle("() => document.getElementById('action-dock')")
@@ -352,16 +352,24 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page.evaluate("(dock) => dock === document.getElementById('action-dock')", dock_handle),
             "the dock element must not be remounted on entering dialogue",
         )
-        self.assertAlmostEqual(geometry["message"]["width"], 1920, delta=1)
-        self.assertAlmostEqual(geometry["message"]["height"], 300, delta=1)
-        self.assertAlmostEqual(geometry["band"]["height"], 300, delta=1)
+        self.assertAlmostEqual(geometry["message"]["width"], 1451, delta=1)
+        self.assertAlmostEqual(geometry["message"]["height"], 220, delta=1)
+        self.assertAlmostEqual(geometry["band"]["height"], 220, delta=1)
         self.assertEqual(geometry["hostSide"], "right")
         self.assertEqual(geometry["hostSpeaking"], "true")
         self.assertEqual(geometry["playerSpeaking"], "false")
         self.assertEqual(geometry["playerFilter"], "brightness(0.6)")
-        # The host stands on the band, 6% in from the right, as tall as the player.
+        # The host stands on the band, inset from the right by the
+        # column-clearance term (at least 6% of the width), as tall as the player.
         self.assertAlmostEqual(geometry["host"]["bottom"], geometry["band"]["top"], delta=1)
-        self.assertAlmostEqual(1920 - geometry["host"]["right"], 1920 * 0.06, delta=1)
+        chrome = ui_scale((1451, 790))
+        left_column = min(max(220.0 * chrome, 0.20 * 1451), 330.0 * chrome)
+        actor_h = min(0.62 * 790, 680.0 * chrome, 790 - 48.0 * chrome - 220.0)
+        self.assertAlmostEqual(
+            1451 - geometry["host"]["right"],
+            max(0.06 * 1451, 312.0 * chrome - actor_h / 3),
+            delta=1.5,
+        )
         self.assertAlmostEqual(geometry["host"]["height"], geometry["player"]["height"], delta=1)
         self.assertTrue(geometry["plate"])
         self.assertTrue(
@@ -589,7 +597,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-browser-verification::browser-acceptance-covers-foundation-recovery-and-layout-behavior"
     )
     def test_dialogue_stage_journey_completes_by_keyboard(self):
-        """webclient-dialogue-choices-overlay: the keyboard-only journey at 1920x1080.
+        """webclient-dialogue-choices-overlay: the keyboard-only journey at 1451x790.
 
         交談 from the scene overview opens the conversation; the greeting is
         read with Enter and the choice list appears centred over the stage
@@ -604,7 +612,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # frames where the list showed beside a typing or unread page, so the
         # window must really type — the `full` level, not the suite's instant
         # `off` seed, which would make that guard vacuous.
-        page = self.logged_in_page((1920, 1080), motion_level="full")
+        page = self.logged_in_page((1451, 790), motion_level="full")
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
         # Record, on every animation frame, whether the list ever showed
@@ -748,7 +756,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         through the list's active descendant, and nothing is answered. While
         focus sits elsewhere (the expanded command line) the highlight stays
         visible and still answers nothing; only a deliberate click does."""
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 

@@ -1,4 +1,4 @@
-"""Combat dock mockup-grid and skill-category journeys (webclient-combat-menu 5.2-5.5): grid/detail geometry at both viewports, area space-select, and the mastered-element scale ladder.
+"""Combat dock mockup-grid and skill-category journeys (webclient-combat-menu 5.2-5.5): grid/detail geometry at both acceptance viewports, area space-select, and the mastered-element scale ladder.
 """
 
 from __future__ import annotations
@@ -232,7 +232,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
     @covers_requirement("webclient-desktop-shell::the-action-dock-s-row-region-and-detail-panes-are-direct-children-of-its-pane-host")
     def test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             page = self.logged_in_page(viewport)
             install_outbound_recorder(page)
             self._engage(page)

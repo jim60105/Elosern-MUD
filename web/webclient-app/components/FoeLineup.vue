@@ -194,7 +194,11 @@ function gestureFor(participant) {
   font-size: calc(clamp(44px * var(--ui-scale), 5.6vh, 66px * var(--ui-scale)) * var(--foe-scale, 1));
 }
 .foe-lineup .stage-actor .reference-artwork__placeholder-label {
-  font-size: calc(var(--text-md) * max(0.86, var(--foe-scale, 1)));
+  /* The label shrinks with the figure, but never below the shipped floor:
+     0.86 × --text-md is 15.48px at the reference scale, and
+     webclient-vue-application "Chrome type is legible and numerals are stable"
+     forbids any surface carrying a reference-scale step below 16 CSS px. */
+  font-size: max(var(--text-xs), calc(var(--text-md) * var(--foe-scale, 1)));
 }
 
 /* The decorative hit-point gauge (design D5; AVG stage design §10.2): a slim

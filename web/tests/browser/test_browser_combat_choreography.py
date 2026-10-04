@@ -39,7 +39,7 @@ from ._journey_support import (
     _participant,
 )
 
-REFERENCE = (1920, 1080)
+REFERENCE = (1451, 790)
 
 # The player's committed catalog key: the fixture combat panel's first party
 # member (identity 1, `portrait_ref` "1") is the status panel's actor.
