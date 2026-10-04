@@ -1,6 +1,10 @@
 {
   "contract": [
     {
+      "path": "world/imports/tests/test_yohanna_demo.py",
+      "reason": "authored Yohanna import card and real protection setup contract"
+    },
+    {
       "path": "tests/test_command_docs.py",
       "reason": "player command docs parity contract"
     },

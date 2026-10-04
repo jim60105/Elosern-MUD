@@ -8,6 +8,7 @@ notification, and ``leave`` dismissal with no affinity change.
 """
 
 from tools.spec_traceability import covers_requirement
+from world.narrative.dialogue import pair_view
 
 import json
 from unittest.mock import patch
@@ -174,7 +175,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(is_companion(self.npc, self.char1))
         self.assertEqual(int(self.npc.db.party_member), int(self.char1.pk))
         self.assertEqual(
-            self.npc._chat_lines(self.char1),
+            pair_view(self.npc, self.char1)[0],
             [f"{self.char1.key}: 你願意與我同行嗎？", "艾洛希雅: 我願意與你同行。"],
         )
 

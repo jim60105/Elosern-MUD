@@ -109,6 +109,7 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     # generated_quest_cards: the single offline quest-template occupant.
     NpcSource("quest_template_occupant", "討伐林間盜匪:0:0", "generated_quest_cards"),
 
-    # import_cards: the single shipped NPC import example.
+    # import_cards: shipped NPC import cards, including the W1 demonstration.
     NpcSource("import_example", "example_character", "import_cards"),
+    NpcSource("import_example", "yohanna_cooper", "import_cards"),
 )

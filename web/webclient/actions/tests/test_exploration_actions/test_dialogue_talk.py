@@ -2,6 +2,7 @@
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from evennia.utils.test_resources import EvenniaTestCase
 from world.ai.fake_client import FakeLLMClient
+from world.narrative.dialogue import pair_view
 from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
@@ -269,7 +270,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(list(npc.db.inventory or []), [])
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(
-            npc._chat_lines(self.player),
+            pair_view(npc, self.player)[0],
             ["探索行動測試: 你好", "對話精靈: 我給你一瓶藥水。"],
         )
 
@@ -314,7 +315,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             )
         self.assertEqual(result["outcome"], "success")
         # Speech is kept (memory), the illegal intent changes no state.
-        self.assertEqual(npc._chat_lines(self.player)[0], "探索行動測試: 你好")
+        self.assertEqual(pair_view(npc, self.player)[0][0], "探索行動測試: 你好")
         self.assertIsNone(self.player.db.guild_registration)
         self.assertEqual(list(self.player.db.inventory or []), [])
 
@@ -378,7 +379,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("離開", result["message"])
         # The speech is shown (memory) and the stale note is surfaced, while
         # the intent changes no state (F22 completion gate).
-        self.assertEqual(npc._chat_lines(self.player)[1], "對話精靈: 我給你一瓶藥水。")
+        self.assertEqual(pair_view(npc, self.player)[0][1], "對話精靈: 我給你一瓶藥水。")
         self.assertEqual(list(self.player.db.inventory or []), [])
         self.assertEqual(list(npc.db.inventory or []), [_T_ITEM])
         texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
@@ -420,7 +421,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "stale_persona")
         self.assertEqual(result["message"], STALE_PERSONA_NOTE)
-        self.assertEqual(npc._chat_lines(self.player), [f"{self.player.key}: 你好"])
+        self.assertEqual(pair_view(npc, self.player)[0], [f"{self.player.key}: 你好"])
         self.assertEqual(list(self.player.db.inventory or []), [])
         self.assertEqual(list(npc.db.inventory or []), [_T_ITEM])
         texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
@@ -463,7 +464,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("她現在正忙著", result["message"])
         seam.assert_not_called()
         self.assertEqual(len(client.calls), 0)
-        self.assertEqual(npc._chat_lines(self.player), [])
+        self.assertEqual(pair_view(npc, self.player)[0], [])
 
 if __name__ == "__main__":
     unittest.main()

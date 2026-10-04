@@ -7,7 +7,7 @@ from typing import Any
 from evennia.typeclasses.attributes import AttributeProperty
 from twisted.internet import defer
 
-from world.observability import log_info
+from world.observability import log_info, log_warn
 from .entities import LivingEntity
 
 # Trait keys whose true current values become no-leak secrets when the NPC
@@ -67,6 +67,8 @@ class DialogueExchangeResult:
     degraded: bool
     reply: Any | None
     stale_persona: bool = False
+    submission_id: str = ""
+    snapshot_id: str = ""
 
 
 # Sentinel returned by at_talked_to when a mid-flight persona edit discards the reply.
@@ -250,7 +252,7 @@ def _swallow_cancelled(failure):
 class LLMNPC(NPC):
     """A generative-dialogue NPC (design §7.4 amendment).
 
-    Ports the Evennia ``LLMNPC`` contrib's per-character chat memory and
+    Uses narrative-owned durable pair turns and ports the Evennia contrib's
     thinking-state feedback as project code rather than subclassing the contrib
     (the project ``NPC`` is ``LivingEntity``-based, which cannot merge with the
     contrib's ``DefaultCharacter`` sibling, and the generative package may not
@@ -266,7 +268,6 @@ class LLMNPC(NPC):
 
     __applabel__ = "typeclasses"
 
-    chat_memory: dict = AttributeProperty(default=dict)
     max_chat_memory_size: int = AttributeProperty(default=12)
     thinking_timeout: float = AttributeProperty(default=2.0)
     # Per-entity thinking feedback override; unset falls back to the prompt
@@ -276,31 +277,6 @@ class LLMNPC(NPC):
     def at_pre_puppet(self, account: Any, session: Any = None, **kwargs: Any) -> None:
         """Accept puppeting by an account during possession (permit-only override)."""
         super().at_pre_puppet(account, session=session, **kwargs)
-
-    def _memory_key(self, character: Any) -> str:
-        """Return the stable per-character memory partition key.
-
-        Uses the persistent primary key (serialized) rather than the display
-        name: two characters may share a key, but never an id, so one
-        character's private conversation history cannot be read or overwritten
-        by another same-named character.
-        """
-        return str(character.pk)
-
-    def _append_memory(self, character: Any, speaker: Any, speech: str) -> None:
-        """Append one speech line to the per-character memory window (oldest dropped)."""
-        memory = dict(self.db.chat_memory or {})
-        lines = list(memory.get(self._memory_key(character), []))
-        lines.append(f"{speaker.key}: {speech}")
-        window = max(int(self.max_chat_memory_size), 1)
-        del lines[:-window]
-        memory[self._memory_key(character)] = lines
-        self.db.chat_memory = memory
-
-    def _chat_lines(self, character: Any) -> list[str]:
-        """Return the bounded memory window lines for one character."""
-        memory = self.db.chat_memory or {}
-        return list(memory.get(self._memory_key(character), []))
 
     def _npc_context(self) -> dict[str, str]:
         """Build the plain-data NPC identity for the prompt builder."""
@@ -446,12 +422,12 @@ class LLMNPC(NPC):
         """Run one guarded dialogue exchange without applying anything.
 
         Performs the same steps ``at_talked_to`` used to: rejects an explicit
-        ``None`` client, appends the speaker's line to the per-character chat
-        memory, arms and cancels the thinking timer, and resolves the reply
+        ``None`` client, durably records the speaker's submission,
+        arms and cancels the thinking timer, and resolves the reply
         through the guarded dialogue layer -- supplying the NPC's and the
         speaking player's persona blocks and the per-call no-leak secret set
         (all read-only, mirroring the affinity context). The NPC's reply
-        speech is appended to memory when one exists. Nothing is applied:
+        speech is recorded only by the actual delivery caller. No intent is applied:
         intent application and degrade fallbacks are the caller's decision,
         which is what lets the ``invite`` adapter apply the fixed threshold
         only on the degraded terminal.
@@ -497,24 +473,37 @@ class LLMNPC(NPC):
         )
         thinking_defer.addErrback(_swallow_cancelled)
 
-        self._append_memory(character, character, speech)
-
+        from world.narrative.dialogue import build_dialogue_context, submit_turn
         from world.rules.npc_persona import current_persona_version
 
         captured_version = current_persona_version(self)
-        npc_persona, player_persona = self._persona_block(character)
+        submission_id = ""
+        snapshot_id = ""
 
         try:
-            reply = yield generate_npc_reply(
-                client,
-                npc_context=self._npc_context(),
-                player_context=self._player_context(character, identity_detail=identity_detail),
-                memory=self._chat_lines(character),
-                affinity_context=self._affinity_context(character),
-                npc_persona=npc_persona,
-                player_persona=player_persona,
-                no_leak_secrets=self._no_leak_secrets(character),
-            )
+            submission_id = submit_turn(self, character, speech)
+            from world.narrative.context import ContextBudgetExceededError
+            from world.prompts.loader import PromptUnavailableError
+
+            try:
+                messages, snapshot_id = build_dialogue_context(
+                    self, character, speech, identity_detail=identity_detail
+                )
+            except (PromptUnavailableError, ContextBudgetExceededError) as error:
+                log_warn("npc_dialogue_context_unavailable", context={
+                    "npc": self.pk, "char": character.pk, "submission_id": submission_id,
+                }, exc=error)
+                reply = None
+            else:
+                reply = yield generate_npc_reply(
+                    client,
+                    npc_context=self._npc_context(),
+                    player_context=self._player_context(character, identity_detail=identity_detail),
+                    memory=(),
+                    affinity_context=self._affinity_context(character),
+                    prepared_messages=messages,
+                    no_leak_secrets=self._no_leak_secrets(character),
+                )
         finally:
             if thinking_defer is not None and not thinking_defer.called:
                 thinking_defer.cancel()
@@ -531,12 +520,14 @@ class LLMNPC(NPC):
                     "path": path,
                 },
             )
-            return DialogueExchangeResult(degraded=False, reply=None, stale_persona=True)
+            return DialogueExchangeResult(degraded=False, reply=None, stale_persona=True,
+                                          submission_id=submission_id, snapshot_id=snapshot_id)
 
         if reply is None:
-            return DialogueExchangeResult(degraded=True, reply=None)
-        self._append_memory(character, self, reply.speech)
-        return DialogueExchangeResult(degraded=False, reply=reply)
+            return DialogueExchangeResult(degraded=True, reply=None,
+                                          submission_id=submission_id, snapshot_id=snapshot_id)
+        return DialogueExchangeResult(degraded=False, reply=reply,
+                                      submission_id=submission_id, snapshot_id=snapshot_id)
 
     @defer.inlineCallbacks
     def at_talked_to(
@@ -632,6 +623,10 @@ class LLMNPC(NPC):
             if greeting is not None:
                 speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
                 character.msg(f"{self.key}說：{speech}")
+                from world.narrative.dialogue import settle_response
+
+                settle_response(self, character, result.submission_id, greeting.text,
+                                snapshot_id=result.snapshot_id)
                 # The authored degrade line is still a presented exchange: the
                 # session observer records it, but only while the completion
                 # gate still passes (the pair is together and talk-allowed).
@@ -640,6 +635,10 @@ class LLMNPC(NPC):
             return
 
         character.msg(f"{self.key}說：{result.reply.speech}")
+        from world.narrative.dialogue import settle_response
+
+        settle_response(self, character, result.submission_id, result.reply.speech,
+                        snapshot_id=result.snapshot_id)
         # Record the exchange iff it settled while the pair is still together
         # and talk-allowed — the same gate the intent applier uses, so a
         # mid-flight-stale settlement records nothing (webclient-align-07).

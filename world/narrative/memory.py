@@ -408,7 +408,7 @@ def project_narrative_event_to_memories(
                     content=mem_content,
                     tick=event.tick,
                     category="encounter",
-                    tier="working",
+                    tier="archive",
                     salience=event.salience,
                     knowledge_scope="witnessed",
                     confidence=1.0,

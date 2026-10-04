@@ -84,12 +84,16 @@ class CmdInvite(Command):
             caller.msg(STALE_PERSONA_NOTE)
             return
         if result.degraded:
-            self._render_degraded(npc)
+            self._render_degraded(npc, result)
             return
         caller.msg(f"{npc.key}說：{result.reply.speech}")
+        from world.narrative.dialogue import settle_response
+
+        settle_response(npc, caller, result.submission_id, result.reply.speech,
+                        snapshot_id=result.snapshot_id)
         self._render_intent(npc, result.reply.intent)
 
-    def _render_degraded(self, npc: LLMNPC) -> None:
+    def _render_degraded(self, npc: LLMNPC, result) -> None:
         """Apply the fixed threshold decision on the degraded terminal only."""
         from world.rules.affinity_config import get_config
         from world.rules.npc_intents import STALE_CONTEXT_NOTE, intent_context_ok
@@ -104,6 +108,10 @@ class CmdInvite(Command):
         affinity = npc.relations.affinity_for(caller)
         if affinity < get_config().invite_threshold:
             caller.msg(f"{npc.key}說：{DEGRADED_REJECT_MESSAGE}")
+            from world.narrative.dialogue import settle_response
+
+            settle_response(npc, caller, result.submission_id, DEGRADED_REJECT_MESSAGE,
+                            snapshot_id=result.snapshot_id)
             return
         try:
             join_party(npc, caller)
@@ -111,6 +119,10 @@ class CmdInvite(Command):
             caller.msg(JOIN_REJECTION_MESSAGES.get(error.reason, REFUSED_MESSAGE))
             return
         caller.msg(f"{npc.key}說：{DEGRADED_ACCEPT_MESSAGE}")
+        from world.narrative.dialogue import settle_response
+
+        settle_response(npc, caller, result.submission_id, DEGRADED_ACCEPT_MESSAGE,
+                        snapshot_id=result.snapshot_id)
         caller.msg(JOINED_MESSAGE)
 
     def _render_intent(self, npc: LLMNPC, intent) -> None:
