@@ -16,14 +16,18 @@ from world.ai.dream import (
     FORBIDDEN_DIVINE_MYSTERY_MARKERS,
 )
 
+from tools.spec_traceability import covers_requirement
+
 
 class DreamFrameContractTests(unittest.TestCase):
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_forbidden_divine_identity_names_the_canonical_deities(self):
         self.assertEqual(
             set(FORBIDDEN_DIVINE_MARKERS),
             {"光明女神", "暗之女神", "知識女神"},
         )
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_forbidden_divine_mysteries_are_declared(self):
         self.assertTrue(FORBIDDEN_DIVINE_MYSTERY_MARKERS)
         for marker in FORBIDDEN_DIVINE_MYSTERY_MARKERS:

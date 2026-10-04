@@ -41,10 +41,13 @@ from world.narrative.dream_track import (
     track_state,
 )
 
+from tools.spec_traceability import covers_requirement
+
 
 class DreamTrackConfigurationTests(unittest.TestCase):
     """The versioned configuration and its committed progression evidence."""
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_committed_configuration_has_one_delta_per_exchange(self):
         self.assertEqual(TRACK_VERSION, 1)
         self.assertEqual(INITIAL_PLEASURE, 0)
@@ -56,6 +59,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertEqual(EXCHANGE_DELTAS, (14, 18, 20, 14, 20, 14))
         self.assertGreaterEqual(sum(EXCHANGE_DELTAS), MAX_PLEASURE)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_progression_report_is_the_committed_evidence(self):
         report = progression_report()
         self.assertEqual(len(report), MAX_EXCHANGES)
@@ -77,6 +81,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_six_distinct_exchanges_follow_the_canonical_bands_once_each(self):
         ordinals = [track_state(step).ordinal for step in range(1, MAX_EXCHANGES + 1)]
         self.assertEqual(ordinals, [0, 1, 2, 3, 4, 4])
@@ -89,6 +94,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertEqual(track_state(MAX_EXCHANGES).pleasure, MAX_PLEASURE)
         self.assertEqual(track_state(MAX_EXCHANGES).level, AROUSAL_LEVELS[-1])
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_climax_is_eligible_only_from_convergence(self):
         for step in range(CONVERGENCE_EXCHANGE):
             with self.subTest(step=step):
@@ -99,6 +105,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertTrue(converging.climax_reached)
         self.assertTrue(converging.converging)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_prospective_phase_is_stable_under_retries_and_duplicates(self):
         first = prospective_state(3)
         self.assertEqual(first, prospective_state(3))
@@ -108,6 +115,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertEqual(track_state(3), track_state(3))
         self.assertEqual(prospective_state(3), first)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_prospective_lookahead_projects_forward_without_advancing_the_track(self):
         committed = track_state(2)
         lookahead = prospective_state(2)
@@ -116,6 +124,7 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertEqual(lookahead, track_state(3))
         self.assertEqual(track_state(2), committed)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_exchange_modes_follow_the_six_exchange_contract(self):
         self.assertEqual(
             [exchange_mode(step) for step in range(MAX_EXCHANGES)],
@@ -131,12 +140,14 @@ class DreamTrackConfigurationTests(unittest.TestCase):
 
 
 class DreamTrackRangeTests(unittest.TestCase):
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_out_of_budget_counts_are_rejected(self):
         for bad in (-1, MAX_EXCHANGES + 1, True, "2", 2.0, None):
             with self.subTest(bad=bad):
                 with self.assertRaises(DreamTrackRangeError):
                     track_state(bad)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_prospective_state_requires_a_next_exchange(self):
         with self.assertRaises(DreamTrackRangeError):
             prospective_state(MAX_EXCHANGES)
@@ -145,6 +156,7 @@ class DreamTrackRangeTests(unittest.TestCase):
 
 
 class DreamEndingTests(unittest.TestCase):
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_early_exit_fades_without_forcing_climax(self):
         ending = render_ending(2)
         self.assertFalse(ending.climax_reached)
@@ -153,6 +165,7 @@ class DreamEndingTests(unittest.TestCase):
         self.assertTrue(ending.fades)
         self.assertTrue(ending.awakens)
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_climax_ending_renders_the_post_climax_phase(self):
         ending = render_ending(CONVERGENCE_EXCHANGE)
         self.assertTrue(ending.climax_reached)
@@ -161,11 +174,13 @@ class DreamEndingTests(unittest.TestCase):
         self.assertTrue(ending.fades)
         self.assertTrue(ending.awakens)
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_ending_is_deterministic_and_versioned(self):
         self.assertEqual(render_ending(3), render_ending(3))
         self.assertEqual(render_ending(3).version, TRACK_VERSION)
         self.assertEqual(render_ending(3).completed, 3)
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_module_references_no_generative_layer_or_state_handler(self):
         source = Path(dream_track.__file__).read_text(encoding="utf-8")
         self.assertNotIn("from world.ai", source)
@@ -210,6 +225,7 @@ class DreamTrackForbiddenWriteTests(EvenniaTest):
             entity.sexual.submission_marks,
         )
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_completed_climax_leaves_live_effects_at_baseline(self):
         char = self.char1
         # Materialize a live handler with distinctive pre-existing state.
@@ -235,6 +251,7 @@ class DreamTrackForbiddenWriteTests(EvenniaTest):
 
         self.assertEqual(self._live_snapshot(char), before)
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_live_state_is_untouched_from_the_untouched_baseline(self):
         char = self.char2
         # Materialize the live handler deterministically, then snapshot it.
@@ -247,6 +264,7 @@ class DreamTrackForbiddenWriteTests(EvenniaTest):
         self.assertTrue(char.sexual.virgin)
         self.assertEqual(char.sexual.climax_today, 0)
 
+    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects")
     def test_offline_endings_require_no_model_call(self):
         # A generation-free renderer takes no client and performs no I/O: the
         # ending at every count is available while every service is offline.

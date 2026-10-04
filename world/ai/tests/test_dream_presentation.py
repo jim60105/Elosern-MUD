@@ -43,6 +43,8 @@ from world.narrative.dream_track import (
 )
 from world.prompts.loader import PromptUnavailableError
 
+from tools.spec_traceability import covers_requirement
+
 # Synthetic explicit fixture prose (kept in the test file, never shipped as
 # prompt text): the approved capability accepts explicit sexual content.
 _EXPLICIT_SCENE = (
@@ -105,6 +107,7 @@ class DreamPromptTests(unittest.TestCase):
     def tearDown(self):
         _reset()
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_identical_inputs_produce_byte_identical_prompts(self):
         state = prospective_state(0)
         first = build_dream_prompt(
@@ -118,6 +121,7 @@ class DreamPromptTests(unittest.TestCase):
         self.assertEqual(first[1]["role"], "user")
         self.assertEqual(first[0]["content"], second[0]["content"])
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_system_prompt_carries_the_server_supplied_phase(self):
         state = prospective_state(4)
         system, _user = build_dream_prompt(
@@ -130,6 +134,7 @@ class DreamPromptTests(unittest.TestCase):
         self.assertNotIn("{phase}", system["content"])
         self.assertNotIn("{mode}", system["content"])
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_user_payload_carries_only_permitted_context(self):
         system, user = build_dream_prompt(
             state=prospective_state(1),
@@ -151,6 +156,7 @@ class DreamPromptTests(unittest.TestCase):
         self.assertIn("神殿夜談", payload["preferences"]["summary"])
         self.assertEqual(payload["preferences"]["participants"], ["1001"])
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_adventure_summary_is_capped_deterministically(self):
         _system, user = build_dream_prompt(
             state=prospective_state(0),
@@ -161,6 +167,7 @@ class DreamPromptTests(unittest.TestCase):
         payload = json.loads(user["content"])
         self.assertEqual(len(payload["adventure_summary"]), MAX_ADVENTURE_LINES)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_prompt_construction_does_not_advance_the_track(self):
         committed = track_state(2)
         lookahead = prospective_state(2)
@@ -170,6 +177,7 @@ class DreamPromptTests(unittest.TestCase):
         self.assertNotEqual(lookahead, committed)
         self.assertEqual(track_state(2), committed)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_adventure_summary_must_be_a_sequence_of_strings(self):
         _system, user = build_dream_prompt(
             state=prospective_state(0),
@@ -179,6 +187,7 @@ class DreamPromptTests(unittest.TestCase):
         )
         self.assertNotIn("adventure_summary", json.loads(user["content"]))
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_cap_string_never_exceeds_a_tiny_limit(self):
         self.assertEqual(dream._cap_string("abcdef", 0), "")
         self.assertEqual(dream._cap_string("abcdef", 1), "a")
@@ -197,6 +206,7 @@ class DreamGenerationTests(unittest.TestCase):
         kwargs.update(overrides)
         return generate_dream_exchange(client, **kwargs)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_recorded_explicit_response_validates(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _response())
@@ -225,6 +235,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertNotIn(_EXPLICIT_SCENE, json.dumps(context, ensure_ascii=False))
         self.assertNotIn(_COUNTERPART_LINE, json.dumps(context, ensure_ascii=False))
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_arbitrary_phase_advance_is_rejected(self):
         client = FakeLLMClient()
         # Declares a later canonical band than the server supplied.
@@ -235,6 +246,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_phase_retry_reuses_the_same_server_phase(self):
         client = FakeLLMClient()
         client.add_response(
@@ -249,6 +261,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
         self.assertIn("phase", client.calls[1].messages[-1]["content"])
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_fifth_exchange_is_convergence_and_satisfies_climax_phase(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _response(completed=4))
@@ -259,6 +272,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertEqual(exchange_mode(4), MODE_CONVERGENCE)
         self.assertEqual(result.completed, 5)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_sixth_exchange_summary_rejects_a_new_question(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _response(dialogue="「這樣好嗎？」", completed=5))
@@ -266,6 +280,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client, completed=5))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_sixth_exchange_summary_without_a_question_validates(self):
         client = FakeLLMClient()
         client.add_response(
@@ -277,6 +292,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.mode, MODE_SUMMARY)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_sixth_exchange_summary_rejects_a_vertical_question_mark(self):
         client = FakeLLMClient()
         client.add_response(
@@ -286,6 +302,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client, completed=5))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_named_deity_assertion_is_rejected(self):
         client = FakeLLMClient()
         client.add_response(
@@ -299,12 +316,14 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
     def test_shipped_divine_marker_vocabulary_is_nonempty(self):
         self.assertTrue(FORBIDDEN_DIVINE_MARKERS)
         self.assertTrue(
             all(isinstance(marker, str) and marker.strip() for marker in FORBIDDEN_DIVINE_MARKERS)
         )
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_metadata_leak_is_rejected(self):
         client = FakeLLMClient()
         client.add_response(
@@ -317,6 +336,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_shipped_metadata_marker_is_rejected_without_patching(self):
         client = FakeLLMClient()
         client.add_response(
@@ -326,6 +346,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_ascii_marker_matching_is_case_insensitive(self):
         client = FakeLLMClient()
         client.add_response(
@@ -335,6 +356,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_state_change_claim_is_rejected(self):
         client = FakeLLMClient()
         client.add_response(
@@ -347,6 +369,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_shipped_state_change_marker_is_rejected_without_patching(self):
         client = FakeLLMClient()
         client.add_response(
@@ -356,6 +379,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_extra_system_field_is_rejected_by_the_schema(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _response(system="hidden"))
@@ -363,6 +387,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_transport_failure_degrades_to_none(self):
         client = FakeLLMClient()
         client.add_timeout(lambda d: True)
@@ -432,6 +457,7 @@ class DreamRegistrationTests(unittest.TestCase):
             register_dream()
         self.assertFalse(dream._is_registered())
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_dream_capability_is_separate_from_the_story_director(self):
         register_dream()
         self.assertEqual(guardrail._semantic_validators.get("scenario_director", {}), {})
@@ -447,6 +473,7 @@ class DreamRegistrationTests(unittest.TestCase):
         profiles = build_profiles(default_profiles())
         self.assertIsNot(profiles["dream"], profiles["scenario_director"])
 
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_dream_schema_is_registered_under_its_own_id(self):
         register_dream()
         self.assertIs(_OUTPUT_SCHEMAS["dream"], DREAM_EXCHANGE_SCHEMA)
