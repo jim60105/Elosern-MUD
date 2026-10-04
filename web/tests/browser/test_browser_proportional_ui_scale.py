@@ -115,10 +115,10 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
         self.assertScaled(240, big["map"]["h"], "minimap canvas")
         # The SVG is only magnified: its user-unit viewBox is unchanged.
         self.assertEqual(ref["viewBox"], big["viewBox"])
-        # Viewport-relative prose scales exactly once (the storybook's
-        # `--prose-scale` is the token default 1, so the page reads at the
-        # 16px floor times the chrome factor).
-        self.assertAlmostEqual(ref["page"], 16, delta=0.1)
+        # Viewport-relative prose scales exactly once: the page reads at the
+        # 16px floor times the default prose step (A = 1.125) at the reference,
+        # and at the same product times the chrome factor at the cap.
+        self.assertAlmostEqual(ref["page"], 16 * 1.125, delta=0.1)
         self.assertScaled(ref["page"], big["page"], "page text", delta=0.1)
         # Band and stage art are viewport-relative (`vh`), never multiplied by
         # the chrome factor: the band lands on 27.85% of the height inside its
@@ -150,9 +150,19 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
     @covers_requirement("webclient-vue-application::desktop-chrome-scales-once-from-the-reference-viewport")
     def test_prose_preference_changes_prose_but_not_chrome(self):
         before = self.story("core-appshell--dialogue-selector", '[data-testid="message-page"]', LARGE)
+        before_scale = float(
+            self.page.evaluate(
+                "() => getComputedStyle(document.documentElement)"
+                ".getPropertyValue('--prose-scale').trim()"
+            )
+        )
         self.page.evaluate("document.documentElement.style.setProperty('--prose-scale', '1.25')")
         after = self.page.evaluate(MEASURE)
-        self.assertAlmostEqual(after["page"], before["page"] * 1.25, delta=0.1)
+        # The page text multiplies the token exactly once, whatever the step
+        # it started from.
+        self.assertAlmostEqual(
+            after["page"], before["page"] * 1.25 / before_scale, delta=0.1
+        )
         self.assertEqual(after["nav"], before["nav"])
         self.assertEqual(after["navFont"], before["navFont"])
         self.assertEqual(after["map"], before["map"])
