@@ -25,11 +25,13 @@ tuples, assertions, and the acceptance requirements that are pure viewport enume
 - No new fixtures, journeys, or frameworks (`openspec/config.yaml` forbids new test frameworks);
   the tuple elements change, the journeys do not.
 - No general `web/webclient-app` rework: this change does not re-derive geometry, redesign a
-  surface, or sweep the source for stale comments. The one carve-out is a defect the retargeted
-  acceptance journey itself exposes — a visible text step that misses the amended 16px floor, or
-  a surface that overflows at an acceptance viewport. Those are fixed at the source against the
-  amended requirement text (never by relaxing the assertion), and reported as cross-change fixes
-  against the already-archived dependency change.
+  surface, or sweep the source for stale comments. The one carve-out is a defect the dependency
+  change's floor sweep left behind — a visible text step that misses the amended 16px floor
+  (whether a retargeted journey surfaces it or the suite's legibility probe reaches it at the
+  reference), or a surface that overflows at an acceptance viewport. Those are fixed at the source
+  against the amended requirement text (never by relaxing the assertion), and reported as
+  cross-change fixes against the already-archived dependency change. Latent same-class defects the
+  acceptance journeys cannot reach are recorded in this change's report, not silently changed.
 
 ## Decisions
 
