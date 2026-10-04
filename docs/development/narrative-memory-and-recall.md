@@ -338,6 +338,10 @@ not-yet-existing gameplay commit event types would be a one-entry stub, so the
 gate is the negative statement-channel set recorded in the dev doc; a future
 statement-flavoured event type must join that set.
 
+A commitment replay is not an effective change: repeating an identical
+commitment text for an already-linked event returns without advancing the
+revision, so later snapshots are not needlessly invalidated.
+
 Lifecycle is explicit. `transition_thread` accepts only the four states and
 refuses to move out of `resolved`/`abandoned`; `mark_thread_dormant` and
 `apply_inactivity` may only move an active thread to dormant, using the most
@@ -348,13 +352,23 @@ requires an existing quest link, records `relation="quest_completion"`, and
 leaves the thread state untouched: a completed quest never resolves its parent
 thread. Quests are linked by durable identity only (`link_quest_to_thread`);
 `world/quests` still owns quest lifecycle, so narrative neither duplicates it
-nor reads quest registries.
+nor reads quest registries, and a quest reference is stored exactly as supplied
+(not existence-checked) with `identity_only` recorded in its link provenance.
+
+Each effective change appends one append-only `StoryThreadRevision` row inside
+the same transaction as the materialized update. The unique `(thread, revision)`
+row is the concurrency backstop: a backend without row locking lets the losing
+writer fail loudly with a typed `NarrativeThreadError` instead of silently
+losing an update, and the enclosing transaction rolls back.
 
 Linkage is real. `StoryThreadLink` rows are keyed
 `(thread, source_kind, source_ref, relation)` and validate that the referenced
 `NarrativeEvent`, `LetterSend`, `DialogueTurn` (`submission_id:kind`), or
 `MemoryRecord` (`mem:<pk>`) row exists before a link is stored; relations are
-whitelisted per kind. `link_memory_to_thread` also writes the thread identity
+whitelisted per kind. Source references are stored exactly as supplied and
+matched case-sensitively, and a link is durable: it outlives a memory's
+supersession, while recall still excludes superseded cognition unless it is
+explicitly requested. `link_memory_to_thread` also writes the thread identity
 into the memory's latest revision relations, which is what the existing
 `fast_recall` thread scope filters on. Tagging a memory this way appends a
 memory revision and therefore advances the owner memory generation: that is
