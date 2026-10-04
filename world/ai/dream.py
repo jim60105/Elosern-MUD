@@ -191,11 +191,14 @@ def _validate_has_cjk(parsed: Any) -> list[str]:
 
 
 def _validate_no_forbidden_markers(parsed: Any, markers: Sequence[str], label: str) -> list[str]:
-    text = _response_text(parsed)
+    # Casefolded so the ASCII policy markers are matched regardless of casing
+    # (the CJK markers are unaffected); the response keys are schema-closed, so
+    # scanning scene+dialogue covers the whole response body.
+    text = _response_text(parsed).casefold()
     return [
         f"dream response contains a forbidden {label}: {marker!r}"
         for marker in markers
-        if marker and marker in text
+        if marker and marker.casefold() in text
     ]
 
 
@@ -238,7 +241,9 @@ def _make_no_new_question_validator() -> Callable[[Any], list[str]]:
 
     def validate(parsed: Any) -> list[str]:
         dialogue = _field(parsed, "dialogue")
-        if isinstance(dialogue, str) and ("？" in dialogue or "?" in dialogue):
+        if isinstance(dialogue, str) and any(
+            mark in dialogue for mark in ("？", "?", "\ufe16")
+        ):
             return ["the summary exchange must not introduce a new question"]
         return []
 
@@ -264,12 +269,14 @@ _HOOKS = GuardrailHooks(
 def _cap_string(value: str, limit: int) -> str:
     if len(value) <= limit:
         return value
+    if limit <= len(_TRUNCATION_MARKER):
+        return value[:limit]
     return value[: limit - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
 
 
 def _bounded_adventure(adventure_summary: Any) -> list[str]:
     """Cap the spoiler-filtered adventure summary deterministically."""
-    if adventure_summary is None:
+    if not isinstance(adventure_summary, (list, tuple)):
         return []
     lines: list[str] = []
     for item in adventure_summary:

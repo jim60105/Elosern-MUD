@@ -108,10 +108,13 @@ class DreamTrackConfigurationTests(unittest.TestCase):
         self.assertEqual(track_state(3), track_state(3))
         self.assertEqual(prospective_state(3), first)
 
-    def test_prospective_lookahead_does_not_advance_the_track(self):
-        before = track_state(2)
-        prospective_state(2)
-        self.assertEqual(track_state(2), before)
+    def test_prospective_lookahead_projects_forward_without_advancing_the_track(self):
+        committed = track_state(2)
+        lookahead = prospective_state(2)
+        # A buggy pass-through returning the committed state would fail here.
+        self.assertNotEqual(lookahead, committed)
+        self.assertEqual(lookahead, track_state(3))
+        self.assertEqual(track_state(2), committed)
 
     def test_exchange_modes_follow_the_six_exchange_contract(self):
         self.assertEqual(

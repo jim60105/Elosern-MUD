@@ -161,12 +161,27 @@ class DreamPromptTests(unittest.TestCase):
         payload = json.loads(user["content"])
         self.assertEqual(len(payload["adventure_summary"]), MAX_ADVENTURE_LINES)
 
-    def test_prompt_construction_leaves_no_state_behind(self):
-        before = track_state(2)
-        build_dream_prompt(
-            state=prospective_state(2), mode=MODE_EXCHANGE, player_message="x" * 10
+    def test_prompt_construction_does_not_advance_the_track(self):
+        committed = track_state(2)
+        lookahead = prospective_state(2)
+        build_dream_prompt(state=lookahead, mode=MODE_EXCHANGE, player_message="x" * 10)
+        # The lookahead is a distinct next-exchange projection, and building the
+        # prompt left the committed state exactly where it was.
+        self.assertNotEqual(lookahead, committed)
+        self.assertEqual(track_state(2), committed)
+
+    def test_adventure_summary_must_be_a_sequence_of_strings(self):
+        _system, user = build_dream_prompt(
+            state=prospective_state(0),
+            mode=MODE_EXCHANGE,
+            player_message="繼續。",
+            adventure_summary=5,
         )
-        self.assertEqual(track_state(2), before)
+        self.assertNotIn("adventure_summary", json.loads(user["content"]))
+
+    def test_cap_string_never_exceeds_a_tiny_limit(self):
+        self.assertEqual(dream._cap_string("abcdef", 0), "")
+        self.assertEqual(dream._cap_string("abcdef", 1), "a")
 
 
 class DreamGenerationTests(unittest.TestCase):
@@ -262,6 +277,15 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.mode, MODE_SUMMARY)
 
+    def test_sixth_exchange_summary_rejects_a_vertical_question_mark(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True, _response(dialogue="你喜歡這樣嗎\ufe16", completed=5)
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
+            result = await_result(self._generate(client, completed=5))
+        self.assertIsNone(result)
+
     def test_named_deity_assertion_is_rejected(self):
         client = FakeLLMClient()
         client.add_response(
@@ -293,6 +317,24 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    def test_shipped_metadata_marker_is_rejected_without_patching(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True, _response(dialogue="系統提示：這裡是內部審核內容。")
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
+            result = await_result(self._generate(client))
+        self.assertIsNone(result)
+
+    def test_ascii_marker_matching_is_case_insensitive(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True, _response(dialogue="Metadata: internal review notes.")
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
+            result = await_result(self._generate(client))
+        self.assertIsNone(result)
+
     def test_state_change_claim_is_rejected(self):
         client = FakeLLMClient()
         client.add_response(
@@ -302,6 +344,15 @@ class DreamGenerationTests(unittest.TestCase):
             patch("world.ai.dream.FORBIDDEN_STATE_CHANGE_MARKERS", ("合成狀態宣告",)),
             override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})),
         ):
+            result = await_result(self._generate(client))
+        self.assertIsNone(result)
+
+    def test_shipped_state_change_marker_is_rejected_without_patching(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True, _response(dialogue="任務已完成，你可以放心了。")
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
