@@ -21,6 +21,13 @@
 - Contract gate passed: all 1829 main requirements covered, zero traceability,
   observability, or test-data violations; manifest checks and 18 contracts passed.
 - `openspec validate correspondence-delivery --strict` passed.
+- Final single-round duck found the generic startup projector would consume
+  correspondence progress. Reserved projector version 2 for its owning consumer
+  and added startup-equivalent recovery assertions; the 72-test focused batch
+  and contract/strict-spec gates passed again after the fix.
+- The duck's non-blocking simultaneous send-identity race was addressed using
+  atomic `get_or_create` and payload revalidation of the winning row. This does
+  not add database-lock retries or claim parallel SQLite writers are supported.
 - No player command changed, so command documentation is intentionally unchanged.
   New delta-only IDs remain for the archive/sync owner to obtain from the canonical
   listing after sync; the existing atomic-clock ID was obtained from that listing.

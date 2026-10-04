@@ -70,8 +70,10 @@ remain unchanged because this change introduces no player command.
 
 Each transition atomically records a private `NarrativeEvent` with a stable
 `correspondence:<send-source>:<status>` identity and pending `ProjectionProgress`.
-The generic live-memory projector is deliberately not invoked; later
-correspondence projection owns that source. Tables share the clock transaction.
+`CORRESPONDENCE_PROJECTOR_VERSION = 2` reserves these progress rows for the later
+correspondence-owned consumer; the generic live-memory projector's version-1
+startup queue cannot consume them. Later correspondence projection owns that
+source. Tables share the clock transaction.
 The declared surface contract has no cached entities: ordinary Django rows are
 queried fresh, updated through querysets, and returned only as detached frozen
 values. No cached mutable row survives rollback. Boundary logs run on durable

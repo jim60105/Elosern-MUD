@@ -12,6 +12,9 @@ from world.rules.clock import CLOCK_YAML, ScheduledEvent, get_world_clock, regis
 
 
 MAX_BODY_CHARACTERS = 8000
+# The generic event-memory projector consumes version 1 at startup. This queue
+# is reserved for the correspondence-owned projection consumer.
+CORRESPONDENCE_PROJECTOR_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -64,12 +67,21 @@ def send_letter(*, sender_id, recipient_id, body, source_id=None, reply_to=""):
                 raise ValueError("Send identity belongs to different correspondence.")
             return get_letter(identity)
         tick = get_world_clock().tick
-        letter = LetterSend.objects.create(
-            source_id=identity, sender_id=str(sender.pk), recipient_id=str(recipient.pk),
-            recipient_kind="player" if isinstance(recipient, PlayerCharacter) else "npc",
-            body=body, sent_tick=tick, due_tick=tick + CLOCK_YAML["seconds_per_hour"],
-            reply_to=reply_to,
+        letter, created = LetterSend.objects.get_or_create(
+            source_id=identity,
+            defaults={
+                "sender_id": str(sender.pk), "recipient_id": str(recipient.pk),
+                "recipient_kind": "player" if isinstance(recipient, PlayerCharacter) else "npc",
+                "body": body, "sent_tick": tick,
+                "due_tick": tick + CLOCK_YAML["seconds_per_hour"], "reply_to": reply_to,
+            },
         )
+        if not created:
+            if (letter.sender_id, letter.recipient_id, letter.body, letter.reply_to) != (
+                str(sender.pk), str(recipient.pk), body, reply_to
+            ):
+                raise ValueError("Send identity belongs to different correspondence.")
+            return get_letter(identity)
         LetterState.objects.create(
             letter=letter, recipient_id=letter.recipient_id, due_tick=letter.due_tick,
         )
@@ -125,7 +137,10 @@ def settle_correspondence_delivery(start_tick, end_tick):
             )
             # Later correspondence-memory projection owns consumption, not the
             # generic event projector's live-character workflow.
-            ProjectionProgress.objects.create(source_id=transition, status="pending")
+            ProjectionProgress.objects.create(
+                source_id=transition, status="pending",
+                projector_version=CORRESPONDENCE_PROJECTOR_VERSION,
+            )
             context = {"source_id": letter.source_id, "recipient": letter.recipient_id,
                        "tick": letter.due_tick, "status": status}
             transaction.on_commit(

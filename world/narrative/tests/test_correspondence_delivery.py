@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
 from world.narrative.correspondence import (
-    MAX_BODY_CHARACTERS, get_letter, register_correspondence_delivery,
+    CORRESPONDENCE_PROJECTOR_VERSION, MAX_BODY_CHARACTERS, get_letter, register_correspondence_delivery,
     send_letter, settle_correspondence_delivery,
 )
 from world.narrative.models import LetterSend, LetterState, NarrativeEvent, ProjectionProgress
@@ -104,14 +104,19 @@ class CorrespondenceDeliveryTests(EvenniaTest):
         self.assertEqual(get_letter(before.source_id).status, "delivered")
 
     def test_restart_repetition_is_idempotent_and_leaves_work_pending(self):
+        from world.narrative.memory import process_pending_narrative_memory_projections
+
         record = self.send()
         self.clock.advance(3600, AdvanceSource.COMBAT, [])
         register_correspondence_delivery()
         restarted = get_world_clock()
         self.assertEqual(restarted.tick, record.due_tick)
         self.assertEqual(settle_correspondence_delivery(17, 3617), [])
+        self.assertEqual(process_pending_narrative_memory_projections(), 0)
         self.assertEqual(NarrativeEvent.objects.count(), 1)
         self.assertEqual(ProjectionProgress.objects.get().status, "pending")
+        self.assertEqual(ProjectionProgress.objects.get().projector_version,
+                         CORRESPONDENCE_PROJECTOR_VERSION)
         self.assertEqual(NarrativeEvent.objects.get().tick, record.due_tick)
         self.assertEqual(self.npc.location, None)
 
