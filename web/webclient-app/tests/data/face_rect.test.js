@@ -16,6 +16,13 @@ describe("faceObjectPosition (gallery face_rect → object-position)", () => {
     expect(faceObjectPosition({ x: 0.6, y: 0, w: 0.5, h: 0.5 })).toBe("50% 50%");
     expect(faceObjectPosition({ x: 0, y: 0, w: 0, h: 0.5 })).toBe("50% 50%");
     expect(faceObjectPosition({ x: 0, y: 0.6, w: 0.5, h: 0.5 })).toBe("50% 50%");
+    expect(faceObjectPosition({ x: 0, y: 0, w: 0.5, h: 0 })).toBe("50% 50%");
+    expect(faceObjectPosition({ x: 0, y: 0, w: -0.5, h: 0.5 })).toBe("50% 50%");
+    // Symmetry with the faceCropStyle rejection set: the shared gate also
+    // rejects a non-finite field, a non-number field, and a missing field.
+    expect(faceObjectPosition({ x: Number.POSITIVE_INFINITY, y: 0, w: 0.5, h: 0.5 })).toBe("50% 50%");
+    expect(faceObjectPosition({ x: "0.1", y: 0, w: 0.5, h: 0.5 })).toBe("50% 50%");
+    expect(faceObjectPosition({ x: 0, y: 0, h: 0.5 })).toBe("50% 50%");
   });
 
   it("pins the boundary rounding tolerance at the rect edge", () => {

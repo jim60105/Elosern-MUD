@@ -133,6 +133,16 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     expect(rowThumb.element.style.left).toBe("");
   });
 
+  it("positions both thumbnail frames and images so the zoom offsets can anchor", () => {
+    // The CSS one-liners are load-bearing: without the relative frame the
+    // absolute image would resolve its offsets against a further ancestor.
+    wrapper = mount(CharacterSwitcher, {
+      props: { available: true, characters: SAMPLE_CHARACTERS },
+    });
+    expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper").element).position).toBe("relative");
+    expect(getComputedStyle(wrapper.get("img.character-switcher__thumb").element).position).toBe("absolute");
+  });
+
   it("collapsed pill uses placeholder when current character has no url", () => {
     const chars = [
       {

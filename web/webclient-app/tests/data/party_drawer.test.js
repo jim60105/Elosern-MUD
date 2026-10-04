@@ -94,6 +94,27 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     expect(img.element.style.top).toBe("");
   });
 
+  it("positions the avatar frame and image so the zoom offsets can anchor", () => {
+    // The CSS one-liners are load-bearing: without the relative frame the
+    // absolute image would resolve its offsets against a further ancestor.
+    const w = mountDrawer();
+    const frame = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]').element;
+    expect(getComputedStyle(frame).position).toBe("relative");
+    expect(getComputedStyle(w.get('[data-testid="party-drawer__row-101"] img').element).position).toBe("absolute");
+  });
+
+  it("keeps the glyph placeholder and renders no image for a companion portrait without a url", () => {
+    const artPanel = {
+      portrait_catalog: {
+        "101": { url: null, face_rect: { x: 0.6, y: 0.1, w: 0.2, h: 0.2 } },
+      },
+    };
+    const w = mountDrawer({ artPanel });
+    const avatar = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]');
+    expect(avatar.find("img").exists()).toBe(false);
+    expect(avatar.get(".av-glyph").exists()).toBe(true);
+  });
+
   it("leaving dispatches explore.party_leave through the two-step confirmation contract", async () => {
     const w = mountDrawer();
 
