@@ -100,6 +100,7 @@ def _context(**overrides) -> AttentionContext:
 class AttentionRankingTests(unittest.TestCase):
     """Pure, offline ranking behavior for every delta scenario."""
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_unrelated_high_salience_candidate_is_ineligible_before_scoring(self):
         """A known-but-uninvested automatic candidate never competes on salience."""
         unrelated = _candidate(
@@ -118,6 +119,7 @@ class AttentionRankingTests(unittest.TestCase):
         self.assertEqual(excluded["thread:unrelated"], (REASON_NOT_INVESTED,))
         self.assertNotIn("thread:unrelated", [item.candidate_id for item in decision.ranked])
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_unavailable_candidate_excluded_regardless_of_score(self):
         """Location, schedule, and capability failures are filtered before scoring."""
         importable = _candidate(
@@ -145,6 +147,7 @@ class AttentionRankingTests(unittest.TestCase):
         self.assertEqual(reasons["thread:busy"], (REASON_SCHEDULE_BLOCKED,))
         self.assertEqual(reasons["thread:dragon"], (REASON_NOT_EXECUTABLE,))
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_confirmed_request_is_eligible_as_player_direction(self):
         """A valid confirmed request competes without invested history."""
         request = _candidate(
@@ -165,6 +168,7 @@ class AttentionRankingTests(unittest.TestCase):
         )
         self.assertIn(REASON_SELECTED, decision.selected[0].reason_codes)
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_superseded_request_is_excluded(self):
         superseded = _candidate(
             "request:draft:v1",
@@ -192,6 +196,7 @@ class AttentionRankingTests(unittest.TestCase):
         excluded = {item.candidate.candidate_id: item.reasons for item in decision.excluded}
         self.assertEqual(excluded["request:draft:v1"], (REASON_SUPERSEDED_REQUEST,))
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_active_engagement_component_exceeds_passive_receipt(self):
         """The measured engagement component, not only the order, reflects action."""
         active = _candidate(
@@ -222,6 +227,7 @@ class AttentionRankingTests(unittest.TestCase):
             components["thread:active"]["engagement"], components["thread:passive"]["engagement"]
         )
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_identical_inputs_rank_identically_and_reason_data_matches(self):
         candidates = [
             _candidate("thread:b", unresolved_stakes=2),
@@ -244,6 +250,7 @@ class AttentionRankingTests(unittest.TestCase):
         self.assertGreaterEqual(len(first.snapshot_hash), 64)
         int(first.snapshot_hash, 16)
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_tie_break_is_stable_by_candidate_id(self):
         decision = rank_attention(
             [_candidate("thread:beta"), _candidate("thread:alpha")], _context()
@@ -252,6 +259,7 @@ class AttentionRankingTests(unittest.TestCase):
             [item.candidate_id for item in decision.selected], ["thread:alpha", "thread:beta"]
         )
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_focus_limit_bounds_selection_only(self):
         candidates = [
             _candidate(f"thread:c{index}", unresolved_stakes=3 - index)
@@ -273,6 +281,7 @@ class AttentionRankingTests(unittest.TestCase):
             [(REASON_SELECTED, 2)],
         )
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_cooldown_and_repetition_are_reported_and_penalise(self):
         fresh = _candidate(
             "thread:fresh", repetition=3, last_activity_tick=1_000_000 - 30
@@ -285,6 +294,7 @@ class AttentionRankingTests(unittest.TestCase):
         by_id = {item.candidate.candidate_id: item for item in decision.ranked}
         self.assertIn(REASON_IN_COOLDOWN, by_id["thread:fresh"].reason_codes)
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_location_component_bands(self):
         same = _candidate("thread:same", required_location=OWNER_LOCATION)
         reachable = _candidate("thread:reachable", required_location="room:annex")
@@ -332,6 +342,10 @@ class AttentionRankingTests(unittest.TestCase):
             decision = rank_attention([_candidate("thread:ok")], _context())
         self.assertEqual(len(decision.selected), 1)
 
+    @covers_requirement(
+        "narrative-attention::eligibility-precedes-attention-scoring",
+        "narrative-attention::observable-engagement-and-calibrated-focus-bound-selection",
+    )
     def test_calibration_cases_all_match_and_report_is_current(self):
         report = run_calibration()
         self.assertEqual(report.metrics.cases_matched, report.metrics.total_cases)
@@ -396,6 +410,7 @@ class AttentionExtractionTests(EvenniaTest):
         self.assertEqual(excluded.get("thread:att_known_only"), (REASON_NOT_INVESTED,))
         self.assertNotIn("thread:att_known_only", [i.candidate_id for i in decision.ranked])
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_unrelated_thread_is_unknown_and_ineligible(self):
         self._owner_thread(
             "att_foreign",
@@ -409,6 +424,7 @@ class AttentionExtractionTests(EvenniaTest):
             (REASON_UNKNOWN_TO_OWNER, REASON_NOT_INVESTED),
         )
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_memory_linked_thread_is_invested_and_eligible(self):
         record, _, _ = record_memory(
             owner_id=self.owner_id,
@@ -423,6 +439,7 @@ class AttentionExtractionTests(EvenniaTest):
         decision = self._decide()
         self.assertIn("thread:att_memory", [item.candidate_id for item in decision.ranked])
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_recipient_only_letter_link_is_owned_experience(self):
         """A linked letter the owner merely received still counts as experience."""
         incoming = send_letter(
@@ -475,6 +492,7 @@ class AttentionExtractionTests(EvenniaTest):
         }
         self.assertEqual(before, after)
 
+    @covers_requirement("narrative-attention::observable-engagement-and-calibrated-focus-bound-selection")
     def test_extract_engagement_counts_only_active_actions(self):
         submit_turn(self.npc, self.owner, "這條線索在哪裡？")
         submit_turn(self.npc, self.owner, "再問一次，線索在哪裡？", submission_id="att_sub_2")
@@ -531,6 +549,7 @@ class AttentionExtractionTests(EvenniaTest):
             1,
         )
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_schedule_block_excludes_candidate(self):
         self._owner_thread("att_busy")
         self.assertEqual(collect_schedule_blocks([self.npc.pk]), frozenset())
@@ -542,6 +561,7 @@ class AttentionExtractionTests(EvenniaTest):
         excluded = {item.candidate.candidate_id: item.reasons for item in decision.excluded}
         self.assertEqual(excluded.get("thread:att_busy"), (REASON_SCHEDULE_BLOCKED,))
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_thread_required_location_follows_linked_event(self):
         event, _, _ = record_narrative_event(
             source_id="att:loc:1",
@@ -567,6 +587,7 @@ class AttentionExtractionTests(EvenniaTest):
             log_warn.call_args.args[0], "narrative_attention_quest_deadlines_unavailable"
         )
 
+    @covers_requirement("narrative-attention::eligibility-precedes-attention-scoring")
     def test_latest_confirmed_request_eligible_and_older_excluded(self):
         direction = {
             "summary": "合成夢境方向：在無名港尋找失落的鐘聲。",
