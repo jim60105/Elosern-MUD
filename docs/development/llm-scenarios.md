@@ -284,7 +284,10 @@ LLM 必須輸出 JSON 格式：
 
 `attempt_decision()` captures the permitted immutable director frame, then
 requests a quest blueprint outside the settlement transaction. The beat-specific
-ScenarioDirector entry uses the existing profile, guardrail, schema and semantic
+client is supplied through `quest_client` or constructed by the server composition
+root using the ScenarioDirector profile, never the story director's transport.
+The beat-specific ScenarioDirector entry uses the existing profile, guardrail,
+schema and semantic
 validators. Unlike generic `generate_quest_blueprint()`, it returns no content on
 disabled transport, exhausted validation, context misfit or an oversized frame.
 The generic entry retains its authored offline templates.

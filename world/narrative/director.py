@@ -657,11 +657,16 @@ def settle_decision(
     if existing is not None:
         return _outcome_for_decision(existing, OUTCOME_DEDUPLICATED, now_tick)
 
+    from world.quests.compile.registration import publication_scope
+
     try:
-        return _settle_once(
-            invocation=invocation, proposals=proposals, now_tick=now_tick, handle=handle,
-            prepared_quest=prepared_quest,
-        )
+        # The outer scope also covers the final transaction exit. The inner
+        # effect scope handles a refused savepoint that settlement consumes.
+        with publication_scope() if prepared_quest is not None else nullcontext():
+            return _settle_once(
+                invocation=invocation, proposals=proposals, now_tick=now_tick, handle=handle,
+                prepared_quest=prepared_quest,
+            )
     except IntegrityError:
         # A concurrent settlement of the same source won the unique source
         # constraint; its row is the durable decision and its beat the durable
@@ -963,6 +968,7 @@ def attempt_decision(
     owner_id: Any,
     *,
     client: Any,
+    quest_client: Any = None,
     candidate: Optional[AttentionSelection] = None,
     request: Optional[CreativeRequest] = None,
     now_tick: int = 0,
@@ -988,7 +994,11 @@ def attempt_decision(
         captured = quest_context(invocation, proposal)
         if captured is not None:
             context, issuer_id = captured
-            blueprint = yield generate_beat_quest_blueprint(client, context=context)
+            if quest_client is None:
+                from server.ai_director_service import build_scenario_director_client
+
+                quest_client = build_scenario_director_client()
+            blueprint = yield generate_beat_quest_blueprint(quest_client, context=context)
             if blueprint is not None:
                 prepared_quest = PreparedQuestBeat(
                     json.dumps(context, ensure_ascii=False, sort_keys=True),

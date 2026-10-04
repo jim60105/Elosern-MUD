@@ -16,7 +16,9 @@
 - Focused Evennia batch: `world.narrative.tests.test_quest_beats`,
   `world.narrative.tests.test_story_director_beats`,
   `world.ai.tests.test_scenario_director_registration`,
-  `world.quests.tests.test_compile_registration`: 78 tests passed.
+  `world.quests.tests.test_compile_registration`: 81 tests passed after final
+  review fixes (outer settlement rollback, separate capability client and
+  rejection-exception privacy).
 - The new module exercises the actual recorded confirmed-direction → beat →
   quest path, disabled/unreachable no-content paths, generic offline template
   behavior, durable restore/replay and rollback cache recovery.

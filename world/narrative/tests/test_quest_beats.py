@@ -53,7 +53,8 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         selection = self.candidate()
         client = self.recorded()
         with patch("world.narrative.quest_beats.log_info") as info, self.captureOnCommitCallbacks(execute=True):
-            first = attempt_decision(self.owner.pk, client=client, candidate=selection, now_tick=self.now).result
+            first = attempt_decision(self.owner.pk, client=client, quest_client=client,
+                                     candidate=selection, now_tick=self.now).result
         self.assertTrue(first.scheduled)
         provenance = first.beat.payload["quest"]
         self.assertIn(provenance["definition_key"], QUEST_DEFINITION_REGISTRY)
@@ -89,7 +90,9 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
     @covers_requirement("story-director-beats::director-schedules-at-most-one-eligible-beat")
     def test_confirmed_direction_compiles_one_linked_quest(self):
         request = self.confirmed_request()
-        result = attempt_decision(self.owner.pk, client=self.recorded(), request=request).result
+        client = self.recorded()
+        result = attempt_decision(self.owner.pk, client=client, quest_client=client,
+                                  request=request).result
         self.assertTrue(result.scheduled)
         self.assertEqual(result.decision.source_ref, request.submission_key)
         self.assertIn("quest", result.beat.payload)
@@ -214,7 +217,8 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         client.add_connection_error(lambda request: request.schema_id == "scenario_director")
         revision = self.thread.revision
         with patch("world.ai.scenario_director.generation.get_template_pool", side_effect=AssertionError("no filler")):
-            result = attempt_decision(self.owner.pk, client=client, candidate=self.candidate()).result
+            result = attempt_decision(self.owner.pk, client=client, quest_client=client,
+                                      candidate=self.candidate()).result
         self.assertEqual(result.outcome, OUTCOME_NO_CONTENT)
         self.thread.refresh_from_db()
         self.assertEqual(self.thread.revision, revision)
@@ -252,3 +256,39 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertTrue(result.scheduled)
         self.assertEqual(result.beat.payload["quest"]["issuer_key"], context["issuer_branch"])
         self.assertEqual(read_records(self.owner), [])
+
+    def test_outer_settlement_failure_restores_quest_publication(self):
+        invocation = self.prepare()
+        before = dict(QUEST_DEFINITION_REGISTRY)
+        with patch("world.narrative.director._announce", side_effect=RuntimeError("outer failure")):
+            with self.assertRaises(RuntimeError):
+                settle_decision(invocation=invocation, proposals=[self.proposal("quest_seed")],
+                                 prepared_quest=self.prepared(invocation))
+        self.assertEqual(ScheduledBeat.objects.count(), 0)
+        self.assertEqual(list_payloads(), [])
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before)
+
+    def test_default_quest_client_comes_from_its_own_composition_profile(self):
+        story_client = _recorded("quest_seed")
+        quest_client = self.recorded()
+        with patch("server.ai_director_service.build_scenario_director_client",
+                   return_value=quest_client) as build:
+            result = attempt_decision(self.owner.pk, client=story_client,
+                                      candidate=self.candidate()).result
+        self.assertTrue(result.scheduled)
+        build.assert_called_once_with()
+        self.assertEqual(len(story_client.calls), 1)
+        self.assertEqual(len(quest_client.calls), 1)
+        self.assertEqual(quest_client.calls[0].schema_id, "scenario_director")
+
+    def test_rejection_exception_does_not_log_proposal_prose(self):
+        invocation = self.prepare()
+        with patch("world.narrative.quest_beats.compile_quest_blueprint",
+                   side_effect=ValueError("private proposal sentence")), patch(
+            "world.narrative.quest_beats.log_warn"
+        ) as warning:
+            result = settle_decision(invocation=invocation, proposals=[self.proposal("quest_seed")],
+                                     prepared_quest=self.prepared(invocation))
+        self.assertEqual(result.outcome, OUTCOME_NO_CONTENT)
+        self.assertNotIn("private proposal", str(warning.call_args))
+        self.assertIsNone(warning.call_args.kwargs["exc"].__context__)

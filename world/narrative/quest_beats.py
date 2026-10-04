@@ -95,10 +95,13 @@ def publish_quest_beat(prepared, invocation, proposal, beat, thread, now_tick):
             raise QuestCompileError("quest blueprint does not fit captured authority")
         register_generated_quest(compiled)
     except (QuestCompileError, ValueError) as error:
+        # Compiler diagnostics may quote proposal fields. Keep the operational
+        # exception type, never its prose-bearing message or chained payload.
+        safe_error = type(error)("quest proposal rejected")
         log_warn("quest_beat_publication_rejected", context={
             "beat_id": beat.beat_id, "snapshot_id": invocation.snapshot_id,
             "owner": invocation.owner_id,
-        }, exc=error)
+        }, exc=safe_error)
         raise _EffectRejected(OUTCOME_NO_CONTENT) from error
     beat.payload = {**beat.payload, "quest": {
         "definition_key": compiled.definition.key,
