@@ -116,15 +116,16 @@ describe("DesktopNavigation", () => {
     expect(buttons.map((b) => b.attributes("data-testid"))).toEqual([
       "nav-tool-lineage",
       "nav-tool-lore",
+      "nav-tool-letters",
       "nav-tool-codex",
       "nav-tool-help",
     ]);
-    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual(["技能系譜", "圖鑑", "稱號冊", "說明"]);
+    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual(["技能系譜", "圖鑑", "信件", "稱號冊", "說明"]);
     for (const button of buttons) {
       // The visible tooltip replaces the delayed, hover-only native one.
       expect(button.attributes("title")).toBeUndefined();
     }
-    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["技能系譜", "圖鑑", "稱號冊", "角色肖像圖庫", "說明"]);
+    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["技能系譜", "圖鑑", "信件", "稱號冊", "角色肖像圖庫", "說明"]);
     expect(toolLabel("gallery")).toBe("角色肖像圖庫");
     expect(toolLabel("map")).toBeNull();
     // The world codex (globe) and title codex (star book) carry distinct labels and glyphs.
@@ -147,6 +148,7 @@ describe("DesktopNavigation", () => {
     expect(group.findAll("button").map((b) => b.attributes("data-testid"))).toEqual([
       "nav-tool-lineage",
       "nav-tool-lore",
+      "nav-tool-letters",
       "nav-tool-codex",
       "gallery-opener",
       "nav-tool-help",
@@ -159,11 +161,12 @@ describe("DesktopNavigation", () => {
     await wrapper.get('[data-testid="nav-settings"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lineage"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
+    await wrapper.get('[data-testid="nav-tool-letters"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
     expect(wrapper.emitted("overlay")).toEqual([["settings"], ["lineage"], ["codex"], ["gallery"], ["help"]]);
-    expect(wrapper.emitted("drawer")).toEqual([["lore"]]);
+    expect(wrapper.emitted("drawer")).toEqual([["lore"], ["letters"]]);
   });
 });
 

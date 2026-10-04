@@ -92,11 +92,18 @@ class PlaceRegistryTests(unittest.TestCase):
                 "ciaran_nireth_home", "ciaran_shelter",
                 "ciaran_teliel_home", "ciaran_valwyn_home",
                 "ciaran_vethiel_home",
+                "altoria_silverfeather", "ciaran_silverfeather",
             ],
         )
 
     def test_shipped_place_registry_passes_validation(self):
         validate_place_registry(PLACE_REGISTRY)
+
+    def test_courier_capability_authors_branches_in_both_settlements(self):
+        branches = [place for place in PLACE_REGISTRY.values() if place.letter_service]
+        self.assertEqual({place.settlement_key for place in branches}, set(SETTLEMENT_REGISTRY))
+        self.assertTrue(all(place_is_hostless(place) for place in branches))
+        self.assertTrue(all(place.kind == PlaceKind.COURIER_STATION for place in branches))
 
     # The altoria-place-slices content-parity guard. Every assembled row is
     # captured as authored-field literals BEFORE the terrace split (a live dump
@@ -222,7 +229,7 @@ class PlaceRegistryTests(unittest.TestCase):
         )
         self.assertEqual(
             {key: astuple(PLACE_REGISTRY[key]) for key in self.PRE_SPLIT_CONTENT_CAPTURE},
-            self.PRE_SPLIT_CONTENT_CAPTURE,
+            {key: (*row, False) for key, row in self.PRE_SPLIT_CONTENT_CAPTURE.items()},
         )
 
     # ---- the kind vocabulary (place-kind-vocabulary) -----------------------
@@ -247,7 +254,7 @@ class PlaceRegistryTests(unittest.TestCase):
                 "jeweller", "alchemist", "temple", "sanctum_shop", "tavern",
                 "lodging", "bathhouse", "palace", "watch_post",
                 "training_ground", "academy", "merchant_hall", "market",
-                "commons",
+                "commons", "courier_station",
             },
         )
         for kind in PlaceKind:
@@ -294,6 +301,8 @@ class PlaceRegistryTests(unittest.TestCase):
             "ciaran_teliel_home": "home",
             "ciaran_valwyn_home": "home",
             "ciaran_vethiel_home": "home",
+            "altoria_silverfeather": "courier_station",
+            "ciaran_silverfeather": "courier_station",
         }
         self.assertEqual(set(PLACE_REGISTRY), set(expected))
         for key, kind in expected.items():

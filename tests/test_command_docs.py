@@ -64,6 +64,10 @@ LOCALIZED_TABLE_HEADING = "本地化預設指令（Localized zh-tw Defaults）"
 # human-review point; every other fact (keys, aliases, admin locks, help
 # categories) is verified against the command classes instead.
 EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
+    "信件": {
+        "syntax": "信件、信件 寄 <收件人>=<內容>、信件 領取、信件 讀 <信件編號>、信件 更多 <頁碼>",
+        "context": "一般（玩家角色；寄信與領信需在銀羽驛站分站）",
+    },
     "talk": {
         "syntax": "talk <npc>、talk <npc> <keyword> [<quest_id>]",
         "context": "一般（需有交談對象）",

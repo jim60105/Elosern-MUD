@@ -634,4 +634,15 @@ def build_production_action_registry() -> ActionRegistry:
         "npc.persona.update", validate_update_payload,
         update_npc_persona_adapter, AFFECTED_UPDATE,
     ))
+    from web.webclient.actions.correspondence_actions import (
+        collect_adapter, list_adapter, read_adapter, send_adapter,
+        validate_collect, validate_list, validate_read, validate_send,
+    )
+    for action_id, validator, adapter in (
+        ("letters.list", validate_list, list_adapter),
+        ("letters.collect", validate_collect, collect_adapter),
+        ("letters.read", validate_read, read_adapter),
+        ("letters.send", validate_send, send_adapter),
+    ):
+        registry.register(ActionSpec(action_id, validator, adapter, ()))
     return registry

@@ -38,6 +38,7 @@
     "World/LocalMap",
     "World/ShopPanel",
     "World/QuestLog",
+    "World/LettersPanel",
     "World/GuildCounter",
     "World/LoreCodexDrawer",
     "World/TitleBallotMenu",

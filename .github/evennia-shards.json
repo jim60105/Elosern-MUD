@@ -229,6 +229,7 @@
         "world.art",
         "world.narrative.tests.test_dialogue_memory",
         "world.narrative.tests.test_correspondence_delivery",
+        "world.narrative.tests.test_player_correspondence",
         "world.narrative.tests.test_dialogue_epochs",
         "world.narrative.tests.test_narrative_context",
         "world.narrative.tests.test_narrative_events",

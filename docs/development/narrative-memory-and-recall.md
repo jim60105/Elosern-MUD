@@ -79,6 +79,49 @@ queried fresh, updated through querysets, and returned only as detached frozen
 values. No cached mutable row survives rollback. Boundary logs run on durable
 commit and include identifiers/ticks/status only, never letter bodies.
 
+## Player correspondence surface (W2)
+
+`world.narrative.player_correspondence` is the sole player lifecycle writer.
+Authored `PlaceDefinition.letter_service` capabilities use the existing unique
+tagged permanent-interior anchor; descriptive `PlaceKind` never grants service.
+Both settlements have a hostless 銀羽驛站 branch. Any branch acquires all available
+letters for the player's identity, preserving unread state. Metadata pages
+contain at most twenty collected/read rows and an opaque numeric next cursor;
+listing never fetches bodies or creates a clock.
+
+`read` gates owner and collection inside the transaction, conditionally changes
+`collected` to `read`, and commits the first-read tick, one private
+`correspondence:<source_id>:read` event and version-2 pending projection together.
+The event references the immutable original letter; it does not copy prose.
+Rereads anywhere perform no canonical writes. Collection creates no content
+knowledge or read event. The correspondence-memory consumer remains a later
+owner; the generic projector cannot consume this queue.
+
+Text `信件` (`letters`) and the four allowlisted browser `letters.*` actions use
+these same APIs. Browser metadata and explicit-open bodies use the existing
+correlated action result-data channel, not a new panel protocol. Up to 8000
+Unicode code points travel as at most four 2000-code-point parts, preserving
+the transport's existing 2048-code-point leaf bound. Unknown payload fields,
+including forged owner fields, fail closed. Browser retries retain the send
+identity while the draft is unchanged; server sends remain atomic/idempotent.
+Session/character replacement drops local private data and never automatically
+replays a send. The tool group's envelope opens the shared focus-trapped drawer;
+its ruled folio uses shared ink/paper/brass tokens without nested card boxes.
+
+Each text command invocation is a new send, not an identified request replay.
+Identical intentional letters must remain possible: deduplicating by body/name
+would incorrectly suppress legitimate correspondence. Text clients must not
+automatically retry an uncertain send after a lost acknowledgement. Both player
+references state this distinction. An identified text retry protocol would be
+a new command contract, outside this boundary's existing text conventions.
+
+Offline smoke: run
+`world.narrative.tests.test_player_correspondence.PlayerCorrespondenceTests.test_real_text_and_browser_offline_smoke_and_log_privacy`
+through the guarded Evennia test entry. It exercises actual text send, committed
+clock delivery, another-branch browser collection, portable browser/text reading
+and first-read log privacy with synthetic data and no generation services.
+Delta-only coverage IDs are obtained by the later spec-sync owner after sync.
+
 ## Durable face-to-face dialogue (W1)
 
 `world.narrative.dialogue` replaces the destructive NPC Attribute history.

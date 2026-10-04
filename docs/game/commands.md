@@ -91,6 +91,14 @@ open **角色狀態 → 技能書**, then choose **修煉** beside an active ski
 | --- | --- |
 | [`lore`](/game/command-reference?id=lore) | 檢視已發現的知識圖鑑。 |
 
+## 信件
+
+| 指令 | 說明 |
+| --- | --- |
+| [`信件`](/game/command-reference?id=信件) | 在銀羽驛站寄信與領信；已領取信件可隨身閱讀。別名 `letters`。 |
+
+文字寄信每次輸入都會建立新信件；寄出後未收到回覆時，請勿自動重送。
+
 ## 經濟
 
 | 指令 | 說明 |
