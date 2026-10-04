@@ -148,9 +148,9 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 `world/ai/profiles.py` 的 `default_profiles(defaults=...)`；`world/ai/profiles.py`
 本身不讀取任何環境變數。每個欄位的優先次序：
 **程式碼預設值 < 全域 `LLM_<SUFFIX>` < 每層 `LLM_<LAYER>_<SUFFIX>` < `secret_settings.py`**。
-每層名稱的 `<LAYER>` 為十個層名大寫（底線保留）：`NARRATOR`、`NPC_DIALOGUE`、
+每層名稱的 `<LAYER>` 為十一個層名大寫（底線保留）：`NARRATOR`、`NPC_DIALOGUE`、
 `SCENARIO_DIRECTOR`、`SCENE_BUILDER`、`CHARACTER_CREATION`、`ACTION_OPTIONS`、
-`TITLE_NOMINATION`、`DIALOGUE_SUMMARY`、`CORRESPONDENCE`、`DREAM`。空白（或未設定）＝交給下一層；可省略型 knob 未設定時
+`TITLE_NOMINATION`、`DIALOGUE_SUMMARY`、`CORRESPONDENCE`、`DREAM`、`STORY_DIRECTOR`。空白（或未設定）＝交給下一層；可省略型 knob 未設定時
 profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Evennia 行程在開機時中止，
 錯誤訊息指名變數、原始值與規則。
 
