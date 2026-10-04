@@ -117,7 +117,9 @@ class InventoryTests(unittest.TestCase):
         # in server/conf/tests/test_llm_env_overrides.py.
         source = open(SETTINGS_PATH, encoding="utf-8").read()
         self.assertIn("LLM_ENV_NAMES = frozenset(llm_env_names())", source)
-        self.assertEqual(len(llm_env_names()), 184)
+        # Drift guard: bump deliberately when a layer or knob lands (the W3
+        # dream-story layers took the inventory from 184 to 276).
+        self.assertEqual(len(llm_env_names()), 276)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
