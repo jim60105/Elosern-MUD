@@ -60,6 +60,7 @@ from world.narrative.models import (
     NarrativeEvent,
     ScheduledBeat,
     StoryDirectorDecision,
+    StoryThread,
     StoryThreadLink,
 )
 from world.narrative.threads import (
@@ -362,7 +363,8 @@ class EffectRoutingTests(StoryDirectorBeatsTestCase):
                 self.assertEqual(ScheduledBeat.objects.count(), 0)
                 self.assertEqual(get_thread_revision(self.thread.thread_id), revision)
                 # Advance the thread so the next case is a distinct source
-                # revision and settles through its own path.
+                # revision and settles through its own path (a repeated source
+                # identity would deduplicate to this case's decision).
                 record_thread_development(
                     thread_id=self.thread.thread_id, tick=self.now + index + 1
                 )
@@ -403,12 +405,11 @@ class SourceGatingTests(StoryDirectorBeatsTestCase):
 
 
 class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
-    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
-    def test_confirmed_request_settles_a_new_story_beat(self):
+    def _confirmed_new_story_request(self, summary="新故事：灰港的失蹤商隊。"):
         draft = save_draft(
             owner_id=str(self.owner.pk),
             direction={
-                "summary": "新故事：灰港的失蹤商隊。",
+                "summary": summary,
                 "themes": ["失蹤"],
                 "atmosphere": [],
                 "participants": [],
@@ -422,9 +423,13 @@ class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
             sources=[],
             tick=self.now,
         )
-        request = confirm_draft(
+        return confirm_draft(
             draft_id=draft.draft_id, owner_id=str(self.owner.pk), tick=self.now
         )
+
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    def test_confirmed_request_settles_a_new_story_beat(self):
+        request = self._confirmed_new_story_request()
         outcome = attempt_decision(
             self.owner.pk, client=_recorded("clue"), request=request, now_tick=self.now
         ).result
@@ -443,6 +448,39 @@ class AuthoringBoundaryTests(StoryDirectorBeatsTestCase):
         ).result
         self.assertEqual(repeated.beat.beat_id, beat.beat_id)
         self.assertEqual(ScheduledBeat.objects.count(), 1)
+
+    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    def test_rejected_new_story_decision_leaves_no_thread_behind(self):
+        request = self._confirmed_new_story_request()
+        threads_before = StoryThread.objects.count()
+        outcome = attempt_decision(
+            self.owner.pk,
+            client=_recorded("quest_seed"),
+            request=request,
+            now_tick=self.now,
+        ).result
+        self.assertEqual(outcome.outcome, OUTCOME_UNSUPPORTED_EFFECT)
+        self.assertIsNone(outcome.beat)
+        self.assertEqual(StoryThread.objects.count(), threads_before)
+        self.assertEqual(outcome.decision.thread_id, "")
+        self.assertEqual(ScheduledBeat.objects.count(), 0)
+        self.assertEqual(self.story_beat_events().count(), 0)
+
+    @covers_requirement("narrative-story-threads::real-linkage-revisions-invalidate-future-context")
+    def test_empty_new_story_decision_creates_no_thread(self):
+        request = self._confirmed_new_story_request("新故事：無聲的鐘塔。")
+        threads_before = StoryThread.objects.count()
+        source = resolve_source(self.owner.pk, request=request)
+        invocation = prepare_decision(
+            self.owner.pk, source=source, now_tick=self.now
+        )
+        outcome = settle_decision(
+            invocation=invocation, proposals=(), now_tick=self.now
+        )
+        self.assertEqual(outcome.outcome, OUTCOME_NO_CONTENT)
+        self.assertIsNone(outcome.beat)
+        self.assertEqual(StoryThread.objects.count(), threads_before)
+        self.assertEqual(ScheduledBeat.objects.count(), 0)
 
     @covers_requirement("narrative-context::generation-retains-an-immutable-source-snapshot")
     def test_existing_story_candidate_settles_an_executable_beat(self):
@@ -508,6 +546,15 @@ class ContextSeparationTests(StoryDirectorBeatsTestCase):
         snapshot = get_context_snapshot(invocation.snapshot_id)
         self.assertEqual(snapshot.capability, "story_director")
         self.assertNotEqual(snapshot.capability, "dream_collaborator")
+        # The scenario's premise: both capabilities may resolve to one shared
+        # deployment endpoint, which still grants no shared history or facts.
+        profiles = default_profiles()
+        self.assertEqual(
+            profiles["story_director"]["base_url"], profiles["narrator"]["base_url"]
+        )
+        self.assertEqual(
+            profiles["story_director"]["model"], profiles["narrator"]["model"]
+        )
 
     @covers_requirement("narrative-context::observability-protects-private-prompt-data")
     def test_boundary_events_carry_ids_only_never_prose(self):

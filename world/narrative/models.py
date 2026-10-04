@@ -844,8 +844,11 @@ class StoryDirectorDecision(models.Model):
     revision)``, so repeated processing of the same source after a restart
     returns this row instead of deciding again; the unique source constraint is
     the durable backstop. ``outcome`` records the settlement result
-    (``scheduled`` or a concrete rejection code), and ``thread_revision`` is the
-    revision captured when the decision was prepared.
+    (``scheduled`` or a concrete rejection code). ``thread_revision`` is the
+    revision captured when the decision was prepared for a thread-scoped source;
+    for a new story it is the revision of the thread the beat created, and a
+    decision that scheduled nothing records ``0`` with the thread it would have
+    used (empty for a new story).
     """
 
     objects = ImmutableDirectorQuerySet.as_manager()

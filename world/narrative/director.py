@@ -195,6 +195,11 @@ def _announce(event: str, boundary: Mapping[str, Any]) -> None:
     transaction.on_commit(lambda: log_info(event, context=payload))
 
 
+# Rejections log synchronously (not through ``on_commit``): the message is the
+# only trace of a refused decision, and a rolled-back settle would otherwise
+# lose it entirely (the same rationale as the dream-session reject helper).
+
+
 def _reject_boundary(
     handle: str,
     invocation: "DirectorInvocation",
@@ -222,8 +227,15 @@ def _reject_boundary(
 def decision_id_for(
     owner_id: Any, source_kind: Any, source_ref: Any, source_revision: Any
 ) -> str:
-    """Deterministic decision identity for one immutable source revision."""
-    key = f"{str(owner_id)}:{str(source_kind)}:{str(source_ref)}:v{int(source_revision)}"
+    """Deterministic decision identity for one immutable source revision.
+
+    Every component is normalized (stripped) so a pre-generation dedupe lookup
+    and the persisted handle always agree on the same identity.
+    """
+    key = (
+        f"{str(owner_id).strip()}:{str(source_kind).strip()}:"
+        f"{str(source_ref).strip()}:v{int(source_revision)}"
+    )
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
     return f"dec_{digest[:48]}"
 
@@ -464,7 +476,7 @@ def prepare_decision(
 
 
 def _proposal_rejection(
-    proposal: Any, thread: StoryThread, owner_id: str
+    proposal: Any, participants: frozenset[str], owner_id: str
 ) -> Optional[str]:
     """The first deterministic gate a proposal fails, or None when acceptable."""
     if not isinstance(proposal, BeatProposal):
@@ -484,7 +496,6 @@ def _proposal_rejection(
 
         if not isinstance(counterpart, NPC):
             return OUTCOME_UNSUPPORTED_TARGET
-        participants = {str(item) for item in (thread.participants or [])}
         if str(counterpart.pk) not in participants:
             return OUTCOME_UNSUPPORTED_TARGET
         if effect == EFFECT_LETTER_SEND:
@@ -496,12 +507,12 @@ def _proposal_rejection(
 
 
 def _select_proposal(
-    proposals: Iterable[Any], thread: StoryThread, owner_id: str
+    proposals: Iterable[Any], participants: frozenset[str], owner_id: str
 ) -> tuple[Optional[BeatProposal], str]:
     """Choose at most one materializable proposal; report the first refusal."""
     first_reason: Optional[str] = None
     for proposal in proposals or ():
-        reason = _proposal_rejection(proposal, thread, owner_id)
+        reason = _proposal_rejection(proposal, participants, owner_id)
         if reason is None:
             return proposal, OUTCOME_SCHEDULED
         if first_reason is None:
@@ -509,35 +520,42 @@ def _select_proposal(
     return None, (first_reason or OUTCOME_NO_CONTENT)
 
 
-def _resolve_settlement_thread(
-    invocation: DirectorInvocation, now_tick: int
-) -> tuple[Optional[StoryThread], Optional[str]]:
-    """Lock the target thread (creating it for a confirmed new story)."""
-    source = invocation.source
-    if source.thread_id:
-        thread = (
-            StoryThread.objects.select_for_update()
-            .filter(thread_id=source.thread_id)
-            .first()
+def new_story_thread_id(decision_id: str) -> str:
+    """Deterministic thread identity a confirmed new-story beat would own."""
+    return f"story:{decision_id}"
+
+
+def _lock_existing_thread(invocation: DirectorInvocation) -> Optional[StoryThread]:
+    """Lock the source's thread row; a new-story source has none yet."""
+    if not invocation.source.thread_id:
+        return None
+    return (
+        StoryThread.objects.select_for_update()
+        .filter(thread_id=invocation.source.thread_id)
+        .first()
+    )
+
+
+def _create_new_story_thread(
+    invocation: DirectorInvocation, thread_id: str, now_tick: int
+) -> StoryThread:
+    """Create the thread a confirmed new-story beat owns, exactly once."""
+    try:
+        create_thread(
+            thread_id=thread_id,
+            origin=f"request:{invocation.source.ref}",
+            participants=[invocation.owner_id],
+            visible_to=[invocation.owner_id],
+            tick=int(now_tick),
         )
-        return thread, None
-    thread_id = f"story:{decision_id_for(invocation.owner_id, source.kind, source.ref, source.revision)}"
-    existing = StoryThread.objects.filter(thread_id=thread_id).first()
-    if existing is None:
-        try:
-            create_thread(
-                thread_id=thread_id,
-                origin=f"request:{source.ref}",
-                participants=[invocation.owner_id],
-                visible_to=[invocation.owner_id],
-                tick=int(now_tick),
-            )
-        except NarrativeThreadError:
-            existing = StoryThread.objects.filter(thread_id=thread_id).first()
-            if existing is None:
-                raise
-        existing = StoryThread.objects.filter(thread_id=thread_id).first()
-    return existing, None
+    except NarrativeThreadError:
+        raced = StoryThread.objects.filter(thread_id=thread_id).first()
+        if raced is None:
+            raise
+    thread = StoryThread.objects.filter(thread_id=thread_id).first()
+    if thread is None:
+        raise DirectorError(f"story thread {thread_id!r} could not be created")
+    return thread
 
 
 def _record_decision(
@@ -640,57 +658,130 @@ def settle_decision(
     if existing is not None:
         return _outcome_for_decision(existing, OUTCOME_DEDUPLICATED, now_tick)
 
-    with transaction.atomic():
-        thread, failure = _resolve_settlement_thread(invocation, now_tick)
-        if thread is None or failure is not None:
-            decision = _record_decision(
-                invocation, OUTCOME_THREAD_UNAVAILABLE, now_tick=now_tick, thread=None
-            )
-            log_warn(
-                "story_director_decision_rejected",
-                context=_reject_boundary(
-                    handle, invocation, OUTCOME_THREAD_UNAVAILABLE, now_tick
-                ),
-            )
-            return BeatOutcome(decision=decision, beat=None, outcome=decision.outcome)
+    try:
+        return _settle_once(
+            invocation=invocation, proposals=proposals, now_tick=now_tick, handle=handle
+        )
+    except IntegrityError:
+        # A concurrent settlement of the same source won the unique source
+        # constraint; its row is the durable decision and its beat the durable
+        # arrangement, so this settlement deduplicates instead of failing.
+        raced = StoryDirectorDecision.objects.filter(decision_id=handle).first()
+        if raced is None:
+            raise
+        return BeatOutcome(
+            decision=raced,
+            beat=ScheduledBeat.objects.filter(decision=raced).first(),
+            outcome=raced.outcome,
+        )
 
-        # Revalidate mutable prerequisites against the captured state: a thread
-        # that became terminal or lost its owner's visibility is unavailable.
-        if thread.state in TERMINAL_THREAD_STATES or not thread_accessible(
-            thread, invocation.owner_id
-        ):
-            decision = _record_decision(
-                invocation, OUTCOME_THREAD_UNAVAILABLE, now_tick=now_tick, thread=thread
-            )
-            log_warn(
-                "story_director_decision_rejected",
-                context=_reject_boundary(
-                    handle,
+
+def _settle_once(
+    *,
+    invocation: DirectorInvocation,
+    proposals: Iterable[Any],
+    now_tick: int,
+    handle: str,
+) -> BeatOutcome:
+    """One single-transaction settlement; the caller dedupes and catches races."""
+    source = invocation.source
+    with transaction.atomic():
+        thread = _lock_existing_thread(invocation)
+        pending_thread_id = ""
+        if source.thread_id:
+            if thread is None:
+                decision = _record_decision(
                     invocation,
                     OUTCOME_THREAD_UNAVAILABLE,
+                    now_tick=now_tick,
+                    thread=None,
+                )
+                log_warn(
+                    "story_director_decision_rejected",
+                    context=_reject_boundary(
+                        handle, invocation, OUTCOME_THREAD_UNAVAILABLE, now_tick
+                    ),
+                )
+                return BeatOutcome(
+                    decision=decision, beat=None, outcome=decision.outcome
+                )
+            # Revalidate mutable prerequisites against the captured state: a
+            # thread that became terminal or lost its owner's visibility is
+            # unavailable.
+            if thread.state in TERMINAL_THREAD_STATES or not thread_accessible(
+                thread, invocation.owner_id
+            ):
+                decision = _record_decision(
+                    invocation,
+                    OUTCOME_THREAD_UNAVAILABLE,
+                    now_tick=now_tick,
+                    thread=thread,
+                )
+                log_warn(
+                    "story_director_decision_rejected",
+                    context=_reject_boundary(
+                        handle,
+                        invocation,
+                        OUTCOME_THREAD_UNAVAILABLE,
+                        now_tick,
+                        thread_id=thread.thread_id,
+                    ),
+                )
+                return BeatOutcome(
+                    decision=decision, beat=None, outcome=decision.outcome
+                )
+            if int(thread.revision) != int(invocation.thread_revision):
+                decision = _record_decision(
+                    invocation, OUTCOME_STALE, now_tick=now_tick, thread=thread
+                )
+                stale = _reject_boundary(
+                    handle,
+                    invocation,
+                    OUTCOME_STALE,
                     now_tick,
                     thread_id=thread.thread_id,
-                ),
+                )
+                stale["captured_revision"] = int(invocation.thread_revision)
+                stale["current_revision"] = int(thread.revision)
+                log_warn("story_director_decision_stale", context=stale)
+                return BeatOutcome(
+                    decision=decision, beat=None, outcome=decision.outcome
+                )
+            participants = frozenset(
+                str(item) for item in (thread.participants or [])
             )
-            return BeatOutcome(decision=decision, beat=None, outcome=decision.outcome)
+        else:
+            # A confirmed new story owns a deterministic thread, but the row is
+            # created only when a beat actually materializes, so a rejected or
+            # empty decision leaves no orphan thread (and no attention
+            # candidate) behind.
+            pending_thread_id = new_story_thread_id(handle)
+            occupied = StoryThread.objects.filter(
+                thread_id=pending_thread_id
+            ).first()
+            if occupied is not None:
+                decision = _record_decision(
+                    invocation, OUTCOME_CONFLICT, now_tick=now_tick, thread=occupied
+                )
+                log_warn(
+                    "story_director_decision_conflict",
+                    context=_reject_boundary(
+                        handle,
+                        invocation,
+                        OUTCOME_CONFLICT,
+                        now_tick,
+                        thread_id=occupied.thread_id,
+                        arrangement_revision=int(occupied.revision),
+                    ),
+                )
+                return BeatOutcome(
+                    decision=decision, beat=None, outcome=decision.outcome
+                )
+            participants = frozenset({invocation.owner_id})
 
-        if source.thread_id and int(thread.revision) != int(invocation.thread_revision):
-            decision = _record_decision(
-                invocation, OUTCOME_STALE, now_tick=now_tick, thread=thread
-            )
-            stale = _reject_boundary(
-                handle,
-                invocation,
-                OUTCOME_STALE,
-                now_tick,
-                thread_id=thread.thread_id,
-            )
-            stale["captured_revision"] = int(invocation.thread_revision)
-            stale["current_revision"] = int(thread.revision)
-            log_warn("story_director_decision_stale", context=stale)
-            return BeatOutcome(decision=decision, beat=None, outcome=decision.outcome)
-
-        proposal, reason = _select_proposal(proposals, thread, invocation.owner_id)
+        proposal, reason = _select_proposal(
+            proposals, participants, invocation.owner_id
+        )
         if proposal is None:
             decision = _record_decision(
                 invocation, reason, now_tick=now_tick, thread=thread
@@ -698,19 +789,31 @@ def settle_decision(
             log_warn(
                 "story_director_decision_rejected",
                 context=_reject_boundary(
-                    handle, invocation, reason, now_tick, thread_id=thread.thread_id
+                    handle,
+                    invocation,
+                    reason,
+                    now_tick,
+                    thread_id=thread.thread_id if thread is not None else "",
                 ),
             )
             return BeatOutcome(decision=decision, beat=None, outcome=decision.outcome)
 
         effect = EFFECT_BY_KIND[proposal.kind]
-        arrangement_revision = int(thread.revision)
         execution_ref = execution_ref_for(handle)
         beat: Optional[ScheduledBeat] = None
+        target: Optional[StoryThread] = thread
+        arrangement_revision = 0
         try:
             with transaction.atomic():
+                if target is None:
+                    # The new-story thread is created inside the savepoint so a
+                    # later failure removes it together with the beat.
+                    target = _create_new_story_thread(
+                        invocation, pending_thread_id, now_tick
+                    )
+                arrangement_revision = int(target.revision)
                 if ScheduledBeat.objects.filter(
-                    thread=thread, arrangement_revision=arrangement_revision
+                    thread=target, arrangement_revision=arrangement_revision
                 ).exists():
                     raise _EffectRejected(OUTCOME_CONFLICT)
                 beat = ScheduledBeat.objects.create(
@@ -719,10 +822,10 @@ def settle_decision(
                         invocation,
                         OUTCOME_SCHEDULED,
                         now_tick=now_tick,
-                        thread=thread,
+                        thread=target,
                     ),
                     owner_id=invocation.owner_id,
-                    thread=thread,
+                    thread=target,
                     kind=proposal.kind,
                     effect=effect,
                     arrangement_revision=arrangement_revision,
@@ -736,7 +839,7 @@ def settle_decision(
                     created_tick=int(now_tick),
                 )
                 _apply_effect(
-                    effect, proposal, invocation, thread, execution_ref, now_tick
+                    effect, proposal, invocation, target, execution_ref, now_tick
                 )
         except _EffectRejected as rejected:
             decision = _record_decision(
@@ -753,7 +856,7 @@ def settle_decision(
                     invocation,
                     rejected.outcome,
                     now_tick,
-                    thread_id=thread.thread_id,
+                    thread_id=target.thread_id if target is not None else "",
                     arrangement_revision=arrangement_revision,
                 ),
             )
@@ -778,7 +881,7 @@ def settle_decision(
                     invocation,
                     OUTCOME_CONFLICT,
                     now_tick,
-                    thread_id=thread.thread_id,
+                    thread_id=target.thread_id if target is not None else "",
                     arrangement_revision=arrangement_revision,
                 ),
             )
@@ -790,7 +893,7 @@ def settle_decision(
                 "decision_id": handle,
                 "beat_id": beat.beat_id,
                 "owner": invocation.owner_id,
-                "thread_id": thread.thread_id,
+                "thread_id": target.thread_id,
                 "kind": proposal.kind,
                 "effect": effect,
                 "tick": int(now_tick),
