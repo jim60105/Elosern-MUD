@@ -816,6 +816,37 @@ class GalleryArtConsumptionEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class SmallAvatarZoomCropEvidenceTest(unittest.TestCase):
+    """face-crop-small-avatar-thumbnails: the shared faceCropStyle zoom
+    mapping and its switcher/drawer thumbnail bindings are Vue-layer
+    contracts; the Vitest files are their executed evidence."""
+
+    @covers_requirement(
+        "webclient-art-panel::small-avatar-thumbnails-zoom-crop-their-portrait-image-to-the-carried-face-rectangle-through-one-shared-pure-function",
+    )
+    def test_small_avatar_zoom_crop_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/core/character_switcher.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/data/party_drawer.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "small-avatar-zoom-crop Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 class MessagePagesEvidenceTest(unittest.TestCase):
     """webclient-message-pages: the pure response-segmentation and
     token-stream pagination contracts are verified in Vitest."""
