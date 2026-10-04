@@ -76,6 +76,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         with self.assertRaises(surface.CorrespondenceError):
             surface.list_letters(self.npc)
 
+    @covers_requirement("correspondence-player-surface::sending-and-collection-require-any-branch")
     def test_any_branch_acquisition_and_write_free_remote_list(self):
         incoming = self.due_letter()
         self.due_letter(source="synthetic_second")
@@ -98,6 +99,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         self.assertEqual(before, (LetterState.objects.count(), NarrativeEvent.objects.count(), ProjectionProgress.objects.count()))
         self.assertEqual(LetterState.objects.get(letter__source_id="synthetic_foreign").status, "available")
 
+    @covers_requirement("correspondence-player-surface::collection-and-reading-remain-distinct")
     def test_read_reread_and_late_failure_roll_back_once(self):
         incoming = self.due_letter()
         surface.collect(self.player)
@@ -119,6 +121,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         self.assertEqual(event.content, {"letter_source_id": incoming.source_id})
         self.assertEqual(ProjectionProgress.objects.filter(source_id=event.source_id).count(), 1)
 
+    @covers_requirement("correspondence-player-surface::browser-and-text-channels-share-authoritative-permissions")
     def test_forged_actions_reject_without_body_or_read_event(self):
         mine = self.due_letter(body="synthetic_secret")
         foreign = self.due_letter(self.other, "synthetic_foreign", "foreign_secret")
