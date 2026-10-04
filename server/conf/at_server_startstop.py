@@ -578,7 +578,7 @@ def at_server_start():
         "narrative_correspondence_projection_init",
         lambda: _late(
             "world.narrative.correspondence_memory",
-            "process_pending_correspondence_projections",
+            "recover_pending_correspondence_projections",
         ),
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,

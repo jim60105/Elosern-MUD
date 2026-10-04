@@ -157,14 +157,23 @@ def settle_delivery_cognition(letter_source_id):
     return True
 
 
-def process_pending_correspondence_projections():
+def recover_pending_correspondence_projections():
+    """Startup recovery entry: drain the durable queue and announce the scan."""
+    return process_pending_correspondence_projections(announce=True)
+
+
+def process_pending_correspondence_projections(*, announce=False):
     """Drain every pending version-2 source; safe to repeat after interruption.
 
-    Returns the number of sources settled in this pass.
+    Returns the number of sources settled in this pass. The cataloged startup
+    scan event is announced only by the recovery entry: the lazy reply and
+    recall drains run on hot paths and stay quiet, while each settled source
+    still emits its own ``correspondence_memory_projected`` boundary event.
     """
-    from world.narrative.events import scan_pending_narrative_projections
+    if announce:
+        from world.narrative.events import scan_pending_narrative_projections
 
-    scan_pending_narrative_projections(projector_version=CORRESPONDENCE_PROJECTOR_VERSION)
+        scan_pending_narrative_projections(projector_version=CORRESPONDENCE_PROJECTOR_VERSION)
     pending = list(ProjectionProgress.objects.filter(
         projector_version=CORRESPONDENCE_PROJECTOR_VERSION, status="pending",
     ).values_list("source_id", flat=True))
