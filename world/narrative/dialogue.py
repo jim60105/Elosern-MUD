@@ -87,12 +87,21 @@ def build_dialogue_context(npc, player, speech, *, identity_detail=False):
     # before selection, or a face-to-face turn would miss the letter entirely.
     process_pending_correspondence_projections()
     recall = fast_recall(owner_id=owner, requester_id=owner, query=speech)
+    # The persona-card bounds size this window: an NPC card is bounded at
+    # 2000 rendered code points (about 4000 estimated tokens) and the
+    # speaking player's public persona block rides in the current frame.
+    # The 4096 default window (3078 input budget) could not hold a
+    # mandatory anchor plus a player persona with zero history, so every
+    # fully-authored card degraded. 16384 keeps the current frame, a
+    # 12-line memory window, and replayed epoch frames inside headroom.
     budget = build_budget_profile(
         get_profile("npc_dialogue"),
+        context_window=16384,
         section_targets={"epoch_summary": SUMMARY_PROFILE_LIMITS["npc_dialogue"]["soft_target"],
                          "character_anchor": 900},
         section_bounds={"epoch_summary": SUMMARY_PROFILE_LIMITS["npc_dialogue"]["hard_limit"],
-                        "character_anchor": 1800},
+                        "character_anchor": 5200,
+                        "turn_frames": 15366},
     )
     context = assemble_narrative_context(
         capability="npc_dialogue", prompt_version="npc_dialogue_epochs_v1",
@@ -141,8 +150,10 @@ def build_dialogue_context(npc, player, speech, *, identity_detail=False):
     if current.get("cognition") != cognition:
         sources = ()
     total = sum(estimate_tokens(message["content"]) for message in messages)
-    max_input = min(budget.max_input_budget,
-                    estimate_tokens(messages[0]["content"]) + budget.section_bounds["turn_frames"])
+    # The aggregate bound is the profile budget alone: the min() with
+    # system-plus-turn-frames could sink below the mandatory system +
+    # current frame and reject prompts no reduction step can relieve.
+    max_input = budget.max_input_budget
     # A failed/offline compaction keeps the epoch usable via a deterministic tail.
     while total > max_input and payload.get("frames"):
         payload["frames"].pop(0)

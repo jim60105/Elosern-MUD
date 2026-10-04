@@ -6,8 +6,19 @@ local-first profiles, not provider tokenizers or model-quality claims.
 
 | Capability profile | Context window | Completion reservation | Deep Recall | Safety | Maximum input | Summary soft target | Summary hard rendered limit |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| npc_dialogue | 4096 | 250 | 512 | 256 | 3078 | 400 | 800 |
+| npc_dialogue | 16384 | 250 | 512 | 256 | 15366 | 400 | 800 |
 | dialogue_summary | 4096 | 1024 | 512 | 256 | 2304 | 400 | 800 |
+
+The npc_dialogue window is sized by the persona-card bounds, not a provider
+window: a fully-authored NPC card is capped at 2000 rendered code points
+(about 4000 `token_est_v3` tokens) inside the mandatory character anchor, and
+the speaking player's public persona block rides the mandatory current frame.
+Under the old 4096 window (3078 maximum input) that mandatory floor alone could
+exceed the budget with zero history, so every fully-authored card degraded with
+`ContextBudgetExceededError`. The dialogue `turn_frames` hard bound is the
+maximum input itself: the mandatory current frame lives inside that section, so
+a smaller bound could reject after the aggregate reduction loop had already
+converged.
 
 Both profiles use the same persisted summary representation. The dedicated
 summary output reservation permits a bounded JSON summary, while ordinary

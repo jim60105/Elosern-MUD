@@ -59,7 +59,8 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(json.loads(payload["current"])["location"], destination.key)
         self.assertIn("supersedes", json.loads(payload["current"])["authority"])
         self.assertEqual(DialogueEpoch.objects.count(), 1)
-        self.assertLessEqual(NarrativeContextSnapshot.objects.get(snapshot_id=snapshot).budget_accounting["total_rendered_tokens"], 3078)
+        captured = NarrativeContextSnapshot.objects.get(snapshot_id=snapshot).budget_accounting
+        self.assertLessEqual(captured["total_rendered_tokens"], captured["max_input_budget"])
         for mutate in (lambda: frame.save(), lambda: frame.delete(), lambda: DialogueFrame.objects.update(tick=9)):
             with self.assertRaises(ValueError):
                 mutate()
@@ -171,6 +172,42 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(DialogueTurn.objects.count(), 30)
         self.assertEqual(DialogueFrame.objects.count(), 15)
         self.assertEqual(DialogueEpoch.objects.count(), 1)
+
+    @covers_requirement(
+        "dialogue-epochs::dialogue-budgets-admit-the-mandatory-persona-card-floor",
+        "npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona",
+        "dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation",
+    )
+    def test_full_persona_card_pair_stays_inside_the_input_budget(self):
+        # A fully-authored card is bounded at 2000 code points (~4000
+        # estimated tokens) and the player's public persona rides the
+        # current frame; the profile must admit that mandatory floor.
+        fill = "字"
+        self.npc.db.persona = {
+            "identity": {"public": fill * 290, "hidden": fill * 290},
+            "appearance": fill * 290,
+            "personality": fill * 290,
+            "speech_style": fill * 290,
+            "life_story": fill * 290,
+            "habit": fill * 290,
+            "social_connection": fill * 55,
+        }
+        self.player.db.persona = {
+            "identity": {"public": fill * 290, "hidden": fill * 290},
+            "personality": fill * 599,
+            "life_story": fill * 599,
+        }
+        identity = submit_turn(self.npc, self.player, "你好")
+        messages, snapshot_id = build_dialogue_context(self.npc, self.player, "你好")
+        settle_response(self.npc, self.player, identity, "Recorded reply",
+                        snapshot_id=snapshot_id)
+        captured = NarrativeContextSnapshot.objects.get(snapshot_id=snapshot_id)
+        current = json.loads(messages[1]["content"])
+        if "current" in current:
+            current = json.loads(current["current"])
+        self.assertIn("persona", current["player"])
+        self.assertLessEqual(captured.budget_accounting["total_rendered_tokens"],
+                             captured.budget_accounting["max_input_budget"])
 
     @covers_requirement("dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation")
     def test_global_prefix_shared_and_logging_contains_only_metadata(self):
