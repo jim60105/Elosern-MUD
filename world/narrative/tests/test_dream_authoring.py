@@ -1,9 +1,9 @@
 """Synthetic behavior tests for private drafts and confirmed request versions.
 
 Everything here is deterministic and offline: synthetic actors, synthetic
-provenance rows, no model or image service. Delta-only requirement ids land at
-archive sync, so substantive tests are annotated against the existing canonical
-main ids they establish.
+provenance rows, no model or image service. Substantive tests are annotated
+against the canonical dream-authoring requirement ids synced at archive, plus
+the existing main ids they establish.
 """
 
 from __future__ import annotations
@@ -124,7 +124,10 @@ class DreamAuthoringTestCase(EvenniaTest):
 class DreamAuthoringPrivacyTests(DreamAuthoringTestCase):
     """Private authoring data never becomes cognition or a character effect."""
 
-    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
+    @covers_requirement(
+        "dream-authoring::creative-discussion-remains-private-authoring-data",
+        "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
+    )
     def test_draft_and_request_stay_private_and_produce_no_cognition(self):
         before = self.character_attribute_snapshot()
         direction = new_story_direction()
@@ -190,6 +193,7 @@ class DreamAuthoringDraftTests(DreamAuthoringTestCase):
                 owner_id=self.other_id, direction=direction, draft_id="draft_replay_01"
             )
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_editing_a_confirmed_version_returns_it_to_unconfirmed(self):
         draft = save_draft(owner_id=self.owner_id, direction=new_story_direction(), tick=100)
         request = confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
@@ -253,6 +257,7 @@ class DreamAuthoringValidationTests(DreamAuthoringTestCase):
         self.assertFalse(result.valid)
         return result.reason_codes
 
+    @covers_requirement("dream-authoring::creative-discussion-remains-private-authoring-data")
     def test_committed_history_rewrite_is_rejected_with_a_concrete_reason(self):
         thread = self.owner_thread("thread_authoring_history")
         committed = self.committed_event("synthetic:authoring:committed:1")
@@ -279,6 +284,7 @@ class DreamAuthoringValidationTests(DreamAuthoringTestCase):
         self.assertEqual(stored.revision, 1)
         self.assertFalse(draft_is_confirmed(stored))
 
+    @covers_requirement("dream-authoring::creative-discussion-remains-private-authoring-data")
     def test_personality_and_outcome_rewrites_are_rejected(self):
         thread = self.owner_thread("thread_authoring_aspects")
         codes = self._reason_codes(
@@ -303,6 +309,7 @@ class DreamAuthoringValidationTests(DreamAuthoringTestCase):
         )
         self.assertEqual(codes, ("unknown_reference",))
 
+    @covers_requirement("dream-authoring::creative-discussion-remains-private-authoring-data")
     def test_effects_are_unauthorized(self):
         codes = self._reason_codes(
             new_story_direction(effects=["clue", "skill"])
@@ -340,6 +347,7 @@ class DreamAuthoringValidationTests(DreamAuthoringTestCase):
             ("terminal_thread",),
         )
 
+    @covers_requirement("dream-authoring::creative-discussion-remains-private-authoring-data")
     def test_structural_rejections_are_concrete(self):
         self.assertEqual(self._reason_codes({}), ("malformed_direction",))
         self.assertEqual(
@@ -383,7 +391,11 @@ class DreamAuthoringValidationTests(DreamAuthoringTestCase):
 class DreamAuthoringConfirmationTests(DreamAuthoringTestCase):
     """Confirmation submits exactly one durable request version per version."""
 
-    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
+    @covers_requirement(
+        "dream-authoring::creative-discussion-remains-private-authoring-data",
+        "dream-authoring::explicit-version-confirmation-submits-once",
+        "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
+    )
     def test_unrelated_new_story_is_eligible_only_after_confirmation(self):
         direction = new_story_direction(
             summary="合成夢境方向：與過往經驗無關的全新篇章。",
@@ -402,6 +414,7 @@ class DreamAuthoringConfirmationTests(DreamAuthoringTestCase):
         self.assertEqual(request.direction, validate_direction(direction, owner_id=self.owner_id).direction)
         self.assertTrue(draft_is_confirmed(get_draft(draft.draft_id, self.owner_id)))
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_duplicate_confirmation_across_reconnect_submits_once(self):
         draft = save_draft(
             owner_id=self.owner_id, direction=new_story_direction(), tick=100, draft_id="draft_reconnect_01"
@@ -418,6 +431,7 @@ class DreamAuthoringConfirmationTests(DreamAuthoringTestCase):
             again.submission_key, submission_key_for("draft_reconnect_01", 1)
         )
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_new_version_after_edit_keeps_the_original_immutable(self):
         draft = save_draft(owner_id=self.owner_id, direction=new_story_direction(), tick=100)
         first = confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
@@ -445,6 +459,7 @@ class DreamAuthoringConfirmationTests(DreamAuthoringTestCase):
         with self.assertRaises(ValueError):
             first.delete()
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_confirmation_is_offline_and_opens_no_transport(self):
         import world.narrative.authoring as authoring_module
 
@@ -589,6 +604,7 @@ class DreamAuthoringReadModelTests(DreamAuthoringTestCase):
         )
         self.assertEqual(collaborator_creative_brief(self.owner_id).summary, direction["summary"])
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_confirmed_request_rows_are_durable_and_immutable(self):
         draft = save_draft(owner_id=self.owner_id, direction=new_story_direction(), tick=100)
         request = confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
