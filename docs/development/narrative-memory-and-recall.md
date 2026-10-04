@@ -752,7 +752,7 @@ transports up to 4000 Unicode code points in two bounded `message_parts`,
 preserving the global 2048-code-point per-string envelope ceiling.
 Generation returns the browser action lock immediately; separate completion
 refreshes the panel so offline draft/confirm/awakening remain dispatchable
-while a call is pending. Closing the dream drawer awakens through the same
+while a call is pending. Escape in the dream stage awakens through the same
 revision-gated action. Text `dream` commands expose the same lifecycle choices.
 
 Focused synthetic evidence is
@@ -760,3 +760,38 @@ Focused synthetic evidence is
 sleep → recorded FakeLLMClient exchange → draft → confirm → offline awaken
 smoke. New delta-only traceability IDs remain archive-sync owned; existing
 main IDs annotate matching sleep, lifecycle and presentation tests.
+
+The frontend interactive storyboard is `World / DreamPanel / Storyboard`.
+Run `pnpm run serve-storybook` from the repository root, or build the offline
+showcase with `pnpm run build-storybook` and serve `.storybook-out` over HTTP.
+It mounts the real standalone `DreamPanel` stage. Its clearly labelled,
+story-only publication controls drive accepted response, rejection/model
+failure, sixth-exchange cap, reconnect and departure frames; submitted actions
+and exact payloads can be inspected without Evennia or a model service.
+Both fixture controls and production actions use the shared core `ui-btn`
+treatment, with only direction confirmation carrying primary emphasis.
+Following the user-supplied core panel notes, the artwork fills the stage rather
+than a boxed window. A bottom-left conversational instrument has no full border,
+rounded panel or shadow: feathered shared ink, one brass lozenge, crown and spine
+leave the adult goddess visible through its open edges. A tabular count,
+server-authored scene and dialogue precede the single conversational entry.
+The shared focus trap includes native disclosures and excludes their closed
+contents; Escape awakens and unmount restores focus.
+The default view presents one conversational input, followed by an explicit
+preview of the direction that confirmation will save. Direction editing and
+plain-language, one-item-per-line preference fields are progressively disclosed;
+the browser never requires JSON or displays thread IDs as option labels.
+Owner-visible thread choices carry bounded `{id, label}` records, with labels
+derived only from the accessible thread's factual summary. A sticky action
+footer names confirmation's departure consequence and keeps awakening visible.
+An empty confirmation opens and focuses the direction editor without requesting
+a model. Story-only publication tools are collapsed by default.
+The illustrative white-bed scene is a bundled AVIF generated through the
+user-selected local sd-webui server using the complete `.env` scene profile:
+1536×864, 12 steps, CFG 1.5, ER SDE / beta, configured checkpoint, both
+configured modules and both configured styles, AVIF quality 75 with metadata
+preserved. It is static presentation artwork, not a character portrait or
+authoritative world state; production and permanent tests never generate it.
+`Pending`, `Failed` and `AtCap` provide isolated boundary frames. The storyboard
+keeps the committed sleep fixture at tick 100 throughout and never simulates
+an authoritative physical restoration or a live server.

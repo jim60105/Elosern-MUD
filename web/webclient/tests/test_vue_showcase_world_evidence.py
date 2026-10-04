@@ -178,6 +178,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The NPC author editor joins through the action-result route
     # (npc-persona-editor-window).
     "Overlays/NpcPersonaEditor",
+    "World/DreamPanel",
     # The AVG stage series (a governed redesign wave) adds the
     # stage place card (webclient-avg-place-card-top-bar).
     "Core/PlaceCard",
@@ -204,7 +205,7 @@ PREVIOUS_MANIFEST_KEYS = {
 # title-ballot menu joined the frozen manifest with the dock-workspace
 # alignment (its stories render the committed title_ballot panel). The
 # story-count partition below asserts the family files plus exactly these.
-WORLD_KEYS_JOINED_AFTER_B4 = ("World/TitleBallotMenu",)
+WORLD_KEYS_JOINED_AFTER_B4 = ("World/TitleBallotMenu", "World/DreamPanel")
 
 
 class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):

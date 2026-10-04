@@ -25,8 +25,12 @@ function validateDreamPanel(payload) {
   });
   if (!Array.isArray(state.direction_parts) || state.direction_parts.length > 2 ||
       state.direction_parts.some(function (part) { return typeof part !== "string" || Array.from(part).length > 2000; })) throw new Error("invalid dream direction");
-  if (!Array.isArray(state.thread_choices) || state.thread_choices.length > 32 ||
-      state.thread_choices.some(function (thread) { return typeof thread !== "string" || !thread.length || thread.length > 128; })) throw new Error("invalid dream thread choices");
+  if (!Array.isArray(state.thread_choices) || state.thread_choices.length > 32) throw new Error("invalid dream thread choices");
+  state.thread_choices.forEach(function (thread) {
+    core.requireExactFields(thread, "dream thread choice", ["id", "label"], []);
+    if (typeof thread.id !== "string" || !thread.id.length || thread.id.length > 128 ||
+        typeof thread.label !== "string" || !thread.label.trim() || Array.from(thread.label).length > 160) throw new Error("invalid dream thread choice");
+  });
   if (state.draft_preferences !== null && !core.isPlainObject(state.draft_preferences)) throw new Error("invalid draft preferences");
   core.requireExactFields(state.track, "dream track", ["version", "completed", "pleasure", "level", "ordinal", "climax_phase", "converging"], []);
   core.requireInt(state.track.version, "track version", 1, Number.MAX_SAFE_INTEGER);

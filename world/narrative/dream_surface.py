@@ -117,7 +117,8 @@ def dream_state(actor):
     if opened:
         for thread in StoryThread.objects.exclude(state__in=TERMINAL_THREAD_STATES).order_by("-pk").iterator():
             if thread_accessible(thread, owner_id(actor)):
-                threads.append(thread.thread_id)
+                threads.append({"id": thread.thread_id,
+                                "label": thread.factual_summary.strip()[:160] or "未命名的故事線"})
                 if len(threads) == 32:
                     break
     displayed_direction = (draft_direction or {}).get("summary", value.get("direction", ""))

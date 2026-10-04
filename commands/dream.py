@@ -19,7 +19,8 @@ def render_state(state):
     if state["can_confirm"]:
         parts.append("dream confirm [故事方向] ／ dream draft [故事方向]")
         if state["thread_choices"]:
-            parts.append("可調整的故事線：" + "、".join(state["thread_choices"]))
+            parts.append("可調整的故事線：" + "、".join(
+                f"{choice['label']}（{choice['id']}）" for choice in state["thread_choices"]))
         parts.append("方向可使用 JSON，指定 kind、thread_id 與偏好欄位。")
     parts.append(state["ending"] or "dream awaken")
     return "\n".join(part for part in parts if part)

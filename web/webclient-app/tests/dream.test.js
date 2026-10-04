@@ -4,6 +4,8 @@ import { reactive } from "vue";
 import DreamPanel from "../components/DreamPanel.vue";
 import Protocol from "../../static/webclient/js/elosern/protocol.js";
 import CommandEcho from "../../static/webclient/js/elosern/command_echo.js";
+import { Storyboard } from "../stories/World/DreamPanel.stories.js";
+import { focusableElements } from "../components/focus-trap.js";
 
 function state(overrides = {}) {
   return { session_id: "synthetic-dream", revision: 2, completed: 0, remaining: 6,
@@ -20,6 +22,29 @@ function fixture(value = state()) {
   return { store, wrapper: mount(DreamPanel, { props: { state: value, store } }) };
 }
 describe("server-authored dream surface", () => {
+  it("reuses core button chrome and mounts a keyboard-accessible dream stage in the storyboard", async () => {
+    const { wrapper } = fixture();
+    for (const button of wrapper.findAll("button")) expect(button.classes()).toContain("ui-btn");
+    expect(wrapper.findAll("button").filter((button) => button.classes().includes("ui-btn--primary"))).toHaveLength(1);
+    expect(wrapper.find(".ui-btn--primary").text()).toBe("帶著這個念頭醒來");
+    expect(wrapper.find(".ui-btn--ghost").text()).toBe("醒來");
+    expect(wrapper.text()).not.toContain("JSON");
+    expect(wrapper.find("[data-testid='dream-direction-editor']").element.open).toBe(false);
+    expect(wrapper.attributes("role")).toBe("dialog");
+    expect(focusableElements(wrapper.element)).toContain(wrapper.find("[data-testid='dream-direction-editor'] > summary").element);
+    expect(focusableElements(wrapper.element)).not.toContain(wrapper.find("[data-testid='dream-direction-editor'] textarea").element);
+    wrapper.unmount();
+    const storyboard = mount(Storyboard.render({}), { attachTo: document.body });
+    const publishCap = storyboard.findAll("button").find((button) => button.text() === "發布第六次上限");
+    expect(publishCap.classes()).toContain("ui-btn");
+    await publishCap.trigger("click");
+    const panel = storyboard.findComponent(DreamPanel);
+    expect(panel.props("state").remaining).toBe(0);
+    expect(panel.find("form").exists()).toBe(false);
+    expect(panel.props("state").sleep).toMatchObject({ tick_from: 100, tick_to: 100 });
+    expect(panel.find(".dream-folio__choices").findAll("button")).toHaveLength(3);
+    storyboard.unmount();
+  });
   it("renders validated scene/dialogue safely and submits exact bounded Unicode message parts", async () => {
     const { wrapper, store } = fixture();
     expect(wrapper.text()).toContain("合成對話");
@@ -54,6 +79,10 @@ describe("server-authored dream surface", () => {
     expect(Protocol.validatePanel("dream", 1, { ...payload, state: null }).state).toBeNull();
     expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ remaining: 0 }) })).toThrow();
     expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ pending: true }) })).toThrow();
+    expect(Protocol.validatePanel("dream", 1, { ...payload, state: state({
+      thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
+    }) }).state.thread_choices[0].label).toBe("合成已知故事");
+    expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
     expect(CommandEcho.commandLine("explore.wait", { sleep: true, dream: true })).toBe("sleep dream");
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
@@ -62,7 +91,7 @@ describe("server-authored dream surface", () => {
     const { wrapper, store } = fixture();
     await wrapper.find("form textarea").setValue("尚未送出的交流");
     await wrapper.setProps({ state: state({
-      revision: 8, direction_parts: ["伺服器保存的故事方向"], thread_choices: ["synthetic-thread"],
+      revision: 8, direction_parts: ["伺服器保存的故事方向"], thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
       draft_preferences: { kind: "thread_direction", thread_id: "synthetic-thread", themes: ["鐘聲"], exclusions: ["暴力"] },
     }) });
     expect(wrapper.find("form textarea").element.value).toBe("尚未送出的交流");

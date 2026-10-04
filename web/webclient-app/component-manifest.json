@@ -62,7 +62,8 @@
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",
     "Overlays/GalleryStageTransformModal",
-    "Overlays/NpcPersonaEditor"
+    "Overlays/NpcPersonaEditor",
+    "World/DreamPanel"
   ],
   "frozen": true
 }

@@ -511,10 +511,7 @@ function onFoeLineupGone() {
     <!-- The NPC author editor (npc-persona-editor-window) owns its drawer
          chrome: it binds to the target captured at 編輯人物設定 and guards a
          dirty close. -->
-    <HudDrawer v-if="panel('dream')?.state?.open" :open="true" title="夢境協作" drawer-key="dream"
-      @close="dispatchIntent('dream.awaken', { session_id: panel('dream').state.session_id, revision: panel('dream').state.revision })">
-      <DreamPanel :state="panel('dream').state" :store="store" />
-    </HudDrawer>
+    <DreamPanel v-if="panel('dream')?.state?.open" :state="panel('dream').state" :store="store" />
     <NpcPersonaEditor
       v-if="store.view.hudDrawer === 'npc_persona' && npcPersonaEditor.open"
       :editor="npcPersonaEditor"

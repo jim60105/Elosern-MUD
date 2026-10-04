@@ -19,6 +19,7 @@ export const FOCUSABLE_SELECTOR = [
   "input:not([disabled])",
   "select:not([disabled])",
   "textarea:not([disabled])",
+  "summary",
   '[contenteditable="true"]',
   "[tabindex]:not([tabindex='-1'])",
 ].join(", ");
@@ -35,6 +36,10 @@ export function focusableElements(containerEl) {
   }
   const nodes = Array.from(containerEl.querySelectorAll(FOCUSABLE_SELECTOR));
   return nodes.filter((el) => {
+    for (let ancestor = el.parentElement; ancestor && ancestor !== containerEl; ancestor = ancestor.parentElement) {
+      if (ancestor.tagName === "DETAILS" && !ancestor.open &&
+          !(el.tagName === "SUMMARY" && el.parentElement === ancestor)) return false;
+    }
     if (el.hasAttribute && el.hasAttribute("disabled")) {
       return false;
     }

@@ -306,8 +306,8 @@ class DreamSurfaceTests(EvenniaTest):
         thread = create_thread(thread_id="synthetic-thread", origin="synthetic-origin", participants=[str(self.actor.pk)])
         create_thread(thread_id="synthetic-private-thread", origin="synthetic-other-origin", participants=[str(self.other.pk)])
         state = service.dream_state(self.actor)
-        self.assertIn(thread.thread_id, state["thread_choices"])
-        self.assertNotIn("synthetic-private-thread", state["thread_choices"])
+        self.assertIn({"id": thread.thread_id, "label": "未命名的故事線"}, state["thread_choices"])
+        self.assertNotIn("synthetic-private-thread", [choice["id"] for choice in state["thread_choices"]])
         direction = {"kind": "thread_direction", "thread_id": thread.thread_id,
                      "summary": "沿著已知故事尋找鐘聲。", "themes": ["鐘聲"],
                      "atmosphere": ["安靜"], "emphasis": ["探索"], "exclusions": ["暴力"]}
