@@ -13,7 +13,7 @@ import unittest
 from playwright.sync_api import sync_playwright
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import ui_scale
+from .browser_base import ACCEPTANCE_VIEWPORT_TUPLE, ui_scale
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -73,7 +73,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             ("world-localmap--wilderness", ".local-map__detail"),
             ("overlays-mapoverlay--interior-with-remembered", ".map-overlay__remembered"),
         )
-        for width, height in ((1451, 790), (1741, 948), (2560, 1440)):
+        for width, height in ACCEPTANCE_VIEWPORT_TUPLE:
             self.page.set_viewport_size({"width": width, "height": height})
             floor = 16 * ui_scale((width, height))
             for story, selector in stories:

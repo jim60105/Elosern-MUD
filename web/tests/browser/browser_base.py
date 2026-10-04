@@ -35,8 +35,13 @@ def ui_scale(viewport: tuple[int, int]) -> float:
 
     ``S = clamp(1, min(height / 790, width / 1451), 1.4)`` — the same factor
     ``lib/ui_scale.js`` writes to ``--ui-scale`` (webclient-proportional-ui-scale;
-    retarget-desktop-viewport-contract). Chrome geometry scales by it once;
-    viewport-relative ``vh``/``vw`` terms never do.
+    retarget-desktop-viewport-contract), including its four-decimal rounding
+    (``Math.round(raw * 10000) / 10000``), so ``"%g" % ui_scale(viewport)`` is
+    the exact string the property carries. Note the half-case: JavaScript rounds
+    half away from zero, Python's ``round`` rounds half to even, so a raw ratio
+    ending in exactly 5 ten-thousandths could differ in the last digit — no
+    acceptance viewport comes near that. Chrome geometry scales by the factor
+    once; viewport-relative ``vh``/``vw`` terms never do.
     """
     width, height = viewport
     raw = min(height / _UI_SCALE_REFERENCE_HEIGHT, width / _UI_SCALE_REFERENCE_WIDTH)

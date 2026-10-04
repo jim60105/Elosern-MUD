@@ -17,6 +17,7 @@ service is involved.
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from tools.spec_traceability import covers_requirement
@@ -718,7 +719,18 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
               return {
                 top: scroll.scrollTop,
                 atEnd: scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4,
-                lastInside: last.top >= box.top - 1 && last.bottom <= box.bottom + 1,
+                // "the most recently retained line is inside the scroll
+                // region's visible box" (webclient-input-narrative, "A long log
+                // opens at the latest reply"): its end is inside the box, and
+                // the whole line is when the line fits the box — one retained
+                // reply can be taller than the box, and the region is scrolled
+                // to the end of its content.
+                lastInside: last.bottom <= box.bottom + 1 && last.bottom >= box.top - 1,
+                // The content the region holds after the last line (the
+                // column's own trailing space), which the visible box cannot
+                // also fit.
+                trailing: Math.max(0, scroll.scrollHeight - ((last.bottom - box.top) + scroll.scrollTop)),
+                lastFullyInside: last.top >= box.top - 1 && last.bottom <= box.bottom + 1,
                 lastTop: last.top, lastBottom: last.bottom,
                 boxTop: box.top, boxBottom: box.bottom,
                 focused: document.activeElement === scroll,
@@ -750,12 +762,29 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         before = self._live_reader(page)
         self.assertEqual(before["page"], "1")
 
+        def reader_unmoved(label):
+            """The window still shows the page the reader left it on: the log
+            never advances or re-pages the message window (webclient-input-
+            narrative, "Log readers can return to latest ...")."""
+            state = self._live_reader(page)
+            pages = page.locator('[data-testid="message-page"]').get_attribute("data-pages")
+            self.assertEqual(
+                state["page"], before["page"],
+                f"{label} never moves the message window's reader "
+                f"(now page {state['page']} of {pages})",
+            )
+
         page.locator('[data-testid="message-log-open"]').click()
         page.wait_for_selector('[data-testid="fulllog-scroll"]', timeout=15000)
         self.assertEqual(page.locator('[data-testid="fulllog__title"]').inner_text(), "日誌")
         self.assertEqual(page.get_by_role("dialog", name="日誌").count(), 1)
+        reader_unmoved("opening the log")
         state = self._log_scroll_state(page)
         self.assertTrue(state["atEnd"] and state["lastInside"] and state["focused"], state)
+        if (state["lastBottom"] - state["lastTop"]) <= (
+            state["boxBottom"] - state["boxTop"] - state["trailing"]
+        ):
+            self.assertTrue(state["lastFullyInside"], state)
         self.assertEqual(page.locator('[data-testid="fulllog-latest"]').count(), 0)
         # Every echo appears once, in order, as its response's heading.
         echoes = page.locator('[data-testid="fulllog-scroll"] .narrative-line.inp').all_inner_texts()
@@ -763,13 +792,16 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(echoes[-11:-1], [f"look {r}" for r in range(1, 11)])
 
         # A click on the scrim neither closes the log nor lets focus escape it.
-        page.mouse.click(640, 700)
+        # The scrim's hit area is the band strip the panel leaves exposed
+        # (--workspace-bottom above the viewport's bottom edge).
+        page.mouse.click(725, 778)
         self.assertEqual(page.locator('[data-testid="fulllog-overlay"]').count(), 1)
         self.assertTrue(
             page.evaluate(
                 "() => document.querySelector('[data-testid=\"fulllog-overlay\"]').contains(document.activeElement)"
             )
         )
+        reader_unmoved("clicking the scrim")
 
         # Scrolled up, an arrival leaves the reader where they are and marks 新內容.
         page.evaluate("() => { document.querySelector('[data-testid=\"fulllog-scroll\"]').scrollTop = 0; }")
@@ -781,6 +813,21 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(self._log_scroll_state(page)["top"], 0)
         self.assertIn("新內容", page.locator('[data-testid="fulllog-latest"]').inner_text())
+        # This append is the test's own mutation of the live response, and the
+        # clause it would exercise — "Lines appended to the response being read
+        # SHALL NOT move the reader off the page on screen", owned by
+        # webclient-input-narrative::the-message-window-s-reading-controls-
+        # advance-pages-and-a-new-action-flushes-unread-pages — is asserted by
+        # that requirement's own journey in this module
+        # (`test_message_window_pages_and_flushes`, `test_message_window_
+        # repages_on_resize`) and by webclient-shell
+        # `test_paging_marker_and_append_keep_page`, where an append keeps the
+        # reader's page and its text. Everything asserted from here on is this
+        # test's own claim: opening, scrolling and returning to latest never
+        # move the message window's reader (webclient-input-narrative, "Log
+        # readers can return to latest without losing their place
+        # involuntarily"), so the baseline is taken after this mutation.
+        before = self._live_reader(page)
         # The control sits in the footer, below the text, never over it.
         rects = page.evaluate(
             """() => {
@@ -793,8 +840,13 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
 
         page.locator('[data-testid="fulllog-latest"]').click()
         page.wait_for_selector('[data-testid="fulllog-latest"]', state="detached", timeout=15000)
+        reader_unmoved("returning to latest")
         state = self._log_scroll_state(page)
         self.assertTrue(state["atEnd"] and state["lastInside"] and state["focused"], state)
+        if (state["lastBottom"] - state["lastTop"]) <= (
+            state["boxBottom"] - state["boxTop"] - state["trailing"]
+        ):
+            self.assertTrue(state["lastFullyInside"], state)
 
         page.keyboard.press("Escape")
         page.wait_for_selector('[data-testid="fulllog-overlay"]', state="detached", timeout=15000)
@@ -1015,7 +1067,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_message_window_repages_on_resize(self):
-        page = self.logged_in_page((2560, 1440))
+        page = self.logged_in_page((1451, 790))
         _append_multipage_response(page)
         surface = page.locator('[data-testid="message-page"]')
         page.locator('[data-testid="message-window"]').click()
@@ -1033,17 +1085,26 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         page_2_text = surface.inner_text().strip()
         self.assertTrue(page_2_text)
-        anchor_prefix = page_2_text[:6]
+        # The typing position is the last character shown on the page (the page
+        # is fully shown at the `instant` speed), so the anchor is the page's
+        # LAST tagged sentence, not its first:
+        # "A change of the window's box ... SHALL re-page the current response
+        # and SHALL keep the reader on the page that holds the typing position"
+        # (webclient-input-narrative).
+        page_2_tags = re.findall(r"【段落\d+】", page_2_text)
+        self.assertTrue(page_2_tags, "page 2 carries tagged sentences")
+        anchor_prefix = page_2_tags[-1]
         self.assertNotIn(
             anchor_prefix,
             "【段落1】",
-            "page 2's leading tag must be distinct from page 1's leading tag",
+            "page 2's trailing tag must be distinct from page 1's leading tag",
         )
         live_before = page.locator('[data-testid="message-live"]').inner_text()
 
-        # Shrink the viewport from 2560x1440 to the 1451x790 reference and wait for the
+        # Shrink the viewport from the 1451x790 reference to the off-contract
+        # 1200x700 window the requirement's own scenario names, and wait for the
         # ResizeObserver re-page pass to settle across two consecutive reads.
-        page.set_viewport_size({"width": 1451, "height": 790})
+        page.set_viewport_size({"width": 1200, "height": 700})
         page.wait_for_timeout(150)
         previous_sig = None
         for _ in range(20):
@@ -1056,7 +1117,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self.assertIn(
             anchor_prefix,
             after_text,
-            "re-paging on resize must keep the page-2 anchor substring on screen",
+            "re-paging on resize must keep the page holding the typing position "
+            "on screen (page 2 was %r, after the resize the window shows %r)"
+            % (page_2_text, after_text),
         )
         self.assertEqual(
             page.locator('[data-testid="message-live"]').inner_text(),
