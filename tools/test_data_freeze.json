@@ -21,6 +21,10 @@
       "reason": "offline quest template occupant card contract"
     },
     {
+      "path": "world/ai/tests/test_dream_frame_contract.py",
+      "reason": "approved dream frame divine-identity refusal contract"
+    },
+    {
       "path": "world/lore/tests/test_anchor_placement.py",
       "reason": "anchor placement data contract"
     },

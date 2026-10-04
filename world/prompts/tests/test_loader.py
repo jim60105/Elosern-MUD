@@ -53,6 +53,7 @@ class ValidLoadTests(unittest.TestCase):
                 "narrator.yaml",
                 "npc_dialogue.yaml",
                 "correspondence.yaml",
+                "dream.yaml",
                 "scenario_director.yaml",
                 "scene_builder.yaml",
                 "npc.yaml",
@@ -62,6 +63,29 @@ class ValidLoadTests(unittest.TestCase):
                 "title_nomination.yaml",
             },
         )
+
+    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
+    def test_dream_key_is_registered_with_the_server_state_placeholders(self):
+        library = load_prompt_library(str(REPO_PROMPTS))
+        self.assertIn("dream.system", library.texts)
+        self.assertIn("dream.system", PROMPT_SPECS)
+        spec = PROMPT_SPECS["dream.system"]
+        self.assertEqual(
+            set(spec.allowed_placeholders),
+            {"phase", "climax_phase", "mode", "exchange_number", "remaining"},
+        )
+        text = render_prompt(
+            "dream.system",
+            phase="合成階段",
+            climax_phase="合成相位",
+            mode="合成模式",
+            exchange_number="合成次數",
+            remaining="合成剩餘",
+        )
+        self.assertIn("合成階段", text)
+        self.assertIn("合成相位", text)
+        self.assertNotIn("{phase}", text)
+        self.assertNotIn("{climax_phase}", text)
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
     def test_scene_flavor_key_is_registered_with_four_scene_placeholders(self):

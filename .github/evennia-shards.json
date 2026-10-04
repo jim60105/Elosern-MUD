@@ -241,6 +241,7 @@
         "world.narrative.tests.test_narrative_threads",
         "world.narrative.tests.test_dream_authoring",
         "world.narrative.tests.test_dream_session",
+        "world.narrative.tests.test_dream_track",
         "world.ai",
         "world.lore"
       ]
