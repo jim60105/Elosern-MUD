@@ -1493,7 +1493,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(
             [t["testid"] for t in fit["tools"]],
-            ["nav-tool-lineage", "nav-tool-lore", "nav-tool-codex", "gallery-opener", "nav-tool-help"],
+            [
+                "nav-tool-lineage",
+                "nav-tool-lore",
+                "nav-tool-letters",
+                "nav-tool-codex",
+                "gallery-opener",
+                "nav-tool-help",
+            ],
         )
         for tool in fit["tools"]:
             # The visible shared tooltip replaced the native title tooltip.
@@ -1510,6 +1517,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         expected_tools = (
             ("nav-tool-lineage", '[data-testid="overlay-host"][data-elosern-overlay="lineage"]'),
             ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
+            ("nav-tool-letters", '[data-testid="letters-panel"]'),
             ("nav-tool-codex", '[data-testid="overlay-host"][data-elosern-overlay="codex"]'),
             ("gallery-opener", '[data-testid="gallery-panel"]'),
             ("nav-tool-help", '[data-testid="help-overlay"]'),
