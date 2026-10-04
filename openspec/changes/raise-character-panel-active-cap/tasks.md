@@ -44,3 +44,12 @@ Verified on `feat/raise-character-panel-active-cap` (base `96845a9d`). No merge/
 - 5.2 `openspec validate raise-character-panel-active-cap --strict` → valid; `openspec validate --all --strict` → 283 passed, 0 failed.
 - 5.3 `uv run --locked python -m tools.contract_gate` → passed (traceability, observability, test-data, manifests, contracts). `MAX_TRAIT_ROWS`, `MAX_EQUIPMENT_ROWS`, `MAX_DISPLAYED_ROWS`, `MAX_PASSIVE_ROWS`, `MAX_CATEGORY_GROUPS` unchanged.
 - 6.1 `git diff --name-only` touches no `docs/game/*` file and no `.github/evennia-shards.json` (no test module added or renamed).
+
+### Review
+
+Post-implementation `rubber-duck` review over the finished diff: **no blocking findings**. Advisory
+dispositions: (a) no direct JS accept-96/reject-97 assert pair exists — the Python boundary test
+covers the shared bound, the JS tests are constant-driven, and the parity contract keeps the two
+literals equal, so no JS test was added; (b) the D3 passive-cap rationale was qualified and given
+the same re-derive note D1 carries; (c) the fixture-coupled enrichment assertion mirrors the
+existing sibling test and was kept.

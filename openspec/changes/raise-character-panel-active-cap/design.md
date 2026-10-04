@@ -76,11 +76,13 @@ touching the "version-7" registration.
 
 ### D3: `MAX_PASSIVE_ROWS` stays 32 — explicit, not accidental
 
-Passives cannot reach the cap: the PASSIVE side of `SKILL_REGISTRY` has 37 members total (37
-verified live) and none arrive through the act-unlock flood path; the observed live passive count
-for the worst character is 8. Widening a bound that is never approached would only enlarge the
-attack/fabrication surface of a guard that works, so 32 stays — don't widen what isn't broken.
-The delta spec states both numbers side by side so the asymmetry is deliberate and visible.
+Passives never approach the cap in practice: the PASSIVE side of `SKILL_REGISTRY` has 37 members
+(37 verified live), but only owned skills enter the panel, none arrive through the act-unlock flood
+path, and the observed live passive count for the worst character is 8. Renegotiate this bound if a
+passive-unlock path ever lands (the same re-derive discipline D1 records for actives). Widening a
+bound that is never approached would only enlarge the attack/fabrication surface of a guard that
+works, so 32 stays — don't widen what isn't broken. The delta spec states both numbers side by side
+so the asymmetry is deliberate and visible.
 
 ### D4: Envelope safety at the new bound (envelope math)
 
