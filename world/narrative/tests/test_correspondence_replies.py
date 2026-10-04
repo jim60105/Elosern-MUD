@@ -60,7 +60,10 @@ class CorrespondenceReplyTests(EvenniaTestCase):
             self.tick(letter.due_tick)
         return letter
 
-    @covers_requirement("correspondence-delivery::accepted-letters-have-fixed-guaranteed-delivery")
+    @covers_requirement(
+        "correspondence-delivery::accepted-letters-have-fixed-guaranteed-delivery",
+        "correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional",
+    )
     def test_offline_delivery_pending_and_explicit_recorded_smoke(self):
         profiles = default_profiles()
         profiles["correspondence"]["enabled"] = False
@@ -81,7 +84,10 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         settle_correspondence_delivery(23599, 23600)
         self.assertEqual(get_letter(outgoing.source_id).status, "available")
 
-    @covers_requirement("narrative-context::generation-retains-an-immutable-source-snapshot")
+    @covers_requirement(
+        "narrative-context::generation-retains-an-immutable-source-snapshot",
+        "correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional",
+    )
     def test_delivered_only_permissions_and_immutable_linked_snapshot(self):
         letter = self.incoming(delivered=False)
         with self.assertRaises(LetterReplyWork.DoesNotExist):
@@ -104,6 +110,7 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             row.save()
 
+    @covers_requirement("correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional")
     def test_restart_replay_deduplicates_outgoing_and_relationship(self):
         incoming = self.incoming()
         snapshot = prepare_reply(incoming.source_id)
@@ -118,7 +125,10 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertEqual(LetterSend.objects.count(), 2)
         self.assertEqual(self.npc.relations.affinity_for(self.player), 5)
 
-    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    @covers_requirement(
+        "affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget",
+        "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+    )
     def test_remote_relation_routes_existing_rules_budget_without_colocation(self):
         self.npc.location = create_object("typeclasses.rooms.Room", key="Synthetic distant room")
         self.player.location = create_object("typeclasses.rooms.Room", key="Synthetic origin room")
@@ -136,7 +146,10 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertEqual(after.daily_gain, before.daily_gain)
         self.assertNotEqual(self.npc.location, self.player.location)
 
-    @covers_requirement("guardrail::guarded-generative-calls-validate-retry-then-degrade")
+    @covers_requirement(
+        "guardrail::guarded-generative-calls-validate-retry-then-degrade",
+        "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+    )
     def test_forbidden_channel_effects_never_reach_other_owners(self):
         incoming = self.incoming()
         before = (self.player.db.inventory, self.player.db.quest_records,
@@ -152,6 +165,7 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertEqual(before, (self.player.db.inventory, self.player.db.quest_records,
                                  self.player.db.appointments, self.npc.db.relations_data))
 
+    @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
     def test_willingness_and_quest_claim_are_only_stored_statements(self):
         incoming = self.incoming()
         body = "我願意和你見面；我認為信中提到的工作已經完成。"
@@ -162,6 +176,7 @@ class CorrespondenceReplyTests(EvenniaTestCase):
                                  self.player.db.appointments))
         self.assertEqual(self.npc.db.relations_data, None)
 
+    @covers_requirement("correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional")
     def test_transport_failure_keeps_work_pending_without_text(self):
         incoming = self.incoming()
         offline = FakeLLMClient()
@@ -172,6 +187,7 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertTrue(work.snapshot_id)
         self.assertEqual(LetterSend.objects.count(), 1)
 
+    @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
     def test_relationship_payload_bounds_reject_extra_authority(self):
         incoming = self.incoming()
         for effect in (
