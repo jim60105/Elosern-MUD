@@ -317,3 +317,68 @@ reservations, source/output measurements and hard summary limits.
 No player command surface changes, so both command references are unchanged.
 New dialogue-epochs main requirement IDs must be obtained and annotated by the
 later sync/archive owner; active delta requirements are not canonical IDs.
+
+## Story threads: lifecycle and real linkage (W3)
+
+`world.narrative.threads` owns the deterministic `StoryThread` row: immutable
+`origin`, `participants`, `visible_to` (the owner ACL), the factual
+`factual_summary`, `unresolved_questions`, `proposed_plans`, gameplay-established
+`commitments`, `memory_references`, `development_ticks`, the lifecycle `state`,
+and a monotonic `revision`. `thread_id` and `origin` are immutable, every
+effective change appends an append-only `StoryThreadRevision`, and the durable
+rows reject queryset-level mutation, bulk updates, and deletion.
+
+Facts stay separate from plans. `establish_commitment` is the only path that
+appends to `commitments`, and it requires an existing durable `NarrativeEvent`
+that is not a statement channel: claims (`claim_receipt`), correspondence
+(`correspondence_delivery`/`correspondence_read`), and private authoring are
+rejected, so a letter's expressed willingness is linked as
+`relation="statement"` and never becomes a commitment. An allowlist over the
+not-yet-existing gameplay commit event types would be a one-entry stub, so the
+gate is the negative statement-channel set recorded in the dev doc; a future
+statement-flavoured event type must join that set.
+
+Lifecycle is explicit. `transition_thread` accepts only the four states and
+refuses to move out of `resolved`/`abandoned`; `mark_thread_dormant` and
+`apply_inactivity` may only move an active thread to dormant, using the most
+recent instant across creation, `development_ticks`, and link ticks, so
+inactivity alone can never produce abandonment. Abandonment and resolution are
+explicit operations with a stated reason. `note_thread_quest_completion`
+requires an existing quest link, records `relation="quest_completion"`, and
+leaves the thread state untouched: a completed quest never resolves its parent
+thread. Quests are linked by durable identity only (`link_quest_to_thread`);
+`world/quests` still owns quest lifecycle, so narrative neither duplicates it
+nor reads quest registries.
+
+Linkage is real. `StoryThreadLink` rows are keyed
+`(thread, source_kind, source_ref, relation)` and validate that the referenced
+`NarrativeEvent`, `LetterSend`, `DialogueTurn` (`submission_id:kind`), or
+`MemoryRecord` (`mem:<pk>`) row exists before a link is stored; relations are
+whitelisted per kind. `link_memory_to_thread` also writes the thread identity
+into the memory's latest revision relations, which is what the existing
+`fast_recall` thread scope filters on. Tagging a memory this way appends a
+memory revision and therefore advances the owner memory generation: that is
+intentional conservative invalidation of every later snapshot for the owner,
+and no production path links on every turn.
+
+Thread revision is the context read identity. `assemble_narrative_context`
+accepts an explicit `thread_id`, reads the current revision for that scope and
+for every validated memory's `relations['thread_id']`, records it on each
+`SourceReference` and in `AssembledContext.thread_revisions`, and
+`persist_context_snapshot` stores that map on the immutable snapshot;
+`build_request_descriptor` compares it as provenance. New generations see the
+new revision, while historical captures and retries keep the revision they
+captured. The tokenization cache is deliberately *not* keyed by thread revision:
+tokenization depends only on immutable record content, and any linkage change
+already advances the owner memory generation that the cache is keyed on.
+
+Explicit thread recall is gated before ranking. `fast_recall(..., thread_id=...)`
+resolves the thread and requires the owner to be in `visible_to`; an unknown or
+inaccessible thread yields no eligible views at all and emits the warn event
+`narrative_thread_recall_denied`, so no private thread or source content enters
+recall. Boundary events (`narrative_thread_created`, `narrative_thread_linked`,
+`narrative_thread_revised`, `narrative_thread_recall_denied`) carry identifiers,
+counts, ticks, and revisions only — never summaries, commitments, or letter
+text. Delta-only coverage IDs for this boundary are obtained and annotated by
+the later spec-sync owner after the delta spec reaches `openspec/specs/`; this
+change annotates its substantive tests against existing canonical main IDs.
