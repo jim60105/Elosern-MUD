@@ -77,11 +77,17 @@ def _exploration_fixture(character) -> None:
     apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
 
     if os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1":
-        from world.rules.party import join_party
+        from world.rules.party import PARTY_MAX_COMPANIONS, join_party, party_size
 
-        for index in range(4):
+        # Under the synthetic catalogs the shipped races are not registered;
+        # the only race the patched registry knows is the kit race.
+        companion_race = "t_duskmari" if synth else "human"
+        # The preset activation already bound its declared starting
+        # companions; top the party up to the cap so the lineup journey
+        # always sees exactly PARTY_MAX_COMPANIONS companions.
+        for index in range(PARTY_MAX_COMPANIONS - party_size(character)):
             npc = create_object(LLMNPC, key=f"測試同行{index}", location=south_gate)
-            npc.race = "human"
+            npc.race = companion_race
             npc.apply_race_baseline()
             npc.db.age = npc.db.apparent_age = 30
             join_party(npc, character)

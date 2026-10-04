@@ -164,11 +164,15 @@ def main() -> None:
 
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
     is_persona_test = os.environ.get("ELOSERN_BROWSER_NPC_PERSONA") == "1"
+    is_companion_lineup = os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1"
 
-    if is_persona_test:
+    if is_persona_test or is_companion_lineup:
         # For NPC persona tests, #1 is an admin superuser account so Evennia initial_setup
         # wipe of superuser attributes does not touch BROWSER_ACCOUNT, and admin actions (e.g. @tel)
-        # can be performed via admin_dummy without demoting browserplayer for other suites.
+        # can be performed via admin_dummy without demoting browserplayer for other suites. The
+        # companion-lineup journey reads the roster panel, whose data lives in exactly the
+        # superuser-account attributes that the first server boot's initial_setup wipes, so the
+        # wipe must be parked on the dummy account there too.
         superuser = create_account(
             "admin_dummy",
             "admin_dummy@example.test",
@@ -196,7 +200,7 @@ def main() -> None:
         BROWSER_ACCOUNT_EMAIL,
         BROWSER_ACCOUNT_PASSWORD,
         typeclass=Account,
-        is_superuser=not is_persona_test,
+        is_superuser=not (is_persona_test or is_companion_lineup),
     )
     character = create_object(PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True)
     account.at_post_create_character(character)
