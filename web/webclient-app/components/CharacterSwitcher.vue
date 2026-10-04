@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { faceObjectPosition } from "./face-rect.js";
+import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
 
 // CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui):
 // Mounted in TopBar.vue's top-right cluster beside the meta pill.
@@ -149,7 +149,12 @@ onUnmounted(() => {
           class="character-switcher__thumb"
           :src="currentCharacter.portrait.url"
           :alt="currentCharacter.portrait.alt || currentCharacter.name"
-          :style="{ objectPosition: faceObjectPosition(currentCharacter.portrait.face_rect) }"
+          :style="
+            faceCropStyle(
+              currentCharacter.portrait.face_rect,
+              faceObjectPosition(currentCharacter.portrait.face_rect),
+            )
+          "
         />
         <span
           v-else
@@ -214,7 +219,12 @@ onUnmounted(() => {
                 class="character-switcher__row-thumb"
                 :src="char.portrait.url"
                 :alt="char.portrait.alt || char.name"
-                :style="{ objectPosition: faceObjectPosition(char.portrait.face_rect) }"
+                :style="
+                  faceCropStyle(
+                    char.portrait.face_rect,
+                    faceObjectPosition(char.portrait.face_rect),
+                  )
+                "
               />
               <span
                 v-else
@@ -352,13 +362,18 @@ onUnmounted(() => {
   width: calc(22px * var(--ui-scale));
   height: calc(22px * var(--ui-scale));
   border-radius: 50%;
+  /* The faceCropStyle offsets anchor against this clipping frame. */
+  position: relative;
   overflow: hidden;
   background: var(--paper-800);
   border: 1px solid var(--paper-700);
   flex-shrink: 0;
 }
 
+/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
+   is exactly that wrapper's padding box. */
 .character-switcher__thumb {
+  position: absolute;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -461,13 +476,18 @@ onUnmounted(() => {
   width: calc(24px * var(--ui-scale));
   height: calc(24px * var(--ui-scale));
   border-radius: 50%;
+  /* The faceCropStyle offsets anchor against this clipping frame. */
+  position: relative;
   overflow: hidden;
   background: var(--paper-800);
   border: 1px solid var(--paper-700);
   flex-shrink: 0;
 }
 
+/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
+   is exactly that wrapper's padding box. */
 .character-switcher__row-thumb {
+  position: absolute;
   width: 100%;
   height: 100%;
   object-fit: cover;

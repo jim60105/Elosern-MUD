@@ -63,15 +63,56 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     expect(r2.text()).not.toContain("70");
   });
 
-  it("offsets the companion avatar crop by the catalog face rect", () => {
+  it("zoom-crops the companion avatar by the catalog face rect", () => {
+    // The off-center rect is deliberate: it anchors at -x * 5 / -y * 5, which
+    // a centered fixture could not distinguish from the image center.
     const artPanel = {
       portrait_catalog: {
-        "101": { url: "/media/portraits/reina.png", face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 } },
+        "101": { url: "/media/portraits/reina.png", face_rect: { x: 0.6, y: 0.1, w: 0.2, h: 0.2 } },
       },
     };
     const w = mountDrawer({ artPanel });
     const img = w.get('[data-testid="party-drawer__row-101"] img');
-    expect(img.element.style.objectPosition).toBe("50% 30%");
+    expect(img.element.style.width).toBe("500%");
+    expect(img.element.style.height).toBe("500%");
+    expect(img.element.style.left).toBe("-300%");
+    expect(img.element.style.top).toBe("-50%");
+  });
+
+  it("falls back to the centered cover crop for a companion portrait with no face rect", () => {
+    const artPanel = {
+      portrait_catalog: {
+        "101": { url: "/media/portraits/reina.png", face_rect: null },
+      },
+    };
+    const w = mountDrawer({ artPanel });
+    const img = w.get('[data-testid="party-drawer__row-101"] img');
+    expect(img.element.style.objectPosition).toBe("50% 50%");
+    expect(img.element.style.width).toBe("");
+    expect(img.element.style.height).toBe("");
+    expect(img.element.style.left).toBe("");
+    expect(img.element.style.top).toBe("");
+  });
+
+  it("positions the avatar frame and image so the zoom offsets can anchor", () => {
+    // The CSS one-liners are load-bearing: without the relative frame the
+    // absolute image would resolve its offsets against a further ancestor.
+    const w = mountDrawer();
+    const frame = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]').element;
+    expect(getComputedStyle(frame).position).toBe("relative");
+    expect(getComputedStyle(w.get('[data-testid="party-drawer__row-101"] img').element).position).toBe("absolute");
+  });
+
+  it("keeps the glyph placeholder and renders no image for a companion portrait without a url", () => {
+    const artPanel = {
+      portrait_catalog: {
+        "101": { url: null, face_rect: { x: 0.6, y: 0.1, w: 0.2, h: 0.2 } },
+      },
+    };
+    const w = mountDrawer({ artPanel });
+    const avatar = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]');
+    expect(avatar.find("img").exists()).toBe(false);
+    expect(avatar.get(".av-glyph").exists()).toBe(true);
   });
 
   it("leaving dispatches explore.party_leave through the two-step confirmation contract", async () => {
