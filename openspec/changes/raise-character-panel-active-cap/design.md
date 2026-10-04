@@ -58,6 +58,11 @@ fabricating an unbounded payload, and fail-closed discipline is a contract prope
 rejection boundary far from today's legitimate maximum (61 observed) yet far below envelope
 saturation.
 
+Re-verified at implementation time: `SEXUAL_ACT_REGISTRY` holds 66 rows (all ACTIVE-kind), the
+`SexualMasteryEffect` blanket unlocks 58 of them, and the innate grants add 2, so the worst
+legitimate roster observed (悠奈) is 61 rows — 35 below the new bound. Re-derive this inventory
+whenever the act catalogue grows; 96 is sized for that headroom, not for today's count alone.
+
 ### D2: `schema_version` stays 7 — no bump
 
 The payload *shape* is byte-identical: same keys, same grouping rules, same ordering rules, same
