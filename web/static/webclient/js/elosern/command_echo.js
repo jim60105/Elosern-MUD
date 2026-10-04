@@ -118,6 +118,7 @@
     "gallery.card.delete",
     "gallery.face_rect.update",
     "gallery.binding.save",
+    "gallery.stage.update",
     // NPC persona author editor actions are silent webclient author controls.
     "npc.persona.read",
     "npc.persona.update",

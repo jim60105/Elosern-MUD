@@ -707,6 +707,16 @@ const REGISTERED_MUTATION_ACTIONS = {
   "gallery.card.delete": null,
   "gallery.face_rect.update": null,
   "gallery.binding.save": null,
+  "gallery.stage.update": null,
+  // Personal correspondence (use-letters.js): the folio dispatches the same
+  // typed 信件 commands the text client types, with no descriptor fill.
+  "letters.list": { payload: { after: 0 }, display: {} },
+  "letters.collect": { payload: {}, display: {} },
+  "letters.read": { payload: { source_id: "t_synthetic_sender" }, display: {} },
+  "letters.send": {
+    payload: { recipient: "t_synthetic_recipient", body_parts: ["合成內容"] },
+    display: {},
+  },
   "npc.persona.read": null,
   "npc.persona.update": null,
   "shop.buy": { payload: { item_key: SYNTH_ITEM.id, quantity: 2 }, display: { itemLabel: SYNTH_ITEM.display } },

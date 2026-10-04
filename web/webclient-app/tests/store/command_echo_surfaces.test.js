@@ -790,6 +790,46 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
       expected: "dream awaken",
     },
+    {
+      id: "letters folio: refresh echoes the bare typed 信件 command",
+      ids: ["letters.list"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("letters.list", { after: 0 });
+      },
+      expected: "信件",
+    },
+    {
+      id: "letters folio: collect echoes 信件 領取",
+      ids: ["letters.collect"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("letters.collect", {});
+      },
+      expected: "信件 領取",
+    },
+    {
+      id: "letters folio: opening a letter echoes 信件 讀 <sender>",
+      ids: ["letters.read"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("letters.read", { source_id: "t_synthetic_sender" });
+      },
+      expected: "信件 讀 t_synthetic_sender",
+    },
+    {
+      id: "letters folio: sending echoes 信件 寄 <recipient>=<body>",
+      ids: ["letters.send"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("letters.send", {
+          recipient: "t_synthetic_recipient",
+          body_parts: ["合成內容"],
+          source_id: "00000000-0000-4000-8000-000000000000",
+        });
+      },
+      expected: "信件 寄 t_synthetic_recipient=合成內容",
+    },
   ];
 
   const gallerySubject = "portrait:character:t_gallery";
@@ -801,6 +841,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
     ["gallery.card.delete", galleryCard],
     ["gallery.face_rect.update", { ...galleryCard, face_rect: { x: 0, y: 0, w: 1, h: 1 } }],
     ["gallery.binding.save", { ...galleryCard, slots: ["armor"] }],
+    ["gallery.stage.update", { ...galleryCard, stage: { scale: 1, x: 0, y: 0 } }],
   ]) {
     SURFACES.push({
       id: `EXPECTED SILENCE: ${actionId} webclient-only management`,
