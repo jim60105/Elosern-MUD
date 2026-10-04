@@ -1,6 +1,6 @@
-# LLM 7 大業務情境與調度流程
+# LLM 10 大業務情境與調度流程
 
-《伊洛瑟恩》的生成體系共涵蓋 7 個落地的業務情境層（Generative Layers）。每個情境層均擁有專屬的業務觸發點、上下文組裝管線、Prompt 契約以及確定性離線降級機制。
+《伊洛瑟恩》的生成體系共涵蓋 10 個落地的業務情境層（Generative Layers）。每個情境層均擁有專屬的業務觸發點、上下文組裝管線、Prompt 契約以及確定性離線降級機制。
 
 > [!TIP]
 > **快速導航指引**
@@ -11,7 +11,7 @@
 
 ---
 
-## 7 大生成層快速對照表
+## 10 大生成層快速對照表
 
 | 層級名稱 (`LAYER_NAMES`) | 核心模組 | 業務觸發點 | 輸出類型 | 離線降級結果 (Fallback) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -19,6 +19,7 @@
 | **`npc_dialogue`** | `world/ai/npc_dialogue.py` | 玩家發起對話（`talk`） | JSON（台詞 + 8 種意圖） | 回退為作者手寫問候語或保持沉默 |
 | **`dialogue_summary`** | `world/narrative/epochs.py` | 決定性擁有者要求紀元壓縮 | JSON（衍生摘要） | 保留原始對話與目前紀元，使用有界的近期脈絡 |
 | **`correspondence`** | `world/ai/correspondence.py` | 決定性擁有者明確要求回信 | JSON（信文與受限關係提案） | 來信照常送達，回信工作保留待處理 |
+| **`dream`** | `world/ai/dream.py` | 夢境協商會話的一次已完成交換 | JSON（露骨場景散文 + 對談者台詞 + 伺服器興奮階段） | 回傳 `None`（無生成散文；`world.narrative.dream_track.render_ending` 仍可無模型收尾與喚醒） |
 | **`scenario_director`** | `world/ai/scenario_director.py` | 公會委託櫃檯任務查詢 | JSON（任務藍圖） | 自手寫任務範本池抽取符合條件之任務 |
 | **`scene_builder`** | `world/ai/scene_flavor.py` | 玩家進入動態副本房間 | 正體中文氛圍散文 (50-200 字) | 回傳 `None`（房間不附加額外氛圍） |
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |

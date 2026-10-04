@@ -47,6 +47,7 @@ _BODY_TARGETS = (
     "web.webclient.presentation.art_push.connect_art_push",
     "world.ai.narrator.register_narrator",
     "world.ai.npc_dialogue.register_npc_dialogue",
+    "world.ai.dream.register_dream",
     "world.ai.scenario_director.register_scenario_director",
     "world.ai.character_creation.register_character_creation",
     "world.ai.scene_flavor.register_scene_flavor",

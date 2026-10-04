@@ -303,6 +303,49 @@ coverage IDs for this boundary are obtained and annotated by the later
 spec-sync owner after the delta spec reaches `openspec/specs/`; this change
 annotates its substantive tests against existing canonical main IDs.
 
+## Explicit dream presentation and the server-owned arousal track (W3)
+
+`world.narrative.dream_track` owns the deterministic, session-only pleasure /
+arousal / climax track of one collaborative dream conversation and the
+generation-free ending (design section 6.4). It is a pure read model over the
+durable exchange count owned by `world.narrative.dream_session`, never a live
+`SexualState` handler: it reuses only the canonical `AROUSAL_LEVELS` /
+`CLIMAX_PHASE_LEVELS` vocabulary and the read-only `PLEASURE_CONFIG` band table,
+writes no persistent trait, pleasure gauge, sensitivity, virginity/experience,
+lifetime counter, `climax_today`, buff, skill, codex or relationship state, and
+instantiates no handler. The committed sleep settlement remains the sole
+physical-restoration path.
+
+`TRACK_VERSION` 1 commits the initial pleasure value (`INITIAL_PLEASURE` 0) and
+one configured delta per exchange (`EXCHANGE_DELTAS`), calibrated so six
+completed exchanges traverse the five canonical bands in order and reach the
+`進行中` climax phase at convergence; `progression_report()` is the committed
+per-exchange evidence. `track_state(n)` renders the state after `n` completed
+exchanges and `prospective_state(n)` the phase the next exchange will commit, so
+a validation retry, duplicate delivery, transport failure or abandoned turn
+reuses exactly the same phase: the generated response can never advance the
+track and no failure double-increments it. `exchange_mode(n)` marks exchange
+five as `convergence` and exchange six as `summary`. `render_ending(n)` is
+generation-free: a reached climax renders the canonical post-climax phase
+(`餘韻`) before fading, and an earlier exit fades without forcing a climax;
+awakening never depends on a model call.
+
+`world.ai.dream` owns the `dream` generative layer: one validated JSON exchange
+(`scene` explicit prose, `dialogue` counterpart speech, `phase`) whose
+`phase_fidelity` per-call validator rejects any value other than the
+server-supplied phase, and whose layer validators accept explicit sexual content
+while rejecting system/metadata leaks, named-deity identity, divine-mystery
+disclosure and state-change claims. The prompt renders `dream.system` with the
+server phase and exchange metadata and serializes only the player message, the
+confirmed creative preferences and a caller-supplied spoiler-filtered adventure
+summary; no StoryDirector history, hidden answer or other owner's data enters
+the request. The layer registers its own hooks, schema and profile slot
+(`server/conf/at_server_startstop.py::register_dream_layer`), shares no hook or
+profile with `scenario_director`, and degrades to `None` when the profile is
+disabled, the transport fails or the retry budget is exhausted. The
+`dream_exchange_generated` boundary event carries the layer, completed count,
+mode and server phase only — never scene prose, dialogue or the player message.
+
 ## Durable face-to-face dialogue (W1)
 
 `world.narrative.dialogue` replaces the destructive NPC Attribute history.

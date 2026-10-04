@@ -12,6 +12,7 @@ import unittest
 from django.test import override_settings
 
 from world.ai.profiles import (
+    DREAM_MAX_TOKENS,
     LAYER_NAMES,
     LLMProfile,
     ProfileValidationError,
@@ -368,6 +369,9 @@ class RegistryTests(unittest.TestCase):
             elif layer in ("dialogue_summary", "correspondence"):
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 1024)
+            elif layer == "dream":
+                self.assertFalse(profiles[layer].supports_response_format)
+                self.assertEqual(profiles[layer].max_tokens, DREAM_MAX_TOKENS)
             else:
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 250)
