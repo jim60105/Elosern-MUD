@@ -745,6 +745,10 @@
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   padding: 0;
+  /* The glyph is visible text, so the shared floor step applies: a button
+     does not inherit its font, and the UA default (13.33px) is below the
+     16px reference floor (retarget-desktop-viewport-contract D4). */
+  font-size: var(--text-xs);
   color: var(--paper-300);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);

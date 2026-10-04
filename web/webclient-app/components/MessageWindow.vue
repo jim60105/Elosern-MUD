@@ -1350,7 +1350,10 @@ export default {
   text-overflow: ellipsis;
   color: var(--gold-300);
   font-family: var(--f-display);
-  font-size: 0.86em;
+  /* An absolute floor token, not a fraction of the plate line
+     (retarget-desktop-viewport-contract D6): at 0.86em of the 18px base the
+     name rendered at 15.48px, below the 16px reference floor. */
+  font-size: var(--text-xs);
   letter-spacing: 0.14em;
   text-shadow: 0 0 calc(14px * var(--ui-scale)) var(--gold-glow), 0 1px 2px rgba(0, 0, 0, 0.7);
 }

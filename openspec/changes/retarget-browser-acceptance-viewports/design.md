@@ -13,18 +13,23 @@ tuples, assertions, and the acceptance requirements that are pure viewport enume
 
 **Goals:**
 - CI proves the contract at the sizes the contract names: the reference (1451x790), an uncapped
-  large display (1741x948, S = 1.2), and the capped display (2560x1440, S = 1.4).
+  large display (1741x948, S = 1.1999), and the capped display (2560x1440, S = 1.4).
 - Every acceptance requirement keeps its assertions; only the viewport enumerations and the
   reference values they compare against move.
 - One clean partition from the dependency change: requirements amended there are never touched
   here, because a MODIFIED delta replaces its whole requirement block.
+- The journeys the retarget turns red because the dependency change's sweep missed a floor or a
+  fit rule are fixed at the source, against the amended requirement text (D2 below).
 
 **Non-Goals:**
 - No new fixtures, journeys, or frameworks (`openspec/config.yaml` forbids new test frameworks);
   the tuple elements change, the journeys do not.
-- No `web/webclient-app` source edits — if a journey's expected geometry differs from the
-  dependency change's spec values, the bug is in whichever side is wrong against the spec, not
-  in this change's scope to paper over.
+- No general `web/webclient-app` rework: this change does not re-derive geometry, redesign a
+  surface, or sweep the source for stale comments. The one carve-out is a defect the retargeted
+  acceptance journey itself exposes — a visible text step that misses the amended 16px floor, or
+  a surface that overflows at an acceptance viewport. Those are fixed at the source against the
+  amended requirement text (never by relaxing the assertion), and reported as cross-change fixes
+  against the already-archived dependency change.
 
 ## Decisions
 

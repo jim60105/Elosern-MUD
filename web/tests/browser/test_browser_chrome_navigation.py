@@ -29,8 +29,11 @@ MEASURE_NAV = """() => {
     tools: tools && tools.left,
     slots: [...document.querySelectorAll('[data-testid="nav-primary"] > *')].map((e) => e.dataset.navSlot),
     placeholders: document.querySelectorAll('.desktop-navigation [aria-disabled], .desktop-navigation [hidden], .desktop-navigation button:disabled').length,
+    // scrollWidth/clientWidth are integers, so a fractional chrome factor can
+    // leave a label that fits (its rect is inside its box) rounding to a 1px
+    // difference. The suite's geometry tolerance is 1px.
     clipped: [...document.querySelectorAll('[data-testid="nav-primary"] > button > span')]
-      .filter((e) => e.scrollWidth > e.clientWidth + 0.5).map((e) => e.textContent),
+      .filter((e) => e.scrollWidth > e.clientWidth + 1.5).map((e) => e.textContent),
     overlap: cluster ? buttons.filter((b) => b.getBoundingClientRect().right > cluster.left).map((b) => b.textContent.trim() || b.getAttribute('aria-label')) : [],
   };
 }"""
