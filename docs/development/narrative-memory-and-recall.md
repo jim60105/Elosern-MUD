@@ -51,7 +51,7 @@ The `world/narrative` subsystem manages persistent narrative events, character m
 keys, a nonblank body of at most 8000 characters, and an optional stable source
 identity and reply-to source identity. Preflight rejects unknown/non-character
 recipients before persistence. Reusing the source identity is idempotent only
-for the same sender, recipient, body, and reply link. Accepted `LetterSend` rows
+for the same sender, recipient, body, reply link, and source snapshot. Accepted `LetterSend` rows
 are immutable; indexed `LetterState` rows own transitions separately.
 
 The send fixes the current authoritative tick and a due tick exactly
@@ -64,9 +64,9 @@ Rejected skips do not advance; settlement never assumes the requested interval.
 NPC recipients become `delivered`; player recipients become `available`, without
 collection/read ticks. Delivery performs no recipient lookup, trait mutation,
 quest transition, model call, or image call. Movement and absent live locations
-cannot affect accepted delivery. Collection, reading, memory projection, replies,
-and player command/menu surfaces belong to subsequent changes; command docs
-remain unchanged because this change introduces no player command.
+cannot affect accepted delivery. Collection and reading use the player surface
+below; optional replies use their own remote channel. Correspondence memory
+projection remains separately owned.
 
 Each transition atomically records a private `NarrativeEvent` with a stable
 `correspondence:<send-source>:<status>` identity and pending `ProjectionProgress`.
@@ -78,6 +78,52 @@ The declared surface contract has no cached entities: ordinary Django rows are
 queried fresh, updated through querysets, and returned only as detached frozen
 values. No cached mutable row survives rollback. Boundary logs run on durable
 commit and include identifiers/ticks/status only, never letter bodies.
+
+## Optional NPC replies (W2)
+
+Delivery creates one durable `LetterReplyWork` per incoming NPC letter in the
+same clock transaction. Delivery and startup never await generation or sweep the
+pending queue. An intentional owner request calls
+`server.correspondence_service.request_letter_reply(source_id)` once; callers
+may inject a recorded `FakeLLMClient`. The service constructs the dedicated
+`correspondence` profile client in production. A later explicit request is a new
+attempt through the existing guardrail; there is no automatic retry policy or
+promise that an NPC will respond.
+
+`prepare_reply` captures the full delivered source and recipient-owned W1 recall
+in an immutable context snapshot. The 32768-token context budget reserves the
+profile completion budget, recall reservation and safety margin; its turn-frame
+target/bound are 22000/24000 tokens, allowing the accepted 8000-character input.
+The equipped model for the `correspondence` layer must therefore accept a 32k
+context; a smaller window degrades the attempt to pending, never to truncated
+input.
+Uncaptured or truncated incoming inputs cannot produce a reply. Each attempt
+captures a fresh snapshot; superseded completions and changed memory generations
+or recipient anchors leave work pending. No remote player's private traits or
+face-to-face context enter the prompt.
+
+The dedicated prompt/schema admits a nonblank Chinese body and `none` or a
+nonnegative `adjust_relation` delta bounded at 10; a zero delta is `none`, so the
+rules writer is never called and no empty affinity record is materialized.
+Narratively described meetings,
+clues and quest claims remain statements in the stored letter. No quest,
+objective, codex, inventory, physical action, party invitation or appointment
+writer is called. Relationship proposals route to `world.rules.correspondence`
+and the existing affinity writer's shared `AI_DIALOGUE` bounds/daily budget;
+they do not require co-location. Rejected effects leave work pending rather
+than sending speech that implies a committed effect.
+
+Settlement serializes the work and recipient, revalidates the current source
+and snapshot, and atomically commits relationship changes, the immutable
+reply-to/source-snapshot link, outgoing send and work completion. The outgoing
+deadline is one game hour after this send's own commit tick. Replay returns the
+same outgoing letter without generating or charging relationship budget again.
+Failed send settlement restores Evennia's relationship cache as well as rolling
+back database writes. Failures never invent fallback letters.
+
+No player command syntax or browser action changed, so command documentation
+remains unchanged. Boundary events carry IDs/counts/ticks, never letter bodies,
+private recall or prompts.
 
 ## Player correspondence surface (W2)
 

@@ -204,6 +204,12 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `correspondence_settled` | `source_id`, `recipient`, `tick`, `status` |
 | `correspondence_collected` | `char`, `room`, `tick`, `count`; durable commit only, no bodies or recipient names |
 | `correspondence_read` | `char`, `source_id`, `tick`; first durable opening only, no body |
+| `correspondence_reply_captured` | `source_id`, `recipient`, `snapshot_id`; no letter or memory text |
+| `correspondence_reply_pending` | `source_id`, `recipient`, `snapshot_id`; no fabricated response |
+| `correspondence_reply_stale` | `source_id`, `recipient`, `snapshot_id` |
+| `correspondence_reply_effect_rejected` | `source_id`, `recipient`, `snapshot_id` |
+| `correspondence_reply_committed` | `source_id`, `outgoing_source_id`, `recipient`, `snapshot_id`, `tick` |
+| `correspondence_reply_failed` | `source_id`; exception chain via `exc`, no prompt or letter text |
 | `narrative_projection_pending_scanned` | `projector_version`、`count` |
 | `narrative_memory_recorded` | `record_id`、`owner_id`、`category`、`tick`、`scope`、`generation` |
 | `narrative_memory_revised` | `record_id`、`revision_number`、`owner_id`、`availability`、`tier`、`generation` |
