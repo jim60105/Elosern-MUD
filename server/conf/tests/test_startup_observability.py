@@ -54,6 +54,7 @@ _BODY_TARGETS = (
     "world.ai.title_nomination.register_title_nomination",
     "server.title_nomination_service.register_nomination_triggers",
     "world.narrative.memory.process_pending_narrative_memory_projections",
+    "world.narrative.correspondence_memory.recover_pending_correspondence_projections",
 )
 
 

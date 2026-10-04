@@ -14,6 +14,7 @@ from world.narrative.context import (
     persist_context_snapshot,
 )
 from world.narrative.correspondence import _character, get_letter, send_letter
+from world.narrative.correspondence_memory import settle_delivery_cognition
 from world.narrative.memory import get_owner_generation
 from world.narrative.models import LetterReplyWork, LetterState
 from world.narrative.recall import fast_recall
@@ -44,6 +45,11 @@ def prepare_reply(source_id):
         if work.status == "complete":
             return None
         letter = work.letter
+        # Order invariant: after the completed-work early return and before the
+        # recall/capture below, so a reply either sees the delivered letter's
+        # settled cognition or waits instead of generating without it.
+        if not settle_delivery_cognition(source_id):
+            raise ValueError("Reply input has no settled delivery cognition.")
         npc = _character(letter.recipient_id)
         recall = fast_recall(owner_id=letter.recipient_id, requester_id=letter.recipient_id,
                              query=letter.body)

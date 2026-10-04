@@ -77,6 +77,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "art_sync_all",
     "connect_art_push",
     "narrative_projection_init",
+    "narrative_correspondence_projection_init",
 )
 
 # Any-unexpected-error tolerance, used by steps that were broadly guarded
@@ -568,6 +569,20 @@ def at_server_start():
     _startup_step(
         "narrative_projection_init",
         lambda: _late("world.narrative.memory", "process_pending_narrative_memory_projections"),
+    )
+    # Correspondence cognition recovery: drains every version-2 delivery/read
+    # source left pending by an interruption. Boot-tolerant like the art prune:
+    # a poisoned narrative row must never abort startup, because the reply gate
+    # and the face-to-face recall boundary drain the same durable queue lazily.
+    _startup_step(
+        "narrative_correspondence_projection_init",
+        lambda: _late(
+            "world.narrative.correspondence_memory",
+            "recover_pending_correspondence_projections",
+        ),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
     )
 
 
