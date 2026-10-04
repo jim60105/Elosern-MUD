@@ -33,3 +33,15 @@ The public feature composes lifecycle and Section 6.4 presentation together. No 
 - Scope expansion → implement only the listed boundary; future behavior gets its own real proposal rather than a stub or compatibility path.
 
 Main-spec reconciliation: time-skip-commands remains no-duration sleep with existing regeneration calculation; skip-safety-gate currently rejects outright. The optional post-settlement dream is additive and must not reinterpret either rule. world-clock converse remains unwired; dreams do not advance it.
+
+Implementation reconciliation: text opts in with `sleep dream`; browser opts in
+with exact `explore.wait` payload `{"sleep": true, "dream": true}`. The new
+`dream` panel uses the existing versioned OOB registry/envelope and reports
+durable session revision, count, track, validated scene/dialogue and choices.
+`dream.say` uses two bounded message parts to preserve the transport's
+per-string ceiling without reducing the lifecycle's 4000-character input bound.
+Draft/confirm accept plain summaries or bounded structured authoring directions;
+browser thread choices are server-authored and permissioned. Explicit later
+entry resumes unconfirmed ended discussion with its original count, while
+confirmed sessions remain final. Both sleep adapters record and report actual
+committed ticks, retaining their original safety and settlement seams.
