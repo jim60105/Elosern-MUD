@@ -458,3 +458,65 @@ reason codes only — never the direction summary, themes, or a reason message.
 Delta-only coverage IDs for this boundary are obtained and annotated by the
 later spec-sync owner after the delta spec reaches `openspec/specs/`; this
 change annotates its substantive tests against existing canonical main IDs.
+
+## Deterministic narrative attention (W3)
+
+`world.narrative.attention` owns the deterministic filter-and-rank boundary that
+narrows the directions a later StoryDirector may pursue. It generates no text,
+calls no model, and persists no beat: `rank_attention` is a pure function over
+plain immutable `AttentionCandidate`/`AttentionContext` values, and the module
+is read-only, so a run never mutates, deletes, or hides unselected story state.
+The output is a bounded `AttentionDecision`: the focus-limited `selected` set,
+the full `ranked` order, the `excluded` candidates with their reasons, immutable
+identity+revision `sources`, a `snapshot_hash` fingerprinting inputs and
+configuration (not the order), and a `reason_counts` tally.
+
+`build_attention_candidates(owner=...)` is the read-only durable extraction
+layer. Every active `StoryThread` becomes a candidate marked `knowledge` (the
+owner is in `visible_to`, is a participant, or owns a linked
+memory/event/dialogue/letter experience) and `invested` (the owner is a
+participant or owns such a linked experience) — an ACL-only thread is known but
+not yet invested. Every valid `CreativeRequest` version becomes a
+`confirmed` request candidate, with only the authoritative
+`latest_confirmed_request` marked `authoritative`; earlier versions stay in the
+result as `superseded_request` exclusions so the decision is observable.
+Thread `unresolved_stakes` counts unresolved questions plus gameplay
+commitments, `repetition` counts developments beyond creation, and
+`last_activity_tick` is the latest development, link, or creation instant
+(request candidates use `submitted_tick`).
+
+Eligibility runs before any scoring. Knowledge (`unknown_to_owner`), an
+invested source or confirmed request (`not_invested`), capability feasibility
+(`not_executable`; only `dialogue`, `letter` and `quest` have deterministic
+owners), location reachability (`location_unreachable`; `required_location` is
+the most recent linked event location), a participant NPC whose
+`schedule_state` blocks `interaction_reason` (`schedule_blocked`), and
+superseded request versions are all excluded first, so a high-salience
+ineligible candidate can never out-rank an eligible one. An unrelated new story
+is therefore eligible only as an explicitly confirmed request, never as
+automatic history.
+
+Scoring normalizes named components — unresolved stakes, engagement,
+relationship (`relations.affinity_for`), deadline, location relevance,
+repetition and cooldown — each clamped to `0..1`, and combines them with the
+calibrated `AttentionWeights`; repetition and cooldown subtract. Engagement is
+built only from observable owner actions: initiated dialogue, sustained
+correspondence, explicit clue questions, and committed gameplay participation.
+Passive receipt (letter collection/reading, and the private
+`correspondence_read` event it writes) is counted as `passive_receipts` and
+contributes zero. Ties resolve by `candidate_id`, so identical inputs and
+configuration always yield an identical order and reason data offline. Weights,
+saturations, cooldown and the focus limit are calibration choices recorded in
+`world/narrative/attention_calibration.py` and the committed
+`world/narrative/attention_calibration_report.json` (regenerate with
+`python -m world.narrative.attention_calibration`); the report pins the
+deliberate behavior that cooldown plus repetition can outweigh a higher stake
+for a just-developed thread, so attention does not repeat it.
+
+Boundary events (`narrative_attention_ranked`, and the warn-level
+`narrative_attention_candidates_truncated` when the read bound is hit) carry
+owner id, config version, counts, tick and the snapshot hash only — never player
+prose, thread summaries, or direction text. Delta-only coverage IDs for this
+boundary are obtained and annotated by the later spec-sync owner after the delta
+spec reaches `openspec/specs/`; this change annotates its substantive tests
+against existing canonical main IDs.
