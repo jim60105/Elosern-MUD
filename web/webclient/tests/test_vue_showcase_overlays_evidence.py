@@ -193,6 +193,14 @@ PREVIOUS_MANIFEST_KEYS = {
     # The settings overlay's local reading preview
     # (webclient-settings-reading-preview).
     "Overlays/ReadingSample",
+    # The companion line-up (companion-portrait-lineup) replaced
+    # Core/PartyStrip, the correspondence folio added World/LettersPanel,
+    # and the gallery stage-transform drawer added
+    # Overlays/GalleryStageTransformModal when the manifest refroze after
+    # this baseline was pinned.
+    "Core/CompanionLineup",
+    "World/LettersPanel",
+    "Overlays/GalleryStageTransformModal",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
@@ -211,6 +219,9 @@ OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     # (npc-persona-editor-window).
     "Overlays/NpcPersonaEditor",
     "Overlays/ReadingSample",
+    # The gallery stage-transform drawer joined when the correspondence
+    # stage surface landed.
+    "Overlays/GalleryStageTransformModal",
 )
 
 

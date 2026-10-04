@@ -201,6 +201,12 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The dialogue choice list (webclient-dialogue-choices-overlay), centred
                 # over the stage once the session line is read.
                 "Core/DialogueChoices",
+                # The correspondence folio and the gallery stage-transform
+                # drawer refroze the manifest after this baseline was
+                # pinned: World/LettersPanel and
+                # Overlays/GalleryStageTransformModal joined the frozen set.
+                "World/LettersPanel",
+                "Overlays/GalleryStageTransformModal",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

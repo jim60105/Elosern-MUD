@@ -199,13 +199,25 @@ PREVIOUS_MANIFEST_KEYS = {
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",
+    # The correspondence folio and the stage-transform drawer refroze the
+    # manifest: World/LettersPanel and Overlays/GalleryStageTransformModal
+    # joined the frozen set after this baseline was pinned.
+    # Core/CompanionLineup (the companion line-up that replaced
+    # Core/PartyStrip) is already listed above.
+    "World/LettersPanel",
+    "Overlays/GalleryStageTransformModal",
 }
 
 # The World-directory story files that sit outside the B4 family: the
 # title-ballot menu joined the frozen manifest with the dock-workspace
 # alignment (its stories render the committed title_ballot panel). The
 # story-count partition below asserts the family files plus exactly these.
-WORLD_KEYS_JOINED_AFTER_B4 = ("World/TitleBallotMenu", "World/DreamPanel")
+# World/LettersPanel joined when the correspondence folio landed.
+WORLD_KEYS_JOINED_AFTER_B4 = (
+    "World/TitleBallotMenu",
+    "World/DreamPanel",
+    "World/LettersPanel",
+)
 
 
 class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
