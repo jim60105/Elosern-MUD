@@ -270,6 +270,18 @@ INSTALLED_APPS = list(INSTALLED_APPS) + ["world.narrative.apps.NarrativeConfig"]
 # page reload (server/conf/websocket_protocol.py).
 WEBSOCKET_PROTOCOL_CLASS = "server.conf.websocket_protocol.WebSocketClient"
 
+# No reverse proxy fronts this deployment: compose publishes 4001/4002
+# directly. Evennia's default UPSTREAM_IPS (["127.0.0.1"]) makes the Django
+# side of the internal Portal->Server proxy hop (port 4005, whose
+# REMOTE_ADDR is always loopback) look like an excluded upstream, so every
+# Django request logged "ip_from_request: No valid IP address found" and
+# fell back to remote_addr. An empty list means every address is taken at
+# face value: the warning disappears, and both Twisted's
+# HTTPChannelWithXForwardedFor and ip_from_request stop trusting a client-
+# forged X-Forwarded-For header. If a real reverse proxy is ever added,
+# restore the proxy's address/CIDR here and have it send X-Forwarded-For.
+UPSTREAM_IPS = []
+
 # Generative-layer LLM endpoint profiles (llm-client, env-overridable-llm-
 # profiles). All twenty-three endpoint knobs resolve from the environment in
 # THIS module only — world/ai/profiles.py performs zero env reads (D-A3).
