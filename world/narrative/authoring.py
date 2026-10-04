@@ -409,7 +409,10 @@ def save_draft(
     existing ``draft_id`` is an effective edit that advances ``revision`` (so the
     version is unconfirmed again until a new confirmation), and an identical save
     is a no-op. ``sources=None`` keeps the stored references on update; pass a
-    list to replace them.
+    list to replace them. A caller-supplied ``draft_id`` assumes one writer per
+    owner (the authoring session is serialized by its single-player owner); two
+    concurrent saves racing on the same new ``draft_id`` would surface the
+    unique-constraint ``IntegrityError`` rather than a typed error.
     """
     clean_owner = _clean_owner_id(owner_id)
     if not isinstance(direction, Mapping):
@@ -582,13 +585,14 @@ def list_requests(owner_id: Any) -> list[CreativeRequest]:
 def latest_confirmed_request(owner_id: Any) -> Optional[CreativeRequest]:
     """The most recently submitted confirmed version, or None.
 
-    Deterministic tie-break (``submitted_tick``, then ``draft_id``, then
-    ``version``) keeps the answer independent of insertion order. An unconfirmed
-    edit does not displace the last explicitly confirmed version.
+    Deterministic recency: ``submitted_tick`` then the durable monotonic row id,
+    so same-tick submissions resolve to the later submission and a
+    caller-supplied ``draft_id`` cannot steer the answer. An unconfirmed edit
+    does not displace the last explicitly confirmed version.
     """
     return (
         CreativeRequest.objects.filter(owner_id=_clean_owner_id(owner_id))
-        .order_by("-submitted_tick", "-draft_id", "-version")
+        .order_by("-submitted_tick", "-id")
         .first()
     )
 

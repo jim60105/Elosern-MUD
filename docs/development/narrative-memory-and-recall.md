@@ -447,8 +447,9 @@ the owner's rows. `collaborator_creative_brief` is the spoiler-filtered read
 model for the collaborator: the latest confirmed version's summary and
 preference fields only, with no source references, validation internals, other
 owners' data, or StoryDirector-hidden answers (this record model has none). A
-deterministic tie-break (`submitted_tick`, `draft_id`, `version`) makes
-`latest_confirmed_request` independent of insertion order.
+deterministic recency key (`submitted_tick`, then the durable monotonic row id)
+makes `latest_confirmed_request` resolve same-tick submissions to the later
+submission, so a caller-supplied `draft_id` cannot steer it.
 
 Boundary events (`narrative_authoring_draft_saved`,
 `narrative_authoring_draft_edited`, `narrative_authoring_validation_rejected`,

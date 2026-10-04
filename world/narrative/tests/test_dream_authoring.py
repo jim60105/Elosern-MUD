@@ -542,18 +542,20 @@ class DreamAuthoringObservabilityTests(DreamAuthoringTestCase):
 class DreamAuthoringReadModelTests(DreamAuthoringTestCase):
     """Confirmed-version reads are owner-scoped and spoiler-filtered."""
 
-    def test_latest_confirmed_request_has_a_deterministic_tie_break(self):
+    def test_latest_confirmed_request_is_recency_not_name_ordered(self):
         self.assertIsNone(latest_confirmed_request(self.owner_id))
+        # The second draft's id sorts first lexicographically, so insertion
+        # recency (not the caller-chosen name) must decide the answer.
         first_draft = save_draft(
-            owner_id=self.owner_id, direction=new_story_direction(), tick=100, draft_id="draft_a"
+            owner_id=self.owner_id, direction=new_story_direction(), tick=100, draft_id="zz_draft_first"
         )
         confirm_draft(draft_id=first_draft.draft_id, owner_id=self.owner_id, tick=100)
         second_draft = save_draft(
-            owner_id=self.owner_id, direction=new_story_direction(), tick=100, draft_id="draft_b"
+            owner_id=self.owner_id, direction=new_story_direction(), tick=100, draft_id="aa_draft_second"
         )
         confirm_draft(draft_id=second_draft.draft_id, owner_id=self.owner_id, tick=100)
         latest = latest_confirmed_request(self.owner_id)
-        self.assertEqual(latest.submission_key, submission_key_for("draft_b", 1))
+        self.assertEqual(latest.submission_key, submission_key_for("aa_draft_second", 1))
         self.assertIsNone(latest_confirmed_request(self.other_id))
 
     def test_collaborator_brief_exposes_preferences_only(self):
