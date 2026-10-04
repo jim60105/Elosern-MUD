@@ -65,20 +65,27 @@
   fixture (`command_echo.test.js`), the Vitest per-surface behavioral table
   (`web/webclient-app/tests/store/command_echo_surfaces.test.js`), and the
   exact production-registry pin
-  (`web/webclient/actions/tests/test_dispatcher/test_registry.py`), and the
-  `dream` panel in the exact panel-name pin
+  (`web/webclient/actions/tests/test_dispatcher/test_registry.py`, completed to
+  mirror the production registry exactly) and the `dream` panel in the exact
+  panel-name pin
   (`web/webclient/presentation/tests/test_combat_panel/test_presenter.py`).
-  The `webclient-action-dispatch` requirement is carried as a MODIFIED delta.
+  The `webclient-action-dispatch` requirement is carried as a MODIFIED delta
+  whose enumeration now matches the production registry exactly.
+- The resume also closed the tracked-image allowlist the bundled stage artwork
+  broke: `world/art/tests/test_gallery_fallback.py` pins every tracked image
+  against `APPROVED_NON_RUNTIME_IMAGES`, and the white-bed AVIF (bundled UI
+  chrome, never served through `/art/defaults/`) joins that exact reviewed set.
 - Focused Evennia rerun: `world.narrative.tests.test_dream_surface` 15 tests
-  passed; `test_dispatcher.test_registry`, `test_combat_panel.test_presenter`
-  and `test_action_catalog_coverage` ran 23 tests with two failures that now
-  name only the pre-existing `letters.list`, `letters.collect`, `letters.read`,
-  `letters.send` and `gallery.stage.update` registry drift. Those five ids were
-  registered on master by the correspondence and gallery-stage-transform
-  changes without catalog entries, so both pins fail identically on master;
-  this change no longer contributes to either diff and the unrelated ids are
-  intentionally unchanged.
-- Final gate rerun: full Vitest suite 136 files / 1523 tests passed, the
+  passed; `test_dispatcher.test_registry`, `test_combat_panel.test_presenter`,
+  `test_action_catalog_coverage` and `world.art.tests.test_gallery_fallback` ran
+  44 tests with one failure (`test_action_catalog_coverage`) naming only the
+  pre-existing `letters.list`, `letters.collect`, `letters.read`, `letters.send`
+  and `gallery.stage.update` ids. Those five were registered on master by the
+  correspondence and gallery stage-transform changes without command-echo
+  catalog entries, so the catalog pin fails identically on master; this change
+  contributes no id to that diff and leaves the unrelated catalog entries to
+  their owning changes.
+- Final gate rerun: full Vitest suite 136 files / 1524 tests passed, the
   dependency-free Node gate 479 tests passed, `pnpm run build`,
   `pnpm run build-storybook` and the 64-component `showcase-coverage` gate
   passed, `openspec validate dream-sleep-surface --strict` passed, and
@@ -112,3 +119,42 @@ and four suggestions were fixed with focused regressions:
 - S-3 is deliberately retained: the initial refresh is needed when `dream say`
   is a typed WebSocket command, where no action dispatcher publishes pending
   state. The final refresh publishes completion; neither calls another model.
+
+The second (resume) final critique ran over the complete branch diff. Its one
+blocking finding and every non-blocking finding are dispositioned here:
+
+- B-1 (blocking): the newly tracked white-bed AVIF was missing from
+  `world/art/tests/test_gallery_fallback.py`'s reviewed
+  `APPROVED_NON_RUNTIME_IMAGES`, which broke a CI-registered pin that this
+  change's evidence had not disclosed. Fixed by adding the exact path to that
+  reviewed set; the module now passes (21 tests).
+- NB-1: an unsent direction edit is no longer discarded when `dream say`
+  republishes the authoritative direction. The editor adopts the server value
+  only while the player's field is untouched or already equal to it, with a
+  focused Vitest regression.
+- NB-2: `Escape` during an active IME composition no longer awakens the dream
+  (`event.isComposing` guard).
+- NB-3: rejected. The wire validator requires the exact `thread_choices` field,
+  so a lenient dereference would only mask a protocol error rather than prevent
+  one.
+- NB-4: examined and rejected. An empty draft behaves exactly like no draft for
+  confirmation (both end in the same concrete `empty_direction` refusal), the
+  panel's saved-draft label renders only alongside a non-empty preview, and
+  changing that path would alter the text/browser draft parity owned by the
+  dream-authoring surface.
+- NB-5: rejected. `generation.json` records a seed and model hash this asset
+  cannot verify; the prompt is preserved in the asset's own embedded metadata
+  instead of inventing provenance fields.
+- NB-6: fixed. The MODIFIED enumeration now lists the production registry
+  exactly (including the `npc.persona.*`, `letters.*` and `gallery.stage.update`
+  ids it previously omitted), and the registry allowlist pin mirrors it.
+- NB-7: rejected on the committed tip. Fresh `agent-browser` captures at
+  1280×900 and 390×844 show no clipped control, no horizontal overflow, and a
+  folio inside its `min(58vw, 840px)` cap; the cited artefacts were stale
+  captures from an earlier revision, and the story-only publication tools it
+  also cites are collapsed by default and never ship.
+- S-1/S-2: the direction editor's null guard and the confirm/draft payload
+  condition are now explicit.
+- S-3: confirmed the code-point parity between the server's `[:160]` label bound
+  and the client validator, and that the echo lockstep is complete for this
+  change's ids.

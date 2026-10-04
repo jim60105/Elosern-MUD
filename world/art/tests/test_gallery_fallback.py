@@ -40,10 +40,12 @@ DEFAULTS_DIR = REPO_ROOT / FALLBACK_DEFAULTS_DIRECTORY
 
 # Non-runtime images the repository deliberately tracks: the desktop-redesign
 # mockups under docs/design/ (player-facing documentation screenshots) and
-# the webclient fixture samples under web/webclient-app/assets/ (Storybook/
-# Vitest sample art). They are not part of the closed fallback vocabulary
-# and are never served through the /art/defaults/ route; each path joins
-# this exact set deliberately, in review, never by directory prefix.
+# the bundled webclient illustrations under web/webclient-app/assets/
+# (Storybook/Vitest sample art, plus the dream stage's white-bed scene
+# illustration from dream-sleep-surface). They are not part of the closed
+# fallback vocabulary and are never served through the /art/defaults/ route;
+# each path joins this exact set deliberately, in review, never by directory
+# prefix.
 APPROVED_NON_RUNTIME_IMAGES = frozenset(
     [
         "docs/design/elosern-redesign2/任務公會.webp",
@@ -62,6 +64,7 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
         "web/webclient-app/assets/redesign/sample-forest.webp",
         "web/webclient-app/assets/redesign/sample-guild.webp",
         "web/webclient-app/assets/redesign/sample-town.webp",
+        "web/webclient-app/assets/redesign/dream-white-bed.avif",
     ]
 )
 

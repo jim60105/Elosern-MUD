@@ -102,4 +102,20 @@ describe("server-authored dream surface", () => {
       direction: { kind: "thread_direction", thread_id: "synthetic-thread", summary: "伺服器保存的故事方向", themes: ["鐘聲"], exclusions: ["暴力"] },
     }, null);
   });
+  it("keeps an unsent direction edit when an exchange republishes the authored direction", async () => {
+    const { wrapper } = fixture();
+    const editor = () => wrapper.find("[data-testid='dream-direction-editor'] textarea");
+    // An untouched editor follows the authoritative direction the server
+    // republishes after every accepted exchange.
+    await wrapper.setProps({ state: state({ revision: 4, direction_parts: ["交換後提出的方向"] }) });
+    expect(editor().element.value).toBe("交換後提出的方向");
+    // A field the player has typed into keeps their own text instead.
+    await editor().setValue("我還在寫的方向");
+    await wrapper.setProps({ state: state({ revision: 5, direction_parts: ["交換後提出的方向", "再一次"] }) });
+    expect(editor().element.value).toBe("我還在寫的方向");
+    // Clearing the field restores the follow-the-server behaviour.
+    await editor().setValue("");
+    await wrapper.setProps({ state: state({ revision: 6, direction_parts: ["後來的方向"] }) });
+    expect(editor().element.value).toBe("後來的方向");
+  });
 });

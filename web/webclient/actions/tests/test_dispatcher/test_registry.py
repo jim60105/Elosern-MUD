@@ -97,6 +97,14 @@ class RegistryTests(unittest.TestCase):
                     "gallery.card.delete",
                     "gallery.face_rect.update",
                     "gallery.binding.save",
+                    # Registered before this change by the correspondence and
+                    # gallery stage-transform changes; the registry allowlist
+                    # mirrors the production registry exactly.
+                    "gallery.stage.update",
+                    "letters.collect",
+                    "letters.list",
+                    "letters.read",
+                    "letters.send",
                     "npc.persona.read",
                     "npc.persona.update",
                     "dream.say",

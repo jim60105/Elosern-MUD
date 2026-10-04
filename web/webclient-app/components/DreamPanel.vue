@@ -10,6 +10,10 @@ const refusal = ref("");
 const directionEditor = ref(null);
 const directionInput = ref(null);
 const stage = ref(null);
+// The authoritative direction most recently copied into the editor. An unsent
+// edit that differs from it is the player's own draft and is never overwritten
+// by a later publication.
+const syncedDirection = ref("");
 let trap = null;
 onMounted(() => {
   trap = createFocusTrap(stage.value, { initialFocusEl: stage.value, openerEl: document.activeElement });
@@ -17,6 +21,9 @@ onMounted(() => {
 });
 onUnmounted(() => { trap?.restore(); trap = null; });
 function onKeydown(event) {
+  // Escape cancels an in-progress IME composition for Traditional Chinese
+  // input; that keystroke never awakens the dream.
+  if (event.isComposing) return;
   if (event.key === "Tab") { trap?.onKeydown(event); return; }
   event.stopPropagation();
   if (event.key === "Escape" && props.state.open) {
@@ -42,7 +49,13 @@ const selectedStory = computed(() => thread.value
   : "新故事");
 watch(() => props.state.session_id, () => { message.value = ""; });
 watch(() => JSON.stringify([props.state.session_id, props.state.draft_preferences, props.state.direction_parts]), () => {
-  direction.value = Array.from(savedDirection.value).length <= 2000 ? savedDirection.value : "";
+  const authoritative = Array.from(savedDirection.value).length <= 2000 ? savedDirection.value : "";
+  // `dream say` republishes the authored direction on every exchange, so adopt
+  // it only while the player has not typed their own unsent edit.
+  if (direction.value === "" || direction.value === syncedDirection.value) {
+    direction.value = authoritative;
+  }
+  syncedDirection.value = authoritative;
   thread.value = props.state.draft_preferences?.thread_id || "";
   for (const { key } of preferenceFields) {
     const values = props.state.draft_preferences?.[key];
@@ -60,16 +73,16 @@ async function send(action) {
     const summary = direction.value.trim() || savedDirection.value;
     if (action === "confirm" && !summary.trim()) {
       refusal.value = "先寫下要保存的故事方向，再確認並醒來。你也可以不保存，直接醒來。";
-      directionEditor.value.open = true;
+      if (directionEditor.value) directionEditor.value.open = true;
       await nextTick();
-      directionInput.value.focus();
+      directionInput.value?.focus();
       return;
     }
     const values = Object.fromEntries(preferenceFields.flatMap(({ key }) => {
       const items = preferences[key].split("\n").map((item) => item.trim()).filter(Boolean);
       return items.length ? [[key, items]] : [];
     }));
-    payload.direction = summary || thread.value || Object.keys(values).length
+    payload.direction = (summary || thread.value || Object.keys(values).length)
       ? { ...values, kind: thread.value ? "thread_direction" : "new_story", thread_id: thread.value || null, summary }
       : "";
   }
