@@ -145,6 +145,7 @@ class CorrespondenceReplyTests(EvenniaTestCase):
     @covers_requirement(
         "correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional",
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
+        "correspondence-memory::letter-knowledge-enters-at-the-approved-boundary",
     )
     def test_delayed_delivery_projection_settles_before_capture_or_waits(self):
         incoming = self.incoming()

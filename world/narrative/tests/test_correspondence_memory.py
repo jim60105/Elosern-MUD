@@ -102,6 +102,7 @@ class CorrespondenceCognitionProjectionTests(EvenniaTest):
     @covers_requirement(
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
         "correspondence-delivery::accepted-letters-have-fixed-guaranteed-delivery",
+        "correspondence-memory::letter-knowledge-enters-at-the-approved-boundary",
     )
     def test_paired_boundary_roles_admit_only_the_approved_owner(self):
         npc_body = "合成收件人得知的內容：北方森林有一頭龍。"
@@ -141,6 +142,8 @@ class CorrespondenceCognitionProjectionTests(EvenniaTest):
     @covers_requirement(
         "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
         "correspondence-player-surface::collection-and-reading-remain-distinct",
+        "correspondence-memory::letter-knowledge-enters-at-the-approved-boundary",
+        "correspondence-memory::letters-preserve-claims-and-channel-provenance",
     )
     def test_first_read_projects_once_with_letter_provenance(self):
         body = "合成閱讀內容：北方森林已經開放。"
@@ -171,7 +174,10 @@ class CorrespondenceCognitionProjectionTests(EvenniaTest):
         self.assertEqual(MemoryRecord.objects.filter(source_id=source_id).count(), 1)
         self.assertEqual(self.statements(self.owner.pk), [body])
 
-    @covers_requirement("narrative-memory::memory-projection-is-idempotent-and-restart-safe")
+    @covers_requirement(
+        "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
+        "correspondence-memory::letters-preserve-claims-and-channel-provenance",
+    )
     def test_replay_and_restart_drain_settle_one_memory(self):
         body = "合成重播內容"
         letter = self.deliver_npc(body=body)
@@ -205,6 +211,7 @@ class CorrespondenceCognitionProjectionTests(EvenniaTest):
     @covers_requirement(
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
         "correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions",
+        "correspondence-memory::letters-preserve-claims-and-channel-provenance",
     )
     def test_claimed_deed_stays_told_speech_without_objective_progress(self):
         body = "合成信件聲稱：我已在北方森林擊敗那頭龍，任務已經完成。"
@@ -269,6 +276,7 @@ class CorrespondenceFaceToFaceTests(EvenniaTestCase):
     @covers_requirement(
         "npc-dialogue::npc-context-recalls-only-permitted-committed-experience",
         "narrative-fast-recall::permissions-and-explicit-scope-precede-recall-scoring",
+        "correspondence-memory::letters-preserve-claims-and-channel-provenance",
     )
     def test_delivered_letter_supplies_dialogue_continuity_without_turn_copies(self):
         head = "合成信件開頭：" + "北方森林的龍。" * 30
