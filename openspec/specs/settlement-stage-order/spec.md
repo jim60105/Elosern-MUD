@@ -4,22 +4,20 @@ Define the deterministic order and execution rules for world-clock settlement st
 
 ## Requirements
 
-
 ### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, practice settlement,
-daily resets, then the five declared world-event seams
+daily resets, then the six declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
-`npc_schedules`, `instance_reclamation` — matching design doc §6.5's four built stages plus
+`npc_schedules`, `correspondence_delivery`, `instance_reclamation` — matching design doc §6.5's four built stages plus
 `practice_settlement` (the declared-practice writer owned directly by
 `world/rules/clock.py`, inserted between `sexual_decay` and
-`daily_resets`) plus `instance_reclamation` (change 14's `reclaim_due_instances()`, appended after
-`npc_schedules` as the final stage), and SHALL execute every `advance()` call's stages in this order
+`daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement) and `instance_reclamation` (change 14's `reclaim_due_instances()`, after `correspondence_delivery` as the final stage), and SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
 
 #### Scenario: The stage order is exactly the fixed sequence, including practice_settlement and instance_reclamation
 - **WHEN** the settlement stage sequence is inspected
 - **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "practice_settlement", "daily_resets",
-  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "instance_reclamation")`, in
+  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "correspondence_delivery", "instance_reclamation")`, in
   that order, with no duplicate or missing entry
 
 #### Scenario: Transposing any of the four ordered stages is mechanically detected
@@ -81,8 +79,7 @@ and this is a stated, not silent, limitation
 `practice_settlement` stages entirely when `advance()` is called with `AdvanceSource.COMBAT`: `buff_ticks` and
 `sexual_decay` because change 9's `run_round()` already applies both once per round as part of combat's
 own per-round upkeep; `practice_settlement` because declared practice is a downtime concept that must
-never settle during a fight. Every other stage (`gauge_regen`, `daily_resets`, and the four declared world-event
-stages) SHALL run regardless of `AdvanceSource`.
+never settle during a fight. Every other stage (`gauge_regen`, `daily_resets`, and all declared world-event stages including correspondence_delivery) SHALL run regardless of `AdvanceSource`.
 
 #### Scenario: A combat-sourced advance does not double-tick an active buff
 - **WHEN** a `poisoned` combatant's fight is resolved via `run_round()` for `N` rounds (each round
@@ -223,7 +220,7 @@ registrable, no-op seams
 
 `world/rules/clock.py` SHALL provide `register_event_source(kind, source)` as the only sanctioned
 way to attach a boundary-crossing event query for `caravan_arrivals`, `shop_hours`,
-`quest_deadlines`, or `npc_schedules`. When no source is registered for a given `kind`, `advance()`
+`quest_deadlines`, `npc_schedules`, or `correspondence_delivery`. When no source is registered for a given `kind`, `advance()`
 SHALL treat that stage as producing zero events — never raising, never blocking the rest of
 settlement. As of the `npc-schedule-runtime` change, `npc_schedules` SHALL have exactly one
 registered source, `settle_npc_schedules`, supplied by `world/rules/npc_schedules.py`.
@@ -245,6 +242,8 @@ registered source, `settle_npc_schedules`, supplied by `world/rules/npc_schedule
 - **THEN** the returned `ScheduledEvent` list includes that source's event, proving the registry
   mechanism works without real scheduling data
 
+The correspondence_delivery source SHALL be registered by deterministic startup and remain generation-free. Its table writes SHALL participate in the outer clock transaction and its surface contract SHALL invalidate or refresh touched cached row values on rollback.
+
 ### Requirement: ScheduledEvent is a plain, JSON-compatible record with no live entity references
 `world/rules/clock.py` SHALL define `ScheduledEvent` as a frozen dataclass with `kind: str`,
 `due_tick: int`, and `payload: dict`, following change 8's `EventEntry`/`EventLog` precedent of
@@ -254,3 +253,11 @@ key-only, serializable data.
 - **WHEN** any `ScheduledEvent` returned by `advance()` is inspected
 - **THEN** its `payload` contains only plain, JSON-compatible values — no live `LivingEntity` or
   `Battlefield` reference
+
+### Requirement: Due letters settle at their exact deadlines
+
+Letter delivery SHALL query due ticks within the actual advance window, including non-hour-aligned sends. It SHALL NOT wait for the next calendar-hour boundary.
+
+#### Scenario: Letter sent between hour boundaries
+- **WHEN** a letter sent at tick 17 is followed by an advance ending at tick 3617
+- **THEN** it settles with due_tick 3617, not at the next calendar hour
