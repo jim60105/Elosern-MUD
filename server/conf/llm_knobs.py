@@ -20,6 +20,7 @@ LAYER_NAMES: tuple[str, ...] = (
     "narrator",
     "npc_dialogue",
     "dialogue_summary",
+    "correspondence",
     "scenario_director",
     "scene_builder",
     "character_creation",
@@ -172,7 +173,7 @@ LLM_KNOBS: tuple[LlmKnob, ...] = (
         250,
         minimum=0,
         rule="expected a positive integer",
-        layer_defaults={"action_options": 320, "title_nomination": 640, "dialogue_summary": 1024},
+        layer_defaults={"action_options": 320, "title_nomination": 640, "dialogue_summary": 1024, "correspondence": 1024},
     ),
     LlmKnob(
         "timeout_seconds",

@@ -31,6 +31,7 @@ class LetterSend(models.Model):
     sent_tick = models.BigIntegerField()
     due_tick = models.BigIntegerField(db_index=True)
     reply_to = models.CharField(max_length=128, blank=True, default="")
+    source_snapshot_id = models.CharField(max_length=128, blank=True, default="")
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -61,6 +62,18 @@ class LetterState(models.Model):
             models.Index(fields=["status", "due_tick"], name="letter_due_idx"),
             models.Index(fields=["recipient_id", "status"], name="letter_recipient_idx"),
         ]
+
+
+class LetterReplyWork(models.Model):
+    """One durable optional response per delivered incoming NPC letter."""
+
+    letter = models.OneToOneField(LetterSend, on_delete=models.CASCADE)
+    snapshot_id = models.CharField(max_length=128, blank=True, default="")
+    outgoing_source_id = models.CharField(max_length=128, blank=True, default="")
+    status = models.CharField(max_length=16, default="pending")
+
+    class Meta:
+        app_label = "narrative"
 
 
 class AppendOnlyDialogueQuerySet(models.QuerySet):

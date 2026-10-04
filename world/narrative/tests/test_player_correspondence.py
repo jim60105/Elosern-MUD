@@ -33,7 +33,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         for key, settlement in (("synthetic_branch_a", "synthetic_settlement_a"), ("synthetic_branch_b", "synthetic_settlement_b")):
             registry[key] = PlaceDefinition(key, settlement, PlaceKind.COURIER_STATION,
                                            "合成驛站", "合成分站。", (1, 1), "驛站", (), letter_service=True)
-        self.registry_patch = patch.dict(surface.PLACE_REGISTRY, registry, clear=True)
+        self.registry_patch = patch.object(surface, "PLACE_REGISTRY", registry)
         self.registry_patch.start()
         self.clock = get_world_clock()
         self.clock.tick = 17

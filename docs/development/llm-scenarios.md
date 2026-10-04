@@ -18,6 +18,7 @@
 | **`narrator`** | `world/ai/narrator.py` | 戰鬥/行動事件日誌結算 | 正體中文散文 | 呼叫本地模板渲染器輸出標準文字 |
 | **`npc_dialogue`** | `world/ai/npc_dialogue.py` | 玩家發起對話（`talk`） | JSON（台詞 + 8 種意圖） | 回退為作者手寫問候語或保持沉默 |
 | **`dialogue_summary`** | `world/narrative/epochs.py` | 決定性擁有者要求紀元壓縮 | JSON（衍生摘要） | 保留原始對話與目前紀元，使用有界的近期脈絡 |
+| **`correspondence`** | `world/ai/correspondence.py` | 決定性擁有者明確要求回信 | JSON（信文與受限關係提案） | 來信照常送達，回信工作保留待處理 |
 | **`scenario_director`** | `world/ai/scenario_director.py` | 公會委託櫃檯任務查詢 | JSON（任務藍圖） | 自手寫任務範本池抽取符合條件之任務 |
 | **`scene_builder`** | `world/ai/scene_flavor.py` | 玩家進入動態副本房間 | 正體中文氛圍散文 (50-200 字) | 回傳 `None`（房間不附加額外氛圍） |
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |
