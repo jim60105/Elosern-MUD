@@ -66,6 +66,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_narrator_layer",
     "register_npc_dialogue_layer",
     "register_correspondence_layer",
+    "register_dream_layer",
     "register_scenario_director_layer",
     "register_character_creation_layer",
     "register_scene_flavor_layer",
@@ -239,6 +240,21 @@ def _register_correspondence_layer():
     from world.ai.correspondence import register_correspondence
 
     return _tolerant_register("register_correspondence_layer", register_correspondence, schema=True)
+
+
+def _register_dream_layer():
+    """Register the dream collaborator layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover dream registration (a
+    conflicting fallback/validator, or a conflicting output schema) must never
+    abort startup.
+    """
+    from world.ai.dream import register_dream
+
+    return _tolerant_register("register_dream_layer", register_dream, schema=True)
 
 
 def _register_scenario_director_layer():
@@ -495,6 +511,9 @@ def at_server_start():
     )
     _startup_step(
         "register_correspondence_layer", _register_correspondence_layer, fail_loud=False
+    )
+    _startup_step(
+        "register_dream_layer", _register_dream_layer, fail_loud=False
     )
     _startup_step(
         "register_scenario_director_layer",

@@ -37,6 +37,10 @@ TITLE_NOMINATION_MAX_TOKENS = 640
 # tokens at a conservative 2 tokens per Traditional Chinese code point
 # (npc-persona-generated-quest-cards D6); 8,192 leaves headroom.
 SCENARIO_DIRECTOR_MAX_TOKENS = 8192
+# The dream collaborator's combined explicit scene prose plus counterpart
+# dialogue, bounded at 900 + 500 code points (design 6.4); 3,072 leaves
+# headroom at the same conservative 2 tokens-per-code-point estimate.
+DREAM_MAX_TOKENS = 3072
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
@@ -311,6 +315,10 @@ def default_profiles(
     profiles["correspondence"] = {
         **profiles["correspondence"],
         "max_tokens": 1024,
+    }
+    profiles["dream"] = {
+        **profiles["dream"],
+        "max_tokens": DREAM_MAX_TOKENS,
     }
     profiles["scenario_director"] = {
         **profiles["scenario_director"],
