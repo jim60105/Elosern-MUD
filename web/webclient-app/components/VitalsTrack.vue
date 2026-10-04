@@ -260,7 +260,7 @@ watch(
 }
 .num .max {
   color: var(--paper-500);
-  font-size: calc(10px * var(--ui-scale));
+  font-size: calc(12px * var(--ui-scale));
 }
 
 .low-mark {
@@ -269,7 +269,7 @@ watch(
   border: 1px solid var(--seal-600);
   border-radius: 2px;
   color: var(--crit);
-  font: 700 calc(10px * var(--ui-scale))/1.2 var(--f-sans);
+  font: 700 calc(12px * var(--ui-scale))/1.2 var(--f-sans);
   letter-spacing: 0.1em;
 }
 
