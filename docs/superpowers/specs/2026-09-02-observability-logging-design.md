@@ -188,6 +188,12 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `npc_dialogue_context_unavailable` | `npc`、`char`、`submission_id`、`exc`（warn 級；未送出超出預算或無法呈現的脈絡） |
 | `narrative_dialogue_submitted` | `submission_id`、`npc`、`char`、`tick` |
 | `narrative_dialogue_delivered` | `submission_id`、`npc`、`char`、`snapshot_id`、`tick` |
+| `narrative_dialogue_epoch_started` | `npc`, `char`, `epoch`, `sequence`, `reason`, `sources_count` |
+| `narrative_dialogue_frame_captured` | `epoch`, `frame`, `tick`, `sources_count`, `tokens`, `sha256` |
+| `narrative_dialogue_prefix_rendered` | `npc`, `char`, `epoch`, `snapshot_id`, `prefix_sha256`, `tokens` |
+| `narrative_dialogue_compaction_deferred` | `epoch`, `snapshot_id` |
+| `narrative_dialogue_compaction_stale` | `epoch`, `snapshot_id` |
+| `llm_cached_tokens_reported` | `profile`, `cached_tokens` (optional validated provider usage; no prompt content) |
 | `protection_demo_prepared` | `char`、`npc`、`enemy`、`room` |
 | `npc_voice_profile_missing` | `npc`、`profile`（error 級；dangling profile reference） |
 | `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |

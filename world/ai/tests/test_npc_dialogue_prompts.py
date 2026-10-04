@@ -230,13 +230,13 @@ class PersonaPromptTests(unittest.TestCase):
         parsed = json.loads(user["content"])
         self.assertNotIn("persona", parsed["player"])
         self.assertEqual(user["content"], baseline[1]["content"])
-        # The pre-persona user payload, pinned byte-for-byte (historical
-        # baseline; absent persona must reproduce it exactly).
+        # Persona-free baseline for the current frame rendering version.
         self.assertEqual(
             user["content"],
-            '{"memory": ["第1則對話", "第2則對話", "第3則對話"], '
+            '{"authority": "Current state supersedes historical frame state; history retains its original tick.", '
+            '"location": "王都阿爾托利亞", "memory": ["第1則對話", "第2則對話", "第3則對話"], '
             '"player": {"disguised_stats": {"agility": 6, "atk_phys": 5, '
-            '"defense": 6}, "name": "薇歐蕾"}}',
+            '"defense": 6}, "name": "薇歐蕾"}, "tick": 0}',
         )
 
 

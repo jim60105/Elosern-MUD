@@ -70,8 +70,6 @@ _SCENARIO_DIRECTOR_SYSTEM = (
     "約 800 個字元左右。整份提案所有 stage 的 npc_req 合計最多 3 個。"
 )
 _NPC_DIALOGUE_TEMPLATE = (
-    "{persona}"
-    "你是《伊洛瑟恩大陸》中的 {name}。{desc}。目前位於{location}。"
     "你只能根據自己確實能觀察到的情況回應；"
     "玩家在你面前展現出的樣貌，就是你所見到的真實。"
     "請以正體中文和對方說話，並只輸出一個 JSON 物件："
@@ -82,6 +80,7 @@ _NPC_DIALOGUE_TEMPLATE = (
     "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
     "不得虛構任何結果、數字、對話或世界狀態；"
     "你沒有把握能確實執行的行為，不要寫進 intent。"
+    "\n\n### 人物定錨\n{persona}你是《伊洛瑟恩大陸》中的 {name}。{desc}。{location}"
 )
 _NPC_THINKING = "（{name} 沉思片刻……）"
 # The shipped template after gallery-prompt-composition admitted the
@@ -208,7 +207,7 @@ class VerbatimShipmentTests(unittest.TestCase):
         )
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
-    def test_npc_dialogue_render_equals_the_original_rendered_constant(self):
+    def test_npc_dialogue_render_preserves_contract_before_character_anchor(self):
         rendered = render_prompt(
             "npc_dialogue.system",
             name="甲",
@@ -218,7 +217,6 @@ class VerbatimShipmentTests(unittest.TestCase):
         )
         self.assertEqual(
             rendered,
-            "你是《伊洛瑟恩大陸》中的 甲。乙。目前位於丙。"
             "你只能根據自己確實能觀察到的情況回應；"
             "玩家在你面前展現出的樣貌，就是你所見到的真實。"
             "請以正體中文和對方說話，並只輸出一個 JSON 物件："
@@ -228,7 +226,8 @@ class VerbatimShipmentTests(unittest.TestCase):
             "delta 為 0 到 10 之間整數的好感度調整；"
             "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
             "不得虛構任何結果、數字、對話或世界狀態；"
-            "你沒有把握能確實執行的行為，不要寫進 intent。",
+            "你沒有把握能確實執行的行為，不要寫進 intent。"
+            "\n\n### 人物定錨\n你是《伊洛瑟恩大陸》中的 甲。乙。丙",
         )
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
@@ -352,13 +351,14 @@ class LibrarySourceTests(unittest.TestCase):
         )
         self.assertEqual(
             system["content"],
-            render_prompt(
+            "\n\n".join((render_prompt("npc_dialogue.global_rules"),
+                          render_prompt("npc_dialogue.world_digest"), render_prompt(
                 "npc_dialogue.system",
                 name="甲",
                 desc="乙",
-                location="丙",
+                location="",
                 persona="",
-            ),
+            ))),
         )
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")

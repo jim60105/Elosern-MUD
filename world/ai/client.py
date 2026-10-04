@@ -30,7 +30,7 @@ from world.ai.schemas.registry import resolve_output_schema
 from world.ai.schemas.response import validate_chat_completion_envelope
 
 from world.http_identity import http_user_agent
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from world.observability.sanitize import safe_endpoint
 
 # Verbatim-passthrough sampling knobs (endpoint design §4.2 request order).
@@ -251,6 +251,14 @@ class OpenAICompatClient(LLMClient):
             raise LLMTransportError(
                 "malformed", self._scrub_key("; ".join(errors))
             )
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            details = usage.get("prompt_tokens_details")
+            cached = details.get("cached_tokens") if isinstance(details, dict) else None
+            if isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0:
+                log_info("llm_cached_tokens_reported", context={
+                    "profile": self.profile.model, "cached_tokens": cached,
+                })
         return payload["choices"][0]["message"]["content"]
 
     def _scrub_key(self, message: str) -> str:

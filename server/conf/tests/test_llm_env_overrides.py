@@ -147,7 +147,7 @@ class KnobTableTests(unittest.TestCase):
     @covers_requirement(
         "settings-environment-overrides::llm-profile-knobs-accept-global-and-per-layer-environment-overrides"
     )
-    def test_total_name_set_is_globals_plus_per_layer_for_seven_layers(self):
+    def test_total_name_set_is_globals_plus_per_layer_for_eight_layers(self):
         names = llm_env_names()
         # Exact set equality, never a cardinality count.
         expected = set(DOCUMENTED_GLOBAL_NAMES)
@@ -157,7 +157,7 @@ class KnobTableTests(unittest.TestCase):
                 for name in DOCUMENTED_GLOBAL_NAMES
             }
         self.assertEqual(names, frozenset(expected))
-        self.assertEqual(len(names), 23 + 23 * 7)
+        self.assertEqual(len(names), 23 + 23 * 8)
         self.assertEqual(
             llm_layer_env_names("title_nomination"),
             {n for n in names if n.startswith("LLM_TITLE_NOMINATION_")},
@@ -225,7 +225,7 @@ class DefaultBootTests(_LlmSubprocessTests):
         result = self._run(code)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("MATCH True", result.stdout)
-        self.assertIn("COUNT 184", result.stdout)
+        self.assertIn("COUNT 207", result.stdout)
 
 
 class ValidCoercionTests(_LlmSubprocessTests):

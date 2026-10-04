@@ -56,7 +56,7 @@ flowchart LR
 | :--- | :---: | :---: | :--- |
 | `MODEL` | 字串 | `llama3.2` | 呼叫的模型標籤或名稱。 |
 | `TEMPERATURE` | 浮點數 | `0.7` | 採樣溫度（0.0～2.0）。數值愈低愈穩定，愈高愈具隨機創造力。 |
-| `MAX_TOKENS` | 整數 | 視層級而定 | 回傳最大 Token 數（一般層預設 250，`action_options` 為 320，`title_nomination` 為 640，`scenario_director` 為 8192）。 |
+| `MAX_TOKENS` | 整數 | 視層級而定 | 回傳最大 Token 數（一般層預設 250，`action_options` 為 320，`title_nomination` 為 640，`scenario_director` 為 8192，`dialogue_summary` 為 1024）。 |
 | `MAX_COMPLETION_TOKENS` | 整數 | 省略 | 若設定此值，將取代 `max_tokens` 傳出（OpenAI 新版 API 相容）。 |
 | `TOP_P` | 浮點數 | 省略 | 核採樣機率閾值（0.0～1.0）。 |
 | `TOP_K` | 整數 | 省略 | Top-K 採樣限制（正整數）。 |

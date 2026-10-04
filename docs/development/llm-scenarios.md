@@ -17,6 +17,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **`narrator`** | `world/ai/narrator.py` | 戰鬥/行動事件日誌結算 | 正體中文散文 | 呼叫本地模板渲染器輸出標準文字 |
 | **`npc_dialogue`** | `world/ai/npc_dialogue.py` | 玩家發起對話（`talk`） | JSON（台詞 + 8 種意圖） | 回退為作者手寫問候語或保持沉默 |
+| **`dialogue_summary`** | `world/narrative/epochs.py` | 決定性擁有者要求紀元壓縮 | JSON（衍生摘要） | 保留原始對話與目前紀元，使用有界的近期脈絡 |
 | **`scenario_director`** | `world/ai/scenario_director.py` | 公會委託櫃檯任務查詢 | JSON（任務藍圖） | 自手寫任務範本池抽取符合條件之任務 |
 | **`scene_builder`** | `world/ai/scene_flavor.py` | 玩家進入動態副本房間 | 正體中文氛圍散文 (50-200 字) | 回傳 `None`（房間不附加額外氛圍） |
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |
@@ -70,7 +71,7 @@
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/npc_dialogue.yaml` $\rightarrow$ `npc_dialogue.system`。
-* **白名單占位符**：`{name}`（NPC 名字）、`{desc}`（外觀特徵）、`{location}`（所在位置）、`{persona}`（人設區塊）。
+* **白名單占位符**：`{name}`（NPC 名字）、`{desc}`（外觀特徵）、`{location}`（API 保留，穩定定錨傳入空字串）、`{persona}`（人設區塊）。當前位置放在新回合框架；歷史框架保留原始時間與資料。
 * **動態記憶與上下文**：
   * 最近 12 輪交談記憶（Memory Window）。
   * 玩家對象資訊：公開形象、表觀特徵與社交連結（玩家的真實隱藏身分與隱藏背景絕不進入 Prompt）。

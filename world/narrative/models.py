@@ -112,6 +112,63 @@ class DialogueTurn(models.Model):
         ]
 
 
+class DialogueEpoch(models.Model):
+    """Immutable pair boundary and optional derived summary generation."""
+
+    objects = AppendOnlyDialogueQuerySet.as_manager()
+    npc_id = models.CharField(max_length=64)
+    player_id = models.CharField(max_length=64)
+    sequence = models.PositiveIntegerField()
+    version = models.CharField(max_length=64)
+    reason = models.CharField(max_length=32)
+    start_turn_id = models.BigIntegerField(default=0)
+    summary = models.TextField(default="")
+    generation_id = models.CharField(max_length=64, unique=True)
+    source_refs = models.JSONField(default=list)
+    snapshot_id = models.CharField(max_length=128, default="")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Dialogue epochs are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dialogue epochs are append-only.")
+
+    class Meta:
+        app_label = "narrative"
+        constraints = [
+            models.UniqueConstraint(fields=["npc_id", "player_id", "sequence"],
+                                    name="unique_dialogue_pair_epoch")
+        ]
+
+
+class DialogueFrame(models.Model):
+    """Exact bytes supplied at the original tick, never regenerated."""
+
+    objects = AppendOnlyDialogueQuerySet.as_manager()
+    epoch = models.ForeignKey(DialogueEpoch, on_delete=models.PROTECT)
+    identity = models.CharField(max_length=64)
+    content = models.TextField()
+    tick = models.IntegerField(default=0)
+    sources = models.JSONField(default=list)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Dialogue frames are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dialogue frames are append-only.")
+
+    class Meta:
+        app_label = "narrative"
+        constraints = [
+            models.UniqueConstraint(fields=["epoch", "identity"],
+                                    name="unique_dialogue_epoch_frame")
+        ]
+
+
 class NarrativeEvent(models.Model):
     """An immutable, committed narrative occurrence."""
 

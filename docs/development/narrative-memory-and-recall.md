@@ -147,3 +147,36 @@ the guarded Evennia test entry point. Do not enable live model/image services fo
 automated checks or assert live wording. New delta-only requirement annotations
 are added by the later spec-sync owner after obtaining their canonical main IDs;
 this change annotates substantive tests against the existing main IDs.
+
+## Explicit dialogue epochs and stable prefixes
+
+DialogueEpoch is an append-only pair boundary, separate from the current-target
+session. DialogueFrame retains canonical JSON bytes, tick and captured memory
+source revisions. Location, affinity, recalled cognition and player context
+belong to the current frame. Replayed frames retain their original bytes; the
+current authority marker supersedes their state without rewriting history.
+Global rules and world digest precede the prompt-library capability/character
+anchor. The four `npc_dialogue.system` placeholders remain supported, with
+`location=""`; NPC persona remains system-side and public player persona stays
+user-side. Changes to rendered anchors, persona or rendering version create a
+new epoch. Historical affinity numbers remain covered by the no-leak validator.
+
+The deterministic owner exposes `start_epoch(npc, player)` for natural
+boundaries and `compact_epoch(npc, player, client)` for compaction. Inject an
+`OpenAICompatClient(get_profile("dialogue_summary"))` in production, or a
+recorded FakeLLMClient in tests. The summary capability uses its own schema and
+guardrail hooks; it summarizes bounded original dialogue, never state frames.
+Accepted generations retain original turn hashes/revisions and their immutable
+snapshot. Subsequent summaries can reference the prior summary generation.
+Original turns are never removed. Invalid, offline and stale completions do
+not activate successors. The active epoch remains usable through a bounded
+tail view. NPC-row locking and pair/sequence uniqueness serialize boundaries.
+
+The `dialogue_summary` profile uses the existing endpoint/profile controls
+(including generated `LLM_DIALOGUE_SUMMARY_*` environment names). Provider
+cache controls are optional; validated cached-token counts are metadata only.
+The [rendered calibration report](dialogue-epoch-calibration.md) records profile
+reservations, source/output measurements and hard summary limits.
+No player command surface changes, so both command references are unchanged.
+New dialogue-epochs main requirement IDs must be obtained and annotated by the
+later sync/archive owner; active delta requirements are not canonical IDs.
