@@ -754,6 +754,28 @@ def abandon_turn(
         return progress(locked)
 
 
+def resume_saved_session(session_id: Any, owner_id: Any, *, tick: int = 0) -> DreamSession:
+    """Explicit later entry resumes unconfirmed discussion without a new budget.
+
+    Confirmed sessions remain final. Sleep settlement is the caller's separate
+    responsibility; this operation changes only narrative session state.
+    """
+    clean_owner = _clean_owner(owner_id)
+    clean_tick = _clean_tick(tick)
+    session = get_session(session_id, clean_owner)
+    with transaction.atomic():
+        locked = _locked_session(session.session_id, clean_owner)
+        if locked.state == STATE_ENDED and locked.outcome != OUTCOME_CONFIRMED:
+            locked.state = STATE_OPEN
+            locked.revision = int(locked.revision) + 1
+            locked.save(update_fields=["state", "revision", "updated_at"])
+            _announce("dream_session_resumed", {
+                "session_id": locked.session_id, "owner": clean_owner,
+                "completed": int(locked.completed_exchanges), "tick": clean_tick,
+            })
+        return locked
+
+
 def _save_session_draft(
     session: DreamSession,
     owner_id: str,

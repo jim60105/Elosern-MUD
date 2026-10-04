@@ -110,13 +110,28 @@ class CmdSleep(Command):
     aliases = ("睡眠",)
 
     def func(self) -> None:
+        choice = self.args.strip()
+        if choice not in ("", "dream"):
+            self.caller.msg("用法：sleep [dream]")
+            return
         if not _safe_to_skip(self.caller):
             return
         seconds = _seconds_to_full_regen(self.caller)
         self.caller.db.practice_booking = None  # unlabeled skips grow nothing
-        events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
-        self.caller.msg(_render_skip_summary(seconds, events))
+        clock = get_world_clock()
+        tick_from = int(clock.tick) if choice else None
+        events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
+        settled_seconds = int(clock.tick) - tick_from if choice else seconds
+        self.caller.msg(_render_skip_summary(settled_seconds, events))
         _maybe_nominate_after_rest(self.caller, events)
+        if choice:
+            from server.dream_service import enter_after_sleep
+            from commands.dream import render_state
+            state = enter_after_sleep(
+                self.caller, tick_from=tick_from, tick_to=int(clock.tick),
+                requested_seconds=seconds, events=events,
+            )
+            self.caller.msg(render_state(state))
 
 
 class CmdWaitUntil(Command):

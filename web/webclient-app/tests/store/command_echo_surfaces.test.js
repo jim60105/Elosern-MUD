@@ -732,6 +732,64 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
       expected: "wait until dusk",
     },
+    {
+      // The dream panel's exchange submits the same typed `dream say` line; the
+      // browser never carries the session/revision knobs into the echo.
+      id: "dream exchange echoes the typed say line",
+      ids: ["dream.say"],
+      prepare() {
+        openExploration();
+        const payload = {
+          session_id: "session:synthetic-dream",
+          revision: 1,
+          message_parts: ["合成", "方向"],
+        };
+        store.dispatchAction("dream.say", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: "dream say 合成方向",
+    },
+    {
+      id: "dream draft echoes the typed draft line",
+      ids: ["dream.draft"],
+      prepare() {
+        openExploration();
+        const payload = {
+          session_id: "session:synthetic-dream",
+          revision: 1,
+          direction: { kind: "new_story", summary: "合成方向" },
+        };
+        store.dispatchAction("dream.draft", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: 'dream draft {"kind":"new_story","summary":"合成方向"}',
+    },
+    {
+      id: "dream confirmation echoes the typed confirm line",
+      ids: ["dream.confirm"],
+      prepare() {
+        openExploration();
+        const payload = {
+          session_id: "session:synthetic-dream",
+          revision: 1,
+          direction: { kind: "new_story", summary: "合成方向" },
+        };
+        store.dispatchAction("dream.confirm", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: 'dream confirm {"kind":"new_story","summary":"合成方向"}',
+    },
+    {
+      id: "dream awakening echoes the typed awaken line",
+      ids: ["dream.awaken"],
+      prepare() {
+        openExploration();
+        const payload = { session_id: "session:synthetic-dream", revision: 1 };
+        store.dispatchAction("dream.awaken", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: "dream awaken",
+    },
   ];
 
   const gallerySubject = "portrait:character:t_gallery";

@@ -173,6 +173,7 @@ _LOCALIZED_ACCOUNT_WRAPPERS = (
 
 
 from commands.correspondence import CmdLetters
+from commands.dream import CmdDream
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -202,6 +203,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdArtHealth)
         self.add(CmdRest)
         self.add(CmdSleep)
+        self.add(CmdDream)
         self.add(CmdWaitUntil)
         self.add(CmdEngage)
         self.add(CmdCombatForfeit)

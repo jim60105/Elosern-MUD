@@ -244,6 +244,7 @@
         "world.narrative.tests.test_dream_track",
         "world.narrative.tests.test_story_director_beats",
         "world.narrative.tests.test_quest_beats",
+        "world.narrative.tests.test_dream_surface",
         "world.ai",
         "world.lore"
       ]

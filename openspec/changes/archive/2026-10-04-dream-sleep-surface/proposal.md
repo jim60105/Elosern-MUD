@@ -14,7 +14,10 @@ Continuity and player collaboration require durable directions rather than gener
 - `dream-sleep-surface`: Connect optional dreams to sleep and complete browser/text confirm-draft-awaken surfaces.
 
 ### Modified Capabilities
-None.
+- `webclient-action-dispatch`: the production registry gains the four dream
+  collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and
+  `dream.awaken`, so the requirement's exact production-registry enumeration is
+  extended by this change.
 
 ## Impact
 

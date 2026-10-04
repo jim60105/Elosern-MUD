@@ -135,6 +135,10 @@
       return payload.after ? "信件 更多 " + payload.after : "信件";
     },
     "letters.collect": function () { return "信件 領取"; },
+    "dream.say": function (payload) { return "dream say " + payload.message_parts.join(""); },
+    "dream.draft": function (payload) { return "dream draft" + (payload.direction ? " " + (typeof payload.direction === "object" ? JSON.stringify(payload.direction) : payload.direction) : ""); },
+    "dream.confirm": function (payload) { return "dream confirm" + (payload.direction ? " " + (typeof payload.direction === "object" ? JSON.stringify(payload.direction) : payload.direction) : ""); },
+    "dream.awaken": function () { return "dream awaken"; },
     "letters.read": function (payload) { return "信件 讀 " + payload.source_id; },
     "letters.send": function (payload) {
       return "信件 寄 " + payload.recipient + "=" + payload.body_parts.join("");
@@ -205,7 +209,7 @@
     },
     "explore.wait": function (payload, display) {
       if (payload && payload.sleep) {
-        return "sleep";
+        return payload.dream ? "sleep dream" : "sleep";
       }
       if (isNonEmpty(payload && payload.daypart)) {
         return join(["wait until", payload.daypart]);

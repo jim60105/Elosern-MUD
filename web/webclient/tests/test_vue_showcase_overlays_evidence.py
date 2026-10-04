@@ -169,6 +169,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The NPC author editor joins through the action-result route
     # (npc-persona-editor-window).
     "Overlays/NpcPersonaEditor",
+    "World/DreamPanel",
     # The AVG stage series (a governed redesign wave) adds the
     # stage place card (webclient-avg-place-card-top-bar).
     "Core/PlaceCard",

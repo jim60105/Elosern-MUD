@@ -645,4 +645,6 @@ def build_production_action_registry() -> ActionRegistry:
         ("letters.send", validate_send, send_adapter),
     ):
         registry.register(ActionSpec(action_id, validator, adapter, ()))
+    from web.webclient.actions.dream_actions import register_actions
+    register_actions(registry)
     return registry
