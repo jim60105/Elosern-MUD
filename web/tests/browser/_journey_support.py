@@ -256,6 +256,7 @@ def _art_panel(portrait_refs: list) -> dict:
             "alt": "角色肖像",
             "placeholder": None,
             "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
             "context": {"name": "角色", "role": "人物"},
         }
     return {
@@ -271,6 +272,7 @@ def _art_panel(portrait_refs: list) -> dict:
             "aspect_ratio": "16:9",
             "alt": "當前場景",
             "placeholder": None,
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
         },
         "portrait_catalog": catalog,
     }

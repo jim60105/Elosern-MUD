@@ -1317,6 +1317,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     "aspect_ratio": None, "alt": "角色肖像",
                     "placeholder": {"kind": "missing", "label": "尚無肖像"},
                     "face_rect": None,
+                    # A placeholder portrait carries no stage (the wire
+                    # contract: stage is non-null only beside a url).
+                    "stage": None,
                 },
             }],
             "can_create": False,
@@ -1447,6 +1450,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                             "alt": "角色肖像",
                             "placeholder": {"kind": "missing", "label": "尚無肖像"},
                             "face_rect": None,
+                            "stage": None,
                         },
                     }],
                     "can_create": False,

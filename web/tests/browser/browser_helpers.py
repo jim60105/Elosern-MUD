@@ -893,6 +893,10 @@ def valid_art_panel() -> dict:
             "aspect_ratio": "16:9",
             "alt": label,
             "placeholder": None,
+            # The stage-transform contract: a scene with a url carries the
+            # identity placement triple (webclient-presentation art.py
+            # _validate_stage mirrors this on the wire).
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
         },
         "portrait_catalog": {},
     }
