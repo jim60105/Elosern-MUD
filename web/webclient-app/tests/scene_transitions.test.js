@@ -153,8 +153,12 @@ describe("PlaceCard location change", () => {
     const fresh = both.find((h) => h.text() === "北岸大道");
     expect(old.element.inert).toBe(true);
     expect(fresh.element.inert).toBe(false);
-    await frames();
-    expect(headings(wrapper).map((h) => h.text())).toEqual(["北岸大道"]);
+    // Poll until the leave resolves instead of trusting a fixed sleep: the
+    // leave is transitionend-driven, and a loaded CI runner can stretch the
+    // zero-duration fallback past any constant wait.
+    await vi.waitFor(() => {
+      expect(headings(wrapper).map((h) => h.text())).toEqual(["北岸大道"]);
+    }, { timeout: 5000, interval: 10 });
   });
 
   it("a time-only change adds no leaving element", async () => {
