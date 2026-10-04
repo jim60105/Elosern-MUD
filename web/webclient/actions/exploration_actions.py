@@ -707,6 +707,10 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
         affinity = npc.relations.affinity_for(actor)
         if affinity < get_config().invite_threshold:
             actor.msg(f"{npc.key}說：{DEGRADED_REJECT_MESSAGE}")
+            from world.narrative.dialogue import settle_response
+
+            settle_response(npc, actor, result.submission_id, DEGRADED_REJECT_MESSAGE,
+                            snapshot_id=result.snapshot_id)
             return "她婉拒了你的邀請。"
         try:
             join_party(npc, actor)
@@ -716,10 +720,18 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
             actor.msg(line)
             return line
         actor.msg(f"{npc.key}說：{DEGRADED_ACCEPT_MESSAGE}")
+        from world.narrative.dialogue import settle_response
+
+        settle_response(npc, actor, result.submission_id, DEGRADED_ACCEPT_MESSAGE,
+                        snapshot_id=result.snapshot_id)
         actor.msg(JOINED_MESSAGE)
         return JOINED_MESSAGE
 
     actor.msg(f"{npc.key}說：{result.reply.speech}")
+    from world.narrative.dialogue import settle_response
+
+    settle_response(npc, actor, result.submission_id, result.reply.speech,
+                    snapshot_id=result.snapshot_id)
     intent = result.reply.intent
     outcome = apply_npc_intent(npc, actor, intent)
     if is_stale_context(outcome):

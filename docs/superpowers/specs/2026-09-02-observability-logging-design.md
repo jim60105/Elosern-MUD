@@ -185,6 +185,10 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `npc_persona_update_rejected` | `npc`、`char`、`reason`（拒絕原因，可帶版本） |
 | `npc_persona_unavailable` | `npc`、`reason`（warn 級；不可用原因） |
 | `npc_dialogue_stale_persona` | `npc`、`char`、`version_from`、`version_to`、`path` |
+| `npc_dialogue_context_unavailable` | `npc`、`char`、`submission_id`、`exc`（warn 級；未送出超出預算或無法呈現的脈絡） |
+| `narrative_dialogue_submitted` | `submission_id`、`npc`、`char`、`tick` |
+| `narrative_dialogue_delivered` | `submission_id`、`npc`、`char`、`snapshot_id`、`tick` |
+| `protection_demo_prepared` | `char`、`npc`、`enemy`、`room` |
 | `npc_voice_profile_missing` | `npc`、`profile`（error 級；dangling profile reference） |
 | `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |
 | `guild_exam_opponent_created` | `char`、`rank`、`profile` |

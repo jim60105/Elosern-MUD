@@ -44,3 +44,72 @@ The `world/narrative` subsystem manages persistent narrative events, character m
    - Immutable `NarrativeContextSnapshot` model (append-only manager plus instance guards) tracking source IDs, read revisions, section hashes, budget accounting, truncation decisions, and the reconstructible rendered payload.
    - Thin `NarrativeRequestDescriptor` binding prompt messages, validators, and snapshot/trace identities, rejecting mismatched context/snapshot provenance.
    - Every fresh assembly reads the owner memory generation, so effective-memory changes surface to new generations while retries re-read the authoritative persisted snapshot instead of rewriting it.
+
+## Durable face-to-face dialogue (W1)
+
+`world.narrative.dialogue` replaces the destructive NPC Attribute history.
+`submit_turn` allocates one ingress identity and preserves the original player
+speech. `run_npc_exchange` carries that identity and the immutable snapshot ID
+in its result; it never records an undelivered NPC response. Talk and both
+invitation delivery callers record the displayed response through
+`settle_response`, whose unique `(submission_id, kind)` key prevents duplicate
+settlement. Authored offline greetings are delivered turns; silence and
+stale-persona responses are not. Existing late co-location/schedule rejection
+still displays validated speech but rejects its intent, so that displayed
+speech remains in the archive.
+
+`pair_view` reads only the configured tail (at most 12 turns), keyed by persistent
+NPC/player identities. Trimming affects rendering only. Omitted-turn counts
+accompany the prompt and snapshot; originals remain recoverable in
+`DialogueTurn`. Changing a persona changes later rendering without rewriting
+historical speech. There is no compatibility history store or migration of old
+Attribute data.
+
+Each exchange uses owner-permitted Fast Recall followed by the existing context
+builder. Core and working selections remain fixed context. Protection events
+project to the existing `archive` tier: durable episodic experience excluded from
+fixed working selection, but eligible for relevant lexical recall. Unrelated
+questions do not force that episode into cognition. The W1 system template stays
+in the prompt library; cognition is added to the existing user JSON placement.
+The snapshot captures the exact final system/user messages and only sources
+whose recall block survived rendering. Normal logs contain IDs/counts, never
+speech, private persona, or prompt prose.
+
+## Author-controlled Yohanna protection/revisit route
+
+The fresh NPC import card is `world/imports/examples/yohanna_cooper.json`.
+It authors Yohanna Cooper's hereditary barrel-making family and guild artisan
+connections, independently of temporary handoff plots. The compact-card importer
+is the persona/age/name-validation boundary; `NPC_SOURCE_INVENTORY` records its
+existing `import_example` ownership.
+
+For an author-controlled local world, put an unbound player at a reachable room
+on the guild approach, with no current fight. From the existing administrator
+Python seam, call `world.rules.protection_demo.prepare_protection_demo(player)`.
+For example, in an administrator's `@py` context where `self` is the player:
+
+```python
+from world.rules.protection_demo import prepare_protection_demo
+npc, enemy = prepare_protection_demo(self)
+```
+
+This imports Yohanna beside the player, binds her through the real party owner,
+and engages the lowest registry threat tier. It does not declare a victory.
+Use the existing combat attack/action menu to defeat the creature while Yohanna
+survives. Real combat settlement commits the protection fact; the normal
+projection consumer creates her witnessed episode. Dismiss her with the existing
+party-leave action so she stays at the encounter location. Use ordinary downtime
+commands over several days, return to the same reachable room, and talk about
+the earlier protection. An unrelated topic omits the recalled episode; the
+pair's original dialogue can of course still mention it.
+
+No new player command, alias, syntax, or availability context is introduced.
+Permanent acceptance tests use a synthetic card and fixed combat rolls plus
+`FakeLLMClient`; the separate registered authored-data contract checks the shipped
+card and setup. A controlled recorded/offline smoke can run the focused
+`DurableDialogueTests.test_real_protection_commit_multi_day_revisit_and_permissioned_recall`
+and `test_offline_delivered_greeting_is_durable_but_silence_is_not` labels through
+the guarded Evennia test entry point. Do not enable live model/image services for
+automated checks or assert live wording. New delta-only requirement annotations
+are added by the later spec-sync owner after obtaining their canonical main IDs;
+this change annotates substantive tests against the existing main IDs.

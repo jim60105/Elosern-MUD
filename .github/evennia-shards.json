@@ -227,7 +227,11 @@
         "world.quests",
         "world.skills",
         "world.art",
-        "world.narrative",
+        "world.narrative.tests.test_dialogue_memory",
+        "world.narrative.tests.test_narrative_context",
+        "world.narrative.tests.test_narrative_events",
+        "world.narrative.tests.test_narrative_fast_recall",
+        "world.narrative.tests.test_narrative_memory",
         "world.ai",
         "world.lore"
       ]

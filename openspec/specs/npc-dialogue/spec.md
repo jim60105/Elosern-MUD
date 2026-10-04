@@ -1,7 +1,9 @@
 ## Purpose
 
 Defines the NPC dialogue layer that runs a guarded generative reply pipeline for `LLMNPC` entities, builds deterministic and bounded prompts that inject the player's `disguised_stats`, extracts whitelisted, shape-validated intents, and applies verified intents through the deterministic core while degrading to authored greetings or silence offline. The layer preserves the single-writer and transport boundaries: it never mutates state, never opens a network connection itself, and consumes the client through an injected protocol.
+
 ## Requirements
+
 ### Requirement: NPC dialogue runs a guarded generative reply pipeline
 
 `world/ai/npc_dialogue.py` SHALL provide a guarded entry point `generate_npc_reply(...) -> Deferred[NPCDialogueReply | None]` that runs the `npc_dialogue` layer's validation-retry-degrade pipeline (design §7.5) and resolves, on success, to a frozen `NPCDialogueReply` carrying `speech: str` and `intent: dict`; on disabled profile, transport failure, or exhausted retries it SHALL resolve to `None` (the degraded outcome). The client SHALL be a required injected argument, and a call with an explicit `None` client SHALL errback with a named error before any prompt construction or transport work. The output SHALL be validated against the registered `{speech, intent}` jsonschema and the layer's semantic validators, and retried within the `1 + max_retries` budget with the validation errors appended.
@@ -24,7 +26,7 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 
 ### Requirement: NPC dialogue prompts are deterministic, bounded, and inject disguised stats, affinity context, and persona
 
-`build_npc_dialogue_prompt(...)` SHALL produce a deterministic system/user message pair serialized from the NPC's identity (name, description, location), the speaking player's identity and `disguised_stats`, the NPC's affinity context for the speaking player (`affinity` as the true numeric value, `affinity_cap`, and `affinity_stage` as the display stage name), optional persona blocks (the NPC's own persona in the system message and the speaking player's persona as `player.persona`), and a bounded chat-memory window, using stable JSON serialization with hard bounds on memory lines, per-field string length, and total size. The affinity block SHALL be serialized as `player.affinity = {"value": int, "cap": int, "stage": str}` and SHALL be read-only: building a prompt SHALL never create, persist, or mutate an affinity record, and a player without a record SHALL omit the block. The system message SHALL be rendered from the prompt library's `npc_dialogue.system` key via `render_prompt("npc_dialogue.system", name=…, desc=…, location=…, persona=…)` — the library is the sole source of the system-prompt template, and the module SHALL NOT embed it as a Python constant; only the allowlisted `{name}`, `{desc}`, `{location}`, and `{persona}` placeholders are substituted, and `persona` SHALL be passed on every call (the flattened block when one exists, an empty string when not) so the `{persona}` token is always substituted and the empty-substitution output equals the pre-persona system message. The system message SHALL fix the NPC's role, the 正體中文 language, and the output contract: reply with a `{speech, intent}` object, never invent outcomes, express only what the NPC could perceive — including reading the player's `disguised_stats` as the truth — choose `adjust_relation` deltas from the supplied affinity context within the bounded 0–10 range, and treat the numeric affinity value and cap as secrets never spoken aloud. The no-leak check SHALL be installed for a call whenever its secret set is non-empty — including calls with no affinity context but with disguise true values — and SHALL treat a reply whose speech contains the affinity value, the cap, or any bound disguise true value as a decimal integer substring (fullwidth digit forms folded via NFKC normalization) as a validation failure, retried within the budget, and on budget exhaustion degraded to `None` rather than presented; the check SHALL be bound to the individual call's own secret numbers through the request descriptor so interleaved calls never cross-contaminate, and stage names SHALL remain allowed in speech. Identical input SHALL produce byte-identical prompts with no live entity references.
+`build_npc_dialogue_prompt(...)` SHALL produce a deterministic system/user message pair serialized from the NPC's identity (name, description, location), the speaking player's identity and `disguised_stats`, the NPC's affinity context for the speaking player (`affinity` as the true numeric value, `affinity_cap`, and `affinity_stage` as the display stage name), optional persona blocks (the NPC's own persona in the system message and the speaking player's persona as `player.persona`), and a bounded rendered view of durable pair dialogue plus owner-permitted fixed and recalled memories, using stable JSON serialization with hard bounds on memory lines, per-field string length, and total size. The affinity block SHALL be serialized as `player.affinity = {"value": int, "cap": int, "stage": str}` and SHALL be read-only: building a prompt SHALL never create, persist, or mutate an affinity record, and a player without a record SHALL omit the block. The system message SHALL be rendered from the prompt library's `npc_dialogue.system` key via `render_prompt("npc_dialogue.system", name=…, desc=…, location=…, persona=…)` — the library is the sole source of the system-prompt template, and the module SHALL NOT embed it as a Python constant; only the allowlisted `{name}`, `{desc}`, `{location}`, and `{persona}` placeholders are substituted, and `persona` SHALL be passed on every call (the flattened block when one exists, an empty string when not) so the `{persona}` token is always substituted and the empty-substitution output equals the pre-persona system message. The system message SHALL fix the NPC's role, the 正體中文 language, and the output contract: reply with a `{speech, intent}` object, never invent outcomes, express only what the NPC could perceive — including reading the player's `disguised_stats` as the truth — choose `adjust_relation` deltas from the supplied affinity context within the bounded 0–10 range, and treat the numeric affinity value and cap as secrets never spoken aloud. The no-leak check SHALL be installed for a call whenever its secret set is non-empty — including calls with no affinity context but with disguise true values — and SHALL treat a reply whose speech contains the affinity value, the cap, or any bound disguise true value as a decimal integer substring (fullwidth digit forms folded via NFKC normalization) as a validation failure, retried within the budget, and on budget exhaustion degraded to `None` rather than presented; the check SHALL be bound to the individual call's own secret numbers through the request descriptor so interleaved calls never cross-contaminate, and stage names SHALL remain allowed in speech. Identical input SHALL produce byte-identical prompts with no live entity references.
 
 #### Scenario: A disguised elf reads as weak to the NPC
 - **WHEN** a prompt is built for an NPC facing a player whose `disguised_stats` hide their true power
@@ -43,9 +45,8 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 - **THEN** the system message contains the NPC's flattened persona block through `{persona}` and the user payload carries `player.persona` with the player's block, both capped
 
 #### Scenario: Absent persona keeps the byte-identical baseline
-- **WHEN** a prompt is built for an NPC and player with no persona records
-- **THEN** `persona=""` is substituted into `{persona}`, and the system message and user payload
-  are byte-identical to the pre-persona output with no persona token or block present
+- **WHEN** a prompt is built without NPC or player persona records
+- **THEN** `persona=""` is substituted and no player persona token/block is present; the output equals the persona-free baseline for the current context/rendering version, including the same memory sections
 
 #### Scenario: A reply that echoes the secret value is retried
 - **WHEN** a reply's speech contains the affinity value, the cap, or a bound disguise true value as a decimal integer substring
@@ -69,7 +70,7 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 
 #### Scenario: Oversized memory is bounded deterministically
 - **WHEN** the chat memory exceeds the configured window
-- **THEN** the prompt truncates to the fixed window with an explicit marker and never produces an unbounded request
+- **THEN** the rendered view is reduced deterministically with explicit accounting, durable turns remain intact, and no unbounded request is produced
 
 #### Scenario: The system message is rendered from the prompt library
 - **WHEN** the NPC dialogue system message is inspected
@@ -197,24 +198,25 @@ When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `gen
 #### Scenario: A profiled host speaks its profile greeting offline
 - **WHEN** the LLM is offline, an NPC has no table greeting and an empty offline-greeting field, and its persona provenance names a profile that authors a greeting
 - **THEN** the player receives that profile greeting verbatim with no state change
+
 ### Requirement: The LLMNPC entity provides chat memory, thinking state, and a dialogue seam
 
-`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass carrying persistent per-character chat memory, a bounded memory window, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`. Before invoking the guarded pipeline, the seam SHALL consult
+`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass using narrative-owned append-only durable pair turns and a bounded rendered prompt view, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`. Before invoking the guarded pipeline, the seam SHALL consult
 `world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
 that stable rejection line and SHALL NOT build a prompt, run the pipeline, append memory, or
 apply an intent.
 
 #### Scenario: A reply is recorded and a verified intent is applied
 - **WHEN** the player talks to an `LLMNPC` and the guarded pipeline resolves a valid `NPCDialogueReply`
-- **THEN** the NPC's speech is presented to the player, the exchange is appended to the per-character memory within its bound, and a verified intent is applied through the deterministic applier
+- **THEN** the NPC's speech is presented to the player, delivered turn records are appended once to the durable pair stream, and a verified intent is applied through the deterministic applier
 
 #### Scenario: The seam injects affinity context without persisting
 - **WHEN** the player talks to an `LLMNPC` with an existing affinity record and the prompt is built
 - **THEN** the user payload carries the true affinity value, cap, and stage, and the NPC's stored affinity data is unchanged by the talk
 
 #### Scenario: Memory is trimmed to the configured window
-- **WHEN** the per-character chat memory exceeds its configured maximum
-- **THEN** the oldest exchanges are dropped so the memory stays within the bound
+- **WHEN** pair history exceeds the configured rendered window
+- **THEN** only the rendered memory view is trimmed to the configured window; all original turns remain recoverable under narrative ownership and no durable exchange is dropped
 
 #### Scenario: Thinking feedback is bounded and cancelled on a terminal result
 - **WHEN** the LLM reply takes longer than the configured thinking timeout
@@ -283,3 +285,14 @@ Every asynchronous NPC dialogue exchange SHALL capture the NPC's identity and cu
 - **WHEN** an exchange settles as stale-persona after its thinking timer started
 - **THEN** the timer is cancelled, no second request is made, and the pending state ends
 
+### Requirement: NPC context recalls only permitted committed experience
+
+NPC generation SHALL receive owner-permitted cognition and a durable player/NPC turn view from the narrative context builder. An uninformed NPC SHALL NOT receive another owner private memory or hidden world facts. Speech SHALL NOT establish authoritative outcomes.
+
+#### Scenario: Shared protection reaches the response
+- **WHEN** a synthetic observer talks about protection several game days after the encounter
+- **THEN** its recorded request includes the selected episode/provenance and a validated fixture reply can refer to it
+
+#### Scenario: Unrelated question does not force recall
+- **WHEN** the same owner asks about an unrelated topic
+- **THEN** the protection episode is absent from recalled context

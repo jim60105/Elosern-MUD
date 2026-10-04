@@ -1,0 +1,29 @@
+{
+  "record_type": "character",
+  "schema_version": 1,
+  "key": "尤漢娜‧庫柏",
+  "display_name": "尤漢娜‧庫柏",
+  "title": "公會製桶匠",
+  "age": 28,
+  "apparent_age": 28,
+  "race": "human",
+  "subrace": "human_plains",
+  "sex": "female",
+  "stats": {"hp": 150, "mp": 100, "sp": 140, "atk_phys": 5, "agility": 6, "defense": 6, "magic_power": 5, "guild_merit": 0},
+  "disguised_stats": {},
+  "affinity_elements": [],
+  "skills": [],
+  "passives": [],
+  "equipment": {},
+  "inventory": [],
+  "sexual_baseline": {"arousal": "平靜", "wetness": "乾燥", "virgin": false, "sensitivity": {"general": "普通"}},
+  "persona": {
+    "identity": {"public": "阿爾托利亞公會工匠圈的製桶匠，替旅店與冒險者修理盛水的木桶。", "hidden": "擔心家傳工坊的手藝後繼無人，尚未決定是否收學徒。"},
+    "appearance": "二十八歲的人類女子，褐色頭髮束成低辮，右手虎口有刨木留下的薄繭。穿麻布襯衣與皮圍裙，腰間掛著量尺。",
+    "personality": "務實而謹慎，對陌生人先觀察言行，願意為可靠的同行者多花時間。遇到危險會求援，不逞強。",
+    "speech_style": "語氣平實，說明事情時常提尺寸與用途。感謝別人時說出具體原因，熟識以後用名字稱呼對方。",
+    "life_story": "庫柏家世代製桶，姓氏沿用祖先的行業名稱 Cooper。尤漢娜跟隨母親學會刨木與箍桶，在王都公會接工匠委託。今天要到城郊檢查一批製桶木料，希望有人陪她走過野獸出沒的路段。",
+    "habit": "工作前檢查桶箍是否鬆動，收工時把木屑掃到爐邊。",
+    "social_connection": "與阿爾托利亞公會工匠圈往來，替下城旅店供應盛水木桶，也向鐵匠訂製桶箍。"
+  }
+}

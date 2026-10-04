@@ -429,7 +429,7 @@ def _bounded_identity_entries(entries: Any) -> list[dict[str, str]]:
     return bounded
 
 
-def _bounded_memory(memory: Any) -> list[str]:
+def _bounded_memory(memory: Any, omitted: int = 0) -> list[str]:
     """Cap the chat-memory window deterministically with a truncation marker.
 
     Lines are consumed through a fixed-length window so the cap applies before
@@ -438,7 +438,7 @@ def _bounded_memory(memory: Any) -> list[str]:
     exchanges were omitted.
     """
     window = deque(maxlen=MAX_MEMORY_LINES)
-    dropped = 0
+    dropped = omitted
     for line in memory:
         if len(window) == MAX_MEMORY_LINES:
             dropped += 1
@@ -485,7 +485,7 @@ def _system_message(
     ``npc_persona`` is the speaking NPC's flattened persona block (already
     bounded by the PersonaStore contract); it is substituted into the
     ``{persona}`` placeholder on every call, using an empty string when absent
-    so the rendered message is byte-identical to the pre-persona baseline.
+    so rendering matches the persona-free baseline for the current version.
     """
     name = _cap_string(str(npc_context.get("name", "")))
     desc = _cap_string(str(npc_context.get("desc", "")))
@@ -514,6 +514,9 @@ def build_npc_dialogue_prompt(
     *,
     npc_persona: str | None = None,
     player_persona: str | None = None,
+    cognition: str = "",
+    omitted_memory_lines: int = 0,
+    cognition_sources: tuple[dict[str, Any], ...] = (),
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build a deterministic (system, user) message pair for NPC dialogue.
 
@@ -557,8 +560,17 @@ def build_npc_dialogue_prompt(
         player["persona"] = player_persona
     payload = {
         "player": player,
-        "memory": _bounded_memory(memory),
+        "memory": _bounded_memory(memory, omitted_memory_lines),
     }
+    if cognition:
+        payload["cognition"] = cognition
+        payload["cognition_sources"] = [
+            {"source_id": str(source["source_id"])[:255],
+             "record_id": int(source["record_id"]),
+             "revision_number": int(source["revision_number"]),
+             "knowledge_scope": str(source["knowledge_scope"])[:32]}
+            for source in cognition_sources[:13]
+        ]
     user = {"role": "user", "content": _bounded_serialization(payload)}
     return system, user
 
@@ -620,6 +632,7 @@ def generate_npc_reply(
     npc_persona: str | None = None,
     player_persona: str | None = None,
     no_leak_secrets: frozenset[str] | None = None,
+    prepared_messages: tuple[dict[str, str], ...] | None = None,
 ):
     """Run the npc_dialogue layer's guarded pipeline for one NPC reply.
 
@@ -632,14 +645,14 @@ def generate_npc_reply(
             location) as the caller resolves it.
         player_context: The speaking player's plain-data identity and
             ``disguised_stats`` (what the NPC perceives).
-        memory: The bounded chat-memory window lines for this conversation.
+        memory: The bounded rendered view of the durable pair turn stream.
         affinity_context: The NPC's read-only affinity context for the
             speaking player (true value, cap, stage), injected as
             ``player.affinity`` in the user payload; ``None`` omits the block.
         npc_persona: The speaking NPC's flattened persona block (already
             bounded by the PersonaStore contract), substituted into the
             system message's ``{persona}`` placeholder; ``None`` substitutes
-            an empty string and keeps the pre-persona baseline byte-identical.
+            an empty string and matches the current persona-free rendering.
         player_persona: The speaking player's flattened persona block,
             serialized as ``player.persona`` beside ``player.affinity`` when
             present; ``None`` omits the key.
@@ -648,6 +661,9 @@ def generate_npc_reply(
             regardless of the affinity context (so disguise true values stay
             protected without an affinity record); when absent, an affinity
             context still binds exactly its own value and cap as before.
+        prepared_messages: The deterministic orchestration's captured final
+            message pair, including permitted cognition and provenance. This
+            value-only seam performs no persistence in the generative layer.
 
     Returns:
         A Deferred resolving to a frozen ``NPCDialogueReply`` on success, or to
@@ -660,7 +676,7 @@ def generate_npc_reply(
         )
     _require_registered()
     try:
-        system, user = build_npc_dialogue_prompt(
+        system, user = prepared_messages or build_npc_dialogue_prompt(
             npc_context,
             player_context,
             memory,

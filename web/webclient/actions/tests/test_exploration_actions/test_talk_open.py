@@ -16,6 +16,7 @@ from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.exploration_actions import _talk_open_adapter
 from world.ai.fake_client import FakeLLMClient
+from world.narrative.models import DialogueTurn
 from world.rules.clock import get_world_clock
 from world.rules.dialogue import (
     DialogueDefinition,
@@ -207,7 +208,7 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         host = self._scripted_host()
         tick_before = int(get_world_clock().tick)
         relations_before = host.db.relations_data
-        memory_before = dict(host.db.chat_memory or {})
+        memory_before = DialogueTurn.objects.count()
         client = FakeLLMClient()
         with patch(
             "web.webclient.actions.dialogue_composition.build_dialogue_client",
@@ -217,7 +218,7 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(int(get_world_clock().tick), tick_before)
         self.assertEqual(host.db.relations_data, relations_before)
-        self.assertEqual(dict(host.db.chat_memory or {}), memory_before)
+        self.assertEqual(DialogueTurn.objects.count(), memory_before)
         self.assertEqual(client.calls, [])
         build_client.assert_not_called()
 

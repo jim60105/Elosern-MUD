@@ -1,6 +1,55 @@
 from django.db import models
 
 
+class AppendOnlyDialogueQuerySet(models.QuerySet):
+    """Reject every update/delete path for original dialogue speech."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Dialogue turns are append-only.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dialogue turns are append-only.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Dialogue turns are append-only.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Dialogue turns are append-only.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class DialogueTurn(models.Model):
+    """Original pair speech, uniquely settled by submission/kind."""
+
+    objects = AppendOnlyDialogueQuerySet.as_manager()
+    submission_id = models.CharField(max_length=64, db_index=True)
+    kind = models.CharField(max_length=16)
+    npc_id = models.CharField(max_length=64, db_index=True)
+    player_id = models.CharField(max_length=64, db_index=True)
+    speaker = models.CharField(max_length=255)
+    speech = models.TextField()
+    tick = models.IntegerField(default=0)
+    provenance = models.JSONField(default=dict)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Dialogue turns are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Dialogue turns are append-only.")
+
+    class Meta:
+        app_label = "narrative"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission_id", "kind"], name="unique_dialogue_submission_kind"
+            )
+        ]
+
+
 class NarrativeEvent(models.Model):
     """An immutable, committed narrative occurrence."""
 

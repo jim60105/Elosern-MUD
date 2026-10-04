@@ -36,6 +36,7 @@ from world.ai.npc_dialogue import (
 )
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+from world.narrative.dialogue import pair_view
 from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
@@ -206,15 +207,15 @@ class DialogueExchangeHelperTests(EvenniaTest):
         self.assertTrue(failure.check(NPCDialogueClientRequiredError))
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
-    def test_exchange_appends_only_the_reply_never_the_degraded_greeting(self):
+    def test_exchange_records_submission_but_not_an_undelivered_reply(self):
         client = FakeLLMClient()
         client.add_response(
             lambda d: True,
             _reply_text(speech="我願意與你同行。", intent={"kind": "none"}),
         )
         await_result(self.npc.run_npc_exchange("請與我同行", self.player, client))
-        lines = self.npc._chat_lines(self.player)
-        self.assertEqual(lines, ["exchange player: 請與我同行", "交換精靈: 我願意與你同行。"])
+        lines = pair_view(self.npc, self.player)[0]
+        self.assertEqual(lines, ["exchange player: 請與我同行"])
 
 
 class LLMNPCSeamTests(EvenniaTest):
@@ -253,7 +254,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertEqual(_inventory(self.player), [_GIFT_KEY])
         self.assertEqual(_inventory(self.npc), [])
-        lines = self.npc._chat_lines(self.player)
+        lines = pair_view(self.npc, self.player)[0]
         self.assertEqual(lines, ["dialogue player: 你好", "對話精靈: 我給你一瓶藥水。"])
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
@@ -268,7 +269,7 @@ class LLMNPCSeamTests(EvenniaTest):
             client.add_response(lambda d: True, _reply_text(speech=reply))
             with patch.object(self.player, "msg"):
                 await_result(self.npc.at_talked_to(greeting, self.player, client))
-        lines = self.npc._chat_lines(self.player)
+        lines = pair_view(self.npc, self.player)[0]
         self.assertEqual(len(lines), 2)
         self.assertEqual(lines, ["dialogue player: 問候三", "對話精靈: 回應三。"])
 
@@ -301,7 +302,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(msg.call_count, 0)
         self.assertEqual(len(client.calls), 0)
         self.assertEqual(_inventory(self.player), [])
-        lines = self.npc._chat_lines(self.player)
+        lines = pair_view(self.npc, self.player)[0]
         self.assertEqual(len(lines), 1)
 
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
@@ -313,7 +314,7 @@ class LLMNPCSeamTests(EvenniaTest):
         texts = _msg_texts(msg)
         self.assertEqual(texts, ["她現在正忙著，沒有理會你。"])
         self.assertEqual(len(client.calls), 0)
-        self.assertEqual(self.npc._chat_lines(self.player), [])
+        self.assertEqual(pair_view(self.npc, self.player)[0], [])
         self.assertEqual(_inventory(self.player), [])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
@@ -337,7 +338,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertTrue(any("離開" in text for text in texts))
         self.assertEqual(_inventory(self.player), [])
         self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
-        self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
+        self.assertIn("對話精靈: 我給你一瓶藥水。", pair_view(self.npc, self.player)[0])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_npc_leaving_mid_exchange_shows_the_note_and_drops_the_intent(self):
@@ -359,7 +360,7 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertTrue(any("離開" in text for text in texts))
         self.assertEqual(_inventory(self.player), [])
         self.assertEqual(_inventory(self.npc), [_GIFT_KEY])
-        self.assertIn("對話精靈: 我給你一瓶藥水。", self.npc._chat_lines(self.player))
+        self.assertIn("對話精靈: 我給你一瓶藥水。", pair_view(self.npc, self.player)[0])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_busy_transition_mid_exchange_shows_the_note_and_drops_the_intent(self):
@@ -1089,7 +1090,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertIs(outcome, STALE_PERSONA)
         self.assertEqual(settled, [])
         self.assertEqual(_inventory(self.player), [])
-        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        self.assertEqual(pair_view(self.npc, self.player)[0], ["test player: 你好"])
         texts = _msg_texts(msg)
         self.assertIn(STALE_PERSONA_NOTE, texts)
         self.assertNotIn("請出示通行證。", " ".join(texts))
@@ -1114,7 +1115,7 @@ class DialogueVersionGateTests(EvenniaTest):
             outcome = await_result(d)
 
         self.assertIs(outcome, STALE_PERSONA)
-        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        self.assertEqual(pair_view(self.npc, self.player)[0], ["test player: 你好"])
         texts = _msg_texts(msg)
         self.assertIn(STALE_PERSONA_NOTE, texts)
         self.assertNotIn("你好冒險者。", " ".join(texts))
@@ -1148,7 +1149,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertIsNot(outcome, STALE_PERSONA)
         self.assertEqual(settled, ["這給你。"])
         self.assertEqual(_inventory(self.player), [_GIFT_KEY])
-        self.assertIn("這給你。", self.npc._chat_lines(self.player)[1])
+        self.assertIn("這給你。", pair_view(self.npc, self.player)[0][1])
         texts = _msg_texts(msg)
         self.assertIn("守衛NPC說：這給你。", texts)
         self.assertNotIn(STALE_PERSONA_NOTE, texts)
@@ -1170,7 +1171,7 @@ class DialogueVersionGateTests(EvenniaTest):
         self.assertTrue(result.stale_persona)
         self.assertFalse(result.degraded)
         self.assertIsNone(result.reply)
-        self.assertEqual(self.npc._chat_lines(self.player), ["test player: 你好"])
+        self.assertEqual(pair_view(self.npc, self.player)[0], ["test player: 你好"])
         self.assertEqual(len(client.calls), 1)
 
     @covers_requirement("npc-dialogue::a-persona-edit-during-an-asynchronous-exchange-discards-the-stale-response")
