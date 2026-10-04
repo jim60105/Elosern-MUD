@@ -37,7 +37,7 @@ const OVERVIEW = overviewArgs(PANEL, {
   active: false,
 });
 
-// The command panel at 1920×1080 (640×300), positioned so the popover's
+// The command panel at 1451x790 (484×220), positioned so the popover's
 // layer fills it, with the inactive overview underneath.
 const overPanel = (story) => ({
   render: () =>
@@ -46,8 +46,8 @@ const overPanel = (story) => ({
       {
         style: {
           position: "relative",
-          width: "640px",
-          height: "300px",
+          width: "484px",
+          height: "220px",
           boxSizing: "border-box",
           overflow: "hidden",
           background: "linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))",

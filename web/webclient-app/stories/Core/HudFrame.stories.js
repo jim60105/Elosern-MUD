@@ -20,7 +20,7 @@ const sample = (label, extra = "") =>
       style:
         "box-sizing:border-box;height:100%;display:grid;place-items:center;" +
         "border:1px dashed #bda47766;border-radius:6px;color:#cdbf9f;" +
-        "font:12px var(--f-sans);letter-spacing:.08em;" + extra,
+        "font:16px var(--f-sans);letter-spacing:.08em;" + extra,
     },
     label,
   );
@@ -45,8 +45,8 @@ const renderFrame = (args) => ({
           : null,
       vitals: () => sample("vitals ‧ 生命／狀態／同伴", "height:120px;"),
       map: () => [
-        sample("map ‧ 地點卡", "width:218px;height:64px;align-self:flex-end;"),
-        sample("map ‧ 小地圖", "width:218px;height:200px;align-self:flex-end;"),
+        sample("map ‧ 地點卡", "width:250px;height:64px;align-self:flex-end;"),
+        sample("map ‧ 小地圖", "width:250px;height:200px;align-self:flex-end;"),
         sample("map ‧ 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
       ],
       "band-message": () => sample(args.mode === "dialogue" ? "band-message ‧ 訊息視窗（全寬，名牌）" : "band-message ‧ 訊息視窗（2/3）"),
@@ -190,8 +190,8 @@ const renderHoldLoop = (args) => ({
             : null,
         vitals: () => sample("vitals ‧ 生命／狀態／同伴", "height:120px;"),
         map: () => [
-          sample("map ‧ 地點卡", "width:218px;height:64px;align-self:flex-end;"),
-          sample("map ‧ 小地圖（已回到探索）", "width:218px;height:200px;align-self:flex-end;"),
+          sample("map ‧ 地點卡", "width:250px;height:64px;align-self:flex-end;"),
+          sample("map ‧ 小地圖（已回到探索）", "width:250px;height:200px;align-self:flex-end;"),
           sample("map ‧ 目標（一行）", "height:32px;align-self:flex-end;padding:0 12px;"),
         ],
         "band-message": () => sample("band-message ‧ 訊息視窗（最後的節拍）"),

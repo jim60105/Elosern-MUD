@@ -84,7 +84,7 @@ export const Storyboard = {
         }) }),
         h("section", {
           class: "gallery-ui",
-          style: "position:fixed;top:0;left:0;right:0;z-index:5000;background:#11151f;border-bottom:1px solid #c9ae75;padding:8px 16px;display:flex;align-items:center;gap:12px;font-size:12px",
+          style: "position:fixed;top:0;left:0;right:0;z-index:5000;background:#11151f;border-bottom:1px solid #c9ae75;padding:8px 16px;display:flex;align-items:center;gap:12px;font-size:16px",
           "aria-label": "分鏡展示控制",
         }, [
           h("strong", "互動分鏡"),

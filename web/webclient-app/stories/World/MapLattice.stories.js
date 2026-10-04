@@ -18,13 +18,13 @@ import {
 // the old private copy deleted), reusing the existing `local_map` fixtures
 // so both surfaces render the identical committed payload.
 
-// The minimap island's fixed 208px canvas (the island sits at the top of the
+// The minimap island's fixed 240px canvas (the island sits at the top of the
 // stage's `map` anchor). Island-scale stories fill it the way the island
 // does, so a story shows the same canvas the minimap draws rather than a
 // natural-size one.
 const renderLattice = (args) => ({
   render: () =>
-    h("div", { style: "width: 208px;" }, [h(MapLattice, args)]),
+    h("div", { style: "width: 240px;" }, [h(MapLattice, args)]),
 });
 
 const renderOverlayScale = (args) => ({
@@ -34,7 +34,7 @@ const renderOverlayScale = (args) => ({
         colPitch: 280,
         rowPitch: 212,
         labelMax: 10,
-        labelFont: 14,
+        labelFont: 16,
         markerScale: 2.2,
         fitView: true,
         ...args,
@@ -56,18 +56,18 @@ const latticeOf = (fixture) => {
   return {
     localMap: model,
     variant: model.layoutVariant,
-    canvasSize: 208,
+    canvasSize: 240,
     colPitch: 40,
     rowPitch: 40,
-    labelFont: 9,
+    labelFont: 16,
     showAxis: true,
     fogVignette: true,
     markerNames: true,
   };
 };
 
-// Island (minimap) scale: the crowding fix's decoupled pitches (58px
-// column / 44px row), 4-char label truncation, markerScale 1.
+// Island (minimap) scale: the island's declared 40px square pitch, 4-char
+// label truncation, markerScale 1 and the shared 16-unit label steps.
 // IslandScaleSample carries an outside-extent remembered place, so the
 // lattice variant draws its edge direction marker in the gutter (name-free
 // on the island — the remembered list stays the canonical reading path).

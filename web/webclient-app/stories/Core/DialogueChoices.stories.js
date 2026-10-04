@@ -31,7 +31,7 @@ const LOCAL_MAP = localMapFixture([
 const EXITS = overviewExits(overviewArgs(ROOM).menu);
 
 // The list sits in a box the size of the `choices` anchor's span at
-// 1920×1080 (560px wide), over a dim stage-like ground, and takes focus on
+// 1451x790 (560px wide), over a dim stage-like ground, and takes focus on
 // mount the way the shell hands it focus.
 const stageBox = (story) => ({
   render: () =>
