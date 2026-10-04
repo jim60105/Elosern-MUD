@@ -36,12 +36,14 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
   it("renders identical node/edge/legend content at the island's default scale", () => {
     const w = mountLattice();
-    // The grid fixture's in-view lattice: 3 cols × 1 row. The remembered
-    // fixture node (5, 5) sits outside the in-view extent, so the island
-    // grows an edge-marker gutter around the natural 174×58 canvas
-    // (map-02 D3b; the model's gutter for this fixture is 26.4558…).
+    // The grid fixture's in-view lattice: 3 cols × 1 row. The 16-unit labels
+    // raise the declared 58-unit column pitch to 65 — ((8 + 4) / 2 × CELL_EM
+    // + 0.5) × 16 = 65 — and the remembered fixture node (5, 5) sits outside
+    // the in-view extent, so the island grows an edge-marker gutter around the
+    // natural 195×58 canvas (map-02 D3b; the model's name-free gutter for this
+    // fixture is 26.4558…).
     const svg = w.find("svg.local-map__lattice");
-    expect(Number(svg.attributes("width"))).toBeCloseTo(226.91168824543144, 6);
+    expect(Number(svg.attributes("width"))).toBeCloseTo(247.91168824543144, 6);
     expect(Number(svg.attributes("height"))).toBeCloseTo(110.91168824543144, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     // The payload lists 3 edges, but the third one ends at the remembered
@@ -62,8 +64,8 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // The natural canvas is 3 × 280px wide, 1 × 212px row pitch + 14px
     // label band; the edge-marker gutter (model value 271.6480… at the
     // overlay's name-bearing geometry, whose outward name box is 22
-    // monospace cells at 11) grows it on every side (map-02 D3b).
-    const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 11 + 2;
+    // monospace cells at 16) grows it on every side (map-02 D3b).
+    const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 16 + 2;
     expect(Number(svg.attributes("width"))).toBeCloseTo(840 + 2 * expectedGutter, 6);
     expect(Number(svg.attributes("height"))).toBeCloseTo(226 + 2 * expectedGutter, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
@@ -132,7 +134,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
         canvasHeight: 212 + 14,
         current: { x: 420, y: 106 },
         markerHalf: 9 * 4.83,
-        nameWidth: 22 * CELL_EM * 11,
+        nameWidth: 22 * CELL_EM * 16,
         nameHeight: 16,
       },
     ).gutter;
@@ -163,14 +165,15 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       "grid:altoria:2:2": { x1: centers["grid:altoria:2:2"].x - UNVISITED_HALF, y1: centers["grid:altoria:2:2"].y - UNVISITED_HALF, x2: centers["grid:altoria:2:2"].x + UNVISITED_HALF, y2: centers["grid:altoria:2:2"].y + UNVISITED_HALF },
       "grid:altoria:0:2": { x1: centers["grid:altoria:0:2"].x - VISITED_HALF, y1: centers["grid:altoria:0:2"].y - VISITED_HALF, x2: centers["grid:altoria:0:2"].x + VISITED_HALF, y2: centers["grid:altoria:0:2"].y + VISITED_HALF },
     };
-    // Node labels: baseline at the scaled offset (13×4.83 + 13 ≈ 75.8px
-    // below the node origin); the 11px monospace line box is modelled as
-    // 10.5px above and 3px below the baseline. The drawn label is measured
-    // in monospace cells of CELL_EM × 11 (a wide glyph is two cells, the
-    // truncation "…" one).
-    const LABEL_ASCENT = 10.5;
-    const LABEL_DESCENT = 3;
-    const labelY = 13 * 4.83 + 13;
+    // Node labels: baseline at the scaled offset (11×4.83 + 2 + 16 ≈ 71.1px
+    // below the node origin); the 16px monospace line box is modelled as
+    // 15.27px above and 4.36px below the baseline (the old 11px model's
+    // 10.5 / 3 scaled by 16/11). The drawn label is measured in monospace
+    // cells of CELL_EM × 16 (a wide glyph is two cells, the truncation "…"
+    // one).
+    const LABEL_ASCENT = (10.5 * 16) / 11;
+    const LABEL_DESCENT = (3 * 16) / 11;
+    const labelY = 11 * 4.83 + 2 + 16;
     function labelBox(id) {
       const center = centers[id];
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
@@ -181,7 +184,7 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
         .map((n) => n.textContent)
         .join("")
         .trim();
-      const width = textCells(label) * CELL_EM * 11;
+      const width = textCells(label) * CELL_EM * 16;
       return {
         x1: center.x - width / 2,
         y1: center.y + labelY - LABEL_ASCENT,

@@ -437,7 +437,7 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     const css = styleBlock("components/HudFrame.vue");
     expect(css).not.toContain("--dock-h");
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
-    expect(tokens).toContain("--band-h: clamp(260px * var(--ui-scale), 27.8vh, 400px * var(--ui-scale));");
+    expect(tokens).toContain("--band-h: clamp(190px * var(--ui-scale), 27.85vh, 400px * var(--ui-scale));");
     expect(tokens).toContain("--stage-content-bottom: calc(var(--band-h) + var(--command-line-h));");
     expect(tokens).not.toContain("--dock-h");
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");

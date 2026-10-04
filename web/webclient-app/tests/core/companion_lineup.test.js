@@ -23,19 +23,27 @@ describe("companion standing lineup", () => {
         expect(slot.z).toBeLessThan(slots[i].z);
         expect(slot.lift).toBe(0);
       });
-      for (const [width, height] of [[1920, 1080], [1440, 900], [1280, 720]]) {
-        const band = Math.max(260, Math.min(400, height * 0.278));
-        const actorHeight = Math.min(height * 0.62, 680, height - 48 - band);
+      // The reference viewport and its larger-display pins
+      // (retarget-desktop-viewport-contract D8): 1451x790 (S = 1), 1741x948
+      // (S ≈ 1.2, uncapped) and 2560x1440 (S = 1.4, the cap). The band and the
+      // anchor model the shared tokens at each chrome factor.
+      for (const [width, height] of [[1451, 790], [1741, 948], [2560, 1440]]) {
+        const s = Math.min(1.4, Math.max(1, Math.min(height / 790, width / 1451)));
+        const band = Math.max(190 * s, Math.min(400 * s, height * 0.2785));
+        const actorHeight = Math.min(height * 0.62, 680 * s, height - 48 * s - band);
         const anchorWidth = actorHeight * 2 / 3;
-        const column = width <= 1440 ? 216 : Math.max(220, Math.min(330, width * 0.2));
-        const inset = Math.max(width * 0.06, column + 8 - actorHeight / 3);
+        const column = width <= 1350 ? 216 * s : Math.max(220 * s, Math.min(330 * s, width * 0.2));
+        const inset = Math.max(width * 0.06, column + 8 * s - actorHeight / 3);
         const span = companionLineupSpan(count) * anchorWidth;
         const shift = Math.max(0, span - anchorWidth - inset + 16);
         expect(inset + anchorWidth + shift - span).toBeGreaterThanOrEqual(16);
         expect(inset + anchorWidth + shift).toBeLessThan(width / 2);
         const choiceLeft = Math.max(width * 0.3, width / 2 - 280);
         const maximumSpan = (choiceLeft - 32) / anchorWidth;
-        expect(16 + companionLineupSpan(count, maximumSpan) * anchorWidth).toBeLessThanOrEqual(choiceLeft - 16);
+        // The span cap is exact, so the only slack needed is floating point.
+        expect(16 + companionLineupSpan(count, maximumSpan) * anchorWidth).toBeLessThanOrEqual(
+          choiceLeft - 16 + 1e-6,
+        );
       }
     }
   });

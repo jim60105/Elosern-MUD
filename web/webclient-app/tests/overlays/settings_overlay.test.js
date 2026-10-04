@@ -48,7 +48,9 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
   });
 
   it("marks the current scale step with a non-colour indicator (task 7.2)", () => {
-    wrapper = mount(SettingsOverlay, { props: { fontScale: 0.92 } });
+    // A− is the 16px reading floor: multiplier 1 at the reference
+    // (retarget-desktop-viewport-contract D6).
+    wrapper = mount(SettingsOverlay, { props: { fontScale: 1 } });
     const aMinus = wrapper.get('[data-testid="settings-overlay-scale-A−"]');
     expect(aMinus.classes()).toContain("on");
     expect(aMinus.attributes("aria-pressed")).toBe("true");
@@ -58,7 +60,7 @@ describe("SettingsOverlay (H5 body, webclient-hud-05-overlays-and-command-line)"
     wrapper = mount(SettingsOverlay);
     wrapper.get('[data-testid="settings-overlay-scale-A+"]').trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.emitted("scale-change")).toEqual([[1.12]]);
+    expect(wrapper.emitted("scale-change")).toEqual([[1.25]]);
   });
 
   it("emits motion-level-change across the three levels", async () => {

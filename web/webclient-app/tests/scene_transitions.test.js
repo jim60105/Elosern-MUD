@@ -308,14 +308,14 @@ describe("StatusPanel reveal", () => {
 });
 
 describe("MapLattice pan", () => {
-  // jsdom has no layout: give the canvas its 208px CSS box.
+  // jsdom has no layout: give the canvas its 240px CSS box.
   beforeEach(() => {
     vi.spyOn(SVGElement.prototype, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, top: 0, left: 0, right: 208, bottom: 208, width: 208, height: 208,
+      x: 0, y: 0, top: 0, left: 0, right: 240, bottom: 240, width: 240, height: 240,
     });
   });
 
-  const ISLAND = { canvasSize: 208, colPitch: 40, rowPitch: 40, labelFont: 12, showAxis: true };
+  const ISLAND = { canvasSize: 240, colPitch: 40, rowPitch: 40, labelFont: 16, showAxis: true };
   const groups = (w) => w.findAll(".map-lattice__pan").map((g) => g.element);
 
   // Every `--pan-*` / `--glide-*` write, with the declaration it went to
@@ -379,7 +379,7 @@ describe("MapLattice pan", () => {
     const startY = Number.parseFloat(own("--pan-y")[0]);
     // On the first frame the node the player left is on the screen point
     // where it stood, whatever the new placement and viewBox.
-    const size = { width: 208, height: 208 };
+    const size = { width: 240, height: 240 };
     const was = toScreen({ viewBox: vbBefore, size }, before);
     const is = toScreen({ viewBox: viewBoxOf(wrapper), size }, { x: after.x + startX, y: after.y + startY });
     expect(is.x).toBeCloseTo(was.x, 6);

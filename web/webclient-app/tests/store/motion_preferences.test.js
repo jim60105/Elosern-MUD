@@ -180,7 +180,10 @@ describe("motion level preference", () => {
     });
     const store = freshStore();
     expect(store.view.motionLevel).toBe("reduced");
-    expect(store.view.fontScale).toBe(1.12);
+    // The legacy 1.12 prose multiplier loads as the default step A
+    // (retarget-desktop-viewport-contract D6); the invalid motion level is
+    // discarded as if nothing were stored.
+    expect(store.view.fontScale).toBe(1.125);
   });
 
   it("resets a version-2 wrapper to the version-3 default", () => {
@@ -193,7 +196,7 @@ describe("motion level preference", () => {
     });
     const store = freshStore();
     expect(store.view.motionLevel).toBe("full");
-    expect(store.view.fontScale).toBe(1);
+    expect(store.view.fontScale).toBe(1.125);
     expect(ROOT.getAttribute("data-motion")).toBe("full");
     expect(stored().layout_version).toBe(3);
   });

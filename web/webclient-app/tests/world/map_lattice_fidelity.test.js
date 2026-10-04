@@ -32,8 +32,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
   const ISLAND_PROPS = {
     colPitch: 40,
     rowPitch: 40,
-    labelFont: 12,
-    canvasSize: 208,
+    labelFont: 16,
+    canvasSize: 240,
     showAxis: true,
     fogVignette: true,
     markerNames: true,
@@ -55,8 +55,11 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(pattern.exists()).toBe(true);
       const pitchW = Number(pattern.attributes("width"));
       const pitchH = Number(pattern.attributes("height"));
-      expect(pitchW).toBe(40);
-      expect(pitchH).toBe(40);
+      // The reported wilderness shape's 240px square grows the drawn pitch to
+      // 45 (its gutter reserves 44.456 units a side), and the dot field is
+      // registered to that drawn pitch, not to the declared 40 units.
+      expect(pitchW).toBe(45);
+      expect(pitchH).toBe(45);
 
       const circle = pattern.find("circle");
       expect(circle.exists()).toBe(true);
@@ -263,20 +266,20 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const islandLabel = wIsland.get(".local-map__node-label");
-      expect(islandLabel.attributes("style")).toContain("font-size: 12px");
-      expect(islandLabel.attributes("y")).toBe("25");
+      expect(islandLabel.attributes("style")).toContain("font-size: 16px");
+      expect(islandLabel.attributes("y")).toBe("29");
 
       const wOverlay = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
         colPitch: 280,
         rowPitch: 212,
         markerScale: 4.83,
-        labelFont: 11,
+        labelFont: 16,
         labelMax: 10,
       });
       const overlayLabel = wOverlay.get(".local-map__node-label");
-      expect(overlayLabel.attributes("style")).toContain("font-size: 11px");
-      expect(Number(overlayLabel.attributes("y"))).toBeCloseTo(13 * 4.83 + 13, 2);
+      expect(overlayLabel.attributes("style")).toContain("font-size: 16px");
+      expect(Number(overlayLabel.attributes("y"))).toBeCloseTo(11 * 4.83 + 2 + 16, 2);
     });
 
     it("Task 2.2: derives square pitch 40 on uniform wilderness (repetition suppressed) and clears the drawn adjacent labels", () => {
@@ -298,7 +301,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(uniformWildernessPayload),
         colPitch: 40,
         rowPitch: 40,
-        labelFont: 12,
+        labelFont: 16,
       });
       const visibleLabels = wUniform.findAll(".local-map__node-label").filter((l) => (l.element.lastChild?.textContent || "").trim() !== "");
       expect(visibleLabels).toHaveLength(1);
@@ -322,17 +325,17 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         localMap: localMapModelFor(distinctAdjacentPayload),
         colPitch: 40,
         rowPitch: 40,
-        labelFont: 12,
+        labelFont: 16,
       });
       // webclient-map-legibility: the label term clears the labels actually
       // drawn, measured in monospace cells — two 4-glyph CJK names (8 cells
-      // each) need ceil(((8 + 8) / 2 × CELL_EM + 0.5) × 12) = 63.
+      // each) need ceil(((8 + 8) / 2 × CELL_EM + 0.5) × 16) = 83.
       const patternDistinct = wDistinct.find("defs pattern");
-      expect(Number(patternDistinct.attributes("width"))).toBe(63);
-      expect(Number(patternDistinct.attributes("height"))).toBe(63);
+      expect(Number(patternDistinct.attributes("width"))).toBe(83);
+      expect(Number(patternDistinct.attributes("height"))).toBe(83);
 
       // A short name beside a long one needs less:
-      // ceil(((4 + 8) / 2 × CELL_EM + 0.5) × 12) = 49.
+      // ceil(((4 + 8) / 2 × CELL_EM + 0.5) × 16) = 65.
       const shortLong = {
         ...distinctAdjacentPayload,
         nodes: [
@@ -340,12 +343,12 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
           { id: "g:1:0", label: "霧骨渡口", x: 1, y: 0, visibility: "visible_unvisited" },
         ],
       };
-      const wShortLong = mountLattice({ localMap: localMapModelFor(shortLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
-      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(49);
+      const wShortLong = mountLattice({ localMap: localMapModelFor(shortLong), colPitch: 40, rowPitch: 40, labelFont: 16 });
+      expect(Number(wShortLong.find("defs pattern").attributes("width"))).toBe(65);
 
       // Two truncated names (labelMax 4 wide glyphs + the narrow "…" = 9
       // cells) are the worst case, never looser than the old
-      // (labelMax + 1) * labelFont + 3 = 63: ceil((9 × CELL_EM + 0.5) × 12) = 70.
+      // (labelMax + 1) * labelFont + 3 = 83: ceil((9 × CELL_EM + 0.5) × 16) = 93.
       const longLong = {
         ...distinctAdjacentPayload,
         nodes: [
@@ -353,15 +356,15 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
           { id: "g:1:0", label: "南岸大道西段", x: 1, y: 0, visibility: "visible_unvisited" },
         ],
       };
-      const wLongLong = mountLattice({ localMap: localMapModelFor(longLong), colPitch: 40, rowPitch: 40, labelFont: 12 });
-      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(70);
-      expect(70).toBeGreaterThanOrEqual((4 + 1) * 12 + 3);
+      const wLongLong = mountLattice({ localMap: localMapModelFor(longLong), colPitch: 40, rowPitch: 40, labelFont: 16 });
+      expect(Number(wLongLong.find("defs pattern").attributes("width"))).toBe(93);
+      expect(93).toBeGreaterThanOrEqual((4 + 1) * 16 + 3);
 
       const wOverlayDistinct = mountLattice({
         localMap: localMapModelFor(distinctAdjacentPayload),
         colPitch: 280,
         rowPitch: 212,
-        labelFont: 11,
+        labelFont: 16,
         labelMax: 10,
       });
       const patternOverlay = wOverlayDistinct.find("defs pattern");
@@ -370,7 +373,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
     });
 
     it("Task 2.3: verifies all 6 rows of Design D5 Table and scale <= 1 invariant", () => {
-      // 1. 3x3 core with no gateways: pitch 59 and scale 1
+      // 1. 3x3 core with no gateways: pitch 60 (the 1.5x cap) and scale 1
       const noGatewaysPayload = {
         ...UNIFORM_WILDERNESS_PAYLOAD,
         nodes: UNIFORM_WILDERNESS_PAYLOAD.nodes.filter((n) => n.visibility !== "remembered"),
@@ -380,14 +383,14 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const svg1 = wNoGateways.get("svg.local-map__lattice");
-      expect(Number(svg1.attributes("width"))).toBe(208);
-      expect(Number(svg1.attributes("height"))).toBe(208);
-      expect(svg1.attributes("viewBox")).toBe("0 0 208 208");
-      expect(svg1.attributes("style")).toContain("width: calc(208px * var(--ui-scale, 1))");
-      expect(svg1.attributes("style")).toContain("height: calc(208px * var(--ui-scale, 1))");
+      expect(Number(svg1.attributes("width"))).toBe(240);
+      expect(Number(svg1.attributes("height"))).toBe(240);
+      expect(svg1.attributes("viewBox")).toBe("0 0 240 240");
+      expect(svg1.attributes("style")).toContain("width: calc(240px * var(--ui-scale, 1))");
+      expect(svg1.attributes("style")).toContain("height: calc(240px * var(--ui-scale, 1))");
       const pattern1 = wNoGateways.find("defs pattern");
-      expect(Number(pattern1.attributes("width"))).toBe(59);
-      expect(Number(pattern1.attributes("height"))).toBe(59);
+      expect(Number(pattern1.attributes("width"))).toBe(60);
+      expect(Number(pattern1.attributes("height"))).toBe(60);
 
       // 2. Single node: pitch 60 (1.5x cap) and scale 1
       const wSingle = mountLattice({
@@ -395,33 +398,36 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const svg2 = wSingle.get("svg.local-map__lattice");
-      expect(Number(svg2.attributes("width"))).toBe(208);
-      expect(Number(svg2.attributes("height"))).toBe(208);
-      expect(svg2.attributes("viewBox")).toBe("0 0 208 208");
-      expect(svg2.attributes("style")).toContain("width: calc(208px * var(--ui-scale, 1))");
-      expect(svg2.attributes("style")).toContain("height: calc(208px * var(--ui-scale, 1))");
+      expect(Number(svg2.attributes("width"))).toBe(240);
+      expect(Number(svg2.attributes("height"))).toBe(240);
+      expect(svg2.attributes("viewBox")).toBe("0 0 240 240");
+      expect(svg2.attributes("style")).toContain("width: calc(240px * var(--ui-scale, 1))");
+      expect(svg2.attributes("style")).toContain("height: calc(240px * var(--ui-scale, 1))");
       const pattern2 = wSingle.find("defs pattern");
       expect(Number(pattern2.attributes("width"))).toBe(60);
       expect(Number(pattern2.attributes("height"))).toBe(60);
 
-      // 3. Reported wilderness shape with gateways: pitch 40, side ≈ 222.91, scale ≈ 0.933, label ≈ 11.20 px
+      // 3. Reported wilderness shape with gateways: the 240px square's roomier
+      // inset box grows the pitch to 45 (the gutter reserves 44.456 units a
+      // side), so the drawing needs 237.91 units, fits the 240px square at
+      // scale 1, and every drawn node label reads at exactly 16.00 CSS px.
       const wWild = mountLattice({
         localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
         ...ISLAND_PROPS,
       });
       const svg3 = wWild.get("svg.local-map__lattice");
-      expect(Number(svg3.attributes("width"))).toBe(208);
-      expect(Number(svg3.attributes("height"))).toBe(208);
+      expect(Number(svg3.attributes("width"))).toBe(240);
+      expect(Number(svg3.attributes("height"))).toBe(240);
       const pattern3 = wWild.find("defs pattern");
-      expect(Number(pattern3.attributes("width"))).toBe(40);
-      expect(Number(pattern3.attributes("height"))).toBe(40);
+      expect(Number(pattern3.attributes("width"))).toBe(45);
+      expect(Number(pattern3.attributes("height"))).toBe(45);
       const vbParts = svg3.attributes("viewBox").split(" ").map(Number);
-      expect(vbParts[2]).toBeCloseTo(222.91, 1);
-      expect(vbParts[3]).toBeCloseTo(222.91, 1);
-      const scale3 = 208 / vbParts[2];
-      expect(scale3).toBeCloseTo(0.933, 3);
-      expect(scale3 * 12).toBeCloseTo(11.2, 1);
-      expect(scale3 * 12).toBeGreaterThanOrEqual(11);
+      expect(vbParts[2]).toBeCloseTo(240, 1);
+      expect(vbParts[3]).toBeCloseTo(240, 1);
+      const scale3 = 240 / vbParts[2];
+      expect(scale3).toBeCloseTo(1, 3);
+      expect(scale3 * 16).toBeCloseTo(16, 1);
+      expect(scale3 * 16).toBeGreaterThanOrEqual(16);
 
       // 4. 2x64 lattice: the 2574-unit square would draw at 0.0808, below
       // the island's legibility floor, so it is windowed at scale 0.75
@@ -431,35 +437,35 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const svg4 = wTall.get("svg.local-map__lattice");
-      expect(Number(svg4.attributes("width"))).toBe(208);
-      expect(Number(svg4.attributes("height"))).toBe(208);
+      expect(Number(svg4.attributes("width"))).toBe(240);
+      expect(Number(svg4.attributes("height"))).toBe(240);
       const vbTall = svg4.attributes("viewBox").split(" ").map(Number);
-      expect(vbTall[2]).toBeCloseTo(208 / 0.75, 6);
-      expect(vbTall[3]).toBeCloseTo(208 / 0.75, 6);
-      const scale4 = 208 / vbTall[2];
+      expect(vbTall[2]).toBeCloseTo(240 / 0.75, 6);
+      expect(vbTall[3]).toBeCloseTo(240 / 0.75, 6);
+      const scale4 = 240 / vbTall[2];
       expect(scale4).toBeCloseTo(0.75, 6);
 
       // 5. Graph cases:
       // a. One-ring interior: a 260-unit radial canvas (R0 80 + label bottom 26
       // + padding 24 per side), cropped to its footprint plus the 8px inset:
-      // side 228, scale ≈ 0.91
+      // the 228-unit footprint fits the 240px square at scale 1
       const wInterior = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE),
         variant: "graph",
         ...ISLAND_PROPS,
       });
       const svg5 = wInterior.get("svg.local-map__lattice");
-      expect(Number(svg5.attributes("width"))).toBe(208);
-      expect(Number(svg5.attributes("height"))).toBe(208);
+      expect(Number(svg5.attributes("width"))).toBe(240);
+      expect(Number(svg5.attributes("height"))).toBe(240);
       const vb5 = svg5.attributes("viewBox").split(" ").map(Number);
-      expect(vb5[0]).toBe(16);
-      expect(vb5[1]).toBe(16);
-      expect(vb5[2]).toBe(228);
-      expect(vb5[3]).toBe(228);
-      const scale5 = 208 / 228;
-      expect(scale5).toBeCloseTo(0.91, 2);
+      expect(vb5[0]).toBe(10);
+      expect(vb5[1]).toBe(10);
+      expect(vb5[2]).toBe(240);
+      expect(vb5[3]).toBe(240);
+      const scale5 = 240 / 240;
+      expect(scale5).toBe(1);
 
-      // b. Current-only interior: side 208 with scale 1 and current node at centre
+      // b. Current-only interior: side 240 with scale 1 and current node at centre
       const singleInteriorPayload = {
         schema_version: 1,
         available: true,
@@ -477,14 +483,14 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         ...ISLAND_PROPS,
       });
       const svg6 = wSingleInterior.get("svg.local-map__lattice");
-      expect(Number(svg6.attributes("width"))).toBe(208);
-      expect(Number(svg6.attributes("height"))).toBe(208);
+      expect(Number(svg6.attributes("width"))).toBe(240);
+      expect(Number(svg6.attributes("height"))).toBe(240);
       const vb6 = svg6.attributes("viewBox").split(" ").map(Number);
-      expect(vb6[0]).toBe(-54);
-      expect(vb6[1]).toBe(-54);
-      expect(vb6[2]).toBe(208);
-      expect(vb6[3]).toBe(208);
-      const scale6 = 208 / 208;
+      expect(vb6[0]).toBe(-70);
+      expect(vb6[1]).toBe(-70);
+      expect(vb6[2]).toBe(240);
+      expect(vb6[3]).toBe(240);
+      const scale6 = 240 / 240;
       expect(scale6).toBe(1.0);
       const currentNodeEl = wSingleInterior.get('[data-testid="local-map__node--room:current"]');
       expect(currentNodeEl.attributes("transform")).toBe("translate(50, 50)");
@@ -514,13 +520,14 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
         rowPitch: 212,
         markerScale: 4.83,
         labelMax: 10,
-        labelFont: 11,
-        markerNameFont: 11,
+        labelFont: 16,
+        markerNameFont: 16,
         overlayChrome: true,
         markerNames: true,
       });
-      // namePad: the outward box of (10 + 1) × 2 monospace cells at 11, plus 2.
-      const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + (22 * CELL_EM * 11 + 2);
+      // namePad: the outward box of (10 + 1) × 2 monospace cells at the
+      // overlay's 16-unit marker-name step, plus 2.
+      const expectedGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + (22 * CELL_EM * 16 + 2);
       expect(Number(wOverlay.get("svg.local-map__lattice").attributes("width"))).toBeCloseTo(
         3 * 280 + 2 * expectedGutter,
         4,
@@ -532,6 +539,41 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(wOverlay.find('[data-testid="local-map__dot-field"]').exists()).toBe(true);
       expect(wOverlay.find('[data-testid="local-map__vignette"]').exists()).toBe(false);
       expect(wOverlay.find('[data-testid="local-map__axis"]').exists()).toBe(false);
+    });
+
+    it("retarget: the island draws its node labels and marker names at the 16px floor", () => {
+      // webclient-local-map "Map chrome and ordinary node labels are legible
+      // without dropping topology" (amended by
+      // retarget-desktop-viewport-contract D7): on the reported wilderness
+      // shape with its named edge markers the island's drawing resolves to
+      // scale 1, so every drawn node label and every drawn marker name renders
+      // at its declared 16-unit step — exactly 16 CSS px at the 1451x790
+      // reference viewport.
+      const w = mountLattice({
+        localMap: localMapModelFor(UNIFORM_WILDERNESS_PAYLOAD),
+        ...ISLAND_PROPS,
+      });
+      const svg = w.get("svg.local-map__lattice");
+      // The canvas renders at its reference 240 CSS px; the viewBox side is the
+      // drawing's own square, so the ratio is the uniform scale.
+      const canvas = Number(svg.attributes("width"));
+      expect(canvas).toBe(240);
+      const scale = canvas / Number(svg.attributes("viewBox").split(" ")[2]);
+      expect(scale).toBe(1);
+
+      const stepOf = (el) => Number(el.attributes("style").match(/font-size:\s*([\d.]+)px/)[1]);
+      const labels = w.findAll(".local-map__node-label");
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        expect(stepOf(label)).toBe(16);
+        expect(stepOf(label) * scale).toBeGreaterThanOrEqual(16);
+      }
+      const names = w.findAll(".local-map__edge-marker-name--island");
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        expect(stepOf(name)).toBe(16);
+        expect(stepOf(name) * scale).toBeGreaterThanOrEqual(16);
+      }
     });
   });
 });

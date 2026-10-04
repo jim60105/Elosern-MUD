@@ -78,10 +78,11 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const westMarker = w.get('[data-testid="local-map__edge-marker--r:west"]');
     const textEl = westMarker.find("text.local-map__edge-marker-name--island");
     expect(textEl.exists()).toBe(true);
-    // The type size is the surface's declared `markerNameFont` step (default
-    // 10), bound inline so the drawn size and the fit budget cannot drift
-    // apart; the rule itself declares only the shared font token and tier.
-    expect(textEl.attributes("style")).toContain("font-size: 10px");
+    // The type size is the surface's declared `markerNameFont` step (16 units
+    // — the shared floor), bound inline so the drawn size and the fit budget
+    // cannot drift apart; the rule itself declares only the shared font token
+    // and tier.
+    expect(textEl.attributes("style")).toContain("font-size: 16px");
     const tspans = textEl.findAll("tspan");
     expect(tspans.length).toBeGreaterThan(0);
     // Every tspan has the same x coordinate within band's depth, and the line
@@ -93,12 +94,12 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       if (i === 0) {
         expect(tspan.attributes("dy")).toBe("0");
       } else {
-        expect(tspan.attributes("dy")).toBe("10");
+        expect(tspan.attributes("dy")).toBe("16");
       }
     });
     // The stacked column stays inside the free span its own marker holds, so
     // the fit budget and the drawn column height agree.
-    expect(tspans.length * 10).toBeLessThanOrEqual(
+    expect(tspans.length * 16).toBeLessThanOrEqual(
       Number(w.find("svg.local-map__lattice").attributes("height")),
     );
 
@@ -115,8 +116,9 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
   });
 
   it("Task 2.1: fits lone marker whole and truncates two markers to their span allocating tail first", () => {
-    // Lone marker on top edge: span = 174, budget = floor(174 / (CELL_EM × 10))
-    // = 29 cells. The label is 11 wide glyphs = 22 cells <= 29 -> draws whole.
+    // Lone marker on top edge: span = 174, budget = floor(174 / (CELL_EM × 16))
+    // = 18 cells. The label is 11 wide glyphs = 22 cells, so the kept
+    // （南門） qualifier (8 cells) plus "…" leaves 9 cells of head: 西部丘陵.
     const lonePayload = {
       schema_version: 1,
       available: true,
@@ -130,12 +132,12 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     };
     const wLone = mountLattice({ localMap: localMapModelFor(lonePayload), markerNames: true });
     const northMarker = wLone.get('[data-testid="local-map__edge-marker--r:north"]');
-    expect(northMarker.find("text").text()).toBe("西部丘陵與谷地（南門）");
+    expect(northMarker.find("text").text()).toBe("西部丘陵…（南門）");
 
     // Two markers on top edge: span = 174/2 = 87, budget = floor(87 / (CELL_EM
-    // × 10)) = 14 cells. The qualifier （南門） is 8 cells and … is 1, so the
-    // head keeps 14 - 1 - 8 = 5 cells, two wide glyphs ('西部').
-    // Fitted: 西部…（南門）.
+    // × 16)) = 9 cells. The qualifier （南門） (8 cells) plus "…" (1) fills the
+    // budget, so the fit falls through to the head-and-tail form: 西 (2) + …
+    // (1) + the 3-glyph tail 南門） (6) = 9 cells. Fitted: 西…南門）.
     const twoPayload = {
       schema_version: 1,
       available: true,
@@ -151,15 +153,16 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const wTwo = mountLattice({ localMap: localMapModelFor(twoPayload), markerNames: true });
     const n1 = wTwo.get('[data-testid="local-map__edge-marker--r:north1"]');
     const n2 = wTwo.get('[data-testid="local-map__edge-marker--r:north2"]');
-    expect(n1.find("text").text()).toBe("西部…（南門）");
+    expect(n1.find("text").text()).toBe("西…南門）");
     expect(n2.find("text").text()).toBe("聖潔王都");
   });
 
   it("Task 2.2 & 2.3: anti-ambiguity drops names when differing labels truncate identically; preserves title", () => {
-    // Three markers on top edge: span = 174/3 = 58, budget = 9 cells.
+    // Three markers on top edge: span = 174/3 = 58, budget = floor(58 /
+    // (CELL_EM × 16)) = 6 cells.
     // The two gate labels differ only in their middle (北關 / 南關), which the
-    // head-and-tail fit allocates away first: tail 關隘道 (6), head 灰 (2), so
-    // both would be drawn as 灰…關隘道 while their payload labels differ.
+    // head-and-tail fit allocates away first: head 灰 (2) + … (1) + tail 道
+    // (2), so both would be drawn as 灰…道 while their payload labels differ.
     // Anti-ambiguity rule MUST omit both visible names while keeping diamonds and titles.
     const crowdedPayload = {
       schema_version: 1,
@@ -189,8 +192,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(gateS.find("text").exists()).toBe(false);
     expect(gateN.find("text").exists()).toBe(false);
 
-    // Non-colliding marker draws its name
-    expect(king.find("text").text()).toBe("聖潔王都");
+    // The non-colliding marker draws its own fitted name (聖潔王都 is 8 cells,
+    // so the 6-cell budget truncates it to 聖…都) — only the two colliding
+    // names are dropped entirely.
+    expect(king.find("text").text()).toBe("聖…都");
   });
 
   it("Task 2.4: overlay disclosure path draws full names for crowded island payload", () => {
