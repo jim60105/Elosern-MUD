@@ -35,7 +35,7 @@ export function useMapView({
   currentNodeId,
   viewportEl,
   markerScale = 1,
-  labelFont = 11,
+  labelFont = 16,
 }) {
   const view = ref(null);
   const isDragging = ref(false);
@@ -301,9 +301,11 @@ export function useMapView({
     if (!pos) return;
 
     const mScale = toValue(markerScale) ?? 1;
-    const lFont = toValue(labelFont) ?? 11;
-    const labelBaseline =
-      lFont === 11 ? 13 * mScale + 13 : 11 * mScale + 2 + lFont;
+    const lFont = toValue(labelFont) ?? 16;
+    // The renderer's one label-baseline rule (use-map-lattice-render.js
+    // `labelY`): the marker footprint's reserved half at this scale, the
+    // 2-unit model margin, then a full type step.
+    const labelBaseline = 11 * mScale + 2 + lFont;
 
     const box = {
       left: pos.x - HALO_R * mScale,

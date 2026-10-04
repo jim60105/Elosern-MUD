@@ -178,9 +178,15 @@ function onIslandClick(event) {
       </div>
 
       <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
-           minimap composes MapLattice with a fixed square 208px canvasSize
-           (design D1), pitch-fit (D3), and footprint crop (D4).
-           Scale never exceeds 1.
+           minimap composes MapLattice with a fixed square 240px canvasSize
+           (retarget-desktop-viewport-contract D7), pitch-fit (D3), and
+           footprint crop (D4). Scale never exceeds 1.
+
+           The declared node-label and marker-name steps are the shared 16-unit
+           floor: at the reference scale the drawn labels therefore read at
+           exactly 16 CSS px (scale 1 on ordinary neighbourhoods), which the
+           208px square could not reach — it rendered the reported wilderness
+           shape at scale 0.933 (11.2 CSS px labels) under the old reference.
 
            The island no longer listens to select/hover/leave (D3): the shared
            renderer keeps its event surface for the overlay and future changes
@@ -188,11 +194,11 @@ function onIslandClick(event) {
       <MapLattice
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
-        :canvas-size="208"
+        :canvas-size="240"
         :col-pitch="40"
         :row-pitch="40"
-        :label-font="12"
-        :marker-name-font="10"
+        :label-font="16"
+        :marker-name-font="16"
         :show-axis="true"
         :fog-vignette="true"
         :marker-names="true"
@@ -261,8 +267,9 @@ function onIslandClick(event) {
   flex-direction: column;
   gap: var(--sp-2);
   box-sizing: border-box;
-  /* The island renders at a constant size (design D1/D2): a fixed 208px square
-     canvas, 1px hairline border, and --sp-1 padding. It is right-aligned in
+  /* The island renders at a constant size (design D1/D2;
+     retarget-desktop-viewport-contract D7): a fixed 240px square canvas, 1px
+     hairline border, and --sp-1 padding — a 250px card. It is right-aligned in
      the anchor and does not stretch to the column width. */
   min-height: auto;
   width: auto;

@@ -48,11 +48,10 @@
    `markerNameFont` step, bound as an inline style (the same policy the node
    label follows) because the SAME number drives the along-edge fit budget and
    the stacked-column line step in script: a CSS-only size could drift away
-   from the geometry that reserves the name's room. `--text-sm` (13px) used to
-   sit here, which the island's coordinate margin then drew at ~13 CSS px —
-   larger than the island's 10px title and than the 9-unit node labels, so a
-   marker's name out-shouted both the map it annotates and the card's own
-   heading. */
+   from the geometry that reserves the name's room. The step is 16 units —
+   the shared legibility floor (retarget-desktop-viewport-contract D7) — for
+   both surfaces, so a name never renders below 16 CSS px at the reference
+   scale. */
 .local-map__edge-marker-name--island {
   font-family: var(--f-mono);
   fill: var(--paper-500);
@@ -79,7 +78,11 @@
 
 .local-map__node-label {
   font-family: var(--f-mono);
-  font-size: 11px;
+  /* The reference step the surface declares (the island and the overlay both
+     pass 16, MapLattice's default is 16): a user unit is a drawn CSS px at
+     scale 1, so this base never dips below the 16px floor. The live value is
+     bound inline from `labelFont`. */
+  font-size: 16px;
   /* Decorative label: must never intercept pointer events intended for the
      node's actionable circle (the label sits in the cell below its node). */
   pointer-events: none;
