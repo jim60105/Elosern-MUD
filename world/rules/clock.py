@@ -68,6 +68,7 @@ _STAGE_ORDER = (
     "shop_hours",
     "quest_deadlines",
     "npc_schedules",
+    "correspondence_delivery",
     "instance_reclamation",
 )
 

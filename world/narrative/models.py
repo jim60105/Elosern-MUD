@@ -1,6 +1,68 @@
 from django.db import models
 
 
+class ImmutableLetterQuerySet(models.QuerySet):
+    """Prevent rewriting accepted send records through bulk ORM operations."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Accepted letter sends are immutable.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Accepted letter sends are immutable.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Accepted letter sends are immutable.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Accepted letter sends are immutable.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class LetterSend(models.Model):
+    """Immutable accepted correspondence; state lives in a separate row."""
+
+    objects = ImmutableLetterQuerySet.as_manager()
+    source_id = models.CharField(max_length=128, unique=True)
+    sender_id = models.CharField(max_length=64)
+    recipient_id = models.CharField(max_length=64)
+    recipient_kind = models.CharField(max_length=16)
+    body = models.TextField()
+    sent_tick = models.BigIntegerField()
+    due_tick = models.BigIntegerField(db_index=True)
+    reply_to = models.CharField(max_length=128, blank=True, default="")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Accepted letter sends are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Accepted letter sends are immutable.")
+
+    class Meta:
+        app_label = "narrative"
+
+
+class LetterState(models.Model):
+    """Delivery state, without a recipient live-object dependency."""
+
+    letter = models.OneToOneField(LetterSend, on_delete=models.CASCADE)
+    recipient_id = models.CharField(max_length=64)
+    due_tick = models.BigIntegerField()
+    status = models.CharField(max_length=32, default="sent")
+    transition_id = models.CharField(max_length=255, blank=True, default="")
+    collection_tick = models.BigIntegerField(null=True)
+    read_tick = models.BigIntegerField(null=True)
+
+    class Meta:
+        app_label = "narrative"
+        indexes = [
+            models.Index(fields=["status", "due_tick"], name="letter_due_idx"),
+            models.Index(fields=["recipient_id", "status"], name="letter_recipient_idx"),
+        ]
+
+
 class AppendOnlyDialogueQuerySet(models.QuerySet):
     """Reject every update/delete path for original dialogue speech."""
 

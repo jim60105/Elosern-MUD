@@ -268,6 +268,7 @@ class ClockTests(unittest.TestCase):
                 "shop_hours",
                 "quest_deadlines",
                 "npc_schedules",
+                "correspondence_delivery",
                 "instance_reclamation",
             ),
         )
@@ -760,6 +761,7 @@ class AdvanceSurfaceContractUnitTests(unittest.TestCase):
                 "shop_hours",
                 "quest_deadlines",
                 "npc_schedules",
+                "correspondence_delivery",
                 "instance_reclamation",
             ),
         )
@@ -781,6 +783,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
     @covers_requirement("world-clock::every-registered-boundary-stage-source-declares-the-durable-surfaces-it-may-write")
     def test_completeness_guard_writing_sources_declare_contracts(self):
         from world.maps.instance import register_instance_reclamation
+        from world.narrative.correspondence import register_correspondence_delivery
         from world.quests.bootstrap import sync_quest_runtime
         from world.rules.caravan_arrivals import register_caravan_arrivals
         from world.rules.npc_schedules import register_npc_schedules
@@ -790,11 +793,13 @@ class AdvanceSurfaceContractTests(EvenniaTest):
         register_caravan_arrivals()
         register_npc_schedules()
         register_instance_reclamation()
+        register_correspondence_delivery()
         register_shop_hours()
         for kind in (
             "caravan_arrivals",
             "quest_deadlines",
             "npc_schedules",
+            "correspondence_delivery",
             "instance_reclamation",
         ):
             registration = _EVENT_SOURCES[kind]

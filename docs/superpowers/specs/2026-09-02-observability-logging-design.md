@@ -193,6 +193,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |
 | `guild_exam_opponent_created` | `char`、`rank`、`profile` |
 | `narrative_event_recorded` | `source_id`、`event_type`、`tick`、`participants` |
+| `correspondence_sent` | `source_id`, `char`, `recipient`, `tick`, `due_tick` |
+| `correspondence_settled` | `source_id`, `recipient`, `tick`, `status` |
 | `narrative_projection_pending_scanned` | `projector_version`、`count` |
 | `narrative_memory_recorded` | `record_id`、`owner_id`、`category`、`tick`、`scope`、`generation` |
 | `narrative_memory_revised` | `record_id`、`revision_number`、`owner_id`、`availability`、`tier`、`generation` |

@@ -58,6 +58,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "sync_quest_runtime",
     "sync_guild_economy",
     "sync_npc_schedules",
+    "register_correspondence_delivery",
     "register_title_planner",
     "restore_persisted_sessions",
     "sync_wilderness",
@@ -445,6 +446,8 @@ def at_server_start():
     _startup_step("sync_quest_runtime", sync_quest_runtime)
     _startup_step("sync_guild_economy", sync_guild_economy)
     _startup_step("sync_npc_schedules", sync_npc_schedules)
+    from world.narrative.correspondence import register_correspondence_delivery
+    _startup_step("register_correspondence_delivery", register_correspondence_delivery)
     # The title event-effect planner derives fixed-title grants from committed
     # actions; like the quest planner it must be registered before any player
     # action resolves (idempotent).
