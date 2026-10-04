@@ -373,14 +373,14 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.locator('[data-testid="settings-overlay-scale-A+"]').click()
         page.wait_for_function(
             "() => { const s = window.__elosernBridge.store;"
-            " return s && s.view && s.view.fontScale === 1.12; }",
+            " return s && s.view && s.view.fontScale === 1.25; }",
             timeout=15000,
         )
         self.assertEqual(
             page.evaluate(
                 "() => document.documentElement.style.getPropertyValue('--prose-scale')"
             ),
-            "1.12",
+            "1.25",
             "the prose scale is applied to the presentation token",
         )
         self.assertEqual(
@@ -388,7 +388,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                 "() => { const raw = localStorage.getItem('elosern.layout');"
                 " return raw ? JSON.parse(raw).preferences.fontScale : null; }"
             ),
-            1.12,
+            1.25,
             "the prose scale is persisted as client-local presentation state",
         )
         self.assertEqual(
@@ -442,7 +442,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_message_page_types_and_completes(self):
         # webclient-motion-level (design D9): real typing needs the `full` level,
         # so this journey opts out of the suite's `off` seed.
-        page = self.logged_in_page((1920, 1080), motion_level=None)
+        page = self.logged_in_page((1451, 790), motion_level=None)
         self._settle_window_mount(page)
         sentences = "".join(
             f"【段落{i}】霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
@@ -502,7 +502,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_reduced_motion_pages_are_instant(self):
         # webclient-motion-level (design D9): the OS preference must be the only
         # input, so nothing is seeded.
-        page = self.logged_in_page((1920, 1080), motion_level=None)
+        page = self.logged_in_page((1451, 790), motion_level=None)
         page.emulate_media(reduced_motion="reduce")
         self._settle_window_mount(page)
         page.evaluate("() => window.__elosernBridge.store.setTextSpeed('slow')")
@@ -721,7 +721,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-input-narrative::log-readers-can-return-to-latest-without-losing-their-place-involuntarily"
     )
     def test_full_log_frame_returns_to_latest_without_touching_the_reader(self):
-        page = self.logged_in_page(viewport=(1280, 720))
+        page = self.logged_in_page(viewport=(1451, 790))
         install_outbound_recorder(page)
         wait_for_presentation_settled(page)
         wait_for_narrative_settled(page, 0)
@@ -1005,7 +1005,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_message_window_repages_on_resize(self):
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         _append_multipage_response(page)
         surface = page.locator('[data-testid="message-page"]')
         page.locator('[data-testid="message-window"]').click()
@@ -1018,7 +1018,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
                     "() => document.querySelector('[data-testid=\"message-page\"]')"
                     ".getAttribute('data-page') === '2'"
                 ),
-                "description": "advanced to page 2 at 1920x1080",
+                "description": "advanced to page 2 at 1451x790",
             },
         )
         page_2_text = surface.inner_text().strip()
@@ -1031,9 +1031,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         live_before = page.locator('[data-testid="message-live"]').inner_text()
 
-        # Shrink the viewport from 1920x1080 to 1280x720 and wait for the
+        # Resize the viewport from 1451x790 to 2560x1440 and wait for the
         # ResizeObserver re-page pass to settle across two consecutive reads.
-        page.set_viewport_size({"width": 1280, "height": 720})
+        page.set_viewport_size({"width": 2560, "height": 1440})
         page.wait_for_timeout(150)
         previous_sig = None
         for _ in range(20):
@@ -1718,7 +1718,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         "webclient-contextual-hud::the-message-window-presents-the-current-response-one-page-at-a-time-in-the-band-s-message-region"
     )
     def test_message_window_pages_and_flushes(self):
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         self._wait_exploration_available(page)
         _append_multipage_response(page)
 
@@ -1727,7 +1727,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertEqual(surface.get_attribute("data-page"), "1")
         self.assertEqual(marker.inner_text(), "▼")
 
-        # At 1920x1080 with default prose scale (1), computed font size is 28px (±0.5px),
+        # At 1451x790 with the default prose scale (A = 1.125), computed font size is 18px (±0.5px),
         # every line's content box is at most 42em wide, and the control strip's
         # marker, 日誌, and ⌨ rects are pairwise disjoint left-to-right.
         metrics = page.evaluate(
@@ -1751,7 +1751,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
               };
             }"""
         )
-        self.assertAlmostEqual(metrics["fontSize"], 28.0, delta=0.5)
+        self.assertAlmostEqual(metrics["fontSize"], 18.0, delta=0.5)
         self.assertLessEqual(metrics["contentWidth"], metrics["fontSize"] * 42.0 + 1.0)
         self.assertLessEqual(metrics["maxLineWidth"], metrics["fontSize"] * 42.0 + 1.0)
         self.assertLessEqual(metrics["markerRight"], metrics["logLeft"])

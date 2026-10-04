@@ -1,7 +1,7 @@
-"""Map legibility acceptance (webclient-map-legibility): the island's one 12px
-chrome step and readable node labels on an ordinary neighbourhood, every node
-and name still reachable on a payload at the model's node bound, and the full
-map's single current-location footprint.
+"""Map legibility acceptance (webclient-map-legibility; retarget D7): the
+island's one 16px chrome step and readable node labels on an ordinary
+neighbourhood, every node and name still reachable on a payload at the model's
+node bound, and the full map's single current-location footprint.
 
 Every payload is injected through the store's own ``receive`` path, so the
 checks measure the real client layout.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from ._journey_support import _inject_snapshot, _wait_mode
 
 
@@ -130,9 +130,10 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology"
     )
     def test_ordinary_island_reads_at_its_chrome_step(self):
-        """An ordinary neighbourhood draws at scale 1: the chrome at 12px and
-        every node label between 11 and 12 CSS px, markers and labels apart."""
-        for viewport in ((1280, 720), (1440, 900), (1920, 1080)):
+        """An ordinary neighbourhood draws at the island's own scale: the chrome
+        at the 16px floor (scaled once by the chrome factor) and every node
+        label at the declared 16-unit step, markers and labels apart."""
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 self._island_ready(page, _ordinary_panel())
@@ -160,10 +161,11 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                     }""",
                     _BOX,
                 )
-                self.assertEqual(probe["title"], 12)
-                self.assertEqual(probe["orientation"], 12)
-                self.assertEqual(probe["readout"], 12)
-                self.assertAlmostEqual(probe["scale"], 1, places=3)
+                chrome_step = 16.0 * ui_scale(viewport)
+                self.assertAlmostEqual(probe["title"], chrome_step, delta=0.5)
+                self.assertAlmostEqual(probe["orientation"], chrome_step, delta=0.5)
+                self.assertAlmostEqual(probe["readout"], chrome_step, delta=0.5)
+                self.assertAlmostEqual(probe["scale"], ui_scale(viewport), places=3)
                 self.assertEqual(len(probe["nodes"]), 9)
                 self.assertEqual(probe["rings"], 0, "the island draws no ornament beyond its current marker")
 
@@ -171,8 +173,8 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                     return a["x2"] <= b["x1"] or b["x2"] <= a["x1"] or a["y2"] <= b["y1"] or b["y2"] <= a["y1"]
 
                 for node in probe["nodes"]:
-                    self.assertGreaterEqual(node["drawn"], 11, node)
-                    self.assertLessEqual(node["drawn"], 12.01, node)
+                    self.assertGreaterEqual(node["drawn"], chrome_step - 0.01, node)
+                    self.assertLessEqual(node["drawn"], chrome_step + 0.01, node)
                     for other in probe["nodes"]:
                         if other is node:
                             continue
@@ -188,12 +190,12 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         "webclient-local-map::map-chrome-and-ordinary-node-labels-are-legible-without-dropping-topology"
     )
     def test_dense_island_keeps_every_node_and_name_reachable(self):
-        """At the 64-node bound the island stays a bounded 208px canvas that
+        """At the 64-node bound the island stays a bounded 240px canvas that
         drops no node or gateway, and the full map names every node and reads
-        at 12px or more once zoomed in."""
+        at the 16px floor or more once zoomed in."""
         panel = _dense_panel()
         in_view = {n["id"]: n["label"] for n in panel["nodes"] if n["visibility"] != "remembered"}
-        page = self.logged_in_page((1920, 1080))
+        page = self.logged_in_page((1451, 790))
         self._island_ready(page, panel)
         island = page.evaluate(
             """() => {
@@ -212,13 +214,13 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
               };
             }"""
         )
-        self.assertAlmostEqual(island["width"], 208, delta=1)
-        self.assertAlmostEqual(island["height"], 208, delta=1)
+        self.assertAlmostEqual(island["width"], 240, delta=1)
+        self.assertAlmostEqual(island["height"], 240, delta=1)
         self.assertEqual(island["titles"], in_view)
         self.assertEqual(island["markers"], 16)
         self.assertEqual(island["mirror"], 16)
-        # Scaled (and windowed at 0.75) but never below 12 × 0.75 = 9px.
-        self.assertGreaterEqual(min(island["drawn"]), 9 - 0.01)
+        # Scaled (and windowed at 0.75) but never below 16 × 0.75 = 12px.
+        self.assertGreaterEqual(min(island["drawn"]), 12 - 0.01)
 
         self._open_full_map(page)
         names = page.evaluate(
@@ -240,7 +242,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
               return parseFloat(getComputedStyle(label).fontSize) * scale;
             }"""
         )
-        self.assertGreaterEqual(drawn, 12)
+        self.assertGreaterEqual(drawn, 16)
         page.close()
 
     @covers_requirement(
@@ -251,7 +253,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         """The full map rings the current marker concentrically — no pin —
         clear of every label, with each incident connector running on past
         the ring."""
-        for viewport in ((1280, 720), (1920, 1080)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 self._island_ready(page, _ordinary_panel())

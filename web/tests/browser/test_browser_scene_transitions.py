@@ -26,7 +26,7 @@ from .browser_helpers import (
     valid_status_panel,
 )
 
-REFERENCE = (1920, 1080)
+REFERENCE = (1451, 790)
 
 # A 16x9 opaque PNG: decodable, and small enough to serve from memory.
 _PNG = base64.b64decode(

@@ -22,14 +22,14 @@ from .browser_helpers import (
 
 
 class ShellAcceptanceTest(BrowserAcceptanceTest):
-    """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
+    """Every required surface at 1451x790 and 2560x1440, plus keyboard journeys."""
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
         "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
     )
     def test_action_dock_renders_the_mockup_command_surface(self):
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             page = self.logged_in_page(viewport)
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())

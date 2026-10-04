@@ -24,8 +24,8 @@ from ._journey_support import (
 )
 from .test_browser_mode_transitions import _START_SCROLL_SAMPLER, _STOP_SCROLL_SAMPLER
 
-REFERENCE = (1920, 1080)
-VIEWPORTS = ((1920, 1080), (1440, 900), (1280, 720))
+REFERENCE = (1451, 790)
+VIEWPORTS = ((1451, 790), (1741, 948), (2560, 1440))
 
 # Heights, front to back, as fractions of the player's stage actor
 # (components/foe-lineup.js FOE_SCALES).

@@ -298,7 +298,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             "the offline alert must stay hidden while the shell is ready",
         )
 
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
             page.wait_for_timeout(300)
             for testid in CORE_SURFACE_TESTIDS:

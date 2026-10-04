@@ -37,12 +37,12 @@ class ConceptCreationJourneys(CreationBrowserTest):
     # isolated server (the activated character state of one journey must never
     # leak into the next login).
     @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
-    def test_concept_field_journey_to_activation_at_1440x900(self):
-        self._concept_journey((1440, 900))
+    def test_concept_field_journey_to_activation_at_the_reference_viewport(self):
+        self._concept_journey((1451, 790))
 
     @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
-    def test_concept_field_journey_to_activation_at_1280x720(self):
-        self._concept_journey((1280, 720))
+    def test_concept_field_journey_to_activation_at_the_capped_viewport(self):
+        self._concept_journey((2560, 1440))
 
     def _concept_journey(self, viewport):
         page = self._login_creation(viewport)

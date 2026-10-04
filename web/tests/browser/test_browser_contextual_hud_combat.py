@@ -95,10 +95,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     @covers_requirement("webclient-contextual-hud::combat-details-follow-the-active-command-frame")
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_command_window_scrolls_its_rows_and_details_the_current_frame(self):
-        """At 1280x720 the vertical combat list walks with Up/Down, keeps its
+        """At 1451x790 the vertical combat list walks with Up/Down, keeps its
         last row reachable above the legend, and details only the current
         frame's highlighted row (webclient-combat-command-window)."""
-        page = self.logged_in_page((1280, 720))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
         _wait_mode(page, "combat")

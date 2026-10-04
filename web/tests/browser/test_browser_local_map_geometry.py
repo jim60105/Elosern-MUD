@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from tools.spec_traceability import covers_requirement
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     fixture_home_node_id,
     fixture_home_xyz_arg,
@@ -142,7 +142,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         # island; the canvas, legend, remembered list, and detail line must
         # stay inside the island's bounded height without overprinting each
         # other, at both supported viewports.
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -173,8 +173,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 # overhang the canvas bottom edge (H2 re-map, task 9.2).
                 canvas = page.locator('[data-testid="local-map__lattice"]')
                 canvas_box = canvas.bounding_box()
-                self.assertAlmostEqual(canvas_box["width"], 208.0, delta=1.0)
-                self.assertAlmostEqual(canvas_box["height"], 208.0, delta=1.0)
+                canvas_side = 240.0 * ui_scale(viewport)
+                self.assertAlmostEqual(canvas_box["width"], canvas_side, delta=1.0)
+                self.assertAlmostEqual(canvas_box["height"], canvas_side, delta=1.0)
                 # Every node's primary marker shape (the current rect, the
                 # unvisited/visited circles) — selected by the shared
                 # `local-map__marker` class, not just the testid hooks (the
@@ -422,12 +423,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
 
         The spec bounds the node label at "the surface's own smallest chrome
         type step" and states the readout at that same step. Since
-        webclient-map-legibility the island has one 12px chrome step (title,
-        orientation marks and readout at `--text-xs`), node labels at a
-        12-unit step and marker names at 10 units, each drawn at the
-        drawing's uniform scale (≤ 1).
+        retarget-desktop-viewport-contract D7 the island has one chrome step
+        — the 16px floor at the reference (title, orientation marks, readout,
+        node labels and marker names all at `--text-xs`/16 units) — each drawn
+        at the drawing's uniform scale (≤ 1 at the reference).
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -473,14 +474,21 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                       };
                     }"""
                 )
-                # One chrome step (webclient-map-legibility): the title,
-                # orientation marks and readout all compute to 12px.
-                self.assertEqual(ladder["header"], 12, "the island's header type step is 12px")
-                chrome_step = ladder["readout"]
-                self.assertEqual(
+                # One chrome step (webclient-map-legibility; retarget D7): the
+                # title, orientation marks and readout all compute to --text-xs
+                # — 16px at the reference, scaled once by the chrome factor.
+                chrome_step = 16.0 * ui_scale(viewport)
+                self.assertAlmostEqual(
+                    ladder["header"],
                     chrome_step,
-                    12,
-                    "the readout states its figure at the island's smallest type step",
+                    delta=0.5,
+                    msg="the island's header type step is the shared floor step",
+                )
+                self.assertAlmostEqual(
+                    ladder["readout"],
+                    chrome_step,
+                    delta=0.5,
+                    msg="the readout states its figure at the island's smallest type step",
                 )
                 self.assertLessEqual(
                     ladder["scale"], 1, "coordinate margin never magnifies the drawing"

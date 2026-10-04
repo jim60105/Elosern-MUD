@@ -4,8 +4,8 @@ Journeys on the dedicated ``inventory_actions`` server, keyboard-first at
 both desktop viewports (webclient-service-menus: keyboard-only,
 confirmation-protected, desktop-bounded): an injured holder of two healing
 potions and one sword. Keyboard activation of the enabled use tile opens the
-labelled confirmation (Escape returns focus with nothing sent at 1440x900; a
-1280x720 keyboard confirm dispatches exactly one ``inventory.use`` and the
+labelled confirmation (Escape returns focus with nothing sent at 1451x790; a
+2560x1440 keyboard confirm dispatches exactly one ``inventory.use`` and the
 committed ``hp_full`` refusal then governs the tile). A keyboard activation
 of the enabled equipment row dispatches exactly one ``inventory.toggle_equip``
 immediately, and the pointer affordance emits the identical envelope through
@@ -157,7 +157,7 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
         )
         self.assertTrue(committed[weapon]["action"]["enabled"])
 
-        # 1440x900, keyboard: activation opens the confirmation and Escape
+        # 1451x790, keyboard: activation opens the confirmation and Escape
         # returns focus to the tile with nothing dispatched.
         self._keyboard_activate_tile(page, potion)
         dialog = page.locator('[data-testid="inventory-panel__confirm-dialog"]')
@@ -171,9 +171,9 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
         self.assertEqual(focused, TILE.format(potion))
         self.assertEqual(sent_action_count(page, "inventory.use"), 0)
 
-        # 1280x720, keyboard: the confirmation stays fully operable and the
+        # 2560x1440, keyboard: the confirmation stays fully operable and the
         # Enter on the focused 使用 control is the only submit path.
-        page.set_viewport_size({"width": 1280, "height": 720})
+        page.set_viewport_size({"width": 2560, "height": 1440})
         page.wait_for_timeout(120)
         self._keyboard_activate_tile(page, potion)
         self.assertEqual(self._dialog_count(page), 1)

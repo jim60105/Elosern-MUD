@@ -81,7 +81,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """H4 (task 9.5): at both viewports an open drawer closes in one
         action, Escape restores focus, and no reference surface is in the DOM
         while every drawer is closed."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 # The focus-restoration contract: the drawer is opened while the
@@ -357,7 +357,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         roster spanning all five severities (more than the H2 island's 6-item
         cap), including a multi-modifier condition and several durations.
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 focus_action_dock(page)
@@ -466,7 +466,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(fit["pillCount"], 9, "all 9 conditions render as pills")
                 self.assertEqual(fit["tileCount"], 6, "3 vitals + 1 trait + 2 guild tiles render")
                 # Visual evidence for the design-alignment check (task 6.5).
-                if viewport == (1440, 900):
+                if viewport == (1451, 790):
                     page.screenshot(path=f"tmp/status_drawer_{viewport[0]}x{viewport[1]}.png")
                 page.close()
 
@@ -525,7 +525,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         that covers the expanded command-line row and leaves only the band's
         lowest strip under a scrim; the overlay scrim absorbs pointer input
         below the navigation while the navigation still switches overlays."""
-        for viewport in ((1280, 720), (1440, 900), (1920, 1080)):
+        for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")

@@ -13,6 +13,8 @@ import unittest
 from playwright.sync_api import sync_playwright
 from tools.spec_traceability import covers_requirement
 
+from .browser_base import ui_scale
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -71,29 +73,30 @@ class VueTypographyBrowserTest(unittest.TestCase):
             ("world-localmap--wilderness", ".local-map__detail"),
             ("overlays-mapoverlay--interior-with-remembered", ".map-overlay__remembered"),
         )
-        for width, height in ((1920, 1080), (1440, 900), (1280, 720)):
+        for width, height in ((1451, 790), (1741, 948), (2560, 1440)):
             self.page.set_viewport_size({"width": width, "height": height})
+            floor = 16 * ui_scale((width, height))
             for story, selector in stories:
                 with self.subTest(viewport=(width, height), story=story):
                     self.story(story, selector)
-                    result = self.page.evaluate("""() => {
+                    result = self.page.evaluate("""(floor) => {
                       const exempt = 'svg,.narrative-line,.cmdfield__prompt-html,.sr-only,.visually-hidden,[aria-hidden="true"]';
                       const small = [...document.querySelectorAll('#storybook-root *')].filter(e =>
                         e.checkVisibility() && !e.closest(exempt) && e.getBoundingClientRect().width > 1 &&
                         [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) &&
-                        parseFloat(getComputedStyle(e).fontSize) < 12
+                        parseFloat(getComputedStyle(e).fontSize) < floor
                       ).map(e => ({text:e.textContent, size:getComputedStyle(e).fontSize}));
                       const clipped = [...document.querySelectorAll('.action-dock__legend,.reading .num,.creation-overlay__actions button')]
                         .filter(e => e.checkVisibility() && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1))
                         .map(e => e.textContent);
                       return {small, clipped, overflow: document.documentElement.scrollWidth > innerWidth};
-                    }""")
+                    }""", floor)
                     self.assertEqual(result, {"small": [], "clipped": [], "overflow": False})
 
     @covers_requirement("webclient-vue-application::chrome-type-is-legible-and-numerals-are-stable")
     def test_changed_numerals_keep_columns_and_tabular_glyph_widths(self):
-        for height in (1080, 720):
-            self.page.set_viewport_size({"width": 1280, "height": height})
+        for width, height in ((1451, 790), (2560, 1440)):
+            self.page.set_viewport_size({"width": width, "height": height})
             self.story("data-vitalstrack--changing-numerals", ".shop-row__price")
             def metrics():
                 return self.page.evaluate("""() => {

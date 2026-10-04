@@ -14,7 +14,33 @@ from playwright.sync_api import sync_playwright
 from .browser_helpers import guard_local_only, login_and_open, seed_motion_level
 from .harness import get_shared_server
 
-DEFAULT_VIEWPORT = (1440, 900)
+# The acceptance contract's reference viewport (retarget-desktop-viewport-contract):
+# every journey that does not pass an explicit viewport opens here.
+DEFAULT_VIEWPORT = (1451, 790)
+
+# The acceptance contract's three-element viewport tuple
+# (retarget-browser-acceptance-viewports D1): the reference, an uncapped 1.2
+# display, and the capped large display.
+ACCEPTANCE_VIEWPORT_TUPLE = ((1451, 790), (1741, 948), (2560, 1440))
+# The two-element acceptance pair the prose requirements name.
+ACCEPTANCE_VIEWPORTS = (ACCEPTANCE_VIEWPORT_TUPLE[0], ACCEPTANCE_VIEWPORT_TUPLE[2])
+
+_UI_SCALE_REFERENCE_WIDTH = 1451
+_UI_SCALE_REFERENCE_HEIGHT = 790
+_UI_SCALE_MAX = 1.4
+
+
+def ui_scale(viewport: tuple[int, int]) -> float:
+    """The desktop chrome factor for a viewport.
+
+    ``S = clamp(1, min(height / 790, width / 1451), 1.4)`` — the same factor
+    ``lib/ui_scale.js`` writes to ``--ui-scale`` (webclient-proportional-ui-scale;
+    retarget-desktop-viewport-contract). Chrome geometry scales by it once;
+    viewport-relative ``vh``/``vw`` terms never do.
+    """
+    width, height = viewport
+    raw = min(height / _UI_SCALE_REFERENCE_HEIGHT, width / _UI_SCALE_REFERENCE_WIDTH)
+    return round(min(_UI_SCALE_MAX, max(1.0, raw)), 4)
 
 # Captures every WebSocket the page creates so tests can interrupt the active
 # transport with an abnormal close (which, unlike Evennia's graceful

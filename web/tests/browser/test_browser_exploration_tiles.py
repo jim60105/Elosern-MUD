@@ -74,7 +74,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         pane horizontally, the reading order is unchanged, and the last chip is
         reachable by scrolling (the dock pane is the single scrolling region).
         """
-        page = self.logged_in_page((1280, 720))
+        page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
@@ -94,7 +94,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # Twelve exit chips plus the footer's 查看房間 and 等待／休息 chips.
         self.assertEqual(chips.count(), 14, "the overview renders one chip per entry")
         pane_box = pane.bounding_box()
-        self.assertIsNotNone(pane_box, "the dock pane must be visible at 1280x720")
+        self.assertIsNotNone(pane_box, "the dock pane must be visible at 1451x790")
 
         # The reading order is unchanged: the exits lead, the footer closes.
         keys = page.evaluate(
@@ -123,7 +123,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
             tops.add(round(box["y"]))
         self.assertGreater(
-            len(tops), 1, "the chips must wrap into more than one row at 1280x720"
+            len(tops), 1, "the chips must wrap into more than one row at 1451x790"
         )
 
         # The last chip is reachable by scrolling: focusing it (the real

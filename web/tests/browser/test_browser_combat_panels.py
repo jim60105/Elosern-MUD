@@ -375,7 +375,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         "webclient-contextual-hud::condition-icons-float-without-a-window-and-disclose-their-detail-in-a-tooltip",
     )
     def test_combat_renders_at_minimum_viewport(self):
-        page = self.logged_in_page(viewport=(1280, 720))
+        page = self.logged_in_page(viewport=(1451, 790))
         install_outbound_recorder(page)
         self._engage(page)
         self.assertEqual(self._dock_mode(page), "combat")

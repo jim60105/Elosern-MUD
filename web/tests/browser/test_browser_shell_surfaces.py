@@ -1,4 +1,4 @@
-"""Desktop-shell acceptance: required surfaces at 1440x900 and 1280x720, stage-anchor geometry, head-card identity, minimap mode presence, the island stack anchor, and the low-HP stage hook.
+"""Desktop-shell acceptance: required surfaces at 1451x790 and 2560x1440, stage-anchor geometry, head-card identity, minimap mode presence, the island stack anchor, and the low-HP stage hook.
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ def _objectives_panel(count: int) -> dict:
 
 
 class ShellAcceptanceTest(BrowserAcceptanceTest):
-    """Every required surface at 1440x900 and 1280x720, plus keyboard journeys."""
+    """Every required surface at 1451x790 and 2560x1440, plus keyboard journeys."""
     def assert_surfaces_visible(self, page):
         surfaces_js = ", ".join(repr(s) for s in REQUIRED_SURFACES)
         wait_for_store_state(
@@ -108,15 +108,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
     )
-    def test_surfaces_visible_at_1440x900(self):
-        page = self.logged_in_page((1440, 900))
+    def test_surfaces_visible_at_the_reference_viewport(self):
+        page = self.logged_in_page((1451, 790))
         self.assert_surfaces_visible(page)
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"
     )
-    def test_surfaces_visible_at_1280x720(self):
-        page = self.logged_in_page((1280, 720))
+    def test_surfaces_visible_at_the_capped_viewport(self):
+        page = self.logged_in_page((2560, 1440))
         self.assert_surfaces_visible(page)
 
     @covers_requirement(
@@ -249,7 +249,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         breaking the "surfaces remain usable" contract. Verified at both
         supported desktop viewports.
         """
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             page = self.logged_in_page(viewport)
             overlap = page.evaluate(
                 """() => {
@@ -329,13 +329,13 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_populated_island_stack_fits_its_anchor_at_both_viewports(self):
         """H2 task 9.5; webclient-avg-stage-hud-anchors (design D3/D6): at
-        1440x900 and 1280x720, with every island populated — eight conditions
+        1451x790 and 2560x1440, with every island populated — eight conditions
         with the overflow disclosed, a party of four, the minimap, and a
         three-row objective line — each island anchor's stack fits its anchor
         without scrolling, and neither stack (the place card heading the
         `map` stack) intersects the bottom band, the command line, or the
         other anchor's islands."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.new_page(viewport)
                 from .browser_helpers import login_and_open
@@ -502,7 +502,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         player portrait's lowest quarter, the expanded command line starts past
         it, and a condition icon shows only its glyph while hovering it opens a
         tooltip with the full label and duration that Escape closes."""
-        for viewport in ((1920, 1080), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
                 status = valid_status_panel("艾倫‧灰誓", "char-42")

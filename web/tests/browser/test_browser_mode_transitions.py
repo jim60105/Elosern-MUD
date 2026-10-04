@@ -23,7 +23,7 @@ from ._journey_support import (
     _interact_target,
 )
 
-REFERENCE = (1920, 1080)
+REFERENCE = (1451, 790)
 
 
 

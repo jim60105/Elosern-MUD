@@ -255,7 +255,7 @@ class LayoutMigrationTest(BrowserAcceptanceTest):
             self.assertEqual(
                 stored["layout_version"], 3, f"a version-{version} wrapper resets"
             )
-            self.assertEqual(stored["preferences"].get("fontScale"), 1)
+            self.assertEqual(stored["preferences"].get("fontScale"), 1.125)
             self.assertEqual(stored["preferences"].get("textSpeed"), "normal")
             self.assertIs(stored["preferences"].get("autoAdvance"), False)
             self.assertNotIn("motionLevel", stored["preferences"])
@@ -478,7 +478,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         """No stage anchor's rendered box intersects another's at either supported
         viewport (H1's stage-anchor non-overlap invariant, promoted to the standing
         journey)."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport, motion_level=None)
                 self._wait_mode(page, "exploration")
@@ -509,7 +509,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
         again in the modes that show them, at both supported viewports. Focus that
         lands on a surface the mode change hides is rescued to the incoming mode's
         focus home: the message window in dialogue, the action dock otherwise."""
-        for viewport in ((1440, 900), (1280, 720)):
+        for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport, motion_level=None)
                 map_panel = valid_local_map_panel()
