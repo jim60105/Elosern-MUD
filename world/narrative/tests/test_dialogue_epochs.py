@@ -13,6 +13,8 @@ from typeclasses.characters import Character
 from typeclasses.rooms import Room
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles, LLMProfile
+from world.ai import guardrail
+from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.ai.npc_dialogue import build_npc_dialogue_prompt, generate_npc_reply, register_npc_dialogue
 from world.ai.client import OpenAICompatClient
 from world.narrative.dialogue import build_dialogue_context, submit_turn, settle_response
@@ -195,6 +197,23 @@ class DialogueEpochTests(EvenniaTestCase):
 
     @covers_requirement("persona-dialogue-injection::the-no-leak-validator-binds-a-per-call-bounded-secret-set-including-disguise-true-values")
     def test_superseded_affinity_numbers_remain_secret_in_replayed_frames(self):
+        # The registration leaks unless undone: later suites install their own
+        # npc_dialogue degrade fallback and would see this layer's real
+        # validators reject their synthetic payloads (same snapshot discipline
+        # as test_dream_surface).
+        saved_validators = {key: dict(value) for key, value in guardrail._semantic_validators.items()}
+        saved_fallbacks = dict(guardrail._degrade_fallbacks)
+        saved_schemas = dict(_OUTPUT_SCHEMAS)
+
+        def restore() -> None:
+            guardrail._semantic_validators.clear()
+            guardrail._semantic_validators.update(saved_validators)
+            guardrail._degrade_fallbacks.clear()
+            guardrail._degrade_fallbacks.update(saved_fallbacks)
+            _OUTPUT_SCHEMAS.clear()
+            _OUTPUT_SCHEMAS.update(saved_schemas)
+
+        self.addCleanup(restore)
         register_npc_dialogue()
         old = build_npc_dialogue_prompt({"name": "Synthetic NPC"}, {"name": "Synthetic player"}, [],
                                        affinity_context={"value": 55, "cap": 99, "stage": "Synthetic stage"})

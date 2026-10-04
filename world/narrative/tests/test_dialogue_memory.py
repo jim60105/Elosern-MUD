@@ -12,6 +12,8 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import LLMNPC
 from typeclasses.rooms import Room
 from world.ai.fake_client import FakeLLMClient
+from world.ai import guardrail
+from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.ai.npc_dialogue import register_npc_dialogue
 from world.ai.profiles import default_profiles
 from world.narrative.dialogue import build_dialogue_context, pair_view, settle_response, submit_turn
@@ -55,6 +57,23 @@ class DurableDialogueTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         open_synthetic_scope(self, "races", "subraces", "static_tiers", "monster_tiers")
         super().setUp()
+        # Undo the npc_dialogue registration after each test: the registries
+        # are process globals, and a leaked real-validator set makes a later
+        # suite's synthetic degrade fixtures fail (same snapshot discipline
+        # as test_dream_surface).
+        saved_validators = {key: dict(value) for key, value in guardrail._semantic_validators.items()}
+        saved_fallbacks = dict(guardrail._degrade_fallbacks)
+        saved_schemas = dict(_OUTPUT_SCHEMAS)
+
+        def restore() -> None:
+            guardrail._semantic_validators.clear()
+            guardrail._semantic_validators.update(saved_validators)
+            guardrail._degrade_fallbacks.clear()
+            guardrail._degrade_fallbacks.update(saved_fallbacks)
+            _OUTPUT_SCHEMAS.clear()
+            _OUTPUT_SCHEMAS.update(saved_schemas)
+
+        self.addCleanup(restore)
         register_npc_dialogue()
         self.room = create_object(Room, key="合成小徑")
         self.player = _player("合成旅人")
