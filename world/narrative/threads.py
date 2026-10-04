@@ -160,13 +160,16 @@ def _source_exists(source_kind: str, source_ref: str) -> bool:
         prefix, _, pk = source_ref.partition(":")
         return prefix == "mem" and pk.isdigit() and MemoryRecord.objects.filter(pk=int(pk)).exists()
     if source_kind == "dialogue":
+        # Matches the canonical ``{submission_id}:{kind}`` form built by
+        # ``dialogue_source_ref``; a bare submission id is ambiguous by itself.
         submission_id, separator, kind = source_ref.rpartition(":")
         return bool(separator and submission_id) and DialogueTurn.objects.filter(
             submission_id=submission_id, kind=kind
         ).exists()
     if source_kind == "quest":
         # world/quests owns the quest lifecycle; narrative stores only the durable
-        # quest identity and never duplicates or queries quest state.
+        # quest identity and never duplicates or queries quest state, so a quest
+        # reference is stored as supplied and is not existence-checked.
         return True
     return False
 
@@ -218,14 +221,23 @@ def _record_revision(
     revision = int(thread.revision) + 1
     thread.revision = revision
     update_fields = sorted(set(changed_fields or ()) | {"revision", "updated_at"})
-    thread.save(update_fields=update_fields)
-    StoryThreadRevision.objects.create(
-        thread=thread,
-        revision_number=revision,
-        operation=operation,
-        state=thread.state,
-        details=dict(details or {}),
-    )
+    try:
+        with transaction.atomic():
+            thread.save(update_fields=update_fields)
+            StoryThreadRevision.objects.create(
+                thread=thread,
+                revision_number=revision,
+                operation=operation,
+                state=thread.state,
+                details=dict(details or {}),
+            )
+    except IntegrityError as exc:
+        # The unique (thread, revision) row is the concurrency backstop: a backend
+        # without row locking fails the losing writer loudly instead of losing an
+        # update, and the whole enclosing transaction rolls back.
+        raise NarrativeThreadError(
+            f"Concurrent change to story thread {thread.thread_id!r}; retry the operation."
+        ) from exc
     return revision
 
 
@@ -532,22 +544,27 @@ def establish_commitment(
                 f"{event.event_type!r} is a statement channel and cannot establish a commitment."
             )
         commitments = list(thread.commitments)
-        if clean_text not in commitments:
+        commitment_changed = clean_text not in commitments
+        if commitment_changed:
             commitments.append(clean_text)
-        thread.commitments = commitments
-        revision = _record_revision(
-            thread,
-            operation="commitment_established",
-            details={"event": clean_event, "event_type": str(event.event_type)},
-            changed_fields={"commitments"},
-        )
-        _create_link(
+            thread.commitments = commitments
+        _link, link_created = _create_link(
             thread,
             "event",
             clean_event,
             "commitment",
             {"event_type": str(event.event_type)},
             tick,
+        )
+        if not commitment_changed and not link_created:
+            # A replay of an already-established commitment is not an effective
+            # change, so it must not advance the revision or invalidate snapshots.
+            return thread
+        revision = _record_revision(
+            thread,
+            operation="commitment_established",
+            details={"event": clean_event, "event_type": str(event.event_type)},
+            changed_fields={"commitments"} if commitment_changed else set(),
         )
         _announce(
             "narrative_thread_revised",
@@ -708,30 +725,37 @@ def mark_thread_dormant(
     with transaction.atomic():
         thread = _locked_thread(thread_id)
         _require_access(thread, actor_id)
-        if thread.state != "active":
-            return thread
-        thread.state = "dormant"
-        revision = _record_revision(
-            thread,
-            operation="dormant",
-            details={"reason": str(reason).strip()},
-            changed_fields={"state"},
-        )
-        _announce(
-            "narrative_thread_revised",
-            {
-                "thread_id": thread.thread_id,
-                "operation": "dormant",
-                "revision": revision,
-                "state": "dormant",
-                "tick": int(tick),
-            },
-        )
+        _become_dormant(thread, tick=tick, details={"reason": str(reason).strip()})
         return thread
 
 
+def _become_dormant(thread: StoryThread, *, tick: int, details: dict[str, Any]) -> bool:
+    """Move an active thread to dormant once, appending one revision."""
+    if thread.state != "active":
+        return False
+    thread.state = "dormant"
+    revision = _record_revision(
+        thread, operation="dormant", details=details, changed_fields={"state"}
+    )
+    _announce(
+        "narrative_thread_revised",
+        {
+            "thread_id": thread.thread_id,
+            "operation": "dormant",
+            "revision": revision,
+            "state": "dormant",
+            "tick": int(tick),
+        },
+    )
+    return True
+
+
 def _thread_recency(thread: StoryThread) -> int:
-    """Most recent development instant across creation, ticks, and links."""
+    """Most recent development instant across creation, ticks, and links.
+
+    Links are append-only, so only the newest link tick can be the most recent
+    development instant; older links cannot raise the recency.
+    """
     ticks = [int(thread.created_tick or 0)]
     ticks.extend(int(t) for t in (thread.development_ticks or []))
     last_link = (
@@ -761,24 +785,11 @@ def apply_inactivity(
             return False
         if int(current_tick) - _thread_recency(thread) < int(dormant_after_ticks):
             return False
-        thread.state = "dormant"
-        revision = _record_revision(
+        return _become_dormant(
             thread,
-            operation="dormant",
+            tick=current_tick,
             details={"reason": "inactivity", "current_tick": int(current_tick)},
-            changed_fields={"state"},
         )
-        _announce(
-            "narrative_thread_revised",
-            {
-                "thread_id": thread.thread_id,
-                "operation": "dormant",
-                "revision": revision,
-                "state": "dormant",
-                "tick": int(current_tick),
-            },
-        )
-        return True
 
 
 def resolve_thread(
@@ -854,7 +865,7 @@ def note_thread_quest_completion(
             "quest",
             clean_quest,
             "quest_completion",
-            {"quest_id": clean_quest},
+            {"quest_id": clean_quest, "identity_only": True},
             tick,
         )
         revision = _record_revision(
@@ -889,7 +900,7 @@ def link_quest_to_thread(
         source_kind="quest",
         source_ref=quest_id,
         relation=relation,
-        provenance={"quest_id": str(quest_id).strip()},
+        provenance={"quest_id": str(quest_id).strip(), "identity_only": True},
         tick=tick,
         actor_id=actor_id,
     )

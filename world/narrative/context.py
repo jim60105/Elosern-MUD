@@ -664,6 +664,7 @@ def persist_context_snapshot(
             "knowledge_scope": s.knowledge_scope,
             "owner_id": s.owner_id,
             "sha256": s.sha256,
+            "thread_revision": s.thread_revision,
         }
         for s in context.sources
     ]
