@@ -12,9 +12,20 @@ from tools.spec_traceability import covers_requirement
 from world.ai.correspondence import LetterReply, register_correspondence
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
-from world.narrative.correspondence import get_letter, send_letter, settle_correspondence_delivery
+from world.narrative.correspondence import (
+    correspondence_event_source_id,
+    get_letter,
+    send_letter,
+    settle_correspondence_delivery,
+)
 from world.narrative.memory import record_memory
-from world.narrative.models import LetterReplyWork, LetterSend
+from world.narrative.models import (
+    LetterReplyWork,
+    LetterSend,
+    MemoryRecord,
+    NarrativeEvent,
+    ProjectionProgress,
+)
 from world.narrative.replies import attempt_reply, prepare_reply, settle_reply
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import AffinityConfig
@@ -100,7 +111,13 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         snapshot = prepare_reply(letter.source_id)
         self.assertIn("合成核心準則", str(snapshot.rendered_payload))
         self.assertNotIn("不應洩漏", str(snapshot.rendered_payload))
-        self.assertEqual([row["source_id"] for row in snapshot.sources], ["synthetic:permitted"])
+        # The drained delivered letter is permitted owner cognition: it joins the
+        # core selection's source in the captured provenance.
+        self.assertEqual(
+            [row["source_id"] for row in snapshot.sources],
+            ["synthetic:permitted",
+             correspondence_event_source_id(letter.source_id, "delivered")],
+        )
         outgoing = settle_reply(letter.source_id, snapshot.snapshot_id, LetterReply("我記得你的來信。"))
         row = LetterSend.objects.get(source_id=outgoing.source_id)
         self.assertEqual(row.reply_to, letter.source_id)
@@ -124,6 +141,35 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertEqual(never_called.calls, [])
         self.assertEqual(LetterSend.objects.count(), 2)
         self.assertEqual(self.npc.relations.affinity_for(self.player), 5)
+
+    @covers_requirement(
+        "correspondence-npc-replies::replies-use-delivered-inputs-and-remain-optional",
+        "narrative-memory::memory-projection-is-idempotent-and-restart-safe",
+    )
+    def test_delayed_delivery_projection_settles_before_capture_or_waits(self):
+        incoming = self.incoming()
+        source_id = correspondence_event_source_id(incoming.source_id, "delivered")
+        self.assertEqual(
+            ProjectionProgress.objects.get(source_id=source_id).status, "pending"
+        )
+        self.assertFalse(MemoryRecord.objects.filter(source_id=source_id).exists())
+
+        # Catch up: capture drains the durable delivery source before recall.
+        snapshot = prepare_reply(incoming.source_id)
+        self.assertEqual(
+            ProjectionProgress.objects.get(source_id=source_id).status, "completed"
+        )
+        record = MemoryRecord.objects.get(source_id=source_id)
+        self.assertEqual(record.owner_id, str(self.npc.pk))
+        self.assertEqual(record.knowledge_scope, "told")
+        self.assertIn(source_id, [row["source_id"] for row in snapshot.sources])
+
+        # Wait: a delivery source that cannot settle never lets capture proceed.
+        ProjectionProgress.objects.filter(source_id=source_id).update(status="pending")
+        NarrativeEvent.objects.filter(source_id=source_id).delete()
+        with self.assertRaises(ValueError):
+            prepare_reply(incoming.source_id)
+        self.assertEqual(LetterReplyWork.objects.get().status, "pending")
 
     @covers_requirement(
         "affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget",
