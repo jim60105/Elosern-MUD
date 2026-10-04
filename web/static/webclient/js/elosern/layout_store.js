@@ -153,13 +153,20 @@
     // The default wrapper's preferences carry every default; the
     // `motionLevel` key is absent (optional — its absence means nothing is
     // stored, so the OS preference applies).
+    // `fontScale` is the narrative prose multiplier
+    // (retarget-desktop-viewport-contract D6): the re-stepped values are
+    // A− = 1 (the 16px reading floor), A = 1.125 (18px, the default) and
+    // A+ = 1.25 (20px) at the 1451x790 reference scale, and the default is
+    // the middle step A, so a fresh or reset client reads its page text at
+    // 18px rather than at the floor. The layout version is unchanged (3): the
+    // steps are multipliers under one token, not a storage-schema change.
     return {
       layout_version: CURRENT_LAYOUT_VERSION,
       dimensions: {},
       tabs: {},
       preferences: {
         text2html: true,
-        fontScale: 1,
+        fontScale: 1.125,
         colorblind: false,
         textSpeed: "normal",
         autoAdvance: false,

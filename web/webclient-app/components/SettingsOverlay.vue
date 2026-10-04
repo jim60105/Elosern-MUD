@@ -8,8 +8,10 @@
 // allowlist.
 //
 // Controls (task 7.2–7.4): the narrative prose scale as the draft's
-// A−/A/A+ segmented control at [0.92, 1, 1.12] (replacing the 90/100/110/
-// 125% select), the motion level (完整 / 減少 / 關閉), the text-to-HTML
+// A−/A/A+ segmented control, re-stepped by retarget-desktop-viewport-contract
+// D6 to [1, 1.125, 1.25] — the 16px prose floor, 18px and 20px at the
+// reference scale (replacing the 90/100/110/125% select), the motion level
+// (完整 / 減少 / 關閉), the text-to-HTML
 // narrative toggle, and the colorblind-safe status palette. The invented
 // font-family select is removed: the design system's three self-hosted faces
 // are role-assigned and the binding design reference has no typeface control.
@@ -37,15 +39,17 @@ import { computed } from "vue";
 import ReadingSample from "./ReadingSample.vue";
 import { MOTION_LEVELS } from "../lib/motion_level.js";
 import { TEXT_SPEEDS } from "../lib/message_reveal.js";
+import { PROSE_SCALE_DEFAULT, PROSE_SCALE_STEPS } from "../lib/prose_scale.js";
 
-// The draft's three prose-scale steps (index.html :1297 fsScale): A− = 0.92,
-// A = 1, A+ = 1.12. The current step is marked by a non-colour indicator
+// The three prose-scale steps (lib/prose_scale.js owns the numbers): A− = 1
+// (16px at the reference — the reading floor), A = 1.125 (18px, the default)
+// and A+ = 1.25 (20px). The current step is marked by a non-colour indicator
 // (border + underline), never by colour alone.
-const SCALE_STEPS = [
-  { label: "A−", value: 0.92 },
-  { label: "A", value: 1 },
-  { label: "A+", value: 1.12 },
-];
+const SCALE_LABELS = ["A−", "A", "A+"];
+const SCALE_STEPS = PROSE_SCALE_STEPS.map((value, index) => ({
+  label: SCALE_LABELS[index],
+  value,
+}));
 
 // The four text-speed steps, in `TEXT_SPEEDS` order.
 const SPEED_LABELS = { slow: "慢", normal: "標準", fast: "快", instant: "瞬間" };
@@ -60,7 +64,7 @@ const props = defineProps({
   // presentation-preferences slice (task 7.5): the prose scale (number), the
   // text-to-HTML toggle (boolean), the EFFECTIVE motion level ("full" |
   // "reduced" | "off"), and the colorblind palette (boolean).
-  fontScale: { type: Number, default: 1 },
+  fontScale: { type: Number, default: PROSE_SCALE_DEFAULT },
   textToHtml: { type: Boolean, default: true },
   motionLevel: {
     type: String,

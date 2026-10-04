@@ -257,7 +257,11 @@ test("a version-1 wrapper resets to the version-3 default", () => {
   assert.equal(result.state.preferences.motionLevel, undefined);
   const stored = JSON.parse(storage.getItem("elosern.layout"));
   assert.equal(stored.layout_version, 3, "the reset version-3 wrapper is persisted");
-  assert.equal(stored.preferences.fontScale, 1);
+  assert.equal(
+    stored.preferences.fontScale,
+    1.125,
+    "the reset default is the middle prose step A (retarget-desktop-viewport-contract D6)"
+  );
 });
 
 test("a version-2 wrapper resets to the version-3 default", () => {
@@ -274,7 +278,7 @@ test("a version-2 wrapper resets to the version-3 default", () => {
   const result = store.load();
   assert.deepEqual(result.state, LayoutStore.defaultWrapper());
   assert.equal(result.state.layout_version, 3);
-  assert.equal(result.state.preferences.fontScale, 1);
+  assert.equal(result.state.preferences.fontScale, 1.125);
   assert.equal(result.state.preferences.textSpeed, "normal");
   assert.equal(result.state.preferences.motionLevel, undefined);
   assert.equal(JSON.parse(storage.getItem("elosern.layout")).layout_version, 3);

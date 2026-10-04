@@ -28,13 +28,16 @@
 import LayoutStore from "../../lib/layout_store.js";
 import { MOTION_LEVELS, resolveMotionLevel } from "../../lib/motion_level.js";
 import { TEXT_SPEEDS } from "../../lib/message_reveal.js";
+import { PROSE_SCALE_DEFAULT, normalizeProseScale } from "../../lib/prose_scale.js";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 export function applyPreferences(ctx) {
   const layoutPersistence = LayoutStore.createStore({ storage: window.localStorage });
   const prefs = {
-    fontScale: 1,
+    // The default prose scale is A = 1.125 (18px at the reference), not the
+    // 16px floor (retarget-desktop-viewport-contract D6).
+    fontScale: PROSE_SCALE_DEFAULT,
     text2html: true,
     // Optional key: absent in the stored wrapper = nothing stored, so the OS
     // preference is followed (design D2).
@@ -117,7 +120,13 @@ export function applyPreferences(ctx) {
     const result = layoutPersistence.load();
     const stored = (result.state && result.state.preferences) || {};
     if (typeof stored.fontScale === "number" && isFinite(stored.fontScale)) {
-      prefs.fontScale = Math.min(2, Math.max(0.5, stored.fontScale));
+      // Clamp to the legacy 0.5–2 band, then normalize to one of the three
+      // re-stepped values (retarget-desktop-viewport-contract D6): a stored
+      // legacy multiplier such as 0.92 or 1.12 matches no step, so it loads as
+      // the default A rather than as a clamped legacy multiplier. No
+      // layout-version bump: a stale presentation multiplier is exactly as
+      // harmless as a stale presentation key.
+      prefs.fontScale = normalizeProseScale(Math.min(2, Math.max(0.5, stored.fontScale)));
     }
     if (typeof stored.text2html === "boolean") {
       prefs.text2html = stored.text2html;
@@ -144,7 +153,9 @@ export function applyPreferences(ctx) {
     if (typeof value !== "number" || !isFinite(value)) {
       return;
     }
-    prefs.fontScale = Math.min(2, Math.max(0.5, value));
+    // One of the three steps, or the default A — an off-step value would leave
+    // the settings surface's segment with no step to mark.
+    prefs.fontScale = normalizeProseScale(Math.min(2, Math.max(0.5, value)));
     applyPresentationPreferences();
     persistPresentationPreferences();
   };

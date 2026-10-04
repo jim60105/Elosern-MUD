@@ -23,6 +23,7 @@ import { computed, onMounted, watch } from "vue";
 import { useTypewriter } from "../composables/use-typewriter.js";
 import { MOTION_LEVELS } from "../lib/motion_level.js";
 import { TEXT_SPEED_CPS, TEXT_SPEEDS, effectiveCps } from "../lib/message_reveal.js";
+import { PROSE_SCALE_DEFAULT } from "../lib/prose_scale.js";
 
 // The fixed sample: narration then a line of speech, so the preview shows
 // both the page's prose and its corner-bracket quotation.
@@ -34,7 +35,7 @@ const SPEED_LABELS = { slow: "慢", normal: "標準", fast: "快", instant: "瞬
 const MOTION_LABELS = { reduced: "減少", off: "關閉" };
 
 const props = defineProps({
-  fontScale: { type: Number, default: 1 },
+  fontScale: { type: Number, default: PROSE_SCALE_DEFAULT },
   textSpeed: { type: String, default: "normal" },
   motionLevel: {
     type: String,
@@ -173,7 +174,10 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
   grid-area: page;
   max-width: 42em;
   margin: 0;
-  font-family: var(--f-serif);
+  /* The message window's page face (retarget-desktop-viewport-contract D5):
+     the preview must show the surface it previews, now the bundled monospace
+     reading face. */
+  font-family: var(--f-mono);
   font-size: calc(var(--message-text) * var(--prose-scale));
   line-height: var(--message-line-height);
   color: var(--paper-100);
@@ -193,6 +197,9 @@ watch(() => [props.fontScale, props.textSpeed, props.motionLevel], play);
   display: inline-block;
   margin-left: 0.4em;
   color: var(--gold-400);
+  /* `visibility: hidden` spacing furniture, exempt from the legibility floor
+     (webclient-vue-application "Chrome type is legible"; it is never visible
+     text and exists only to reserve the mark's place while the line types). */
   font-size: 0.5em;
   vertical-align: 0.25em;
   visibility: hidden;

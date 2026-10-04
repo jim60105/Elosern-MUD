@@ -51,6 +51,7 @@ import MessageWindow from "./MessageWindow.vue";
 import PlaceCard from "./PlaceCard.vue";
 import TopBar from "./TopBar.vue";
 import { retireReplacedFallback } from "../fallback.js";
+import { PROSE_SCALE_DEFAULT } from "../lib/prose_scale.js";
 
 const props = defineProps({
   // The contextual mode slice (the store's committed mode: exploration /
@@ -71,7 +72,7 @@ const props = defineProps({
   dialogue: { type: Object, default: null },
   // The client-local prose scale (`store.view.fontScale`), forwarded to
   // MessageWindow so a scale change re-measures pages.
-  fontScale: { type: Number, default: 1 },
+  fontScale: { type: Number, default: PROSE_SCALE_DEFAULT },
   // The reading preferences (webclient-typewriter-reading-prefs):
   // `store.view.textSpeed`, `store.view.autoAdvance`, and the effective
   // motion level `store.view.motionLevel`, forwarded to MessageWindow.

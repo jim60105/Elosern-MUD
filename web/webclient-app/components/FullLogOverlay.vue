@@ -420,7 +420,11 @@ export default {
   margin: 0 auto;
   padding: calc(28px * var(--ui-scale)) calc(32px * var(--ui-scale)) calc(48px * var(--ui-scale));
   color: var(--paper-100);
-  font-family: var(--f-serif);
+  /* The log reads in the message window's own page face and size
+     (retarget-desktop-viewport-contract D5; the amended
+     webclient-input-narrative full-log clause): the bundled monospace reading
+     face at the 16px floor token, so `--log-text` and `--message-text` agree. */
+  font-family: var(--f-mono);
   font-size: calc(var(--log-text) * var(--prose-scale));
   line-height: 1.75;
 }
@@ -492,7 +496,10 @@ export default {
 
 .fulllog-overlay .narrative-line.sys {
   font-family: var(--f-sans);
-  font-size: 0.75em;
+  /* An absolute reference token, not an `em` fraction: at the 16px floor a
+     `0.75em` aside would fall below the legibility floor
+     (retarget-desktop-viewport-contract D6). */
+  font-size: var(--text-sm);
   line-height: 1.6;
   letter-spacing: 0.02em;
   color: var(--paper-500);
@@ -514,7 +521,8 @@ export default {
   max-width: 100%;
   overflow-x: auto;
   font-family: var(--f-mono);
-  font-size: 0.8em;
+  /* Absolute floor token, as `.sys` (retarget-desktop-viewport-contract D6). */
+  font-size: var(--text-xs);
   line-height: 1.15;
   white-space: pre;
   color: var(--paper-300);

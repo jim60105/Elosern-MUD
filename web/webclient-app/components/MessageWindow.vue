@@ -34,6 +34,7 @@ import { useMessageMeasure } from "../composables/use-message-measure.js";
 import { useTypewriter } from "../composables/use-typewriter.js";
 import { MOTION_LEVELS } from "../lib/motion_level.js";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
+import { PROSE_SCALE_DEFAULT } from "../lib/prose_scale.js";
 
 // The AVG message window (docs/superpowers/specs/2026-09-23-webclient-avg-
 // stage-redesign-design.md §6; OpenSpec change
@@ -111,7 +112,7 @@ export default {
     dialogue: { type: Object, default: null },
     // The prose scale; a change re-pages (a CSS variable change is invisible
     // to the ResizeObserver).
-    fontScale: { type: Number, default: 1 },
+    fontScale: { type: Number, default: PROSE_SCALE_DEFAULT },
     // Test seam: an injected `fits(fragments) -> boolean`.
     pageFit: { type: Function, default: null },
     // The reader's typing speed (`store.view.textSpeed`).
@@ -1024,7 +1025,10 @@ export default {
   margin: 0 auto;
   padding: 0 calc(24px * var(--ui-scale));
   overflow: hidden;
-  font-family: var(--f-serif);
+  /* The page text's face (retarget-desktop-viewport-contract D5): the bundled
+     Jim Mono TC reading face, whose CJK is exactly two cells wide — what the
+     42-cell measure below was always counting in. */
+  font-family: var(--f-mono);
   font-size: var(--message-page-font);
   line-height: var(--message-line-height);
   color: var(--paper-100);
@@ -1123,7 +1127,12 @@ export default {
    each consuming surface owns this rule). */
 .message-window .narrative-line.sys {
   font-family: var(--f-sans);
-  font-size: 0.75em;
+  /* An absolute reference token, not an `em` fraction
+     (retarget-desktop-viewport-contract D6): at the page's 16px floor a
+     `0.75em` aside would render at 12px, below the legibility floor, so the
+     aside reads at `--text-sm` (17px at the reference) whatever the reader's
+     prose scale. */
+  font-size: var(--text-sm);
   line-height: 1.6;
   letter-spacing: 0.02em;
   color: var(--paper-500);
@@ -1156,7 +1165,10 @@ export default {
    strokes join. */
 .message-window .narrative-line.map-art {
   font-family: var(--f-mono);
-  font-size: 0.6em;
+  /* The same floor rule as `.sys`: the box-drawing art path is an absolute
+     token, `--text-xs` (16px at the reference), never a sub-em fraction
+     (retarget-desktop-viewport-contract D6). */
+  font-size: var(--text-xs);
   line-height: 1.15;
   white-space: pre;
   color: var(--paper-300);
