@@ -24,7 +24,7 @@ import {
 // is skipped so editor outcomes never enter the narrative log. The check runs
 // inside the request-id/epoch-matched in-flight branch, so it is keyed to the
 // result's own request.
-const EDITOR_PRESENTED_ACTIONS = new Set(["npc.persona.read", "npc.persona.update"]);
+const EDITOR_PRESENTED_ACTIONS = new Set(["npc.persona.read", "npc.persona.update", "letters.list", "letters.read", "letters.collect", "letters.send"]);
 
 export function applyTransport(ctx) {
   ctx.handleTransportLifecycle = function handleTransportLifecycle(prev, rs) {

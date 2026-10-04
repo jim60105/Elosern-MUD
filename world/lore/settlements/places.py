@@ -67,6 +67,7 @@ class PlaceKind(StrEnum):
     MERCHANT_HALL = "merchant_hall"
     MARKET = "market"
     COMMONS = "commons"
+    COURIER_STATION = "courier_station"
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,8 @@ class PlaceDefinition:
     # (npc-persona-host-examiner-producers adds that rule); this field counts
     # as host material, so a hostless place carrying one is never hostless.
     host_profile_key: str | None = None
+    # A place capability, independent of descriptive kind or host profession.
+    letter_service: bool = False
 
 
 def _authored_kwargs_map(place: PlaceDefinition) -> dict[str, str]:
@@ -232,6 +235,8 @@ def validate_place_registry(places: Mapping[str, PlaceDefinition]) -> None:
     silently losing a location rather than failing.
     """
     for place_key, place in places.items():
+        if type(place.letter_service) is not bool:
+            raise ValueError(f"place {place_key!r} letter_service must be a boolean")
         if place_key != place.key:
             raise ValueError(f"place {place_key!r} key mismatch (declared {place.key!r})")
         if place.settlement_key not in SETTLEMENT_REGISTRY:
@@ -366,6 +371,28 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
         *ALTORIA_MIDDLE_ROWS,
         *ALTORIA_UPPER_ROWS,
         *CIARAN_ROWS,
+        PlaceDefinition(
+            key="altoria_silverfeather",
+            settlement_key="capital_altoria",
+            kind=PlaceKind.COURIER_STATION,
+            room_name_zh="銀羽驛站・王都分站",
+            room_desc_zh="銀羽驛行的櫃檯備有信紙與封蠟，牆上列著各地分站。旅人可在此寄信，或領取寄給自己的信件。",
+            exterior_xy=(2, 3),
+            doorway_key_zh="銀羽驛站",
+            doorway_aliases=("courier",),
+            letter_service=True,
+        ),
+        PlaceDefinition(
+            key="ciaran_silverfeather",
+            settlement_key="village_ciaran",
+            kind=PlaceKind.COURIER_STATION,
+            room_name_zh="銀羽驛站・精靈村分站",
+            room_desc_zh="樹蔭下的銀羽驛行櫃檯收存各地來信。旅人可在此寄信，或領取寄給自己的信件。",
+            exterior_xy=(1, 2),
+            doorway_key_zh="銀羽驛站",
+            doorway_aliases=("courier",),
+            letter_service=True,
+        ),
     )
 }
 

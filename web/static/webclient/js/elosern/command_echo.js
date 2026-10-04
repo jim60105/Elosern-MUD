@@ -131,6 +131,14 @@
   // Resolver table: actionId -> (payload, display) => string | null. Every
   // resolver returns null when a descriptor it needs is missing.
   var RESOLVERS = {
+    "letters.list": function (payload) {
+      return payload.after ? "信件 更多 " + payload.after : "信件";
+    },
+    "letters.collect": function () { return "信件 領取"; },
+    "letters.read": function (payload) { return "信件 讀 " + payload.source_id; },
+    "letters.send": function (payload) {
+      return "信件 寄 " + payload.recipient + "=" + payload.body_parts.join("");
+    },
     // Evennia's stock `look` command: bare for the room, named for a target.
     "explore.look": function (payload, display) {
       if (display && display.room) {

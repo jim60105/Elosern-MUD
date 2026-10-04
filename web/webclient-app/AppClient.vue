@@ -38,6 +38,7 @@ import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
+import LettersPanel from "./components/LettersPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import CompanionLineup from "./components/CompanionLineup.vue";
 import { companionFigures } from "./components/companion-lineup.js";
@@ -537,7 +538,8 @@ function onFoeLineupGone() {
           stage
         />
       </template>
-      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />
+      <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
+      <SkillBook v-else-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"

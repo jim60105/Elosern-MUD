@@ -160,6 +160,7 @@ repo 基類 `commands/command.py::Command`（Evennia default commands 不在
 | event | 級別 | context |
 |---|---|---|
 | `cmd_in` | info | `char`（pk）、`cmd`（命令 key）、`args`（截斷） |
+| `cmd_in` for `信件` | info | `char`, `cmd`, `args_count`; private arguments never enter logs |
 | `cmd_done` | info | `char`、`cmd`、`ms`（耗時）、`outcome=ok` |
 
 Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func 拋例外
@@ -201,6 +202,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_event_recorded` | `source_id`、`event_type`、`tick`、`participants` |
 | `correspondence_sent` | `source_id`, `char`, `recipient`, `tick`, `due_tick` |
 | `correspondence_settled` | `source_id`, `recipient`, `tick`, `status` |
+| `correspondence_collected` | `char`, `room`, `tick`, `count`; durable commit only, no bodies or recipient names |
+| `correspondence_read` | `char`, `source_id`, `tick`; first durable opening only, no body |
 | `narrative_projection_pending_scanned` | `projector_version`、`count` |
 | `narrative_memory_recorded` | `record_id`、`owner_id`、`category`、`tick`、`scope`、`generation` |
 | `narrative_memory_revised` | `record_id`、`revision_number`、`owner_id`、`availability`、`tier`、`generation` |

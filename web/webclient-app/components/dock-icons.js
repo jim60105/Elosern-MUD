@@ -5,6 +5,7 @@
 // carries the text). Every glyph is `aria-hidden` beside the real text
 // label.
 export const GLYPHS = {
+  letters: "M3 5h18v14H3ZM3 5l9 7 9-7",
   // Exploration root item keys (the G2 stable keys). The `d` values for
   // move/look/interact/suggestions are copied verbatim from
   // `docs/design/elosern-redesign/index.html` (the binding visual reference);

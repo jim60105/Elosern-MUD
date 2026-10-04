@@ -172,6 +172,9 @@ _LOCALIZED_ACCOUNT_WRAPPERS = (
 )
 
 
+from commands.correspondence import CmdLetters
+
+
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
     """
     The `CharacterCmdSet` contains general in-game commands like `look`,
@@ -223,6 +226,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdBuy)
         self.add(CmdSell)
         self.add(CmdInventory)
+        self.add(CmdLetters)
         self.add(CmdUseItem)
         self.add(CmdToggleEquip)
         self.add(CmdDeliver)

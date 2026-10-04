@@ -9,6 +9,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // H4 (task 7.4): the reference drawer layer. The drawer title/subtitle is
   // derived from the single open-drawer name the store publishes.
   const DRAWER_TITLES = {
+    letters: "信件",
     skill: "技能書",
     inventory: "背包 ‧ 裝備",
     shop: "商店",
@@ -22,6 +23,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // `dock-icons.js` registry key per drawer — the same key the navigation
   // control that opens it draws, so the header and its opener agree.
   const DRAWER_ICONS = {
+    letters: "letters",
     skill: "skills",
     inventory: "inventory",
     shop: "shop",

@@ -8,6 +8,7 @@
 export const NAV_TOOLS = Object.freeze([
   { key: "lineage", label: "技能系譜", testid: "nav-tool-lineage" },
   { key: "lore", label: "圖鑑", testid: "nav-tool-lore", drawer: "lore" },
+  { key: "letters", label: "信件", testid: "nav-tool-letters", drawer: "letters" },
   { key: "codex", label: "稱號冊", testid: "nav-tool-codex" },
   { key: "gallery", label: "角色肖像圖庫", testid: "gallery-opener" },
   { key: "help", label: "說明", testid: "nav-tool-help" },
