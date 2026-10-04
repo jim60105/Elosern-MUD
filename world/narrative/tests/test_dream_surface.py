@@ -90,7 +90,10 @@ class DreamSurfaceTests(EvenniaTest):
                 deepcopy(self.actor.db.sexual_state), deepcopy(self.actor.db.buffs),
                 deepcopy(self.actor.db.skill_proficiency), deepcopy(self.actor.db.relationships))
 
-    @covers_requirement("time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum")
+    @covers_requirement(
+        "time-skip-commands::sleep-computes-its-own-duration-from-gauge-regen-capped-at-a-configured-maximum",
+        "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result",
+    )
     def test_zero_duration_real_sleep_and_ordinary_sleep(self):
         for gauge in ("hp", "mp", "sp"):
             trait = self.actor.traits.get(gauge)
@@ -111,6 +114,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(before, self.physical())
         self.assertIn("dream awaken", render_state(state))
 
+    @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     def test_browser_zero_sleep_choice_and_ordinary_rest_wait(self):
         for payload in ({"sleep": True}, {"seconds": 5}, {"daypart": "dawn"}):
             clock = SimpleNamespace(tick=100, calendar=self.clock.calendar)
@@ -128,7 +132,10 @@ class DreamSurfaceTests(EvenniaTest):
             with self.assertRaises(ValueError):
                 validate_wait_payload(forged)
 
-    @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")
+    @covers_requirement(
+        "skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened",
+        "dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result",
+    )
     def test_rejected_sleep_never_opens_or_advances_on_either_client(self):
         command = CmdSleep()
         command.caller = self.actor
@@ -144,6 +151,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(result["outcome"], "rejected")
         self.assertIsNone(service.dream_state(self.actor))
 
+    @covers_requirement("dream-sleep-surface::optional-collaboration-follows-one-accepted-sleep-result")
     def test_interrupted_committed_result_uses_actual_ticks_on_both_clients(self):
         for browser in (False, True):
             clock = SimpleNamespace(tick=100)
@@ -174,7 +182,11 @@ class DreamSurfaceTests(EvenniaTest):
             self.assertEqual(self.request("awaken").result["outcome"], "success")
             self.assertEqual(clock.tick, 107)
 
-    @covers_requirement("dream-explicit-presentation::dream-presentation-changes-no-live-character-effects", "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame")
+    @covers_requirement(
+        "dream-explicit-presentation::dream-presentation-changes-no-live-character-effects",
+        "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
+        "dream-sleep-surface::dream-departure-never-settles-sleep-again",
+    )
     def test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke(self):
         command = CmdSleep()
         command.caller = self.actor
@@ -201,7 +213,11 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(self.physical(), physical)
         self.assertIn("醒了", service.dream_state(self.actor)["ending"])
 
-    @covers_requirement("dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget", "dream-session-lifecycle::convergence-and-exit-require-explicit-choices")
+    @covers_requirement(
+        "dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget",
+        "dream-session-lifecycle::convergence-and-exit-require-explicit-choices",
+        "dream-sleep-surface::public-dream-surface-includes-the-approved-presentation-and-deterministic-escape",
+    )
     def test_cap_six_text_browser_choices_remain_offline(self):
         self.enter()
         physical = self.physical()
@@ -222,7 +238,10 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(self.physical(), physical)
         self.assertTrue(service.dream_state(self.actor)["ending_phase"])
 
-    @covers_requirement("dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening")
+    @covers_requirement(
+        "dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening",
+        "dream-sleep-surface::dream-departure-never-settles-sleep-again",
+    )
     def test_model_failure_draft_and_awaken_preserve_committed_sleep(self):
         self.enter(tick_from=90, tick_to=100, requested_seconds=10)
         physical = self.physical()
@@ -238,6 +257,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(physical, self.physical())
         self.assertEqual(service.dream_state(self.actor)["sleep"]["seconds"], 10)
 
+    @covers_requirement("dream-sleep-surface::dream-departure-never-settles-sleep-again")
     def test_reconnect_progress_and_new_sleep_association_authority(self):
         first = self.enter()
         self.request("say", message="鐘聲", client=self.delivered())
