@@ -108,6 +108,7 @@ class StoryThreadLifecycleTests(StoryThreadTestCase):
     """Facts stay separate from plans; inactivity and quests never resolve a thread."""
 
     @covers_requirement(
+        "narrative-story-threads::thread-lifecycle-preserves-facts-separately-from-plans",
         "narrative-memory::revision-history-remains-recoverable",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
     )
@@ -199,7 +200,10 @@ class StoryThreadLifecycleTests(StoryThreadTestCase):
         with self.assertRaises(ValueError):
             thread.save()
 
-    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
+    @covers_requirement(
+        "narrative-story-threads::thread-lifecycle-preserves-facts-separately-from-plans",
+        "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
+    )
     def test_quest_completion_never_resolves_the_parent_thread(self):
         """Scenario: quest completes with open questions while the thread stays open."""
         self.create_owner_thread(
@@ -236,7 +240,10 @@ class StoryThreadLifecycleTests(StoryThreadTestCase):
                 thread_id="thread_quest_01", quest_id="quest_unknown", tick=140
             )
 
-    @covers_requirement("narrative-memory::revision-history-remains-recoverable")
+    @covers_requirement(
+        "narrative-story-threads::thread-lifecycle-preserves-facts-separately-from-plans",
+        "narrative-memory::revision-history-remains-recoverable",
+    )
     def test_long_inactivity_dormants_but_never_abandons(self):
         """Scenario: long inactivity alone is not proof of abandonment."""
         self.create_owner_thread("thread_idle_01")
@@ -298,6 +305,7 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
     """Real cross-channel linkage, provenance, and statement/commitment separation."""
 
     @covers_requirement(
+        "narrative-story-threads::thread-lifecycle-preserves-facts-separately-from-plans",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
         "correspondence-memory::letters-preserve-claims-and-channel-provenance",
     )
@@ -368,7 +376,10 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
                     )
         self.assertEqual(get_thread("thread_channels_01").commitments, [])
 
-    @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
+    )
     def test_real_linkage_across_channels_preserves_durable_provenance(self):
         """Events, letters, dialogue turns, and memories link by durable identity."""
         self.create_owner_thread("thread_links_01")
@@ -445,7 +456,10 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
                 tick=100,
             )
 
-    @covers_requirement("narrative-fast-recall::permissions-and-explicit-scope-precede-recall-scoring")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "narrative-fast-recall::permissions-and-explicit-scope-precede-recall-scoring",
+    )
     def test_inaccessible_thread_content_never_enters_recall(self):
         """Scenario: requested thread is private -> no private thread content enters recall."""
         create_thread(
@@ -497,7 +511,10 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
 class StoryThreadRevisionTests(StoryThreadTestCase):
     """Thread revisions invalidate future context while history keeps its read."""
 
-    @covers_requirement("narrative-context::generation-retains-an-immutable-source-snapshot")
+    @covers_requirement(
+        "narrative-story-threads::real-linkage-revisions-invalidate-future-context",
+        "narrative-context::generation-retains-an-immutable-source-snapshot",
+    )
     def test_thread_revision_change_after_capture_keeps_historical_read_revision(self):
         """Scenario: thread linkage/summary changes after capture."""
         self.create_owner_thread(
