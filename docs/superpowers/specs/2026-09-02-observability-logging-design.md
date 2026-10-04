@@ -259,6 +259,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `llm_transport_error` | `layer`、`endpoint`、`exc` |
 | `sd_job_claim` | `job`、`subject` |
 | `sd_job_settled` | `job`、`subject`、`status`、`reason` |
+| `dream_exchange_generated` | `layer`、`completed`、`mode`、`phase`、`climax_phase`；通過驗證的夢境交換只留層級、計數與伺服器階段，場景散文、台詞與玩家訊息永不入 log |
 
 ### 4.4 伺服器生命週期
 
