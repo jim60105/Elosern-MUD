@@ -83,7 +83,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
                         [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) &&
                         parseFloat(getComputedStyle(e).fontSize) < 12
                       ).map(e => ({text:e.textContent, size:getComputedStyle(e).fontSize}));
-                      const clipped = [...document.querySelectorAll('.action-dock__legend,.vital .num,.creation-overlay__actions button')]
+                      const clipped = [...document.querySelectorAll('.action-dock__legend,.reading .num,.creation-overlay__actions button')]
                         .filter(e => e.checkVisibility() && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1))
                         .map(e => e.textContent);
                       return {small, clipped, overflow: document.documentElement.scrollWidth > innerWidth};
@@ -97,7 +97,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
             self.story("data-vitalstrack--changing-numerals", ".shop-row__price")
             def metrics():
                 return self.page.evaluate("""() => {
-                  const values = [...document.querySelectorAll('.vital .num')];
+                  const values = [...document.querySelectorAll('.reading .num')];
                   const stocks = [...document.querySelectorAll('[data-testid="shop-panel__stock-section"] .shop-row')];
                   return {
                     text: values.map(e => e.textContent.trim()),
@@ -109,7 +109,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
                 }""")
             before = metrics()
             self.page.get_by_test_id("change-numerals").click()
-            self.page.wait_for_function("document.querySelector('.vital .num').textContent.includes('139')")
+            self.page.wait_for_function("document.querySelector('.reading .num').textContent.includes('139')")
             after = metrics()
             self.assertEqual(before["text"], ["9 / 405", "111 / 999", "11 / 99"])
             self.assertEqual(after["text"], ["139 / 405", "888 / 999", "88 / 99"])

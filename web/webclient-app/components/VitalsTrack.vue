@@ -247,9 +247,15 @@ watch(
 .reading.sp .ic { color: var(--vit-sp); }
 
 .num {
-  font-family: var(--f-mono);
+  /* The numeral role token (proportional sans, tabular lining figures):
+     the chrome-type contract reserves the monospace role for command
+     input, keycaps, badges, and map art — gauge values stay sans. */
+  font-family: var(--f-num);
   font-variant-numeric: tabular-nums lining-nums;
-  line-height: 1;
+  /* 1.2, not 1: the reading mixes the 16px current value with the 12px
+     maximum on a shared baseline, and a unit line-box makes the smaller
+     inline box overflow its parent's content box by a few pixels. */
+  line-height: 1.2;
   letter-spacing: 0;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
 }
@@ -257,6 +263,13 @@ watch(
   color: var(--paper-50);
   font-size: var(--text-sm);
   font-weight: 600;
+  /* The numerals-are-stable contract: the current value holds a 3-digit
+     tabular box (right-aligned), so a digit entering the value — 9 → 139 —
+     never shifts the numeral's right edge or its neighbours' columns. A
+     4-digit value still grows the box naturally instead of overlapping. */
+  display: inline-block;
+  min-width: 3ch;
+  text-align: right;
 }
 .num .max {
   color: var(--paper-500);
