@@ -14,7 +14,7 @@ import {
 // derived-shape helper. Props: menu, focusedKey, localMap, idPrefix, active.
 // Events: focus-change (every click), activate ({key, item}, enabled chips
 // only). Each story renders inside a box the size of the command panel at
-// 1920×1080 (640×300) that scrolls like the dock pane.
+// 1451x790 (484×220) that scrolls like the dock pane.
 
 const commandPanel = (story) => ({
   render: () =>
@@ -22,8 +22,8 @@ const commandPanel = (story) => ({
       "div",
       {
         style: {
-          width: "640px",
-          height: "300px",
+          width: "484px",
+          height: "220px",
           boxSizing: "border-box",
           padding: "12px 14px",
           overflowY: "auto",

@@ -10,8 +10,8 @@ import {
 // minimap. Stories: three tracked (`ActiveObjectives`: the first row plus `+2`), a completed
 // objective, a progress counter, a reward tag, a row whose deadline stays in
 // the quest drawer, a long line that truncates, and empty rows (renders
-// nothing). The frame mimics the `map` anchor at 1920x1080: a 332px
-// right-aligned column under a 218px minimap-sized card.
+// nothing). The frame mimics the `map` anchor at 1451x790: its 291px
+// right-aligned column under a 250px minimap card.
 
 export default {
   title: "Overlays/ObjectiveTracker",
@@ -31,13 +31,13 @@ const renderTracker = (args) => ({
           "div",
           {
             style:
-              "width: 332px; display: flex; flex-direction: column; align-items: stretch; gap: 14px;",
+              "width: 291px; display: flex; flex-direction: column; align-items: stretch; gap: 14px;",
           },
           [
             h("div", {
               "aria-hidden": "true",
               style:
-                "align-self: flex-end; width: 218px; height: 120px; box-sizing: border-box; " +
+                "align-self: flex-end; width: 250px; height: 120px; box-sizing: border-box; " +
                 "border: 1px dashed #bda47766; border-radius: var(--radius);",
             }),
             h(ObjectiveTracker, args),

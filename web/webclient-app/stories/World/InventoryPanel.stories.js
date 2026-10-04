@@ -495,7 +495,7 @@ export const RowActionStates = {
               "p",
               {
                 style:
-                  "position: absolute; left: 12px; bottom: 8px; right: 12px; color: var(--paper-500); font-size: 12px;",
+                  "position: absolute; left: 12px; bottom: 8px; right: 12px; color: var(--paper-500); font-size: 16px;",
               },
               lastIntent.value ? `已發出意圖：${lastIntent.value}` : "尚無已發出的背包操作意圖。",
             ),

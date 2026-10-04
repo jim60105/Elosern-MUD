@@ -74,7 +74,9 @@ describe("reading preferences", () => {
     const store = freshStore();
     expect(store.view.textSpeed).toBe("normal");
     expect(store.view.autoAdvance).toBe(true);
-    expect(store.view.fontScale).toBe(1.12);
+    // A legacy multiplier matches none of the re-stepped values, so it loads
+    // as the default step A = 1.125 (retarget-desktop-viewport-contract D6).
+    expect(store.view.fontScale).toBe(1.125);
   });
 
   it("resets a version-1 or version-2 wrapper to every default", () => {
@@ -90,7 +92,9 @@ describe("reading preferences", () => {
         }),
       );
       const store = freshStore();
-      expect(store.view.fontScale).toBe(1);
+      // The reset default is the middle prose step A
+      // (retarget-desktop-viewport-contract D6).
+      expect(store.view.fontScale).toBe(1.125);
       expect(store.view.colorblind).toBe(false);
       expect(store.view.textSpeed).toBe("normal");
       expect(store.view.autoAdvance).toBe(false);

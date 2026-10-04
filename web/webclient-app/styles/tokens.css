@@ -12,11 +12,12 @@
 
 :root {
   /* The desktop chrome factor (webclient-proportional-ui-scale; lib/ui_scale.js
-     writes the live value on <html>): 1 at and below a 1080px viewport height,
-     the height over 1080 above it, capped at 1.4. Every fixed CSS-pixel chrome
-     literal is written `calc(<n>px * var(--ui-scale))`; viewport-relative
-     (vh/vw) prose, band and stage-art terms are never multiplied by it. This
-     fallback serves Storybook frames and the frames before the owner runs. */
+     writes the live value on <html>): 1 at and below the 1451x790 reference
+     viewport, the limiting ratio above it, capped at 1.4
+     (retarget-desktop-viewport-contract). Every fixed CSS-pixel chrome literal
+     is written `calc(<n>px * var(--ui-scale))`; viewport-relative (vh/vw)
+     prose, band and stage-art terms are never multiplied by it. This fallback
+     serves Storybook frames and the frames before the owner runs. */
   --ui-scale: 1;
 
   /* ---- ink night palette ---- */
@@ -90,16 +91,21 @@
      that coverage (at 1em). No machine-installed family sits ahead of them. */
   --f-mono: "Jim Mono TC", "Noto Sans TC", monospace;
   --f-num: var(--f-sans);
-  --text-xs: calc(12px * var(--ui-scale));
-  --text-sm: calc(13px * var(--ui-scale));
-  --text-md: calc(14px * var(--ui-scale));
-  --text-base: calc(16px * var(--ui-scale));
-  --text-lg: calc(18px * var(--ui-scale));
-  --text-xl: calc(20px * var(--ui-scale));
-  --text-2xl: calc(24px * var(--ui-scale));
-  --text-3xl: calc(28px * var(--ui-scale));
-  --text-4xl: calc(32px * var(--ui-scale));
-  --text-initial: calc(44px * var(--ui-scale));
+  /* The type ramp (retarget-desktop-viewport-contract D4): design-led, not a
+     uniform multiply. `--text-xs` (16px) is the smallest rendered step anywhere
+     — the client's legibility floor — and the bottom steps compress (12/13/14 →
+     16/17/18) so the floor is met with the least disruption to the densest
+     chrome; the top steps keep their rhythm. */
+  --text-xs: calc(16px * var(--ui-scale));
+  --text-sm: calc(17px * var(--ui-scale));
+  --text-md: calc(18px * var(--ui-scale));
+  --text-base: calc(20px * var(--ui-scale));
+  --text-lg: calc(22px * var(--ui-scale));
+  --text-xl: calc(24px * var(--ui-scale));
+  --text-2xl: calc(28px * var(--ui-scale));
+  --text-3xl: calc(32px * var(--ui-scale));
+  --text-4xl: calc(36px * var(--ui-scale));
+  --text-initial: calc(48px * var(--ui-scale));
    --lh-narrative: 1.82;
    --lh-dialog: 1.78;
    /* H5 (webclient-hud-05-overlays-and-command-line, design D13): the
@@ -107,25 +113,36 @@
       message window's page text, the full-log surface's lines, the
       command-line prompt line and the settings reading sample that
       previews the page text — never into `--text-sm` / `--text-base` or
-      any HUD, dock, drawer or overlay chrome. */
+      any HUD, dock, drawer or overlay chrome.
+
+      retarget-desktop-viewport-contract D6: the steps are A− = 1.0
+      (16px at the reference, the reading floor), A = 1.125 (18px, the
+      default) and A+ = 1.25 (20px). */
    --prose-scale: 1;
    /* The AVG message window's page text (design §5.1/§6.2;
-      webclient-message-window-component design D1): 28px at 1080 and a
-      42em column, so a page line holds at most 42 CJK characters. The
-      window multiplies it by `--prose-scale`. The control strip under the
-      text holds the page marker, 日誌, and ⌨. */
-   --message-text: clamp(20px * var(--ui-scale), 2.593vh, 38px * var(--ui-scale));
+      webclient-message-window-component design D1;
+      retarget-desktop-viewport-contract D5): the reference-scale size is the
+      16px floor itself, scaled once by the chrome factor like every other
+      dimension. The `vh` clamp is gone: at the reference the window
+      multiplies this by `--prose-scale`, so the default step A (1.125)
+      renders the page at 18px, `A−` at 16px and `A+` at 20px. The 42em
+      column is untouched, so a page line still holds at most 42 CJK
+      characters in the bundled monospace reading face. The control strip
+      under the text holds the page marker, 日誌, and ⌨. */
+   --message-text: calc(16px * var(--ui-scale));
    /* The page's CJK leading and the gap between two narrative lines
       (webclient-message-typesetting): one and a half lines, and a little
       under half a line between paragraphs. Paging measures the rendered
       page, so capacity follows these values rather than a line count. */
    --message-line-height: 1.5;
    --message-paragraph-gap: 0.45em;
-   /* The full log's reading size (webclient-full-log-frame): a reference
-      surface read at 20px at 1080, below the 28px page, on the same 42em
-      measure. The log multiplies it by `--prose-scale`; its header, footer
-      and 回到最新 control are chrome and never scale. */
-   --log-text: clamp(17px * var(--ui-scale), 1.852vh, 26px * var(--ui-scale));
+   /* The full log's reading size (webclient-full-log-frame; the amended
+      webclient-input-narrative clause): the log reads at the message window's
+      page size — the same 16px floor token on the same 42em measure and
+      leading — so it loses its separate, smaller step. The log multiplies it
+      by `--prose-scale`; its header, footer and 回到最新 control are chrome
+      and never scale. */
+   --log-text: calc(16px * var(--ui-scale));
    --message-controls-h: calc(36px * var(--ui-scale));
    /* The bottom band's shared control strip (webclient-band-material-pass):
       the message window's marker / 日誌 / ⌨ row and the dock's shortcut
@@ -255,12 +272,15 @@
      fills the viewport) and each side's inset. The inset is 6% of the stage
      width, grown where the island column on that side would cover the
      figure's face (the anchor's centre, a third of its height in): the
-     vitals island column on the left, the 218px minimap card 16px from the
-     right edge (+ ~46px of air) on the right. At 1920x1080 both are 6%. The
-     dialogue text column aligns to the left inset. */
+     vitals island column on the left, the 250px minimap card (the 240px
+     canvas plus its padding and hairline) 16px from the right edge
+     (+ ~46px of air) on the right. At the 1451x790 reference viewport both
+     insets take their column-clearance value, which is therefore also the
+     floor the 6% term never has to act as. The dialogue text column aligns
+     to the left inset. */
   --actor-h: min(62vh, 680px * var(--ui-scale), calc(100vh - var(--header-h) - var(--band-h)));
   --actor-left-inset: max(6vw, calc(var(--left-column) + 8px * var(--ui-scale) - var(--actor-h) / 3));
-  --actor-right-inset: max(6vw, calc(280px * var(--ui-scale) - var(--actor-h) / 3));
+  --actor-right-inset: max(6vw, calc(312px * var(--ui-scale) - var(--actor-h) / 3));
   /* In combat the right-hand island is the compact participant frame, within
      the `map` anchor's `--right-column - 28px` column (the column's left edge
      `--right-column - 12px` from the stage's right edge) — much wider than
@@ -300,8 +320,13 @@
     --vitals-dock-w: 25vw;
     /* The AVG stage's bottom band (design §5.1): the message region and the
        command region share this one fixed height. It scales with the
-       viewport height only and never depends on content, frame, or mode. */
-    --band-h: clamp(260px * var(--ui-scale), 27.8vh, 400px * var(--ui-scale));
+       viewport height only and never depends on content, frame, or mode.
+       retarget-desktop-viewport-contract D2: the `27.85vh` term is kept and
+       re-pointed at the 790px reference (27.85% × 790 = 220.0px), and the px
+       bounds become 190/400 (× the chrome factor), so the reference band is
+       220px and the vh term owns it; 2560x1440 gives 401.0px, inside the
+       bounds. */
+    --band-h: clamp(190px * var(--ui-scale), 27.85vh, 400px * var(--ui-scale));
     /* The collapsible command line's expanded height (AVG stage design §5.5;
        webclient-collapsible-command-line design D4). HudFrame's
        [data-anchor="command-line"] rule and the stage clearance consume it. */
@@ -320,7 +345,11 @@
     /* The edge every stage surface above the band clears: the band plus the
        command-line row docked on its top edge. Every surface positioned
        above the band derives its offset from this single token, never
-       re-deriving the command line's height by hand. */
+       re-deriving the command line's height by hand.
+
+       The stage box (webclient-contextual-hud "the stage box is at least 65%
+       of the reference viewport"): 790 − 48 (top band) − 220 (bottom band) =
+       522px = 66.1% ≥ 65% (513.5px) at the 1451x790 reference. */
     --stage-content-bottom: calc(var(--band-h) + var(--command-line-h));
     /* The scene caption row (SceneBackdrop's plate: the scene label, its
        alt text, and the full-view control on one line) sits 12px above the
@@ -339,7 +368,7 @@
    --z-offline: 9000;
 }
 
-/* Short viewports (the stage box is 412px tall at 1280x720): a full
+/* Short viewports (the stage box is 471px tall at 1280x720): a full
    encounter's participant frame reaches down to the stage floor, so the foe
    line-up steps in further, until the front foe's floor gauge — not only its
    face — clears the frame (webclient-combat-foes-on-stage). */

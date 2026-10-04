@@ -85,7 +85,7 @@ describe("ReadingSample", () => {
     wrapper = mount(ReadingSample, { props: { fontScale: 1, textSpeed: "fast", motionLevel: "full" } });
     await run(1000);
     expect(shownLength(wrapper)).toBe(UNITS);
-    for (const change of [{ fontScale: 1.12 }, { textSpeed: "slow" }, { motionLevel: "full", fontScale: 0.92 }]) {
+    for (const change of [{ fontScale: 1.125 }, { textSpeed: "slow" }, { motionLevel: "full", fontScale: 1.25 }]) {
       await wrapper.setProps(change);
       await nextTick();
       expect(wrapper.get('[data-testid="settings-sample"]').attributes("data-typing")).toBe("true");
@@ -138,9 +138,9 @@ describe("SettingsOverlay reading sample and switches", () => {
   });
 
   it("hands the sample the preferences and emits nothing when it replays", async () => {
-    wrapper = mount(SettingsOverlay, { props: { fontScale: 1.12, textSpeed: "instant", motionLevel: "full" } });
+    wrapper = mount(SettingsOverlay, { props: { fontScale: 1.125, textSpeed: "instant", motionLevel: "full" } });
     const sample = wrapper.getComponent(ReadingSample);
-    expect(sample.props()).toEqual({ fontScale: 1.12, textSpeed: "instant", motionLevel: "full" });
+    expect(sample.props()).toEqual({ fontScale: 1.125, textSpeed: "instant", motionLevel: "full" });
     await wrapper.get('[data-testid="settings-sample-replay"]').trigger("click");
     expect(wrapper.emitted()).not.toHaveProperty("scale-change");
     expect(Object.keys(wrapper.emitted()).filter((name) => name.endsWith("-change"))).toEqual([]);

@@ -49,7 +49,7 @@ const OVERVIEW_MAP = localMapFixture([
 const renderDock = (args) => ({
   render: () =>
     h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;" }, [
-      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 13px;" },
+      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 16px;" },
         "（上方為敘事區域）"),
       h(ActionDock, args, {
         default: () => [
@@ -68,7 +68,7 @@ const renderDock = (args) => ({
 const renderOverview = (args) => ({
   render: () =>
     h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;" }, [
-      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 13px;" },
+      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 16px;" },
         "（上方為敘事區域）"),
       h(ActionDock, args, {
         default: () => [
@@ -89,7 +89,7 @@ const renderOverview = (args) => ({
 const renderPopover = (args) => ({
   render: () =>
     h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;" }, [
-      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 13px;" },
+      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 16px;" },
         "（上方為敘事區域）"),
       h(ActionDock, args, {
         default: () => [
@@ -139,7 +139,8 @@ export const VerbPopoverOverOverview = {
 // The combat command window (webclient-combat-command-window): the real
 // resolver's root and category rows, normalized to the DockMenu contract the
 // live dock passes (`command`, the committed `count`, the local copy, the
-// disabled reason), inside a box the size of the 1920×1080 command region.
+// disabled reason), inside a box the size of the command region at the
+// 1451x790 reference (484×220).
 const COMBAT_SKILL_COUNT = 5;
 const commandItems = (items) =>
   items.map((item) => ({
@@ -170,7 +171,7 @@ const renderCommandWindow = ({ items, focusedKey, crumb, ...args }) => ({
       "div",
       {
         style:
-          "width: 640px; height: 300px; box-sizing: border-box; padding: 10px 14px 0; " +
+          "width: 484px; height: 220px; box-sizing: border-box; padding: 10px 14px 0; " +
           "background: linear-gradient(180deg, #16161a, #0c0d10); border-top: 1px solid rgba(185,154,96,.45);",
       },
       [

@@ -66,7 +66,10 @@ import { LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
     markerScale: 4.83,
     overlayChrome: true,
     markerNames: true,
-    markerNameFont: 11,
+    // The full-map overlay's declared steps are the shared 16-unit floor
+    // (retarget-desktop-viewport-contract D7; MapOverlay.vue passes both).
+    labelFont: 16,
+    markerNameFont: 16,
   };
 
 export function mountLattice(setWrapper, props = {}) {

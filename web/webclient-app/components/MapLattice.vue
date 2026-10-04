@@ -56,24 +56,26 @@ const props = defineProps({
   // Fitted view (webclient-full-map-fit-view design D1): when set, the SVG fills
   // a clipped viewport box and its viewBox becomes a window over the unchanged drawing.
   fitView: { type: Boolean, default: false },
-  // Type size for node labels (SVG user units). Defaults to 11 for bare
-  // mounts; the overlay passes 14 and the island 12 — its own 12px chrome
-  // step (webclient-map-legibility), so a label never out-weighs the island's
-  // title yet reads at 11 CSS px or more on ordinary neighbourhoods.
-  labelFont: { type: Number, default: 11 },
+  // Type size for node labels (SVG user units). Defaults to 16 for bare
+  // mounts; the island and the overlay both pass 16 — the shared legibility
+  // floor (retarget-desktop-viewport-contract D7), so a drawn node label never
+  // renders below 16 CSS px at the reference scale. A user-unit size IS the
+  // drawn CSS px size at scale 1, because the island's pitch fit resolves the
+  // uniform scale to 1 on ordinary neighbourhoods.
+  labelFont: { type: Number, default: 16 },
   // Type size for the island's edge-marker names (SVG user units). Declared
   // by the surface for the same reason `labelFont` is: the island's coordinate
-  // margin now resolves the uniform scale to ~1, so a user-unit size IS the
-  // drawn CSS px size. A marker name annotates the drawing's rim rather than
-  // naming a drawn place, so the island keeps it at 10 units, below its 12px
-  // chrome step and its 12-unit node labels. The number also drives
+  // margin resolves the uniform scale to ~1, so a user-unit size IS the
+  // drawn CSS px size. The island no longer keeps marker names below its
+  // chrome step — the 16px floor forbids it — so the name's step matches the
+  // node label's at 16 units. The number also drives
   // the along-edge fit budget and the stacked-column line step below: a
   // horizontal name is budgeted in monospace cells of CELL_EM × this size
   // (lib/mono_cells.js: one cell for a glyph the monospace face draws narrow,
   // two for any other), and a stacked column advances one type step per
   // glyph, so a divisor that disagreed with the drawn size would either
   // overflow the marker's slot or truncate names that had room to spare.
-  markerNameFont: { type: Number, default: 10 },
+  markerNameFont: { type: Number, default: 16 },
   // Fixed square canvas size (CSS px, design D1): when set, the canvas
   // renders as a fixed square of exactly this size and its viewBox side is at
   // least this size so scale never exceeds 1.

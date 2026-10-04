@@ -121,17 +121,18 @@ export function useMapLatticeRender(props, emit, geometry) {
     return fittedList;
   });
 
-  // The label baseline sits 26px below the node origin at scale 1, scaled
-  // with the markers: the crowding fix's offset (LABEL_ANCHOR_HALF 13 +
-  // 13px clearance), deliberately kept after the re-skin — it clears the
-  // draft ladder's smaller footprints with strictly more room, so the
-  // non-overlap invariant holds a fortiori.
-  const LABEL_ANCHOR_HALF = 13;
+  // The label baseline sits below the node origin: the marker footprint's
+  // reserved half at this scale (the actionable halo's 10-unit radius plus a
+  // 1-unit gap), the 2-unit model margin, then a full type step — so the
+  // label's box starts clear of its own node's widest drawn footprint and
+  // grows with the declared label size. One rule for every surface: the
+  // `labelFont === 11` branch that used to sit here existed only because the
+  // bare mount's default step was 11, and the default is the shared 16-unit
+  // floor now (retarget-desktop-viewport-contract D7), so the sentinel is
+  // gone.
+  const LABEL_BASELINE_HALF = 11;
   function labelY() {
-    if (props.labelFont === 11) {
-      return LABEL_ANCHOR_HALF * props.markerScale + 13;
-    }
-    return 11 * props.markerScale + 2 + props.labelFont;
+    return LABEL_BASELINE_HALF * props.markerScale + 2 + props.labelFont;
   }
 
   // Label tiers (draft label palette, webclient-map-01-draft-chrome): the
@@ -173,10 +174,12 @@ export function useMapLatticeRender(props, emit, geometry) {
 
   // Edge-marker name placement (map-02 D4 wording): the name box is drawn
   // OUTWARD from the diamond's outer tip — never toward the canvas. The
-  // 11px monospace glyph line does not scale with the markers (same policy
+  // name's monospace glyph line does not scale with the markers (same policy
   // as the node labels), so the offset is the scaled rotated-diamond axial
-  // reach plus the 2-unit model margin and an 11px ascent to the baseline.
-  const MARKER_NAME_ASCENT = 11;
+  // reach plus the 2-unit model margin and one ascent to the baseline at the
+  // surface's declared 16-unit name step (retarget-desktop-viewport-contract
+  // D7; the old 11 was that step's 11px ascent).
+  const MARKER_NAME_ASCENT = 16;
   function markerOutset() {
     return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
   }

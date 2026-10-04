@@ -4,7 +4,9 @@
 import { describe, expect, it } from "vitest";
 import { fromScreen, panOffset, toScreen } from "../lib/map_pan.js";
 
-const SQUARE = { width: 208, height: 208 };
+// The island's fixed canvas square at the 1451x790 reference
+// (retarget-desktop-viewport-contract D7).
+const SQUARE = { width: 240, height: 240 };
 
 function frame(pos, viewBox, size = SQUARE) {
   return { pos, viewBox, size };
@@ -12,8 +14,8 @@ function frame(pos, viewBox, size = SQUARE) {
 
 describe("panOffset", () => {
   it("the same viewBox gives the plain position delta", () => {
-    const vb = { x: 0, y: 0, width: 208, height: 208 };
-    const offset = panOffset(frame({ x: 104, y: 104 }, vb), frame({ x: 144, y: 104 }, vb));
+    const vb = { x: 0, y: 0, width: 240, height: 240 };
+    const offset = panOffset(frame({ x: 120, y: 120 }, vb), frame({ x: 160, y: 120 }, vb));
     expect(offset.dx).toBeCloseTo(-40, 6);
     expect(offset.dy).toBeCloseTo(0, 6);
   });
@@ -29,7 +31,7 @@ describe("panOffset", () => {
   });
 
   it("returns null when the node is missing from either placement", () => {
-    const vb = { x: 0, y: 0, width: 208, height: 208 };
+    const vb = { x: 0, y: 0, width: 240, height: 240 };
     expect(panOffset(frame({ x: 10, y: 10 }, vb), frame(null, vb))).toBeNull();
     expect(panOffset(null, frame({ x: 10, y: 10 }, vb))).toBeNull();
     expect(panOffset(frame({ x: 10, y: 10 }, { ...vb, width: 0 }), frame({ x: 10, y: 10 }, vb))).toBeNull();
@@ -41,18 +43,18 @@ describe("panOffset", () => {
     const prev = frame({ x: 150, y: 150 }, { x: 0, y: 0, width: 300, height: 300 });
     const next = frame({ x: 210, y: 150 }, { x: 0, y: 0, width: 360, height: 360 });
     const offset = panOffset(prev, next);
-    // The old centre (104px on screen) back in the new units, minus the new
-    // position: 104 / (208 / 360) - 210.
-    expect(offset.dx).toBeCloseTo(104 * (360 / 208) - 210, 6);
-    expect(offset.dy).toBeCloseTo(104 * (360 / 208) - 150, 6);
+    // The old centre (120px on screen) back in the new units, minus the new
+    // position: 120 / (240 / 360) - 210.
+    expect(offset.dx).toBeCloseTo(120 * (360 / 240) - 210, 6);
+    expect(offset.dy).toBeCloseTo(120 * (360 / 240) - 150, 6);
   });
 
   it("honours the meet letterbox of a non-square viewBox", () => {
     const vb = { x: 0, y: 0, width: 400, height: 200 };
     const point = toScreen(frame(null, vb), { x: 200, y: 100 });
-    // Scale 0.52, the 200-unit height letterboxed to 104px, centred in 208.
-    expect(point.x).toBeCloseTo(104, 6);
-    expect(point.y).toBeCloseTo(104, 6);
+    // Scale 0.6, the 200-unit height letterboxed to 120px, centred in 240.
+    expect(point.x).toBeCloseTo(120, 6);
+    expect(point.y).toBeCloseTo(120, 6);
     const back = fromScreen(frame(null, vb), point);
     expect(back.x).toBeCloseTo(200, 6);
     expect(back.y).toBeCloseTo(100, 6);

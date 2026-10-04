@@ -20,7 +20,8 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     markerScale: 4.83,
     overlayChrome: true,
     markerNames: true,
-    markerNameFont: 11,
+    labelFont: 16,
+    markerNameFont: 16,
   };
 
   it("Task 1.1: pins pre-change overlay baseline for names within capacity", () => {
@@ -37,11 +38,11 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
 
     // Core lattice: 3 cols × 280 = 840; 3 rows × 212 = 636 + 14 = 650.
     // Model gutterMin for overlay: 2 * reach + 1 + namePad, where namePad is
-    // the outward name box, (labelMax + 1) × 2 = 22 monospace cells at 11,
+    // the outward name box, (labelMax + 1) × 2 = 22 monospace cells at 16,
     // plus 2.
-    const expectedOverlayGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 11 + 2;
+    const expectedOverlayGutter = 2 * Math.SQRT2 * (9 * 4.83) + 1 + 22 * CELL_EM * 16 + 2;
     // Pinned literal, so a drift in the cell measure itself is caught here too.
-    expect(22 * CELL_EM * 11).toBeCloseTo(141.797, 3);
+    expect(22 * CELL_EM * 16).toBeCloseTo(206.25, 3);
     expect(svgWidth).toBeCloseTo(840 + 2 * expectedOverlayGutter, 5);
     expect(svgHeight).toBeCloseTo(650 + 2 * expectedOverlayGutter, 5);
     expect(viewBox).toBe(`0 0 ${svgWidth} ${svgHeight}`);
@@ -70,7 +71,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         rowPitch: 40,
         labelMax: 4,
         markerScale: 1,
-        canvasSize: 208,
+        canvasSize: 240,
         overlayChrome: false,
         markerNames: true,
       },
@@ -79,29 +80,35 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     const svgWidth = Number(svg.attributes("width"));
     const svgHeight = Number(svg.attributes("height"));
 
-    // Core lattice: the label term clears the drawn 3-glyph labels ("0,0"),
-    // (3 + 3) / 2 * 11 + 11 / 2 = 38.5 < 40, so the pitch stays 40.
-    // 3 cols × 40 = 120; 3 rows × 40 = 120 + 14 = 134.
-    // Gutter for island with nameHeight: 16 -> namePad: 18 -> gutter: 2 * sqrt(2) * 9 + 1 + 18 ≈ 44.4558
+    // Core lattice: the label term clears the drawn 3-glyph labels ("0,0") —
+    // ((3 + 3) / 2 × CELL_EM + 0.5) × 16 = 37 < 40 — so the declared 40-unit
+    // pitch is the floor and the 240px square's roomier inset box grows the
+    // drawn pitch to 45.
+    // Gutter for the island with nameHeight 16 -> namePad 18 -> gutter:
+    // 2 * sqrt(2) * 9 + 1 + 18 ≈ 44.4558, so the drawn field is
+    // 240 − 2 × 44.4558 = 151.088 units a side.
     const expectedGutter = 2 * Math.SQRT2 * 9 + 1 + 18;
-    expect(svgWidth).toBe(208);
-    expect(svgHeight).toBe(208);
+    expect(svgWidth).toBe(240);
+    expect(svgHeight).toBe(240);
     const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(134 + 2 * expectedGutter, 5);
-    expect(vb[3]).toBeCloseTo(134 + 2 * expectedGutter, 5);
+    expect(vb[2]).toBeCloseTo(240, 5);
+    expect(vb[3]).toBeCloseTo(240, 5);
+    const westSpan = wrapper.vm.fittedEdgeMarkers.find((m) => m.id === "r:west").span;
+    expect(westSpan).toBeCloseTo(240 - 2 * expectedGutter, 5);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
-    // Span on left edge: 134. The island stacks left names one glyph per line,
-    // so budget = floor(134 / 10) = 13 steps. Label is 11 glyphs -> fits whole!
-    expect(westText.text()).toBe("西部丘陵與谷地（南門）");
+    // Span on the left edge: 151.088. The island stacks left names one glyph
+    // per line, so budget = floor(151.088 / 16) = 9 steps; the kept （南門）
+    // qualifier (4 steps) plus "…" leaves 4 steps of head: 西部丘陵.
+    expect(westText.text()).toBe("西部丘陵…（南門）");
     const tspans = westText.findAll("tspan");
-    expect(tspans).toHaveLength(11);
+    expect(tspans).toHaveLength(9);
     const reach = Math.SQRT2 * 9;
     const expectedX = -(reach + 9);
     tspans.forEach((tspan, i) => {
       expect(Number(tspan.attributes("x"))).toBeCloseTo(expectedX, 3);
-      expect(tspan.attributes("dy")).toBe(i === 0 ? "0" : "10");
+      expect(tspan.attributes("dy")).toBe(i === 0 ? "0" : "16");
     });
 
     const eastMarker = wrapper.get('[data-testid="local-map__edge-marker--r:east"]');
@@ -120,7 +127,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     });
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const textEl = westMarker.get("text.local-map__edge-marker-name");
-    expect(textEl.attributes("style")).toContain("font-size: 11px");
+    expect(textEl.attributes("style")).toContain("font-size: 16px");
 
     let checkedRule = false;
     for (const sheet of document.styleSheets) {
@@ -145,23 +152,24 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         ...OVERLAY_CONFIG,
       },
     });
-    // Default overlay markerNameFont is 11, labelMax is 10: the outward box is
-    // (10 + 1) × 2 = 22 monospace cells, 22 × CELL_EM × 11 ≈ 145.7 units.
-    const svg11 = wOverlay.get("svg.local-map__lattice");
-    const width11 = Number(svg11.attributes("width"));
+    // The overlay's markerNameFont is 16, labelMax is 10: the outward box is
+    // (10 + 1) × 2 = 22 monospace cells, 22 × CELL_EM × 16 = 206.25 units.
+    const svg16 = wOverlay.get("svg.local-map__lattice");
+    const width16 = Number(svg16.attributes("width"));
 
-    // Re-render with markerNameFont = 12: the box grows by 22 × CELL_EM ≈ 13.2
-    // units, so namePad and each gutter grow by that and svgWidth by twice it.
-    const wOverlay12 = mount(MapLattice, {
+    // Re-render with markerNameFont = 20 (a step above the floor): the box
+    // grows by 22 × CELL_EM × 4 = 51.5625 units, so namePad and each gutter
+    // grow by that and svgWidth by twice it.
+    const wOverlay20 = mount(MapLattice, {
       props: {
         localMap: localMapModelFor(REPORTED_WILDERNESS_PAYLOAD),
         ...OVERLAY_CONFIG,
-        markerNameFont: 12,
+        markerNameFont: 20,
       },
     });
-    const svg12 = wOverlay12.get("svg.local-map__lattice");
-    const width12 = Number(svg12.attributes("width"));
-    expect(width12 - width11).toBeCloseTo(2 * 22 * CELL_EM, 5);
+    const svg20 = wOverlay20.get("svg.local-map__lattice");
+    const width20 = Number(svg20.attributes("width"));
+    expect(width20 - width16).toBeCloseTo(2 * 22 * CELL_EM * 4, 5);
   });
 
   it("Task 4.3: fits 14-glyph label to 11 on lone overlay left and draws whole on lone overlay top", () => {
@@ -215,7 +223,8 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     const topText = topMarker.get("text.local-map__edge-marker-name");
     expect(topText.text()).toBe("灰鬮荒原第一南關隘道前哨站營");
 
-    // Island budget for both orientations is unchanged from wave 1
+    // The island's own declared step (16 units) truncates the same long label
+    // harder than the overlay's outward_name capacity does.
     const wIslandLeft = mount(MapLattice, {
       props: {
         localMap: localMapModelFor(leftPayload),
@@ -223,15 +232,15 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
         rowPitch: 40,
         labelMax: 4,
         markerScale: 1,
-        canvasSize: 208,
+        canvasSize: 240,
         overlayChrome: false,
         markerNames: true,
       },
     });
     const islandLeftText = wIslandLeft.get('[data-testid="local-map__edge-marker--r:west_long"] text');
-    // Span 134, budget 13: the 14-glyph name keeps its head and tail
-    expect(islandLeftText.text()).toBe("灰…原第一南關隘道前哨站營");
-    expect(Array.from(islandLeftText.text())).toHaveLength(13);
+    // Span 151.088, budget 9 steps: the 14-glyph name keeps its head and tail
+    expect(islandLeftText.text()).toBe("灰…關隘道前哨站營");
+    expect(Array.from(islandLeftText.text())).toHaveLength(9);
   });
 
   it("Task 4.4: anti-ambiguity pass covers overlay when differing 14-glyph labels collide on budget 11", () => {
@@ -315,26 +324,42 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
       },
     });
 
-    // Compare per-marker budgets
-    const islandBudgets = new Map();
-    for (const m of wIsland.vm.fittedEdgeMarkers) {
-      islandBudgets.set(m.id, Math.floor(m.span / 10));
+    // Compare per-marker budgets against the renderer's own rule
+    // (use-map-lattice-render.js): a sideways name on the island stacks one
+    // glyph per line, so its budget is in type steps; every horizontal name is
+    // budgeted in whole monospace cells of CELL_EM × the declared 16-unit
+    // step; and the overlay caps a sideways name at its declared outward box,
+    // (labelMax + 1) × 2 = 22 cells.
+    const STEP = 16;
+    const OUTWARD_CELLS = 22;
+    function budgetFor(marker, overlay) {
+      const sideways = marker.side === "left" || marker.side === "right";
+      const stacked = sideways && !overlay;
+      if (stacked) {
+        return Math.floor(marker.span / STEP);
+      }
+      return Math.min(
+        Math.floor(marker.span / (CELL_EM * STEP)),
+        overlay && sideways ? OUTWARD_CELLS : Infinity,
+      );
     }
-    const overlayBudgets = new Map();
-    for (const m of wOverlay.vm.fittedEdgeMarkers) {
-      const drawsOutward = (121 > 0) && (m.side === "left" || m.side === "right");
-      const maxBox = drawsOutward ? Math.floor(121 / 11) : Infinity;
-      overlayBudgets.set(m.id, Math.min(Math.floor(m.span / 11), maxBox));
-    }
+    const islandBudgets = new Map(
+      wIsland.vm.fittedEdgeMarkers.map((m) => [m.id, budgetFor(m, false)]),
+    );
+    const overlayBudgets = new Map(
+      wOverlay.vm.fittedEdgeMarkers.map((m) => [m.id, budgetFor(m, true)]),
+    );
 
-    // Top markers: island span = 120 / 3 = 40 -> budget = 4. Overlay span = 840 / 3 = 280 -> budget = 25.
+    // Top markers: island span = 120 / 3 = 40 -> budget 4. Overlay span =
+    // 840 / 3 = 280 -> budget floor(280 / (CELL_EM × 16)) = 29.
     expect(islandBudgets.get("r:top_1")).toBe(4);
-    expect(overlayBudgets.get("r:top_1")).toBe(25);
+    expect(overlayBudgets.get("r:top_1")).toBe(29);
     expect(overlayBudgets.get("r:top_1")).toBeGreaterThan(islandBudgets.get("r:top_1"));
 
-    // Left markers: island span = 134 / 2 = 67 -> budget = 6. Overlay outwardBox bound = 11.
-    expect(islandBudgets.get("r:left_1")).toBe(6);
-    expect(overlayBudgets.get("r:left_1")).toBe(11);
+    // Left markers: island span = 134 / 2 = 67 -> budget floor(67 / 16) = 4.
+    // Overlay span = 650 / 2 = 325, capped by the 22-cell outward box.
+    expect(islandBudgets.get("r:left_1")).toBe(4);
+    expect(overlayBudgets.get("r:left_1")).toBe(22);
     expect(overlayBudgets.get("r:left_1")).toBeGreaterThan(islandBudgets.get("r:left_1"));
 
     for (const id of ["r:top_1", "r:top_2", "r:top_3", "r:left_1", "r:left_2"]) {

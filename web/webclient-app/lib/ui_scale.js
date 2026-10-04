@@ -1,17 +1,22 @@
 // The desktop chrome scale (webclient-proportional-ui-scale; AVG stage design
 // §2 decision 2): one unitless factor,
-// `S = clamp(1, min(viewportHeight / 1080, viewportWidth / 1920), 1.4)`,
+// `S = clamp(1, min(viewportHeight / 790, viewportWidth / 1451), 1.4)`,
 // written once to the root as `--ui-scale`. Stylesheets multiply their fixed
-// CSS-pixel chrome literals by it (`calc(12px * var(--ui-scale))`), so
-// 2560x1440 renders the 1920x1080 reference at four thirds while every
-// acceptance size at or below 1080px keeps S = 1. Viewport-relative prose,
-// band and stage-art terms (`vh`/`vw`) are never multiplied by it, so nothing
-// scales twice. The reader's prose scale is a separate multiplier. The width
-// term keeps a tall, narrow window (the layout is 16:9 desktop only) from
+// CSS-pixel chrome literals by it (`calc(16px * var(--ui-scale))`), so above
+// the reference the drawing grows once, and at 2560x1440 — where both raw
+// ratios exceed the cap — chrome renders at the 1.4 cap. Every viewport at or
+// below the reference, and every viewport narrower than its own height would
+// imply, keeps S = 1. The reference is 1451x790 CSS px, the player's real
+// browser viewport (retarget-desktop-viewport-contract): the drawn geometry is
+// the geometry the player sees, and the 16px type floor holds at scale 1.
+// Viewport-relative prose, band and stage-art terms (`vh`/`vw`) are never
+// multiplied by it, so nothing scales twice. The reader's prose scale is a
+// separate multiplier. The width term keeps a tall, narrow window — one whose
+// width is narrower than the reference's own aspect ratio implies — from
 // growing chrome past what its width breakpoints were drawn for.
 
-export const UI_SCALE_REFERENCE_HEIGHT = 1080;
-export const UI_SCALE_REFERENCE_WIDTH = 1920;
+export const UI_SCALE_REFERENCE_HEIGHT = 790;
+export const UI_SCALE_REFERENCE_WIDTH = 1451;
 export const UI_SCALE_MAX = 1.4;
 export const UI_SCALE_PROPERTY = "--ui-scale";
 

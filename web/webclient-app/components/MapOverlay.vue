@@ -167,12 +167,12 @@ function handleMove(payload) {
           :col-pitch="280"
           :row-pitch="212"
           :label-max="10"
-          :label-font="14"
+          :label-font="16"
           :marker-scale="2.2"
           :fit-view="true"
           :overlay-chrome="true"
           :marker-names="true"
-          :marker-name-font="11"
+          :marker-name-font="16"
           @move="handleMove"
         />
         <!-- The view controls float over the map's top-right corner as one
@@ -226,7 +226,9 @@ function handleMove(payload) {
         >
           <!-- The draft dot-chip state legend (webclient-map-01-draft-chrome
                D6, moved here by webclient-full-map-fit-view D5): an 11px
-               radius-3 colour chip paired with its text label. The chip
+               radius-3 colour chip paired with its text label, which reads
+               through the shared `--text-xs` step (16 CSS px at the
+               reference; retarget-desktop-viewport-contract D4/D7). The chip
                border style carries non-colour redundancy — the remembered
                chip's dashed border differs from the visited chip's solid
                border (delta scenario "Legend chips stay text-labelled at
@@ -478,7 +480,8 @@ function handleMove(payload) {
 }
 
 /* The draft dot-chip legend (webclient-map-01-draft-chrome D6): an 11px
-   radius-3 chip + 11px text label, 14px gap, no bordered pill. The text
+   radius-3 chip + a `--text-xs` text label (16px at the reference), 14px gap,
+   no bordered pill. The text
    labels stay the non-colour indicator; remembered (dashed) vs visited
    (solid) chip borders add a non-colour distinction between those two
    entries. Moved here from map-lattice.css with the popover (task 4.2);

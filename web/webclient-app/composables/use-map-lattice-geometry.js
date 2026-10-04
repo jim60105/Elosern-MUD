@@ -242,6 +242,9 @@ export function useMapLatticeGeometry(props) {
       const pMin = Math.max(props.colPitch, labelClearancePitch.value);
       const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
       const nameWidth = outwardNameBox.value;
+      // The marker name's line box the gutter must clear (a fixed 16 units,
+      // not the declared type step): it is what produces the reported
+      // wilderness shape's 44.456-unit gutter (local-map spec).
       const nameHeight = props.markerNames ? 16 : 0;
 
       if (!hasRemembered) {
@@ -386,6 +389,7 @@ export function useMapLatticeGeometry(props) {
 
     const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
     const nameWidth = outwardNameBox.value;
+    // As above: the marker name's line box, a fixed 16 units.
     const nameHeight = props.markerNames ? 16 : 0;
     let fW = cW;
     let fH = cH + LABEL_BAND;
@@ -530,7 +534,7 @@ export function useMapLatticeGeometry(props) {
   );
 
   // Canvas box: the island passes its fixed reference square (`canvasSize`,
-  // CSS px at the 1080p reference), the overlay passes `null` and fills its
+  // CSS px at the 1451x790 reference), the overlay passes `null` and fills its
   // body — bound as inline styles so the caller controls the layout variant.
   // The square's outward box is multiplied once by the desktop chrome factor
   // (webclient-proportional-ui-scale); the viewBox and every user-unit

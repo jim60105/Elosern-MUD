@@ -238,7 +238,7 @@ export const Storyboard = {
         h("button", { class: "ui-btn", type: "button", onClick: handler, disabled }, text);
       return () => h("div", { class: "elosern", style: "position:absolute;inset:0;display:flex;flex-direction:column;background:var(--ink-950)" }, [
         h("div", { "aria-label": "故事發布控制", style: "padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--gold-500)" }, [
-          h("span", { style: "color:var(--gold-400);font-size:13px" }, "故事發布控制"),
+          h("span", { style: "color:var(--gold-400);font-size:16px" }, "故事發布控制"),
           button("發布成功", () => publish(true), dispatchState.value.inFlight === null),
           button("發布拒絕", () => publish(false), dispatchState.value.inFlight === null),
           button("重新連線", reconnect),
@@ -251,7 +251,7 @@ export const Storyboard = {
             h("pre", { style: "max-height:160px;overflow:auto;color:var(--paper-100)" }, JSON.stringify(intent.value, null, 2)),
           ]),
         ]),
-        h("p", { role: "status", style: "margin:0;padding:4px 16px;color:var(--paper-400);font-size:13px" }, notice.value),
+        h("p", { role: "status", style: "margin:0;padding:4px 16px;color:var(--paper-400);font-size:16px" }, notice.value),
         h("div", { style: "position:relative;flex:1;min-height:0" }, [
           h(CreationOverlay, {
             key: mountKey.value, creation: panel.value, stage: stage.value,

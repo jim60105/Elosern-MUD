@@ -12,7 +12,7 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 This requirement carries the `place-card-relocation` and `vitals-bar-redesign` amendments; the party-line wording below replaces the solo-portrait wording of the `actor-left` anchor.
-Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 1080px tall or 1920px wide. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
+Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 790px tall or 1451px wide, the 1451x790 reference viewport. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
 those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
@@ -32,7 +32,7 @@ minimap island, then the objective line, then any other island this capability p
 stage's right gutter and bounded above the bottom band.
 
 The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
-`clamp(260px, 27.8vh, 400px)` with its two px bounds multiplied once by the desktop chrome factor (300px at the 1920x1080 reference viewport, 400px at 2560x1440), taken from a single
+`clamp(190px, 27.85vh, 400px)` with its two px bounds multiplied once by the desktop chrome factor (220px at the 1451x790 reference viewport, 401px at 2560x1440), taken from a single
 shared band-height token. The band's height SHALL NOT depend on its content, on the dock frame, on
 the committed mode, or on any measurement: no frame, pane, line count, dialogue exchange, or mode
 change SHALL grow or shrink it. The band SHALL be divided into the message region `band-message`,
@@ -42,8 +42,8 @@ SHALL span the whole band, and in dialogue mode, where the command region is col
 region SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
 the hairline top border, and the upward shadow) on the band itself, not on the content inside it.
 The stage box — the region between the top band's lower edge and the bottom band's upper edge — is
-where the scene is seen, and at the 1920x1080 reference viewport it SHALL be at least 65% of the
-viewport's height — at least 702px of 1080; the 48px top band and the 300px bottom band leave 731px. Every surface other than the band SHALL be positioned relative to the
+where the scene is seen, and at the 1451x790 reference viewport it SHALL be at least 65% of the
+viewport's height — at least 513.5px of 790; the 48px top band and the 220px bottom band leave 522px. Every surface other than the band SHALL be positioned relative to the
 band-height token so that none of them overlaps the band.
 
 The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
@@ -51,8 +51,8 @@ SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be i
 stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
 (the anchor's horizontal centre) under the island column on its side — the vitals stack on
 the left, the place card and the minimap card on the right — the inset SHALL grow just enough to clear that column; at
-the 1920x1080 reference viewport both insets are exactly 6%, and the compact lower-left dock never
-reaches the portrait's face height, so neither inset needs to grow for it. The `actor-left` anchor SHALL carry the
+the 1451x790 reference viewport both insets take their column-clearance value and only that value
+acts as a floor where no column reaches the portrait's face height. The `actor-left` anchor SHALL carry the
 controlled character's stage actor — the current roster character's portrait, or the possessed
 companion's while the possession banner is available — with the committed party's companion stage
 actors lined up behind it as "Companion standing portraits line up behind the controlled character in
@@ -78,7 +78,7 @@ expanded command line; when its content is taller
 than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
 command-line row, or the bottom band.
 
-At 1920x1080, 1440x900, and 1280x720 no interactive stage anchor (`vitals`, `map`,
+At 1451x790, and at every larger viewport up to the chrome factor's cap, no interactive stage anchor (`vitals`, `map`,
 `band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
 and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
 anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
@@ -88,7 +88,7 @@ Escape and on outside activation; a surface that permanently occupies vertical s
 introduced into the band this way.
 
 #### Scenario: The stage fills the viewport with layered surfaces
-- **WHEN** the shell mounts at 1440x900
+- **WHEN** the shell mounts at 1451x790
 - **THEN** the scene backdrop fills the stage box, and the player portrait, the HUD islands, the bottom band, and the command line are layered above it in that order with no page-level scrollbar
 
 #### Scenario: Required surfaces never scroll out of view
@@ -96,11 +96,11 @@ introduced into the band this way.
 - **THEN** the island stack or the band region itself is bounded and scrolls internally, and no required surface is pushed below the visible viewport
 
 #### Scenario: Anchors do not overlap at the minimum viewport
-- **WHEN** the shell renders at 1280x720 with every mode-visible surface present
+- **WHEN** the shell renders at the 1451x790 reference viewport with every mode-visible surface present
 - **THEN** no interactive stage anchor's rendered box intersects another interactive anchor's rendered box
 
 #### Scenario: The top band's own elements do not collide
-- **WHEN** the shell renders at 1280x720 with every top-band element present and a maximum-length character name committed
+- **WHEN** the shell renders at the 1451x790 reference viewport with every top-band element present and a maximum-length character name committed
 - **THEN** the band's elements render side by side without intersecting, the variable-width element is truncated within its bound, and no band element's box extends into the island anchor region
 
 #### Scenario: A band popover overlays without displacing
@@ -108,24 +108,24 @@ introduced into the band this way.
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
 #### Scenario: The bottom band keeps one height whatever it holds
-- **WHEN** the shell renders at 1920x1080 and the player moves through the exploration scene overview, a target's verb popover, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
-- **THEN** the bottom band's rendered height is 300px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
+- **WHEN** the shell renders at 1451x790 and the player moves through the exploration scene overview, a target's verb popover, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
 
 #### Scenario: The band splits two thirds and one third
-- **WHEN** the shell renders in exploration mode at 1920x1080, 1440x900, and 1280x720
+- **WHEN** the shell renders in exploration mode at 1451x790 and at 2560x1440
 - **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, in creation mode the command region spans the whole band, and in dialogue mode the message region spans the whole band while the command region is not rendered
 
 #### Scenario: The player portrait stands on the band
-- **WHEN** the shell renders in exploration mode at 1920x1080 with a committed roster portrait for the current character
-- **THEN** the `actor-left` anchor renders that portrait frontmost, its bottom edge coincides with the band's top edge, its height is `min(62vh, 680px)` (±1px), its left edge is 6% of the stage width from the stage's left edge, it holds no focusable element, and the `actor-right` anchor renders no content
+- **WHEN** the shell renders in exploration mode at 1451x790 with a committed roster portrait for the current character
+- **THEN** the `actor-left` anchor renders that portrait frontmost, its bottom edge coincides with the band's top edge, its height is `min(62vh, 680px)` (±1px) — its left-edge inset is the value its anchor rule derives, never below 6% of the stage width, it holds no focusable element, and the `actor-right` anchor renders no content
 
 #### Scenario: The portrait never outgrows the stage box
-- **WHEN** the shell renders at 1280x720, where `min(62vh, 680px)` exceeds the stage box's height
+- **WHEN** the shell renders in a window short enough that `min(62vh, 680px)` exceeds the stage box's height
 - **THEN** the player portrait's height equals the stage box's height and its top edge is not above the top band's lower edge
 
 #### Scenario: The stage box is at least 65% of the reference viewport
-- **WHEN** the shell renders in exploration mode at 1920x1080
-- **THEN** the top band is 48px tall, the bottom band is 300px tall (each ±1px), and the stage box between them is at least 702px tall (65% of 1080)
+- **WHEN** the shell renders in exploration mode at 1451x790
+- **THEN** the top band is 48px tall, the bottom band is 220px tall (each ±1px), and the stage box between them is at least 513.5px tall (65% of 790)
 
 #### Scenario: The top band carries no location or time
 - **WHEN** the shell renders in exploration mode with a committed location label and world time
@@ -136,15 +136,15 @@ introduced into the band this way.
 - **THEN** no place card renders anywhere in the stage's left column, and the `vitals` anchor's box is not offset by any place card's height
 
 #### Scenario: The dialogue host stands opposite the player
-- **WHEN** the committed mode changes from exploration to dialogue at 1920x1080 with an available `dialogue` panel whose host is not already in the party lineup
-- **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is 6% of the stage width from the stage's right edge, its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
+- **WHEN** the committed mode changes from exploration to dialogue at 1451x790 with an available `dialogue` panel whose host is not already in the party lineup
+- **THEN** the `actor-right` anchor renders the host's stage actor, its bottom edge coincides with the band's top edge, its right edge is inset by its anchor rule's clearance value (never below 6% of the stage width), its height equals the player portrait's height, it holds no focusable element, and on the return to exploration `actor-right` renders no content again
 
 #### Scenario: The host's face clears the minimap at the smaller viewports
-- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1440x900 and at 1280x720
+- **WHEN** the committed mode is dialogue with a committed `local_map` panel at 1451x790 and at 2560x1440
 - **THEN** the `actor-right` anchor's right inset is at least 6% of the stage width, its horizontal centre lies left of the leftmost edge of the right-hand island column — the place card and the minimap card, which share that column's width — and no interactive stage anchor overlaps another
 
 #### Scenario: The choice list sits over the stage between the portraits
-- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1920x1080, 1440x900, and 1280x720 with the minimap island present and the command line expanded
+- **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1451x790 and at 2560x1440 with the minimap island present and the command line expanded
 - **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
 ### Requirement: Surface visibility is gated by the committed game mode
@@ -301,7 +301,7 @@ behind the bottom band.
 The backdrop's own floating caption elements (the status badge, the `目前場景圖片生成中`
 pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
 positioned so that none of them overlaps the bottom band, the action dock's, or the command line's
-rendered content, at 1920x1080, 1440x900, and 1280x720 — extending the sibling stage requirement's
+rendered content, at 1451x790 and at every larger viewport up to the chrome cap — extending the sibling stage requirement's
 general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
 stage anchors but are absolutely positioned within the same full-bleed stage.
 The scene caption row SHALL render only while an actual scene image is on the stage — a `done` scene
@@ -353,24 +353,24 @@ above the row.
 - **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the status badge
   renders
 - **THEN** the status badge's rendered bounding box intersects neither the bottom band's nor the
-  command line's rendered bounding box at 1920x1080, 1440x900, or 1280x720
+  command line's rendered bounding box at 1451x790 or at any larger viewport up to the chrome cap
 
 #### Scenario: The scene label, alt text, and full-view control clear the dock at both viewports
 - **WHEN** the scene label, alternative-text caption, pending notice, or full-view control render above
   the band
 - **THEN** each one's rendered bounding box stays above the bottom band's top edge and above the
-  command-line row, at 1920x1080, 1440x900, and 1280x720
+  command-line row, at 1451x790 and at every larger viewport up to the chrome cap
 
 #### Scenario: The scene caption stands on the stage floor between the portraits
 - **WHEN** the scene label, alternative text, and full-view control render with the command line expanded
-  at 1920x1080, 1440x900, and 1280x720
+  at 1451x790 and at every larger viewport up to the chrome cap
 - **THEN** their caption row's bottom edge lies at most 16px above the command-line row's top edge, the
   row is horizontally centred between the `actor-left` and `actor-right` anchor boxes (±1.5px), and each
   part lies between those boxes with no other surface painted over it
 
 #### Scenario: The scene caption clears the foe line-up
 - **WHEN** a combat snapshot commits one, two, and three active foes with the command line expanded at
-  1920x1080, 1440x900, and 1280x720
+  1451x790 and at every larger viewport up to the chrome cap
 - **THEN** the caption row lies between the `actor-left` anchor box and the leftmost foe's box, horizontally
   centred between them (±1.5px), with no foe painted over any of its parts
 
@@ -388,9 +388,10 @@ SHALL NOT present earlier responses: they remain readable in the full-log surfac
 transition: when a new response replaces the previous one, the previous page MAY remain only as an
 opaque layer over the new page that fades out within the clear duration of the client's motion level
 (at most 150ms, and none at `off`), carries no focusable element, and is outside the accessibility
-tree and pointer hit-testing from the moment the new response starts. Page text SHALL be set in the
-serif reading face at 28px at the 1920x1080 reference size and the default prose scale, SHALL scale
-with the viewport height and with the client's prose scale, and SHALL hold at most 42 CJK characters
+tree and pointer hit-testing from the moment the new response starts. Page text SHALL be set in the bundled
+monospace reading face — the same Jim Mono TC family the monospace type role ships — at
+18px at the 1451x790 reference size and the default prose scale, SHALL scale once with the
+desktop chrome factor and with the client's prose scale, and SHALL hold at most 42 CJK characters
 per line in every mode, including the whole-band width of dialogue mode.
 
 The window's lower edge SHALL keep a control strip in which no page text renders. The strip SHALL
@@ -431,8 +432,8 @@ waits for.
   has finished no line of the two earlier responses is rendered in the window
 
 #### Scenario: The page measure is bounded at the reference size
-- **WHEN** the stage renders at 1920x1080 with the default prose scale and a long prose response, in exploration mode and in dialogue mode with the panel transiently unavailable
-- **THEN** the page text's computed font size is 28px (±0.5px) and no rendered text line holds more
+- **WHEN** the stage renders at 1451x790 with the default prose scale and a long prose response, in exploration mode and in dialogue mode with the panel transiently unavailable
+- **THEN** the page text's computed font size is 18px (±0.5px) in the bundled monospace reading face and no rendered text line holds more
   than 42 CJK characters in either mode
 
 #### Scenario: The marker names more pages and the last page
@@ -461,7 +462,7 @@ waits for.
 - **THEN** no unread count, unread live region, or jump-to-latest control exists in the window
 
 #### Scenario: The dialogue line is paged under the name plate
-- **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, and a greeting long enough for two pages at 1920x1080
+- **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, and a greeting long enough for two pages at 1451x790
 - **THEN** the window spans the whole band, shows the name plate `灰婆婆 ‧ 羈絆 親睦`, types page 1 with no marker until it is fully shown, shows `▼`, advances on Enter on the page surface to page 2, and shows `■` once page 2 is fully shown, with no choice row inside the window at any point
 
 #### Scenario: An unbonded host's plate names only the host
@@ -499,7 +500,7 @@ neither a character head card nor a portrait catalog strip nor a party quickbar.
 place card, the
 minimap island, the objective line, the combat participant frame while it is mounted, and the title
 ballot menu while it is mounted, each present only while its own requirement renders it; no reference
-panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at both 1440x900 and 1280x720 with
+panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at the 1451x790 reference viewport and at 2560x1440 with
 every island populated, so no required island depends on scrolling the anchor to be seen. Every
 island's chrome SHALL be expressed through the shared design tokens, so a token change or the
 reduced-motion block reaches all of them at once.
@@ -509,7 +510,7 @@ reduced-motion block reaches all of them at once.
 - **THEN** the condition icon row and the vitals bars render as the lower-left dock's two surfaces in that order, the dock carries the translucent blurred panel chrome, no head card, place card, portrait catalog strip, or party quickbar is rendered, and the party appears only as standing portraits in the `actor-left` anchor
 
 #### Scenario: The populated stack fits its anchor at the minimum viewport
-- **WHEN** the shell renders at 1280x720 with every island populated and the condition overflow disclosed
+- **WHEN** the shell renders at the 1451x790 reference viewport with every island populated and the condition overflow disclosed
 - **THEN** each island anchor's stack fits inside its anchor, the place card's rendered box does not intersect the minimap island below it, and neither stack intersects the bottom band, the command line, or the other island anchor's content
 
 #### Scenario: Island chrome comes from the shared tokens
@@ -1060,7 +1061,7 @@ does not stand on the stage, and it SHALL remain the only surface that states pa
 points, and states: the foe line-up in `actor-right` carries decorative portraits, names, non-colour
 acting/target cues and hit-point gauges without numerals. A display name longer than the frame's width SHALL end in an
 ellipsis on screen while its full text stays in the DOM, and the frame's rows SHALL be compact enough
-that a frame of six participants ends above the foe line-up's gauges at 1920x1080 and 1440x900; at all three acceptance sizes its visible content SHALL NOT cover a standing foe head.
+that a frame of six participants ends above the foe line-up's gauges at 1451x790 and 2560x1440; at both acceptance sizes its visible content SHALL NOT cover a standing foe head.
 
 Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
 up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
@@ -1094,7 +1095,7 @@ dock's target frame.
 - **THEN** it is not reachable by sequential keyboard navigation, the dock's active row container remains the surface's only listbox, and no portrait strip is rendered outside the frame and the stage actors
 
 #### Scenario: The frame sits in the map anchor, not on a portrait anchor
-- **WHEN** a combat session commits participants at 1440x900 and 1280x720
+- **WHEN** a combat session commits participants at 1451x790 and 2560x1440
 - **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and gauges and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
 
 ### Requirement: Foes stand opposite the player during combat
@@ -1113,7 +1114,7 @@ past the foe in front of it. The front foe SHALL stand on the band's upper edge,
 stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
 be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
 lies at least 24px left of the participant frame's column, within the `map` anchor in combat.
-At 1920x1080, 1440x900, and 1280x720 no foe's stage actor SHALL cross the stage's vertical centre line or
+At 1451x790 and at every larger viewport up to the chrome cap, no foe's stage actor SHALL cross the stage's vertical centre line or
 intersect the player's stage actor.
 
 Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
@@ -1142,13 +1143,13 @@ every change SHALL render its final state in the commit's frame. No change SHALL
 element that contains it.
 
 #### Scenario: One foe stands opposite the player
-- **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1920x1080
+- **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1451x790
 - **THEN** `actor-right` renders one foe stage actor with that image, its bottom edge on the band's top
   edge, its height equal to the player's stage actor's height (±1px), its horizontal centre at least 24px
   left of the participant frame's left edge, a gauge and name under it, and no focusable element
 
 #### Scenario: Three foes stand in depth toward the centre
-- **WHEN** a combat snapshot commits three active foes at 1920x1080, 1440x900, and 1280x720
+- **WHEN** a combat snapshot commits three active foes at 1451x790 and at 2560x1440
 - **THEN** three foe stage actors render in presenter order at 80%, 70%, and 61% of the player's height
   (±1px), each later one further left, higher, and behind the one before it, and none crosses the stage's
   centre line or intersects the player's stage actor
@@ -1595,7 +1596,7 @@ focus by any other means (a pointer activation elsewhere, a drawer or overlay op
 collapse the row.
 
 The expanded bar SHALL NOT overlap the action dock, the narrative caption, the bottom band, or any HUD
-island anchor at 1920x1080, 1440x900, or 1280x720. When horizontal space is insufficient, the hint
+island anchor at 1451x790 or at any larger viewport up to the chrome cap. When horizontal space is insufficient, the hint
 cluster SHALL be dropped first; the input field, its send control, and the history controls SHALL
 never be dropped. (The command line and its toggle are absent from the layout in creation mode, per the
 visibility matrix.)
@@ -1605,7 +1606,7 @@ visibility matrix.)
 - **THEN** the command-line row is hidden with `display:none`, the input field is present in the DOM but outside the tab order, the ⌨ toggle is rendered at the message region's bottom-right with `aria-expanded="false"`, and pressing `/` or activating the toggle once renders the row and puts focus in the input field
 
 #### Scenario: The expanded row keeps its geometry at the minimum viewport
-- **WHEN** the command line is expanded at 1280x720 and at 1920x1080, in exploration mode and in dialogue mode
+- **WHEN** the command line is expanded at the 1451x790 reference viewport and at 2560x1440, in exploration mode and in dialogue mode
 - **THEN** the row is 44px tall (±1px), its lower edge sits on the bottom band's upper edge, its horizontal extent runs from the left HUD column's right edge to the right edge of the band's left two thirds, its rendered box intersects no HUD island anchor, band region, or other interactive stage anchor, and the input field, its send control, and the history controls are all rendered
 
 #### Scenario: Constrained width drops the hint before any control
@@ -1805,11 +1806,14 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 - **THEN** it renders the client's own control reference, including `/` and the ⌨ toggle expanding the command line and Escape collapsing it, and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
 
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
-The client SHALL expose a narrative prose scale with three steps, selectable from the settings surface,
-whose current step is marked by an indicator that does not rely on colour alone. The scale SHALL apply
+The client SHALL expose a narrative prose scale with three steps — `A−` 16px, `A` 18px, and
+`A+` 20px at the 1451x790 reference scale, multiplied once by the desktop chrome factor —
+selectable from the settings surface, whose current step is marked by an indicator that does not
+rely on colour alone. `A−` is the reading floor: at the reference scale it renders the prose the
+client shows at exactly 16 CSS px, and no step renders it smaller. The scale SHALL apply
 to narrative and dialogue prose only — the message window's page text, the complete-log surface's lines,
 the prompt line and the settings surface's reading sample, which previews the page text — and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text, so the
-stage's measured anchor geometry is unaffected at either supported viewport.
+stage's measured anchor geometry is unaffected at the reference viewport or any larger one.
 
 The prose scale and every other setting the surface offers SHALL be client-local presentation state. No
 settings control SHALL dispatch an action: the client's action allowlist carries exactly one `options.*`
@@ -1819,7 +1823,8 @@ the motion level, the text-to-HTML toggle and the colourblind palette, and the m
 reading preferences and the motion level — and SHALL be persisted through the client's versioned,
 presentation-only browser store as a harmless display preference. Each setting SHALL be re-applied at
 load, and SHALL be reset to its default — fully applied, never half-applied — whenever that store
-resets. The motion level SHALL follow "The motion level is a client-local preference that governs every
+resets. A stored prose-scale value that matches none of the re-stepped values SHALL load as the
+default `A` step rather than as a clamped legacy multiplier. The motion level SHALL follow "The motion level is a client-local preference that governs every
 client animation": a stored level overrides the operating system's reduced-motion preference, which
 SHALL continue to apply while no level is stored.
 
@@ -1827,7 +1832,7 @@ The settings surface SHALL offer no control it does not implement.
 
 #### Scenario: The prose scale moves prose and nothing else
 - **WHEN** the player selects the largest prose scale
-- **THEN** the message window's page text, the complete-log surface's lines, the prompt line and the settings surface's reading sample render larger, every other HUD, dock and overlay label is unchanged, and no stage anchor's rendered box intersects another's at 1440x900 or 1280x720
+- **THEN** the message window's page text, the complete-log surface's lines, the prompt line and the settings surface's reading sample render at 20px at the reference scale, every other HUD, dock and overlay label is unchanged, and no stage anchor's rendered box intersects another's at 1451x790
 
 #### Scenario: No setting dispatches an action
 - **WHEN** the player changes every control the settings surface offers
@@ -1850,7 +1855,7 @@ Committed narrative lines SHALL render with the reference draft's semantic prese
 committed `sys` kind SHALL render in the sans face at the reference's secondary size and colour with
 a leading `◈` seal-colour marker contributed by the line's own class, not by invented text;
 emphasis inside prose lines SHALL render in the reference's gold accent; plain prose lines SHALL
-render in the serif reading face. The classes SHALL be mounted by the existing markup pipeline at
+render in the bundled monospace reading face, the face the message window's page text uses. The classes SHALL be mounted by the existing markup pipeline at
 render time from committed line kinds only — the tokenizer, the player-echo divider lines, and the
 box-drawing art path SHALL be unchanged, and no markup class SHALL be mounted for a kind the store
 does not carry. The markup pipeline SHALL run exactly once for each retained server, system, or error
@@ -1873,7 +1878,7 @@ of a `sys` line SHALL show the leading `◈` marker.
 
 #### Scenario: Unknown kinds do not gain semantic classes
 - **WHEN** a committed line carries no semantic kind beyond plain output
-- **THEN** it renders as plain serif prose without the sys marker
+- **THEN** it renders as plain prose in the monospace reading face without the sys marker
 
 #### Scenario: Each line is tokenized once
 - **WHEN** a server line is retained and is then rendered by the narrative surface and by the
@@ -1886,7 +1891,7 @@ of a `sys` line SHALL show the leading `◈` marker.
   fragments
 - **THEN** both fragments of the `sys` line carry the sys face and colour, only the first shows the
   `◈` marker, and both fragments of the prose
-  line render in the serif reading face with the emphasis still gold in whichever fragment holds it
+  line render in the monospace reading face with the emphasis still gold in whichever fragment holds it
 
 ### Requirement: The party drawer presents compbig rows and the fixed follow rules
 The 同伴 ‧ 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count
@@ -2014,7 +2019,7 @@ menu key, or the meaning of Escape.
 - **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption stays in the bottom band's message region
 
 #### Scenario: An emptied right-hand stack costs nothing
-- **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
+- **WHEN** the stage renders at 1451x790 and 2560x1440 with every drawer closed
 - **THEN** the top-right `map` anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
 
 ### Requirement: The action dock fills the band's command region at a fixed size
@@ -2045,11 +2050,11 @@ it SHALL paint the reference's band chrome. Selected actions remain distinguisha
 as well as their gold or warm-red emphasis.
 
 #### Scenario: The command region is the band's right third
-- **WHEN** the shell renders in exploration mode at 1920x1080, 1440x900, and 1280x720
+- **WHEN** the shell renders in exploration mode at 1451x790 and at 2560x1440
 - **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
 
 #### Scenario: No frame resizes the command region
-- **WHEN** the dock moves at 1440x900 from the scene overview to a target's verb popover, to the waiting frame, and, in combat, to the deepest skill target frame
+- **WHEN** the dock moves at 1451x790 from the scene overview to a target's verb popover, to the waiting frame, and, in combat, to the deepest skill target frame
 - **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and the verb popover's card lies inside the command region
 
 #### Scenario: An overflowing frame scrolls inside the panel
@@ -2064,7 +2069,7 @@ as well as their gold or warm-red emphasis.
   it is not removed and re-created
 
 #### Scenario: The panel stays inside its region at the minimum viewport
-- **WHEN** the shell renders at 1280x720 with the deepest combat frame open
+- **WHEN** the shell renders at 1451x790 with the deepest combat frame open
 - **THEN** the dock's rendered box stays within the command region, no dock content overflows the
   region horizontally, and the frame's confirm control is reachable by scrolling the row region
   without being clipped
@@ -2106,7 +2111,7 @@ The card SHALL set its two values on two levels: the location heading in the ser
 `--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the
 world-time line. The world-time line SHALL carry no leading separator glyph or rule before its first
 value, SHALL use the
-numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 12px chrome
+numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 16px chrome
 floor), and SHALL render the committed world-time label (or its placeholder) verbatim, with every
 date and time value intact: all time values SHALL remain server-authored, and the card SHALL NOT
 reformat, abbreviate, or derive them. The heading, the rule, and the time line SHALL fit the card's
@@ -2184,7 +2189,7 @@ SHALL NOT change which row occupies which cell. The scene overview is not a fixe
 wrap by width under the section geometry the exploration dock requirement defines).
 
 #### Scenario: A narrow command region keeps every row inside the pane
-- **WHEN** a combat skill, target, or scale pane renders in the command region at the minimum supported 1280x720 viewport
+- **WHEN** a combat skill, target, or scale pane renders in the command region at the 1451x790 reference viewport
 - **THEN** every row lies inside the pane's right edge, the pane shows no horizontal overflow, and a long label wraps within its row
 
 #### Scenario: Rendered width never changes the keyboard cell mapping
@@ -2221,8 +2226,8 @@ a frame, or activates a hidden entry. The keys the dialogue choice list handles 
 and Enter and Space on the focused page surface keep their reading meaning.
 
 #### Scenario: Entering dialogue collapses the command region
-- **WHEN** the player activates 交談 in a host's verb popover at 1920x1080 and the commit makes the mode `dialogue`
-- **THEN** from the commit's frame the band's command region and the `#action-dock` element are out of the accessibility tree and the tab order, the message region spans the band's whole width at 300px (±1px) height, the region is `visibility: hidden` once its slide ends, focus is on the message window's page surface while the greeting is read, and focus moves to the dialogue choice list when the greeting's last page is fully shown
+- **WHEN** the player activates 交談 in a host's verb popover at 1451x790 and the commit makes the mode `dialogue`
+- **THEN** from the commit's frame the band's command region and the `#action-dock` element are out of the accessibility tree and the tab order, the message region spans the band's whole width at 220px (±1px) height, the region is `visibility: hidden` once its slide ends, focus is on the message window's page surface while the greeting is read, and focus moves to the dialogue choice list when the greeting's last page is fully shown
 
 #### Scenario: Leaving dialogue restores the overview without a remount
 - **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
@@ -2614,7 +2619,7 @@ at most 150ms, the flash SHALL NOT be visible, and the stagger SHALL be zero. At
 SHALL render its final state in the commit's frame.
 
 #### Scenario: Entering dialogue slides the panel out and the host in
-- **WHEN** the effective level is `full` at 1920x1080 and the player opens a conversation
+- **WHEN** the effective level is `full` at 1451x790 and the player opens a conversation
 - **THEN** in the commit's frame the message region is the band's full width and the command region is
   inert, the command region's computed transition runs 250ms toward a translated, transparent state and
   ends `visibility: hidden`, the host's stage actor enters from the right with a 350ms fade, and the name
@@ -2759,7 +2764,7 @@ Standing portraits SHALL retain their supplied image contours and align their fe
 - **THEN** only full motion animates the silhouette; the pending label remains readable at every level
 
 #### Scenario: Compact stage preserves labels
-- **WHEN** the player silhouette, vitals and command line render at 1280x720
+- **WHEN** the player silhouette, vitals and command line render at the 1451x790 reference viewport
 - **THEN** the silhouette identity and state are not occluded by vitals or the command line and all HUD controls remain reachable
 
 ### Requirement: The bottom band separates material and focus without obscuring controls
@@ -2789,7 +2794,7 @@ Prose SHALL have readable CJK line and paragraph spacing while preserving exact 
 - **THEN** the map retains its indentation and alignment while prose receives spacing treatment
 
 #### Scenario: The marker follows the dialogue column
-- **WHEN** a dialogue page is fully shown at 1920x1080
+- **WHEN** a dialogue page is fully shown at 1451x790
 - **THEN** the marker's right edge lies within a few pixels of the left-aligned prose column's right edge, far from the band's right end
 
 #### Scenario: Reduced motion keeps the marker still
@@ -2947,26 +2952,26 @@ drawer's follow rules SHALL name affinity by the established term 羈絆.
 The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide (a viewport-relative width, not multiplied by the chrome factor), and at whatever compact height its content takes. The dock SHALL NOT be top-anchored and SHALL NOT claim the stage's upper-left corner: at the top of the left column the stage shows only the standing portrait line. The condition icon row SHALL be the dock's topmost content, directly above the bars. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge. The dock MAY overlap the lowest strip of the `actor-left` standing portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them. The dock SHALL NOT read as a rectangular box: its ground is the shared panel ink with the backdrop blur, feathered out towards its right and top edges so the scene reads through them, and it is mounted on a hairline brass spine down its left side capped by the band's lozenge ornament, with a hairline brass crown fading out along its top; it carries no full border and no square corners. Every island chrome the dock carries SHALL come from the shared design tokens. The command-line row docked on the same band edge SHALL begin past the dock's right edge, so the two never intersect. Until `companion-portrait-lineup` removes it, the interim party quickbar island stands in the `vitals` anchor between the dock and the band.
 
 #### Scenario: The dock stands on the band's edge
-- **WHEN** the shell renders in exploration mode with the vitals dock visible at 1920x1080
+- **WHEN** the shell renders in exploration mode with the vitals dock visible at 1451x790
 - **THEN** the `vitals` anchor's bottom edge coincides with the bottom band's top edge (the dock's own bottom edge does too whenever no interim party quickbar stands below it), the dock's left edge sits at the stage's left gutter and its width is a quarter of the viewport's width (±1.5px), its rendered height is the compact height of the icon row, the readout, and the three lines, and the stage's upper-left corner holds no vitals surface
 
 #### Scenario: The dock covers only the portraits' lowest strip
-- **WHEN** the dock is visible and the player's standing portrait renders at 1920x1080 and at 1280x720
+- **WHEN** the dock is visible and the player's standing portrait renders at 1451x790 and at 2560x1440
 - **THEN** the overlap of the two rendered boxes reaches no higher than the portrait's lowest quarter, the portrait's face and torso are fully visible, and neither box moves the other
 
 #### Scenario: The dock stays bounded at the minimum viewport
-- **WHEN** the shell renders at 1280x720 with the dock visible and conditions overflowing the row
+- **WHEN** the shell renders at 1451x790 with the dock visible and conditions overflowing the row
 - **THEN** the dock's box stays inside the left gutter between the top band and the band's top edge, its content scrolls within that bound, and it intersects no other interactive anchor's content
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
 The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each companion portrait SHALL resolve from `portrait_ref` through `art.portrait_catalog`, falling back to its display name's initial-letter placeholder when null or unresolved. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
 
-Every figure, including the controlled character, SHALL have the same full anchor size and ground line: no progressively smaller scale, lift ramp or depth dimming. Horizontal overlap SHALL compress as necessary to keep the row inside the stage's left half at 1920x1080, 1440x900 and 1280x720, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half. In dialogue the group SHALL compress overlap to clear the choice list without resizing figures. Zero companions SHALL render the existing solo portrait at its standard anchor position. The anchor SHALL have `overflow: visible`; the vitals dock MAY cover the lowest strip of feet, never face or torso.
+Every figure, including the controlled character, SHALL have the same full anchor size and ground line: no progressively smaller scale, lift ramp or depth dimming. Horizontal overlap SHALL compress as necessary to keep the row inside the stage's left half at 1451x790, 1741x948 and 2560x1440, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half. In dialogue the group SHALL compress overlap to clear the choice list without resizing figures. Zero companions SHALL render the existing solo portrait at its standard anchor position. The anchor SHALL have `overflow: visible`; the vitals dock MAY cover the lowest strip of feet, never face or torso.
 
 The lineup SHALL be visible in exploration, combat and dialogue, hidden in creation. Companions SHALL use the existing StageActor listener dim unless their committed dialogue host identity is the active host speaker in dialogue mode. That speaking companion SHALL temporarily receive z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes. Speaking focus SHALL change only dim and z, never position, lift or size, and SHALL remain correct at off/reduced motion. The controlled figure SHALL retain its existing speaking and beat behavior. No figure box SHALL cross the stage's horizontal centre; the foe lineup is unchanged.
 
 #### Scenario: A two-companion party renders a three-figure group
-- **WHEN** the committed `party` panel carries two resolved-portrait slots at 1920x1080 in exploration mode
+- **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in exploration mode
 - **THEN** three equally sized figures share a ground line, the player is rightmost with highest baseline z, the companions overlap leftward in party order, no box crosses the horizontal centre and no figure is focusable
 
 #### Scenario: A zero-companion party renders only the player
@@ -2978,7 +2983,7 @@ The lineup SHALL be visible in exploration, combat and dialogue, hidden in creat
 - **THEN** that figure renders the initial `蕾` through the stage actor's truthful placeholder, with no invented image or constructed URL
 
 #### Scenario: The full party fits the left half at every viewport
-- **WHEN** the committed party carries four slots and the shell renders at 1920x1080, 1440x900, and 1280x720
+- **WHEN** the committed party carries four slots and the shell renders at 1451x790 and at 2560x1440
 - **THEN** all five equally sized figures render with compressed horizontal overlap inside the left half; in exploration/combat each face is at least partially visible, and in dialogue a speaking companion is brought above the overlapping listeners without moving its slot
 
 #### Scenario: A speaking companion rises temporarily without moving
@@ -2986,7 +2991,7 @@ The lineup SHALL be visible in exploration, combat and dialogue, hidden in creat
 - **THEN** that companion changes from dim baseline z to lit highest z and back, preserving its exact geometry; possession swaps, lineup changes and off motion cannot retain stale speaking z
 
 #### Scenario: The companion line and the foe line-up do not overlap
-- **WHEN** the committed mode is combat with two companions and three active foes at 1280x720
+- **WHEN** the committed mode is combat with two companions and three active foes at 1451x790
 - **THEN** no companion figure's rendered box intersects any foe figure's rendered box
 
 ### Requirement: Possession moves the possessed companion to the group's front

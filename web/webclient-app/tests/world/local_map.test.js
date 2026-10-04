@@ -368,21 +368,21 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
     expect(svg.exists()).toBe(true);
-    expect(svg.attributes("width")).toBe("208");
-    expect(svg.attributes("height")).toBe("208");
+    expect(svg.attributes("width")).toBe("240");
+    expect(svg.attributes("height")).toBe("240");
     // Below the island's legibility floor the 2574-unit square is shown
-    // through a 208 / 0.75 window centred on the current node, not shrunk to
+    // through a 240 / 0.75 window centred on the current node, not shrunk to
     // a hairline (design §11).
     const vb = svg.attributes("viewBox").split(" ").map(Number);
-    expect(vb[2]).toBeCloseTo(208 / 0.75, 6);
-    expect(vb[3]).toBeCloseTo(208 / 0.75, 6);
+    expect(vb[2]).toBeCloseTo(240 / 0.75, 6);
+    expect(vb[3]).toBeCloseTo(240 / 0.75, 6);
     const current = w.get('[data-visibility="current"]');
     const [cx, cy] = current.attributes("transform").match(/-?[\d.]+/g).map(Number);
     expect(cx).toBeCloseTo(vb[0] + vb[2] / 2, 6);
     expect(cy).toBeCloseTo(vb[1] + vb[3] / 2, 6);
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
-    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
+    expect(style).toContain("width: calc(240px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(240px * var(--ui-scale, 1))");
   });
 
   // ---------------------------------------------------------------------
@@ -394,20 +394,20 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap();
     const svg = w.get("svg.local-map__lattice");
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
-    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
-    expect(Number(svg.attributes("width"))).toBe(208);
-    expect(Number(svg.attributes("height"))).toBe(208);
+    expect(style).toContain("width: calc(240px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(240px * var(--ui-scale, 1))");
+    expect(Number(svg.attributes("width"))).toBe(240);
+    expect(Number(svg.attributes("height"))).toBe(240);
   });
 
   it("spends width fill as coordinate margin rather than magnification (maxUpscale retired)", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE) });
     const svg = w.get("svg.local-map__lattice");
     const style = w.get("svg.local-map__lattice").attributes("style") ?? "";
-    expect(style).toContain("width: calc(208px * var(--ui-scale, 1))");
-    expect(style).toContain("height: calc(208px * var(--ui-scale, 1))");
-    expect(Number(svg.attributes("width"))).toBe(208);
-    expect(Number(svg.attributes("height"))).toBe(208);
+    expect(style).toContain("width: calc(240px * var(--ui-scale, 1))");
+    expect(style).toContain("height: calc(240px * var(--ui-scale, 1))");
+    expect(Number(svg.attributes("width"))).toBe(240);
+    expect(Number(svg.attributes("height"))).toBe(240);
     const pattern = w.find("defs pattern");
     expect(Number(pattern.attributes("width"))).toBe(60);
   });
@@ -468,12 +468,12 @@ describe("LocalMap (B4 world family)", () => {
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(Number(svg.attributes("width"))).toBe(208);
-    expect(Number(svg.attributes("height"))).toBe(208);
+    expect(Number(svg.attributes("width"))).toBe(240);
+    expect(Number(svg.attributes("height"))).toBe(240);
     const vb = svg.attributes("viewBox").split(" ").map(Number);
     // The 2022.91-unit square exceeds the legibility floor, so the island
-    // shows a 208 / 0.75 window clamped inside the drawing.
-    expect(vb[2]).toBeCloseTo(208 / 0.75, 6);
+    // shows a 240 / 0.75 window clamped inside the drawing.
+    expect(vb[2]).toBeCloseTo(240 / 0.75, 6);
     expect(vb[0]).toBeGreaterThanOrEqual(0);
     expect(vb[1]).toBeGreaterThanOrEqual(0);
     expect(vb[0] + vb[2]).toBeLessThanOrEqual(2022.911688 + 1e-6);
@@ -486,29 +486,31 @@ describe("LocalMap (B4 world family)", () => {
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
 
-    // With canvasSize 208 the label term binds: the adjacent 霧骨渡口 (8 cells)
-    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 12 → 66,
-    // above the 60-unit fill cap. Three columns and two rows of 66 centre in
-    // the 208 square at margins 5 (x) and 31 (y, with the 14-unit label band).
-    const P = 66;
-    const col = (c) => c * P + P / 2 + 5;
-    const row = (r) => (1 - r) * P + P / 2 + 31;
+    // With canvasSize 240 the label term binds: the adjacent 霧骨渡口 (8 cells)
+    // and 南門街道… (9 cells) need ((8 + 9) / 2 × CELL_EM + 0.5) × 16 → 88,
+    // above the 60-unit fill cap. Three columns and two rows of 88 need a
+    // 264-unit square — wider than the island's 240px canvas, so the drawing
+    // is scaled to 240/264 — at margins 0 (x) and 37 (y, with the 14-unit
+    // label band).
+    const P = 88;
+    const col = (c) => c * P + P / 2;
+    const row = (r) => (1 - r) * P + P / 2 + 37;
     const centers = {
       "grid:altoria:1:1": { x: col(1), y: row(0) },
       "grid:altoria:2:1": { x: col(2), y: row(0) },
       "grid:altoria:1:2": { x: col(1), y: row(1) },
       "grid:altoria:0:1": { x: col(0), y: row(0) },
     };
-    expect(centers["grid:altoria:1:1"]).toEqual({ x: 104, y: 130 });
+    expect(centers["grid:altoria:1:1"]).toEqual({ x: 132, y: 169 });
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
     }
 
-    // Label baseline at labelFont 12: 11 + 2 + 12 = 25 units
+    // Label baseline at labelFont 16: 11 + 2 + 16 = 29 units
     for (const id of Object.keys(centers)) {
       const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
-      expect(label.attributes("y")).toBe("25");
+      expect(label.attributes("y")).toBe("29");
     }
 
     // Current seal half-extent 9; visited/unvisited dots 5.5.
@@ -519,7 +521,7 @@ describe("LocalMap (B4 world family)", () => {
     }
 
     // Label boxes: the drawn (truncated) label measured in monospace cells at
-    // font 12, ascent 11.4 and descent 5.4 around the baseline y = 25.
+    // font 16, ascent 15.2 and descent 7.2 around the baseline y = 29.
     const labelBoxes = {};
     for (const [id, c] of Object.entries(centers)) {
       // The drawn text only: the element also holds the full name's <title>.
@@ -529,8 +531,8 @@ describe("LocalMap (B4 world family)", () => {
         .map((n) => n.textContent)
         .join("")
         .trim();
-      const width = textCells(text) * CELL_EM * 12;
-      labelBoxes[id] = { x1: c.x - width / 2, y1: c.y + 13.6, x2: c.x + width / 2, y2: c.y + 30.4 };
+      const width = textCells(text) * CELL_EM * 16;
+      labelBoxes[id] = { x1: c.x - width / 2, y1: c.y + 13.8, x2: c.x + width / 2, y2: c.y + 36.2 };
     }
 
     function separated(a, b) {
@@ -564,16 +566,16 @@ describe("LocalMap (B4 world family)", () => {
     everyPair(labelBoxes);
 
     const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(e0.attributes("x1")).toBe("104");
-    expect(e0.attributes("y1")).toBe("130");
-    expect(e0.attributes("x2")).toBe("170");
-    expect(e0.attributes("y2")).toBe("130");
+    expect(e0.attributes("x1")).toBe("132");
+    expect(e0.attributes("y1")).toBe("169");
+    expect(e0.attributes("x2")).toBe("220");
+    expect(e0.attributes("y2")).toBe("169");
     expect(P - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
-    expect(e1.attributes("x1")).toBe("104");
-    expect(e1.attributes("y1")).toBe("130");
-    expect(e1.attributes("x2")).toBe("104");
-    expect(e1.attributes("y2")).toBe("64");
+    expect(e1.attributes("x1")).toBe("132");
+    expect(e1.attributes("y1")).toBe("169");
+    expect(e1.attributes("x2")).toBe("132");
+    expect(e1.attributes("y2")).toBe("81");
     expect(P - 9 - 5.5).toBeGreaterThan(0);
   });
 
@@ -581,11 +583,11 @@ describe("LocalMap (B4 world family)", () => {
     const model = localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(svg.attributes("width")).toBe("208");
-    expect(svg.attributes("height")).toBe("208");
+    expect(svg.attributes("width")).toBe("240");
+    expect(svg.attributes("height")).toBe("240");
     expect(
       w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
-    ).toBe("translate(104, 97)");
+    ).toBe("translate(120, 113)");
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
   });
 
@@ -604,19 +606,19 @@ describe("LocalMap (B4 world family)", () => {
     overlay.unmount();
   });
 
-  it("Task 2.5: declares island geometry on MapLattice mount and renders node labels at its 12-unit step", () => {
+  it("Task 2.5: declares island geometry on MapLattice mount and renders node labels at its 16-unit step", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     const lattice = w.findComponent({ name: "MapLattice" });
     expect(lattice.exists()).toBe(true);
     expect(lattice.props("colPitch")).toBe(40);
     expect(lattice.props("rowPitch")).toBe(40);
-    expect(lattice.props("labelFont")).toBe(12);
-    expect(lattice.props("canvasSize")).toBe(208);
+    expect(lattice.props("labelFont")).toBe(16);
+    expect(lattice.props("canvasSize")).toBe(240);
     expect(lattice.props("showAxis")).toBe(true);
     expect(lattice.props("fogVignette")).toBe(true);
     expect(lattice.props("maxUpscale")).toBeUndefined();
     const label = lattice.find(".local-map__node-label");
-    expect(label.attributes("style")).toContain("font-size: 12px");
+    expect(label.attributes("style")).toContain("font-size: 16px");
   });
 
   // ---------------------------------------------------------------------
@@ -641,15 +643,16 @@ describe("LocalMap (B4 world family)", () => {
   it("declares the marker-name step so no island text outweighs the island's chrome", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
     const lattice = w.findComponent({ name: "MapLattice" });
-    expect(lattice.props("markerNameFont")).toBe(10);
+    expect(lattice.props("markerNameFont")).toBe(16);
     // Declared by the surface, not inherited from the renderer's default —
     // the island owns every type size it draws (the `labelFont` precedent).
-    expect(ISLAND_SOURCE).toContain(':marker-name-font="10"');
-    // Every type size the island declares is at or below its 12px chrome step
-    // (webclient-map-legibility): the node label (12), the marker name (10),
-    // and the title, orientation marks and readout at `--text-xs` (12). A
-    // marker name drawn at --text-sm (13) used to out-shout them all.
-    const chromeStep = 12;
+    expect(ISLAND_SOURCE).toContain(':marker-name-font="16"');
+    // Every type size the island declares is at or below its own chrome step
+    // (retarget-desktop-viewport-contract D7): the node label (16), the marker
+    // name (16), and the title, orientation marks and readout at `--text-xs`
+    // (16px at the reference) — one 16px floor for the whole island, no drawn
+    // label or name below it.
+    const chromeStep = 16;
     for (const selector of [".local-map__meta", ".local-map__orientation", ".local-map__detail"]) {
       expect(ruleBody(ISLAND_SOURCE, selector)).toContain("font-size: var(--text-xs)");
     }

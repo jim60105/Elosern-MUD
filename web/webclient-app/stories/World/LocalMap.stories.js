@@ -48,7 +48,7 @@ export const FullLattice = {
 
 // An ordinary town neighbourhood (webclient-map-legibility): nine distinct
 // room names and no gateway, so the island draws at scale 1 and every node
-// label reads at the island's 12px chrome step.
+// label reads at the island's 16px chrome step.
 export const OrdinaryNeighbourhood = {
   render: renderMap,
   args: {
@@ -140,9 +140,9 @@ export const EdgeMarkers = {
 export const FocusedRemembered = EdgeMarkers;
 
 // Tall-lattice window (design §11): the 2-col × 64-row fixture's square
-// drawing would have to shrink to about 0.08 to fit the island's fixed 208px
+// drawing would have to shrink to about 0.08 to fit the island's fixed 240px
 // canvas, below the island's 0.75 legibility floor. The island instead shows a
-// 208 / 0.75 window centred on the current node, clipped to the square, and
+// 240 / 0.75 window centred on the current node, clipped to the square, and
 // the full-map overlay remains the surface for the whole street.
 export const TallLatticeScaled = {
   render: renderMap,

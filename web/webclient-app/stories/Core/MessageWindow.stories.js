@@ -6,7 +6,7 @@ import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
 
 // MessageWindow: the AVG message window (AVG stage design §6;
 // webclient-message-window-component). The stories render inside a box the
-// size of the band's message region at 1920×1080 (1280×300, the band's
+// size of the band's message region at 1451x790 (967×220, the band's
 // gradient and the region's padding), with the real DOM measurer, so every
 // page shown here is cut by real layout. A decorative ⌨ in the corner marks
 // where the shell's controls sit beside the marker.
@@ -57,7 +57,7 @@ const MAP_LINES = [
 ].join("<br>");
 
 // The band message region at the reference size: the left two thirds of a
-// 1920px band, or the whole band in dialogue mode, where the command region
+// 1451px band, or the whole band in dialogue mode, where the command region
 // collapses (webclient-dialogue-stage-actors).
 const bandRegion = (story, context) => ({
   render: () =>
@@ -66,9 +66,9 @@ const bandRegion = (story, context) => ({
       {
         style: {
           position: "relative",
-          width: context?.args?.mode === "dialogue" ? "1920px" : "1280px",
+          width: context?.args?.mode === "dialogue" ? "1451px" : "967px",
           maxWidth: "100vw",
-          height: "300px",
+          height: "220px",
           boxSizing: "border-box",
           padding: "10px 12px 12px 18px",
           background: "linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))",
@@ -121,7 +121,8 @@ export default {
       description: {
         component:
           "The AVG message window: the current response one page at a time " +
-          "(28px serif at 1080, at most 42 CJK characters per line), a blinking " +
+          "(the bundled monospace reading face at the 16px floor with the " +
+          "default prose scale, at most 42 CJK characters per line), a blinking " +
           "`▼` while pages follow and `■` on the last page. A click advances " +
           "(not on a control, not with a text selection); Enter / Space advance " +
           "only while the page surface has focus and never reach the dock. " +
