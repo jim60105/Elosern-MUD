@@ -365,7 +365,7 @@ class RegistryTests(unittest.TestCase):
             elif layer == "scenario_director":
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 8192)
-            elif layer == "dialogue_summary":
+            elif layer in ("dialogue_summary", "correspondence"):
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 1024)
             else:

@@ -52,6 +52,7 @@ class ValidLoadTests(unittest.TestCase):
             {
                 "narrator.yaml",
                 "npc_dialogue.yaml",
+                "correspondence.yaml",
                 "scenario_director.yaml",
                 "scene_builder.yaml",
                 "npc.yaml",
@@ -217,7 +218,7 @@ class ValidLoadTests(unittest.TestCase):
         )
         self.assertNotIn("{persona}", text)
         self.assertNotIn("性格：", text)
-        self.assertTrue(text.startswith("你是《伊洛瑟恩大陸》中的 艾洛西亞。"))
+        self.assertIn("### 人物定錨\n你是《伊洛瑟恩大陸》中的 艾洛西亞。", text)
 
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_double_braced_tokens_and_json_braces_pass_through(self):
