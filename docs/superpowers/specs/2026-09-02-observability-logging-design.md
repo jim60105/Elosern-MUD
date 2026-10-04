@@ -210,6 +210,9 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `correspondence_reply_effect_rejected` | `source_id`, `recipient`, `snapshot_id` |
 | `correspondence_reply_committed` | `source_id`, `outgoing_source_id`, `recipient`, `snapshot_id`, `tick` |
 | `correspondence_reply_failed` | `source_id`; exception chain via `exc`, no prompt or letter text |
+| `correspondence_memory_projected` | `source_id`、`owner_id`、`projector_version`、`records_count`；letters settle told cognition, never letter text in logs |
+| `correspondence_memory_projection_skipped` | `source_id`、`projector_version`（warn 級；pending 來源缺對應 durable event，該列保持 pending） |
+| `correspondence_memory_projection_failed` | `source_id`、`projector_version`、`exc` |
 | `narrative_projection_pending_scanned` | `projector_version`、`count` |
 | `narrative_memory_recorded` | `record_id`、`owner_id`、`category`、`tick`、`scope`、`generation` |
 | `narrative_memory_revised` | `record_id`、`revision_number`、`owner_id`、`availability`、`tier`、`generation` |

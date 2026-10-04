@@ -66,14 +66,16 @@ collection/read ticks. Delivery performs no recipient lookup, trait mutation,
 quest transition, model call, or image call. Movement and absent live locations
 cannot affect accepted delivery. Collection and reading use the player surface
 below; optional replies use their own remote channel. Correspondence memory
-projection remains separately owned.
+projection is owned by `world.narrative.correspondence_memory` (see below).
 
 Each transition atomically records a private `NarrativeEvent` with a stable
 `correspondence:<send-source>:<status>` identity and pending `ProjectionProgress`.
-`CORRESPONDENCE_PROJECTOR_VERSION = 2` reserves these progress rows for the later
+`CORRESPONDENCE_PROJECTOR_VERSION = 2` keeps these progress rows for the
 correspondence-owned consumer; the generic live-memory projector's version-1
-startup queue cannot consume them. Later correspondence projection owns that
-source. Tables share the clock transaction.
+startup queue never consumes them. The rows stay pending through the clock
+advance — that pending downstream work is part of the archived delivery
+contract — and the correspondence consumer drains them. Tables share the clock
+transaction.
 The declared surface contract has no cached entities: ordinary Django rows are
 queried fresh, updated through querysets, and returned only as detached frozen
 values. No cached mutable row survives rollback. Boundary logs run on durable
@@ -137,11 +139,12 @@ listing never fetches bodies or creates a clock.
 
 `read` gates owner and collection inside the transaction, conditionally changes
 `collected` to `read`, and commits the first-read tick, one private
-`correspondence:<source_id>:read` event and version-2 pending projection together.
-The event references the immutable original letter; it does not copy prose.
-Rereads anywhere perform no canonical writes. Collection creates no content
-knowledge or read event. The correspondence-memory consumer remains a later
-owner; the generic projector cannot consume this queue.
+`correspondence:<source_id>:read` event, its version-2 progress row and the
+owner's told memory together. The event references the immutable original
+letter; it does not copy prose. Rereads anywhere perform no canonical writes,
+and the completed row means a replay adds no cognition. Collection creates no
+content knowledge or read event; the generic version-1 projector cannot consume
+this queue.
 
 Text `信件` (`letters`) and the four allowlisted browser `letters.*` actions use
 these same APIs. Browser metadata and explicit-open bodies use the existing
@@ -167,6 +170,47 @@ through the guarded Evennia test entry. It exercises actual text send, committed
 clock delivery, another-branch browser collection, portable browser/text reading
 and first-read log privacy with synthetic data and no generation services.
 Delta-only coverage IDs are obtained by the later spec-sync owner after sync.
+
+## Correspondence cognition projection (W2)
+
+`world.narrative.correspondence_memory` is the version-2 consumer of the durable
+letter transition sources. The receipt is the authority, never the claim: a
+letter creates told cognition only, with no world truth, quest objective, item,
+appointment or defeat fact. An NPC gains a letter at its delivery occurrence; a
+player gains it only at the first read after collection. Undelivered letters and
+collected-but-unread letters have no memory at all, so retrieval, fixed
+selection and prompt context cannot expose them.
+
+Each memory keeps immutable letter provenance (letter source identity, sender,
+sent/settled ticks, reply-to link) plus `statement` with the letter body, scope
+`told`, category `correspondence` and the claim confidence below a witnessed
+observation. `summary` stays a bounded excerpt, because the rendered cognition
+line enters prompts while the full statement stays in owner cognition. The tier
+is `working`, so bounded fixed selection supplies face-to-face continuity
+instead of copying the letter archive into `DialogueTurn` speech.
+
+Settlement drains the same durable queue from four boundaries. Server startup
+recovers every pending version-2 source left by an interruption (boot-tolerant
+`narrative_correspondence_projection_init`; the pending source stays pending if
+it must be retried). `prepare_reply` drains its letter's delivery source after
+the completed-work early return and before recall capture: a ready reply either
+sees the settled delivery cognition or waits, and generation never bypasses the
+delivery knowledge boundary. `build_dialogue_context` drains before its recall
+selection, so a delivered letter is present for a face-to-face turn. The
+player's first read projects inside the read transaction, because that
+occurrence is the owner's knowledge boundary and nothing else would trigger it.
+
+Projection is idempotent: the `(source_id, projector_version)` progress row
+settles once and a replay returns the original records instead of duplicating
+memories, and both versions keep independent rows. Boundary events carry only
+source/owner/version/count identifiers — `correspondence_memory_projected`,
+`correspondence_memory_projection_skipped` (a pending source with no durable
+event stays pending and is reported), `correspondence_memory_projection_failed`
+— never letter text.
+
+Delta-only coverage IDs for this boundary are obtained and annotated by the
+later spec-sync owner after the delta spec reaches `openspec/specs/`; this
+change annotates its substantive tests against existing canonical main IDs.
 
 ## Durable face-to-face dialogue (W1)
 
