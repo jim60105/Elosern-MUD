@@ -1,0 +1,838 @@
+{
+  "cases": [
+    {
+      "actual_excluded": [
+        [
+          "thread:unrelated",
+          "not_invested"
+        ]
+      ],
+      "actual_ranked": [],
+      "actual_selected": [],
+      "case_id": "unrelated_high_salience_ineligible",
+      "components": [],
+      "description": "A high-salience automatic candidate with no invested source or confirmed request is ineligible before ranking.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "not_invested",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [
+        [
+          "thread:far",
+          "location_unreachable"
+        ]
+      ],
+      "actual_ranked": [],
+      "actual_selected": [],
+      "case_id": "location_unreachable_excluded",
+      "components": [],
+      "description": "An urgent candidate whose required location is unreachable is excluded regardless of its score.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "location_unreachable",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [
+        [
+          "thread:busy",
+          "schedule_blocked"
+        ]
+      ],
+      "actual_ranked": [],
+      "actual_selected": [],
+      "case_id": "schedule_blocked_excluded",
+      "components": [],
+      "description": "A candidate whose participant NPC is busy is excluded before scoring.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "schedule_blocked",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [
+        [
+          "thread:dragon",
+          "not_executable"
+        ]
+      ],
+      "actual_ranked": [],
+      "actual_selected": [],
+      "case_id": "capability_not_executable_excluded",
+      "components": [],
+      "description": "A candidate whose capability has no deterministic owner is excluded regardless of its score.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "not_executable",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "request:draft_synthetic:v1"
+      ],
+      "actual_selected": [
+        "request:draft_synthetic:v1"
+      ],
+      "case_id": "confirmed_request_eligible",
+      "components": [
+        [
+          "request:draft_synthetic:v1:stakes",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v1:engagement",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v1:relationship",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v1:deadline",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v1:location",
+          0.5
+        ],
+        [
+          "request:draft_synthetic:v1:repetition",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v1:cooldown",
+          0.0
+        ]
+      ],
+      "description": "A valid explicitly confirmed request is eligible as player-originated direction without invested history.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "selected",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [
+        [
+          "request:draft_synthetic:v1",
+          "superseded_request"
+        ]
+      ],
+      "actual_ranked": [
+        "request:draft_synthetic:v2"
+      ],
+      "actual_selected": [
+        "request:draft_synthetic:v2"
+      ],
+      "case_id": "superseded_request_excluded",
+      "components": [
+        [
+          "request:draft_synthetic:v2:stakes",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v2:engagement",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v2:relationship",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v2:deadline",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v2:location",
+          0.5
+        ],
+        [
+          "request:draft_synthetic:v2:repetition",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v2:cooldown",
+          0.0
+        ]
+      ],
+      "description": "An older confirmed version superseded by a newer confirmed version is excluded so only the authoritative direction competes.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "selected",
+          1
+        ],
+        [
+          "superseded_request",
+          1
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "thread:active",
+        "thread:passive"
+      ],
+      "actual_selected": [
+        "thread:active",
+        "thread:passive"
+      ],
+      "case_id": "active_engagement_outweighs_passive_receipt",
+      "components": [
+        [
+          "thread:active:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:active:engagement",
+          1.0
+        ],
+        [
+          "thread:active:relationship",
+          0.0
+        ],
+        [
+          "thread:active:deadline",
+          0.0
+        ],
+        [
+          "thread:active:location",
+          1.0
+        ],
+        [
+          "thread:active:repetition",
+          0.0
+        ],
+        [
+          "thread:active:cooldown",
+          0.0
+        ],
+        [
+          "thread:passive:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:passive:engagement",
+          0.0
+        ],
+        [
+          "thread:passive:relationship",
+          0.0
+        ],
+        [
+          "thread:passive:deadline",
+          0.0
+        ],
+        [
+          "thread:passive:location",
+          1.0
+        ],
+        [
+          "thread:passive:repetition",
+          0.0
+        ],
+        [
+          "thread:passive:cooldown",
+          0.0
+        ]
+      ],
+      "description": "With every other component identical, initiated visits/questions and sent correspondence outrank a thread with only passive receipt.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "thread:rested",
+        "thread:fresh"
+      ],
+      "actual_selected": [
+        "thread:rested",
+        "thread:fresh"
+      ],
+      "case_id": "cooldown_penalises_recent_activity",
+      "components": [
+        [
+          "thread:rested:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:rested:engagement",
+          0.0
+        ],
+        [
+          "thread:rested:relationship",
+          0.0
+        ],
+        [
+          "thread:rested:deadline",
+          0.0
+        ],
+        [
+          "thread:rested:location",
+          1.0
+        ],
+        [
+          "thread:rested:repetition",
+          0.0
+        ],
+        [
+          "thread:rested:cooldown",
+          0.0
+        ],
+        [
+          "thread:fresh:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:fresh:engagement",
+          0.0
+        ],
+        [
+          "thread:fresh:relationship",
+          0.0
+        ],
+        [
+          "thread:fresh:deadline",
+          0.0
+        ],
+        [
+          "thread:fresh:location",
+          1.0
+        ],
+        [
+          "thread:fresh:repetition",
+          0.0
+        ],
+        [
+          "thread:fresh:cooldown",
+          0.9833333333333333
+        ]
+      ],
+      "description": "At equal stakes, a thread developed inside the cooldown window ranks below one that has rested.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "in_cooldown",
+          1
+        ],
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "thread:alpha",
+        "thread:beta"
+      ],
+      "actual_selected": [
+        "thread:alpha",
+        "thread:beta"
+      ],
+      "case_id": "deterministic_tie_break",
+      "components": [
+        [
+          "thread:alpha:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:alpha:engagement",
+          0.0
+        ],
+        [
+          "thread:alpha:relationship",
+          0.0
+        ],
+        [
+          "thread:alpha:deadline",
+          0.0
+        ],
+        [
+          "thread:alpha:location",
+          1.0
+        ],
+        [
+          "thread:alpha:repetition",
+          0.0
+        ],
+        [
+          "thread:alpha:cooldown",
+          0.0
+        ],
+        [
+          "thread:beta:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:beta:engagement",
+          0.0
+        ],
+        [
+          "thread:beta:relationship",
+          0.0
+        ],
+        [
+          "thread:beta:deadline",
+          0.0
+        ],
+        [
+          "thread:beta:location",
+          1.0
+        ],
+        [
+          "thread:beta:repetition",
+          0.0
+        ],
+        [
+          "thread:beta:cooldown",
+          0.0
+        ]
+      ],
+      "description": "Identical scores order by candidate identity for a stable offline result.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [
+        [
+          "thread:c6",
+          "not_invested"
+        ]
+      ],
+      "actual_ranked": [
+        "thread:c1",
+        "thread:c2",
+        "thread:c3",
+        "thread:c4",
+        "thread:c5"
+      ],
+      "actual_selected": [
+        "thread:c1",
+        "thread:c2"
+      ],
+      "case_id": "focus_limit_bounds_selection_only",
+      "components": [
+        [
+          "thread:c1:stakes",
+          1.0
+        ],
+        [
+          "thread:c1:engagement",
+          0.0
+        ],
+        [
+          "thread:c1:relationship",
+          0.0
+        ],
+        [
+          "thread:c1:deadline",
+          0.0
+        ],
+        [
+          "thread:c1:location",
+          1.0
+        ],
+        [
+          "thread:c1:repetition",
+          0.0
+        ],
+        [
+          "thread:c1:cooldown",
+          0.0
+        ],
+        [
+          "thread:c2:stakes",
+          1.0
+        ],
+        [
+          "thread:c2:engagement",
+          0.0
+        ],
+        [
+          "thread:c2:relationship",
+          0.0
+        ],
+        [
+          "thread:c2:deadline",
+          0.0
+        ],
+        [
+          "thread:c2:location",
+          1.0
+        ],
+        [
+          "thread:c2:repetition",
+          0.0
+        ],
+        [
+          "thread:c2:cooldown",
+          0.0
+        ],
+        [
+          "thread:c3:stakes",
+          0.6666666666666666
+        ],
+        [
+          "thread:c3:engagement",
+          0.0
+        ],
+        [
+          "thread:c3:relationship",
+          0.0
+        ],
+        [
+          "thread:c3:deadline",
+          0.0
+        ],
+        [
+          "thread:c3:location",
+          1.0
+        ],
+        [
+          "thread:c3:repetition",
+          0.0
+        ],
+        [
+          "thread:c3:cooldown",
+          0.0
+        ],
+        [
+          "thread:c4:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:c4:engagement",
+          0.0
+        ],
+        [
+          "thread:c4:relationship",
+          0.0
+        ],
+        [
+          "thread:c4:deadline",
+          0.0
+        ],
+        [
+          "thread:c4:location",
+          1.0
+        ],
+        [
+          "thread:c4:repetition",
+          0.0
+        ],
+        [
+          "thread:c4:cooldown",
+          0.0
+        ],
+        [
+          "thread:c5:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:c5:engagement",
+          0.0
+        ],
+        [
+          "thread:c5:relationship",
+          0.0
+        ],
+        [
+          "thread:c5:deadline",
+          0.0
+        ],
+        [
+          "thread:c5:location",
+          1.0
+        ],
+        [
+          "thread:c5:repetition",
+          0.0
+        ],
+        [
+          "thread:c5:cooldown",
+          0.0
+        ]
+      ],
+      "description": "The focus limit trims the selected set only; eligible candidates stay ranked and unselected story state is preserved.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "below_focus_limit",
+          3
+        ],
+        [
+          "not_invested",
+          1
+        ],
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "thread:rested_low",
+        "thread:heavy"
+      ],
+      "actual_selected": [
+        "thread:rested_low",
+        "thread:heavy"
+      ],
+      "case_id": "heavy_recent_activity_yields_to_rested_thread",
+      "components": [
+        [
+          "thread:rested_low:stakes",
+          0.3333333333333333
+        ],
+        [
+          "thread:rested_low:engagement",
+          0.0
+        ],
+        [
+          "thread:rested_low:relationship",
+          0.0
+        ],
+        [
+          "thread:rested_low:deadline",
+          0.0
+        ],
+        [
+          "thread:rested_low:location",
+          1.0
+        ],
+        [
+          "thread:rested_low:repetition",
+          0.0
+        ],
+        [
+          "thread:rested_low:cooldown",
+          0.0
+        ],
+        [
+          "thread:heavy:stakes",
+          1.0
+        ],
+        [
+          "thread:heavy:engagement",
+          0.0
+        ],
+        [
+          "thread:heavy:relationship",
+          0.0
+        ],
+        [
+          "thread:heavy:deadline",
+          0.0
+        ],
+        [
+          "thread:heavy:location",
+          1.0
+        ],
+        [
+          "thread:heavy:repetition",
+          1.0
+        ],
+        [
+          "thread:heavy:cooldown",
+          0.9972222222222222
+        ]
+      ],
+      "description": "Cooldown and repetition penalties deliberately outweigh a higher stake for a just-developed thread, so attention does not repeat it: the rested, lower-stake thread ranks first. This distinction is intentional, not a bug.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "in_cooldown",
+          1
+        ],
+        [
+          "repeated",
+          1
+        ],
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    },
+    {
+      "actual_excluded": [],
+      "actual_ranked": [
+        "thread:rested",
+        "request:draft_synthetic:v9"
+      ],
+      "actual_selected": [
+        "thread:rested",
+        "request:draft_synthetic:v9"
+      ],
+      "case_id": "aging_request_yields_to_rested_thread",
+      "components": [
+        [
+          "thread:rested:stakes",
+          0.0
+        ],
+        [
+          "thread:rested:engagement",
+          0.0
+        ],
+        [
+          "thread:rested:relationship",
+          0.0
+        ],
+        [
+          "thread:rested:deadline",
+          0.0
+        ],
+        [
+          "thread:rested:location",
+          0.5
+        ],
+        [
+          "thread:rested:repetition",
+          0.0
+        ],
+        [
+          "thread:rested:cooldown",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:stakes",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:engagement",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:relationship",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:deadline",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:location",
+          0.5
+        ],
+        [
+          "request:draft_synthetic:v9:repetition",
+          0.0
+        ],
+        [
+          "request:draft_synthetic:v9:cooldown",
+          1.0
+        ]
+      ],
+      "description": "A just-submitted confirmed request carries its own cooldown, so an actively invested, rested thread at the same stake still ranks first.",
+      "exclusions_match": true,
+      "order_matches": true,
+      "reason_counts": [
+        [
+          "in_cooldown",
+          1
+        ],
+        [
+          "selected",
+          2
+        ]
+      ],
+      "selections_match": true
+    }
+  ],
+  "config_version": "attention_v1",
+  "engagement_weights": {
+    "clue_question": 1.5,
+    "correspondence": 1.0,
+    "dialogue_initiation": 1.0,
+    "participation": 1.0
+  },
+  "focus_limit": 3,
+  "metrics": {
+    "cases_matched": 12,
+    "exclusions_expected": 6,
+    "exclusions_matched": 6,
+    "focus_precision": 1.0,
+    "focus_recall": 1.0,
+    "total_cases": 12
+  },
+  "notes": [
+    "Attention is pure and offline: no model call, no state write.",
+    "repetition and cooldown both derive from durable thread activity (development ticks and link creation ticks); their penalties are deliberately allowed to outweigh a higher stake for a just-developed thread.",
+    "passive receipt (collection/reading) is recorded but contributes zero to the engagement score.",
+    "engagement is counterpart-scoped: a candidate whose participants resolve to no other party is zeroed rather than inheriting the owner's global activity, and the committed-play counters are candidate-window facts rather than a per-thread link claim.",
+    "the engagement event scan and the thread read both have read-cost caps; hitting them is reported (narrative_attention_engagement_truncated / narrative_attention_candidates_truncated) so a bounded read is never silent."
+  ],
+  "report_version": "attention_calibration_v1",
+  "saturation": {
+    "cooldown_ticks": 3600,
+    "deadline_horizon_ticks": 86400,
+    "engagement_saturation": 4.0,
+    "relationship_saturation": 50,
+    "repetition_saturation": 4,
+    "stakes_saturation": 3
+  },
+  "weights": {
+    "cooldown": 0.8,
+    "deadline": 1.5,
+    "engagement": 1.2,
+    "location": 0.5,
+    "relationship": 1.0,
+    "repetition": 0.6,
+    "stakes": 1.0
+  }
+}
