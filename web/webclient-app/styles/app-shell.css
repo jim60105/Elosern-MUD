@@ -208,6 +208,16 @@ body {
 @media (max-height: 820px) {
   :root { --stage-inset-y: calc(10px * var(--ui-scale)); }
   .elosern-root .elosern-stage [data-anchor="vitals"] { gap: calc(8px * var(--ui-scale)); }
+  /* The map column holds the place card on top of the minimap and the
+     objective line (place-card-relocation D1); at 720px the column tightens
+     its gaps and the place card compacts its padding, rule gap, and time
+     leading so the whole stack still fits its anchor without scrolling. */
+  .elosern-root .elosern-stage [data-anchor="map"] { gap: calc(10px * var(--ui-scale)); }
+  .place-card {
+    padding: calc(7px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(6px * var(--ui-scale));
+    row-gap: calc(3px * var(--ui-scale));
+  }
+  .place-card__time { line-height: 1.2; }
 }
 /* The command region (design D5): the dock fills it at a fixed size, and
    every master-detail frame keeps list and detail side by side inside the
