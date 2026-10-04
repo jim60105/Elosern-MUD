@@ -6,10 +6,8 @@ immutable permissioned context snapshot, asks the generative layer for at most
 one value-only beat proposal, and settles that proposal through deterministic
 owner boundaries only:
 
-* the deterministic core owns routing: a kind maps to one effect, and only
-  effects with a registered owner implementation are materialized (``quest_seed``
-  is deliberately unregistered until ``scenario-beat-compilation`` supplies the
-  real quest boundary, so it is rejected rather than stubbed);
+* the deterministic core owns routing: a kind maps to one implemented owner
+  effect; quest seeds require a prepared, revalidated blueprint;
 * narrative writes only its own data (a narrative event and thread development,
   or a letter); a relationship proposal routes through the rules owner;
 * every mutable prerequisite is revalidated against the snapshot's captured
@@ -34,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import nullcontext
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -125,10 +124,9 @@ EFFECT_BY_KIND: dict[str, str] = {
 }
 
 # The executable registry: only effects with a real deterministic owner handler.
-# ``quest_seed`` is absent on purpose until scenario-beat-compilation registers
-# the quest boundary; an absent effect is rejected, never stubbed.
+# Every executable effect has a deterministic owner implementation.
 EXECUTABLE_EFFECTS: frozenset[str] = frozenset(
-    {EFFECT_NARRATIVE_STATEMENT, EFFECT_LETTER_SEND}
+    {EFFECT_NARRATIVE_STATEMENT, EFFECT_LETTER_SEND, EFFECT_QUEST_SEED}
 )
 
 NARRATIVE_BEAT_EVENT_TYPE = "story_beat"
@@ -642,7 +640,8 @@ def _apply_effect(
 
 
 def settle_decision(
-    *, invocation: DirectorInvocation, proposals: Iterable[Any], now_tick: int = 0
+    *, invocation: DirectorInvocation, proposals: Iterable[Any], now_tick: int = 0,
+    prepared_quest=None,
 ) -> BeatOutcome:
     """Settle one decision: schedule at most one materializable beat, or none.
 
@@ -658,10 +657,16 @@ def settle_decision(
     if existing is not None:
         return _outcome_for_decision(existing, OUTCOME_DEDUPLICATED, now_tick)
 
+    from world.quests.compile.registration import publication_scope
+
     try:
-        return _settle_once(
-            invocation=invocation, proposals=proposals, now_tick=now_tick, handle=handle
-        )
+        # The outer scope also covers the final transaction exit. The inner
+        # effect scope handles a refused savepoint that settlement consumes.
+        with publication_scope() if prepared_quest is not None else nullcontext():
+            return _settle_once(
+                invocation=invocation, proposals=proposals, now_tick=now_tick, handle=handle,
+                prepared_quest=prepared_quest,
+            )
     except IntegrityError:
         # A concurrent settlement of the same source won the unique source
         # constraint; its row is the durable decision and its beat the durable
@@ -682,11 +687,31 @@ def _settle_once(
     proposals: Iterable[Any],
     now_tick: int,
     handle: str,
+    prepared_quest=None,
 ) -> BeatOutcome:
     """One single-transaction settlement; the caller dedupes and catches races."""
     source = invocation.source
     with transaction.atomic():
         thread = _lock_existing_thread(invocation)
+        if source.kind == SOURCE_REQUEST:
+            request = CreativeRequest.objects.select_for_update().filter(
+                submission_key=source.ref, owner_id=invocation.owner_id
+            ).first()
+            if (
+                request is None or int(request.version) != int(source.revision)
+                or request.validation_status != "valid"
+                or not validate_direction(request.direction, owner_id=invocation.owner_id).valid
+                or render_director_frame(
+                    _context_payload(invocation.owner_id, source, thread, request)
+                ) != invocation.context_frame
+            ):
+                decision = _record_decision(
+                    invocation, OUTCOME_STALE, now_tick=now_tick, thread=thread
+                )
+                log_warn("story_director_decision_stale", context=_reject_boundary(
+                    handle, invocation, OUTCOME_STALE, now_tick
+                ))
+                return BeatOutcome(decision=decision, beat=None, outcome=OUTCOME_STALE)
         pending_thread_id = ""
         if source.thread_id:
             if thread is None:
@@ -803,8 +828,15 @@ def _settle_once(
         beat: Optional[ScheduledBeat] = None
         target: Optional[StoryThread] = thread
         arrangement_revision = 0
+        from world.quests.compile.registration import publication_scope
+
         try:
-            with transaction.atomic():
+            with (
+                publication_scope()
+                if effect == EFFECT_QUEST_SEED and prepared_quest is not None
+                else nullcontext(),
+                transaction.atomic(),
+            ):
                 if target is None:
                     # The new-story thread is created inside the savepoint so a
                     # later failure removes it together with the beat.
@@ -816,7 +848,7 @@ def _settle_once(
                     thread=target, arrangement_revision=arrangement_revision
                 ).exists():
                     raise _EffectRejected(OUTCOME_CONFLICT)
-                beat = ScheduledBeat.objects.create(
+                beat = ScheduledBeat(
                     beat_id=beat_id_for(handle),
                     decision=_record_decision(
                         invocation,
@@ -838,9 +870,20 @@ def _settle_once(
                     execution_ref=execution_ref,
                     created_tick=int(now_tick),
                 )
-                _apply_effect(
-                    effect, proposal, invocation, target, execution_ref, now_tick
-                )
+                if effect == EFFECT_QUEST_SEED:
+                    from world.narrative.quest_beats import publish_quest_beat
+
+                    publish_quest_beat(
+                        prepared_quest, invocation, proposal, beat, target, now_tick
+                    )
+                    _apply_effect(
+                        effect, proposal, invocation, target, execution_ref, now_tick
+                    )
+                else:
+                    _apply_effect(
+                        effect, proposal, invocation, target, execution_ref, now_tick
+                    )
+                beat.save(force_insert=True)
         except _EffectRejected as rejected:
             decision = _record_decision(
                 invocation, rejected.outcome, now_tick=now_tick, thread=thread
@@ -925,6 +968,7 @@ def attempt_decision(
     owner_id: Any,
     *,
     client: Any,
+    quest_client: Any = None,
     candidate: Optional[AttentionSelection] = None,
     request: Optional[CreativeRequest] = None,
     now_tick: int = 0,
@@ -942,7 +986,27 @@ def attempt_decision(
         return _outcome_for_decision(existing, OUTCOME_DEDUPLICATED, now_tick)
     invocation = prepare_decision(owner_id, source=source, now_tick=now_tick)
     proposal = yield generate_beat_proposal(client, invocation.messages)
+    prepared_quest = None
+    if proposal is not None and proposal.kind == BEAT_KIND_QUEST_SEED and not proposal.writes:
+        from world.ai.scenario_director.generation import generate_beat_quest_blueprint
+        from world.narrative.quest_beats import PreparedQuestBeat, quest_context
+
+        captured = quest_context(invocation, proposal)
+        if captured is not None:
+            context, issuer_id = captured
+            if quest_client is None:
+                from server.ai_director_service import build_scenario_director_client
+
+                quest_client = build_scenario_director_client()
+            blueprint = yield generate_beat_quest_blueprint(quest_client, context=context)
+            if blueprint is not None:
+                prepared_quest = PreparedQuestBeat(
+                    json.dumps(context, ensure_ascii=False, sort_keys=True),
+                    json.dumps(blueprint.to_payload(), ensure_ascii=False, sort_keys=True),
+                    issuer_id,
+                )
     proposals: tuple[Any, ...] = (proposal,) if proposal is not None else ()
     return settle_decision(
-        invocation=invocation, proposals=proposals, now_tick=now_tick
+        invocation=invocation, proposals=proposals, now_tick=now_tick,
+        prepared_quest=prepared_quest,
     )

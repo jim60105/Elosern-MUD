@@ -9,6 +9,9 @@ module, preserving the single-writer boundary the repository contract tests
 assert.
 """
 
+from contextlib import contextmanager
+from copy import deepcopy
+
 from world.quests.compile.contracts import (
     CompiledQuest,
     IssuanceDescriptor,
@@ -39,6 +42,32 @@ from world.rules.quest_issuance import (
     parse_issuer_key,
     register_quest_issuance,
 )
+
+
+@contextmanager
+def publication_scope():
+    """Restore process registries and Evennia caches after a caller rollback.
+
+    Enclose the caller's atomic savepoint, not the other way around: cache
+    restoration must happen after Django has rolled back durable attributes.
+    """
+    from world.quests.generated_quest_store import get_store
+
+    store = get_store()
+    payloads = deepcopy(list(store.db.payloads or []))
+    registries = (
+        QUEST_DEFINITION_REGISTRY, GUILD_OFFER_REGISTRY,
+        QUEST_ISSUANCE_REGISTRY, SCENE_REQUIREMENT_REGISTRY,
+    )
+    snapshots = tuple(dict(registry) for registry in registries)
+    try:
+        yield
+    except Exception:
+        for registry, snapshot in zip(registries, snapshots):
+            registry.clear()
+            registry.update(snapshot)
+        store.db.payloads = payloads
+        raise
 
 
 def _publish_registration(

@@ -676,9 +676,11 @@ identity/revision, and the allowed kinds.
 none. Routing is deterministic and central: a kind maps to one effect
 (`follow_up`/`clue`/`invitation` → `narrative_statement`, `letter` →
 `letter_send`, `quest_seed` → `quest_seed`), and only registered effects are
-materialized. `quest_seed` has no registered handler until
-`scenario-beat-compilation` supplies the real quest boundary, so it is rejected
-with `unsupported_effect` — never stubbed. Narrative writes only its own data (a
+materialized. `quest_seed` uses beat-scoped ScenarioDirector generation and the
+existing quest compiler/registration owner; unavailable or misfitting proposals
+produce `no_content`, never template filler. The linked blueprint, definition
+and snapshot identity persist in the append-only beat payload. Narrative writes
+only its own data (a
 narrative event plus a thread development link, or a `send_letter`); a
 `relation_delta` proposal is routed to the rules owner
 (`apply_letter_relationship`), never written by narrative.

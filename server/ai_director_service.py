@@ -57,6 +57,18 @@ class _OfflineStubClient:
         )
 
 
+def build_scenario_director_client():
+    """Construct this capability's client, never reuse another layer profile."""
+    from world.ai.profiles import get_profile
+
+    profile = get_profile("scenario_director")
+    if not profile.enabled:
+        return _OfflineStubClient()
+    from world.ai.client import OpenAICompatClient
+
+    return OpenAICompatClient(profile)
+
+
 @defer.inlineCallbacks
 def request_generated_quest(client=None, *, context):
     """Ask the director for one context-fitting quest and post its offer.
@@ -85,14 +97,7 @@ def request_generated_quest(client=None, *, context):
         )
 
     if client is None:
-        from world.ai.client import OpenAICompatClient
-        from world.ai.profiles import get_profile
-
-        profile = get_profile("scenario_director")
-        if profile.enabled:
-            client = OpenAICompatClient(profile)
-        else:
-            client = _OfflineStubClient()
+        client = build_scenario_director_client()
 
     from world.ai.scenario_director import ScenarioDirectorTemplateError, generate_quest_blueprint
     from world.quests.compile import compile_quest_blueprint, register_generated_quest

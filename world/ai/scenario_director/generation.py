@@ -208,3 +208,33 @@ def generate_quest_blueprint(client: Any, *, context: dict[str, Any]):
     if not _fits_context(blueprint, context):
         return _draw_template(context)
     return blueprint
+
+
+@defer.inlineCallbacks
+def generate_beat_quest_blueprint(client: Any, *, context: dict[str, Any]):
+    """Propose a context-fitting beat quest, never substitute authored filler."""
+    from world.ai.scenario_director.blueprints import MAX_TOTAL_SIZE
+
+    if client is None:
+        raise ScenarioDirectorClientRequiredError("beat generation requires a client")
+    _require_registered()
+    frame = json.dumps(context, ensure_ascii=False, sort_keys=True)
+    if len(frame) > MAX_TOTAL_SIZE:
+        return None
+    try:
+        system, user = build_scenario_prompt(context)
+    except PromptUnavailableError:
+        return None
+    # The generic note cap is too small for the permissioned beat snapshot.
+    # Preserve the entire bounded immutable frame or refuse, never truncate it.
+    user = {"role": "user", "content": frame}
+    descriptor = ChatRequestDescriptor(messages=(system, user), schema_id="scenario_director")
+    text = yield guarded_call("scenario_director", client, descriptor)
+    if text is _SCENARIO_DIRECTOR_DEGRADED:
+        return None
+    try:
+        blueprint = QuestBlueprint.from_payload(json.loads(text))
+    except (TypeError, ValueError, KeyError):
+        # observability: ignore R2: malformed proposals are a no-content outcome
+        return None
+    return blueprint if _fits_context(blueprint, context) else None
