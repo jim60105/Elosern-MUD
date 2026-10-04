@@ -242,6 +242,7 @@
         "world.narrative.tests.test_dream_authoring",
         "world.narrative.tests.test_dream_session",
         "world.narrative.tests.test_dream_track",
+        "world.narrative.tests.test_story_director_beats",
         "world.ai",
         "world.lore"
       ]

@@ -250,6 +250,12 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `dream_session_open_raced` | `session_id`、`owner`、`tick`（warn 級；並行建立由唯一約束裁決，第一個持久列為準並以重播回傳） |
 | `dream_session_exchange_raced` | `session_id`、`owner`、`submission_id`、`exchange_number`、`tick`（warn 級；並行結算由唯一約束裁決，第一個持久列為準且不重複計數） |
 | `dream_session_draft_raced` | `session_id`、`owner`、`draft_id`、`tick`（warn 級；並行草稿寫入由唯一約束裁決，既有草稿列為準） |
+| `story_director_decision_prepared` | `owner`、`source_kind`、`source_ref`、`source_revision`、`thread_id`、`thread_revision`、`snapshot_id`、`tick`；僅識別碼與版本，不含故事事實或提案文案 |
+| `story_director_beat_scheduled` | `decision_id`、`beat_id`、`owner`、`thread_id`、`kind`、`effect`、`tick`；排定橋段的邊界，不含摘要文字 |
+| `story_director_decision_reused` | `decision_id`、`owner`、`outcome`、`tick`；同一來源版本重播時回傳唯一持久決策，不再呼叫模型 |
+| `story_director_decision_rejected` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`tick`（warn 級；僅具體原因碼，不含提案文案，且不變更任何未授權狀態） |
+| `story_director_decision_stale` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`captured_revision`、`current_revision`、`tick`（warn 級；套用前重驗修訂衝突，不留部分狀態） |
+| `story_director_decision_conflict` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`arrangement_revision`、`tick`（warn 級；同一 thread 修訂已被既有橋段佔用，唯一約束裁決） |
 
 ### 4.3 AI／外部服務邊界
 

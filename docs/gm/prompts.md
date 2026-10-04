@@ -19,6 +19,7 @@ prompts/
 ├── npc.yaml                NPC 思考回饋範本
 ├── art.yaml                美術描述範本與生成提示詞（scene／portrait／negative）
 ├── character_creation.yaml 創角提示詞（前瞻註冊，尚未有消費者）
+├── story_director.yaml     故事導演（StoryDirector）橋段提案系統提示詞
 └── action_options.yaml     行動建議提示詞（前瞻註冊，消費者於 action-options-layer 落地）
 ```
 
@@ -42,6 +43,7 @@ prompts:
 | `narrator.system` | `narrator.yaml` | 無 |
 | `npc_dialogue.system` | `npc_dialogue.yaml` | `{name}`、`{desc}`、`{location}` |
 | `scenario_director.system` | `scenario_director.yaml` | 無 |
+| `story_director.system` | `story_director.yaml` | 無 |
 | `npc.thinking` | `npc.yaml` | `{name}` |
 | `art.character_description` | `art.yaml` | `{race}`、`{age}`、`{appearance}`、`{equipment}`、`{custom}` |
 | `art.monster_description` | `art.yaml` | `{description}`、`{display_name}`、`{examples}` |

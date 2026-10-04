@@ -72,6 +72,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_scene_flavor_layer",
     "register_action_options_layer",
     "register_title_nomination_layer",
+    "register_story_director_layer",
     "register_nomination_triggers",
     "art_gallery_prune",
     "art_seed_sync",
@@ -358,6 +359,24 @@ def _register_title_nomination_layer():
     )
 
 
+def _register_story_director_layer():
+    """Register the story_director layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover story_director
+    registration (a conflicting fallback/validator or output schema) must never
+    abort server startup; the proposal gate still fails loudly on a
+    non-story_director registration, so correctness is preserved.
+    """
+    from world.ai.story_director import register_story_director
+
+    return _tolerant_register(
+        "register_story_director_layer", register_story_director, schema=True
+    )
+
+
 def _register_nomination_triggers():
     """Install the epithet-nomination rest-point trigger observers (change G).
 
@@ -532,6 +551,11 @@ def at_server_start():
     _startup_step(
         "register_title_nomination_layer",
         _register_title_nomination_layer,
+        fail_loud=False,
+    )
+    _startup_step(
+        "register_story_director_layer",
+        _register_story_director_layer,
         fail_loud=False,
     )
     # Nomination triggers: any failure here can never take the deterministic

@@ -817,3 +817,124 @@ class DreamExchange(models.Model):
             f"DreamExchange({self.delivery_id}, session={self.session_id}, "
             f"#{self.exchange_number})"
         )
+
+
+class ImmutableDirectorQuerySet(models.QuerySet):
+    """Director decisions and scheduled beats are append-only durable evidence."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Story director rows are append-only.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Story director rows are append-only.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story director rows are durable and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Story director rows cannot be conflict-updated.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class StoryDirectorDecision(models.Model):
+    """One deterministic director decision over an immutable source identity.
+
+    ``decision_id`` is derived from ``(owner, source kind, source ref, source
+    revision)``, so repeated processing of the same source after a restart
+    returns this row instead of deciding again; the unique source constraint is
+    the durable backstop. ``outcome`` records the settlement result
+    (``scheduled`` or a concrete rejection code). ``thread_revision`` is the
+    revision captured when the decision was prepared for a thread-scoped source;
+    for a new story it is the revision of the thread the beat created, and a
+    decision that scheduled nothing records ``0`` with the thread it would have
+    used (empty for a new story).
+    """
+
+    objects = ImmutableDirectorQuerySet.as_manager()
+
+    decision_id = models.CharField(max_length=160, unique=True, db_index=True)
+    owner_id = models.CharField(max_length=255, db_index=True)
+    source_kind = models.CharField(max_length=16)
+    source_ref = models.CharField(max_length=255)
+    source_revision = models.BigIntegerField(default=0)
+    thread_id = models.CharField(max_length=128, default="", db_index=True)
+    thread_revision = models.BigIntegerField(default=0)
+    outcome = models.CharField(max_length=32)
+    scheduled = models.BooleanField(default=False)
+    snapshot_id = models.CharField(max_length=128, default="")
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Story director decisions are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story director decisions are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_director_decisions"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_id", "source_kind", "source_ref", "source_revision"],
+                name="unique_director_decision_source",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"StoryDirectorDecision({self.decision_id}, outcome={self.outcome})"
+
+
+class ScheduledBeat(models.Model):
+    """One durable beat materialized by a decision, at most one per decision.
+
+    ``arrangement_revision`` is the thread revision the decision captured; the
+    unique ``(thread, arrangement_revision)`` constraint is the durable backstop
+    that keeps two settlements from establishing conflicting arrangements for
+    one thread revision. ``execution_ref`` names the durable record the effect
+    produced (narrative event or letter source identity).
+    """
+
+    objects = ImmutableDirectorQuerySet.as_manager()
+
+    beat_id = models.CharField(max_length=200, unique=True, db_index=True)
+    decision = models.OneToOneField(
+        StoryDirectorDecision, on_delete=models.PROTECT, related_name="beat"
+    )
+    owner_id = models.CharField(max_length=255, db_index=True)
+    thread = models.ForeignKey(
+        StoryThread, on_delete=models.PROTECT, related_name="scheduled_beats"
+    )
+    kind = models.CharField(max_length=16)
+    effect = models.CharField(max_length=32)
+    arrangement_revision = models.BigIntegerField(default=0)
+    payload = models.JSONField(default=dict)
+    execution_ref = models.CharField(max_length=255, default="")
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Scheduled beats are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Scheduled beats are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_scheduled_beats"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "arrangement_revision"],
+                name="unique_scheduled_beat_arrangement",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"ScheduledBeat({self.beat_id}, kind={self.kind}, effect={self.effect})"

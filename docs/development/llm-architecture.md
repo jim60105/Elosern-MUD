@@ -65,6 +65,7 @@ world/ai/                        # 生成提案層（無狀態、無副作用、
 ├── scene_flavor.py              # 場景氛圍段落生成
 ├── character_creation.py        # 角色創角提案生成
 ├── action_options.py            # 探索卡片建議生成
+├── story_director/              # 故事橋段提案生成（story-director-beats）
 └── title_nomination.py          # 異名選票提案生成
 server/                          # 服務整合與雙向匯入邊界
 ├── ai_director_service.py       # 任務生成與創角提案服務
