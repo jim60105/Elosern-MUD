@@ -29,7 +29,8 @@ from world.narrative.tokenizer import (
     extract_entities,
     tokenize,
 )
-from world.observability import log_info
+from world.narrative.threads import find_thread, thread_accessible
+from world.observability import log_info, log_warn
 
 # In-process cache of raw tokenized records per owner
 # Cache key: (owner_id, owner_generation, tokenizer_version) -> dict[int, DocumentTokens]
@@ -60,6 +61,8 @@ class FastRecallResult:
     recalled: tuple[ScoredMemory, ...]
     core: tuple[MemoryRecordView, ...]
     working: tuple[MemoryRecordView, ...]
+    thread_id: Optional[str] = None
+    thread_revision: int = 0
 
     @property
     def all_selected(self) -> tuple[MemoryRecordView, ...]:
@@ -160,7 +163,10 @@ def fast_recall(
     Invariants:
     1. Permission & explicit scope filter FIRST:
        - Uses `get_owner_memories` to enforce knowledge scopes and ownership.
-       - If thread_id is requested, filters records whose relations['thread_id'] matches.
+       - If thread_id is requested, the thread's owner permissions gate the scope
+         before any ranking: an unknown or inaccessible thread yields NO eligible
+         views, so no private thread or source content enters recall.
+       - Otherwise filters records whose relations['thread_id'] matches.
     2. Fixed core & working memory selection:
        - Selected independently of lexical relevance up to core_limit and working_limit.
        - Deterministically ordered by (-salience, -tick, source_id, id).
@@ -185,15 +191,30 @@ def fast_recall(
         include_inactive=include_inactive,
     )
 
-    # If thread_id is explicitly requested, filter by relations['thread_id']
+    # Explicit thread scope: the thread's owner permissions gate the scope BEFORE
+    # ranking, so an inaccessible (or unknown) thread contributes no content.
+    scoped_thread_id: Optional[str] = None
+    thread_revision = 0
     if thread_id is not None:
-        clean_thread = str(thread_id).strip()
-        filtered_views = []
-        for v in all_views:
-            rel_thread = v.relations.get("thread_id")
-            if rel_thread is not None and str(rel_thread).strip() == clean_thread:
-                filtered_views.append(v)
-        eligible_views = filtered_views
+        scoped_thread_id = str(thread_id).strip()
+        thread = find_thread(scoped_thread_id)
+        if thread_accessible(thread, clean_owner):
+            thread_revision = int(thread.revision)
+            eligible_views = [
+                v
+                for v in all_views
+                if str(v.relations.get("thread_id", "")).strip() == scoped_thread_id
+            ]
+        else:
+            log_warn(
+                "narrative_thread_recall_denied",
+                context={
+                    "owner_id": clean_owner,
+                    "thread_id": scoped_thread_id,
+                    "reason": "inaccessible_or_unknown_thread",
+                },
+            )
+            eligible_views = []
     else:
         eligible_views = all_views
 
@@ -279,6 +300,8 @@ def fast_recall(
             "core_count": len(selected_core),
             "working_count": len(selected_working),
             "duration_ms": round(elapsed_ms, 3),
+            "thread_id": scoped_thread_id or "",
+            "thread_revision": thread_revision,
         },
     )
 
@@ -291,4 +314,6 @@ def fast_recall(
         recalled=tuple(recalled_scored),
         core=selected_core,
         working=selected_working,
+        thread_id=scoped_thread_id,
+        thread_revision=thread_revision,
     )

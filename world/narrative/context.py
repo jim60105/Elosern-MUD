@@ -48,6 +48,7 @@ from world.ai.profiles import LLMProfile
 from world.ai.schemas.descriptor import ChatRequestDescriptor
 from world.narrative.memory import MemoryRecordView, get_owner_generation
 from world.narrative.models import NarrativeContextSnapshot
+from world.narrative.threads import get_thread_revision
 from world.observability import log_info, log_warn
 
 # Rendering and estimator versions
@@ -204,6 +205,7 @@ class SourceReference:
     knowledge_scope: str
     owner_id: str
     sha256: str
+    thread_revision: int = 0
 
 
 @dataclass(frozen=True)
@@ -222,6 +224,9 @@ class AssembledContext:
     truncation_decisions: tuple[str, ...]
     system_prompt: str
     user_prompt: str
+    thread_id: str = ""
+    thread_revision: int = 0
+    thread_revisions: Mapping[str, int] = field(default_factory=dict)
 
     def get_section_hashes(self) -> dict[str, str]:
         return {s.name: s.sha256 for s in self.sections}
@@ -363,6 +368,7 @@ def assemble_narrative_context(
     schema_version: str = "",
     rendering_version: str = RENDERING_VERSION,
     trace_id: str = "",
+    thread_id: str = "",
 ) -> AssembledContext:
     """Assemble reproducible cognition context obeying permission and budget rules."""
     clean_owner = str(owner_id).strip()
@@ -378,6 +384,14 @@ def assemble_narrative_context(
     # Monotonic generation check (fresh read: new generations see effective changes)
     owner_gen = get_owner_generation(clean_owner)
 
+    # Thread revision read identities: the explicit recall scope plus every thread
+    # referenced by a validated source memory. New assemblies read the current
+    # revision; historical snapshots keep the revision they captured.
+    explicit_thread = str(thread_id).strip()
+    thread_revisions: dict[str, int] = {}
+    if explicit_thread:
+        thread_revisions[explicit_thread] = get_thread_revision(explicit_thread)
+
     # 2. Validate external sources against permission boundary
     sources_provenance: list[SourceReference] = []
     validated_memories: list[MemoryRecordView] = []
@@ -388,6 +402,9 @@ def assemble_narrative_context(
             # Inaccessible memory: excluded before scoring, counted without content
             rejected_source_count += 1
             continue
+        source_thread = str(mem.relations.get("thread_id", "")).strip()
+        if source_thread:
+            thread_revisions.setdefault(source_thread, get_thread_revision(source_thread))
         mem_hash = hashlib.sha256(
             json.dumps(mem.content, sort_keys=True, ensure_ascii=False).encode("utf-8")
         ).hexdigest()
@@ -399,6 +416,7 @@ def assemble_narrative_context(
                 knowledge_scope=mem.knowledge_scope,
                 owner_id=mem.owner_id,
                 sha256=mem_hash,
+                thread_revision=thread_revisions.get(source_thread, 0),
             )
         )
         validated_memories.append(mem)
@@ -597,6 +615,9 @@ def assemble_narrative_context(
         truncation_decisions=tuple(truncation_decisions),
         system_prompt=system_prompt,
         user_prompt=user_prompt,
+        thread_id=explicit_thread,
+        thread_revision=thread_revisions.get(explicit_thread, 0),
+        thread_revisions=_deep_freeze(thread_revisions),
     )
 
     # Observability log: normal log contains only IDs and counts, no private prompt text
@@ -612,6 +633,9 @@ def assemble_narrative_context(
             "rendered_tokens": total_rendered_tokens,
             "truncations": len(truncation_decisions),
             "trace_id": trace_id,
+            "thread_id": explicit_thread,
+            "thread_revision": thread_revisions.get(explicit_thread, 0),
+            "threads_count": len(thread_revisions),
         },
     )
 
@@ -669,6 +693,7 @@ def persist_context_snapshot(
         owner_id=context.owner_id,
         owner_generation=context.owner_generation,
         sources=sources_data,
+        thread_revisions=_plain(context.thread_revisions),
         section_hashes=context.get_section_hashes(),
         budget_accounting=_plain(context.budget_accounting),
         truncation_decisions=list(context.truncation_decisions),
@@ -683,6 +708,7 @@ def persist_context_snapshot(
             "owner_id": context.owner_id,
             "generation": context.owner_generation,
             "sources_count": len(sources_data),
+            "threads_count": len(context.thread_revisions),
         },
     )
 
@@ -706,6 +732,7 @@ def _check_descriptor_provenance(
     prompt_version: str,
     schema_version: str,
     rendering_version: str,
+    thread_revisions: Mapping[str, int],
 ) -> None:
     """Reject descriptor construction that mixes inputs with unrelated snapshot provenance."""
     actual = (
@@ -715,6 +742,7 @@ def _check_descriptor_provenance(
         snapshot.prompt_version,
         snapshot.schema_version,
         snapshot.rendering_version,
+        dict(snapshot.thread_revisions or {}),
     )
     expected = (
         capability,
@@ -723,6 +751,7 @@ def _check_descriptor_provenance(
         prompt_version,
         schema_version,
         rendering_version,
+        _plain(thread_revisions),
     )
     if actual != expected:
         raise ContextProvenanceError(
@@ -770,6 +799,7 @@ def build_request_descriptor(
         prompt_version=context.prompt_version,
         schema_version=context.schema_version,
         rendering_version=context.rendering_version,
+        thread_revisions=context.thread_revisions,
     )
     captured = _snapshot_messages(authoritative)
     if tuple(context.to_messages()) != captured:
