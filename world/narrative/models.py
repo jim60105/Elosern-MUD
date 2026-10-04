@@ -368,6 +368,7 @@ class NarrativeContextSnapshot(models.Model):
     owner_id = models.CharField(max_length=64, db_index=True)
     owner_generation = models.BigIntegerField(default=0)
     sources = models.JSONField(default=list)
+    thread_revisions = models.JSONField(default=dict)
     section_hashes = models.JSONField(default=dict)
     budget_accounting = models.JSONField(default=dict)
     truncation_decisions = models.JSONField(default=list)
@@ -389,3 +390,151 @@ class NarrativeContextSnapshot(models.Model):
 
     def __str__(self) -> str:
         return f"NarrativeContextSnapshot({self.snapshot_id}, capability={self.capability}, owner={self.owner_id}, gen={self.owner_generation})"
+
+
+class ImmutableStoryThreadQuerySet(models.QuerySet):
+    """Prevent bulk rewrites of durable story threads and their provenance rows."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Story threads are append-only; use the thread operations.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Story threads are append-only; use the thread operations.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story threads are durable and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Story threads cannot be conflict-updated through bulk insert.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class StoryThread(models.Model):
+    """Durable continuity across events, interactions, and quests.
+
+    Facts (factual summary and gameplay-established commitments) stay separate
+    from plans and unresolved questions. ``origin`` and ``thread_id`` are
+    immutable; every effective change appends a ``StoryThreadRevision`` and
+    advances ``revision``.
+    """
+
+    objects = ImmutableStoryThreadQuerySet.as_manager()
+
+    thread_id = models.CharField(max_length=128, unique=True, db_index=True)
+    origin = models.CharField(max_length=255)
+    participants = models.JSONField(default=list)
+    visible_to = models.JSONField(default=list)
+    factual_summary = models.TextField(default="", blank=True)
+    unresolved_questions = models.JSONField(default=list)
+    proposed_plans = models.JSONField(default=list)
+    commitments = models.JSONField(default=list)
+    memory_references = models.JSONField(default=list)
+    development_ticks = models.JSONField(default=list)
+    state = models.CharField(max_length=16, default="active", db_index=True)
+    revision = models.BigIntegerField(default=1)
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = StoryThread.objects.get(pk=self.pk)
+            if (
+                original.thread_id != self.thread_id
+                or original.origin != self.origin
+                or original.created_tick != self.created_tick
+            ):
+                raise ValueError(
+                    "StoryThread identity, origin and creation tick are immutable."
+                )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story threads are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_story_threads"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"StoryThread({self.thread_id}, state={self.state}, rev={self.revision})"
+
+
+class StoryThreadLink(models.Model):
+    """Durable provenance linking one source to one thread."""
+
+    objects = ImmutableStoryThreadQuerySet.as_manager()
+
+    thread = models.ForeignKey(
+        StoryThread, on_delete=models.PROTECT, related_name="links"
+    )
+    source_kind = models.CharField(max_length=16)
+    source_ref = models.CharField(max_length=255)
+    relation = models.CharField(max_length=32)
+    provenance = models.JSONField(default=dict)
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Story thread links are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story thread links are append-only.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_story_thread_links"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "source_kind", "source_ref", "relation"],
+                name="unique_story_thread_link",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["source_kind", "source_ref"], name="thread_link_source_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"StoryThreadLink({self.thread_id}, {self.source_kind}:{self.source_ref}, {self.relation})"
+
+
+class StoryThreadRevision(models.Model):
+    """Append-only revision history for a story thread's effective changes."""
+
+    objects = ImmutableStoryThreadQuerySet.as_manager()
+
+    thread = models.ForeignKey(
+        StoryThread, on_delete=models.PROTECT, related_name="revisions"
+    )
+    revision_number = models.IntegerField()
+    operation = models.CharField(max_length=32)
+    state = models.CharField(max_length=16)
+    details = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Story thread revisions are append-only and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Story thread revisions cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_story_thread_revisions"
+        ordering = ["thread", "revision_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "revision_number"],
+                name="unique_story_thread_revision",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"StoryThreadRevision(thread={self.thread_id}, rev={self.revision_number}, {self.operation})"
