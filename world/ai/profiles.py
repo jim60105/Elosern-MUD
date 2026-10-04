@@ -41,6 +41,10 @@ SCENARIO_DIRECTOR_MAX_TOKENS = 8192
 # dialogue, bounded at 900 + 500 code points (design 6.4); 3,072 leaves
 # headroom at the same conservative 2 tokens-per-code-point estimate.
 DREAM_MAX_TOKENS = 3072
+# One beat proposal carries a bounded Traditional-Chinese summary of at most
+# 600 code points (story-director-beats) plus its small JSON envelope; 1,536
+# leaves headroom at a conservative 2 tokens per code point.
+STORY_DIRECTOR_MAX_TOKENS = 1536
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
@@ -281,8 +285,8 @@ def default_profiles(
     requests structured output when the endpoint declares support; the
     ``action_options`` layer is the single exception and always defaults to
     the capability on, with ``max_tokens`` sized for a 5-card JSON payload
-    (pipeline design doc §5). ``title_nomination`` and ``scenario_director``
-    carry their own larger output budgets.
+    (pipeline design doc §5). ``title_nomination``, ``scenario_director`` and
+    ``story_director`` carry their own larger output budgets.
     """
     profiles = {
         layer: {
@@ -323,6 +327,10 @@ def default_profiles(
     profiles["scenario_director"] = {
         **profiles["scenario_director"],
         "max_tokens": SCENARIO_DIRECTOR_MAX_TOKENS,
+    }
+    profiles["story_director"] = {
+        **profiles["story_director"],
+        "max_tokens": STORY_DIRECTOR_MAX_TOKENS,
     }
     if defaults is not None:
         for layer, overrides in defaults.items():

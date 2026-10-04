@@ -54,6 +54,7 @@ class ValidLoadTests(unittest.TestCase):
                 "npc_dialogue.yaml",
                 "correspondence.yaml",
                 "dream.yaml",
+                "story_director.yaml",
                 "scenario_director.yaml",
                 "scene_builder.yaml",
                 "npc.yaml",

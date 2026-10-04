@@ -27,6 +27,7 @@ LAYER_NAMES: tuple[str, ...] = (
     "character_creation",
     "action_options",
     "title_nomination",
+    "story_director",
 )
 
 # Resolution kinds consumed by the dispatcher in server/conf/settings.py.

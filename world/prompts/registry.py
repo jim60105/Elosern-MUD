@@ -46,6 +46,7 @@ def _build() -> dict[str, PromptSpec]:
             "dream.yaml",
             ("phase", "climax_phase", "mode", "exchange_number", "remaining"),
         ),
+        PromptSpec("story_director.system", "story_director.yaml"),
         PromptSpec("scenario_director.system", "scenario_director.yaml", ("name_inspiration",)),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
         PromptSpec(
