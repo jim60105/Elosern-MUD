@@ -233,6 +233,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_authoring_request_submitted` | `submission_key`、`draft_id`、`owner`、`version`、`tick`；已確認版本僅提交一次，不含方向摘要 |
 | `narrative_attention_ranked` | `owner_id`、`config_version`、`tick`、`candidate_count`、`eligible_count`、`selected_count`、`excluded_count`、`focus_limit`、`snapshot_hash`；僅識別碼、計數與雜湊，不含玩家文案、故事摘要或方向內文 |
 | `narrative_attention_candidates_truncated` | `owner_id`、`truncated_count`、`considered`、`tick`（warn 級；讀取上限截斷，唯讀且不刪除任何故事狀態） |
+| `narrative_attention_engagement_truncated` | `owner_id`、`scanned`、`tick`（warn 級；參與掃描上限截斷，僅計數） |
 
 ### 4.3 AI／外部服務邊界
 

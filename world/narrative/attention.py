@@ -493,11 +493,20 @@ def extract_engagement(
     Only owner actions count: initiated dialogue, sent correspondence, explicit
     clue questions and committed gameplay participation. Passive receipt
     (collection/reading) is counted separately and never scored.
+
+    Engagement is counterpart-scoped: ``participants`` names the other parties
+    of the candidate, and when it resolves to no other party the result is
+    zeroed rather than falling back to the owner's global activity, which would
+    otherwise attribute unrelated history to an owner-only candidate. The
+    Committed-play counters are still candidate-window facts, not a claim
+    that every counted occurrence belongs to this thread.
     """
     from world.narrative.models import DialogueTurn, LetterSend, LetterState, NarrativeEvent
 
     clean_owner = str(owner_id)
     targets = {str(participant) for participant in participants if str(participant) != clean_owner}
+    if not targets:
+        return EngagementSignals()
     start = int(now_tick) - max(0, int(window_ticks))
 
     initiations = 0
@@ -512,38 +521,27 @@ def extract_engagement(
         .order_by("id")
         .values_list("npc_id", "speech")
     ):
-        if targets and str(npc_id) not in targets:
+        if str(npc_id) not in targets:
             continue
         initiations += 1
         if "?" in (speech or "") or "？" in (speech or ""):
             clue_questions += 1
 
-    sustained = 0
-    if targets:
-        sustained = (
-            LetterSend.objects.filter(
-                sender_id=clean_owner,
-                recipient_id__in=sorted(targets),
-                sent_tick__gte=start,
-                sent_tick__lte=int(now_tick),
-            )
-            .order_by("pk")
-            .count()
+    sustained = (
+        LetterSend.objects.filter(
+            sender_id=clean_owner,
+            recipient_id__in=sorted(targets),
+            sent_tick__gte=start,
+            sent_tick__lte=int(now_tick),
         )
-    else:
-        sustained = (
-            LetterSend.objects.filter(
-                sender_id=clean_owner,
-                sent_tick__gte=start,
-                sent_tick__lte=int(now_tick),
-            )
-            .order_by("pk")
-            .count()
-        )
+        .order_by("pk")
+        .count()
+    )
 
     participation = 0
     passive_events = 0
     scanned = 0
+    scan_truncated = False
     for event_type, members in (
         NarrativeEvent.objects.filter(tick__gte=start, tick__lte=int(now_tick))
         .order_by("pk")
@@ -551,6 +549,7 @@ def extract_engagement(
     ):
         scanned += 1
         if scanned > MAX_ENGAGEMENT_EVENTS:
+            scan_truncated = True
             break
         if clean_owner not in {str(member) for member in (members or [])}:
             continue
@@ -558,6 +557,15 @@ def extract_engagement(
             passive_events += 1
         else:
             participation += 1
+    if scan_truncated:
+        log_warn(
+            "narrative_attention_engagement_truncated",
+            context={
+                "owner_id": clean_owner,
+                "scanned": scanned - 1,
+                "tick": int(now_tick),
+            },
+        )
 
     passive_reads = (
         LetterState.objects.filter(
@@ -766,15 +774,17 @@ def build_attention_candidates(
     threads = list(
         StoryThread.objects.filter(state="active").order_by("id")[: MAX_CONSIDERED_THREADS + 1]
     )
-    truncated = max(0, len(threads) - MAX_CONSIDERED_THREADS)
-    threads = threads[:MAX_CONSIDERED_THREADS]
-    if truncated:
+    if len(threads) > MAX_CONSIDERED_THREADS:
+        truncated = (
+            StoryThread.objects.filter(state="active").count() - MAX_CONSIDERED_THREADS
+        )
+        threads = threads[:MAX_CONSIDERED_THREADS]
         log_warn(
             "narrative_attention_candidates_truncated",
             context={
                 "owner_id": owner_id,
                 "truncated_count": truncated,
-                "considered": len(threads),
+                "considered": MAX_CONSIDERED_THREADS,
                 "tick": tick,
             },
         )

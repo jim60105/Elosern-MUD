@@ -57,6 +57,7 @@ from world.narrative.models import LetterSend, LetterState, NarrativeEvent, Stor
 from world.narrative.threads import (
     create_thread,
     link_event_to_thread,
+    link_letter_to_thread,
     link_memory_to_thread,
 )
 from world.rules.clock import get_world_clock
@@ -422,6 +423,24 @@ class AttentionExtractionTests(EvenniaTest):
         decision = self._decide()
         self.assertIn("thread:att_memory", [item.candidate_id for item in decision.ranked])
 
+    def test_recipient_only_letter_link_is_owned_experience(self):
+        """A linked letter the owner merely received still counts as experience."""
+        incoming = send_letter(
+            sender_id=str(self.npc.pk),
+            recipient_id=self.owner_id,
+            body="合成來信內容。",
+            source_id="att:letter:recipient",
+        ).source_id
+        letter = LetterSend.objects.get(source_id=incoming)
+        self._owner_thread(
+            "att_letter", participants=[str(self.npc.pk)], visible_to=[self.owner_id]
+        )
+        link_letter_to_thread(
+            thread_id="att_letter", letter=letter, actor_id=self.owner_id, tick=100
+        )
+        decision = self._decide()
+        self.assertIn("thread:att_letter", [item.candidate_id for item in decision.ranked])
+
     @covers_requirement(
         "narrative-story-threads::thread-lifecycle-preserves-facts-separately-from-plans"
     )
@@ -494,6 +513,23 @@ class AttentionExtractionTests(EvenniaTest):
         self.assertEqual(signals.sustained_correspondence, 1)
         self.assertEqual(signals.participation, 0)
         self.assertEqual(signals.passive_receipts, 2)
+
+    def test_engagement_is_counterpart_scoped(self):
+        """A candidate with no other party is zeroed, never owner-global."""
+        submit_turn(self.npc, self.owner, "線索在哪裡？")
+        self.assertEqual(
+            extract_engagement(self.owner_id, participants=(), now_tick=100, window_ticks=100),
+            EngagementSignals(),
+        )
+        self.assertEqual(
+            extract_engagement(
+                self.owner_id,
+                participants=[str(self.npc.pk)],
+                now_tick=100,
+                window_ticks=100,
+            ).dialogue_initiations,
+            1,
+        )
 
     def test_schedule_block_excludes_candidate(self):
         self._owner_thread("att_busy")

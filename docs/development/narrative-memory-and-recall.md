@@ -504,7 +504,10 @@ built only from observable owner actions: initiated dialogue, sustained
 correspondence, explicit clue questions, and committed gameplay participation.
 Passive receipt (letter collection/reading, and the private
 `correspondence_read` event it writes) is counted as `passive_receipts` and
-contributes zero. Ties resolve by `candidate_id`, so identical inputs and
+contributes zero. Engagement is counterpart-scoped: the candidate's other
+participants bound the queries, and a candidate with no other party is zeroed
+rather than inheriting the owner's global activity. Ties resolve by
+`candidate_id`, so identical inputs and
 configuration always yield an identical order and reason data offline. Weights,
 saturations, cooldown and the focus limit are calibration choices recorded in
 `world/narrative/attention_calibration.py` and the committed
@@ -514,9 +517,9 @@ deliberate behavior that cooldown plus repetition can outweigh a higher stake
 for a just-developed thread, so attention does not repeat it.
 
 Boundary events (`narrative_attention_ranked`, and the warn-level
-`narrative_attention_candidates_truncated` when the read bound is hit) carry
-owner id, config version, counts, tick and the snapshot hash only — never player
-prose, thread summaries, or direction text. Delta-only coverage IDs for this
-boundary are obtained and annotated by the later spec-sync owner after the delta
-spec reaches `openspec/specs/`; this change annotates its substantive tests
-against existing canonical main IDs.
+`narrative_attention_candidates_truncated` / `narrative_attention_engagement_truncated`
+when a read bound is hit) carry owner id, config version, counts, tick and the
+snapshot hash only — never player prose, thread summaries, or direction text.
+Delta-only coverage IDs for this boundary are obtained and annotated by the
+later spec-sync owner after the delta spec reaches `openspec/specs/`; this change
+annotates its substantive tests against existing canonical main IDs.

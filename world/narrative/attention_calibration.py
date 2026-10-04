@@ -448,6 +448,13 @@ def run_calibration(
             "deliberately allowed to outweigh a higher stake for a just-developed thread.",
             "passive receipt (collection/reading) is recorded but contributes zero to the "
             "engagement score.",
+            "engagement is counterpart-scoped: a candidate whose participants resolve to no "
+            "other party is zeroed rather than inheriting the owner's global activity, and "
+            "the committed-play counters are candidate-window facts rather than a per-thread "
+            "link claim.",
+            "the engagement event scan and the thread read both have read-cost caps; hitting "
+            "them is reported (narrative_attention_engagement_truncated / "
+            "narrative_attention_candidates_truncated) so a bounded read is never silent.",
         ),
     )
 
