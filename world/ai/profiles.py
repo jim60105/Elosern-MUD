@@ -308,6 +308,10 @@ def default_profiles(
         **profiles["dialogue_summary"],
         "max_tokens": 1024,
     }
+    profiles["correspondence"] = {
+        **profiles["correspondence"],
+        "max_tokens": 1024,
+    }
     profiles["scenario_director"] = {
         **profiles["scenario_director"],
         "max_tokens": SCENARIO_DIRECTOR_MAX_TOKENS,

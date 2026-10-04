@@ -40,6 +40,7 @@ def _build() -> dict[str, PromptSpec]:
         PromptSpec("npc_dialogue.global_rules", "npc_dialogue.yaml"),
         PromptSpec("npc_dialogue.world_digest", "npc_dialogue.yaml"),
         PromptSpec("npc_dialogue.summary", "npc_dialogue.yaml"),
+        PromptSpec("correspondence.system", "correspondence.yaml"),
         PromptSpec("scenario_director.system", "scenario_director.yaml", ("name_inspiration",)),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
         PromptSpec(

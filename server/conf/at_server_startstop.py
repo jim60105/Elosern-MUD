@@ -65,6 +65,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "load_prompt_library",
     "register_narrator_layer",
     "register_npc_dialogue_layer",
+    "register_correspondence_layer",
     "register_scenario_director_layer",
     "register_character_creation_layer",
     "register_scene_flavor_layer",
@@ -230,6 +231,13 @@ def _register_npc_dialogue_layer():
     return _tolerant_register(
         "register_npc_dialogue_layer", register_npc_dialogue, schema=True
     )
+
+
+def _register_correspondence_layer():
+    """Register optional remote replies without processing pending work."""
+    from world.ai.correspondence import register_correspondence
+
+    return _tolerant_register("register_correspondence_layer", register_correspondence, schema=True)
 
 
 def _register_scenario_director_layer():
@@ -483,6 +491,9 @@ def at_server_start():
     _startup_step("register_narrator_layer", _register_narrator_layer, fail_loud=False)
     _startup_step(
         "register_npc_dialogue_layer", _register_npc_dialogue_layer, fail_loud=False
+    )
+    _startup_step(
+        "register_correspondence_layer", _register_correspondence_layer, fail_loud=False
     )
     _startup_step(
         "register_scenario_director_layer",

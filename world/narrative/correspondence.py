@@ -6,7 +6,7 @@ from uuid import uuid4
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 
-from world.narrative.models import LetterSend, LetterState, NarrativeEvent, ProjectionProgress
+from world.narrative.models import LetterReplyWork, LetterSend, LetterState, NarrativeEvent, ProjectionProgress
 from world.observability import log_info
 from world.rules.clock import CLOCK_YAML, ScheduledEvent, get_world_clock, register_event_source
 
@@ -45,7 +45,7 @@ def _character(identity):
     return obj
 
 
-def send_letter(*, sender_id, recipient_id, body, source_id=None, reply_to=""):
+def send_letter(*, sender_id, recipient_id, body, source_id=None, reply_to="", source_snapshot_id=""):
     """Validate before writes, then atomically fix immutable send and state."""
     from typeclasses.characters import PlayerCharacter
 
@@ -61,8 +61,8 @@ def send_letter(*, sender_id, recipient_id, body, source_id=None, reply_to=""):
     with transaction.atomic():
         existing = LetterSend.objects.filter(source_id=identity).first()
         if existing is not None:
-            if (existing.sender_id, existing.recipient_id, existing.body, existing.reply_to) != (
-                str(sender.pk), str(recipient.pk), body, reply_to
+            if (existing.sender_id, existing.recipient_id, existing.body, existing.reply_to, existing.source_snapshot_id) != (
+                str(sender.pk), str(recipient.pk), body, reply_to, source_snapshot_id
             ):
                 raise ValueError("Send identity belongs to different correspondence.")
             return get_letter(identity)
@@ -74,11 +74,12 @@ def send_letter(*, sender_id, recipient_id, body, source_id=None, reply_to=""):
                 "recipient_kind": "player" if isinstance(recipient, PlayerCharacter) else "npc",
                 "body": body, "sent_tick": tick,
                 "due_tick": tick + CLOCK_YAML["seconds_per_hour"], "reply_to": reply_to,
+                "source_snapshot_id": source_snapshot_id,
             },
         )
         if not created:
-            if (letter.sender_id, letter.recipient_id, letter.body, letter.reply_to) != (
-                str(sender.pk), str(recipient.pk), body, reply_to
+            if (letter.sender_id, letter.recipient_id, letter.body, letter.reply_to, letter.source_snapshot_id) != (
+                str(sender.pk), str(recipient.pk), body, reply_to, source_snapshot_id
             ):
                 raise ValueError("Send identity belongs to different correspondence.")
             return get_letter(identity)
@@ -141,6 +142,8 @@ def settle_correspondence_delivery(start_tick, end_tick):
                 source_id=transition, status="pending",
                 projector_version=CORRESPONDENCE_PROJECTOR_VERSION,
             )
+            if status == "delivered":
+                LetterReplyWork.objects.get_or_create(letter=letter)
             context = {"source_id": letter.source_id, "recipient": letter.recipient_id,
                        "tick": letter.due_tick, "status": status}
             transaction.on_commit(
