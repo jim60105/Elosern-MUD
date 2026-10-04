@@ -49,8 +49,11 @@ substantially fills the frame: through one shared pure mapping exported by
 `web/webclient-app/components/face-rect.js`, the image element SHALL be enlarged to `1/w` × `1/h`
 of the frame's size (w, h the rectangle's normalized extents) and anchored inside the frame —
 which clips the overflow — by the offsets `-x/w` and `-y/h` of the frame's width and height, so
-the rectangle's region of the image maps onto the frame's full box. The enlargement factor SHALL
-be clamped to 8× per axis, and the anchor offsets SHALL be derived from the clamped factors so the
+the rectangle's region of the image fills the frame's box. That window is exact for the
+pixel-square rectangle the authoring path enforces; for a legacy or hand-authored non-square
+rectangle the same enlarge-and-anchor composition fills the frame from the rectangle while
+cropping a bounded sliver on the overflowing axis, and it SHALL never blank the image. The
+enlargement factor SHALL be clamped to 8× per axis, and the anchor offsets SHALL be derived from the clamped factors so the
 rectangle window stays coherent under the clamp. The mapping SHALL validate the rectangle with
 exactly the same well-formedness set as the recenters-only mapping — rejecting `null`,
 `undefined`, non-finite fields, fields outside `[0, 1]`, `x + w` or `y + h` greater than 1, and
