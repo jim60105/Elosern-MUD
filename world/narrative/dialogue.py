@@ -78,10 +78,14 @@ def build_dialogue_context(npc, player, speech, *, identity_detail=False):
     """Capture permitted current state and replay exact, versioned epoch frames."""
     from world.ai.npc_dialogue import build_npc_dialogue_prompt
     from world.ai.profiles import get_profile
+    from world.narrative.correspondence_memory import process_pending_correspondence_projections
     from world.narrative.epochs import ensure_epoch, epoch_frames, append_frame, SUMMARY_PROFILE_LIMITS
     from world.rules.npc_persona import current_persona_version
 
     owner = str(npc.pk)
+    # Delivered letters settle at this recall boundary: cognition must exist
+    # before selection, or a face-to-face turn would miss the letter entirely.
+    process_pending_correspondence_projections()
     recall = fast_recall(owner_id=owner, requester_id=owner, query=speech)
     budget = build_budget_profile(
         get_profile("npc_dialogue"),

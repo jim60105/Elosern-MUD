@@ -10,7 +10,11 @@ from typeclasses.rooms import Room
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.narrative.correspondence import MAX_BODY_CHARACTERS, get_letter, send_letter
 from world.narrative.models import LetterState, NarrativeEvent, ProjectionProgress
-from world.narrative.correspondence import CORRESPONDENCE_PROJECTOR_VERSION
+from world.narrative.correspondence import (
+    CORRESPONDENCE_PROJECTOR_VERSION,
+    correspondence_event_source_id,
+)
+from world.narrative.correspondence_memory import project_correspondence_event
 from world.observability import log_info
 from world.rules.clock import read_world_clock
 
@@ -136,14 +140,17 @@ def read(actor, source_id):
                 status="read", read_tick=tick,
             )
             if changed:
-                source = f"correspondence:{source_id}:read"
-                NarrativeEvent.objects.create(
+                source = correspondence_event_source_id(source_id, "read")
+                event = NarrativeEvent.objects.create(
                     source_id=source, event_type="correspondence_read",
                     content={"letter_source_id": source_id},
                     participants=[str(actor.pk)], tick=tick, visibility="private",
                 )
                 ProjectionProgress.objects.create(source_id=source, status="pending",
                                                   projector_version=CORRESPONDENCE_PROJECTOR_VERSION)
+                # First reading IS this owner's knowledge boundary, and rereads
+                # skip this block, so the told memory commits with the read.
+                project_correspondence_event(event)
                 context = {"char": actor.pk, "source_id": source_id, "tick": tick}
                 transaction.on_commit(lambda: log_info("correspondence_read", context=context))
         return get_letter(source_id)

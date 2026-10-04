@@ -17,6 +17,11 @@ MAX_BODY_CHARACTERS = 8000
 CORRESPONDENCE_PROJECTOR_VERSION = 2
 
 
+def correspondence_event_source_id(letter_source_id, status):
+    """Stable identity for one letter transition occurrence."""
+    return f"correspondence:{letter_source_id}:{status}"
+
+
 @dataclass(frozen=True)
 class LetterRecord:
     """Detached read value: never retained or mutated by settlement."""
@@ -124,7 +129,7 @@ def settle_correspondence_delivery(start_tick, end_tick):
         for state in due_letters(start_tick, end_tick):
             letter = state.letter
             status = "delivered" if letter.recipient_kind == "npc" else "available"
-            transition = f"correspondence:{letter.source_id}:{status}"
+            transition = correspondence_event_source_id(letter.source_id, status)
             changed = LetterState.objects.filter(pk=state.pk, status="sent").update(
                 status=status, transition_id=transition,
             )
