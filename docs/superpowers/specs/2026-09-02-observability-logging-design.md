@@ -227,6 +227,10 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_thread_linked` | `thread_id`、`kind`、`ref`、`relation`、`revision`、`tick`；恆為 durable 來源識別，不含來源內文 |
 | `narrative_thread_revised` | `thread_id`、`operation`、`revision`、`state`、`tick`；生命週期與事實/計畫修訂邊界，不含摘要或承諾文字 |
 | `narrative_thread_recall_denied` | `owner_id`、`thread_id`、`reason`（warn 級；未知或無權限的明確 thread 範圍，不取用任何私密內容） |
+| `narrative_authoring_draft_saved` | `draft_id`、`owner`、`revision`、`tick`；僅識別碼與版本，不含方向摘要或主題文字 |
+| `narrative_authoring_draft_edited` | `draft_id`、`owner`、`revision`、`tick`；僅識別碼與版本，不含方向摘要或主題文字 |
+| `narrative_authoring_validation_rejected` | `draft_id`、`owner`、`revision`、`reasons`、`tick`（warn 級；僅具體原因碼，不含玩家訊息或方向文字，且不變更任何持久狀態） |
+| `narrative_authoring_request_submitted` | `submission_key`、`draft_id`、`owner`、`version`、`tick`；已確認版本僅提交一次，不含方向摘要 |
 
 ### 4.3 AI／外部服務邊界
 
