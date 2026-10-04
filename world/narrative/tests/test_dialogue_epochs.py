@@ -40,7 +40,10 @@ class DialogueEpochTests(EvenniaTestCase):
         settle_response(self.npc, self.player, identity, "Recorded reply", snapshot_id=snapshot)
         return messages, snapshot
 
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
+    @covers_requirement(
+        "npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona",
+        "dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation",
+    )
     def test_movement_preserves_prefix_and_original_frame_bytes(self):
         first, _ = self.turn("First question")
         frame = DialogueFrame.objects.get()
@@ -59,6 +62,7 @@ class DialogueEpochTests(EvenniaTestCase):
             with self.assertRaises(ValueError):
                 mutate()
 
+    @covers_requirement("dialogue-epochs::epoch-compaction-preserves-original-turns-and-provenance")
     def test_successful_compaction_retains_originals_and_exact_generation_sources(self):
         self.turn("Can you repair this?")
         before = list(DialogueTurn.objects.values_list("id", "speech"))
@@ -75,7 +79,10 @@ class DialogueEpochTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             successor.save()
 
-    @covers_requirement("npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline")
+    @covers_requirement(
+        "npc-dialogue::npc-dialogue-degrades-to-greeting-or-silence-offline",
+        "dialogue-epochs::epoch-compaction-preserves-original-turns-and-provenance",
+    )
     def test_offline_and_oversized_summary_leave_current_epoch_usable(self):
         self.turn("First question")
         original = current_epoch(self.npc, self.player)
@@ -90,6 +97,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.turn("Still playable")
         self.assertEqual(DialogueTurn.objects.count(), 4)
 
+    @covers_requirement("dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation")
     def test_natural_boundary_and_version_changes_preserve_history(self):
         first, _ = self.turn("First")
         original = current_epoch(self.npc, self.player)
@@ -103,6 +111,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(DialogueTurn.objects.count(), 4)
         self.assertEqual(DialogueFrame.objects.count(), 2)
 
+    @covers_requirement("dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation")
     def test_persona_revision_invalidates_epoch_even_when_text_is_identical(self):
         self.npc.db.npc_persona_meta = {"persona_version": 1}
         first, _ = self.turn("First")
@@ -113,6 +122,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertNotEqual(current_epoch(self.npc, self.player).pk, original.pk)
         self.assertEqual(DialogueFrame.objects.filter(epoch=original).count(), 1)
 
+    @covers_requirement("dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation")
     def test_historical_frame_preserves_original_memory_revision_after_inactivation(self):
         memory, _, _ = record_memory(owner_id=str(self.npc.pk), tier="core",
                                source_id="synthetic:epoch-memory", content={"summary": "Synthetic remembered claim"})
@@ -128,6 +138,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(original.sources[0]["revision_number"], 1)
         self.assertNotIn("cognition", json.loads(payload["current"]))
 
+    @covers_requirement("dialogue-epochs::epoch-compaction-preserves-original-turns-and-provenance")
     def test_invalid_summary_and_oversized_original_never_destroy_history(self):
         self.turn("First")
         epoch = current_epoch(self.npc, self.player)
@@ -144,6 +155,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(DialogueTurn.objects.get(submission_id=identity).speech, "字" * 10000)
         self.assertEqual(current_epoch(self.npc, self.player).pk, boundary.pk)
 
+    @covers_requirement("dialogue-epochs::epoch-compaction-preserves-original-turns-and-provenance")
     def test_offline_history_tail_remains_bounded_with_required_current_state(self):
         for index in range(15):
             messages, snapshot_id = self.turn("合成問題" * 80 + str(index))
@@ -158,6 +170,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(DialogueFrame.objects.count(), 15)
         self.assertEqual(DialogueEpoch.objects.count(), 1)
 
+    @covers_requirement("dialogue-epochs::stable-prefixes-change-only-at-legitimate-invalidation")
     def test_global_prefix_shared_and_logging_contains_only_metadata(self):
         with patch("world.narrative.dialogue.log_info") as logged:
             first, _ = self.turn("Private player text")
@@ -167,6 +180,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertNotIn("Private player text", repr(logged.call_args_list))
         self.assertIn("prefix_sha256", repr(logged.call_args_list))
 
+    @covers_requirement("dialogue-epochs::epoch-compaction-preserves-original-turns-and-provenance")
     def test_stale_summary_cannot_replace_new_natural_boundary(self):
         self.turn("First question")
         captured = current_epoch(self.npc, self.player)
@@ -197,6 +211,7 @@ class DialogueEpochTests(EvenniaTestCase):
         self.assertEqual(reply.speech, "合成安全回覆。")
         self.assertEqual(len(client.calls), 2)
 
+    @covers_requirement("dialogue-epochs::caching-is-optional-observability")
     def test_cached_tokens_are_optional_transport_observability(self):
         client = OpenAICompatClient(LLMProfile(**default_profiles()["npc_dialogue"]))
         payload = {"choices": [{"message": {"role": "assistant", "content": "Recorded response"}}]}
