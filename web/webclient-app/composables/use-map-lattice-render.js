@@ -174,10 +174,12 @@ export function useMapLatticeRender(props, emit, geometry) {
 
   // Edge-marker name placement (map-02 D4 wording): the name box is drawn
   // OUTWARD from the diamond's outer tip — never toward the canvas. The
-  // 11px monospace glyph line does not scale with the markers (same policy
+  // name's monospace glyph line does not scale with the markers (same policy
   // as the node labels), so the offset is the scaled rotated-diamond axial
-  // reach plus the 2-unit model margin and an 11px ascent to the baseline.
-  const MARKER_NAME_ASCENT = 11;
+  // reach plus the 2-unit model margin and one ascent to the baseline at the
+  // surface's declared 16-unit name step (retarget-desktop-viewport-contract
+  // D7; the old 11 was that step's 11px ascent).
+  const MARKER_NAME_ASCENT = 16;
   function markerOutset() {
     return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
   }

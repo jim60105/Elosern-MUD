@@ -412,7 +412,8 @@ function onIslandClick(event) {
   color: var(--paper-500);
   font-family: var(--f-mono);
   /* The island's one chrome step (webclient-map-legibility): title,
-     orientation marks and readout all read at the shared 12px step. */
+     orientation marks and readout all read at the shared `--text-xs` step
+     (16 CSS px at the 1451x790 reference). */
   font-size: var(--text-xs);
   line-height: 1.45;
   min-height: 1.45em;

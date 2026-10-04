@@ -141,15 +141,26 @@ requirements; it owns only the pure acceptance requirements that carry no derive
   retarget — the old clamp bottomed at 20px *at 1080 only* and rendered ~14.6px at 790.
 - **Stale persisted prose multipliers** (0.92/1.12) load as A; a one-time visual reset for
   players who had chosen a step. Accepted over a layout-version bump.
+- **The declared 40-unit pitch no longer clears two vertically adjacent 16-unit label boxes.** D7
+  keeps the pitch derivation untouched, and that derivation computes only the horizontal label
+  term, so a payload that draws labels on vertically adjacent rows while the canvas fit awards the
+  island's 40-unit floor can tighten below the geometry audit's absolute gap (a 16-unit label box
+  needs roughly 50 units of pitch for that gap). The amended `webclient-local-map` text records
+  this as a declared limit of the island's 240px square; a follow-up change must add the computed
+  vertical term and re-derive the island's pitch floor, which in turn moves the frozen
+  no-gateway (60) and wilderness (45) fixture pitches. No fixture in this change's suite draws
+  labels on vertically adjacent rows, so the green unit suite is not evidence about that corner.
 
 ## Migration plan
 
 Land this change first (constants, tokens, components, derived spec geometry, unit tests). The
 companion `retarget-browser-acceptance-viewports` then retargets `browser_base.DEFAULT_VIEWPORT`,
 the Playwright viewport tuples, and the acceptance requirements; between the two, the browser
-suites run the old tuples against the new geometry (they still pass — old viewports remain
-valid, just no longer contractually required). Rollback is the reference constants alone: every
-derived value is a function of them plus the token literals.
+suites run the old tuples against the new geometry, and the map-legibility acceptance module —
+which pins the old 12px chrome step and the 208px canvas — is red until the companion re-pins
+those literals. Old viewports otherwise remain valid, just no longer contractually required.
+Rollback is the reference constants alone: every derived value is a function of them plus the
+token literals.
 
 ## Open Items
 
