@@ -81,7 +81,11 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "unpossess": {"syntax": "unpossess", "context": "附身中"},
     "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
     "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
-    "sleep": {"syntax": "sleep", "context": "一般"},
+    "sleep": {"syntax": "sleep [dream]", "context": "一般"},
+    "dream": {
+        "syntax": "dream、dream say <文字>、dream draft [故事方向]、dream confirm [故事方向]、dream awaken",
+        "context": "一般（需先以 sleep dream 進入；查看狀態隨時可用）",
+    },
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},
     "cast": {

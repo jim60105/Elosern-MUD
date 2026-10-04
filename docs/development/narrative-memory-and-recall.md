@@ -702,3 +702,57 @@ Boundary events (`story_director_decision_prepared`, `story_director_beat_schedu
 `story_director_decision_rejected` / `story_director_decision_stale` /
 `story_director_decision_conflict`) carry identifiers, revisions, counts and
 reason codes only — never the proposal summary or any story prose.
+
+## Sleep-linked dream surface (W3)
+
+`commands.skip.CmdSleep` accepts `sleep [dream]`; browser `explore.wait`
+accepts the exact opt-in payload `{"sleep": true, "dream": true}` beside
+ordinary sleep. Both adapters retain their existing safety/duration/restoration
+and nomination paths, capture the actual clock ticks around their single
+successful settlement, then call `server.dream_service.enter_after_sleep`.
+Zero-second accepted sleep is valid. A rejection never associates a session.
+The present clock is all-or-nothing; the interrupted-result test injects a
+shorter committed clock outcome rather than inventing a new interrupt engine.
+
+`world.narrative.dream_surface` owns the durable character Attribute
+`dream_surface`: associated session id, actual sleep ticks/requested duration/
+event kinds, latest validated scene/dialogue, and the player's direction.
+An associated open session takes precedence over the newest open-session query;
+later explicit sleep records a new result while continuing that discussion.
+Reconnect reads this record and the owner-scoped durable lifecycle only.
+Neither the read model nor any departure advances time or physical traits.
+`resume_saved_session` reopens an explicitly re-entered unconfirmed discussion
+without resetting its exchange count; confirmed sessions remain final.
+Awakening preserves an incomplete direction as a draft before ending.
+
+`server.dream_service.act` is the composition root. `say` invokes the existing
+guarded `dream` collaborator with confirmed creative preferences only (no
+hidden director context). The response must still match the session, owner,
+current control, open state and outstanding submission on delivery. Revision
+equality gates player requests, not asynchronous responses: saving a draft
+during generation can legitimately change revision. Abandoned/ended late
+responses are discarded, not counted. Only delivered validated scene plus
+dialogue settles an exchange. The presentation includes the server-owned dream
+track, with no live SexualState writes. Confirm/draft/awaken use the existing
+authoring/lifecycle APIs; confirmation derives from `draft_is_confirmed`.
+Directions support the existing `new_story` and `thread_direction` records
+plus themes/atmosphere/participants/emphasis/exclusions. Owner-visible,
+non-terminal thread choices are server-authored (at most 32), and confirmation
+revalidates changed thread state. Invalid directions stay unconfirmed drafts
+and return the deterministic concrete reason messages. Text accepts direction
+JSON; browser sends the same object, with an 8192-byte surface bound.
+The ending uses `dream_track.render_ending`, never another model call.
+
+The `dream` OOB panel has a strict mirrored browser schema. `dream.say`
+transports up to 4000 Unicode code points in two bounded `message_parts`,
+preserving the global 2048-code-point per-string envelope ceiling.
+Generation returns the browser action lock immediately; separate completion
+refreshes the panel so offline draft/confirm/awakening remain dispatchable
+while a call is pending. Closing the dream drawer awakens through the same
+revision-gated action. Text `dream` commands expose the same lifecycle choices.
+
+Focused synthetic evidence is
+`world.narrative.tests.test_dream_surface`, including a real accepted zero-second
+sleep → recorded FakeLLMClient exchange → draft → confirm → offline awaken
+smoke. New delta-only traceability IDs remain archive-sync owned; existing
+main IDs annotate matching sleep, lifecycle and presentation tests.

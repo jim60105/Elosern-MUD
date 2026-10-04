@@ -434,6 +434,7 @@ var PANEL_ALLOWLIST = {
   lore_codex: 1,
   quest_log: 1,
   combat_beats: 1,
+  dream: 1,
 };
 
 var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;

@@ -38,12 +38,17 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`rest`](/game/command-reference?id=rest) | 休息並推進時間；可用 `practice <技能>` 宣告每整小時熟練度修煉。 |
-| [`sleep`](/game/command-reference?id=sleep) | 睡到完全恢復。 |
+| [`sleep`](/game/command-reference?id=sleep) | 睡到完全恢復；`sleep dream` 可在結算後進入夢境協作。 |
+| [`dream`](/game/command-reference?id=dream) | 查看夢境剩餘交流次數，商談故事方向、儲存草稿、確認或醒來。 |
 | [`wait`](/game/command-reference?id=wait) | 等待直到指定時段。 |
 
 In the web client, **等待／休息** offers dawn, full-recovery sleep, and
 custom rest in hours (up to 12 hours). Declared practice has a separate screen:
 open **角色狀態 → 技能書**, then choose **修煉** beside an active skill.
+
+夢境協作需明確選擇。文字客戶端使用 `sleep dream`，網頁客戶端在等待畫面選擇「睡眠並進入夢境協作」。一般睡眠、休息與等待不會開啟對話。安全檢查拒絕睡眠時也不會開啟夢境；已完全恢復時仍可透過零秒睡眠進入。
+
+夢境顯示場景與對方的話語，每次成功送達的回應才消耗交流額度，上限為六次。`dream say <文字>` 提出方向，`dream draft [故事方向]` 儲存私人草稿，`dream confirm [故事方向]` 明確確認並提交方向，`dream awaken` 醒來。六次用完後仍可儲存、確認與醒來。生成失敗或回應尚未送達時，醒來也不需模型服務。夢境交流與離開不會再推進時間或重複恢復身體。
 
 ## 戰鬥
 

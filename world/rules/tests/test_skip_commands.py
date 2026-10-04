@@ -257,6 +257,7 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
         clock = self._clock(seen, caller)
         command = CmdSleep()
         command.caller = caller
+        command.args = ""
         with (
             patch("commands.skip._safe_to_skip", return_value=True),
             patch("commands.skip.get_world_clock", return_value=clock),

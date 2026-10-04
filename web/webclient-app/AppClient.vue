@@ -39,6 +39,7 @@ import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
 import LettersPanel from "./components/LettersPanel.vue";
+import DreamPanel from "./components/DreamPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import CompanionLineup from "./components/CompanionLineup.vue";
 import { companionFigures } from "./components/companion-lineup.js";
@@ -441,6 +442,7 @@ function onFoeLineupGone() {
                 <h3>睡眠至完全恢復</h3>
                 <p>依目前恢復速度睡眠，實際時長由伺服器決定，受睡眠上限限制。</p>
                 <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-sleep')">開始睡眠</button>
+                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="dispatchIntent('explore.wait', { sleep: true, dream: true })">睡眠並進入夢境協作</button>
               </article>
               <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-rest' }">
                 <h3>休息 N 小時</h3>
@@ -509,6 +511,10 @@ function onFoeLineupGone() {
     <!-- The NPC author editor (npc-persona-editor-window) owns its drawer
          chrome: it binds to the target captured at 編輯人物設定 and guards a
          dirty close. -->
+    <HudDrawer v-if="panel('dream')?.state?.open" :open="true" title="夢境協作" drawer-key="dream"
+      @close="dispatchIntent('dream.awaken', { session_id: panel('dream').state.session_id, revision: panel('dream').state.revision })">
+      <DreamPanel :state="panel('dream').state" :store="store" />
+    </HudDrawer>
     <NpcPersonaEditor
       v-if="store.view.hudDrawer === 'npc_persona' && npcPersonaEditor.open"
       :editor="npcPersonaEditor"

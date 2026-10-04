@@ -256,6 +256,13 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `story_director_decision_rejected` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`tick`（warn 級；僅具體原因碼，不含提案文案，且不變更任何未授權狀態） |
 | `story_director_decision_stale` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`captured_revision`、`current_revision`、`tick`（warn 級；套用前重驗修訂衝突，不留部分狀態） |
 | `story_director_decision_conflict` | `decision_id`、`owner`、`source_kind`、`source_ref`、`thread_id`、`reason`、`arrangement_revision`、`tick`（warn 級；同一 thread 修訂已被既有橋段佔用，唯一約束裁決） |
+| `dream_sleep_associated` | `char`, `session_id`, `tick_from`, `tick_to`, `requested_seconds`, `completed`; actual committed sleep association, never prose |
+| `dream_surface_action` | `char`, `session_id`, `action`, `completed`, `tick`; delivered response or explicit draft/confirm/awaken boundary |
+| `dream_surface_rejected` | `char`, `session_id`, `action`, `reason`, exception chain when available; owner/control/revision or direction refusal, never input values |
+| `dream_surface_response_stale` | `char`, `session_id`, `action`; a late response whose original outstanding turn or control no longer matches |
+| `dream_surface_generation_unavailable` | `char`, `session_id`, `action`; degraded model response, draft and awakening remain available |
+| `dream_surface_generation_failed` | `char`, `session_id`, `action`, exception chain; generation/delivery failure, no player text or full prompts |
+| `dream_session_resumed` | `session_id`, `owner`, `completed`, `tick`; explicit later entry resumes unconfirmed discussion with the original count, never replays sleep |
 
 | `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
 | `quest_beat_publication_rejected` | `beat_id`, `snapshot_id`, `owner`; warning with sanitized exception type/message, no blueprint or prose-bearing chain |

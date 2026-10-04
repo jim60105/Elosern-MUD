@@ -263,6 +263,10 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
         if payload["sleep"] is not True:
             raise ExplorationActionError("explore.wait sleep must be the exact boolean true")
         return {"sleep": True}
+    if set(payload) == {"sleep", "dream"}:
+        if payload["sleep"] is not True or payload["dream"] is not True:
+            raise ExplorationActionError("dream sleep requires exact boolean true choices")
+        return {"sleep": True, "dream": True}
     raise ExplorationActionError("explore.wait requires exactly one of daypart, seconds, or sleep")
 
 
@@ -834,6 +838,8 @@ def _wait_adapter(
         seconds = payload["seconds"]
     else:
         seconds = seconds_to_full_regen(actor)
+    dream_clock = get_world_clock() if payload.get("dream") else None
+    tick_from = int(dream_clock.tick) if dream_clock is not None else None
     try:
         events = (
             advance_skip(actor, seconds, practice_skill=practice_skill)
@@ -842,7 +848,8 @@ def _wait_adapter(
     except Exception as exc:
         log_error("skip_failed", context={"char": actor.pk, "skill": practice_skill, "seconds": seconds}, exc=exc)
         return _rejected("skip_failed", "無法跳過時間。")
-    message = ("修煉結束。" if practice_skill is not None else "") + render_skip_summary(seconds, events)
+    settled_seconds = int(dream_clock.tick) - tick_from if dream_clock is not None else seconds
+    message = ("修煉結束。" if practice_skill is not None else "") + render_skip_summary(settled_seconds, events)
     actor.msg(message)
     # Rest-point nomination trigger (title-system D4 §7.1, change G): the
     # service helper gates on a day-boundary event and never raises. The
@@ -850,6 +857,12 @@ def _wait_adapter(
     from server.title_nomination_service import schedule_rest_boundary_nomination
 
     schedule_rest_boundary_nomination(actor, events)
+    if dream_clock is not None:
+        from server.dream_service import enter_after_sleep
+        enter_after_sleep(
+            actor, tick_from=tick_from, tick_to=int(dream_clock.tick),
+            requested_seconds=seconds, events=events,
+        )
     return _success("skipped", message, AFFECTED_FULL)
 
 
