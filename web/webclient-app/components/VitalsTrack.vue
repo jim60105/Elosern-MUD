@@ -252,7 +252,7 @@ watch(
      input, keycaps, badges, and map art — gauge values stay sans. */
   font-family: var(--f-num);
   font-variant-numeric: tabular-nums lining-nums;
-  /* 1.2, not 1: the reading mixes the 16px current value with the 12px
+  /* 1.2, not 1: the reading mixes the 17px current value with the 16px
      maximum on a shared baseline, and a unit line-box makes the smaller
      inline box overflow its parent's content box by a few pixels. */
   line-height: 1.2;
@@ -273,7 +273,9 @@ watch(
 }
 .num .max {
   color: var(--paper-500);
-  font-size: calc(12px * var(--ui-scale));
+  /* The floor step: the maximum never renders below 16 CSS px
+     (retarget-desktop-viewport-contract D4). */
+  font-size: var(--text-xs);
 }
 
 .low-mark {
@@ -282,7 +284,7 @@ watch(
   border: 1px solid var(--seal-600);
   border-radius: 2px;
   color: var(--crit);
-  font: 700 calc(12px * var(--ui-scale))/1.2 var(--f-sans);
+  font: 700 var(--text-xs)/1.2 var(--f-sans);
   letter-spacing: 0.1em;
 }
 

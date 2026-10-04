@@ -502,8 +502,9 @@ defineExpose({ focus });
   align-items: center;
   gap: calc(14px * var(--ui-scale));
   box-sizing: border-box;
-  /* 44px at the 1080px reference height, 36px at 720px, so the seven rows
-     of a four-pick conversation fit the shortest stage unscrolled. */
+  /* 36px at the 1451x790 reference height and below, growing to 44px on a
+     taller stage, so the seven rows of a four-pick conversation fit the
+     reference stage unscrolled. */
   min-height: clamp(36px * var(--ui-scale), 4.075vh, 44px * var(--ui-scale));
   padding: calc(4px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(26px * var(--ui-scale));
   border: 1px solid transparent;
@@ -579,7 +580,10 @@ defineExpose({ focus });
 
 .dialogue-choices__row:not(.dialogue-choices__row--pick) .dialogue-choices__label {
   font-family: var(--f-sans);
-  font-size: clamp(15px * var(--ui-scale), 1.574vh, 17px * var(--ui-scale));
+  /* The command rows' lower bound is the shared 16px floor
+     (retarget-desktop-viewport-contract D4): a 15px bound would render below
+     it at the reference. */
+  font-size: clamp(16px * var(--ui-scale), 1.574vh, 17px * var(--ui-scale));
   letter-spacing: 0.04em;
   color: var(--paper-300);
 }

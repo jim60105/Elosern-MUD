@@ -362,9 +362,11 @@ body {
 .elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale)); border-radius: var(--radius-sm); }
 
 @media (max-width: 1350px) {
-  /* 246px keeps the map anchor (right column - 28px) exactly as wide as the
-     218px minimap card (webclient-avg-stage-hud-anchors design D1). */
-  :root { --left-column: calc(216px * var(--ui-scale)); --right-column: calc(246px * var(--ui-scale)); }
+  /* 278px keeps the map anchor (right column - 28px) exactly as wide as the
+     250px minimap card — the 240px canvas plus its padding and hairline
+     (webclient-avg-stage-hud-anchors design D1;
+     retarget-desktop-viewport-contract D7). */
+  :root { --left-column: calc(216px * var(--ui-scale)); --right-column: calc(278px * var(--ui-scale)); }
   /* The brand row fits the 216px column (design D1). */
   .topbar-wordmark { font-size: var(--text-base); letter-spacing: .14em; margin-right: -.14em; }
   .elosern-root .topbar-brand { padding-inline: calc(16px * var(--ui-scale)); gap: calc(10px * var(--ui-scale)); }

@@ -190,7 +190,7 @@
 .npe-capacity__note {
   margin: calc(3px * var(--ui-scale)) 0 0;
   color: var(--paper-700);
-  font-size: calc(11px * var(--ui-scale));
+  font-size: var(--text-xs);
   letter-spacing: .06em;
 }
 
@@ -387,7 +387,7 @@
 }
 .npe-badge {
   padding: calc(1px * var(--ui-scale)) calc(7px * var(--ui-scale));
-  font-size: calc(11px * var(--ui-scale));
+  font-size: var(--text-xs);
   letter-spacing: .14em;
   border-radius: var(--radius-pill);
   border: 1px solid var(--ink-600);
@@ -484,7 +484,7 @@
   gap: calc(12px * var(--ui-scale));
   margin: calc(8px * var(--ui-scale)) 0 calc(-2px * var(--ui-scale));
   color: var(--gold-500);
-  font-size: calc(10px * var(--ui-scale));
+  font-size: var(--text-xs);
 }
 .npe-divider::before,
 .npe-divider::after {

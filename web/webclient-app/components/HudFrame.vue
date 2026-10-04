@@ -335,8 +335,9 @@ defineExpose({ menuOpen });
 }
 /* The insets (webclient-dialogue-stage-actors): 6% of the stage width,
    grown where the island column on that side would cover the figure's face
-   (`--actor-left-inset` / `--actor-right-inset` in tokens.css; exactly 6% at
-   1920x1080). */
+   (`--actor-left-inset` / `--actor-right-inset` in tokens.css; at the
+   1451x790 reference both take their column-clearance value, so the 6% term
+   acts only as the floor). */
 .elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); overflow: visible; }
 .elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
 /* The foe line-up (webclient-combat-foes-on-stage D2) grows leftward from
