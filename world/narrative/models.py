@@ -538,3 +538,131 @@ class StoryThreadRevision(models.Model):
 
     def __str__(self) -> str:
         return f"StoryThreadRevision(thread={self.thread_id}, rev={self.revision_number}, {self.operation})"
+
+
+class ImmutableAuthoringDraftQuerySet(models.QuerySet):
+    """Drafts change only through the authoring operations, never by bulk rewrite."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Authoring drafts change only through the authoring operations.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Authoring drafts change only through the authoring operations.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Authoring drafts are durable and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Authoring drafts cannot be conflict-updated through bulk insert.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class AuthoringDraft(models.Model):
+    """Private creative discussion; never in-world knowledge.
+
+    ``draft_id``, ``owner_id`` and ``created_tick`` are immutable. Every content
+    change advances ``revision``; ``confirmed_revision`` records the revision of
+    the last explicitly confirmed version, so ``confirmed_revision == revision``
+    means the current version is confirmed and a later edit is unconfirmed again.
+    """
+
+    objects = ImmutableAuthoringDraftQuerySet.as_manager()
+
+    draft_id = models.CharField(max_length=128, unique=True, db_index=True)
+    owner_id = models.CharField(max_length=255, db_index=True)
+    direction = models.JSONField(default=dict)
+    sources = models.JSONField(default=list)
+    revision = models.BigIntegerField(default=1)
+    confirmed_revision = models.BigIntegerField(null=True)
+    created_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = AuthoringDraft.objects.get(pk=self.pk)
+            if (
+                original.draft_id != self.draft_id
+                or original.owner_id != self.owner_id
+                or original.created_tick != self.created_tick
+            ):
+                raise ValueError(
+                    "AuthoringDraft identity, owner and creation tick are immutable."
+                )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Authoring drafts are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_authoring_drafts"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"AuthoringDraft({self.draft_id}, owner={self.owner_id}, rev={self.revision})"
+
+
+class ImmutableCreativeRequestQuerySet(models.QuerySet):
+    """Reject every rewrite path for confirmed request versions."""
+
+    def update(self, *args, **kwargs):
+        raise ValueError("Confirmed creative requests are immutable.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("Confirmed creative requests are immutable.")
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Confirmed creative requests are durable and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValueError("Confirmed creative requests are immutable.")
+        return super().bulk_create(objs, **kwargs)
+
+
+class CreativeRequest(models.Model):
+    """An immutable, deterministically validated request version.
+
+    One row exists per confirmed draft revision. ``submission_key`` (derived from
+    ``draft_id`` and ``version``) is the unique submission identity, so a repeated
+    confirmation or a restart returns the same row instead of submitting twice;
+    the unique ``(draft, version)`` constraint is the durable backstop.
+    """
+
+    objects = ImmutableCreativeRequestQuerySet.as_manager()
+
+    submission_key = models.CharField(max_length=160, unique=True, db_index=True)
+    draft = models.ForeignKey(
+        AuthoringDraft, on_delete=models.PROTECT, related_name="requests"
+    )
+    owner_id = models.CharField(max_length=255, db_index=True)
+    version = models.BigIntegerField()
+    direction = models.JSONField(default=dict)
+    sources = models.JSONField(default=list)
+    validation_status = models.CharField(max_length=16, default="valid")
+    submitted_tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValueError("Confirmed creative requests are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Confirmed creative requests are durable and cannot be deleted.")
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_authoring_requests"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["draft", "version"],
+                name="unique_creative_request_version",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"CreativeRequest({self.submission_key}, owner={self.owner_id}, v={self.version})"

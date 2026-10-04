@@ -396,3 +396,65 @@ counts, ticks, and revisions only — never summaries, commitments, or letter
 text. Delta-only coverage IDs for this boundary are obtained and annotated by
 the later spec-sync owner after the delta spec reaches `openspec/specs/`; this
 change annotates its substantive tests against existing canonical main IDs.
+
+## Private dream authoring records (W3)
+
+`world.narrative.authoring` owns the authoring boundary. An `AuthoringDraft` is
+a private record of a negotiated direction: immutable `draft_id`, `owner_id`
+and `created_tick`, the desired `direction`, durable `sources`, a monotonic
+`revision`, and `confirmed_revision`. A `CreativeRequest` is an immutable,
+versioned request created only by confirmation. Both are authoring data, never
+in-world knowledge: they confer no clues, items, quest progress, persistent
+stat changes, skill advancement, buffs, or codex unlocks, and the module
+creates no `NarrativeEvent`, `ProjectionProgress`, or `MemoryRecord`, so a
+private discussion is absent from cognition and recall by construction. The
+module imports nothing from `world.ai` and opens no transport; confirmation is
+deterministic and works with every generation service offline.
+
+Confirmation is explicit and versioned. `save_draft` creates a draft, or
+updates its content and advances `revision`; content is never silently
+discarded (an identical save is a no-op). `draft.confirmed_revision ==
+draft.revision` means the current version is confirmed, so editing a confirmed
+draft makes the new version unconfirmed again and always requires a new
+confirmation. `confirm_draft` validates the current version, then creates one
+`CreativeRequest` whose `submission_key` is `"{draft_id}:v{version}"`. A repeat
+confirmation of the same version — including after reconnect — returns that
+same row without a second submission; the unique `submission_key` and
+`(draft, version)` constraints are the durable "submit once" guarantee, not the
+row lock (`select_for_update` is kept for backends that support it, SQLite
+ignores it). The previously confirmed version stays authoritative and immutable
+until a newer version is confirmed; an unconfirmed edit does not retract it.
+A draft itself schedules nothing.
+
+Validation is deterministic and concrete. `validate_direction` reads only
+durable rows and returns either a normalized direction or named reason codes
+with player-facing messages: referenced `thread_id` must exist, be owned by the
+requesting owner (`thread_accessible`), and not be in a terminal state;
+committed-history targets must exist and are then rejected as
+`committed_history_rewrite` (personality and outcome rewrites have their own
+codes); any requested `effects` are `unauthorized_effects`; shape, bounds and
+unknown keys are `malformed_direction`/`malformed_participants`. A refusal
+changes no durable state — `DirectionValidationError` carries the reasons and
+the draft keeps its stored direction, so re-running validation reproduces the
+same reason rather than reading a stored status that could go stale. Approval
+is direction, not outcome: `new_story` directions unrelated to prior
+experience are valid and simply become eligible only after explicit
+confirmation.
+
+Access is owner-scoped. `get_draft`/`get_request` raise `AuthoringAccessError`
+for a foreign or missing record, and `list_drafts`/`list_requests` return only
+the owner's rows. `collaborator_creative_brief` is the spoiler-filtered read
+model for the collaborator: the latest confirmed version's summary and
+preference fields only, with no source references, validation internals, other
+owners' data, or StoryDirector-hidden answers (this record model has none). A
+deterministic recency key (`submitted_tick`, then the durable monotonic row id)
+makes `latest_confirmed_request` resolve same-tick submissions to the later
+submission, so a caller-supplied `draft_id` cannot steer it.
+
+Boundary events (`narrative_authoring_draft_saved`,
+`narrative_authoring_draft_edited`, `narrative_authoring_validation_rejected`,
+`narrative_authoring_request_submitted`) carry identifiers, counts, ticks and
+reason codes only — never the direction summary, themes, or a reason message.
+Delta-only coverage IDs for this boundary are obtained and annotated by the
+later spec-sync owner after the delta spec reaches `openspec/specs/`; this
+change annotates its substantive tests against existing canonical main IDs.
