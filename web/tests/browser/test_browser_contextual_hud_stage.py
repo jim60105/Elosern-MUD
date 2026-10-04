@@ -707,7 +707,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             for scale in (1, 1.125, 1.25):
                 page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
                 geo = page.evaluate(
-                    """() => {
+                    """(S) => {
                       const byId = (sel) => {
                         const el = document.querySelector(sel);
                         return el && el.getBoundingClientRect();
@@ -738,10 +738,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         hits.push("not-on-band-top");
                       }
                       // The vitals dock stands on the same band edge
-                      // (vitals-bar-redesign): the row starts 16px past the
-                      // dock anchor's right edge.
+                      // (vitals-bar-redesign): the row starts 16px * S past
+                      // the dock anchor's right edge, a chrome gap.
                       const vitalsCol = targets.vitals;
-                      const leftCol = vitalsCol ? vitalsCol.right + 16 : null;
+                      const leftCol = vitalsCol ? vitalsCol.right + 16 * S : null;
                       return {
                         hits,
                         height: cmd.height,
@@ -750,7 +750,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         leftCol,
                         messageRight: targets.messageRegion ? targets.messageRegion.right : null,
                       };
-                    }"""
+                    }""",
+                    ui_scale(viewport),
                 )
                 self.assertEqual(
                     geo["hits"],
@@ -912,11 +913,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     self.assertGreaterEqual(m["top"], strip["top"] - 0.5, where)
                     self.assertLessEqual(m["bottom"], strip["bottom"] + 0.5, where)
                     self.assertGreaterEqual(m["left"], strip["left"], where)
-                    self.assertLessEqual(m["right"], geo["logLeft"] - 4, f"marker touches 日誌 at {where}")
+                    # The strip's own clamp (--band-strip-actions-w) keeps the
+                    # marker off the 日誌 control; at the A+ prose step the
+                    # clamp binds, and the contract is pairwise disjointness
+                    # with the suite's 1px rounding slack.
+                    self.assertLessEqual(m["right"], geo["logLeft"] - 1, f"marker touches 日誌 at {where}")
                     # The marker ends at the centred column's edge, or at the
-                    # controls' clamp when the column runs under them.
+                    # controls' clamp when the column runs under them
+                    # (--band-strip-actions-w = 104px * S).
                     self.assertAlmostEqual(
-                        m["right"], min(geo["columnRight"], strip["right"] - 104), delta=3,
+                        m["right"],
+                        min(geo["columnRight"], strip["right"] - 104 * ui_scale(viewport)),
+                        delta=3,
                         msg=f"marker edge at {where}",
                     )
                     if scale == 1 and geo["page"] == 1:

@@ -487,6 +487,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(result["insideCanvasCount"], 0)
         for text in result["texts"]:
             self.assertIn("…", text)
-            self.assertEqual(len(text), 11)
+            # The overlay's marker-name step is the shared 16-unit legibility
+            # floor (retarget D7); against the same, unchanged gutter the
+            # 14-glyph names truncate to eight glyphs plus the ellipsis.
+            self.assertEqual(len(text), 9)
 
         page.close()

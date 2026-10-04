@@ -280,12 +280,21 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     f"dot field fill must reference grid pattern, got {dot_fill}"
                 )
 
-                # Task 3.1: canvas spans roughly 5 coordinate cells across (~206 / 40 ≈ 5.15)
+                # Task 3.1 re-derived (retarget D7): the island's square is 240
+                # user units and its declared pitch is 40, so the canvas can
+                # never span more than 240 / 40 = 6 coordinate cells; the
+                # 16-unit labels' clearance term (a four-glyph pair needs
+                # ~65 units) can widen the drawn pitch, so it spans at least
+                # 240 / (5 × 16) = 3.
                 pattern_width = float(page.locator("defs pattern").first.get_attribute("width"))
                 canvas_user_width = float(page.locator('[data-testid="local-map__lattice"]').get_attribute("width"))
                 cells_across = canvas_user_width / pattern_width
-                self.assertGreaterEqual(cells_across, 4.0, f"cells across {cells_across} must be >= 4.0")
-                self.assertLessEqual(cells_across, 5.5, f"cells across {cells_across} must be <= 5.5")
+                self.assertGreaterEqual(
+                    cells_across, 240.0 / (5 * 16), f"cells across {cells_across} must be >= 3"
+                )
+                self.assertLessEqual(
+                    cells_across, 240.0 / 40.0, f"cells across {cells_across} must be <= 6"
+                )
 
                 # Task 3.2: Contrast gate (band from spec: >= 1.15 everywhere, >= 1.35 inner field, <= connector edge)
                 tokens = page.evaluate("""() => {
@@ -491,7 +500,9 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     msg="the readout states its figure at the island's smallest type step",
                 )
                 self.assertLessEqual(
-                    ladder["scale"], 1, "coordinate margin never magnifies the drawing"
+                    ladder["scale"],
+                    ui_scale(viewport) + 1e-3,
+                    "the drawing is never magnified past the island's own chrome scale",
                 )
                 self.assertTrue(ladder["markerNames"], "at least one marker name is drawn")
                 for size in ladder["markerNames"]:

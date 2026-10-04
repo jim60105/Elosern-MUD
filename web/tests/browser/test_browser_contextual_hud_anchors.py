@@ -200,7 +200,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         card: r('[data-testid="dialogue-choices"]'),
                         band: r('[data-testid="stage-band"]'),
                         commandLine: r('[data-anchor="command-line"]'),
-                        caption: r('.scene-backdrop__plate'),
+                        caption: (() => {
+                          const el = document.querySelector('.scene-backdrop__plate');
+                          if (!el) return null;
+                          const b = el.getBoundingClientRect();
+                          const cs = getComputedStyle(el);
+                          const kids = [...el.children].map((k) => k.getBoundingClientRect().height);
+                          return {
+                            left: b.left, right: b.right, top: b.top, bottom: b.bottom,
+                            chrome: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+                              + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth),
+                            contentMax: kids.length ? Math.max(...kids) : 0,
+                          };
+                        })(),
                         rows: document.querySelectorAll('[data-testid="dialogue-choices"] [role="menuitem"]').length,
                         scrollable: rows.scrollHeight > rows.clientHeight + 1,
                         width: innerWidth,
@@ -210,7 +222,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(geo["rows"], 7)
                 self.assertAlmostEqual((geo["anchor"]["left"] + geo["anchor"]["right"]) / 2, geo["width"] / 2, delta=1.0)
                 self.assertAlmostEqual((geo["card"]["left"] + geo["card"]["right"]) / 2, geo["width"] / 2, delta=1.0)
-                self.assertLessEqual(geo["card"]["right"] - geo["card"]["left"], min(560, 0.4 * geo["width"]) + 1)
+                # The choices anchor is min(560px * S, 40%) wide (HudFrame D6).
+                self.assertLessEqual(
+                    geo["card"]["right"] - geo["card"]["left"],
+                    min(560 * ui_scale(viewport), 0.4 * geo["width"]) + 1,
+                )
                 self.assertGreaterEqual(geo["card"]["top"], 48)
                 self.assertLessEqual(geo["card"]["bottom"], geo["commandLine"]["top"], "the list clears the expanded command line")
                 self.assertLessEqual(geo["anchor"]["bottom"], geo["commandLine"]["top"])
@@ -218,7 +234,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 # command line, so the caption is never painted over; the
                 # over-long label and alt keep that row one line tall.
                 self.assertIsNotNone(geo["caption"], "the committed scene's caption renders")
-                self.assertLessEqual(geo["caption"]["bottom"] - geo["caption"]["top"], 34.5)
+                # One line tall: the plate is its content's line box plus its
+                # own padding and border (the `--scene-caption-h` floor is a
+                # min-height, and the type ramp's 16px step lifts the line).
+                self.assertLessEqual(
+                    geo["caption"]["bottom"] - geo["caption"]["top"],
+                    geo["caption"]["chrome"] + geo["caption"]["contentMax"] + 1,
+                    "the caption row stays one line tall",
+                )
                 self.assertLessEqual(geo["card"]["bottom"], geo["caption"]["top"], "the list covers the scene caption")
                 self.assertLessEqual(geo["caption"]["bottom"], geo["commandLine"]["top"])
                 self.assertFalse(self._anchors_overlap(page), f"stage anchors overlap with the choice list at {viewport}")
