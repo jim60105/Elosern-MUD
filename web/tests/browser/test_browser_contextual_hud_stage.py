@@ -203,6 +203,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _inject_snapshot(page, {"art": art}, mode="exploration")
         _wait_mode(page, "exploration")
 
+        # The store gate only proves the snapshot committed: Vue mounts the
+        # backdrop image after the decoder settles (decode-then-swap, design
+        # D2), so a one-shot read right after the gate can land before the
+        # mount on a loaded runner. Gate on the terminal DOM state — the image
+        # mounted, or the honest load-failure placeholder — then snapshot.
+        page.wait_for_function(
+            """() => !!document.querySelector('[data-testid="scene-backdrop-image"]')
+                || document.querySelector('[data-testid="scene-backdrop-placeholder"]')
+                       ?.getAttribute("data-kind") === "load_failed\"""",
+            timeout=15000,
+        )
+
         # Read the committed scene URL straight from the DOM in a single
         # (existence + attribute) DOM read instead of `get_attribute`, which
         # auto-waits on the image element. The fixture URL is not a served art
