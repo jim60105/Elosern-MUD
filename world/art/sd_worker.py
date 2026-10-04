@@ -197,6 +197,7 @@ def build_txt2img_request(subject: ArtSubject, description: str) -> dict[str, An
         "cfg_scale": float(settings.ART_SD_CFG_SCALE),
         "width": width,
         "height": height,
+        "save_images": settings.ART_SD_SERVER_RETAIN_IMAGES,
         "override_settings": override,
         "override_settings_restore_afterwards": True,
     }

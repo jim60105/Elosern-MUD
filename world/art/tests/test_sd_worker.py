@@ -126,8 +126,9 @@ class RequestBuildingTests(unittest.TestCase):
     @covers_requirement(
         "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
     )
-    def test_default_retention_omits_suppression_fields(self):
+    def test_enabled_retention_requests_server_saving_without_suppression(self):
         request = build_txt2img_request(_scene(), "desc")
+        self.assertIs(request["save_images"], True)
         self.assertNotIn("do_not_save_samples", request)
         self.assertNotIn("do_not_save_grid", request)
         self.assertNotIn("do_not_save_samples", request["override_settings"])
@@ -139,6 +140,7 @@ class RequestBuildingTests(unittest.TestCase):
     def test_disabled_retention_sets_top_level_suppression_fields(self):
         with override_settings(ART_SD_SERVER_RETAIN_IMAGES=False):
             request = build_txt2img_request(_scene(), "desc")
+        self.assertIs(request["save_images"], False)
         self.assertIs(request["do_not_save_samples"], True)
         self.assertIs(request["do_not_save_grid"], True)
         self.assertNotIn("do_not_save_samples", request["override_settings"])

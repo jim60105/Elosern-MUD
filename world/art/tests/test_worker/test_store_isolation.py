@@ -86,6 +86,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             with self._client(SDWebUIClient(transport=transport)):
                 dispatched = drain_synchronous(10)
         self.assertEqual(dispatched, 1)
+        self.assertIs(captured["request"]["save_images"], False)
         self.assertIs(captured["request"]["do_not_save_samples"], True)
         self.assertIs(captured["request"]["do_not_save_grid"], True)
         record = self._record_for(subject)
