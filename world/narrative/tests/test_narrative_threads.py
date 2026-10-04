@@ -143,6 +143,16 @@ class StoryThreadLifecycleTests(StoryThreadTestCase):
         self.assertIn("護送商隊抵達驛站。", thread.factual_summary)
         self.assertEqual(thread.unresolved_questions, ["誰搬走了貨物？"])
 
+        # Replaying an identical commitment is not an effective change.
+        replayed_revision = get_thread("thread_barrel_01").revision
+        establish_commitment(
+            thread_id="thread_barrel_01",
+            source_event_id="synthetic:thread:protect:1",
+            text="已答應護送尤漢娜返家。",
+            tick=101,
+        )
+        self.assertEqual(get_thread("thread_barrel_01").revision, replayed_revision)
+
         revision = revise_thread_facts(
             thread_id="thread_barrel_01",
             unresolved_questions=["貨物是誰搬走的？"],
@@ -311,7 +321,7 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
         self.assertEqual(get_thread("thread_letters_01").commitments, [])
 
         # The delivery occurrence is a statement channel: it cannot commit anyone.
-        NarrativeEvent.objects.create(
+        record_narrative_event(
             source_id="correspondence:synthetic:letter:willing:1:delivered",
             event_type="correspondence_delivery",
             content={"letter_source_id": letter.source_id, "status": "delivered"},
@@ -327,6 +337,36 @@ class StoryThreadLinkageTests(StoryThreadTestCase):
                 tick=100,
             )
         self.assertEqual(get_thread("thread_letters_01").commitments, [])
+
+    @covers_requirement("correspondence-memory::letters-preserve-claims-and-channel-provenance")
+    def test_every_statement_channel_is_rejected_as_a_commitment_source(self):
+        """The statement-channel deny list is enforced per channel, not by shape."""
+        self.create_owner_thread("thread_channels_01")
+        statement_channels = (
+            "claim_receipt",
+            "correspondence_delivery",
+            "correspondence_read",
+            "private_authoring",
+        )
+        for index, event_type in enumerate(statement_channels):
+            with self.subTest(event_type=event_type):
+                source_id = f"synthetic:thread:channel:{index}"
+                record_narrative_event(
+                    source_id=source_id,
+                    event_type=event_type,
+                    content={"statement": "合成聲明。"},
+                    participants=[self.owner.pk],
+                    tick=100,
+                    visibility="private",
+                )
+                with self.assertRaises(NarrativeThreadCommitmentError):
+                    establish_commitment(
+                        thread_id="thread_channels_01",
+                        source_event_id=source_id,
+                        text=f"由 {event_type} 建立的承諾。",
+                        tick=100,
+                    )
+        self.assertEqual(get_thread("thread_channels_01").commitments, [])
 
     @covers_requirement("narrative-memory::cognition-is-owner-scoped-and-provenance-preserving")
     def test_real_linkage_across_channels_preserves_durable_provenance(self):
@@ -507,6 +547,12 @@ class StoryThreadRevisionTests(StoryThreadTestCase):
             get_context_snapshot(snapshot.snapshot_id).thread_revisions,
             {"thread_rev_01": link_revision},
         )
+        persisted_source = next(
+            row
+            for row in get_context_snapshot(snapshot.snapshot_id).sources
+            if row["source_id"] == "synthetic:thread:rev:memory:1"
+        )
+        self.assertEqual(persisted_source["thread_revision"], link_revision)
 
         # An effective thread change advances the revision...
         new_revision = revise_thread_facts(
