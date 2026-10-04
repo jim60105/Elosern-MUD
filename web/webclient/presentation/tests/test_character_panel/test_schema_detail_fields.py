@@ -82,8 +82,9 @@ class CharacterSchemaTests(unittest.TestCase):
 
 
     def test_worst_case_active_rows_with_detail_fields_fit_the_envelope(self):
-        # Every one of the 32 active rows carries cost + target_spec +
-        # usable_out_of_combat + the full five-entry freeform_scales set.
+        # Every one of the MAX_ACTIVE_ROWS active rows carries cost +
+        # target_spec + usable_out_of_combat + the full five-entry
+        # freeform_scales set.
         actives = _skill_categories_enriched(
             [f"active_{i}" for i in range(MAX_ACTIVE_ROWS)], cost={"mp": 12}
         )

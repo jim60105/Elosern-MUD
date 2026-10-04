@@ -34,6 +34,25 @@ def _unlock_free_act_keys():
     )
 
 
+def _cap_roster_rows(count=40):
+    """File-local ACTIVE rows cloning the kit's element-anchored template.
+
+    The presenter regression needs a registry-backed active roster above the
+    old 32-row bound. Each row extends the kit burst (own element, own damage
+    effect, one category group) so it validates through the same enrichment
+    path as a real catalogue row, without naming shipped content.
+    """
+    from dataclasses import replace
+
+    base = SYNTH_SKILLS["t_ember_burst"]
+    return {
+        f"t_cap_row_{index:02d}": replace(
+            base, key=f"t_cap_row_{index:02d}", label=f"合成上限列{index}"
+        )
+        for index in range(count)
+    }
+
+
 def _innate_key(dotted: str, attribute: str) -> str:
     return _live_registry(dotted, attribute)
 

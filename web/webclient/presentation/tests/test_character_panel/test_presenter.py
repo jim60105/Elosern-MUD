@@ -20,6 +20,7 @@ from ._support import (
     _T_PANEL_RITE_A,
     _T_PANEL_RITE_B,
     _T_THORN,
+    _cap_roster_rows,
     _context,
     _element_mastery_key,
     _flattened_keys,
@@ -398,6 +399,46 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             fallback["groups"][0]["skills"][0],
             {"key": "no_such_skill", "label": "no_such_skill"},
         )
+
+
+    @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
+    def test_progressed_active_roster_above_32_renders_the_available_panel(self):
+        # The regression: a roster the read model legitimately assembles above
+        # the old 32-row bound (stored keys + the innate grants + the
+        # unlock-free catalogue act) must render the available panel with
+        # every row present — never the internal-unavailable fail-closed
+        # payload the old bound produced for a progressed character.
+        rows = _cap_roster_rows()
+        stored = sorted(rows)
+        with patch.dict(_live_skill_registry(), rows):
+            self.player.db.skills = {"active": stored, "passive": []}
+            payload = self._render()
+        self.assertTrue(payload["available"])
+        flattened = _flattened_keys(payload["actives"])
+        expected = {
+            *stored,
+            _innate_key("world.rules.disengage", "FLEE_SKILL" + "_KEY"),
+            _innate_key("world.rules.combat_session", "BASIC" + "_ATTACK_KEY"),
+            *_unlock_free_act_keys(),
+        }
+        self.assertGreater(len(expected), 32)
+        self.assertEqual(sorted(flattened), sorted(expected))
+        # Every row survives the full validator, enriched like any registry
+        # row rather than degrading to the bare unregistered-key shape.
+        row = next(
+            r
+            for c in payload["actives"]
+            for g in c["groups"]
+            for r in g["skills"]
+            if r["key"] in rows
+        )
+        self.assertEqual(
+            set(row),
+            {"key", "label", "cost", "target_spec", "usable_out_of_combat"},
+        )
+        self.assertEqual(row["cost"], {"mp": 12})
+        self.assertEqual(row["target_spec"], "single")
+        self.assertIs(row["usable_out_of_combat"], True)
 
     @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
     def test_holy_rite_rows_list_in_seventh_group_under_client_bound(self):

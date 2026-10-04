@@ -29,7 +29,10 @@ var TARGET_SPECS = C.TARGET_SPECS;
 // ---------------------------------------------------------------------------
 
 var CHARACTER_MAX_TRAIT_ROWS = 32;
-var CHARACTER_MAX_ACTIVE_ROWS = 32;
+// Actives absorb the act-catalogue unlock flood; passives do not, so the
+// two flattened-row bounds are deliberately asymmetric (mirror of the
+// server's MAX_ACTIVE_ROWS/MAX_PASSIVE_ROWS).
+var CHARACTER_MAX_ACTIVE_ROWS = 96;
 var CHARACTER_MAX_PASSIVE_ROWS = 32;
 var CHARACTER_MAX_EQUIPMENT_ROWS = 32;
 var CHARACTER_MAX_DISPLAYED_ROWS = 32;

@@ -87,7 +87,13 @@ MAX_TRAIT_ROWS = 32
 # The per-stat breakdown-layer bound mirrored by the wire validators (the
 # read model's own bound lives in ``world.rules.status_query``).
 MAX_LAYERS_PER_STAT = 16
-MAX_ACTIVE_ROWS = 32
+# The actives bound is deliberately wider than the passive bound: actives
+# absorb the act-catalogue unlock flood (stored keys, innate grants, and
+# every unlocked catalogue act), so the old 32 failed closed on well-formed
+# progressed characters. Passives never receive those rows, so 32 stays.
+# The flattened-row check remains a fail-closed wire guard, never a
+# truncation mechanism; the byte envelope is the true payload ceiling.
+MAX_ACTIVE_ROWS = 96
 MAX_PASSIVE_ROWS = 32
 # The category-group count bound equals the number of SkillCategory members
 # plus one: the extra slot is the presentation-only synthetic fallback group

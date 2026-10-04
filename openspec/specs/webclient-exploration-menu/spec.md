@@ -186,12 +186,16 @@ skills of that kind (active or passive) SHALL be omitted from the corresponding 
 category whose skills carry no `group` SHALL emit exactly one sub-group with a `null` group key and
 label. Within each sub-group, skill rows SHALL be ordered as `SkillHandler.owned_keys()` returns
 them, without alphabetical reordering. The total count of skill rows across every category and
-sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 32 for `actives`,
-tracked as independent bounds; these bounds apply to the flattened totals, not to the count of
-top-level category-group entries in either array, which is separately bounded by the number of
-`SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic
-fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning
-skills in every real category plus one unregistered key still renders.
+sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 96 for `actives`,
+tracked as independent bounds; the 96-row actives bound is sized above every
+registry-authorizable active row an actor can hold plus headroom, so a legitimately progressed
+character never trips it — the bound remains a fail-closed wire guard, not a truncation mechanism,
+and the panel SHALL NEVER drop, clip, or reorder rows to fit it. These bounds apply to the
+flattened totals, not to the count of top-level category-group entries in either array, which is
+separately bounded by the number of `SkillCategory` members plus exactly one — the extra slot
+carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys absent from
+`SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered key still
+renders.
 
 #### Scenario: Innate active skills are visible for the first time
 - **WHEN** the character panel is built for a freshly created character with no imported skill data
@@ -222,9 +226,23 @@ skills in every real category plus one unregistered key still renders.
 
 #### Scenario: The flattened row-count bound rejects a payload whose total exceeds the limit even when its category-group count is small
 - **WHEN** a hand-constructed `passives` (or `actives`) payload has few top-level category-group
-  entries but a flattened total row count across all of their sub-groups exceeding 32
+  entries but a flattened total row count across all of their sub-groups exceeding that array's
+  bound — more than 32 for `passives`, more than 96 for `actives`
 - **THEN** validation rejects the payload, because the bound applies to the flattened total, not to
   the count of top-level category-group entries
+
+#### Scenario: The actives flattened bound admits exactly 96 rows and rejects 97
+- **WHEN** a hand-constructed `actives` payload carries exactly 96 flattened skill rows across its
+  sub-groups, and a second payload carries 97
+- **THEN** the 96-row payload passes validation and the 97-row payload is rejected, while an
+  equally-shaped `passives` payload of 33 rows is still rejected under its independent 32 bound
+
+#### Scenario: A progressed character's full active roster renders the available panel
+- **WHEN** the character panel is built for an actor whose read model legitimately assembles more
+  than 32 active skill rows — stored keys, innate grants, and unlocked act-catalogue skills
+  together exceeding 32 (e.g. 61 rows) — yet staying within the 96 bound
+- **THEN** the `character` panel reports `available` true with every active row present in the
+  grouped shape, with no row dropped, clipped, or reordered to fit the bound
 
 #### Scenario: A skill key absent from the registry degrades to its own key rather than raising
 - **WHEN** an entity's stored skill data names a key absent from `SKILL_REGISTRY`

@@ -58,6 +58,11 @@ fabricating an unbounded payload, and fail-closed discipline is a contract prope
 rejection boundary far from today's legitimate maximum (61 observed) yet far below envelope
 saturation.
 
+Re-verified at implementation time: `SEXUAL_ACT_REGISTRY` holds 66 rows (all ACTIVE-kind), the
+`SexualMasteryEffect` blanket unlocks 58 of them, and the innate grants add 2, so the worst
+legitimate roster observed (悠奈) is 61 rows — 35 below the new bound. Re-derive this inventory
+whenever the act catalogue grows; 96 is sized for that headroom, not for today's count alone.
+
 ### D2: `schema_version` stays 7 — no bump
 
 The payload *shape* is byte-identical: same keys, same grouping rules, same ordering rules, same
@@ -71,11 +76,13 @@ touching the "version-7" registration.
 
 ### D3: `MAX_PASSIVE_ROWS` stays 32 — explicit, not accidental
 
-Passives cannot reach the cap: the PASSIVE side of `SKILL_REGISTRY` has 37 members total (37
-verified live) and none arrive through the act-unlock flood path; the observed live passive count
-for the worst character is 8. Widening a bound that is never approached would only enlarge the
-attack/fabrication surface of a guard that works, so 32 stays — don't widen what isn't broken.
-The delta spec states both numbers side by side so the asymmetry is deliberate and visible.
+Passives never approach the cap in practice: the PASSIVE side of `SKILL_REGISTRY` has 37 members
+(37 verified live), but only owned skills enter the panel, none arrive through the act-unlock flood
+path, and the observed live passive count for the worst character is 8. Renegotiate this bound if a
+passive-unlock path ever lands (the same re-derive discipline D1 records for actives). Widening a
+bound that is never approached would only enlarge the attack/fabrication surface of a guard that
+works, so 32 stays — don't widen what isn't broken. The delta spec states both numbers side by side
+so the asymmetry is deliberate and visible.
 
 ### D4: Envelope safety at the new bound (envelope math)
 

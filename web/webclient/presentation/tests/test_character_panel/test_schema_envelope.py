@@ -293,6 +293,57 @@ class CharacterSchemaTests(unittest.TestCase):
                 validate_character(payload)
 
 
+    @covers_requirement("webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel")
+    def test_actives_boundary_admits_96_rows_and_rejects_97(self):
+        # The flattened actives bound admits exactly MAX_ACTIVE_ROWS rows
+        # spread across the eight category groups and rejects one more, while
+        # an equally-shaped over-bound passives payload still fails under its
+        # own unchanged MAX_PASSIVE_ROWS bound (design D6).
+        def actives(total):
+            return [
+                {
+                    "category": f"cat_{c}",
+                    "label": "分類",
+                    "groups": [
+                        {
+                            "group": None,
+                            "label": None,
+                            "skills": [
+                                {"key": f"active_{i}", "label": "主動技能"}
+                                for i in range(c, total, MAX_CATEGORY_GROUPS)
+                            ],
+                        }
+                    ],
+                }
+                for c in range(MAX_CATEGORY_GROUPS)
+            ]
+
+        at_bound = _valid_panel(actives=actives(MAX_ACTIVE_ROWS))
+        self.assertEqual(
+            sum(
+                len(group["skills"])
+                for category in at_bound["actives"]
+                for group in category["groups"]
+            ),
+            MAX_ACTIVE_ROWS,
+        )
+        validate_character(at_bound)
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(actives=actives(MAX_ACTIVE_ROWS + 1))
+            )
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(
+                    passives=_skill_categories(
+                        [f"passive_{i}" for i in range(MAX_PASSIVE_ROWS + 1)],
+                        category="enhancement",
+                        label="強化",
+                    )
+                )
+            )
+
+
     def test_every_real_category_plus_the_unknown_fallback_fits_the_bound(self):
         # The category-group bound must leave room for the synthetic fallback:
         # an entity owning skills in all seven SkillCategory members plus one
