@@ -1,0 +1,36 @@
+## Batch:
+
+- depends-on: monster-species-registry, monster-identity-construction (placement authors variant references and builds individuals through the construction entry point)
+- conflicts: `world/lore/sync.py` and `world/lore/__init__.py` — shared with `monster-species-registry`, which adds the first mirror step and the registry exports; serialize this change after it (disjoint added steps/exports, but the same hunks). `monster-quest-objectives` adds no lore sync step, so it is not a sync conflict here. `world/maps/` is touched only here within the wave; `monster-identity-construction` verified its `world/maps/wilderness_population.py` caller tests unchanged but edits no file this change owns. The six artwork changes touch `world/art/`, `web/`, settings, and deployment files only, so no overlap. Shared-file note: `.github/evennia-shards.json` is edited by every change in the wave (disjoint added entries; serialize landings to avoid conflicts).
+- content boundary (declared, not a shim): the pre-existing tier-example ambient model (design's `example_monsters_zh` limitation row) stays the ambient source for provider coordinates outside authored species placement until species content covers the whole bounded map — no approved bestiary content exists for those cells yet. This change therefore ADDS the species-bearing placement layer (regional ambient rules plus authored sites) with its own ownership markers and reconciliation domain; it does not re-point the introductory hunt, the hunting band pin, or any existing population requirement, so the six artwork changes and the existing hunt remain untouched.
+- external-prerequisite: per-variant balance approval and the special-ability mechanics prerequisite inherited from `monster-species-registry` (a placed individual's numbers come from the construction owner's balance-gated rule; a site that would depend on an unimplemented special ability authors its site/objective without the ability, never a fake effect).
+
+## Why
+
+Design §5 separates two placement kinds the engine does not have today: deterministic regional ambient populations and explicitly authored camps/nests/boss sites with an authored one-shot or recoverable lifecycle. The only wilderness mechanism today is a per-coordinate tier model whose ownership marker (`db.population_key`) is the only reconciliation domain, and nothing in the codebase can express "this nest is one-shot" or "this camp recovers after N in-game hours" — so a quest that clears a camp has no lawful host, and site-owned monsters can be silently reconciled away by ambient logic that shares the same coordinate. Habitat tags must stay compatibility-only, which also means placement must be authored data, not tag inference.
+
+## What Changes
+
+- Add a read-only placement registry in the existing lore idiom: per-region ambient species placement rules (region key, eligible variant keys, quantity/capacity, determinism parameters) and authored site entries (`camp | nest | boss_site`) naming variant keys, host anchor/coordinate, capacity, one-shot vs recoverable lifecycle, and — for recoverable sites — an in-game-time or approved deterministic recovery condition. Registry validation rejects unknown regions/variants, habitat-incompatible placement (rejected as authored-data error, since habitat tags constrain what authors MAY place, never what spawns), non-variant references, and recovery conditions outside the closed vocabulary.
+- Reuse the existing owners: ambient reconciliation extends the existing `world/maps/wilderness_population.py` ownership discipline to species-bearing entries; site lifecycle lives in `world/maps/` as a new module using the construction entry point from `monster-identity-construction`; nothing new writes monster state outside those owners, and `world/lore/` stays read-only.
+- Ownership and reconciliation domain: every individual a placement owner creates carries its owner marker (`population_key` for ambient, `site_key` for sites); ambient reconciliation acts only on ambient-marked individuals, site reconciliation only on site-marked individuals, and neither deletes, replaces, or moves quest-, story-, or other-site-owned targets. Ambient rules never resume, respawn, or clear a site-owned individual, and site lifecycle never runs ambient rules.
+- Site lifecycle: one-shot sites stay cleared until an author-side re-issue (no automatic recovery); recoverable sites recover only on their in-game-clock tick or approved deterministic condition, never on room re-entry or quest acceptance. Recovery creates fresh individuals with fresh identities (never resurrecting or re-binding the old ones) and stays consistent with the quest layer's republish rule.
+- Capacity: ambient quantity and site capacity are honored — reconciliation adds up to, but never beyond, authored capacity, and never deletes an individual merely to make room for another.
+- Habitat tags remain compatibility-only: they are consulted by registry authoring validation, never at runtime spawn time; a compatible species with no authored placement never appears.
+- Determinism and observability: ambient selection reuses the existing coordinate-hash discipline (pure, no RNG, no wall clock); each placement/recovery/reconciliation decision emits boundary events through the `world.observability` facade with owner/site/region context.
+
+## Capabilities
+
+### New Capabilities
+
+- `monster-site-placement`: authored camps, nests, and boss sites — registry validation, ownership markers, one-shot vs in-game-time recoverable lifecycle, fresh-identity recovery, capacity honoring, and reconciliation scoped to the site owner's own individuals.
+
+### Modified Capabilities
+
+- `wilderness-monster-population`: the ambient layer additionally reconciles species-bearing individuals authored by the regional placement rules under the same pure-determinism and ownership-marker discipline, and reconciliation is explicitly scoped to its own owner domain — ambient rules never act on site-, quest-, or story-owned individuals. Existing tier-example ambient requirements, the hunting band, and the introductory hunt stay unchanged.
+- `lore-registries`: the regional ambient placement and site registries join the frozen keyed lore-data contract (construction-time validation, idempotent mirror, no runtime mutation from lore).
+
+## Impact
+
+- Code: `world/lore/monster_placement.py` (new registries + validation), `world/maps/monster_sites.py` (site lifecycle owner), `world/maps/wilderness_population.py` (species-bearing ambient reconciliation), `world/lore/sync.py` (mirror step), `server/` clock-upkeep registration for site recovery (existing world-clock seam), new tests under `world/lore/tests/` and `world/maps/tests/`, `.github/evennia-shards.json` entries.
+- No player-command surface change; `docs/game/commands.md` and `docs/game/command-reference.md` untouched. No migration, no second population engine, no new monster engine: one construction entry point, one ownership-marker discipline, one world clock.
