@@ -344,6 +344,8 @@ describe("MapLattice pan", () => {
     wrapper = mount(MapLattice, {
       props: { localMap: localMapModelFor(stageJourneyLocalMap("grid:altoria:1:0")), panOnMove: true, ...ISLAND },
     });
+    const before = translateOf(wrapper, "grid:altoria:1:0");
+    const vbBefore = viewBoxOf(wrapper);
     const writes = recordWrites();
     await wrapper.setProps({ localMap: localMapModelFor(stageJourneyLocalMap("grid:altoria:1:1")) });
     await flushPromises();
@@ -355,8 +357,18 @@ describe("MapLattice pan", () => {
     expect(own("--glide-x")).toEqual([`${from.x - to.x}px`, "0px"]);
     expect(own("--glide-y")).toEqual([`${from.y - to.y}px`, "0px"]);
     expect(from.y - to.y).toBeGreaterThan(0);
-    // This drawing does not move between the two placements: no pan.
-    expect(writes.filter((w) => w.name.startsWith("--pan-") && w.value !== "0px")).toEqual([]);
+    // A readable current-centered crop can move while the marker glides.
+    // The node left behind must begin at the same screen point, not jump
+    // because the old below-floor fit happened not to need a crop.
+    const [drawing] = groups(wrapper);
+    const pan = (name) => writes.find((w) => w.style === drawing.style && w.name === name)?.value ?? "0px";
+    const was = toScreen({ viewBox: vbBefore, size: { width: 240, height: 240 } }, before);
+    const is = toScreen({ viewBox: viewBoxOf(wrapper), size: { width: 240, height: 240 } }, {
+      x: from.x + Number.parseFloat(pan("--pan-x")),
+      y: from.y + Number.parseFloat(pan("--pan-y")),
+    });
+    expect(is.x).toBeCloseTo(was.x, 6);
+    expect(is.y).toBeCloseTo(was.y, 6);
     // Nodes and their accessible hooks carry the new placement at commit.
     expect(wrapper.get('[data-node="grid:altoria:1:1"]').attributes("data-visibility")).toBe("current");
     expect(groups(wrapper)).toHaveLength(2);

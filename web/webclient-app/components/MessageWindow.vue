@@ -4,6 +4,7 @@ import {
   computed,
   h,
   nextTick,
+  onBeforeUnmount,
   onMounted,
   ref,
   shallowRef,
@@ -16,7 +17,7 @@ import {
   responseLength,
   segmentResponses,
 } from "../lib/message_pages.js";
-import { beatPages, tailBlocks } from "../lib/beat_queue.js";
+import { beatBlocks, beatPages, tailBlocks } from "../lib/beat_queue.js";
 import { readMotionMs } from "../lib/motion_tokens.js";
 import { narrativeBlockNodes } from "../lib/narrative_line_nodes.js";
 import {
@@ -254,6 +255,10 @@ export default {
     // response dirties `display` at once, before the post-flush re-page, so
     // completeness is never read off the previous response's stale pages.
     const pagedBlocks = shallowRef(null);
+    const layoutKey = ref(null);
+    const layoutBinding = ref(null);
+    const layoutCurrent = computed(() => measure.ready.value &&
+      layoutKey.value === display.value.key && layoutBinding.value === beatBinding.value);
     const pageIndex = ref(0);
     const provisional = ref(false);
     const liveText = ref("");
@@ -620,10 +625,15 @@ export default {
         typing.value,
         pageIndex.value,
         pages.value,
+        layoutCurrent.value,
       ],
       // An awaiting flush always parks on the last page, so `index` then
       // fails the next-page test and nothing arms.
-      ([auto, playing, unpaged, isTyping, index, list]) => {
+      ([auto, playing, unpaged, isTyping, index, list, current]) => {
+        if (!current) {
+          typewriter.disarmAdvance();
+          return;
+        }
         if (playing) {
           return;
         }
@@ -645,12 +655,16 @@ export default {
     // round ends, the window moves to the page after the beats, or stays on
     // the last beat page when none follows.
     watch(
-      () => [beatSignature.value, typing.value, pageIndex.value, pages.value],
+      () => [beatSignature.value, typing.value, pageIndex.value, pages.value, layoutCurrent.value],
       () => {
         const bound = boundBeats.value;
         const playing = !!bound && bound.auto && bound.phase !== "done";
         // Every pass re-decides the pause; only the same-beat branch re-arms.
         clearBeatPageTimer();
+        if (!layoutCurrent.value) {
+          typewriter.disarmAdvance();
+          return;
+        }
         if (playing && !wasBeatPlaying) {
           // A wait armed before the round bound would end it with no player
           // action; the queue owns the channel from here.
@@ -713,6 +727,41 @@ export default {
       { flush: "post" },
     );
 
+    let fontRequest = 0;
+    function requestRepage() {
+      const ticket = ++fontRequest;
+      if (!layoutCurrent.value) {
+        typewriter.disarmAdvance();
+        clearBeatPageTimer();
+      }
+      const commit = () => {
+        if (ticket !== fontRequest) return;
+        repage();
+        if (measure.ready.value) {
+          layoutKey.value = display.value.key;
+          layoutBinding.value = beatBinding.value;
+        }
+      };
+      if (props.pageFit || !measure.ready.value) {
+        commit();
+        return;
+      }
+      const bound = boundBeats.value;
+      const blocks = bound
+        ? [...beatBlocks(bound.texts), ...tailBlocks(display.value.blocks, bound.coveredLines)]
+        : display.value.blocks;
+      const prepared = measure.prepareFonts(blocks);
+      if (prepared) {
+        void prepared.then(commit);
+      } else {
+        commit();
+      }
+    }
+    onBeforeUnmount(() => {
+      fontRequest += 1;
+      clearBeatPageTimer();
+    });
+
     watch(
       () => [
         display.value.key,
@@ -724,7 +773,7 @@ export default {
         measure.boxKey.value,
         measure.ready.value,
       ],
-      () => repage(),
+      () => requestRepage(),
       { flush: "post" },
     );
     // `--prose-scale` lands on <html> with the preference; re-measure on the
@@ -735,14 +784,14 @@ export default {
         const ticket = generation;
         void nextTick(() => {
           if (ticket === generation) {
-            repage();
+            requestRepage();
           }
         });
       },
     );
 
     onMounted(() => {
-      repage();
+      requestRepage();
     });
 
     // Reading complete (design D3): the current response's last page is on

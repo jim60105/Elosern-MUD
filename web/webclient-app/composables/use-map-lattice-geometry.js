@@ -24,6 +24,7 @@ export const MARKER_DOT_R = 4.5;
 export const MARKER_LANDMARK_R = 5;
 export const MARKER_DIAMOND_HALF = 9;
 export const HALO_R = 10;
+export const LABEL_BASELINE_HALF = 11;
 // The full map's current-location ring (webclient-map-legibility): a thin
 // seal ring concentric with the current marker, inside that node's own group,
 // so the one place the player stands carries one footprint. Its radius is the
@@ -45,7 +46,7 @@ export function labelPairPitch(labelA, labelB, labelFont) {
 // window of side `canvasSize / ISLAND_MIN_SCALE` centred on the current node
 // and clamped to the drawing, so a long street never collapses into a
 // hairline. The full-map overlay remains the surface for the whole drawing.
-export const ISLAND_MIN_SCALE = 0.75;
+export const ISLAND_MIN_SCALE = 1;
 
 function islandWindow(S, canvasSize, cur) {
   const V = Math.min(S, canvasSize / ISLAND_MIN_SCALE);
@@ -140,6 +141,20 @@ export function useMapLatticeGeometry(props) {
     }
     return Math.ceil(need);
   });
+  // Rows increase northward. An upper label must clear the lower marker even
+  // when that lower node suppresses its own label (shared wilderness names).
+  // The baseline reserves 11 * markerScale + 2 + labelFont; allow a quarter
+  // type step below it for the bundled face's descent and three units of gap.
+  const verticalClearancePitch = computed(() => {
+    const hasUpperLabel = drawnNodes.value.some((upper) =>
+      visibleNodeLabel(upper) && drawnNodes.value.some((lower) =>
+        upper.col === lower.col && upper.row === lower.row + 1,
+      ),
+    );
+    return hasUpperLabel
+      ? Math.ceil(2 * LABEL_BASELINE_HALF * props.markerScale + 2 + 1.25 * props.labelFont + 3)
+      : 0;
+  });
   const isSquarePitch = computed(() => props.colPitch === props.rowPitch);
   // Placement sourcing (map-02 D2): the lattice variant draws the model's
   // rank-compressed `col`/`row` grid; the graph variant draws the model's
@@ -191,8 +206,7 @@ export function useMapLatticeGeometry(props) {
     if (isGraph.value) {
       const L = graphCanvasWidth.value;
       if (props.canvasSize != null) {
-        const PAD = LocalMap.RADIAL_GEOMETRY ? LocalMap.RADIAL_GEOMETRY.PAD : 24;
-        const S = Math.max(Number(props.canvasSize), L - 2 * PAD + 16);
+        const S = Number(props.canvasSize);
         const vx = L / 2 - S / 2;
         const vy = L / 2 - S / 2;
         return {
@@ -239,7 +253,7 @@ export function useMapLatticeGeometry(props) {
 
     if (props.canvasSize != null) {
       const canvasSize = Number(props.canvasSize);
-      const pMin = Math.max(props.colPitch, labelClearancePitch.value);
+      const pMin = Math.max(props.colPitch, props.rowPitch, labelClearancePitch.value, verticalClearancePitch.value);
       const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
       const nameWidth = outwardNameBox.value;
       // The marker name's line box the gutter must clear (a fixed 16 units,
@@ -358,10 +372,11 @@ export function useMapLatticeGeometry(props) {
     }
 
     // canvasSize == null (overlay and bare mounts)
-    const pCol = Math.max(props.colPitch, labelClearancePitch.value);
+    const pCol = Math.max(props.colPitch, labelClearancePitch.value,
+      isSquarePitch.value ? verticalClearancePitch.value : 0);
     const pRow = isSquarePitch.value
-      ? Math.max(props.rowPitch, labelClearancePitch.value)
-      : props.rowPitch;
+      ? Math.max(props.rowPitch, labelClearancePitch.value, verticalClearancePitch.value)
+      : Math.max(props.rowPitch, verticalClearancePitch.value);
     const cW = colsVal * pCol;
     const cH = rowsVal * pRow;
 

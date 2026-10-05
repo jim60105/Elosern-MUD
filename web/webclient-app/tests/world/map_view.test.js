@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  FIT_INSET,
   MAX_SCALE,
   ZOOM_STEP,
   fitView,
@@ -15,33 +14,20 @@ import {
 } from "../../lib/map_view.js";
 
 describe("map_view pure math", () => {
-  it("fits a 560 × 1074 street in a 1124 × 735 frame with s ≈ 0.662 inside frame less inset", () => {
-    const frame = { vw: 1124, vh: 735, W: 560, H: 1074 };
+  it("opens an oversized street around the current location at the readable floor", () => {
+    const frame = { vw: 1124, vh: 735, W: 560, H: 1074, current: { x: 280, y: 950 } };
     const view = fitView(frame);
-
     expect(view.fitted).toBe(true);
-    // sFit = min(1, (1124 - 24)/560, (735 - 24)/1074) = 711 / 1074 ≈ 0.66201
-    expect(view.s).toBeCloseTo(0.662, 3);
-
-    // Canvas rendered box in viewport pixels
-    const canvasPxW = frame.W * view.s;
-    const canvasPxH = frame.H * view.s;
-
-    // Viewport padding around canvas
-    const padLeft = -view.x * view.s;
-    const padTop = -view.y * view.s;
-    const padRight = frame.vw - (padLeft + canvasPxW);
-    const padBottom = frame.vh - (padTop + canvasPxH);
-
-    // Centred on both axes: horizontal and vertical padding are symmetric
-    expect(padLeft).toBeCloseTo(padRight, 2);
-    expect(padTop).toBeCloseTo(padBottom, 2);
-
-    // Whole canvas inside the frame less the inset
-    expect(padLeft).toBeGreaterThanOrEqual(FIT_INSET - 1e-4);
-    expect(padRight).toBeGreaterThanOrEqual(FIT_INSET - 1e-4);
-    expect(padTop).toBeGreaterThanOrEqual(FIT_INSET - 1e-4);
-    expect(padBottom).toBeGreaterThanOrEqual(FIT_INSET - 1e-4);
+    expect(view.s).toBe(1);
+    expect(view.x).toBe((560 - 1124) / 2);
+    expect(view.y).toBe(1074 - 735);
+    // Panning reaches the far end without ever shrinking text.
+    const north = panBy(view, 0, 2000, frame);
+    expect(north.y).toBe(0);
+    expect(north.s).toBe(1);
+    const resized = resizeView(view, frame, { ...frame, vh: 600 });
+    expect(resized.fitted).toBe(true);
+    expect(resized.y).toBe(1074 - 600);
   });
 
   it("fits a 280 × 226 single node at s = 1, centred on both axes", () => {
@@ -72,7 +58,7 @@ describe("map_view pure math", () => {
     expect(userYAfter).toBeCloseTo(userYBefore, 4);
   });
 
-  it("repeated zoom-out stops at the fitted scale, and repeated zoom-in stops at 2", () => {
+  it("repeated zoom-out stops at the readable floor, and repeated zoom-in stops at 2", () => {
     const frame = { vw: 800, vh: 600, W: 1600, H: 1200 };
     const bounds = scaleBounds(frame);
     let view = { s: 1, x: 100, y: 100, fitted: false };
@@ -82,6 +68,7 @@ describe("map_view pure math", () => {
       view = zoomAt(view, 1 / ZOOM_STEP, null, frame);
     }
     expect(view.s).toBeCloseTo(bounds.min, 5);
+    expect(view.s).toBe(1);
 
     // Repeated zoom in
     for (let i = 0; i < 20; i++) {

@@ -338,6 +338,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 bodyScroll: { scrollHeight: body.scrollHeight, clientHeight: body.clientHeight },
                 nodeBoxes,
                 edgeBoxes,
+                labelSizes: [...viewport.querySelectorAll('text')].filter(e => e.textContent.trim())
+                  .map(e => parseFloat(getComputedStyle(e).fontSize) * e.getScreenCTM().a),
               };
             }"""
         )
@@ -355,9 +357,8 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         "webclient-local-map::the-full-map-surface-opens-fitted-to-its-body-and-offers-zoom-pan-and-recentre"
     )
     def test_full_map_opens_fitted_zooms_pans_and_recentres(self):
-        """webclient-full-map-fit-view (design D1/D3/D4/D5/D7): the whole drawing
-        opens inside the body with no scrollbar; wheel zoom anchors on the
-        pointer; keyboard zoom-out to the bound fits everything again; a drag
+        """The readable default opens around the current node without scrollbars;
+        wheel zoom anchors on the pointer; zoom-out never defeats the text floor; a drag
         pans without ever submitting a move; recentre brings the current node
         back; Tab reveals an off-window actionable node; and the legend popover
         is the topmost disclosure with a reset-to-fitted reopen.
@@ -379,18 +380,14 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
         page.wait_for_selector(".local-map__viewport--fit", timeout=15000)
 
-        # 1. Opens fitted: every node box and every edge-marker box lies inside
-        #    the clipped fit viewport, and the overlay body never scrolls (D7).
+        # 1. Retain complete topology, but show a readable current-centered
+        # window rather than fitting this oversized drawing with tiny text.
         m = self._fit_view_measure(page)
         self.assertEqual(len(m["nodeBoxes"]), 62)
         self.assertGreater(len(m["edgeBoxes"]), 0)
-        for node_id, box in m["nodeBoxes"].items():
-            self.assertTrue(
-                self._inside(m["viewport"], box),
-                f"node {node_id} outside the fitted viewport: {box} vs {m['viewport']}",
-            )
-        for box in m["edgeBoxes"]:
-            self.assertTrue(self._inside(m["viewport"], box), f"edge marker outside: {box}")
+        self.assertTrue(self._inside(m["viewport"], m["nodeBoxes"]["grid:fitview:1:15"]))
+        self.assertTrue(any(not self._inside(m["viewport"], box) for box in m["nodeBoxes"].values()))
+        self.assertGreaterEqual(min(m["labelSizes"]), 16 - 0.01)
         self.assertLessEqual(
             m["bodyScroll"]["scrollHeight"], m["bodyScroll"]["clientHeight"] + 1,
             "the overlay body must not scroll once the map is fitted",
@@ -418,8 +415,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             f"the x-axis clamp must keep the current node inside: {after}",
         )
 
-        # 3. Keyboard zoom-out to the bound: pressing `-` until 縮小 reports
-        #    aria-disabled returns the whole drawing inside the viewport (D3).
+        # 3. Keyboard zoom-out stops at the readable floor, not a whole-map fit.
         toggle = page.locator('[data-testid="map-overlay-zoom-out"]')
         presses = 0
         while toggle.get_attribute("aria-disabled") != "true" and presses < 20:
@@ -428,22 +424,17 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             page.wait_for_timeout(60)
         self.assertEqual(toggle.get_attribute("aria-disabled"), "true", "- never reached the zoom-out bound")
         m = self._fit_view_measure(page)
-        for node_id, box in m["nodeBoxes"].items():
-            self.assertTrue(
-                self._inside(m["viewport"], box),
-                f"node {node_id} outside the viewport at the zoom-out bound",
-            )
+        self.assertGreaterEqual(min(m["labelSizes"]), 16 - 0.01)
+        self.assertEqual(len(m["nodeBoxes"]), 62)
 
-        # 4. Drag pans and never moves: zoom in first — at the fit bound the
-        #    window spans the whole canvas and the clamp pins every pan. One
-        #    `+` press lifts the scale past vh/H so the tall strip overflows
-        #    the window vertically and gains real pan range (the two-column
-        #    strip's width underflows at every permitted scale, so only the
-        #    vertical axis pans). A 120px drag started on an actionable node
-        #    then shifts the node boxes and sends no explore.move (D3).
+        # 4. Drag an actionable node and never submit a move. At the readable
+        # floor there is already pan range. Focus-reveal brings this adjacent
+        # node into the smaller zoomed window before starting the real drag.
         actionable_id = "grid:fitview:1:14"
         page.keyboard.press("+")
         page.wait_for_timeout(80)
+        page.locator(f'.local-map__viewport--fit [data-node="{actionable_id}"]').focus()
+        page.wait_for_timeout(150)
         m = self._fit_view_measure(page)
         # Setup guard: the full row-0..row-30 centre span must exceed the
         # window's height, else these steps prove nothing.
@@ -607,17 +598,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
-        # 8. Reopening shows the fitted view again with the popover closed.
+        # 8. Reopening restores the readable current-centered default.
         page.evaluate("window.__elosernBridge.store.openOverlay('map')")
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
         page.wait_for_selector(".local-map__viewport--fit", timeout=15000)
         self.assertEqual(page.locator('[data-testid="map-overlay-legend-popover"]').count(), 0)
         m = self._fit_view_measure(page)
-        for node_id, box in m["nodeBoxes"].items():
-            self.assertTrue(
-                self._inside(m["viewport"], box),
-                f"reopen did not refit: node {node_id} outside the viewport",
-            )
+        self.assertTrue(self._inside(m["viewport"], m["nodeBoxes"][current_id]))
+        self.assertGreaterEqual(min(m["labelSizes"]), 16 - 0.01)
+        self.assertEqual(len(m["nodeBoxes"]), 62)
         self.assertLessEqual(
             m["bodyScroll"]["scrollHeight"], m["bodyScroll"]["clientHeight"] + 1
         )

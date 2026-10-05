@@ -6,7 +6,7 @@
 // geometry group's edge-marker set and name-box bound explicitly; emits are
 // passed through from the SFC.
 import { computed } from "vue";
-import { MARKER_DIAMOND_HALF } from "./use-map-lattice-geometry.js";
+import { LABEL_BASELINE_HALF, MARKER_DIAMOND_HALF } from "./use-map-lattice-geometry.js";
 import { CELL_EM, charCells } from "../lib/mono_cells.js";
 
 // One line step per glyph: the island's left/right names stack one glyph per
@@ -130,7 +130,6 @@ export function useMapLatticeRender(props, emit, geometry) {
   // bare mount's default step was 11, and the default is the shared 16-unit
   // floor now (retarget-desktop-viewport-contract D7), so the sentinel is
   // gone.
-  const LABEL_BASELINE_HALF = 11;
   function labelY() {
     return LABEL_BASELINE_HALF * props.markerScale + 2 + props.labelFont;
   }

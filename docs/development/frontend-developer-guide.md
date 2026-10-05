@@ -102,6 +102,51 @@ uv run --locked python tools/gen_mono_cells.py
 
 瀏覽器測試與最上層契約測試皆帶有 `@covers_requirement(...)` 標註（從 `tools.spec_traceability` 匯入）；請參閱 [`spec-test-traceability.md`](spec-test-traceability.md)。A2 閘門由 `tests/test_frontend_toolchain_contract.py`（pnpm 執行）、`tests/test_browser_verification_contract.py`（工作流程與靜態檢查）以及 `web/tests/browser/test_vue_foundation.py`（瀏覽器行為）所涵蓋。
 
+## Desktop visual-reading repair (2026-10-05)
+
+The acceptance viewport is exactly **1451 × 790 CSS px**, not an outer browser
+window size. Desktop chrome uses
+`clamp(1, min(innerHeight / 790, innerWidth / 1451), 1.4)`; 1741 × 948 is an
+uncapped spot check and 2560 × 1440 exercises the cap. Message and full-log
+prose use the bundled Jim Mono TC face at **16 / 18 / 20 CSS px** for A− / A /
+A+ at reference. Measure actual drawn glyphs after `document.fonts.ready`;
+the computed family token alone does not prove which face drew a character.
+
+The 240px minimap clips oversized lattice and radial drawings through a
+current-centered, scale-1 window rather than shrinking 16-unit SVG labels.
+Its lattice pitch reserves horizontal label clearance and vertical clearance
+between an upper label and the lower marker, including lower wilderness nodes
+whose shared name is suppressed. The full map also has a scale-1 zoom-out
+floor: oversized drawings open around the current location and remain
+reachable with pan, zoom, focus reveal and remembered-location controls.
+Do not restore historical whole-map fits or a 0.75 island floor: those produce
+effective text smaller than 16 CSS px.
+
+Opening the full log and appending to the response being read must retain the
+message page when its box and prose setting are unchanged. Actual layout
+reflow still follows the response-space reveal anchor. Mount-time
+`document.fonts.ready` does not load Jim Mono TC slices for characters that
+have not appeared yet: prepare the actual rendered response/beat glyph stream
+in both weights before performing synchronous page-fit probes. Superseded and
+unmounted preparations cannot commit; an uncommitted response/binding cannot
+pace combat beats or advance the previous response. Reader tests must keep
+their baseline from before opening the log, not reset it after an append.
+
+Inventory headings allow their informational tag to wrap onto a new row
+without splitting the two-character heading vertically. Informational tags,
+counts, money units and empty-equipment text use the readable muted-paper
+step, not the low-contrast disabled-ink step.
+
+After rebuilding a running managed fixture's SPA, refresh **that fixture's**
+isolated static root with `uv run --locked evennia collectstatic --noinput
+--settings browser_settings` using its existing `runtime.env`. A reload alone
+can keep serving the static copy collected at fixture startup. Never collect
+against the live user settings/database for a visual review.
+
+See [the final visual-review evidence](2026-10-05-final-visual-review.md) and
+the OpenSpec amendment `repair-retarget-visual-reading`. The two archived
+retarget changes remain historical records.
+
 ## Narrative palette showcase
 
 `Core/MessageWindow/NarrativeTones` renders the generated ANSI palette on the

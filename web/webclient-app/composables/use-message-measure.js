@@ -102,5 +102,29 @@ export function useMessageMeasure(surfaceRef) {
     }
   }
 
-  return { ready, boxKey, fits, clear };
+  // Mount-time readiness covers only glyphs already used. Sliced Jim faces
+  // for new response/beat text must load before synchronous fit probes.
+  function prepareFonts(blocks) {
+    const fonts = document.fonts;
+    const surface = surfaceRef.value;
+    if (!measurer || !surface || !fonts || typeof fonts.load !== "function") {
+      return null;
+    }
+    render(
+      h("div", blocks.map((block, index) => narrativeBlockNodes(block, index))),
+      measurer,
+    );
+    const text = measurer.textContent;
+    const style = getComputedStyle(surface);
+    const type = `${style.fontSize} ${style.fontFamily}`;
+    clear();
+    // Native resource errors remain reported. Settle failed faces to actual
+    // terminal available metrics rather than leaving the reader parked.
+    return Promise.allSettled([
+      fonts.load(`400 ${type}`, text),
+      fonts.load(`700 ${type}`, text),
+    ]).then(() => fonts.ready);
+  }
+
+  return { ready, boxKey, fits, clear, prepareFonts };
 }

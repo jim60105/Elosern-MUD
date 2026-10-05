@@ -90,6 +90,36 @@ class InventoryGridJourneys(ServicesBrowserTest):
         self._wait_services_available(page)
         panel = self._open_inventory_drawer(page)
 
+        for viewport in ((1451, 790), (2560, 1440)):
+            page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
+            readability = page.evaluate(r"""() => {
+              const title = document.querySelector('.equipment-doll__title');
+              const range = document.createRange();
+              range.selectNodeContents(title.firstChild);
+              const titleRows = [...range.getClientRects()].length;
+              const luminance = (rgb) => rgb.map(v => {
+                const c = v / 255;
+                return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+              }).reduce((v, c, i) => v + c * [.2126,.7152,.0722][i], 0);
+              const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number);
+              const texts = [...document.querySelectorAll(
+                '.equipment-doll__title-tag,.equipment-doll__slot-empty,' +
+                '.inventory-panel__heading-tag,.inventory-panel__statrow-unit'
+              )];
+              return {titleRows, contrast: texts.map(e => {
+                let p = e;
+                while (p.parentElement && getComputedStyle(p).backgroundColor === 'rgba(0, 0, 0, 0)')
+                  p = p.parentElement;
+                const foreground = luminance(rgb(getComputedStyle(e).color));
+                const background = luminance(rgb(getComputedStyle(p).backgroundColor));
+                return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
+              })};
+            }""")
+            self.assertEqual(readability["titleRows"], 1, viewport)
+            self.assertTrue(readability["contrast"], viewport)
+            self.assertGreaterEqual(min(readability["contrast"]), 4.5, viewport)
+        page.set_viewport_size({"width": 1451, "height": 790})
+
         # The committed panel is the source of truth: two held item keys,
         # with exact held counts and committed presentation metadata.
         STORE = store_fixture_values()

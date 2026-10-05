@@ -311,6 +311,7 @@ const duplicateRows = computed(() => {
 .equipment-doll__title {
   margin: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: calc(8px * var(--ui-scale));
   color: var(--paper-500);
@@ -318,13 +319,15 @@ const duplicateRows = computed(() => {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .equipment-doll__title-tag {
   margin-left: auto;
   letter-spacing: 0.03em;
   text-transform: none;
-  color: var(--paper-700);
+  white-space: normal;
+  color: var(--paper-500);
   font-size: var(--text-xs);
 }
 
@@ -407,7 +410,7 @@ const duplicateRows = computed(() => {
 
 .equipment-doll__slot-empty {
   margin: 0;
-  color: var(--paper-700);
+  color: var(--paper-500);
   font-size: var(--text-xs);
 }
 

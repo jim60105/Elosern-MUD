@@ -192,7 +192,7 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
     def test_dense_island_keeps_every_node_and_name_reachable(self):
         """At the 64-node bound the island stays a bounded 240px canvas that
         drops no node or gateway, and the full map names every node and reads
-        at the 16px floor or more once zoomed in."""
+        at the 16px floor or more at every permitted zoom level."""
         panel = _dense_panel()
         in_view = {n["id"]: n["label"] for n in panel["nodes"] if n["visibility"] != "remembered"}
         page = self.logged_in_page((1451, 790))
@@ -219,10 +219,15 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(island["titles"], in_view)
         self.assertEqual(island["markers"], 16)
         self.assertEqual(island["mirror"], 16)
-        # Scaled (and windowed at 0.75) but never below 16 × 0.75 = 12px.
-        self.assertGreaterEqual(min(island["drawn"]), 12 - 0.01)
+        # Cropping retains the global effective-text floor on dense payloads.
+        self.assertGreaterEqual(min(island["drawn"]), 16 - 0.01)
 
         self._open_full_map(page)
+        initial_size = page.evaluate("""() => {
+          const t = document.querySelector('[data-testid="map-overlay"] .local-map__node-label');
+          return parseFloat(getComputedStyle(t).fontSize) * t.getScreenCTM().a;
+        }""")
+        self.assertGreaterEqual(initial_size, 16 - 0.01)
         names = page.evaluate(
             """() => Object.fromEntries([...document.querySelectorAll(
                 '[data-testid="map-overlay"] .local-map__node')].map((g) => [g.dataset.node, g.getAttribute('aria-label')]))"""
@@ -243,6 +248,33 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertGreaterEqual(drawn, 16)
+        page.keyboard.press("Escape")
+
+        # The lower marker still needs clearance when its wilderness name is
+        # suppressed. A vertical fixture isolates the formerly missing term.
+        vertical = {
+            "schema_version": 1, "available": True, "layer": "wilderness",
+            "current_node": "wild:vertical:0", "title": "Vertical clearance",
+            "nodes": [
+                {"id": f"wild:vertical:{y}", "label": "北岸鐘樓" if y == 2 else "共用地區",
+                 "x": 0, "y": y, "visibility": "current" if y == 0 else "visible_visited",
+                 "current": y == 0, "anchor": False, "landmark": False, "action": None}
+                for y in range(8)
+            ],
+            "edges": [], "legend": [],
+        }
+        self._island_ready(page, vertical)
+        clearance = page.evaluate("""() => {
+          const svg = document.querySelector('[data-testid="local-map"] .local-map__lattice');
+          const upper = svg.querySelector('[data-node="wild:vertical:2"] .local-map__node-label');
+          const lower = svg.querySelector('[data-node="wild:vertical:1"] .local-map__marker');
+          return {gap: lower.getBoundingClientRect().top - upper.getBoundingClientRect().bottom,
+            size: parseFloat(getComputedStyle(upper).fontSize) * upper.getScreenCTM().a,
+            nodes: svg.querySelectorAll('.local-map__node').length};
+        }""")
+        self.assertGreaterEqual(clearance["gap"], 3)
+        self.assertGreaterEqual(clearance["size"], 16 - 0.01)
+        self.assertEqual(clearance["nodes"], 8)
         page.close()
 
     @covers_requirement(

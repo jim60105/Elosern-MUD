@@ -58,8 +58,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       // The reported wilderness shape's 240px square grows the drawn pitch to
       // 45 (its gutter reserves 44.456 units a side), and the dot field is
       // registered to that drawn pitch, not to the declared 40 units.
-      expect(pitchW).toBe(45);
-      expect(pitchH).toBe(45);
+      expect(pitchW).toBeGreaterThanOrEqual(47);
+      expect(pitchH).toBe(pitchW);
 
       const circle = pattern.find("circle");
       expect(circle.exists()).toBe(true);
@@ -306,8 +306,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       const visibleLabels = wUniform.findAll(".local-map__node-label").filter((l) => (l.element.lastChild?.textContent || "").trim() !== "");
       expect(visibleLabels).toHaveLength(1);
       const patternUniform = wUniform.find("defs pattern");
-      expect(Number(patternUniform.attributes("width"))).toBe(40);
-      expect(Number(patternUniform.attributes("height"))).toBe(40);
+      expect(Number(patternUniform.attributes("width"))).toBeGreaterThanOrEqual(47);
+      expect(patternUniform.attributes("height")).toBe(patternUniform.attributes("width"));
 
       const distinctAdjacentPayload = {
         schema_version: 1,
@@ -419,8 +419,8 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(svg3.attributes("width"))).toBe(240);
       expect(Number(svg3.attributes("height"))).toBe(240);
       const pattern3 = wWild.find("defs pattern");
-      expect(Number(pattern3.attributes("width"))).toBe(45);
-      expect(Number(pattern3.attributes("height"))).toBe(45);
+      expect(Number(pattern3.attributes("width"))).toBeGreaterThanOrEqual(47);
+      expect(pattern3.attributes("height")).toBe(pattern3.attributes("width"));
       const vbParts = svg3.attributes("viewBox").split(" ").map(Number);
       expect(vbParts[2]).toBeCloseTo(240, 1);
       expect(vbParts[3]).toBeCloseTo(240, 1);
@@ -430,7 +430,7 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(scale3 * 16).toBeGreaterThanOrEqual(16);
 
       // 4. 2x64 lattice: the 2574-unit square would draw at 0.0808, below
-      // the island's legibility floor, so it is windowed at scale 0.75
+      // the island's legibility floor, so it is windowed at scale 1
       // around the current node instead (design §11).
       const wTall = mountLattice({
         localMap: localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE),
@@ -440,10 +440,10 @@ describe("MapLattice draft lattice fidelity (webclient-minimap-06-draft-lattice-
       expect(Number(svg4.attributes("width"))).toBe(240);
       expect(Number(svg4.attributes("height"))).toBe(240);
       const vbTall = svg4.attributes("viewBox").split(" ").map(Number);
-      expect(vbTall[2]).toBeCloseTo(240 / 0.75, 6);
-      expect(vbTall[3]).toBeCloseTo(240 / 0.75, 6);
+      expect(vbTall[2]).toBeCloseTo(240, 6);
+      expect(vbTall[3]).toBeCloseTo(240, 6);
       const scale4 = 240 / vbTall[2];
-      expect(scale4).toBeCloseTo(0.75, 6);
+      expect(scale4).toBeCloseTo(1, 6);
 
       // 5. Graph cases:
       // a. One-ring interior: a 260-unit radial canvas (R0 80 + label bottom 26

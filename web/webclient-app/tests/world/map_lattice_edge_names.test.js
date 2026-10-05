@@ -64,10 +64,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       markerNames: true,
     });
     const svg = w.find("svg.local-map__lattice");
-    // Core lattice: 3*58=174 by 3*44+14=146. Gutter: 2*sqrt(2)*9 + 1 + 18 ≈ 44.455844.
+    // The vertical footprint raises rows to 47; name gutter is unchanged.
     const expectedGutter = 2 * Math.SQRT2 * 9 + 1 + 18;
     expect(Number(svg.attributes("width"))).toBeCloseTo(174 + 2 * expectedGutter, 5);
-    expect(Number(svg.attributes("height"))).toBeCloseTo(146 + 2 * expectedGutter, 5);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(155 + 2 * expectedGutter, 5);
   });
 
   it("Task 1.3 & 1.4: renders left-edge island marker name as stacked glyph column with token styling", () => {

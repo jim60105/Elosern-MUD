@@ -4,41 +4,33 @@
 //   view:  { s, x, y, fitted }  (scale, origin in user units, fitted flag)
 //   frame: { vw, vh, W, H }     (viewport content box and canvas size)
 
-export const FIT_INSET = 12;
 export const MAX_SCALE = 2;
 export const ZOOM_STEP = 1.25;
 export const DRAG_THRESHOLD = 4;
 
 /**
  * Calculates the fitted view for a given frame.
- * Scale is bounded by 1 so small payloads are not magnified.
- * The canvas is centred within the viewport window.
+ * Small drawings are centred at their declared size; oversized drawings
+ * open around the current location rather than shrinking their text.
  */
 export function fitView(frame) {
   const { vw, vh, W, H } = frame;
-  const sFit = Math.max(
-    1e-4,
-    Math.min(1, (vw - 2 * FIT_INSET) / W, (vh - 2 * FIT_INSET) / H),
-  );
-  const spanX = vw / sFit;
-  const spanY = vh / sFit;
-  const x = (W - spanX) / 2;
-  const y = (H - spanY) / 2;
-  return { s: sFit, x, y, fitted: true };
+  const current = frame.current ?? { x: W / 2, y: H / 2 };
+  return clampView({
+    s: 1,
+    x: current.x - vw / 2,
+    y: current.y - vh / 2,
+    fitted: true,
+  }, frame);
 }
 
 /**
- * Scale bounds for zooming: min is the fitted scale, max is MAX_SCALE (or sFit if larger).
+ * Bounds never permit SVG labels below their declared 16-unit step.
  */
-export function scaleBounds(frame) {
-  const { vw, vh, W, H } = frame;
-  const sFit = Math.max(
-    1e-4,
-    Math.min(1, (vw - 2 * FIT_INSET) / W, (vh - 2 * FIT_INSET) / H),
-  );
+export function scaleBounds() {
   return {
-    min: sFit,
-    max: Math.max(MAX_SCALE, sFit),
+    min: 1,
+    max: MAX_SCALE,
   };
 }
 

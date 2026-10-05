@@ -517,7 +517,7 @@ watch(confirming, (open) => {
   margin-left: auto;
   letter-spacing: 0.03em;
   text-transform: none;
-  color: var(--paper-700);
+  color: var(--paper-500);
   font-size: var(--text-xs);
 }
 
@@ -538,7 +538,7 @@ watch(confirming, (open) => {
 }
 
 .inventory-panel__statrow-unit {
-  color: var(--paper-700);
+  color: var(--paper-500);
   margin-left: calc(6px * var(--ui-scale));
   font-size: var(--text-xs);
 }

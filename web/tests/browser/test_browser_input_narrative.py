@@ -813,21 +813,10 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(self._log_scroll_state(page)["top"], 0)
         self.assertIn("新內容", page.locator('[data-testid="fulllog-latest"]').inner_text())
-        # This append is the test's own mutation of the live response, and the
-        # clause it would exercise — "Lines appended to the response being read
-        # SHALL NOT move the reader off the page on screen", owned by
-        # webclient-input-narrative::the-message-window-s-reading-controls-
-        # advance-pages-and-a-new-action-flushes-unread-pages — is asserted by
-        # that requirement's own journey in this module
-        # (`test_message_window_pages_and_flushes`, `test_message_window_
-        # repages_on_resize`) and by webclient-shell
-        # `test_paging_marker_and_append_keep_page`, where an append keeps the
-        # reader's page and its text. Everything asserted from here on is this
-        # test's own claim: opening, scrolling and returning to latest never
-        # move the message window's reader (webclient-input-narrative, "Log
-        # readers can return to latest without losing their place
-        # involuntarily"), so the baseline is taken after this mutation.
-        before = self._live_reader(page)
+        # Keep the pre-open baseline: a retained-log arrival must not silently
+        # advance the message reader behind the focus-trapped full log.
+        reader_unmoved("appending while the log holds the reader")
+        self.assertEqual(self._live_reader(page)["text"], before["text"])
         # The control sits in the footer, below the text, never over it.
         rects = page.evaluate(
             """() => {

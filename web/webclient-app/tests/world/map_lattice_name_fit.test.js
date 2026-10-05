@@ -94,7 +94,8 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
     expect(vb[2]).toBeCloseTo(240, 5);
     expect(vb[3]).toBeCloseTo(240, 5);
     const westSpan = wrapper.vm.fittedEdgeMarkers.find((m) => m.id === "r:west").span;
-    expect(westSpan).toBeCloseTo(240 - 2 * expectedGutter, 5);
+    // 47-unit rows plus the 14-unit label band; cropping does not reduce it.
+    expect(westSpan).toBe(155);
 
     const westMarker = wrapper.get('[data-testid="local-map__edge-marker--r:west"]');
     const westText = westMarker.get("text.local-map__edge-marker-name--island");
@@ -352,7 +353,7 @@ describe("The Overlay's Marker Names Obey the Geometry That Reserves Them (webcl
 
     // Top markers: island span = 120 / 3 = 40 -> budget 4. Overlay span =
     // 840 / 3 = 280 -> budget floor(280 / (CELL_EM × 16)) = 29.
-    expect(islandBudgets.get("r:top_1")).toBe(4);
+    expect(islandBudgets.get("r:top_1")).toBe(5);
     expect(overlayBudgets.get("r:top_1")).toBe(29);
     expect(overlayBudgets.get("r:top_1")).toBeGreaterThan(islandBudgets.get("r:top_1"));
 

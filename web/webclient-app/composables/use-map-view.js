@@ -12,7 +12,6 @@ import {
 } from "vue";
 import {
   DRAG_THRESHOLD,
-  FIT_INSET,
   ZOOM_STEP,
   centreOn,
   clampView,
@@ -52,8 +51,8 @@ export function useMapView({
     const rect = el.getBoundingClientRect();
     const vw = rect.width;
     const vh = rect.height;
-    if (vw <= 2 * FIT_INSET || vh <= 2 * FIT_INSET) return null;
-    return { vw, vh, W, H };
+    if (vw <= 0 || vh <= 0) return null;
+    return { vw, vh, W, H, current: toValue(currentPos) };
   }
 
   // Viewport resize observer (guarded for jsdom)
@@ -67,9 +66,9 @@ export function useMapView({
             const vh = cr.height;
             const W = toValue(canvasWidth);
             const H = toValue(canvasHeight);
-            if (!W || !H || vw <= 2 * FIT_INSET || vh <= 2 * FIT_INSET) continue;
+            if (!W || !H || vw <= 0 || vh <= 0) continue;
 
-            const newFrame = { vw, vh, W, H };
+            const newFrame = { vw, vh, W, H, current: toValue(currentPos) };
             if (!view.value) {
               view.value = fitView(newFrame);
             } else if (lastFrame) {
