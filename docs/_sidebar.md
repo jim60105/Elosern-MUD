@@ -3,6 +3,7 @@
 - 世界觀設定
   - [世界觀總覽](/lore/overview)
   - [魔法技能體系](/lore/magic-system)
+  - [魔物創作傾向指南](/lore/monster-creation-guidelines)
   - [物品圖鑑](/lore/items)
   - [聚落地點指南](/lore/settlement-locations)
   - 技能系譜設計
