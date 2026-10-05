@@ -111,7 +111,7 @@ trigger-service doc §3.4) and by the presenter when `options_state.status == de
    already gone).
 2. Curate to ≤ 5 entries in rank order: objective-relevant first, then talk over baseline, then
    `look`/`wait`; a `talk_freeform` entry may appear once as the conversation opener
-   (确定性無法發明台詞，所以 freeform 只以「開口交談」入口卡出現，不假造內容). Count is
+   (確定性無法發明台詞，所以 freeform 只以「開口交談」入口卡出現，不假造內容). Count is
    `min(|E|, 5)`.
 3. Each entry is already an executable suggestion card: `known_action` (or freeform with target),
    same `action_id`, same typed params, same label as the dock shows.

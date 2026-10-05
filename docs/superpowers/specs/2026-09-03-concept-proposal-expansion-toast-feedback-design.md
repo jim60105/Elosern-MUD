@@ -49,7 +49,7 @@
 
 單一寫入者契約：每種語氣恰好一個寫入點，零跨切片抑制協議。
 
-1. `creation.concept` 成功（結果 code `concept_applied`）：info toast「概念提案已套用到自訂表單」，**唯一寫入者是表單層**——`CreationOverlay.applyProposal()` 在套用新 revision 且 `conceptPending` 存活時經 `pushToast` 推播。只有套用时點同時知道「落地成功＋導航脈絡」；revision＋pending 雙守門天然單次。store 對成功結果刻意不推（result commit 時同步推播無法被 overlay 追溯抑制；`creationOverlayPresenting` 測不出「完成於概念頁」）。
+1. `creation.concept` 成功（結果 code `concept_applied`）：info toast「概念提案已套用到自訂表單」，**唯一寫入者是表單層**——`CreationOverlay.applyProposal()` 在套用新 revision 且 `conceptPending` 存活時經 `pushToast` 推播。只有套用時點同時知道「落地成功＋導航脈絡」；revision＋pending 雙守門天然單次。store 對成功結果刻意不推（result commit 時同步推播無法被 overlay 追溯抑制；`creationOverlayPresenting` 測不出「完成於概念頁」）。
 2. `creation.concept` 非成功（rejected／stale／error）：crit toast，title 為伺服端訊息逐字（如 LLM 離線的「概念服務目前無法使用」類訊息），**唯一寫入者是 store 的 `handleActionResult`**（`inFlight.handledResult` 指紋去重）。overlay 自身的 result 區照舊顯示（overlay 仍是 presenting surface 契約不變）。
 3. 佇列介面預留：未來 `event-log` 讀模型落地時，由 store 的 reducer 路徑把遊戲事件推入同一佇列，元件零改動。
 

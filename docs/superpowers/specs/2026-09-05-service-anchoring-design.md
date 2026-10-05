@@ -66,7 +66,7 @@ control: they pass unmodified except new `off_anchor` cases.
 ## 4. Presentation
 
 - Exploration affordances for a service whose host is co-located but off-anchor render
-  **disabled** with a fixed 正體中文 `disabled_reason` (「他的服務不在這裡營業。」类), using the
+  **disabled** with a fixed 正體中文 `disabled_reason` (「他的服務不在這裡營業。」類), using the
   affordance `disabled_reason.message` pattern already specified in exploration-affordances.
 - Anchor-room darkness (D5): the room's affordance scan finds no present host → no entry, no
   placeholder. Re-opening happens automatically the moment the host is co-present again — no

@@ -32,7 +32,7 @@ Evennia 沒有標準的伺服器推播面板更新協定。隨附的 Web 客戶�
 | 文字流（GAG lines） | `plugins/default_in.js`、`default_out.js` | 每個命令的輸出，重新整理即重印 |
 | 單行 `prompt` | `default_out.js` | 一行狀態槽 |
 | 泛用 OOB 派發 | `evennia.js`（`listeners[cmdname]`，無則 `default`） | 僅負責路由，重新整理語意由遊戲自己的 JS 決定 |
-| 客戶端對話框工具 | `plugins/popups.js` | 純本機，無伺服器驅動的內容更新 |
+| 客戶端對話方塊工具 | `plugins/popups.js` | 純本機，無伺服器驅動的內容更新 |
 | 行內可點擊按鈕 | `plugins/hotbuttons.js` | 靜態、客戶端自訂 |
 
 最接近標準的模式是 `EvMenu`。每個互動後伺服器重發整個動態區塊，客戶端整塊替換。既有的 `ui_snapshot` / `ui_update` 加上 epoch/revision 協定，正是這個模式的正式化版本。結論在於協定維持原樣，只修客戶端最後一哩的契約。

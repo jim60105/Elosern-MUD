@@ -165,7 +165,7 @@ seam 在 `world/quests/scene_builder.py::_spawn_npc()`：`_apply_characterizatio
 None，走規則層隨機包／隨機池）。LLM 已填名字的佔用者完全不動（「黑鬍」等
 模板名路徑不受影響）。
 
-注意兩側種子「刻意」不同源：prompt 階段是上下文種子的靈感名庫（§6.1，僅供
+注意兩側種子「刻意」不同源：prompt 階段是脈絡種子的靈感名庫（§6.1，僅供
 靈感、可被 LLM 改寫），spawn 階段是 definition.key:stage_index:role 的槽位
 種子（最終落地名、同藍圖重放必得同名）。
 

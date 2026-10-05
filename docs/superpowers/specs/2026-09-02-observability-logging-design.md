@@ -154,7 +154,7 @@ OpenSpec `verify` 階段的對照清單。
 ### 4.1 命令流
 
 將全部 `commands/` 下直接繼承 Evennia `Command` 的 production 命令掛到
-repo 基類 `commands/command.py::Command`（Evennia default commands 不在
+repo 基底類別 `commands/command.py::Command`（Evennia default commands 不在
 範圍），於其 `at_pre_cmd`／`at_post_cmd` 統一實作：
 
 | event | 級別 | context |
@@ -342,7 +342,7 @@ combat 每回合中間值等高頻資料走 `log_debug`，受 Evennia `VERBOSE` 
   另測 parse error 報 violation、豁免 reason 為空報錯。
 - facade 純邏輯測試（stdlib `unittest`）：context 渲染（排序、截斷、
   None 跳過、空白引號）、例外鏈摘要格式、logger 拋錯時退回 stderr。
-- Evennia 整合面：命令基類 `cmd_in`/`cmd_done` 以
+- Evennia 整合面：命令基底類別 `cmd_in`/`cmd_done` 以
   `EvenniaCommandTest` 驗證實際執行會產生兩條 log。
 - 遷移不新增行為測試；既有測試改 patch 對象後必須保持綠。
 

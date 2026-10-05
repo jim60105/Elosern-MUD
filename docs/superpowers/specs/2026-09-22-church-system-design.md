@@ -195,7 +195,7 @@ Modeled byte-shape-wise on guild registration (`commands/guild.py`):
    **The persona drops all religious narrative (owner decision):** no 聖女
    or 聖女繼承人 wording anywhere; the public identity loses the church
    clause; the personality's temple-blessing passages and the life story's
-   consecration/倾湧-duty sentences are deleted (not rewritten into a
+   consecration/傾湧-duty sentences are deleted (not rewritten into a
    successor framing) while keeping the rest of her story continuous.
    **`saintess_vestments` is removed from her `starting_items` (owner
    decision)** — the robe is no longer a family heirloom she starts with;
