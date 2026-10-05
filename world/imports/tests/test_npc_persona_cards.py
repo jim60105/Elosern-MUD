@@ -242,6 +242,26 @@ class NpcCardLoaderTests(BatchFiles, EvenniaTestCase):
             snapshot.provenance, {"kind": "import", "record": "synthetic_llm_npc"}
         )
 
+    def test_an_imported_npc_records_no_official_content_provenance(self):
+        from world.art import official_refs
+        from world.art.official_refs import (
+            NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+            official_content_reference_for_entity,
+        )
+
+        record = npc_record(key="synthetic_unprofiled_npc")
+        npc = instantiate_character(record)
+        # The import record shape names no authored profile identity, and its
+        # provenance is ``import``: nothing is inferred from the record key or
+        # the display name, so no official-content provenance is recorded.
+        self.assertFalse(npc.attributes.has(NPC_PROFILE_PROVENANCE_ATTRIBUTE))
+        with patch.object(
+            official_refs,
+            "NPC_PROFILE_REGISTRY",
+            {record["key"]: object(), record["display_name"]: object()},
+        ):
+            self.assertIsNone(official_content_reference_for_entity(npc))
+
     def test_single_record_entry_rejects_a_bad_card_and_creates_nothing(self):
         record = npc_record(key="synthetic_single_bad")
         record["persona"]["speech_style"] = "   "

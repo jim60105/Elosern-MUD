@@ -10,6 +10,8 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
+from django.db import transaction
+
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff
 from typeclasses.npcs import NPC
@@ -27,12 +29,20 @@ from world.rules.guild_exams import (
     ExamReason,
     ExamState,
     GuildExamError,
+    _spawn_opponent,
     _read_exams,
     from_storage,
     settle_exam_outcome,
     start_guild_exam,
     to_storage,
 )
+from world.art.official_refs import (
+    NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+    OFFICIAL_KIND_NPC,
+    OfficialContentReference,
+    official_content_reference_for_entity,
+)
+from world.rules.npc_persona import provenance_profile_key
 from world.rules.guild_offers import register_guild_offer
 from world.rules.surfaces import read_counter_trait
 from world.rules.tests._combat_session_helpers import (
@@ -239,6 +249,36 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(int(opponent.attributes.get("age")), 26)
         self.assertEqual(int(opponent.attributes.get("apparent_age")), 26)
         self.assertEqual(character_ages(opponent), (26, 26))
+
+    def test_the_spawned_examiner_records_its_authored_profile_provenance(self):
+        self._give_merit(50)
+        record = start_guild_exam(self.player, self.examiner, "E", requested_by="command")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        profile_key = _examiner_identity()[2]
+        # The authored profile key is recorded as stable provenance beside the
+        # persona write, and the persona record's own provenance agrees.
+        self.assertEqual(
+            opponent.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE), profile_key
+        )
+        self.assertEqual(provenance_profile_key(opponent), profile_key)
+        # Resolution binds the npc reference to that provenance, never to the
+        # rank's role/threat band.
+        self.assertEqual(
+            official_content_reference_for_entity(opponent),
+            OfficialContentReference(OFFICIAL_KIND_NPC, profile_key),
+        )
+
+    def test_a_rolled_back_examiner_spawn_leaves_no_provenance(self):
+        profile_key = _examiner_identity()[2]
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                opponent = _spawn_opponent(self.player, "E")
+                self.assertEqual(
+                    opponent.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE),
+                    profile_key,
+                )
+                raise RuntimeError("rollback")
+        self.assertFalse(NPC.objects.filter(db_key=_examiner_identity()[0]).exists())
 
     def test_npc_intent_has_no_extra_authority(self):
         # No merit -> rejected identically for both requesters.

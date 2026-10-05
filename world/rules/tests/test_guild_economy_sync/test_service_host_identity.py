@@ -15,10 +15,16 @@ from typeclasses.rooms import GridRoom
 from world.maps.bootstrap import sync_service_interiors
 from world.rules import guild_config
 from world.rules import guild_economy
+from world.art.official_refs import (
+    NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+    OFFICIAL_KIND_NPC,
+    official_content_reference_for_entity,
+)
 from world.rules.guild_config import get_catalog
 from world.rules.guild_config import load_catalog_into_cache
 from world.rules.guild_economy import ServiceAnchorIntegrityError
 from world.rules.guild_economy import sync_service_content
+from world.rules.npc_persona import provenance_profile_key
 from ._support import (
     GUILD_HALL_TAG,
     GUILD_SERVICE_ID,
@@ -653,6 +659,60 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
         # for the skipped row, and the skipped merchant's stock stayed absent.
         self.assertIsNotNone(NPC.objects.filter(db_key=_guild_host_name()).first())
         self.assertEqual(NPC.objects.filter(db_key=_merchant_host_name()).count(), 0)
+
+
+class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
+    """Authored official-content provenance, recorded once at host creation."""
+
+    def test_every_synced_host_records_its_authored_profile_provenance(self):
+        before = {host.pk for host in NPC.objects.all_family()}
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
+        created = [host for host in NPC.objects.all_family() if host.pk not in before]
+        self.assertTrue(created)
+        for host in created:
+            with self.subTest(host=host.key):
+                profile_key = host.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE)
+                self.assertIsInstance(profile_key, str)
+                self.assertTrue(profile_key)
+                # One authored key, two readers: the persona record's own
+                # provenance agrees with the entity attribute (pinned so the
+                # two cannot drift), and the official reference layer resolves
+                # the profile key rather than any tier or display text.
+                self.assertEqual(provenance_profile_key(host), profile_key)
+                reference = official_content_reference_for_entity(host)
+                self.assertIsNotNone(reference)
+                self.assertEqual(reference.kind, OFFICIAL_KIND_NPC)
+                self.assertEqual(reference.key, profile_key)
+
+    def test_a_reused_host_keeps_its_recorded_provenance_across_resyncs(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
+        host = NPC.objects.filter(db_key=_guild_host_name()).first()
+        recorded = host.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE)
+        self.assertEqual(recorded, _guild_row().profile_key)
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
+        same = NPC.objects.filter(db_key=_guild_host_name()).first()
+        self.assertEqual(same.pk, host.pk)
+        # Creation-only provenance: roster convergence reuses the host and
+        # never rewrites its recorded authored identity.
+        self.assertEqual(same.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE), recorded)
+
+    def test_a_rolled_back_host_creation_leaves_no_provenance(self):
+        from django.db import transaction
+
+        roster_row = _guild_row()
+        room = search_object_by_tag(GUILD_HALL_TAG)[0]
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                host = guild_economy._sync_service_host(roster_row, room)
+                self.assertEqual(
+                    host.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE),
+                    roster_row.profile_key,
+                )
+                raise RuntimeError("rollback")
+        self.assertFalse(NPC.objects.filter(db_key=_guild_host_name()).exists())
 
 
 if __name__ == "__main__":
