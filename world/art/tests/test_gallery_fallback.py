@@ -5,8 +5,10 @@ both directions, size bound, no tracked runtime art), the ordered resolution
 rule (declared registry key -> monster constant -> sex/age band ->
 deterministic subject-key hash), fail-closed behaviour on malformed stored
 sex/apparent age, restart determinism of the hash, the filled seam payload
-through the presenter (one ``gallery_fallback_used`` event, zero writes), and
-the closed serving vocabulary of the ``/art/defaults/`` route branch.
+through the presenter (the silhouette carried decoratively beside the true
+status — one ``gallery_fallback_used`` event, zero writes), the entity-identity
+rule for an entity with no named portrait subject, and the closed serving
+vocabulary of the ``/art/defaults/`` route branch.
 """
 
 import hashlib
@@ -26,10 +28,15 @@ from world.art.fallback_keys import (
     FALLBACK_MAX_FILE_BYTES,
     validate_fallback_key,
 )
-from world.art.gallery_fallback import fallback_key_for, resolve_fallback
+from world.art.gallery_fallback import (
+    fallback_key_for,
+    fallback_key_for_entity,
+    resolve_fallback,
+)
 from world.art.gallery_fallback import FALLBACK_FACE_RECTS
 from world.art.gallery_match import fallback_for
-from world.art.presenter import resolve_subject
+from world.art.presenter import ORIGIN_SILHOUETTE, resolve_subject
+from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monsters, player_presets
 
@@ -307,16 +314,100 @@ class BandRuleTests(unittest.TestCase):
         self.assertIn(fallback_key_for(_character("ghost"), None), ("man", "woman"))
 
 
+class EntityDecorationRuleTests(unittest.TestCase):
+    """The entity-identity rule for a placeholder row's decorative silhouette.
+
+    An entity with no named portrait subject has no subject key to hash, so its
+    stable runtime identity is the sole hash input. The declaration and band
+    rungs run the same code the subject rule runs (``fallback_key_for``), so
+    both paths can never drift apart.
+    """
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_the_band_rung_matches_the_subject_rule(self):
+        for sex, apparent_age, expected in (
+            ("female", 30, "woman"),
+            ("male", 30, "man"),
+            ("female", 8, "girl"),
+            ("male", 8, "boy"),
+            ("female", 75, "elder"),
+            ("male", 75, "elder"),
+        ):
+            with self.subTest(sex=sex, apparent_age=apparent_age):
+                entity = _entity(sex=sex, apparent_age=apparent_age)
+                self.assertEqual(
+                    fallback_key_for(_character("decoration"), entity), expected
+                )
+                self.assertEqual(fallback_key_for_entity(entity, "42"), expected)
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_the_declaration_rung_matches_the_subject_rule(self):
+        fake = SimpleNamespace(fallback_key="elder")
+        entity = _entity(sex="male", apparent_age=30, creation_preset_key="declared_p")
+        with patch.dict(
+            _live_registry(player_presets, "PLAYER", "PRESET"), {"declared_p": fake}
+        ):
+            self.assertEqual(fallback_key_for(_character("decoration"), entity), "elder")
+            self.assertEqual(fallback_key_for_entity(entity, "42"), "elder")
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_the_entity_identity_hashes_deterministically_into_the_band_pool(self):
+        # The identity — never a display name, and never one shared shape for
+        # every missing actor — decides, and it decides the same way on every
+        # call; an unpaired sex stays inside its band's pool.
+        for identity in ("17", "41", "880"):
+            with self.subTest(identity=identity):
+                entity = _entity(sex="other", apparent_age=30)
+                first = fallback_key_for_entity(entity, identity)
+                self.assertEqual(first, fallback_key_for_entity(entity, identity))
+                self.assertIn(first, ("man", "woman"))
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_malformed_attributes_fail_closed_to_the_adult_band(self):
+        for sex, apparent_age in ((None, 30), (17, 30), ("other", None), ("other", True)):
+            with self.subTest(sex=sex, apparent_age=apparent_age):
+                entity = _entity(sex=sex, apparent_age=apparent_age)
+                self.assertIn(
+                    fallback_key_for_entity(entity, "5"), ("man", "woman")
+                )
+
+
+class EntityMonsterConstantTests(EvenniaTestCase):
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_a_monster_without_a_declaration_selects_the_constant(self):
+        from evennia.utils.create import create_object
+        from typeclasses.monsters import Monster
+
+        # A bestiary entity with no resolvable tier still selects the monster
+        # constant rather than a person-band silhouette.
+        monster = create_object(Monster, key="decoration-monster")
+        monster.apparent_age = 30
+        self.assertEqual(
+            fallback_key_for_entity(monster, str(monster.pk)), "monster_anon"
+        )
+
+
 class SeamPayloadTests(EvenniaTestCase):
     @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
-    def test_the_presenter_resolves_a_fallback_image_and_logs_one_event(self):
+    def test_the_presenter_carries_a_fallback_image_and_logs_one_event(self):
         subject = _character("fallbackhero")
         with patch("world.observability.log_info") as logged:
             payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertTrue(payload["url"].startswith("/art/defaults/"))
-        self.assertTrue(payload["url"].endswith(FALLBACK_EXTENSION))
-        rect = payload["face_rect"]
+        # The resolved silhouette rides the decorative `fallback` field: the
+        # payload's own media URL stays null and its true status stands
+        # (builtin-silhouette-stage-fallback).
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["kind"], "missing")
+        self.assertEqual(payload["status"], ArtAssetStatus.MISSING)
+        self.assertNotIn("已生成", str(payload))
+        silhouette = payload["fallback"]
+        self.assertIn(silhouette["key"], FALLBACK_KEYS)
+        self.assertEqual(
+            silhouette["url"],
+            f"/art/defaults/{silhouette['key']}{FALLBACK_EXTENSION}",
+        )
+        rect = silhouette["face_rect"]
         self.assertEqual(sorted(rect), ["h", "w", "x", "y"])
         self.assertTrue(all(0.0 <= rect[f] <= 1.0 for f in ("x", "y", "w", "h")))
         events = [c for c in logged.call_args_list if c.args and c.args[0] == "gallery_fallback_used"]
@@ -325,6 +416,33 @@ class SeamPayloadTests(EvenniaTestCase):
         self.assertEqual(context["subject"], subject.full())
         self.assertEqual(context["kind"], ArtSubjectKind.CHARACTER.value)
         self.assertIn(context["key"], FALLBACK_KEYS)
+
+    @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
+    def test_a_decorative_carriage_selects_the_same_key_without_reporting_a_use(self):
+        # The presenter carries the reference beside a resolved real image and
+        # reports no use then: the event marks a presented silhouette, never a
+        # decorated payload. Selection is byte-identical either way.
+        subject = _character("quiethero")
+        with patch("world.observability.log_info") as logged:
+            quiet = fallback_for(subject, report=False)
+        self.assertEqual(
+            [
+                call
+                for call in logged.call_args_list
+                if call.args and call.args[0] == "gallery_fallback_used"
+            ],
+            [],
+        )
+        self.assertEqual(sorted(quiet), ["face_rect", "identity", "key"])
+        with patch("world.observability.log_info") as logged:
+            announced = fallback_for(subject)
+        self.assertEqual(quiet, announced)
+        events = [
+            call
+            for call in logged.call_args_list
+            if call.args and call.args[0] == "gallery_fallback_used"
+        ]
+        self.assertEqual(len(events), 1)
 
     @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
     def test_the_fallback_writes_no_record_and_no_card(self):

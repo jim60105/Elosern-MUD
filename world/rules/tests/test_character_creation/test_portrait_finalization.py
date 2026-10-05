@@ -222,18 +222,25 @@ class PortraitFinalizationTests(EvenniaTest):
         self.assertEqual(gallery_api.cards_for(subject), [])
         # Empty-gallery resolution reaches the chain's terminal fallback seam
         # (world.art.gallery_match.fallback_for): filled by
-        # gallery-builtin-fallbacks, the seam now resolves a committed
-        # built-in default for the artless character.
+        # gallery-builtin-fallbacks, the seam resolves a committed built-in
+        # silhouette for the artless character, carried decoratively beside the
+        # subject's true missing state (builtin-silhouette-stage-fallback).
         with patch("world.observability.log_info"):
             payload = resolve_entity(self.character)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertTrue(payload["url"].startswith("/art/defaults/"))
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIsNone(payload["url"])
+        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
         with patch(
             "world.art.presenter.fallback_for",
-            return_value={"identity": "fallback/character/default.png"},
+            return_value={
+                "identity": "defaults/man.webp",
+                "key": "man",
+                "face_rect": None,
+            },
         ):
             served = resolve_entity(self.character)
-        self.assertEqual(served["kind"], "asset")
+        self.assertEqual(served["fallback"]["url"], "/art/defaults/man.webp")
+        self.assertIsNone(served["url"])
 
     @covers_requirement(
         "art-gallery-autogen::player-creation-may-skip-the-automatic-portrait"
