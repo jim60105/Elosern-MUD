@@ -5,15 +5,15 @@
 
 ## 2. Catalog core
 
-- [ ] 2.1 Create `world/art/official.py` with the startup index over the `monster|preset/npc/<key>/<file>` layout using no-follow directory walking (gallery_seed discipline), and verify with unit tests that valid synthetic content indexes with root-relative identities and deterministic ordering
-- [ ] 2.2 Implement admission validation — closed extension vocabulary, decodable under the existing bounded image limits, strictly in-root, non-symlink regular files — and verify per-entry refusal tests for out-of-root symlinks, unsupported formats, undecodable and oversized files each prove unrelated valid entries still index
-- [ ] 2.3 Implement optional per-content `manifest.json` handling (`default`, `face_rect`, `stage`; fitted-default and identity-stage degradation, bounded diagnostic, missing manifest silent) and verify manifest tests cover valid, invalid, missing, and per-image-invalid-rectangle cases
-- [ ] 2.4 Compute the per-file content fingerprint once at load and expose `fingerprint_for(identity)` plus snapshot lookup, and verify a test that byte replacement plus reload changes the fingerprint and that resolution performs no hashing
+- [x] 2.1 Create `world/art/official.py` with the startup index over the `monster|preset/npc/<key>/<file>` layout using no-follow directory walking (gallery_seed discipline), and verify with unit tests that valid synthetic content indexes with root-relative identities and deterministic ordering
+- [x] 2.2 Implement admission validation — closed extension vocabulary, decodable under the existing bounded image limits, strictly in-root, non-symlink regular files — and verify per-entry refusal tests for out-of-root symlinks, unsupported formats, undecodable and oversized files each prove unrelated valid entries still index
+- [x] 2.3 Implement optional per-content `manifest.json` handling (`default`, `face_rect`, `stage`; fitted-default and identity-stage degradation, bounded diagnostic, missing manifest silent) and verify manifest tests cover valid, invalid, missing, and per-image-invalid-rectangle cases
+- [x] 2.4 Compute the per-file content fingerprint once at load and expose `fingerprint_for(identity)` plus snapshot lookup, and verify a test that byte replacement plus reload changes the fingerprint and that resolution performs no hashing
 - [ ] 2.5 Wire catalog load into the art service startup step list and verify a startup-integration test proves an absent root yields an empty catalog, startup succeeds, and no network/extraction call occurs (patched socket tripwire per repo convention)
 
 ## 3. Observability
 
-- [ ] 3.1 Emit the `official_art_catalog_loaded` boundary event plus bounded per-entry refusal events with a diagnostic budget through the `world.observability` named-import facade, and verify event tests assert counts, context keys (kind/key/relative path, never absolute roots), and the suppressed-count reporting; run the observability lint check over changed modules
+- [x] 3.1 Emit the `official_art_catalog_loaded` boundary event plus bounded per-entry refusal events with a diagnostic budget through the `world.observability` named-import facade, and verify event tests assert counts, context keys (kind/key/relative path, never absolute roots), and the suppressed-count reporting; run the observability lint check over changed modules
 
 ## 4. Media serving
 
