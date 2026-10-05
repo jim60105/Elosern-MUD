@@ -283,6 +283,12 @@ export function applyCreation(ctx) {
     const modeChanged = !!prev && prev.mode !== rs.mode;
     const epochChanged = !!prev && prev.epoch !== rs.activeEpoch;
     const transportLost = !!prev && prev.connected && !rs.connected;
+    // A transport-generation reset is a genuine lifecycle boundary on its own
+    // (correspondence-panel-open-once D3): a letters folio opened while the
+    // store was still awaiting its first snapshot has a null epoch and a null
+    // mode, so the three transitions above never fire for it and its private
+    // prose/draft/unsent load would otherwise survive the reset.
+    const generationChanged = !!prev && prev.generation !== rs.generation;
     // No-puppet detach is a teardown event in its own right: the reducer
     // retains the epoch and the mode on a `no_puppet` protocol error, so
     // the three transitions above never fire for it. Without this
@@ -338,6 +344,13 @@ export function applyCreation(ctx) {
       return;
     }
 
+    // The narrow generation-close guard for that null-epoch case (D3): only the
+    // letters drawer is discarded here, and only when none of the teardown
+    // events above already handled it. The NPC author editor's own lifecycle
+    // and every other drawer are untouched.
+    if (generationChanged && ctx.hudDrawer.value === "letters") {
+      ctx.hudDrawer.value = null;
+    }
 
     // webclient-align-05-party-hud: on a committed transition where party
     // data becomes unavailable, or mode transitions into creation, close the party drawer.
