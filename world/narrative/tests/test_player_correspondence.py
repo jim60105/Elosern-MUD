@@ -190,6 +190,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         self.other.msg.assert_called_once_with(record.body)
 
     @covers_requirement("correspondence-player-surface::sending-and-collection-require-any-branch")
+    @covers_requirement("correspondence-player-surface::letter-panel-state-follows-genuine-lifecycle-boundaries")
     def test_branch_page_after_leaving_grants_no_remote_send_or_collection(self):
         incoming = self.due_letter()
         self.player.location = self.room2
@@ -237,6 +238,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         self.assertIsNone(state.read_tick)
 
     @covers_requirement("correspondence-player-surface::collection-and-reading-remain-distinct")
+    @covers_requirement("correspondence-player-surface::letter-loading-has-explicit-recovery-and-authoritative-response-updates")
     def test_collected_unread_letter_is_portable_and_reads_exactly_once(self):
         incoming = self.due_letter(body="合成隨身內容")
         baseline = ProjectionProgress.objects.count()
@@ -296,6 +298,7 @@ class PlayerCorrespondenceTests(EvenniaTest):
         self.assertIsNone(LetterState.objects.get(letter__source_id=foreign.source_id).read_tick)
         self.assertIsNone(LetterState.objects.get(letter__source_id=mine.source_id).read_tick)
 
+    @covers_requirement("correspondence-player-surface::personal-letters-load-once-per-opening")
     def test_anchor_duplicates_and_pagination_fail_closed(self):
         duplicate = create_object("typeclasses.rooms.Room", key="Synthetic duplicate anchor", tags=["synthetic_branch_a"])
         self.assertFalse(surface.branch_available(self.player))
