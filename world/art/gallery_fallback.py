@@ -17,6 +17,11 @@ contract test locks). Resolution is ordered:
    elder); ``female``/``male`` resolve that band's sex key directly and any
    other sex hashes the subject's full key into the band's ordered pool.
 
+An entity that carries no named portrait subject at all (the decorative
+silhouette on a placeholder row) resolves through the same rungs via
+``fallback_key_for_entity``, with its stable runtime entity identity as the
+sole hash input.
+
 The resolution is a pure function of the subject key plus the stored sex and
 apparent age: the same subject resolves the same key on every restart, on
 every process, and on every machine. Missing or malformed sex or apparent-age
@@ -218,6 +223,25 @@ def _hash_into_pool(subject_full_key: str, pool: tuple[str, ...]) -> str:
     return pool[int.from_bytes(digest, "big") % len(pool)]
 
 
+def _band_or_hash(identity: str, entity: Any) -> str:
+    """The band's sex key for ``entity``, else ``identity``'s pool entry.
+
+    The one band rule: an apparent age at or below the child ceiling uses the
+    child band, at or above the elder floor the elder band, and everything
+    else (including a missing or malformed value) the adult band; ``female``
+    and ``male`` resolve that band's key directly and every other sex hashes
+    ``identity`` into the band's ordered pool.
+    """
+    sex = getattr(entity, "sex", None) if entity is not None else None
+    stored = getattr(entity, "db", None) if entity is not None else None
+    apparent_age = getattr(stored, "apparent_age", None) if stored is not None else None
+    band = _AGE_BANDS[_band_name_for_apparent_age(apparent_age)]
+    sex_key = band["female"] if sex == "female" else band["male"] if sex == "male" else None
+    if sex_key is not None:
+        return str(sex_key)
+    return _hash_into_pool(identity, band["pool"])
+
+
 def fallback_key_for(subject: ArtSubject, entity: Any = None) -> str:
     """Resolve the fallback key for ``subject`` by declaration, band, hash.
 
@@ -233,14 +257,27 @@ def fallback_key_for(subject: ArtSubject, entity: Any = None) -> str:
         return declared
     if subject.kind is ArtSubjectKind.MONSTER:
         return "monster_anon"
-    sex = getattr(entity, "sex", None) if entity is not None else None
-    stored = getattr(entity, "db", None) if entity is not None else None
-    apparent_age = getattr(stored, "apparent_age", None) if stored is not None else None
-    band = _AGE_BANDS[_band_name_for_apparent_age(apparent_age)]
-    sex_key = band["female"] if sex == "female" else band["male"] if sex == "male" else None
-    if sex_key is not None:
-        return str(sex_key)
-    return _hash_into_pool(subject.full(), band["pool"])
+    return _band_or_hash(subject.full(), entity)
+
+
+def fallback_key_for_entity(entity: Any, identity: str) -> str:
+    """The fallback key for an entity carrying no named portrait subject.
+
+    The decoration rule for a placeholder row whose entity has no portrait
+    policy: a registry key declared by the entity's provenance still wins, a
+    bestiary monster without one selects ``monster_anon``, and otherwise the
+    stored sex and apparent age select the band while ``identity`` — the
+    entity's stable runtime identity — is the sole hash input (there is no
+    subject key to hash).
+    """
+    declared = _declared_key_for_entity(entity)
+    if declared is not None:
+        return declared
+    from typeclasses.monsters import Monster
+
+    if isinstance(entity, Monster):
+        return "monster_anon"
+    return _band_or_hash(identity, entity)
 
 
 def resolve_fallback(subject: ArtSubject, entity: Any = None) -> dict | None:
@@ -270,5 +307,6 @@ __all__ = [
     "fallback_face_rect",
     "fallback_identity_and_rect",
     "fallback_key_for",
+    "fallback_key_for_entity",
     "resolve_fallback",
 ]

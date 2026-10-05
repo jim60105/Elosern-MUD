@@ -7,6 +7,15 @@ deterministic gallery display chain in ``world.art.gallery_match``; every
 payload it produces carries ``face_rect`` — the resolved card's rectangle,
 the shared default for a classic asset or a fallback image, or ``null`` for
 every placeholder.
+Every payload also carries ``origin`` (the closed portrait-origin
+discriminator vocabulary this change establishes) and the decorative
+``fallback`` silhouette reference: the resolved built-in key, its committed
+``/art/defaults/`` URL, and that key's rectangle, carried on stage-eligible
+payloads whether or not a real image resolved, so a browser whose real image
+later fails to load renders the already-resolved silhouette without a new
+request. The field is presentation data only: it never becomes a payload's
+own media URL, never reports the portrait as generated, and never changes the
+subject's true status.
 It never exposes ``out_path``, the store root, or any absolute filesystem path.
 Change 23f's browser panel consumes these primitives; this change owns them.
 """
@@ -22,6 +31,7 @@ from world.art.gallery import (
     validate_stage,
     identity_stage,
 )
+from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_for_entity
 from world.art.gallery_match import fallback_for, resolve_card
 from world.art.paths import resolved_under_store_root
 from world.art.queue import record_key
@@ -43,6 +53,16 @@ PLACEHOLDER_LABELS = {
     PLACEHOLDER_MISSING: "未生成",
     PLACEHOLDER_UNAVAILABLE: "無法提供",
 }
+
+# The CLOSED portrait-origin discriminator vocabulary (art-gallery-fallback
+# owns it here): ``runtime`` for a card or classic image the payload itself
+# carries, ``silhouette`` when only the built-in fallback resolved, and
+# ``placeholder`` when nothing did. The origin is computed from the branch
+# that produced the payload, never inferred from the presence of a URL;
+# `official-art-resolution-contracts` extends the vocabulary with ``official``.
+ORIGIN_RUNTIME = "runtime"
+ORIGIN_SILHOUETTE = "silhouette"
+ORIGIN_PLACEHOLDER = "placeholder"
 
 # The fixed aspect ratio of every gallery card / fallback image payload:
 # portrait geometry is a presenter-side constant (cards store no ratio),
@@ -105,6 +125,14 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     shared default for a classic asset or fallback image, or ``None`` for a
     placeholder.
 
+    A resolved fallback is NEVER the payload's own image: it rides the
+    decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
+    rectangle) beside the subject's true status, so a silhouette-only
+    resolution stays the truthful placeholder row it is — no ``done`` status,
+    no generated label, and the same persisted record. Payloads whose real
+    image resolved carry the same reference (without reporting a use) so the
+    browser can fall back locally when that image fails to load.
+
     Returns status, same-origin URL, aspect ratio, and alternative text for a
     ``done`` record; a truthful placeholder kind/label otherwise. Never leaks
     ``out_path`` or the store root. A claimed ``in_progress`` record is
@@ -115,7 +143,11 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     """
     card = resolve_card(subject, entity)
     if card is not None:
-        return _card_payload(subject, card)
+        return _carried(
+            _card_payload(subject, card),
+            _silhouette_field(subject, entity, report=False),
+            origin=ORIGIN_RUNTIME,
+        )
     record = _record_for(subject)
     identity = None
     if record is not None and record.db.status == ArtAssetStatus.DONE:
@@ -123,42 +155,49 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
         if identity is None:
             log_warn("art_asset_output_missing", context={"subject": subject.full()})
     if identity is not None:
-        return {
-            "kind": "asset",
-            "label": "已生成",
-            "status": ArtAssetStatus.DONE,
-            "url": media_url_for(identity),
-            "aspect_ratio": record.db.aspect_ratio,
-            "alt": subject.full(),
-            "subject_key": subject.full(),
-            "face_rect": dict(DEFAULT_FACE_RECT),
-            "stage": identity_stage(),
-        }
+        return _carried(
+            {
+                "kind": "asset",
+                "label": "已生成",
+                "status": ArtAssetStatus.DONE,
+                "url": media_url_for(identity),
+                "aspect_ratio": record.db.aspect_ratio,
+                "alt": subject.full(),
+                "subject_key": subject.full(),
+                "face_rect": dict(DEFAULT_FACE_RECT),
+                "stage": identity_stage(),
+            },
+            _silhouette_field(subject, entity, report=False),
+            origin=ORIGIN_RUNTIME,
+        )
     # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
     # EVERY fall-through path — no record, an unfinished record, and an
     # unusable done identity alike — before the placeholder closes the chain.
     # The already-resolved entity rides along so the resolver reads its sex,
     # apparent age, and registry provenance directly (gallery-builtin-fallbacks).
-    fallback = fallback_for(subject, entity=entity)
-    if fallback is not None:
-        return _fallback_payload(subject, fallback)
+    # A resolution here IS the presented figure, so it reports its use exactly
+    # once and is carried decoratively — never as the payload's own media URL.
+    silhouette = _silhouette_field(subject, entity)
     if record is None or record.db.status != ArtAssetStatus.DONE:
         kind = PLACEHOLDER_MISSING
         status = record.db.status if record else ArtAssetStatus.MISSING
         if status == ArtAssetStatus.IN_PROGRESS:
             status = ArtAssetStatus.PENDING
-        return {
-            "kind": kind,
-            "label": PLACEHOLDER_LABELS[kind],
-            "status": status,
-            "url": None,
-            "aspect_ratio": record.db.aspect_ratio if record else None,
-            "alt": PLACEHOLDER_LABELS[kind],
-            "subject_key": subject.full(),
-            "face_rect": None,
-            "stage": None,
-        }
-    return _placeholder_unavailable("無法提供")
+        return _carried(
+            {
+                "kind": kind,
+                "label": PLACEHOLDER_LABELS[kind],
+                "status": status,
+                "url": None,
+                "aspect_ratio": record.db.aspect_ratio if record else None,
+                "alt": PLACEHOLDER_LABELS[kind],
+                "subject_key": subject.full(),
+                "face_rect": None,
+                "stage": None,
+            },
+            silhouette,
+        )
+    return _carried(_placeholder_unavailable("無法提供"), silhouette)
 
 
 def _card_payload(subject: ArtSubject, card: dict) -> dict:
@@ -192,35 +231,83 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     }
 
 
-def _fallback_payload(subject: ArtSubject, fallback: dict) -> dict:
-    """The asset payload for a fallback image supplied by the terminal seam.
+def _carried(payload: dict, silhouette: dict | None, *, origin: str | None = None) -> dict:
+    """Attach the origin discriminator and the decorative silhouette.
 
-    Filled by ``gallery-builtin-fallbacks``: the seam hands back the resolved
-    built-in default's ``defaults/<key>.webp`` identity plus its per-key face
-    rectangle, and the URL is built from the identity exactly like every
-    other branch (the media route serves it from the in-repo defaults
-    directory). An unusable seam result stays the truthful placeholder, and a
-    missing or malformed seam rectangle defaults to the shared face rectangle
-    without failing the payload.
+    ``origin`` states the branch that produced the payload's OWN media (a
+    resolved card or classic asset: ``runtime``). Every other payload derives
+    it from what actually resolved: ``silhouette`` when the built-in fallback
+    did, ``placeholder`` when nothing did.
     """
-    identity = fallback.get("identity") if isinstance(fallback, dict) else None
+    payload["fallback"] = silhouette
+    payload["origin"] = (
+        origin
+        if origin is not None
+        else ORIGIN_SILHOUETTE if silhouette is not None else ORIGIN_PLACEHOLDER
+    )
+    return payload
+
+
+def _silhouette(key: object, identity: object, face_rect: object) -> dict | None:
+    """The decorative reference for one resolved fallback key, or ``None``.
+
+    The URL is built from the committed identity exactly like every other
+    branch (the media route serves ``defaults/`` and nothing else). A missing
+    or malformed rectangle defaults to the shared face rectangle without
+    failing the payload.
+    """
+    if not isinstance(key, str) or not key:
+        return None
     if not isinstance(identity, str) or not identity:
-        return _placeholder_unavailable("無法提供")
+        return None
+    rect: dict[str, float] | None = None
     try:
-        face_rect = validate_face_rect(fallback.get("face_rect"))
+        rect = validate_face_rect(face_rect)
     except GalleryRecordError:  # observability: ignore R2: seam rectangle defaults per contract
-        face_rect = dict(DEFAULT_FACE_RECT)
-    return {
-        "kind": "asset",
-        "label": "已生成",
-        "status": ArtAssetStatus.DONE,
-        "url": media_url_for(identity),
-        "aspect_ratio": GALLERY_ASPECT_RATIO,
-        "alt": subject.full(),
-        "subject_key": subject.full(),
-        "face_rect": face_rect,
-        "stage": identity_stage(),
-    }
+        rect = None
+    if rect is None:
+        rect = dict(DEFAULT_FACE_RECT)
+    return {"key": key, "url": media_url_for(identity), "face_rect": rect}
+
+
+def _silhouette_field(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
+    """The silhouette a subject's payload carries, via the terminal seam.
+
+    ``report`` marks whether the resolution is the payload's presented figure
+    (the chain fell all the way through) or a decorative reference carried
+    beside a real image; it rides through to the seam, which owns the
+    ``gallery_fallback_used`` event.
+    """
+    fallback = fallback_for(subject, entity=entity, report=report)
+    if not isinstance(fallback, dict):
+        return None
+    return _silhouette(
+        fallback.get("key"), fallback.get("identity"), fallback.get("face_rect")
+    )
+
+
+def _entity_silhouette(entity) -> dict | None:
+    """The decorative silhouette for an entity with no named portrait subject.
+
+    A rejected subject (no policy, malformed policy, no age pair) has no
+    subject key to hand the seam, so selection runs ``fallback_key_for_entity``
+    over the entity's validated attributes with its stable runtime identity as
+    the sole hash input; the resolved key's committed identity and rectangle
+    come from the same map. The one ``gallery_fallback_used`` event is
+    reported with ``kind`` "entity" because no portrait subject exists, and
+    nothing is installed, created, or enqueued.
+    """
+    identity = getattr(entity, "pk", None)
+    if entity is None or identity is None:
+        return None
+    key = fallback_key_for_entity(entity, str(identity))
+    from world.observability import log_info
+
+    log_info(
+        "gallery_fallback_used",
+        context={"subject": str(identity), "kind": "entity", "key": key},
+    )
+    return _silhouette(key, *fallback_identity_and_rect(key))
 
 
 def resolve_character(entity) -> dict:
@@ -235,11 +322,13 @@ def resolve_character(entity) -> dict:
     except ArtSubjectError:  # observability: ignore R2: unresolvable subject -> specified unavailable placeholder payload
         subject = None
     if subject is None:
-        return _placeholder_unavailable("無肖像")
+        return _placeholder_unavailable("無肖像", silhouette=_entity_silhouette(entity))
     try:
         character_ages(entity)
     except Exception:  # observability: ignore R2: age-eligibility failure -> specified unavailable placeholder; diagnostics must never leak
-        return _placeholder_unavailable("無法提供")
+        return _placeholder_unavailable(
+            "無法提供", silhouette=_silhouette_field(subject, entity)
+        )
     return resolve_subject(subject, entity=entity)
 
 
@@ -259,7 +348,9 @@ def resolve_entity(entity) -> dict:
         try:
             subject = monster_subject_for(threat_tier)
         except ArtSubjectError:  # observability: ignore R2: unregistered tier -> specified unavailable placeholder
-            return _placeholder_unavailable("無法提供")
+            return _placeholder_unavailable(
+                "無法提供", silhouette=_entity_silhouette(entity)
+            )
         payload = resolve_subject(subject, entity=entity)
         payload["subject_key"] = subject.full()
         return payload
@@ -277,15 +368,25 @@ def resolve_scene(archetype: str) -> dict:
     return resolve_subject(subject)
 
 
-def _placeholder_unavailable(label: str) -> dict:
-    return {
-        "kind": PLACEHOLDER_UNAVAILABLE,
-        "label": label,
-        "status": None,
-        "url": None,
-        "aspect_ratio": None,
-        "alt": label,
-        "subject_key": None,
-        "face_rect": None,
-        "stage": None,
-    }
+def _placeholder_unavailable(label: str, *, silhouette: dict | None = None) -> dict:
+    """The unavailable placeholder row, with the decorative silhouette.
+
+    The real fields stay null (no URL, no subject key, no rectangle, no
+    stage); the silhouette the entity's validated attributes select is carried
+    beside them, so a placeholder row still shows the attribute-selected
+    figure instead of one shared shape for every missing actor.
+    """
+    return _carried(
+        {
+            "kind": PLACEHOLDER_UNAVAILABLE,
+            "label": label,
+            "status": None,
+            "url": None,
+            "aspect_ratio": None,
+            "alt": label,
+            "subject_key": None,
+            "face_rect": None,
+            "stage": None,
+        },
+        silhouette,
+    )

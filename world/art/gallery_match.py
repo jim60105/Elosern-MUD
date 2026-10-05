@@ -164,7 +164,7 @@ def _default_card(subject: ArtSubject, cards: list[dict]) -> dict | None:
     return None
 
 
-def fallback_for(subject: ArtSubject, entity=None) -> dict | None:
+def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
     """The terminal fallback seam: consulted after the classic asset record.
 
     Filled by ``gallery-builtin-fallbacks`` with the deterministic built-in
@@ -175,26 +175,37 @@ def fallback_for(subject: ArtSubject, entity=None) -> dict | None:
     digit-only keys, unique pk-ordered attribute scan otherwise — an
     ambiguous shared stable key recovers no entity, failing closed), and
     scene subjects resolve ``None`` which falls through to the truthful
-    placeholder. Every resolution emits the
-    ``gallery_fallback_used`` event naming subject and resolved key and
-    writes nothing. The presenter is the seam's only consumer and gives
-    whatever it returns the shared default face rectangle unless the seam
-    carries one; the returned ``identity`` is a validated ``defaults/``-branch
-    identity the media route serves (the route refuses to serve anything
-    else).
+    placeholder. The resolution returns ``{identity, face_rect, key}`` and
+    writes nothing; the returned ``identity`` is a validated ``defaults/``
+    branch identity the media route serves (the route refuses to serve
+    anything else).
+
+    ``report`` is the observability decision, not a selection decision:
+    ``True`` (the terminal-presentation use) emits one ``gallery_fallback_used``
+    event naming the subject, kind, and resolved key. The presenter asks for
+    ``report=False`` only when it carries the resolution as the decorative
+    silhouette reference beside a real portrait — the fallback is not
+    presented then, so no use event is reported. Selection is identical
+    either way. The event is per presentation, not per entity: every payload
+    that presents the silhouette reports its own resolution (a re-presented
+    subject reports again), so a reader never infers a deduplicated set.
     """
     from world.art.gallery_fallback import resolve_fallback
 
     resolution = resolve_fallback(subject, entity=entity)
     if resolution is None:
         return None
-    key = resolution.pop("key")
-    from world.observability import log_info
+    if report:
+        from world.observability import log_info
 
-    log_info(
-        "gallery_fallback_used",
-        context={"subject": subject.full(), "kind": subject.kind.value, "key": key},
-    )
+        log_info(
+            "gallery_fallback_used",
+            context={
+                "subject": subject.full(),
+                "kind": subject.kind.value,
+                "key": resolution["key"],
+            },
+        )
     return resolution
 
 

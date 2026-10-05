@@ -12,8 +12,12 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.art.fake_sd_client import FakeSDWebUIClient
+from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
 from world.art.gallery import DEFAULT_FACE_RECT, append_card, cards_for, default_face_rect
 from world.art.presenter import (
+    ORIGIN_PLACEHOLDER,
+    ORIGIN_RUNTIME,
+    ORIGIN_SILHOUETTE,
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
     media_url_for,
@@ -271,12 +275,17 @@ class ArtPresenterTests(EvenniaTestCase):
         )
         # A monster identity living outside portrait/monster/ fails the
         # subject-shape validation no matter which format is configured.
-        # Filled seam (gallery-builtin-fallbacks): the unusable identity now
-        # falls through to the built-in fallback instead of the placeholder.
+        # Filled seam (gallery-builtin-fallbacks): the unusable identity falls
+        # through to the built-in silhouette, which rides the decorative
+        # `fallback` field beside the subject's true unavailable state and
+        # never becomes this payload's own image
+        # (builtin-silhouette-stage-fallback).
         with patch("world.observability.log_info"):
             payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertTrue(payload["url"].startswith("/art/defaults/"))
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
@@ -353,9 +362,12 @@ class ResolveEntityTests(EvenniaTestCase):
         with patch("world.observability.log_info"):
             payload = resolve_entity(self.player)
         self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
-        # Filled seam: an artless character now resolves a built-in fallback.
-        self.assertEqual(payload["kind"], "asset")
-        self.assertTrue(payload["url"].startswith("/art/defaults/"))
+        # Filled seam: an artless character resolves a built-in silhouette,
+        # carried decoratively beside its true missing state.
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
         self.assertIn("subject_key", payload)
 
     def test_valid_canonical_ages_reach_the_generation_client(self):
@@ -373,9 +385,12 @@ class ResolveEntityTests(EvenniaTestCase):
         with patch("world.observability.log_info"):
             payload = resolve_entity(self.monster)
         self.assertEqual(payload["subject_key"], f"portrait:monster:{_SYNTH_TIER}")
-        # Filled seam: an artless monster resolves the monster_anon default.
-        self.assertEqual(payload["kind"], "asset")
-        self.assertTrue(payload["url"].startswith("/art/defaults/"))
+        # Filled seam: an artless monster resolves the monster_anon default as
+        # its decorative silhouette.
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["fallback"]["key"], "monster_anon")
+        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
 
     def test_non_integer_age_never_reaches_a_worker(self):
         self.player.age = "22"
@@ -607,21 +622,229 @@ class FaceRectPayloadTests(_CardPayloadCase):
         "art-gallery-resolution::the-chain-ends-at-one-fallback-seam"
     )
     def test_the_seam_is_consulted_on_every_fall_through_path(self):
-        # A filled seam must win over the placeholder for every subject that
-        # resolved no card and no classic done asset: no record at all, and
-        # an unusable done identity.
-        seam = {"identity": "defaults/monster_default.png", "face_rect": None}
+        # A filled seam decorates every subject that resolved no card and no
+        # classic done asset: no record at all, and an unusable done identity.
+        seam = {"identity": "defaults/monster_default.png", "key": "man", "face_rect": None}
         no_record = ArtSubject(ArtSubjectKind.MONSTER, "seam-no-record")
         with patch("world.art.presenter.fallback_for", return_value=seam):
             payload = resolve_subject(no_record)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["url"], "/art/defaults/monster_default.png")
-        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(
+            payload["fallback"],
+            {
+                "key": "man",
+                "url": "/art/defaults/monster_default.png",
+                "face_rect": dict(DEFAULT_FACE_RECT),
+            },
+        )
         # The unpatched seam fills persons but still returns None for scenes:
         # a scene subject keeps the byte-identical truthful placeholder.
         scene = ArtSubject(ArtSubjectKind.SCENE, "seam-no-record-scene")
         payload = resolve_subject(scene)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertEqual(payload["origin"], ORIGIN_PLACEHOLDER)
+        self.assertIsNone(payload["fallback"])
+
+
+class SilhouettePayloadTests(EvenniaTestCase):
+    """The decorative built-in silhouette every payload carries.
+
+    The resolved fallback is presentation data for a still-absent portrait: it
+    rides the ``fallback`` field beside the subject's true status, never
+    becomes the payload's own media URL, and reports one use event only when
+    it is the presented figure (art-gallery-fallback).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.tempdir.name))
+        self.art_settings.enable()
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        super().tearDown()
+
+    def _character(self, stable_key: str):
+        entity = create_object(PlayerCharacter, key=f"silhouette-{stable_key}")
+        entity.age = 30
+        entity.apparent_age = 30
+        entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        return entity
+
+    @covers_requirement(
+        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
+    )
+    def test_a_silhouette_payload_never_claims_generation_success(self):
+        missing, pending, failed = (
+            "silhouette-missing",
+            "silhouette-pending",
+            "silhouette-failed",
+        )
+        pending_subject = ArtSubject(ArtSubjectKind.CHARACTER, pending)
+        failed_subject = ArtSubject(ArtSubjectKind.CHARACTER, failed)
+        ensure(pending_subject, "desc")
+        ensure(failed_subject, "desc")
+        tokens = {record.db_key: str(record.db.generation_token) for record in claim(10)}
+        settle(
+            failed_subject,
+            generation_token=tokens[record_key(failed_subject)],
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
+        cases = (
+            (missing, ArtAssetStatus.MISSING),
+            (pending, ArtAssetStatus.PENDING),
+            (failed, ArtAssetStatus.FAILED),
+        )
+        for stable_key, expected_status in cases:
+            with self.subTest(status=expected_status):
+                entity = self._character(stable_key)
+                subject = ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
+                with patch("world.observability.log_info") as logged:
+                    payload = resolve_character(entity)
+                # The silhouette is carried, never presented as an image.
+                self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+                self.assertIsNone(payload["url"])
+                self.assertIsNone(payload["face_rect"])
+                self.assertIsNone(payload["stage"])
+                self.assertNotIn("已生成", str(payload))
+                # The subject's own key stays the subject's; the silhouette
+                # key lives only inside the decorative field.
+                self.assertEqual(payload["subject_key"], subject.full())
+                silhouette = payload["fallback"]
+                self.assertIn(silhouette["key"], FALLBACK_KEYS)
+                self.assertEqual(
+                    silhouette["url"],
+                    f"/art/defaults/{silhouette['key']}{FALLBACK_EXTENSION}",
+                )
+                self.assertEqual(sorted(silhouette["face_rect"]), ["h", "w", "x", "y"])
+                # The true status passes through: an absent record is missing,
+                # a claimed one is wire-stable pending, a settled one is failed.
+                self.assertEqual(payload["status"], expected_status)
+                events = [
+                    call
+                    for call in logged.call_args_list
+                    if call.args and call.args[0] == "gallery_fallback_used"
+                ]
+                self.assertEqual(len(events), 1, events)
+                # Presentation writes nothing: the persisted record keeps the
+                # status it had (a claimed one stays in progress for its
+                # worker; the wire-stable pending is presentation only).
+                record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+                stored = {
+                    ArtAssetStatus.MISSING: None,
+                    ArtAssetStatus.PENDING: ArtAssetStatus.IN_PROGRESS,
+                    ArtAssetStatus.FAILED: ArtAssetStatus.FAILED,
+                }[expected_status]
+                if stored is None:
+                    self.assertIsNone(record)
+                else:
+                    self.assertEqual(record.db.status, stored)
+
+    @covers_requirement(
+        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
+    )
+    def test_a_real_image_carries_the_reference_without_reporting_a_use(self):
+        entity = self._character("silhouette-card")
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "silhouette-card")
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt={"positive": "a hero", "negative": "blur"},
+            seed=7,
+            checkpoint="realVision.safetensors",
+            requested_fields=["appearance"],
+            binding=None,
+            image_size={"width": 768, "height": 1024},
+            source="generated",
+        )
+        with patch("world.observability.log_info") as logged:
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(payload["url"], f"/art/{identity}")
+        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+        # The reference rides beside the resolved image for a browser-side
+        # load-failure re-render, and is not a use of the fallback.
+        self.assertIn(payload["fallback"]["key"], FALLBACK_KEYS)
+        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+        events = [
+            call
+            for call in logged.call_args_list
+            if call.args and call.args[0] == "gallery_fallback_used"
+        ]
+        self.assertEqual(events, [])
+
+    @covers_requirement(
+        "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
+    )
+    def test_a_policy_less_entity_carries_its_attribute_selected_silhouette(self):
+        before = ArtAssetRecord.objects.count()
+        woman = create_object(PlayerCharacter, key="no-policy-woman")
+        woman.sex = "female"
+        woman.apparent_age = 30
+        payload = resolve_character(woman)
+        # The unavailable placeholder row: no policy, no subject key, no URL.
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        # The decoration comes from the entity's stored attributes, never from
+        # a shared shape, and installs nothing.
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(payload["fallback"]["key"], "woman")
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertIsNone(woman.db.portrait_policy)
+
+    @covers_requirement(
+        "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
+    )
+    def test_a_monster_without_a_resolvable_tier_carries_monster_anon(self):
+        before = ArtAssetRecord.objects.count()
+        monster = create_object(Monster, key="silhouette-monster")
+        monster.threat_tier = "mythical"
+        payload = resolve_entity(monster)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(payload["fallback"]["key"], "monster_anon")
+        self.assertEqual(
+            payload["fallback"]["url"],
+            f"/art/defaults/monster_anon{FALLBACK_EXTENSION}",
+        )
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+
+    @covers_requirement(
+        "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
+    )
+    def test_a_rejected_age_pair_carries_the_decoration_and_writes_nothing(self):
+        # The malformed-age rung of the same terminal path: no subject key, no
+        # URL, no record — and the entity's own attribute-selected silhouette.
+        before = ArtAssetRecord.objects.count()
+        rejected = self._character("silhouette-bad-age")
+        rejected.age = "twenty"
+        payload = resolve_character(rejected)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(payload["stage"])
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(payload["fallback"]["key"], "man")
+        self.assertEqual(payload["fallback"]["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertNotIn("twenty", str(payload))
 
 
 if __name__ == "__main__":

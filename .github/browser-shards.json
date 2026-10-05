@@ -393,7 +393,11 @@
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_vitals_reveal_and_inert",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_reduced_motion_fades_only",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_off_motion_is_instant",
-        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_same_label_lineage_rows_carry_their_root_names_beside_progress"
+        "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_same_label_lineage_rows_carry_their_root_names_beside_progress",
+        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_each_built_in_key_paints_its_own_alpha_mask_on_the_stage",
+        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_the_masked_figure_is_floor_aligned_aspect_preserved_and_unstretched",
+        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_resolved_image_replaces_the_silhouette_and_failure_returns_to_it",
+        "web.tests.browser.test_browser_stage_silhouette.StageSilhouetteBrowserTest.test_a_failed_bundled_mask_keeps_the_frame_usable"
       ]
     },
     {

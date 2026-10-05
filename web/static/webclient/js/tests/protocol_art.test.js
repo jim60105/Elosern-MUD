@@ -43,6 +43,15 @@ function validArtCatalogEntry(overrides) {
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
       stage: { scale: 1, x: 0, y: 0 },
+      origin: "runtime",
+      // The decorative built-in silhouette the server resolved: it rides
+      // beside the real fields and never fills them
+      // (builtin-silhouette-stage-fallback).
+      fallback: {
+        key: "monster_anon",
+        url: "/art/defaults/monster_anon.webp",
+        face_rect: { x: 0.3403, y: 0.02, w: 0.3194, h: 0.18 },
+      },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides
@@ -83,6 +92,7 @@ test("art is in the production panel allowlist and validates the available paylo
             aspect_ratio: null,
             face_rect: null,
             stage: null,
+            origin: "silhouette",
             placeholder: { kind: "unavailable", label: "無法提供" },
             context: { name: "旅店主人", role: "對話對象" },
           }),
@@ -114,6 +124,8 @@ test("rejects malformed art panels atomically", () => {
         portrait_catalog: {
           "42": validArtCatalogEntry({
             url: null,
+            stage: null,
+            origin: "silhouette",
             placeholder: { kind: "unavailable", label: "無法提供" },
           }),
         },
@@ -168,6 +180,72 @@ test("rejects malformed art panels atomically", () => {
       validArtPanel({ portrait_catalog: { "42": validArtCatalogEntry({ context: { name: "x", role: "boss" } }) } })
     )
   );
+});
+
+// The portrait origin vocabulary and the decorative fallback reference are
+// mirrored on both validator sides (builtin-silhouette-stage-fallback): a
+// payload that names a silhouette without carrying its identity, hides a real
+// URL behind a silhouette origin, or fills a fallback from the wrong route is
+// rejected here exactly as the Python validator rejects it.
+test("the catalog origin vocabulary and its decorative fallback are enforced", () => {
+  const rect = { x: 0.3576, y: 0.03, w: 0.2847, h: 0.16 };
+  const panel = (entry) => validArtPanel({ portrait_catalog: { "42": entry } });
+  const placeholder = { kind: "unavailable", label: "無法提供" };
+  const accepts = {
+    runtime: validArtCatalogEntry(),
+    silhouette: validArtCatalogEntry({
+      subject_key: null, status: "missing", url: null, aspect_ratio: null,
+      face_rect: null, stage: null, origin: "silhouette",
+      placeholder, fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
+    }),
+    placeholder: validArtCatalogEntry({
+      subject_key: null, status: null, url: null, aspect_ratio: null,
+      face_rect: null, stage: null, origin: "placeholder",
+      placeholder, fallback: null,
+    }),
+  };
+  Object.keys(accepts).forEach((origin) => {
+    assert.doesNotThrow(() => Protocol.validateArtPanel(panel(accepts[origin])), origin);
+  });
+  const absentOrigin = validArtCatalogEntry();
+  delete absentOrigin.origin;
+  const silhouetteEntry = (overrides) =>
+    validArtCatalogEntry(Object.assign({
+      subject_key: null, status: "missing", url: null, aspect_ratio: null,
+      face_rect: null, stage: null, origin: "silhouette", placeholder,
+      fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
+    }, overrides));
+  const rejects = {
+    "unknown origin": validArtCatalogEntry({ origin: "official" }),
+    "missing origin": absentOrigin,
+    "silhouette hiding a real url": validArtCatalogEntry({ origin: "silhouette" }),
+    "placeholder carrying a fallback": silhouetteEntry({ origin: "placeholder" }),
+    "silhouette claiming a done portrait": silhouetteEntry({ status: "done", placeholder: null }),
+    "silhouette origin without an identity": silhouetteEntry({ fallback: null }),
+    "runtime origin without a url": validArtCatalogEntry({
+      subject_key: null, status: "missing", url: null, aspect_ratio: null,
+      face_rect: null, stage: null, origin: "runtime", placeholder,
+    }),
+    "fallback outside the defaults route": validArtCatalogEntry({
+      fallback: { key: "man", url: "/art/portrait/man.webp", face_rect: rect },
+    }),
+    "fallback without a rectangle": validArtCatalogEntry({
+      fallback: { key: "man", url: "/art/defaults/man.webp" },
+    }),
+    "fallback with an unknown field": validArtCatalogEntry({
+      fallback: { key: "man", url: "/art/defaults/man.webp", face_rect: rect, identity: "x" },
+    }),
+    "fallback with an out-of-range rectangle": validArtCatalogEntry({
+      fallback: { key: "man", url: "/art/defaults/man.webp", face_rect: { x: 0.5, y: 0.5, w: 1.5, h: 0.9 } },
+    }),
+    // The scene wire block is unchanged by this change: the two new fields
+    // belong to the portrait catalog only.
+    "scene carrying an origin": validArtPanel({ scene: validArtScene({ origin: "runtime" }) }),
+    "scene carrying a fallback": validArtPanel({ scene: validArtScene({ fallback: null }) }),
+  };
+  Object.keys(rejects).forEach((label) => {
+    assert.throws(() => Protocol.validateArtPanel(rejects[label]), label);
+  });
 });
 
 test("media url bound admits the worst-case gallery identity in both mirrors", () => {

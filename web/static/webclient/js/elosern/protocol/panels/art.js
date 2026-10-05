@@ -26,6 +26,11 @@ var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
 // web.webclient.presentation.art, webclient-art-panel D1).
 var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
 var ART_ROLES = ["隊友", "敵方", "對話對象", "人物"];
+// The closed portrait-origin vocabulary (art-gallery-fallback owns it;
+// official-art-resolution-contracts extends both sides with "official").
+var ART_ORIGINS = ["runtime", "silhouette", "placeholder"];
+var ART_MAX_FALLBACK_KEY = 32;
+var ART_FALLBACK_URL_PREFIX = "/art/defaults/";
 
 function validateArtPlaceholder(value) {
   if (value === null) {
@@ -156,11 +161,36 @@ function validateArtFaceRect(value) {
   return { x: value.x, y: value.y, w: value.w, h: value.h };
 }
 
+// The decorative built-in silhouette reference the server resolved for a
+// still-absent portrait: exactly the committed key, its /art/defaults/
+// identity and that key's rectangle. It is presentation data and never the
+// entry's own media fields (mirror of
+// web.webclient.presentation.art._validate_portrait_fallback).
+function validateArtFallback(value) {
+  if (value === null) {
+    return null;
+  }
+  requireExactFields(value, "art fallback", ["key", "url", "face_rect"], []);
+  var key = requireString(value.key, "fallback key", ART_MAX_FALLBACK_KEY);
+  if (!key.trim()) {
+    throw new Error("fallback key must be non-empty");
+  }
+  var url = requireString(value.url, "fallback url", MAX_MEDIA_URL);
+  if (url.indexOf(ART_FALLBACK_URL_PREFIX) !== 0) {
+    throw new Error("fallback url must name a committed built-in identity");
+  }
+  var faceRect = validateArtFaceRect(value.face_rect);
+  if (faceRect === null) {
+    throw new Error("a fallback carries a face_rect");
+  }
+  return { key: key, url: url, face_rect: faceRect };
+}
+
 function validateArtCatalogEntry(value) {
   requireExactFields(
     value,
     "art catalog entry",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "context"],
+    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "context", "origin", "fallback"],
     []
   );
   if (value.subject_key !== null) {
@@ -191,11 +221,31 @@ function validateArtCatalogEntry(value) {
   validateArtContext(value.context);
   var faceRect = validateArtFaceRect(value.face_rect);
   validateArtStage(value.stage, url);
+  var origin = requireString(value.origin, "catalog origin", 16);
+  if (ART_ORIGINS.indexOf(origin) === -1) {
+    throw new Error("catalog origin is not a stable value");
+  }
+  var fallback = validateArtFallback(value.fallback);
   if (url !== null && faceRect === null) {
     throw new Error("a catalog entry with a url carries a face_rect");
   }
   if (url === null && faceRect !== null) {
     throw new Error("a catalog placeholder carries no face_rect");
+  }
+  // The origin names the branch that produced the entry's own media, so a
+  // silhouette can never stand where a real image belongs and a placeholder
+  // origin can never hide one.
+  if (url !== null && (origin === "silhouette" || origin === "placeholder")) {
+    throw new Error("a catalog entry carrying a media URL is not a silhouette or a placeholder");
+  }
+  if (url === null && origin === "runtime") {
+    throw new Error("a runtime origin carries the entry's media URL");
+  }
+  if (origin === "silhouette") {
+    if (fallback === null) throw new Error("a silhouette origin carries its fallback identity");
+    if (status === "done") throw new Error("a silhouette origin is not a done portrait");
+  } else if (origin === "placeholder" && fallback !== null) {
+    throw new Error("a placeholder origin carries no fallback identity");
   }
   return value;
 }
@@ -512,6 +562,7 @@ module.exports = {
   validateArtPanel: validateArtPanel,
   validateGalleryPanel: validateGalleryPanel,
   validateGalleryActionPayload: validateGalleryActionPayload,
+  validateArtFallback: validateArtFallback,
   validateArtFaceRect: validateArtFaceRect,
   validateArtStage: validateArtStage,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
