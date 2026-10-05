@@ -41,16 +41,25 @@ const EVENNIA_TEST_ANYWHERE =
 /*
  * Accepted execution prefixes inside a test segment (Amendment A6). They
  * never change WHICH tests run, so the count command keeps them and only
- * swaps the module invocation for the count runner: repeated inline env
- * assignments, one `timeout N`, `nice`/`stdbuf`, the `uv run`/`poetry run`
- * wrapper with its flags, and an optional `coverage run`/`coverage run.pth`
- * with its own flags (the CI-canonical browser-shard form).
+ * swaps the module invocation for the count runner: one `timeout N`,
+ * `nice`/`stdbuf`, the `uv run`/`poetry run` wrapper with its flags
+ * (including the sanctioned single-token `--env-file=<file>`), and an
+ * optional `coverage run`/`coverage run.pth` with its own flags (the
+ * CI-canonical browser-shard form).
+ *
+ * The leading environment-assignment pattern is NOT an accepted prefix: it
+ * is consumed only so a command that carries one parses far enough to be
+ * refused by name (INLINE_ENV_REASON) instead of falling into the generic
+ * "wrapped in an unsupported shell command" message. The spec's fail-closed
+ * policy lists inline environment-assignment prefixes among the constructs
+ * that always block.
  *
  * `-m` and `--testrunner*` are NEVER flag-consumable here: `-m` belongs
  * to the final invocation, and a `--testrunner` smuggled into the prologue
  * must fail closed, like the reserved-flag check on the invocation itself.
  */
 const PROLOGUE_PREFIXES: RegExp[] = [
+  // Consumed only to be refused: see the note above.
   /^[ \t]*[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/,
   /^[ \t]*timeout[ \t]+(?:-[^ \t]+[ \t]+)*\d+[smhd]?(?:[ \t]+|$)/,
   /^[ \t]*nice(?:[ \t]+-n[ \t]+-?\d+)?[ \t]+/,
@@ -58,6 +67,31 @@ const PROLOGUE_PREFIXES: RegExp[] = [
   /^[ \t]*(?:uv|poetry)[ \t]+run(?:[ \t]+(?!(?:-m|--testrunner)(?:[ \t=]|$))(?:-[^ \t]+|--[^ \t]+=[^\s]+))*[ \t]+/,
   /^[ \t]*coverage[ \t]+run(?:\.pth)?(?:[ \t]+(?!(?:-m|--testrunner)(?:[ \t=]|$))(?:-[^ \t]+|--[^ \t]+=[^\s]+))*[ \t]+/,
 ];
+
+/*
+ * An inline environment assignment as a whole token (`FOO=1`). Anchored to a
+ * token boundary so the sanctioned `--env-file=<file>` flag, whose token
+ * starts with `-`, never matches.
+ */
+const ENV_ASSIGN_TOKEN =
+  /(?:^|[ \t])[A-Za-z_][A-Za-z0-9_]*=[^ \t]/;
+
+/*
+ * The same assignment in a form the prologue grammar cannot consume at all
+ * (e.g. `FOO="a b" evennia test ...`), detected on the quote-neutralized
+ * view so the refusal still names the construct instead of the generic
+ * wrapper message.
+ */
+const ENV_ASSIGN_LEAD =
+  /^[ \t]*[A-Za-z_][A-Za-z0-9_]*=[^ \t]/;
+
+/*
+ * The inline environment-assignment refusal. The supported environment seam
+ * is the single-token `--env-file=<file>` flag the `uv run` prefix accepts;
+ * pipes and redirects are blocked, so a value cannot be primed any other way.
+ */
+const INLINE_ENV_REASON =
+  "inline environment-assignment prefixes before the Evennia test command are not supported; set MUD_TEST_SETTINGS via `uv run --locked --env-file=<file>` (single token) instead";
 
 /*
  * Non-CLI Evennia test entry points (Amendment A6). Every Evennia suite
@@ -733,10 +767,34 @@ function analyzeCommand(command: string): CommandAnalysis {
   const invocation = parseTestInvocation(testCommand);
 
   if (invocation === null) {
+    /*
+     * An assignment whose value is quoted (`FOO="a b" evennia test ...`)
+     * never reaches the prologue grammar, so the neutralized view is asked
+     * here too before the generic wrapper message.
+     */
+    if (ENV_ASSIGN_LEAD.test(neutralizeQuoting(testCommand))) {
+      return {
+        kind: "unsupported",
+        reason: INLINE_ENV_REASON,
+      };
+    }
+
     return {
       kind: "unsupported",
       reason:
         "Evennia test is wrapped in an unsupported shell command",
+    };
+  }
+
+  /*
+   * Any inline environment assignment inside the consumed prologue — a bare
+   * one, or one after `timeout`/`nice`/`stdbuf` — blocks before any
+   * discovery, with the construct named as the spec requires.
+   */
+  if (ENV_ASSIGN_TOKEN.test(testCommand.slice(0, invocation.bodyStart))) {
+    return {
+      kind: "unsupported",
+      reason: INLINE_ENV_REASON,
     };
   }
 
@@ -912,7 +970,7 @@ function blockedBecauseUnsupported(reason: string): string {
     "  uv run evennia test <focused-test-label>",
     "  poetry run evennia test <focused-test-label>",
     "  cd <game-dir> && evennia test <focused-test-label>",
-    "  cd <game-dir> && UV_PROJECT_ENVIRONMENT=<venv> timeout <n> uv run --locked python -m web.tests.browser.unittest_driver <focused-module>",
+    "  cd <game-dir> && uv run --locked --env-file=<file> python -m web.tests.browser.unittest_driver <focused-module>",
     "  uv run --locked python -m unittest <focused.module>",
     "",
     OUTPUT_CAPTURE_GUIDANCE,
