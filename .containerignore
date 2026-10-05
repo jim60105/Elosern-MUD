@@ -45,6 +45,13 @@ server/.translate/
 # bulk seed images are never baked into the image.
 art-seed/
 
+# The official-artwork folder and its archive input folder are bind-mounted at
+# runtime (official-artwork-deployment); official artwork is distributed under
+# its own license and is never baked into the image. The six committed
+# built-in fallbacks under web/static/art/defaults/ stay in the build context.
+art-official/
+art-official-archives/
+
 # ==========================================
 # Environment & Secrets
 # ==========================================
