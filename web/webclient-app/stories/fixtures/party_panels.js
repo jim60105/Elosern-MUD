@@ -73,14 +73,21 @@ export const PARTY_PANEL_FULL_SAMPLE = {
 
 // Existing bundled fixture art only; production never constructs these refs.
 export const COMPANION_PORTRAIT_CATALOG = Object.fromEntries(
-  PARTY_PANEL_FULL_SAMPLE.slots.map((row, index) => [String(row.identity), {
-    subject_key: `portrait:character:t_companion_${index}`,
-    status: "done", url: `/art/defaults/${["woman", "elder", "man", "girl"][index]}.webp`,
-    aspect_ratio: "3:4", alt: row.display_name, placeholder: null,
-    face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-    stage: { scale: 1, x: 0, y: 0 },
-    context: { name: row.display_name, role: "隊友" },
-  }]),
+  PARTY_PANEL_FULL_SAMPLE.slots.map((row, index) => {
+    const key = ["woman", "elder", "man", "girl"][index];
+    return [String(row.identity), {
+      subject_key: `portrait:character:t_companion_${index}`,
+      status: "done", url: `/art/defaults/${key}.webp`,
+      aspect_ratio: "3:4", alt: row.display_name, placeholder: null,
+      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      stage: { scale: 1, x: 0, y: 0 },
+      // builtin-silhouette-stage-fallback: the decorative built-in
+      // silhouette reference the server carries beside the resolved image.
+      origin: "runtime",
+      fallback: { key, url: `/art/defaults/${key}.webp`, face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 } },
+      context: { name: row.display_name, role: "隊友" },
+    }];
+  }),
 );
 
 export const PARTY_COMBAT_PARTICIPANTS_SAMPLE = [

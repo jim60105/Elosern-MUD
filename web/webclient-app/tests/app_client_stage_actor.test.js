@@ -26,6 +26,14 @@ const HOST_ENTRY = {
   placeholder: null,
   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
   stage: { scale: 1, x: 0, y: 0 },
+  // builtin-silhouette-stage-fallback: the stage-eligible entry carries the
+  // server-resolved built-in silhouette beside its own fields.
+  origin: "runtime",
+  fallback: {
+    key: "elder",
+    url: "/art/defaults/elder.webp",
+    face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 },
+  },
   context: { name: "店長", role: "對話對象" },
 };
 

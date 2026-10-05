@@ -5,6 +5,18 @@
 // for their mix of light and dark backdrops so the depth shadow and the
 // gauges are reviewed over both.
 
+// builtin-silhouette-stage-fallback: every stage-eligible catalog entry also
+// carries the decorative built-in silhouette the server resolved for the
+// subject (key + committed /art/defaults/ identity + rectangle). The line-up
+// fixtures already point at committed defaults, so the key is the URL's stem.
+function foeFallback(url) {
+  return {
+    key: url.slice("/art/defaults/".length, -".webp".length),
+    url,
+    face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
+  };
+}
+
 function foeEntry(ref, url, name) {
   return {
     subject_key: `npc_${ref}`,
@@ -15,6 +27,8 @@ function foeEntry(ref, url, name) {
     placeholder: null,
     face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
     stage: { scale: 1, x: 0, y: 0 },
+    origin: "runtime",
+    fallback: foeFallback(url),
     context: { name, role: "敵方" },
   };
 }

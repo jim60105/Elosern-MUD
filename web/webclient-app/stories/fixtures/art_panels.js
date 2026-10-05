@@ -1,5 +1,14 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
+// builtin-silhouette-stage-fallback: the server-resolved decorative
+// silhouette reference every stage-eligible catalog entry carries beside its
+// own fields (key + committed /art/defaults/ identity + rectangle).
+function silhouette(key, faceRect) {
+  return { key, url: `/art/defaults/${key}.webp`, face_rect: faceRect };
+}
+
+const SILHOUETTE_FACE_RECT = { x: 0.35, y: 0.03, w: 0.29, h: 0.16 };
+
 // The `art` payload when the scene asset is generated: the 16:9 scene
 // renders cover-style and the 3:4 portrait catalog carries contextual
 // names/roles; labels and alt text stay DOM nodes outside the bitmaps.
@@ -28,6 +37,8 @@ export const ART_PANEL_SAMPLE = {
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
       stage: { scale: 1.1, x: -0.1, y: 0 },
+      origin: "runtime",
+      fallback: silhouette("man", SILHOUETTE_FACE_RECT),
       context: { name: "老周", role: "對話對象" },
     },
     "217": {
@@ -39,6 +50,8 @@ export const ART_PANEL_SAMPLE = {
       placeholder: null,
       face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
       stage: { scale: 1, x: 0, y: 0 },
+      origin: "runtime",
+      fallback: silhouette("monster_anon", SILHOUETTE_FACE_RECT),
       context: { name: "河灣巨魔", role: "敵方" },
     },
   },
@@ -72,6 +85,8 @@ export const ART_PANEL_PENDING_SAMPLE = {
       placeholder: { kind: "missing", label: "肖像圖像尚未生成" },
       face_rect: null,
       stage: null,
+      origin: "silhouette",
+      fallback: silhouette("man", SILHOUETTE_FACE_RECT),
       context: { name: "老周", role: "對話對象" },
     },
   },
