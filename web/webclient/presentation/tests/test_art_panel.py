@@ -274,6 +274,9 @@ class ArtSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_origin_is_the_closed_vocabulary(self):
         # The server-authored discriminator names the branch that produced the

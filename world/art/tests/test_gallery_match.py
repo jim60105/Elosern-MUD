@@ -614,6 +614,9 @@ class OfficialDefaultStepTests(EvenniaTestCase):
             )
         )
 
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
     def test_a_hundred_resolutions_read_only_the_snapshot_and_write_nothing(self):
         self._index()
         entity = self._entity()

@@ -20,9 +20,14 @@ with accessories sorted and an empty slot legal; (2) keep every card whose `bind
 and whose snapshot value for EVERY masked slot equals the computed snapshot value for that slot;
 (3) among those, the card whose mask covers the most slots wins, and a tie is broken by the newest
 `created_at`; (4) otherwise the card named by `default_image_id`; (5) otherwise the subject's classic
-`done` asset record, resolved exactly as it is today; (6) otherwise the terminal fallback seam;
-(7) otherwise the existing truthful placeholder. The chain SHALL be a pure function of stored state:
-the same record and the same equipment SHALL always resolve to the same card.
+`done` asset record, resolved exactly as it is today; (6) otherwise the official default for the
+entity's official content reference (see the `official-art-resolution` capability), resolved from the
+startup official snapshot — an entity with no reference, or a reference the snapshot does not hold,
+falls through with no diagnostic beyond the bounded catalog vocabulary; (7) otherwise the terminal
+fallback seam; (8) otherwise the existing truthful placeholder. The chain SHALL be a pure function of
+stored state plus the startup official snapshot: the same record and the same equipment SHALL always
+resolve to the same card, and no step SHALL perform a network call, filesystem write, job enqueue,
+or record mutation.
 
 #### Scenario: The most specific matching binding wins
 - **WHEN** one card binds `armor` alone and another binds `armor` and `weapon_main`, and the entity's current equipment matches both
@@ -44,6 +49,14 @@ the same record and the same equipment SHALL always resolve to the same card.
 - **WHEN** no card's binding matches the current equipment and a default is set
 - **THEN** the default card is resolved
 
+#### Scenario: A runtime card outranks an available official default
+- **WHEN** a subject resolves its gallery default card and its content reference has official artwork in the snapshot
+- **THEN** the card is resolved and the official step is never consulted
+
+#### Scenario: Nothing runtime falls through to the official default
+- **WHEN** no binding matches, no default card exists, the classic record is absent, and the entity's content reference has a valid catalog entry
+- **THEN** the official default resolves ahead of the fallback seam
+
 ### Requirement: An unbound card is never auto-selected
 A card whose `binding` is `None` SHALL be eligible ONLY as the subject's explicit default. When no
 binding matches the current equipment and `default_image_id` is `None`, the chain SHALL fall through
@@ -62,10 +75,13 @@ exist — so no image the player has not chosen is ever displayed as a surprise.
 The chain SHALL run steps 1 through 3 — the equipment snapshot, the binding candidates, and the
 most-specific-mask selection — only for a subject kind whose capability declaration supports
 bindings. A kind that does not support them, which the monster portrait kind does not, SHALL resolve
-by skipping those steps: the default card, then the classic asset record, then the fallback seam, then
-the placeholder. No equipment snapshot SHALL be computed for such a subject and no card of such a
-subject SHALL be selected by a binding. The skip SHALL be decided by reading the declaration, never by
-comparing the subject kind inline.
+by skipping those steps: the default card, then the classic asset record, then the official-default
+step, then the fallback seam, then the placeholder. No equipment snapshot SHALL be computed for such
+a subject and no card of such a subject SHALL be selected by a binding. The skip SHALL be decided by
+reading the declaration, never by comparing the subject kind inline. The monster official-default step
+resolves only from a validated species/content reference, which no in-repo producer supplies before
+the separate monster species catalog lands (see `official-content-provenance`), so monster
+resolution today falls through the official step to the fallback seam exactly as it does now.
 
 #### Scenario: A monster resolves its single card
 - **WHEN** a monster subject holds its one card
@@ -79,17 +95,26 @@ comparing the subject kind inline.
 - **WHEN** display resolution runs for a kind whose declaration does not support bindings
 - **THEN** the binding steps are skipped and no equipment snapshot is computed, with no edit to the resolution module
 
+#### Scenario: A tier-keyed monster falls through the official step
+- **WHEN** a registered threat-tier monster with no species/content reference resolves with a populated official snapshot
+- **THEN** the official step resolves nothing for it, no tier-to-content mapping runs, and the fallback seam presents
+
 ### Requirement: The chain ends at one fallback seam
 `world/art/gallery_match.py` SHALL expose exactly one terminal seam `fallback_for(subject)` consulted
-after the classic asset record and before the placeholder. The seam was introduced inert (returning
-`None`, byte-for-byte today's placeholder) and is now filled by `art-gallery-fallback`: it resolves
-the built-in default identity and face rectangle for person subjects and returns `None` for scene
-subjects, without the chain itself being modified. The presenter threads the entity it already
-resolved to the seam as an optional parameter; a bare subject-only call stays legal.
+after the classic asset record and the official-default step and before the placeholder. The seam was
+introduced inert (returning `None`, byte-for-byte today's placeholder) and is now filled by
+`art-gallery-fallback`: it resolves the built-in default identity and face rectangle for person
+subjects and returns `None` for scene subjects, without the chain itself being modified. The
+presenter threads the entity it already resolved to the seam as an optional parameter; a bare
+subject-only call stays legal.
 
 #### Scenario: The seam returning nothing preserves today's placeholder
 - **WHEN** nothing resolves for a subject and the seam returns `None` (e.g. a scene subject)
 - **THEN** the payload is exactly the truthful placeholder this project produces today
+
+#### Scenario: The seam still runs when the official step resolves nothing
+- **WHEN** a subject reaches the official-default step and its reference is absent from the snapshot
+- **THEN** the chain consults the terminal seam exactly as before the official step existed
 
 ### Requirement: Every resolution payload carries a face rectangle or null
 `world/art/presenter.py` SHALL add `face_rect` to every resolution payload it produces: the resolved
@@ -97,7 +122,9 @@ card's normalized rectangle when a card resolved, validated through the gallery 
 against that card's recorded `image_size`; the shared default rectangle when a classic asset
 resolved (the card-less composition anchor, which knows no image size), the rectangle the fallback
 seam supplies (defaulting to the shared default) when a
-fallback image resolved, and `null` for every placeholder payload. The value SHALL be a mapping
+fallback image resolved, the directory-metadata or fitted-default rectangle validated against the
+decoded image dimensions when an official image resolved (see the `official-art-resolution`
+capability), and `null` for every placeholder payload. The value SHALL be a mapping
 of exactly `x`, `y`, `w`, `h` in `[0, 1]`, and a rectangle carried from a card or the fallback map
 SHALL be pixel-square on the image it ships with — every rectangle a client receives from a
 resolution marks a square region of its image. The server SHALL NOT crop, transform, or produce a second
@@ -121,6 +148,10 @@ no image size is known) with one bounded diagnostic, never to a failed payload.
 #### Scenario: A classic-asset payload keeps the shared constant
 - **WHEN** a classic (non-card) asset resolves
 - **THEN** the payload carries the shared default constant rectangle, bounds-validated with no image size
+
+#### Scenario: An official payload carries validated metadata geometry
+- **WHEN** an official default with a valid declared manifest rectangle and a non-identity declared stage resolves
+- **THEN** the payload carries that rectangle validated against the image's decoded dimensions, and that declared stage — the identity triple only when none is declared or it is invalid
 
 ### Requirement: Gallery URLs are built only from validated card identities
 The presenter SHALL build a gallery media URL only from a card's stored identity that it has

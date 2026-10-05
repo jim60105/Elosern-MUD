@@ -984,6 +984,12 @@ class OfficialPayloadTests(EvenniaTestCase):
         )
 
     # -- payload shape ----------------------------------------------------
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
+    @covers_requirement(
+        "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
+    )
     def test_an_official_default_presents_with_its_metadata_geometry(self):
         identity = self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character()
@@ -1027,6 +1033,12 @@ class OfficialPayloadTests(EvenniaTestCase):
         )
         self.assertEqual(entity.attributes.get(PRESET_PROVENANCE_ATTRIBUTE), _PRESET_KEY)
 
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
     def test_a_runtime_card_outranks_the_official_default(self):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character("card-first")
@@ -1083,6 +1095,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
         self.assertEqual(payload["url"], f"/art/{identity}")
 
+    @covers_requirement(
+        "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
+    )
     def test_a_disappeared_official_entry_falls_through_to_the_seam(self):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character()
@@ -1160,6 +1175,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(events.count("art_official_url_over_wire_budget"), 1)
 
     # -- eligibility ordering --------------------------------------------
+    @covers_requirement(
+        "official-art-resolution::eligibility-checks-order-before-official-and-runtime-presentation"
+    )
     def test_eligibility_runs_ahead_of_official_presentation(self):
         # A fully valid directory unlocks nothing for a character whose
         # canonical ages fail: the official step is never even consulted.
@@ -1208,6 +1226,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         self.assertNotEqual(payload["origin"], ORIGIN_OFFICIAL)
         self.assertIsNone(payload["url"])
 
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
     def test_a_hundred_presentations_write_nothing_and_call_no_network(self):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character()
