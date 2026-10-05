@@ -52,6 +52,13 @@ services:
       EVENNIA_SUPERUSER_USERNAME: ${EVENNIA_SUPERUSER_USERNAME:-browserplayer}
       EVENNIA_SUPERUSER_EMAIL: ${EVENNIA_SUPERUSER_EMAIL:-browser@example.test}
       EVENNIA_SUPERUSER_PASSWORD: ${EVENNIA_SUPERUSER_PASSWORD:-ElosernBrowserTest!2026}
+      # The official-artwork bind mount below is read from exactly this
+      # container path. This is deliberately a literal, never an
+      # interpolation: a host ART_OFFICIAL_ROOT exported for a bare-metal run
+      # must not leak into the container. The named-volume alternative is
+      # configured by editing this value together with its volume line
+      # (docs/development/official-artwork-deployment.md).
+      ART_OFFICIAL_ROOT: /app/art-official
     security_opt:
       - no-new-privileges
     stop_signal: SIGINT
@@ -68,6 +75,45 @@ services:
       - evennia-media:/app/server/.media
       - ${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z
       - ${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z
+      - ${ART_OFFICIAL_DIR:-./art-official}:/app/art-official:ro,z
+
+  # Deployment-time only: populate the named official-artwork volume from one
+  # trusted operator archive (docs/development/official-artwork-deployment.md).
+  #   ART_OFFICIAL_ARCHIVE=official-art-2026-10.tar.gz \
+  #     podman compose --profile artwork-prepare run --rm artwork-prepare
+  # The archive is read from ${ART_OFFICIAL_ARCHIVES_DIR} mounted read-only;
+  # without ART_OFFICIAL_ARCHIVE the run is a no-op. Game startup never invokes
+  # this service and the game process never extracts anything, so no
+  # extraction tooling lives in the evennia service.
+  artwork-prepare:
+    profiles:
+      - artwork-prepare
+    image: localhost/elosern-mud:${IMAGE_TAG:-edge}
+    build: *evennia-build
+    # The repository script, mounted read-only: the runtime image itself
+    # carries no artwork, archive, or extraction workflow.
+    entrypoint:
+      - /bin/sh
+      - /app/prepare-official-artwork.sh
+    command: []
+    environment:
+      ART_OFFICIAL_ARCHIVE: ${ART_OFFICIAL_ARCHIVE:-}
+      ART_OFFICIAL_CONTENT_DIR: /app/art-official/content
+      ART_OFFICIAL_MAX_ENTRIES: ${ART_OFFICIAL_MAX_ENTRIES:-50000}
+      ART_OFFICIAL_MAX_FILE_BYTES: ${ART_OFFICIAL_MAX_FILE_BYTES:-67108864}
+      ART_OFFICIAL_MAX_TOTAL_BYTES: ${ART_OFFICIAL_MAX_TOTAL_BYTES:-8589934592}
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,mode=1777
+    volumes:
+      # Write access to the volume's content subdirectory only; the volume
+      # root is never replaced and the game mounts this same volume read-only.
+      - evennia-art-official:/app/art-official
+      - ${ART_OFFICIAL_ARCHIVES_DIR:-./art-official-archives}:/app/art-official-archives:ro,z
+      - ./scripts/prepare-official-artwork.sh:/app/prepare-official-artwork.sh:ro,z
 
   # First run only: podman compose --profile bootstrap run --rm bootstrap
   bootstrap:
@@ -104,3 +150,4 @@ volumes:
   evennia-logs:
   evennia-static:
   evennia-media:
+  evennia-art-official:

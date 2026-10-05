@@ -1,0 +1,50 @@
+## 1. Compose mount surface
+
+- [x] 1.1 Add the `${ART_OFFICIAL_DIR:-./art-official}:/app/art-official:ro,z}` bind mount and `ART_OFFICIAL_ROOT=/app/art-official` env forward to the `evennia` service in `compose.yaml`, add `ART_OFFICIAL_DIR` to `.env.example`, and verify with a compose-config test (`podman compose config` or the repo's compose contract test) that the mount and variable interpolation match the `ART_SEED_DIR` pattern exactly
+      — Verified: `tests.test_container_contract::test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image` (plus the updated exact volume/service sets) pins the mount, the read-only flag, the literal env forward, and the `evennia-art-official` volume; `podman compose -p omp-oawd config` renders `./art-official:/app/art-official:ro,z` and `ART_OFFICIAL_ROOT: /app/art-official`, the `ART_SEED_DIR` pattern byte-for-byte. `.env.example` carries the commented `ART_OFFICIAL_DIR` host-side entry (commented exactly like `ART_SEED_DIR`, so the env-inventory gates stay green), and both new compose-only variables are registered in the settings-guide reader allow-list.
+- [x] 1.2 Verify a no-directory start: bring the service up locally with no `./art-official` present and confirm the server starts normally with the empty-catalog diagnostic (acceptance criterion 10's startup half)
+      — Verified live with `podman compose -p omp-oawd -f <probe copy of compose.yaml> up -d --no-build` and no `./art-official` on the host: the service logs `Evennia Server successfully started` and, per boot, exactly one bounded `official_art_catalog_loaded` event with `reason=official_root_empty skipped=True images=0 refused=0`, from a startup step that completes in 2 ms and attempts no acquisition. (The probe copy differs from `compose.yaml` only in remapping the published ports to 4100-4102, because a developer stack occupies 4000-4002; the image was built from this worktree so the running code is master plus this change.)
+
+## 2. Named-volume preparation
+
+- [x] 2.1 Add the `evennia-art-official` volume and the profile-gated, non-interactive `artwork-prepare` one-shot service (write to the volume, read-only archive input when supplied) to `compose.yaml`, and verify the config test shows it is profile-gated and absent from the default `up` path
+      — Verified: `tests.test_container_contract::test_the_official_artwork_preparation_service_is_profile_gated_and_confined` asserts the profile gate, absence from the `evennia` service, non-interactive flags, no network, read-only root filesystem, the read-write volume mount, the read-only archive-directory and script mounts, and the blank no-op `ART_OFFICIAL_ARCHIVE` default; `podman compose -p omp-oawd config` (default profile) omits `artwork-prepare`, while `--profile artwork-prepare config` renders it with `command: []`.
+- [x] 2.2 Write the confined preparation entrypoint script (empty-temp-dir extraction, refuse absolute/traversal/link entries, entry-count and byte caps, complete-then-replace of the volume's content subdirectory, no-archive no-op) and verify with local tests: valid archive populates, corrupt/unsafe archive exits non-zero leaving the prior tree byte-for-byte unchanged, no-archive run changes nothing
+      — Verified: `scripts/prepare-official-artwork.sh` (POSIX sh; the archive comes from `ART_OFFICIAL_ARCHIVE` because Compose appends the image's default command to a service entrypoint, and positional arguments are logged and ignored). `tests.test_official_artwork_preparation` (15 tests) covers plain/gzip archives, the bare-name resolution, replacement of an existing tree, the no-archive no-op, a missing/non-file archive, a corrupt stream, absolute/traversal/symlink/hardlink/fifo/device members with byte-for-byte unchanged trees, the entry/per-file/total caps, invalid cap settings, and recovery/cleanup of an interrupted install. Extraction stages inside the volume and installs by renames, so nothing is written over the live tree.
+
+## 3. Build-context exclusion
+
+- [x] 3.1 Add `art-official/` to `.containerignore` and verify a build-context contract test proves the official directory is excluded while `web/static/art/defaults/` (the six built-ins) remains in the image inputs (acceptance criterion 10's publication half)
+      — Static contract: `tests.test_container_contract::test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image` asserts both ignore patterns (and that no pattern excludes `art/defaults/`), that no active Containerfile instruction mentions `official`, and that the archives folder is gitignored. Build-context proof: an image built from this worktree while `art-official/` held a marker file contains no `/app/art-official` and no marker, while all six `web/static/art/defaults/*.webp` originals are present and the current `world/art/official.py` is baked.
+
+## 4. Documentation
+
+- [x] 4.1 Write `docs/development/official-artwork-deployment.md` (linked from `docs/_sidebar.md`): layout contract and LICENSE placement, the four preparation procedures (plain copy/sync default, separate Git repository/submodule, S3 CLI sync, local archive plus the one-shot service), the named-volume subdirectory rule for `ART_OFFICIAL_ROOT`, the stop/replace/start maintenance window, the no-partial-replacement rule, and the restart-only refresh rule — all in English
+      — The guide body is English (the sidebar label stays in the docs site's zh-tw navigation language). It carries the layout + `LICENSE` contract, all four preparation procedures, the named-volume edit, the maintenance window, the no-partial-replacement and restart-only rules, the caps, the supported archive formats (uncompressed/gzip tar: the runtime image ships `tar` and `gzip` only), and a troubleshooting table.
+- [x] 4.2 Update the README deployment section to link the guide and verify sidebar links resolve
+      — README "Run locally" links the guide; the sidebar entry `官方美術部署` (Chinese label per the site's zh-tw navigation convention) resolves to the new page. Every `docs/_sidebar.md` target was checked to exist on disk.
+
+## 5. Verification
+
+- [x] 5.1 Run the applicable compose/config and build-context contract tests once and confirm the full deployment acceptance set for this change: successful preparation, reuse without archive, failed extraction leaves destination unchanged, absent-directory startup, no runtime Git/S3 dependency
+      — Focused tests: `tests.test_container_contract`, `tests.test_official_artwork_preparation`, `tests.test_art_offline_contract`, `server.conf.tests.test_env_overrides.test_inventory_and_shard_ownership`, plus `tools.contract_gate` (traceability, both lints, shard manifests, ownership/frozen-audit contracts) and `openspec validate official-artwork-deployment --strict`. Live acceptance with the built image and a throwaway compose project (`omp-oawd`): `ART_OFFICIAL_ARCHIVE=official-art-probe.tar.gz podman compose --profile artwork-prepare run --rm artwork-prepare` exits 0 and leaves `content/{LICENSE,monster/alpha_wolf/portrait.png}` in the `evennia-art-official` volume; the same command with no `ART_OFFICIAL_ARCHIVE` exits 0 and changes nothing (and an already-populated volume is never erased); corrupt and unsafe (traversal + symlink) archives exit non-zero leaving that tree byte-for-byte unchanged; starting the game with the volume mounted read-only at `/app/art-official` and `ART_OFFICIAL_ROOT=/app/art-official/content` reports `official_art_catalog_loaded … contents=1 images=1 reason=official_root_indexed`, serves `/art/official/<sha256>/monster/alpha_wolf/portrait.png` as HTTP 200 `image/png` with byte-identical content, and returns 404 for a stale fingerprint; the built image contains `tar`/`gzip` but no `git`, `aws`, `rclone`, `unzip`, `xz`, or `bzip2`, and no service definition fetches or unpacks anything.
+
+## Archive-time traceability sync (deliberately not a task box)
+
+Every box above is checked, so the change reads tasks-complete; this note records
+the one obligation that belongs to the archive step instead of the apply step.
+The two ADDED requirements in `specs/container-image/spec.md` enter the
+traceability index only once the archive syncs them into
+`openspec/specs/container-image/spec.md`, and `tools.spec_traceability check`
+rejects an annotation whose requirement ID is not in that index yet, so the
+apply step must not carry them. The archiver MUST add them in the same commit as
+the spec sync (and re-run `tools.spec_traceability check`):
+
+`container-image::one-shot-official-artwork-archive-preparation-service` on the
+preparation-service behavior tests — `tests/test_official_artwork_preparation.py`
+and
+`tests.test_container_contract::test_the_official_artwork_preparation_service_is_profile_gated_and_confined`
+— and
+`container-image::official-artwork-is-excluded-from-publication-inputs-while-built-in-defaults-ship`
+on
+`tests.test_container_contract::test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image`.

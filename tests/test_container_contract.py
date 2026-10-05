@@ -116,7 +116,7 @@ class ContainerContractTests(unittest.TestCase):
         evennia = services["evennia"]
         bootstrap = services["bootstrap"]
 
-        self.assertEqual(set(services), {"evennia", "bootstrap"})
+        self.assertEqual(set(services), {"evennia", "bootstrap", "artwork-prepare"})
         self.assertEqual(set(evennia["ports"]), {"4000:4000", "4001:4001", "4002:4002"})
         self.assertEqual(
             set(evennia["volumes"]),
@@ -130,6 +130,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-media:/app/server/.media",
                 "${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z",
                 "${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z",
+                "${ART_OFFICIAL_DIR:-./art-official}:/app/art-official:ro,z",
             },
         )
         self.assertEqual(
@@ -142,6 +143,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-logs",
                 "evennia-static",
                 "evennia-media",
+                "evennia-art-official",
             },
         )
         self.assertIn("host.containers.internal", evennia["environment"]["LLM_BASE_URL"])
@@ -198,8 +200,9 @@ class ContainerContractTests(unittest.TestCase):
             "ART_TRANSLATE_", evennia.get("environment", {})
         )
         self.assertEqual(
-            set(compose["services"]), {"evennia", "bootstrap"},
-            "no service definition performs a model fetch",
+            set(compose["services"]), {"evennia", "bootstrap", "artwork-prepare"},
+            "no service definition performs a model fetch (artwork-prepare only "
+            "extracts an operator-supplied archive)",
         )
         containerfile = _read("Containerfile")
         layout = _stage(containerfile, "app-layout")
@@ -249,6 +252,132 @@ class ContainerContractTests(unittest.TestCase):
         }
         self.assertIn("art-seed/", ignored)
         self.assertIn("art-seed/", set(_read(".gitignore").splitlines()))
+
+    @covers_requirement(
+        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::official-artwork-is-excluded-from-publication-inputs-while-built-in-defaults-ship",
+    )
+    def test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image(self):
+        # official-artwork-deployment: the operator-prepared directory follows
+        # the ART_SEED_DIR pattern (read-only, SELinux-relabelled bind mount)
+        # and the game reads exactly that container path; an absent host
+        # directory stays a valid no-art start. The image carries no official
+        # artwork, while the six committed built-in fallbacks stay in the build
+        # context and in the served static assets.
+        compose = yaml.safe_load(_read("compose.yaml"))
+        evennia = compose["services"]["evennia"]
+        volumes = evennia["volumes"]
+        self.assertIn("${ART_OFFICIAL_DIR:-./art-official}:/app/art-official:ro,z", volumes)
+        self.assertFalse(
+            [line for line in volumes if "/app/art-official" in line and ":ro" not in line],
+            "the game's official-artwork mount must be read-only",
+        )
+        self.assertEqual(evennia["environment"]["ART_OFFICIAL_ROOT"], "/app/art-official")
+        self.assertIn("evennia-art-official", compose["volumes"])
+
+        instructions = [
+            line
+            for line in _read("Containerfile").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self.assertFalse(
+            [line for line in instructions if "official" in line],
+            "no build stage may copy official artwork into an image layer",
+        )
+
+        patterns = {
+            line.strip()
+            for line in _read(".containerignore").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn("art-official/", patterns)
+        self.assertIn("art-official-archives/", patterns)
+        self.assertFalse(
+            [pattern for pattern in patterns if "art/defaults" in pattern],
+            "the six committed built-in fallbacks stay in the build context",
+        )
+        self.assertIn(
+            "art-official-archives/", set(_read(".gitignore").splitlines())
+        )
+
+    @covers_requirement(
+        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::one-shot-official-artwork-archive-preparation-service",
+    )
+    def test_the_official_artwork_preparation_service_is_profile_gated_and_confined(self):
+        # official-artwork-deployment: one explicitly invoked, non-interactive
+        # one-shot service prepares the named volume from a trusted operator
+        # archive. It is outside the default `up` path, has no network, cannot
+        # write outside the volume and its tmpfs, takes its archive input
+        # read-only, and runs the repository script rather than any extraction
+        # tooling baked into the runtime image.
+        compose = yaml.safe_load(_read("compose.yaml"))
+        services = compose["services"]
+        prepare = services["artwork-prepare"]
+
+        self.assertEqual(prepare["profiles"], ["artwork-prepare"])
+        self.assertNotIn("profiles", services["evennia"])
+        self.assertFalse(prepare.get("stdin_open", False))
+        self.assertFalse(prepare.get("tty", False))
+        self.assertEqual(
+            prepare["entrypoint"], ["/bin/sh", "/app/prepare-official-artwork.sh"]
+        )
+        # An empty command keeps the image's default CMD out of the entrypoint
+        # arguments (Compose appends the command to the entrypoint otherwise).
+        self.assertEqual(prepare.get("command"), [])
+        self.assertEqual(prepare.get("network_mode"), "none")
+        self.assertTrue(
+            prepare.get("read_only"), "the preparation container writes only the volume"
+        )
+        self.assertEqual(prepare["security_opt"], ["no-new-privileges"])
+        self.assertIn("evennia-art-official:/app/art-official", prepare["volumes"])
+        self.assertFalse(
+            [
+                line
+                for line in prepare["volumes"]
+                if line.startswith("evennia-art-official") and ":ro" in line
+            ],
+            "the preparation service needs write access to the volume",
+        )
+        self.assertIn(
+            "${ART_OFFICIAL_ARCHIVES_DIR:-./art-official-archives}"
+            ":/app/art-official-archives:ro,z",
+            prepare["volumes"],
+        )
+        self.assertIn(
+            "./scripts/prepare-official-artwork.sh"
+            ":/app/prepare-official-artwork.sh:ro,z",
+            prepare["volumes"],
+        )
+        # An unset archive forwards the blank no-op default.
+        self.assertEqual(
+            prepare["environment"]["ART_OFFICIAL_ARCHIVE"], "${ART_OFFICIAL_ARCHIVE:-}"
+        )
+        self.assertEqual(
+            prepare["environment"]["ART_OFFICIAL_CONTENT_DIR"],
+            "/app/art-official/content",
+        )
+
+        # The game service never runs the preparation entrypoint, and the
+        # runtime image carries neither the script nor any official artwork.
+        self.assertNotIn(
+            "prepare-official-artwork", " ".join(services["evennia"]["volumes"])
+        )
+        containerfile = _read("Containerfile")
+        self.assertNotIn("prepare-official-artwork", containerfile)
+        self.assertNotIn("ART_OFFICIAL", containerfile)
+
+        # No service definition fetches or unpacks anything itself: acquiring
+        # artwork is host/deployment tooling.
+        for name, service in services.items():
+            command = " ".join(
+                [*service.get("entrypoint", []), *service.get("command", [])]
+            )
+            with self.subTest(service=name):
+                self.assertFalse(
+                    re.search(r"(?i)\b(git|curl|wget|aws|rclone|s3cmd|unzip)\b", command),
+                    msg=f"{name} must not fetch or unpack artwork itself",
+                )
 
     @covers_requirement("container-image::container-ignore-file-excludes-non-build-context-files")
     def test_containerignore_excludes_repository_secrets_caches_and_development_paths(self):
