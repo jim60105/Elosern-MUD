@@ -254,6 +254,45 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
                 self.assertFalse((self.base / "escaped").exists())
                 self.assert_no_leftovers()
 
+    def test_the_extraction_step_refuses_traversal_and_relocates_absolute_members(self):
+        # Belt-and-suspenders for the listing parser above: even if a hostile
+        # member reached extraction, the tar invocation the script uses must
+        # never write outside its staging directory. Traversal members are
+        # refused outright and absolute members are relocated inside the target
+        # by the leading-slash strip — which is exactly why the parser refuses
+        # absolute names before extraction instead of trusting that relocation.
+        target = self.base / "target"
+        target.mkdir()
+        invocation = [
+            "tar",
+            "-xf",
+            "",
+            "--no-same-owner",
+            "--no-same-permissions",
+            "-C",
+            str(target),
+        ]
+
+        traversal = self.archives / "traversal.tar"
+        _write_archive(traversal, {"../escaped.png": b"poison\n"})
+        invocation[2] = str(traversal)
+        refused = subprocess.run(invocation, capture_output=True, text=True)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertEqual(_snapshot(target), {})
+        self.assertFalse((self.base / "escaped.png").exists())
+
+        outside = self.base / "escape-dir" / "poison.png"
+        absolute = self.archives / "absolute.tar"
+        _write_archive(absolute, {str(outside): b"poison\n"})
+        invocation[2] = str(absolute)
+        relocated = subprocess.run(invocation, capture_output=True, text=True)
+        self.assertEqual(relocated.returncode, 0, msg=relocated.stderr)
+        self.assertFalse(outside.exists())
+        self.assertEqual(
+            sorted(path.name for path in target.rglob("*") if path.is_file()),
+            ["poison.png"],
+        )
+
     def test_the_entry_count_and_size_caps_are_enforced(self):
         self.seed_content()
         before = _snapshot(self.content)

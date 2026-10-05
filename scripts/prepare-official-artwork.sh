@@ -43,8 +43,16 @@
 # gzip-compressed tar archives are the supported inputs (the runtime image ships
 # tar and gzip and nothing else that unpacks archives); prepare any other
 # archive format with host tooling, or use the plain-directory or S3 procedure.
+# Member listing parses GNU tar's `-tvf` line shape (type, permissions,
+# owner/group, size, ISO date, time, name); the C locale below keeps that shape
+# and the diagnostics locale-independent, and tar's own refusal of traversal and
+# absolute members is the backstop asserted by the repository tests.
 
 set -eu
+
+# Deterministic, locale-independent tar listings and diagnostics.
+LC_ALL=C
+export LC_ALL
 
 content_dir=${ART_OFFICIAL_CONTENT_DIR:-/app/art-official/content}
 archive_dir=${ART_OFFICIAL_ARCHIVE_DIR:-/app/art-official-archives}
@@ -123,10 +131,13 @@ if [ -z "$content_name" ] || [ "$content_name" = "/" ] || [ "$content_name" = ".
     die "ART_OFFICIAL_CONTENT_DIR does not name a directory: $content_dir"
 fi
 
-listing=$(mktemp) || die "cannot create a temporary listing file"
+# The listing is scratch, never state: keep it in the container tmpfs rather
+# than anywhere a caller-set TMPDIR could point (for example the volume).
+listing=$(TMPDIR=/tmp mktemp) || die "cannot create a temporary listing file"
 
 # Bounded count pass: a hostile or huge archive cannot make the listing, which
-# is written on the next pass, unbounded.
+# is written on the next pass, unbounded. A failing tar is masked here by the
+# pipeline's last command, so the next pass's `|| die` is the real gate.
 counted=$(tar -tf "$archive_path" 2>/dev/null | head -n "$((max_entries + 1))" | wc -l)
 counted=$(printf '%s' "$counted" | tr -d ' ')
 if [ "$counted" -gt "$max_entries" ]; then

@@ -316,6 +316,9 @@ class ContainerContractTests(unittest.TestCase):
         self.assertEqual(
             prepare["entrypoint"], ["/bin/sh", "/app/prepare-official-artwork.sh"]
         )
+        # An empty command keeps the image's default CMD out of the entrypoint
+        # arguments (Compose appends the command to the entrypoint otherwise).
+        self.assertEqual(prepare.get("command"), [])
         self.assertEqual(prepare.get("network_mode"), "none")
         self.assertTrue(
             prepare.get("read_only"), "the preparation container writes only the volume"
