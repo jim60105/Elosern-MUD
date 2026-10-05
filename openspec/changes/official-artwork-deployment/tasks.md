@@ -28,3 +28,23 @@
 
 - [x] 5.1 Run the applicable compose/config and build-context contract tests once and confirm the full deployment acceptance set for this change: successful preparation, reuse without archive, failed extraction leaves destination unchanged, absent-directory startup, no runtime Git/S3 dependency
       — Focused tests: `tests.test_container_contract`, `tests.test_official_artwork_preparation`, `tests.test_art_offline_contract`, `server.conf.tests.test_env_overrides.test_inventory_and_shard_ownership`, plus `tools.contract_gate` (traceability, both lints, shard manifests, ownership/frozen-audit contracts) and `openspec validate official-artwork-deployment --strict`. Live acceptance with the built image and a throwaway compose project (`omp-oawd`): `ART_OFFICIAL_ARCHIVE=official-art-probe.tar.gz podman compose --profile artwork-prepare run --rm artwork-prepare` exits 0 and leaves `content/{LICENSE,monster/alpha_wolf/portrait.png}` in the `evennia-art-official` volume; the same command with no `ART_OFFICIAL_ARCHIVE` exits 0 and changes nothing (and an already-populated volume is never erased); corrupt and unsafe (traversal + symlink) archives exit non-zero leaving that tree byte-for-byte unchanged; starting the game with the volume mounted read-only at `/app/art-official` and `ART_OFFICIAL_ROOT=/app/art-official/content` reports `official_art_catalog_loaded … contents=1 images=1 reason=official_root_indexed`, serves `/art/official/<sha256>/monster/alpha_wolf/portrait.png` as HTTP 200 `image/png` with byte-identical content, and returns 404 for a stale fingerprint; the built image contains `tar`/`gzip` but no `git`, `aws`, `rclone`, `unzip`, `xz`, or `bzip2`, and no service definition fetches or unpacks anything.
+
+## Archive-time traceability sync (deliberately not a task box)
+
+Every box above is checked, so the change reads tasks-complete; this note records
+the one obligation that belongs to the archive step instead of the apply step.
+The two ADDED requirements in `specs/container-image/spec.md` enter the
+traceability index only once the archive syncs them into
+`openspec/specs/container-image/spec.md`, and `tools.spec_traceability check`
+rejects an annotation whose requirement ID is not in that index yet, so the
+apply step must not carry them. The archiver MUST add them in the same commit as
+the spec sync (and re-run `tools.spec_traceability check`):
+
+`container-image::one-shot-official-artwork-archive-preparation-service` on the
+preparation-service behavior tests — `tests/test_official_artwork_preparation.py`
+and
+`tests.test_container_contract::test_the_official_artwork_preparation_service_is_profile_gated_and_confined`
+— and
+`container-image::official-artwork-is-excluded-from-publication-inputs-while-built-in-defaults-ship`
+on
+`tests.test_container_contract::test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image`.

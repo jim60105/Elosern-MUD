@@ -202,6 +202,8 @@ podman compose up -d                      # 3. start the game again
   intended recovery; there is no release registry and no automatic rollback.
 - Startup never acquires artwork: after an operator error the server simply
   serves the artwork it finds, or the built-in silhouettes when it finds none.
+- Run one preparation at a time: the service replaces the prepared tree as a
+  unit, and two concurrent runs would race over each other's staging directory.
 
 ## Verifying a deployment
 
@@ -209,14 +211,18 @@ podman compose up -d                      # 3. start the game again
 # The mount and interpolation the service will use.
 podman compose config
 
-# A no-art start is valid: the server starts, the catalog is empty, and one
-# `official_art_catalog_loaded` info event reports the empty/absent root.
+# The catalog reports what the server actually indexed at startup, once per
+# boot, including the empty/absent-root condition.
 podman compose logs --since 5m | grep official_art_catalog_loaded
 ```
 
-After preparing artwork, expect the same event to report indexed content
-directories and images instead of the empty condition, and refused entries for
-anything the admission rules rejected.
+A container that is merely "up" is not proof that artwork is being served: a
+missing, empty, or unreadable root starts normally with
+`reason=official_root_empty`, and the game then uses the built-in silhouettes.
+After preparing artwork, require the same event to report the indexed content
+directories and images with `reason=official_root_indexed` (for example
+`contents=1 images=7 refused=0`), and treat any refusal count as a to-do
+naming the offending root-relative paths the diagnostics carry.
 
 ### Troubleshooting
 
@@ -224,6 +230,6 @@ anything the admission rules rejected.
 | --- | --- |
 | `archive is not a regular file` | `ART_OFFICIAL_ARCHIVE` names a missing file inside `/app/art-official-archives`. Check `ART_OFFICIAL_ARCHIVES_DIR` and the file name. |
 | `archive is not a readable tar archive` | The input is not an uncompressed or gzip tar archive (a zip or xz/bzip2 archive). Unpack or repack it on the host. |
-| `permission denied` while creating the content directory | The named volume must be writable by the preparation service's user (UID 1001 of the image). Podman creates a fresh named volume owned by that user; if your engine creates it root-owned, `chown` the volume or run the preparation as root for one invocation (`podman compose --profile artwork-prepare run --rm --user 0 artwork-prepare`). |
+| `permission denied` while creating the content directory | The named volume must be writable by the preparation service's user (UID 1001 of the image). Podman creates a fresh named volume owned by that user; if your engine creates it root-owned, either `chown` the volume to UID 1001 or run one preparation as root (`podman compose --profile artwork-prepare run --rm --user 0 artwork-prepare`) and then **repair ownership**, because root-owned content is unreadable to the game (UID 1001), which would start and silently serve silhouettes: `podman unshare chown -R 1001:1001 "$(podman volume inspect <project>_evennia-art-official --format '{{.Mountpoint}}')"`. |
 | Artwork replaced but the game serves the old bytes | The catalog refreshes only at startup, and old fingerprint URLs intentionally 404. Restart the service. |
 | `official_art_catalog_loaded` reports refusals | Per-entry admission refused unsupported, symlinked, out-of-root, or oversized files; the event and its bounded diagnostics name the offending root-relative paths and the unrelated artwork still loads. |
