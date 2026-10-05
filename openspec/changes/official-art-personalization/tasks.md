@@ -13,10 +13,12 @@
 - [ ] 3.1 Project `official_entries` for the selected subject in the gallery panel presenter and mirror the exact row shape through the Python and JavaScript validators, and verify dual-direction parity tests (official rows never in `cards`, empty list for no-reference subjects, malformed rows rejected both sides)
 - [ ] 3.2 Add the four preference adapters (select, clear selection, set geometry, clear geometry) with exact payload validators, reference-scope identity re-resolution, and stable codes, and verify adapter tests including replay-idempotence and no-partial-write on rejection
 - [ ] 3.3 Make the existing mutation adapters reject official identities with `official_read_only` and verify direct-dispatch refusal tests prove byte-for-byte unchanged official files, cards, and preferences (acceptance criterion 6)
+- [ ] 3.4 Amend the change's own delta specs so the widened `image_id` card-reference union, the four new registry action IDs, and the official-entry UI affordances are stated contract rather than silent drift: `webclient-gallery-management-actions` MODIFIED blocks (exact-payload-validators and stage-save), a `webclient-action-dispatch` delta for the allowlisted registry, a `webclient-gallery-ui` delta for the official-row affordances, and the `webclient-gallery-panel` row bounds; every amended requirement keeps its exact heading so its canonical requirement ID is unchanged
 
 ## 4. Frontend affordances
 
 - [ ] 4.1 Render official rows in `GalleryPanel.vue`/`GalleryDetailRail.vue` (select/preview/geometry affordances; delete/replace/regenerate hidden), and verify showcase/browser-local coverage for the new states per the frozen component manifest
+- [ ] 4.2 Register the four preference adapters as declared silent webclient-only controls in the command-echo catalog and its shared coverage manifest (Python pin, Node fixture, Vitest per-surface table), and add the `official_entries` field to the browser-injected gallery fixture
 
 ## 5. Verification
 
