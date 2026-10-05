@@ -37,13 +37,15 @@ from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecordError,
+    OfficialPreferences,
     default_face_rect,
+    official_preferences_for,
     validate_face_rect,
     validate_stage,
     identity_stage,
 )
 from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_for_entity
-from world.art.gallery_match import fallback_for, official_default_for, resolve_card
+from world.art.gallery_match import fallback_for, official_default_for, resolve_display
 from world.art.paths import resolved_under_store_root
 from world.art.queue import record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -143,17 +145,22 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     """Resolve a validated subject to its presentation payload.
 
     Characters and monsters first attempt the deterministic gallery display
-    chain (``resolve_card``); a resolved card yields an ``asset`` payload
-    whose URL is built only from its validated stored identity. When nothing
-    in the gallery resolves, the classic ``done`` asset record is resolved
-    exactly as before, the entity's official content reference resolves its
-    default image from the startup catalog snapshot when one is indexed (an
-    absent, unregistered, or removed reference — and a URL outside the wire
-    budget — falls through like the classic record's unusable identity), the
-    terminal fallback seam is consulted, and the truthful placeholder closes
-    the chain. Every payload carries ``face_rect``: the card's or official
-    image's rectangle, the shared default for a classic asset or fallback
-    image, or ``None`` for a placeholder.
+    chain's steps 1-4 (``resolve_display``): a resolved card yields an
+    ``asset`` payload whose URL is built only from its validated stored
+    identity, and a resolving personal official selection yields an
+    ``official`` payload (the player's explicit choice replaces the gallery
+    default while every equipment-bound card still outranks it). Only when no
+    personal official selection resolved is the classic ``done`` asset record
+    consulted, exactly as before; then the entity's official content
+    reference resolves its default image from the startup catalog snapshot
+    when one is indexed (an absent, unregistered, or removed reference — and
+    a URL outside the wire budget — falls through like the classic record's
+    unusable identity), the terminal fallback seam is consulted, and the
+    truthful placeholder closes the chain. Every payload carries
+    ``face_rect``: the card's or official image's rectangle (a personal
+    geometry override taking precedence for an official image), the shared
+    default for a classic asset or fallback image, or ``None`` for a
+    placeholder.
 
     A resolved fallback is NEVER the payload's own image: it rides the
     decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
@@ -171,12 +178,29 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     schema (fix-art-pipeline-contracts D3); the persistent record status is
     never touched.
     """
-    card = resolve_card(subject, entity)
-    if card is not None:
+    outcome, resolved = resolve_display(subject, entity)
+    if outcome == "card":
         return _carried(
-            _card_payload(subject, card),
+            _card_payload(subject, resolved),
             _silhouette_field(subject, entity, report=False),
             origin=ORIGIN_RUNTIME,
+        )
+    if outcome == "official":
+        # Step 4's personal selection is the player's own explicit choice, so
+        # it replaces the gallery default and presents behind every
+        # equipment-bound card — still inside the shared wire budget, because
+        # an official identity embeds an operator-chosen filename.
+        if len(resolved["url"]) <= MAX_PORTRAIT_MEDIA_URL:
+            return _carried(
+                # One tolerant preference read per presentation: the same
+                # snapshot feeds the payload's geometry override.
+                _official_payload(subject, resolved, official_preferences_for(subject)),
+                _silhouette_field(subject, entity, report=False),
+                origin=ORIGIN_OFFICIAL,
+            )
+        log_warn(
+            "art_official_url_over_wire_budget",
+            context={"subject": subject.full(), "identity": resolved["identity"]},
         )
     record = _record_for(subject)
     identity = None
@@ -211,7 +235,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     if official is not None:
         if len(official["url"]) <= MAX_PORTRAIT_MEDIA_URL:
             return _carried(
-                _official_payload(subject, official),
+                _official_payload(subject, official, official_preferences_for(subject)),
                 _silhouette_field(subject, entity, report=False),
                 origin=ORIGIN_OFFICIAL,
             )
@@ -281,7 +305,9 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     }
 
 
-def _official_payload(subject: ArtSubject, official: dict) -> dict:
+def _official_payload(
+    subject: ArtSubject, official: dict, preferences: OfficialPreferences
+) -> dict:
     """The asset payload for one resolved official default (chain step 6).
 
     The URL is the catalog's admitted same-origin identity (fingerprinted; the
@@ -293,18 +319,46 @@ def _official_payload(subject: ArtSubject, official: dict) -> dict:
     stage to identity placement, each with one bounded diagnostic — never a
     failed payload.
 
+    The subject's own geometry override for this identity takes precedence,
+    component by component, read from the caller's single tolerant preference
+    snapshot. A stored rectangle the CURRENT bytes invalidate
+    (an artwork update replaced them at other dimensions) degrades to the
+    catalog's metadata-or-fitted rectangle with ONE bounded
+    ``art_official_override_invalid`` diagnostic naming the subject, the
+    identity, and the component; the stored preference itself is retained,
+    because this builder only ever reads it. A stored stage needs no such
+    guard: the tolerant preference read already validated it (and drops a
+    malformed one) before this payload is built.
+
     No status is claimed: an official image is not a generated asset, so the
     payload reports no ``done``/generated portrait state, and it carries no
     filesystem root, deployment source, license/manifest text, or prompt.
     """
     image_size = official.get("image_size")
+    face_rect = official["face_rect"]
+    stage = official["stage"]
+    override = preferences.geometry.get(official["identity"])
+    if override is not None and "face_rect" in override:
+        try:
+            face_rect = validate_face_rect(override["face_rect"], image_size=image_size)
+        except GalleryRecordError:  # observability: ignore R2: the retained preference degrades to the catalog's geometry with the bounded diagnostic below
+            log_warn(
+                "art_official_override_invalid",
+                context={
+                    "subject": subject.full(),
+                    "identity": official.get("identity"),
+                    "component": "face_rect",
+                },
+            )
+    if override is not None and "stage" in override:
+        stage = override["stage"]
     try:
-        face_rect = validate_face_rect(official["face_rect"], image_size=image_size)
+        face_rect = validate_face_rect(face_rect, image_size=image_size)
     except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
         log_warn("art_face_rect_invalid", context={"subject": subject.full()})
         face_rect = default_face_rect(image_size) if image_size else dict(DEFAULT_FACE_RECT)
     try:
-        stage = validate_stage(official["stage"])
+        stage = validate_stage(stage)
     except GalleryRecordError:  # observability: ignore R2: malformed placement degrades with its bounded diagnostic
         log_warn(
             "art_stage_invalid",

@@ -33,14 +33,19 @@ from world.art.gallery import (
     GalleryRecord,
     append_card,
     cards_for,
+    official_preferences_for,
     record_for,
     record_key,
     set_default,
+    set_official_geometry,
+    set_official_selection,
 )
 from world.art.gallery_match import (
     fallback_for,
     official_default_for,
+    official_selection_for,
     resolve_card,
+    resolve_display,
     validated_card_identity,
 )
 from world.art.official import (
@@ -684,6 +689,255 @@ class ImportBoundaryTests(unittest.TestCase):
                     module == forbidden or module.startswith(f"{forbidden}."),
                     f"gallery_match imports forbidden {module}",
                 )
+
+
+class _ProvenanceEquipmentEntity(_ProvenanceEntity):
+    """A preset-born entity that also carries stored equipment."""
+
+    def __init__(self, pk=11, preset_key=_PRESET_KEY, equipment=None):
+        super().__init__(pk=pk, preset_key=preset_key)
+        self.db = _FakeDb({"equipment": equipment} if equipment is not None else {})
+
+
+class OfficialSelectionStepTests(EvenniaTestCase):
+    """Chain step 4's personal official selection (tasks 2.1 and 2.2).
+
+    The entity is preset-born, so its content reference is the indexed
+    ``preset/<key>/`` directory; the store is a temp root so a real card can
+    sit beside the selection.
+    """
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name).resolve()
+        self.store = self.root / "store"
+        self.store.mkdir()
+        self.official_root = self.root / "official"
+        self.settings = override_settings(
+            ART_STORE_ROOT=str(self.store),
+            ART_OFFICIAL_ROOT=str(self.official_root),
+        )
+        self.settings.enable()
+        self.addCleanup(self.settings.disable)
+        reset_catalog()
+        self.addCleanup(reset_catalog)
+        for patcher in (
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            ),
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _write_image(self, name, width=4, height=4, **manifest) -> None:
+        folder = self.official_root / "preset" / _PRESET_KEY
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(_png(width, height))
+        manifest_path = folder / "manifest.json"
+        if manifest:
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        elif manifest_path.exists():
+            manifest_path.unlink()
+
+    def _index(self, name="hero.png", width=4, height=4, **manifest) -> str:
+        self._write_image(name, width, height, **manifest)
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def _subject(self, pk=11) -> ArtSubject:
+        return ArtSubject(ArtSubjectKind.CHARACTER, str(pk))
+
+    def _entity(self, pk=11, preset_key=_PRESET_KEY):
+        # The chain reads the entity's stored equipment for a binding-capable
+        # kind, so every entity here carries the same db namespace too.
+        return _ProvenanceEquipmentEntity(pk=pk, preset_key=preset_key)
+
+    def _append_present(self, subject, **overrides):
+        fields = _card_fields(subject, **overrides)
+        target = self.store / fields["stored_identity"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        append_card(subject, **fields)
+        return fields["image_id"]
+
+    def test_a_selection_outranks_the_default_card_and_stays_behind_a_binding(self):
+        self._write_image("a.png", face_rect=dict(DEFAULT_FACE_RECT), stage={"scale": 1.0, "x": 0.0, "y": 0.0})
+        selected = self._index("b.png", stage={"scale": 1.4, "x": 0.1, "y": -0.2})
+        subject = self._subject()
+        entity = self._entity()
+        set_official_selection(subject, selected)
+        # The first card appends with the automatic default: both a card
+        # default and the selection are now set, and the selection wins.
+        default_card = self._append_present(subject)
+        outcome, facts = resolve_display(subject, entity)
+        self.assertEqual(outcome, "official")
+        self.assertEqual(facts["identity"], selected)
+        self.assertEqual(facts["url"], current_catalog().url_for(selected))
+        self.assertEqual(facts["stage"], {"scale": 1.4, "x": 0.1, "y": -0.2})
+        # The card-only projection shows no card: the official branch owns the
+        # payload — and the default card itself is untouched.
+        self.assertIsNone(resolve_card(subject, entity))
+        self.assertEqual(record_for(subject).db.default_image_id, default_card)
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [default_card])
+        # An equipment-bound card outranks the selection.
+        bound = self._append_present(
+            subject, binding=_binding(["armor"], {"armor": "t_coat"})
+        )
+        armed = _ProvenanceEquipmentEntity(equipment={"armor": "t_coat"})
+        outcome, facts = resolve_display(subject, armed)
+        self.assertEqual(outcome, "card")
+        self.assertEqual(facts["image_id"], bound)
+        # The selection survived both resolutions untouched.
+        self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    def test_a_stale_selection_falls_through_to_the_default_card_and_is_retained(self):
+        selected = self._index("b.png")
+        subject = self._subject()
+        entity = self._entity()
+        set_official_selection(subject, selected)
+        shutil.rmtree(self.official_root / "preset")
+        load_catalog()
+        default_card = self._append_present(subject)
+        self.assertIsNone(official_selection_for(subject, entity))
+        outcome, facts = resolve_display(subject, entity)
+        self.assertEqual(outcome, "card")
+        self.assertEqual(facts["image_id"], default_card)
+        self.assertEqual(official_preferences_for(subject).selection, selected)
+        # With no card at all the chain resolves nothing here and continues in
+        # the presenter; the preference still stands.
+        bare = self._subject(pk=12)
+        set_official_selection(bare, selected)
+        self.assertEqual(resolve_display(bare, self._entity(pk=12)), ("none", None))
+        self.assertEqual(official_preferences_for(bare).selection, selected)
+
+    def test_a_selection_outside_the_reference_resolves_nothing(self):
+        self._index("a.png")
+        subject = self._subject()
+        for identity in (
+            f"preset/{_PRESET_KEY}/absent.png",
+            "preset/t_synth_other/a.png",
+            "npc/t_synth_profile/a.png",
+        ):
+            with self.subTest(identity=identity):
+                with patch("world.art.gallery.log_warn"):
+                    set_official_selection(subject, identity)
+                self.assertIsNone(official_selection_for(subject, self._entity()))
+                self.assertEqual(
+                    resolve_display(subject, self._entity()), ("none", None)
+                )
+                self.assertEqual(official_preferences_for(subject).selection, identity)
+
+    def test_the_retained_identity_resolves_new_bytes_after_a_restart(self):
+        selected = self._index("b.png", width=4, height=4)
+        subject = self._subject()
+        entity = self._entity()
+        set_official_selection(subject, selected)
+        before = current_catalog().fingerprint_for(selected)
+        _, first = resolve_display(subject, entity)
+        # A maintenance update replaces the bytes at the same identity, then
+        # the server restarts (the snapshot simply reloads).
+        self._write_image("b.png", width=8, height=8)
+        load_catalog()
+        after = current_catalog().fingerprint_for(selected)
+        self.assertNotEqual(before, after)
+        _, second = resolve_display(subject, entity)
+        self.assertEqual(second["identity"], selected)
+        self.assertEqual(second["url"], f"/art/official/{after}/{selected}")
+        self.assertEqual(second["image_size"], {"width": 8, "height": 8})
+        self.assertNotEqual(first["url"], second["url"])
+        self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    def test_resolve_card_is_the_card_only_projection(self):
+        subject = self._subject()
+        entity = self._entity()
+        bound = self._append_present(
+            subject, binding=_binding(["armor"], {"armor": "t_coat"})
+        )
+        armed = _ProvenanceEquipmentEntity(equipment={"armor": "t_coat"})
+        self.assertEqual(
+            resolve_card(subject, armed), resolve_display(subject, armed)[1]
+        )
+        self.assertEqual(resolve_card(subject, armed)["image_id"], bound)
+        # With no preference set the two agree for a default card too.
+        other = self._subject(pk=12)
+        default_card = self._append_present(other)
+        self.assertEqual(
+            resolve_card(other, self._entity(pk=12))["image_id"], default_card
+        )
+        self.assertEqual(
+            resolve_card(other, self._entity(pk=12)),
+            resolve_display(other, self._entity(pk=12))[1],
+        )
+
+    def test_mutual_clearing_between_the_two_writers(self):
+        selected = self._index("b.png")
+        subject = self._subject()
+        entity = self._entity()
+        card = self._append_present(subject)
+        self.assertEqual(resolve_display(subject, entity)[0], "card")
+        set_official_selection(subject, selected)
+        self.assertIsNone(record_for(subject).db.default_image_id)
+        self.assertEqual(resolve_display(subject, entity)[0], "official")
+        set_default(subject, card)
+        self.assertIsNone(official_preferences_for(subject).selection)
+        outcome, facts = resolve_display(subject, entity)
+        self.assertEqual(outcome, "card")
+        self.assertEqual(facts["image_id"], card)
+
+    def test_a_hundred_resolutions_read_only_the_snapshot_and_write_nothing(self):
+        selected = self._index("b.png", stage={"scale": 1.4, "x": 0.1, "y": -0.2})
+        subject = self._subject()
+        entity = self._entity()
+        set_official_selection(subject, selected)
+        set_official_geometry(
+            subject, selected, stage={"scale": 0.6, "x": 0.0, "y": -0.2}
+        )
+        tripwires = (
+            patch.object(socket, "create_connection", side_effect=AssertionError("network")),
+            patch.object(socket.socket, "connect", side_effect=AssertionError("network")),
+            patch("world.art.gallery.append_card", side_effect=AssertionError("card write")),
+            patch("world.art.gallery.set_default", side_effect=AssertionError("default write")),
+            patch(
+                "world.art.gallery.set_official_selection",
+                side_effect=AssertionError("preference write"),
+            ),
+            patch(
+                "world.art.queue.enqueue_gallery_job",
+                side_effect=AssertionError("enqueue"),
+            ),
+            patch.object(official, "open_dir_fd", side_effect=AssertionError("re-walk")),
+            patch.object(official, "load_catalog", side_effect=AssertionError("re-load")),
+        )
+        before = (
+            GalleryRecord.objects.count(),
+            ArtAssetRecord.objects.count(),
+            repr(record_for(subject).attributes.all()),
+            sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
+        )
+        with ExitStack() as stack:
+            for tripwire in tripwires:
+                stack.enter_context(tripwire)
+            resolutions = [resolve_display(subject, entity) for _ in range(100)]
+        after = (
+            GalleryRecord.objects.count(),
+            ArtAssetRecord.objects.count(),
+            repr(record_for(subject).attributes.all()),
+            sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
+        )
+        # The tripwire is not vacuous: every resolution really resolved the
+        # selection, and all of them agreed.
+        self.assertTrue(all(item == ("official", resolutions[0][1]) for item in resolutions))
+        self.assertEqual(resolutions[0][1]["identity"], selected)
+        self.assertEqual(before, after)
 
 
 if __name__ == "__main__":

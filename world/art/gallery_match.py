@@ -10,7 +10,11 @@ the entity's stored equipment — never the environment, never a write):
    snapshot value for EVERY masked slot equals the computed value;
 3. among those, the card whose mask covers the most slots wins; a tie is
    broken by the newest ``created_at``;
-4. otherwise the card named by the record's ``default_image_id``;
+4. otherwise the entity's personal official selection when one is set and
+   resolves inside its own content reference (``official_selection_for`` — the
+   player's explicit choice REPLACES the gallery default, and every
+   equipment-bound card still outranks it), else the card named by the
+   record's ``default_image_id``;
 
 Monster subjects skip steps 1-3 entirely — no equipment snapshot is ever
 computed for them and no monster card is ever selected by a binding — so a
@@ -19,8 +23,11 @@ ONLY as the explicit default (step 4); no image the player has not chosen is
 ever displayed as a surprise. Scene subjects have no gallery and always
 resolve to ``None`` here.
 
-The chain's remaining lookups live in the presenter, which owns payload
-construction: the classic ``done`` asset record (step 5), the official
+``resolve_display`` returns steps 1-4 as the discriminated pair the presenter
+consumes (``card`` | ``official`` | ``none``); ``resolve_card`` is its
+card-only projection. The chain's remaining lookups live in the presenter,
+which owns payload construction: the classic ``done`` asset record (step 5 —
+consulted only when no personal official selection resolved), the official
 default for the entity's content reference (step 6,
 ``official_default_for`` — resolved from the startup catalog snapshot alone,
 so an entity with no reference, or a reference the snapshot does not hold,
@@ -30,6 +37,11 @@ This module exposes the official lookup and the seam
 ``fallback_for(subject)``, filling the latter from
 ``gallery-builtin-fallbacks``: the deterministic built-in resolver over the
 six committed defaults, or ``None`` (scenes) when no fallback applies.
+
+A personal official selection that no longer resolves — removed by an artwork
+update, refused at admission, or outside the entity's content reference —
+resolves ``None`` here and the chain simply continues; nothing deletes the
+preference, writes a file, or enqueues a job.
 
 Every candidate is identity-validated through
 ``validated_card_identity`` — subject prefix, closed store-extension set, and
@@ -52,6 +64,7 @@ from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     empty_snapshot,
     cards_for,
+    official_preferences_for,
     record_for,
     snapshot_for,
 )
@@ -108,25 +121,48 @@ def _identity_extension(identity: str) -> str:
     return identity[dot:] if dot != -1 else ""
 
 
-def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
-    """Resolve the card to display for ``subject`` under ``entity``'s equipment.
+def resolve_display(
+    subject: ArtSubject, entity: Any = None
+) -> tuple[str, dict | None]:
+    """The chain's steps 1-4 as one discriminated resolution.
 
-    Returns the validated card dict (the tolerant read's stored form) or
-    ``None`` when nothing in the gallery resolves — the caller then continues
-    the chain at the classic asset record. The same record and the same
-    equipment always resolve to the same card; nothing here writes.
+    ``("card", card)`` when an equipment-bound card matched or the record's
+    ``default_image_id`` resolved, ``("official", facts)`` when the personal
+    official selection resolves at step 4 (it replaces the gallery default and
+    stays behind every equipment-bound card), ``("none", None)`` when nothing
+    in steps 1-4 resolved. A pure function of stored state plus the startup
+    snapshot: the same record, preference, and equipment always resolve the
+    same way, and nothing here writes.
     """
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:
-        return None
+        return ("none", None)
     cards = cards_for(subject)
     if capability.supports_bindings:
         snapshot = snapshot_for(entity) if entity is not None else empty_snapshot()
-        matched = _binding_candidates(cards, snapshot)
-        for card in matched:
+        for card in _binding_candidates(cards, snapshot):
             if validated_card_identity(subject, card) is not None:
-                return card
-    return _default_card(subject, cards)
+                return ("card", card)
+    selection = official_selection_for(subject, entity)
+    if selection is not None:
+        return ("official", selection)
+    default = _default_card(subject, cards)
+    if default is not None:
+        return ("card", default)
+    return ("none", None)
+
+
+def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
+    """Resolve the CARD to display for ``subject`` under ``entity``'s equipment.
+
+    The card-only projection of :func:`resolve_display`: the validated card
+    dict (the tolerant read's stored form) or ``None`` when no card resolves —
+    the caller then continues the chain at the classic asset record. A
+    resolving personal official selection is step 4's other half, so it makes
+    this return ``None``; the presenter's official branch owns that payload.
+    """
+    outcome, facts = resolve_display(subject, entity)
+    return facts if outcome == "card" else None
 
 
 def _binding_candidates(cards: list[dict], snapshot: dict) -> list[dict]:
@@ -214,6 +250,51 @@ def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> di
     return resolution
 
 
+def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | None:
+    """Step 4's first half: the subject's personal official selection.
+
+    The retained preference resolves only when it names an image the startup
+    snapshot admits INSIDE the entity's own official content reference. An
+    unset, malformed, out-of-reference, or no-longer-indexed selection
+    resolves ``None`` and the chain continues with no other effect — the
+    preference stays stored, nothing is deleted, and no acquisition is
+    attempted. The returned facts are the catalog's own: the admitted
+    root-relative ``identity``, its same-origin fingerprinted ``url``, the
+    geometry it validated at load, and the pixel size it decoded, so the
+    presenter re-validates a personal override against exactly those
+    dimensions.
+
+    Imports stay local — like :func:`fallback_for` — so this module keeps its
+    read-only, transport-free module-level import surface.
+    """
+    from world.art import official
+    from world.art.official_refs import official_content_reference_for_entity
+
+    selection = official_preferences_for(subject).selection
+    if selection is None:
+        return None
+    reference = official_content_reference_for_entity(entity)
+    if reference is None:
+        return None
+    catalog = official.current_catalog()
+    content = catalog.content(reference.kind, reference.key)
+    if content is None or selection not in content.images:
+        return None
+    image = catalog.entry(selection)
+    if image is None:
+        return None
+    url = catalog.url_for(image.identity)
+    if url is None:
+        return None
+    return {
+        "identity": image.identity,
+        "url": url,
+        "face_rect": dict(image.face_rect),
+        "stage": dict(image.stage),
+        "image_size": dict(image.image_size),
+    }
+
+
 def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None:
     """Step 6 of the chain: the mounted catalog's default official image.
 
@@ -272,6 +353,8 @@ def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None
 __all__ = [
     "fallback_for",
     "official_default_for",
+    "official_selection_for",
     "resolve_card",
+    "resolve_display",
     "validated_card_identity",
 ]
