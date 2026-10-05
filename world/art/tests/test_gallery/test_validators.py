@@ -31,6 +31,8 @@ from world.art.gallery import (
     validate_image_size,
     default_face_rect,
     validate_stage,
+    validate_official_geometry,
+    validate_official_identity,
 )
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -306,3 +308,96 @@ class BindingValidationTests(unittest.TestCase):
             with self.subTest(binding=label):
                 with self.assertRaises(GalleryRecordError):
                     validate_binding(binding)
+
+
+class OfficialIdentityValidationTests(unittest.TestCase):
+    """The closed root-relative identity grammar the preference fields store."""
+
+    def test_a_catalog_shaped_identity_is_returned_verbatim(self):
+        for identity in (
+            "preset/t_synth_preset/hero.png",
+            "npc/t_synth_npc/a.webp",
+            "monster/t_synth_species/deep one.avif",
+        ):
+            with self.subTest(identity=identity):
+                self.assertEqual(validate_official_identity(identity), identity)
+        # The bound is inclusive: 192 code points pass, 193 refuse.
+        at_cap = "preset/" + "k" * (192 - len("preset/") - len("/a.png")) + "/a.png"
+        self.assertEqual(len(at_cap), 192)
+        self.assertEqual(validate_official_identity(at_cap), at_cap)
+        over_cap = "preset/" + "k" * (193 - len("preset/") - len("/a.png")) + "/a.png"
+        self.assertEqual(len(over_cap), 193)
+        with self.assertRaises(GalleryRecordError):
+            validate_official_identity(over_cap)
+
+    def test_every_malformed_identity_is_refused(self):
+        malformed = {
+            "none": None,
+            "int": 7,
+            "empty": "",
+            "two_segments": "preset/t_synth_preset",
+            "four_segments": "preset/t_synth_preset/deep/a.png",
+            "empty_key": "preset//a.png",
+            "empty_filename": "preset/t_synth_preset/",
+            "leading_slash": "/preset/t_synth_preset/a.png",
+            "dot_segment": "preset/./a.png",
+            "parent_segment": "preset/../a.png",
+            "unknown_extension": "preset/t_synth_preset/a.bmp",
+            "no_extension": "preset/t_synth_preset/a",
+            "control_char": "preset/t_synth_preset/a\u0000.png",
+            "newline": "preset/t_synth_preset/a\n.png",
+            "format_char": "preset/t_synth_preset/a\u200b.png",
+            "non_breaking_space": "preset/t_synth_preset/a\u00a0.png",
+            "ideographic_space": "preset/t_synth_preset/a\u3000.png",
+            "lone_surrogate": "preset/t_synth_preset/\ud800.png",
+        }
+        for label, identity in malformed.items():
+            with self.subTest(identity=label):
+                with self.assertRaises(GalleryRecordError):
+                    validate_official_identity(identity)
+
+
+class OfficialGeometryValidationTests(unittest.TestCase):
+    """The stored override shape: either component, each by its own rule."""
+
+    RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375}
+    STAGE = {"scale": 1.4, "x": 0.1, "y": -0.2}
+
+    def test_each_component_combination_is_stored_verbatim(self):
+        for entry, expected in (
+            ({"face_rect": dict(self.RECT)}, {"face_rect": self.RECT}),
+            ({"stage": dict(self.STAGE)}, {"stage": self.STAGE}),
+            (
+                {"face_rect": dict(self.RECT), "stage": dict(self.STAGE)},
+                {"face_rect": self.RECT, "stage": self.STAGE},
+            ),
+        ):
+            with self.subTest(entry=sorted(entry)):
+                stored = validate_official_geometry(entry)
+                self.assertEqual(stored, expected)
+                self.assertIs(type(stored), dict)
+                self.assertIsNot(stored, entry)
+        # Bounds-only: an unknown image size never adds a squareness check.
+        self.assertEqual(
+            validate_official_geometry({"face_rect": dict(DEFAULT_FACE_RECT)}),
+            {"face_rect": DEFAULT_FACE_RECT},
+        )
+
+    def test_every_malformed_override_is_refused(self):
+        malformed = {
+            "not_a_mapping": ["face_rect"],
+            "empty": {},
+            "unknown_key": {"zoom": 1},
+            "rect_and_unknown": {"face_rect": dict(self.RECT), "zoom": 1},
+            "rect_out_of_bounds": {"face_rect": {"x": 0.9, "y": 0.0, "w": 0.5, "h": 0.5}},
+            "rect_boolean": {"face_rect": {"x": True, "y": 0.0, "w": 0.5, "h": 0.5}},
+            "rect_missing_key": {"face_rect": {"x": 0.0, "y": 0.0, "w": 0.5}},
+            "stage_out_of_bounds": {"stage": {"scale": 3.0, "x": 0.0, "y": 0.0}},
+            "stage_boolean": {"stage": {"scale": 1.0, "x": True, "y": 0.0}},
+            "stage_extra_key": {"stage": {"scale": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}},
+            "stage_none": {"stage": None},
+        }
+        for label, entry in malformed.items():
+            with self.subTest(override=label):
+                with self.assertRaises(GalleryRecordError):
+                    validate_official_geometry(entry)
