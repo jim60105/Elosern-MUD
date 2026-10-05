@@ -690,5 +690,57 @@ class StartupWiringTests(unittest.TestCase):
         )
 
 
+class OfficialReferenceContractTests(unittest.TestCase):
+    """The single origin of the content vocabulary and the key grammar.
+
+    ``world.art.official`` owns the closed content-kind vocabulary and the
+    admission key contract; ``world.art.official_refs`` (the
+    ``official-content-provenance`` capability) duplicates the vocabulary as
+    literals BY DESIGN so its leaf module need not import this one's Pillow /
+    Django / no-follow chain, and delegates the key grammar to the one shared
+    predicate. These two assertions are what make those borrowings safe: the
+    tuples cannot diverge, and there is exactly one grammar implementation.
+    """
+
+    def test_the_kind_vocabulary_has_exactly_one_origin(self):
+        from world.art import official_refs
+
+        self.assertEqual(official_refs.OFFICIAL_CONTENT_KINDS, official.OFFICIAL_CONTENT_KINDS)
+
+    def test_the_key_grammar_has_exactly_one_implementation(self):
+        from world.art import official_refs
+        from world.art.subjects import is_valid_subject_key
+
+        self.assertIs(official.is_valid_subject_key, is_valid_subject_key)
+        self.assertIs(official_refs.is_valid_subject_key, is_valid_subject_key)
+        # The boundary battery either side of the contract, so the shared
+        # predicate's behavior at every documented edge is pinned here.
+        over_long = "x" * 65
+        over_bytes = "\U0001d54f" * 51  # 51 code points, 204 UTF-8 bytes
+        valid = ("t_synth_preset", "a" * 64, "é" * 64, "a b", "a#b")
+        invalid = (
+            "",
+            None,
+            7,
+            "a/b",
+            "a:b",
+            "a|b",
+            "a{b",
+            "a}b",
+            "a\x00b",
+            "a\x7fb",
+            "a\u00a0b",
+            "a\u200bb",
+            over_long,
+            over_bytes,
+        )
+        for key in valid:
+            with self.subTest(key=repr(key)):
+                self.assertTrue(is_valid_subject_key(key))
+        for key in invalid:
+            with self.subTest(key=repr(key)):
+                self.assertFalse(is_valid_subject_key(key))
+
+
 if __name__ == "__main__":
     unittest.main()
