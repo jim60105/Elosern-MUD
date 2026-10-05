@@ -219,12 +219,55 @@ Use package-adjacent tests and the existing shard manifest for new non-browser t
 
 ## 13. Delivery boundaries
 
-The design can be decomposed into independently verifiable OpenSpec changes:
+This design is decomposed into six independently verifiable OpenSpec changes under `openspec/changes/`:
 
-1. External directory catalog, read-only container mount, optional native archive preparation, media serving, and resolver integration with stable preset/NPC content references.
-2. Personal official-image selections/geometry and gallery read-only presentation.
-3. Built-in silhouette payload semantics and the stage SVG replacement; this does not depend on the official artwork mount and can be implemented independently.
+| Change | Scope (source sections) | Proposal |
+|---|---|---|
+| `official-artwork-catalog` | `ART_OFFICIAL_ROOT`, the read-only startup catalog: layout/admission/manifest contract, per-file fingerprint, `/art/official/...` media branch (sections 3, 4, 10) | [proposal](../../../openspec/changes/official-artwork-catalog/proposal.md) |
+| `official-artwork-deployment` | Read-only bind mount + named-volume alternative + one-shot native archive preparation service, build-context exclusion, operator deployment guide (sections 5, 10) | [proposal](../../../openspec/changes/official-artwork-deployment/proposal.md) |
+| `official-content-provenance` | Typed official content references: preset provenance with gallery independence, authored NPC/profile provenance, dynamic-NPC explicit-only rule, entity-identity-hash-only rule, monster species-catalog prerequisite with anti-tier-substitution (section 6) | [proposal](../../../openspec/changes/official-content-provenance/proposal.md) |
+| `official-art-resolution-contracts` | Extended deterministic chain with the official-default step, payload origin discriminator, eligibility ordering, auto-generation suppression (sections 6, 7) | [proposal](../../../openspec/changes/official-art-resolution-contracts/proposal.md) |
+| `official-art-personalization` | Personal official-image selections and geometry overrides, mutual default clearing, stale-selection retention, read-only official gallery entries and mutation rejection (sections 7, 8) | [proposal](../../../openspec/changes/official-art-personalization/proposal.md) |
+| `builtin-silhouette-stage-fallback` | Silhouette payload semantics and attribute-selected alpha-mask stage rendering replacing the inline SVG (section 9) | [proposal](../../../openspec/changes/builtin-silhouette-stage-fallback/proposal.md) |
 
-Species-specific monster integration follows the separate monster catalog design. The official directory kind is defined here, but a threat-tier alias is not a substitute for that prerequisite. Monster habitat placement, target quantities, guild difficulty, city safety, and quest provisioning are outside this document and remain subject to their own brainstorming and approvals.
+### Coverage mapping
 
-No runtime implementation is included in this design-document change. After the user reviews this written specification, use the repository's specification-driven workflow for proposal and implementation planning.
+Design section → owning change: sections 1 and 2 (boundaries/amendments) are contracts every change references; 3 → catalog + deployment; 4 → catalog; 5 → deployment; 6 → provenance (references) + resolution-contracts (chain/payload separation); 7 → resolution-contracts (chain, eligibility, suppression) + personalization (selection precedence/clearing); 8 → personalization; 9 → builtin-silhouette-stage-fallback; 10 → catalog (serving/fingerprint) + deployment (mounts/build exclusion); 11 → catalog (diagnostics/observability) + deployment (preparation reporting), each change carrying its own logging clauses; 12 → acceptance criterion 1 = catalog, 2 = deployment, 3 = catalog, 4 = personalization (with resolution-contracts' resolution half), 5 = provenance (synthetic-reference form until the species prerequisite lands), 6 = personalization + deployment, 7 = builtin-silhouette-stage-fallback, 8 = builtin-silhouette-stage-fallback (focused browser file), 9 = catalog + personalization, 10 = deployment (+ catalog startup invariants). No acceptance criterion is left unmapped; the species-dependent half of criterion 5 is explicitly deferred with its prerequisite rather than narrowed.
+
+### Dependencies, external prerequisites, and shared-file conflicts
+
+Machine-readable `## Batch:` sections in each proposal are authoritative; the matrix:
+
+| Change | depends-on | Hard external prerequisite |
+|---|---|---|
+| `official-artwork-catalog` | — | — |
+| `official-artwork-deployment` | `official-artwork-catalog` | — (live Git/S3 hosts explicitly not required) |
+| `official-content-provenance` | `official-artwork-catalog` (single origin of the closed content-kind vocabulary) | Species-specific monster references require the separate, still-in-brainstorming monster species catalog design; until it lands, monsters resolve no official reference (guarded seams preserved) |
+| `official-art-resolution-contracts` | `official-artwork-catalog`, `official-content-provenance`, `builtin-silhouette-stage-fallback` (declared so the origin vocabulary it extends is serialized ahead of it) | — |
+| `official-art-personalization` | `official-artwork-catalog`, `official-content-provenance`, `official-art-resolution-contracts` | — |
+| `builtin-silhouette-stage-fallback` | — | — |
+
+Shared-file conflicts (files multiple changes edit):
+
+- `world/art/presenter.py` payload branch + the portrait origin wire vocabulary (`protocol.js` + Python validators): `official-art-resolution-contracts` ↔ `builtin-silhouette-stage-fallback`. Dependency-free but NOT mergeable in parallel: `builtin-silhouette-stage-fallback` establishes the closed origin vocabulary (`runtime | silhouette | placeholder`) and the decorative `fallback` field; `official-art-resolution-contracts` extends that shipped vocabulary with `official`. Recommended order is silhouette-first; the reverse requires the silhouette change to rebase.
+- `world/art/gallery_match.py` chain + payloads: `official-art-resolution-contracts` ↔ `official-art-personalization` (declared dependency; personalization MODIFIEDs the exact chain to place the personal official selection at the default-card slot and qualifies the classic step).
+- `webclient-art-panel` portrait-catalog requirement: `builtin-silhouette-stage-fallback` (decorative fallback fields) ↔ `official-art-resolution-contracts` (`official` discriminator extension) ↔ `official-art-personalization` (official-backed entries) — one requirement, three sequential editors, per the wave order.
+- `compose.yaml`/`.env.example`/inventory test: `official-artwork-catalog` ↔ `official-artwork-deployment` (declared dependency; disjoint variables).
+- `world/art/gallery.py` (record lifecycle + preference fields vs. read-model projections), gallery-panel validators, management adapters: `official-art-resolution-contracts` ↔ `official-art-personalization` (declared dependency, sequential).
+- `world/art/gallery_fallback.py` comments: `official-content-provenance` ↔ `builtin-silhouette-stage-fallback` (comment-only overlap; provenance first).
+- `ReferenceArtwork.vue`: `builtin-silhouette-stage-fallback` (stage placeholder region) ↔ `official-art-personalization` (personal-override affordances; disjoint regions, serialize anyway).
+
+Genuinely independent (no dependency and no shared file with each other): `builtin-silhouette-stage-fallback` from `official-artwork-deployment` and from `official-content-provenance` (comment overlap aside). `builtin-silhouette-stage-fallback` needs no official directory at runtime; the dependency `official-art-resolution-contracts` declares on it exists solely to serialize the shared presenter/protocol vocabulary (it establishes `runtime | silhouette | placeholder` + the decorative `fallback` field; the resolution change extends it with `official`) — dependency-free-in-substance but strictly non-parallel in integration, and integration of `presenter.py`, `protocol.js`, and the management/gallery surfaces must run under one integrator, never as a parallel merge.
+
+### Suggested parallel implementation waves
+
+One engineer-day per change; each wave's changes touch disjoint files except where serialized below:
+
+1. **Wave 1 (parallel):** `official-artwork-catalog` ∥ `builtin-silhouette-stage-fallback` (independent of the official mount per section 9; it establishes the origin/fallback wire vocabulary that wave 3 extends).
+2. **Wave 2 (parallel after wave 1):** `official-artwork-deployment` ∥ `official-content-provenance` (after catalog).
+3. **Wave 3:** `official-art-resolution-contracts` — single integrator pass over `presenter.py`/`gallery_match.py`/`protocol.js`, extending the origin vocabulary shipped by wave 1's silhouette change (exactly once) with `official`.
+4. **Wave 4:** `official-art-personalization` — last, after the resolution payloads and stage component settle.
+
+If the landing order ever reverses (resolution contracts before silhouettes), the silhouette change rebases its vocabulary onto the already-shipped discriminator. Monster species-specific integration follows the separate monster catalog design when its owner lands the species catalog; a threat-tier alias is not a substitute for that prerequisite. Monster habitat placement, target quantities, guild difficulty, city safety, and quest provisioning are outside this document and remain subject to their own brainstorming and approvals.
+
+No runtime implementation is included in this design-document change; the six proposals are planning artifacts. Use the repository's specification-driven workflow (`/opsx:apply`) for implementation.
