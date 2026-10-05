@@ -474,6 +474,8 @@ def _active_env_example_keys() -> set[str]:
 EXTERNAL_READERS: dict[str, str] = {
     "PROMPTS_DIR": "compose.yaml bind mount interpolation",
     "ART_SEED_DIR": "compose.yaml bind mount interpolation",
+    "ART_OFFICIAL_DIR": "compose.yaml bind mount interpolation",
+    "ART_OFFICIAL_ARCHIVES_DIR": "compose.yaml bind mount interpolation",
     "CONTAINER_UID": "Containerfile build ARG",
     "IMAGE_TAG": "compose.yaml image tag interpolation",
     "VERSION": "Containerfile/OCI label build ARG",
