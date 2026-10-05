@@ -67,18 +67,18 @@ GALLERY_STORY_IDS = frozenset(
 
 # The gallery journey frames the frame guide must state, each with its
 # transition and recovery column (spec: "state each transition and recovery
-# path"). Matched as the guide's frame headings, not prose paraphrases.
+# path"). Matched as the guide's zh-TW frame headings, not prose paraphrases.
 FRAME_GUIDE_FRAMES = (
-    "1. Browse",
-    "2. Inspect",
-    "3. Generate",
-    "4. Submit and settle",
-    "5. Bind",
-    "6. Crop",
-    "7. Default",
-    "8. Delete",
-    "9. Monster",
-    "10. Transform",
+    "1. 瀏覽",
+    "2. 檢視",
+    "3. 生成",
+    "4. 送出與結算",
+    "5. 綁定",
+    "6. 框選",
+    "7. 預設",
+    "8. 刪除",
+    "9. 魔物",
+    "10. 比例",
 )
 
 # The four reference design images the guide must link (spec: "reference the
@@ -258,7 +258,7 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     def test_offline_storyboard_and_frame_guide(self):
         # The five component families plus the interactive Storyboard are
         # registered in the built offline showcase; the storyboard entry is a
-        # document story under Data/GalleryPanel. The English frame guide
+        # document story under Data/GalleryPanel. The zh-TW frame guide
         # links the four reference images, states every journey frame with
         # its transition and recovery column, and separates the fixture
         # publication driver from live behavior.
@@ -292,10 +292,10 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 frame, guide, f"frame guide does not state frame {frame}"
             )
         self.assertIn(
-            " Recovery", guide, "frame guide lacks the recovery column"
+            "復原 |", guide, "frame guide lacks the recovery column"
         )
         self.assertIn(
-            "story-only publication driver",
+            "僅供故事使用的發布驅動器",
             guide,
             "frame guide does not distinguish fixture publications from live behavior",
         )
