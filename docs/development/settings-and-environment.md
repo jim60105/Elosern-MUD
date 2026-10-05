@@ -136,6 +136,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `LLM_BASE_URL` | `server/conf/settings.py` | URL 字串 | `http://127.0.0.1:11434`（compose：`http://host.containers.internal:11434`） | 所有 LLM 層的 OpenAI 相容端點；見下方 LLM endpoint knob 表 |
 | `PROMPT_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/prompts` | 根內提示詞資料夾；僅 bare-metal／非標準佈局使用 |
 | `ART_SEED_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/art-seed` | 根內批次種子圖資料夾（gallery-seed-sync）；目錄不存在＝「不同步任何東西」，永遠不是錯誤 |
+| `ART_OFFICIAL_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/art-official` | 根內官方美術資料夾（official-artwork-catalog）：`<root>/<kind>/<content-key>/<image-file>`，`kind` 恰為 `monster`／`preset`／`npc`；遊戲只讀取、永不寫入，改動僅在重啟後生效；目錄不存在或為空＝「沒有任何官方美術」，永遠不是錯誤 |
 | `WEBSOCKET_CLIENT_PROXY_PORT` | Evennia `general_context` | 整數 | `4002` | 前端可見的 websocket 埠覆寫（反代／埠重映射） |
 
 ## LLM endpoint knobs（23 個）

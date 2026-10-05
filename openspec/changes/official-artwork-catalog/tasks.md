@@ -1,7 +1,7 @@
 ## 1. Setting and layout contract
 
-- [ ] 1.1 Declare `ART_OFFICIAL_ROOT` in `server/conf/settings.py` (default `art-official/` under `GAME_DIR`, same-named env override, `ART_SEED_ROOT` precedent), gitignore the default directory, and verify with a settings unit test that the env override and default both resolve and the directory is untracked
-- [ ] 1.2 Add `ART_OFFICIAL_ROOT` to `.env.example` and document it in `docs/development/settings-and-environment.md`, and verify the settings inventory contract test passes with the new variable
+- [x] 1.1 Declare `ART_OFFICIAL_ROOT` in `server/conf/settings.py` (default `art-official/` under `GAME_DIR`, same-named env override, `ART_SEED_ROOT` precedent), gitignore the default directory, and verify with a settings unit test that the env override and default both resolve and the directory is untracked
+- [x] 1.2 Add `ART_OFFICIAL_ROOT` to `.env.example` and document it in `docs/development/settings-and-environment.md`, and verify the settings inventory contract test passes with the new variable
 
 ## 2. Catalog core
 
