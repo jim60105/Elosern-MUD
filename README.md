@@ -27,6 +27,14 @@ client at `http://localhost:4001`.
 `LLM_BASE_URL` and `SD_WEBUI_BASE_URL` configure external services. They are not containerized
 by this project.
 
+Official artwork (monsters, player presets, and authored NPCs) is optional and lives outside the
+repository: mount an operator-prepared directory read-only with `ART_OFFICIAL_DIR`, or keep it in
+the `evennia-art-official` volume and prepare it with the one-shot `artwork-prepare` service. With
+no prepared directory the server starts normally on the built-in silhouettes, and startup never
+downloads or extracts anything. See
+[docs/development/official-artwork-deployment.md](docs/development/official-artwork-deployment.md)
+for the directory layout and the copy/submodule/S3/archive procedures.
+
 ## Develop locally
 
 Use uv `0.12.0` or newer. This checkout pins uv's interpreter selection to Python `3.13` in
