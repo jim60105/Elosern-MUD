@@ -539,9 +539,27 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             })"""
         )
         self.assertEqual(state, {"typing": "false", "hidden": 0, "marker": "▼"})
-        # Selecting the explicit `full` level turns reduced motion off and
-        # lets pages type again.
+        # Selecting the explicit `full` level turns reduced motion off and lets
+        # pages type again: the response on screen re-opens on page 1 and types,
+        # so the first activation shows that page in full (a press never
+        # advances a typing page) and the one after it advances — the pair the
+        # journey above pins for the ordinary path.
         page.evaluate("() => window.__elosernBridge.store.setMotionLevel('full')")
+        page.wait_for_function(
+            """() => { const w = document.querySelector('[data-testid="message-window"]');
+              const p = document.querySelector('[data-testid="message-page"]');
+              return w && p && p.getAttribute('data-page') === '1'
+                && w.getAttribute('data-typing') === 'true'
+                && p.querySelector('.narrative-unrevealed, .narrative-line.unrevealed') !== null; }""",
+            timeout=30000,
+        )
+        page.locator('[data-testid="message-window"]').click()
+        wait_for_page_shown(page)
+        self.assertEqual(
+            page.locator('[data-testid="message-page"]').get_attribute("data-page"),
+            "1",
+            "a press while the page types shows it in full, never advancing it",
+        )
         page.locator('[data-testid="message-window"]').click()
         page.wait_for_function(
             """() => { const w = document.querySelector('[data-testid="message-window"]');
