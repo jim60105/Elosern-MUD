@@ -253,13 +253,13 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 
 | 項目 | 為什麼不走環境 |
 | --- | --- |
-| `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏行程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
+| `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏進程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_REMBG_BACKEND`／`ART_TRANSLATE_BACKEND` | 這兩個 local art stage seam 也會執行 dotted-path 匯入；它們分別是第二與第三個 import-executing seam，維持 code-only 可阻止繼承環境載入任意程式碼 |
-| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境變數打錯字會把約 1 GB 去背模型／翻譯模型搬離其 volume（`ART_STORE_ROOT` 同規則）；非標準佈局請在 `secret_settings.py` 明確設定 |
-| `ART_STORE_ROOT` | 環境變數打錯字會把生成美術搬到持久卷之外的路徑；非標準佈局請在 `secret_settings.py` 明確設定 |
-| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏行程序清單與 `compose inspect`。客戶端只在兩個值都非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
+| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境變數打錯字會把約 1 GB 去背模型／翻譯模型悄悄搬離其 volume（`ART_STORE_ROOT` 同規則）；非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_STORE_ROOT` | 環境變數打錯字會把生成美術悄悄搬到持久卷之外的路徑；非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩個值都非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
 
 ## Bare-metal（非容器）設定步驟
 

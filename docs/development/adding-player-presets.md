@@ -118,7 +118,7 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 ### Step 7 — 補測試與驗證
 
-新卡會自動進建立畫面（`build_preset_cards()` 讀 registry），通常零程式碼。但 `world/lore/tests/test_player_presets.py` 釘住了目錄現況：種族覆蓋、恰好八張卡的名單與鍵順序、每張卡的核准開局裝載。加卡時要**有意識地更新**這些釘值，它們屬於目錄契約的一環。依序跑最小聚焦集：
+新卡會自動進建立畫面（`build_preset_cards()` 讀 registry），通常零程式碼。但 `world/lore/tests/test_player_presets.py` 釘住了目錄現況：種族覆蓋、恰好八張卡的名單與鍵順序、每張卡的核准開局裝載。加卡時要**有意識地更新**這些釘值，它們屬於目錄契約的一環，只能如實更新，不能設法迴避。依序跑最小聚焦集：
 
 ```sh
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb \

@@ -576,7 +576,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ### webclient-retire-exploration-submenus — 2026-09-26（webclient-retire-exploration-submenus）
 
 - **§2.3 退役識別碼：** `.dock-menu__outlet` 與 `.dock-menu__outlet-tile` 自 CSS class hooks 表移除。探索 dock 的根框架是場景總覽（webclient-scene-overview-swap），出口即總覽的 chips，因此移動子選單連同其 exit-outlet pane 一併刪除；受管瀏覽器套件對該 pane 的引用同步改指場景總覽的 chips。
-- **§2.3 新增 hooks：** `.scene-chip`（場景總覽的 chips）、`.action-dock__pane`（dock 的捲動面板）、`.dock-menu-item__label` 與 `.dock-menu-item__glyph`（chip 的文字與方向字形），三者皆為既有的 `.dock-menu-item` 列所描述的同一個共享列渲染器之穩定鉤點，本變更把該列展開為明列項目。
+- **§2.3 新增 hooks：** `.scene-chip`（場景總覽的 chips）、`.action-dock__pane`（dock 的捲動面板）、`.dock-menu-item__label` 與 `.dock-menu-item__glyph`（chip 的文字與方向字形），皆為既有的 `.dock-menu-item` 列所描述的同一個共享列渲染器之穩定鉤點，本變更把該列展開為明列項目。
 - **§5 完整性聲明維持成立：** 本變更只退役並新增受管目標，未遺留未註冊的識別碼；`tests/test_webclient_frozen_contract.py` 的單向涵蓋檢查維持與本變更前相同的判定結果。
 
 ### quest-drawer-split — 2026-09-06（webclient-quest-drawer-split）

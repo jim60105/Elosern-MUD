@@ -42,7 +42,7 @@
 1. 它會被「使用」嗎？是 → 需要 `use_mechanics` 旗標與 `item_effects.yaml` 的一筆效果條目（見 Step 2）。
 2. 它能裝備嗎？是 → 選 `EquipmentSlot`（`weapon_main`／`weapon_off`／`armor`／`accessory`），飾品共用 5 件上限，並要為它註冊 `EquipmentModifierKey` 與 `equipment_effects.yaml` 條目（見 Step 2b）。
 3. 它能買賣嗎？是 → 需要 `PRICE_TABLE` 價格帶與至少一家店的 offer。
-4. 三個現成動詞（`stat`＋`amount` 計量條調整、`apply_status` 施加狀態、`remove_status` 移除狀態）加上既有狀態鍵，能描述它的效果嗎？不能（例如需要新的目標範圍）→ 這不只是加資料，見 §5。
+4. 三個現成動詞（`stat`＋`amount` 計量條調整、`apply_status` 施加狀態、`remove_status` 移除狀態）加上既有狀態鍵，能描述它的效果嗎？不能（例如需要新的目標範圍）→ 這已超出加資料的範圍，見 §5。
 
 ---
 
@@ -134,7 +134,7 @@ effects:
 - 預算：條目所綁物品 `presentation.rarity` 對應的預算列決定每欄上限，`abs(值)` 超過即拒絕（`bias` 欄允許 0 上限）。護盾上限只收正整數（hp／mp／sp），單筆上限 ≤ 9999。
 - 空條目合法（`storage_pouch: {}`），代表「純觀察的裝備，無效果」；同一條目不得同時宣告 `immune` 與 `attached_buffs` 的同源矛盾。
 
-數值來自設計文件（`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` 的平衡表），不得自行發明。**注意**：本 rulebook 在 P1 階段僅由啟動驗證載入，消費端由後續 change 接管。
+數值來自設計文件（`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` 的平衡表），不得自行發明。**注意**：本 rulebook 在 P1 階段僅由啟動驗證載入，目前尚無遊戲消費端，要由後續 change 接管。
 
 ### Step 4 — 可交易物品：價格帶與商店 offer
 
