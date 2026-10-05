@@ -664,8 +664,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             }"""
         )
         self.assertTrue(placement["focused"], "the list takes focus when it appears over the read line")
+        # The list is centred over the stage: at this journey's 1451x790
+        # reference that centre is 1451/2, not the pre-retarget 1920
+        # reference's half.
         self.assertAlmostEqual(
-            (placement["card"]["left"] + placement["card"]["right"]) / 2, 960, delta=1
+            (placement["card"]["left"] + placement["card"]["right"]) / 2, 1451 / 2, delta=1
         )
         self.assertLessEqual(placement["card"]["bottom"], placement["band"]["top"])
         # The command region's slide has ended: it is hidden, not merely inert.

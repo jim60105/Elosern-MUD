@@ -127,13 +127,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         # The last chip is reachable by scrolling: focusing it (the real
-        # keyboard path) scrolls it into the pane's visible box.
-        last_key = "exit-" + exits[-1]["exit_ref"]
+        # keyboard path) scrolls it into the pane's visible box. The chip the
+        # assertion below measures is the last one in DOM order — the footer's
+        # 等待 — so the keyboard path must focus that same chip; focusing an
+        # already-visible exit chip scrolls nothing and leaves the footer
+        # below the pane's visible box.
+        last_key = keys[-1]
         self.assertTrue(
             page.evaluate(
                 "(key) => window.__elosernBridge.store.focusItemByKey(key)", last_key
             ),
-            "the last exit chip must be focusable by its key",
+            "the last chip must be focusable by its key",
         )
         page.wait_for_timeout(150)
         last_box = chips.last.bounding_box()
