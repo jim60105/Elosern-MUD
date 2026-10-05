@@ -1,6 +1,6 @@
 """Same-origin media serving for validated art-store identities.
 
-The route serves three closed identity vocabularies and nothing else:
+The route serves four closed identity vocabularies and nothing else:
 
 * classic identities (``scene/``, ``portrait/monster/``, ``portrait/character/``)
   — served only when a ``done`` asset record references them (unchanged);
@@ -10,6 +10,12 @@ The route serves three closed identity vocabularies and nothing else:
   request exactly (a direct record lookup, never a scan of every record);
 * built-in fallback identities (``defaults/<fallback-key>.<ext>``) — served
   from one fixed in-repo defaults directory (never the store root).
+* official identities (``official/<fingerprint>/<root-relative-image-path>``) —
+  served only when the startup official-artwork catalog's current snapshot
+  indexes that exact root-relative path at that exact content fingerprint, so
+  the request is answered from the catalog lookup alone: a caller-supplied
+  filesystem path is never accepted, no historical artwork is retained for an
+  outdated fingerprint, and nothing is ever copied into the store.
 
 Every branch applies the same confinement discipline: path traversal,
 symlinks, unexpected directories or extensions, absolute paths, and missing
@@ -23,6 +29,7 @@ import re
 from django.conf import settings
 from django.http import FileResponse, Http404
 
+from world.art import official
 from world.art.gallery import cards_for
 from world.art.paths import resolved_under_root, resolved_under_store_root
 from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
@@ -51,6 +58,15 @@ _GALLERY_IDENTITY = re.compile(
 # filename outside the six committed keys can never be served whatever the
 # directory holds (gallery-builtin-fallbacks).
 _DEFAULTS_IDENTITY = re.compile(r"^defaults/[^/]+\.(png|webp|jpg|avif)$")
+
+# The exact official identity shape: `official/<fingerprint>/<root-relative
+# path>`, each segment non-empty (so `..` or an empty segment can never match)
+# and the extension from the same closed four store extensions. Matching the
+# shape is only the cheap pre-gate: `_serve_official` then requires the
+# catalog's snapshot to index that path at that fingerprint.
+_OFFICIAL_IDENTITY = re.compile(
+    r"^official/([^/]+)/((?:[^/]+/)*[^/]+\.(png|webp|jpg|avif))$"
+)
 
 _MIME_BY_EXTENSION = {
     ".png": "image/png",
@@ -142,8 +158,29 @@ def _serve_defaults(identity: str) -> FileResponse:
     return _serve(resolved)
 
 
+def _serve_official(match: re.Match) -> FileResponse:
+    """Serve one catalog-admitted official image under root confinement.
+
+    The catalog lookup is the authorization: only a root-relative path the
+    current startup snapshot indexes at exactly the requested fingerprint is
+    served, so an unindexed path, a stale fingerprint (the bytes were replaced
+    and the server restarted), or a bogus fingerprint returns 404 — never
+    another file and never a re-scan. The catalog's recorded identity is then
+    re-resolved strictly inside ``ART_OFFICIAL_ROOT`` through the shared
+    confinement helper (no symlinked component, no traversal), which also
+    refuses a file swapped for a symlink after load.
+    """
+    fingerprint, relative_path = match.group(1), match.group(2)
+    if not official.current_catalog().admits(relative_path, fingerprint):
+        raise Http404
+    resolved = resolved_under_root(Path(settings.ART_OFFICIAL_ROOT), relative_path)
+    if resolved is None or not resolved.is_file():
+        raise Http404
+    return _serve(resolved)
+
+
 def art_media(request, identity: str):
-    """Serve one validated identity from the store, gallery, or defaults dir."""
+    """Serve one validated identity from the store, gallery, defaults, or official root."""
     if not identity:
         raise Http404
     gallery_match = _GALLERY_IDENTITY.fullmatch(identity)
@@ -151,6 +188,9 @@ def art_media(request, identity: str):
         return _serve_gallery(identity, gallery_match)
     if _DEFAULTS_IDENTITY.fullmatch(identity) is not None:
         return _serve_defaults(identity)
+    official_match = _OFFICIAL_IDENTITY.fullmatch(identity)
+    if official_match is not None:
+        return _serve_official(official_match)
     if not _ALLOWED_IDENTITY.fullmatch(identity):
         raise Http404
     if not _referenced_by_done_record(identity):

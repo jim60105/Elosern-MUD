@@ -17,8 +17,8 @@
 
 ## 4. Media serving
 
-- [ ] 4.1 Add the `official/<fingerprint>/<root-relative-path>` branch to `web/art_media.py` as a catalog lookup only (closed extension map, in-root confinement, no caller-supplied paths), and verify route tests: admitted identity serves bytes, stale fingerprint / unindexed path / escape / symlink return 404 with no acquisition attempt
-- [ ] 4.2 Prove serving does not copy official bytes into the store in a test that fetches an official identity and asserts the runtime store tree is byte-for-byte unchanged
+- [x] 4.1 Add the `official/<fingerprint>/<root-relative-path>` branch to `web/art_media.py` as a catalog lookup only (closed extension map, in-root confinement, no caller-supplied paths), and verify route tests: admitted identity serves bytes, stale fingerprint / unindexed path / escape / symlink return 404 with no acquisition attempt
+- [x] 4.2 Prove serving does not copy official bytes into the store in a test that fetches an official identity and asserts the runtime store tree is byte-for-byte unchanged
 
 ## 5. Verification
 
