@@ -9,7 +9,7 @@
 - [x] 2.2 Implement admission validation — closed extension vocabulary, decodable under the existing bounded image limits, strictly in-root, non-symlink regular files — and verify per-entry refusal tests for out-of-root symlinks, unsupported formats, undecodable and oversized files each prove unrelated valid entries still index
 - [x] 2.3 Implement optional per-content `manifest.json` handling (`default`, `face_rect`, `stage`; fitted-default and identity-stage degradation, bounded diagnostic, missing manifest silent) and verify manifest tests cover valid, invalid, missing, and per-image-invalid-rectangle cases
 - [x] 2.4 Compute the per-file content fingerprint once at load and expose `fingerprint_for(identity)` plus snapshot lookup, and verify a test that byte replacement plus reload changes the fingerprint and that resolution performs no hashing
-- [ ] 2.5 Wire catalog load into the art service startup step list and verify a startup-integration test proves an absent root yields an empty catalog, startup succeeds, and no network/extraction call occurs (patched socket tripwire per repo convention)
+- [x] 2.5 Wire catalog load into the art service startup step list and verify a startup-integration test proves an absent root yields an empty catalog, startup succeeds, and no network/extraction call occurs (patched socket tripwire per repo convention)
 
 ## 3. Observability
 
