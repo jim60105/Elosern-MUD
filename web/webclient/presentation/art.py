@@ -14,7 +14,11 @@ URL, aspect, alternative text, and a nullable placeholder) and a bounded
 ``portrait_catalog`` keyed by the opaque IDs of currently present focusable
 entities, each entry additionally carrying the resolved normalized face
 rectangle (exactly ``x``, ``y``, ``w``, ``h`` in ``[0, 1]`` whenever the entry
-has a media URL, ``null`` for every placeholder). It never exposes
+has a media URL, ``null`` for every placeholder), the server-authored origin
+discriminator (the closed vocabulary ``runtime``/``silhouette``/
+``placeholder``), and the decorative built-in silhouette the fallback seam
+resolved (``key``, committed ``/art/defaults/`` URL and rectangle, see
+``art-gallery-fallback``). It never exposes
 ``out_path``, the store root, or rejected prompt content.
 """
 
@@ -33,7 +37,13 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.art.presenter import resolve_entity, resolve_scene
+from world.art.presenter import (
+    ORIGIN_PLACEHOLDER,
+    ORIGIN_RUNTIME,
+    ORIGIN_SILHOUETTE,
+    resolve_entity,
+    resolve_scene,
+)
 from world.art.gallery import GalleryRecordError, validate_stage
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.art_view import (
@@ -59,9 +69,16 @@ MAX_PLACEHOLDER_KIND = 16
 MAX_PLACEHOLDER_LABEL = 128
 MAX_CONTEXT_NAME = 64
 MAX_CONTEXT_ROLE = 16
+MAX_FALLBACK_KEY = 32
+MAX_ORIGIN = 16
 
 PLACEHOLDER_KINDS = frozenset({"missing", "unavailable"})
 ROLES = frozenset({ROLE_ALLY, ROLE_DIALOGUE, ROLE_FOE, ROLE_PERSON})
+# The closed portrait-origin vocabulary (owned by ``world.art.presenter``;
+# `official-art-resolution-contracts` extends both).
+PORTRAIT_ORIGINS = frozenset({ORIGIN_PLACEHOLDER, ORIGIN_RUNTIME, ORIGIN_SILHOUETTE})
+# The committed built-in identities the decorative fallback may name.
+FALLBACK_URL_PREFIX = "/art/defaults/"
 
 
 class ArtPanelError(ProtocolValidationError):
@@ -116,6 +133,32 @@ def _validate_placeholder(value: Any) -> dict[str, Any] | None:
     if not label.strip():
         raise ProtocolValidationError("placeholder label must be non-empty")
     return {"kind": kind, "label": label}
+
+
+def _validate_portrait_fallback(value: Any) -> dict[str, Any] | None:
+    """Validate the decorative built-in silhouette reference.
+
+    ``None``, or exactly ``key``, ``url``, and ``face_rect``: the committed
+    fallback key, its ``/art/defaults/`` identity, and that key's normalized
+    rectangle. The field is presentation data for a still-absent portrait —
+    the caller keeps it out of the entry's own fields — so it carries a URL
+    only under that closed prefix and never a second portrait.
+    """
+    if value is None:
+        return None
+    _require_exact_fields(value, "art fallback", {"key", "url", "face_rect"}, {})
+    key = _require_str(value, "key", maximum=MAX_FALLBACK_KEY)
+    if not key.strip():
+        raise ProtocolValidationError("fallback key must be non-empty")
+    url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
+    if not url.startswith(FALLBACK_URL_PREFIX):
+        raise ProtocolValidationError(
+            "fallback url must name a committed built-in identity"
+        )
+    face_rect = _validate_face_rect(value["face_rect"])
+    if face_rect is None:
+        raise ProtocolValidationError("a fallback carries a face_rect")
+    return {"key": key, "url": url, "face_rect": face_rect}
 
 
 def _validate_scene(value: Any) -> dict[str, Any]:
@@ -211,6 +254,8 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
             "face_rect",
             "stage",
             "context",
+            "origin",
+            "fallback",
         },
         {},
     )
@@ -241,12 +286,34 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
     context = _validate_context(value["context"])
     face_rect = _validate_face_rect(value["face_rect"])
     stage = _validate_stage(value["stage"], url)
+    origin = _require_str(value, "origin", maximum=MAX_ORIGIN)
+    if origin not in PORTRAIT_ORIGINS:
+        raise ProtocolValidationError("catalog origin is not a stable value")
+    fallback = _validate_portrait_fallback(value["fallback"])
     # A client never offsets a frame it has no image for: the rectangle is
     # present exactly when the entry carries a media URL.
     if url is not None and face_rect is None:
         raise ProtocolValidationError("a catalog entry with a url carries a face_rect")
     if url is None and face_rect is not None:
         raise ProtocolValidationError("a catalog placeholder carries no face_rect")
+    # The origin names the branch that produced the entry's own media, so a
+    # silhouette can never stand where a real image belongs and a placeholder
+    # origin can never hide one.
+    if url is not None and origin in (ORIGIN_SILHOUETTE, ORIGIN_PLACEHOLDER):
+        raise ProtocolValidationError(
+            "a catalog entry carrying a media URL is not a silhouette or a placeholder"
+        )
+    if url is None and origin == ORIGIN_RUNTIME:
+        raise ProtocolValidationError("a runtime origin carries the entry's media URL")
+    if origin == ORIGIN_SILHOUETTE:
+        if fallback is None:
+            raise ProtocolValidationError(
+                "a silhouette origin carries its fallback identity"
+            )
+        if status == "done":
+            raise ProtocolValidationError("a silhouette origin is not a done portrait")
+    elif origin == ORIGIN_PLACEHOLDER and fallback is not None:
+        raise ProtocolValidationError("a placeholder origin carries no fallback identity")
     return {
         "subject_key": subject_key,
         "status": status,
@@ -257,6 +324,8 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
         "face_rect": face_rect,
         "stage": stage,
         "context": context,
+        "origin": origin,
+        "fallback": fallback,
     }
 
 
@@ -367,6 +436,8 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
             "subject_key": None,
             "face_rect": None,
             "stage": None,
+            "origin": ORIGIN_PLACEHOLDER,
+            "fallback": None,
         }
     else:
         resolved = resolve_entity(entity)
@@ -379,6 +450,8 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
         "placeholder": _placeholder_for(resolved),
         "face_rect": resolved.get("face_rect"),
         "stage": resolved.get("stage"),
+        "origin": resolved.get("origin"),
+        "fallback": resolved.get("fallback"),
         "context": {
             "name": entity_view.display_name,
             "role": entity_view.role,
@@ -421,19 +494,24 @@ def art_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "ART_SCHEMA_VERSION",
     "ArtPanelError",
+    "FALLBACK_URL_PREFIX",
     "MAX_ARCHETYPE",
     "MAX_ALT",
     "MAX_CONTEXT_NAME",
     "MAX_CONTEXT_ROLE",
+    "MAX_FALLBACK_KEY",
     "MAX_LABEL",
+    "MAX_ORIGIN",
     "MAX_PLACEHOLDER_KIND",
     "MAX_PLACEHOLDER_LABEL",
     "MAX_STATUS",
     "MAX_SUBJECT_KEY",
     "MAX_MEDIA_URL",
     "PLACEHOLDER_KINDS",
+    "PORTRAIT_ORIGINS",
     "ROLES",
     "_validate_face_rect",
+    "_validate_portrait_fallback",
     "_placeholder_for",
     "art_presenter",
     "validate_art",

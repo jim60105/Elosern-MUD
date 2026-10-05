@@ -31,9 +31,11 @@ from web.webclient.presentation.art import (
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
+    ProtocolValidationError,
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
+from world.art.fallback_keys import FALLBACK_KEYS
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -70,10 +72,49 @@ def _valid_catalog_entry(**overrides):
         "placeholder": None,
         "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
         "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+        "origin": "runtime",
+        # The decorative built-in silhouette the fallback seam resolved: it
+        # rides beside the real fields and never fills them
+        # (builtin-silhouette-stage-fallback).
+        "fallback": {
+            "key": "monster_anon",
+            "url": "/art/defaults/monster_anon.webp",
+            "face_rect": {"x": 0.3403, "y": 0.02, "w": 0.3194, "h": 0.18},
+        },
         "context": {"name": "哥布林", "role": "敵方"},
     }
     value.update(overrides)
     return value
+
+
+SILHOUETTE_FALLBACK = {
+    "key": "woman",
+    "url": "/art/defaults/woman.webp",
+    "face_rect": {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16},
+}
+
+
+def _silhouette_entry(**overrides):
+    """A truthful placeholder row carrying the built-in silhouette."""
+    value = {
+        "subject_key": None,
+        "status": "missing",
+        "url": None,
+        "aspect_ratio": None,
+        "alt": "未生成",
+        "placeholder": {"kind": "missing", "label": "未生成"},
+        "face_rect": None,
+        "stage": None,
+        "origin": "silhouette",
+        "fallback": dict(SILHOUETTE_FALLBACK),
+    }
+    value.update(overrides)
+    return _valid_catalog_entry(**value)
+
+
+def _bare_placeholder_entry(**overrides):
+    """A placeholder row with no built-in identity (e.g. a scene-kind actor)."""
+    return _silhouette_entry(fallback=None, origin="placeholder", **overrides)
 
 
 def _valid_payload(**overrides):
@@ -175,11 +216,8 @@ class ArtSchemaTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_art(payload)
         # A url-less placeholder entry carries face_rect: null.
-        placeholder_entry = _valid_catalog_entry(
-            url=None,
+        placeholder_entry = _bare_placeholder_entry(
             placeholder={"kind": "unavailable", "label": "無法提供"},
-            face_rect=None,
-            stage=None,
         )
         normalized = validate_art(
             _valid_payload(portrait_catalog={"42": placeholder_entry})
@@ -190,13 +228,105 @@ class ArtSchemaTests(unittest.TestCase):
             validate_art(
                 _valid_payload(
                     portrait_catalog={
-                        "42": _valid_catalog_entry(
-                            url=None,
+                        "42": _bare_placeholder_entry(
                             placeholder={"kind": "unavailable", "label": "無法提供"},
+                            face_rect={"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
                         )
                     }
                 )
             )
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_catalog_origin_is_the_closed_vocabulary(self):
+        # The server-authored discriminator names the branch that produced the
+        # entry's own media, so no client inspects the URL to tell them apart.
+        for origin, entry in (
+            ("runtime", _valid_catalog_entry()),
+            ("silhouette", _silhouette_entry()),
+            ("placeholder", _bare_placeholder_entry()),
+        ):
+            with self.subTest(origin=origin):
+                normalized = validate_art(_valid_payload(portrait_catalog={"42": entry}))
+                self.assertEqual(normalized["portrait_catalog"]["42"]["origin"], origin)
+        for rejected in (None, "official", "", "runtime "):
+            with self.subTest(origin=rejected):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_art(
+                        _valid_payload(
+                            portrait_catalog={"42": _valid_catalog_entry(origin=rejected)}
+                        )
+                    )
+        absent = _valid_catalog_entry()
+        absent.pop("origin")
+        with self.assertRaises(ProtocolValidationError):
+            validate_art(_valid_payload(portrait_catalog={"42": absent}))
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_catalog_fallback_is_decorative_and_coherent(self):
+        # The placeholder row's real fields stay null: the silhouette never
+        # populates the entry's URL, subject key, rectangle, stage, or origin.
+        entry = _silhouette_entry()
+        self.assertIsNone(entry["subject_key"])
+        self.assertIsNone(entry["url"])
+        self.assertIsNone(entry["face_rect"])
+        self.assertIsNone(entry["stage"])
+        normalized = validate_art(_valid_payload(portrait_catalog={"42": entry}))
+        self.assertEqual(
+            normalized["portrait_catalog"]["42"]["fallback"], entry["fallback"]
+        )
+        # A resolved real row keeps the decoration beside its own fields.
+        normalized = validate_art(
+            _valid_payload(portrait_catalog={"42": _valid_catalog_entry()})
+        )
+        carried = normalized["portrait_catalog"]["42"]
+        self.assertEqual(carried["origin"], "runtime")
+        self.assertEqual(carried["url"], "/art/portrait/monster/low.png")
+        self.assertEqual(carried["fallback"]["key"], "monster_anon")
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_catalog_fallback_coherence_rejects_one_sided_payloads(self):
+        rect = {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16}
+        # A placeholder with no silhouette at all stays legal (e.g. a
+        # scene-kind actor): the decoration is optional, the coherence is not.
+        validate_art(
+            _valid_payload(portrait_catalog={"42": _bare_placeholder_entry()})
+        )
+        cases = {
+            "silhouette origin hiding a real url": _valid_catalog_entry(
+                origin="silhouette"
+            ),
+            "placeholder origin carrying a fallback": _silhouette_entry(
+                origin="placeholder"
+            ),
+            "silhouette claiming a done portrait": _silhouette_entry(status="done"),
+            "silhouette origin with no identity": _silhouette_entry(fallback=None),
+            "runtime origin with no url": _silhouette_entry(origin="runtime"),
+            "fallback outside the defaults route": _silhouette_entry(
+                fallback={"key": "man", "url": "/art/portrait/man.webp", "face_rect": rect}
+            ),
+            "fallback without a rectangle": _silhouette_entry(
+                fallback={"key": "man", "url": "/art/defaults/man.webp"}
+            ),
+            "fallback with an unknown field": _silhouette_entry(
+                fallback={
+                    "key": "man",
+                    "url": "/art/defaults/man.webp",
+                    "face_rect": rect,
+                    "identity": "defaults/man.webp",
+                }
+            ),
+            "fallback with an out-of-range rectangle": _silhouette_entry(
+                fallback={
+                    "key": "man",
+                    "url": "/art/defaults/man.webp",
+                    "face_rect": {"x": 0.5, "y": 0.5, "w": 1.5, "h": 0.9},
+                }
+            ),
+        }
+        for label, payload_entry in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_art(_valid_payload(portrait_catalog={"42": payload_entry}))
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_url_bound_admits_the_worst_case_gallery_identity(self):
@@ -539,6 +669,67 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(entry["face_rect"], dict(DEFAULT_FACE_RECT))
         # The scene wire block stays byte-identical: no face_rect key.
         self.assertNotIn("face_rect", payload["scene"])
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_a_policy_less_host_row_carries_the_attribute_selected_silhouette(self):
+        host = create_object(NPC, key="barkeep", location=self.room)
+        host.components.add(
+            ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
+        )
+        host.sex = "female"
+        host.db.apparent_age = 30
+        before = ArtAssetRecord.objects.count()
+        payload = self._render()
+        entry = payload["portrait_catalog"][str(host.pk)]
+        # The real fields stay null: the decoration is the entity's own
+        # attribute-selected built-in identity, not one shared shape.
+        self.assertIsNone(entry["subject_key"])
+        self.assertIsNone(entry["url"])
+        self.assertIsNone(entry["face_rect"])
+        self.assertIsNone(entry["stage"])
+        self.assertEqual(entry["origin"], "silhouette")
+        self.assertEqual(entry["fallback"]["key"], "woman")
+        self.assertEqual(entry["fallback"]["url"], "/art/defaults/woman.webp")
+        # The decoration installs nothing: no policy and no gallery record.
+        self.assertIsNone(host.db.portrait_policy)
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_a_resolved_row_retains_the_decorative_reference(self):
+        guest = _player(key="reference guest")
+        guest.location = self.room
+        guest.db.portrait_policy = {"mode": "named", "stable_key": "reference-guest"}
+        self._settle_done(
+            ArtSubject(ArtSubjectKind.CHARACTER, "reference-guest"),
+            "portrait/character/reference-guest.png",
+        )
+        payload = self._render()
+        entry = payload["portrait_catalog"][str(guest.pk)]
+        self.assertEqual(entry["origin"], "runtime")
+        self.assertEqual(entry["url"], "/art/portrait/character/reference-guest.png")
+        # The decorative reference rides beside the resolved image for a
+        # browser-side load-failure re-render.
+        self.assertIn(entry["fallback"]["key"], FALLBACK_KEYS)
+        self.assertEqual(
+            entry["fallback"]["url"],
+            f"/art/defaults/{entry['fallback']['key']}.webp",
+        )
+        # The scene wire block is unchanged by any of this: the presenter
+        # never forwards origin or fallback into it.
+        self.assertEqual(
+            sorted(payload["scene"]),
+            [
+                "alt",
+                "archetype",
+                "aspect_ratio",
+                "label",
+                "placeholder",
+                "stage",
+                "status",
+                "subject_key",
+                "url",
+            ],
+        )
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_presenter_is_read_only(self):

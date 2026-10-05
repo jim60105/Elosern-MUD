@@ -45,6 +45,12 @@ function validEntry(overrides) {
       placeholder: null,
       face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
       stage: { scale: 1, x: 0, y: 0 },
+      origin: "runtime",
+      fallback: {
+        key: "monster_anon",
+        url: "/art/defaults/monster_anon.webp",
+        face_rect: { x: 0.3403, y: 0.02, w: 0.3194, h: 0.18 },
+      },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides
@@ -99,6 +105,8 @@ test("malformed art payloads are rejected by the protocol validator", () => {
         portrait_catalog: {
           "1": validEntry({
             url: null,
+            stage: null,
+            origin: "silhouette",
             placeholder: { kind: "unavailable", label: "無法提供" },
             face_rect: { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
           }),
