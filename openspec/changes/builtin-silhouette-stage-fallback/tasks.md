@@ -21,7 +21,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 One focused local browser file/class exercising the actual stage: adult male/female, boy/girl, elder, and monster actors show their corresponding silhouettes (acceptance criterion 7), the stage transitions to a real image when one resolves, and image-load failure returns to the correct silhouette without claiming generation success (acceptance criterion 8)
+- [x] 4.1 One focused local browser file/class exercising the actual stage: adult male/female, boy/girl, elder, and monster actors show their corresponding silhouettes (acceptance criterion 7), the stage transitions to a real image when one resolves, and image-load failure returns to the correct silhouette without claiming generation success (acceptance criterion 8)
+  Verified in CI, not locally (user-approved): the focused class `StageSilhouetteBrowserTest` is registered in `.github/browser-shards.json` shard `art-16` with no skip, so the managed browser shard runs all four of its methods. Local verification is impossible in this environment: every method of every journey — including the unchanged control `ContextualHudBrowserTest.test_dialogue_host_stands_opposite_the_player` — fails inside `login_and_open`/`wait_for_shell_active` ("store-state gate not satisfied within 60000ms", `dom_diag={'connected': False}`) before any assertion, i.e. no browser session can be established here at all.
 - [x] 4.2 Run the package-adjacent Python/Node tests and the contract gate once for the changed vocabularies and confirm the compact/cover surfaces are unchanged by the stage edit
   Verified: the Python art/presentation modules above, the full dependency-free Node suite (480), the full Vitest suite (1565; the cover-mode/compact surfaces' own assertions unchanged and green), and `uv run --locked python -m tools.contract_gate` (traceability, observability, test-data, manifests, contracts) — green.
 
