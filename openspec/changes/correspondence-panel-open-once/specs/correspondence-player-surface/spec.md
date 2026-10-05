@@ -49,6 +49,11 @@ Opening or listing the panel SHALL NOT automatically collect letters or mark the
 - **THEN** the failure is displayed with close-and-reopen recovery guidance and no automatic retry is submitted
 - **AND** closing and reopening starts one fresh initial load when dispatch-ready
 
+#### Scenario: Sender fails synchronously without a server result
+- **WHEN** the transport reports a correlated synchronous send failure for this opening's list attempt and no server action result arrives
+- **THEN** the panel leaves its local processing state and displays failure with close-and-reopen guidance without clearing global transport uncertainty
+- **AND** subsequent ordinary publications neither retry the consumed initial attempt nor overwrite that failure guidance
+
 #### Scenario: Successful collection updates without reading
 - **WHEN** a player explicitly collects letters at an authorized branch and receives success
 - **THEN** the returned authoritative page is displayed with no additional browser list request
