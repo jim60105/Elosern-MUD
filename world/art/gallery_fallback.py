@@ -22,6 +22,18 @@ silhouette on a placeholder row) resolves through the same rungs via
 ``fallback_key_for_entity``, with its stable runtime entity identity as the
 sole hash input.
 
+The two identity layers stay separate (external-art-assets design §6). This
+module resolves the built-in silhouette key; the official content reference —
+``world.art.official_refs`` — names reusable authored images in the mounted
+official directory. An entity's ``npc_tier_key`` remains the tier-declared
+fallback provenance read here, while its authored ``npc_profile_key`` belongs
+to the official-reference layer alone: neither ever stands in for the other,
+and a numeric tier never selects a named character's image. The stable runtime
+identity this module hashes for an entity without a named portrait subject is a
+hash input only — it is never an official content reference, and asking it for
+portrait state installs no ``portrait_policy``, creates no gallery record, and
+enqueues no generation.
+
 The resolution is a pure function of the subject key plus the stored sex and
 apparent age: the same subject resolves the same key on every restart, on
 every process, and on every machine. Missing or malformed sex or apparent-age
@@ -85,7 +97,11 @@ FALLBACK_FACE_RECTS: dict[str, dict[str, float]] = {
 
 # Entity-carried provenance attribute names written by the spawning/activation
 # paths so a registry declaration can be found for subjects whose portrait key
-# is the entity pk rather than a registry key.
+# is the entity pk rather than a registry key. The preset literal is shared with
+# the official-reference layer (``world/art/official_refs.py`` declares the same
+# name for its preset arm; a contract test locks the two equal). ``npc_tier_key``
+# is this module's tier-declared fallback provenance and is deliberately NOT the
+# authored ``npc_profile_key`` that layer resolves.
 PRESET_PROVENANCE_ATTRIBUTE = "creation_preset_key"
 NPC_TIER_PROVENANCE_ATTRIBUTE = "npc_tier_key"
 

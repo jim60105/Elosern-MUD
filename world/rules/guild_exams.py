@@ -18,6 +18,7 @@ from typing import Any
 
 from evennia.utils.create import create_object
 
+from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
 from world.observability import log_info, log_warn
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.rules.npc_persona import initialize_npc_persona
@@ -293,6 +294,15 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
                 opponent,
                 examiner_profile.card.to_record(),
                 {"kind": "profile", "profile": rank.examiner_profile_key},
+            )
+            # Authored official-content provenance (official-content-provenance):
+            # the ranked examiner's authored profile key, written with the rest
+            # of its authored identity before the one save below and inside the
+            # caller's exam transaction, so the official reference layer resolves
+            # ``(npc, <profile key>)`` — never the rank's threat/role band nor a
+            # numeric tier key.
+            opponent.attributes.add(
+                NPC_PROFILE_PROVENANCE_ATTRIBUTE, rank.examiner_profile_key
             )
         opponent.location = actor.location
         # Occupancy check inside the same start_guild_exam transaction: no

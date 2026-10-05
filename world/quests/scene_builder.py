@@ -285,6 +285,16 @@ def _apply_characterization(
             "stable_key": characterization.portrait_stable_key,
         }
     try:
+        # No authored official-content provenance is recorded here
+        # (official-content-provenance). A generated quest occupant is
+        # instantiated from the closed compiled-characterization contract
+        # (display name, title, age pair, optional stable portrait key, persona
+        # card, combat traits), which names no profile identity, and its
+        # persona provenance below is ``generated_quest``. Taking a profile key
+        # from a generated proposal would make the model an authored channel,
+        # which the dynamic-NPC rule forbids, so no ``npc_profile_key`` write
+        # exists on this path and none is inferred from the display name, the
+        # entity key, the tier, or the role.
         initialize_npc_persona(
             npc,
             _card_record(characterization.persona),
