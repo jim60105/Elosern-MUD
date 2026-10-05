@@ -20,10 +20,9 @@ registries only —
   built-in silhouette without acquiring a portrait policy, a gallery record, or
   a queue record, and never becoming an official reference.
 
-Deferred annotations: this change's requirement ids live only in its delta spec
-and ``tools.spec_traceability`` indexes main specs, so the archive step adds the
-``covers_requirement`` annotations in the commit that syncs the spec (the
-``official-artwork-catalog`` precedent).
+Annotated with the canonical ``official-content-provenance`` requirement IDs
+the archive sync published — the follow-up tasks 5.1 deferred, on the
+``official-artwork-catalog`` precedent.
 """
 
 import base64
@@ -60,6 +59,7 @@ from world.art.official_refs import (
 )
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import NpcCard, NpcCardIdentity
 from world.rules.npc_persona import initialize_npc_persona, provenance_profile_key
 
@@ -131,6 +131,9 @@ class PresetProvenanceTests(EvenniaTest):
             source="generated",
         )
 
+    @covers_requirement(
+        "official-content-provenance::preset-born-characters-resolve-their-template-reference-and-keep-their-own-gallery"
+    )
     def test_two_preset_born_characters_share_the_reference_and_keep_disjoint_galleries(self):
         first = self._preset_born("t_preset_born_first")
         second = self._preset_born("t_preset_born_second")
@@ -162,6 +165,9 @@ class PresetProvenanceTests(EvenniaTest):
         self.assertNotEqual(first_after, first_before)
         self.assertNotEqual(first_after, second_before)
 
+    @covers_requirement(
+        "official-content-provenance::preset-born-characters-resolve-their-template-reference-and-keep-their-own-gallery"
+    )
     def test_a_preset_preview_resolves_without_creating_any_state(self):
         with tempfile.TemporaryDirectory() as store:
             with override_settings(ART_STORE_ROOT=store):
@@ -191,6 +197,9 @@ class NpcProvenanceTests(EvenniaTest):
         official_refs._reported_unresolved.clear()
         self.addCleanup(official_refs._reported_unresolved.clear)
 
+    @covers_requirement(
+        "official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation"
+    )
     def test_only_the_profile_bearing_npc_resolves_a_named_reference(self):
         with patch_registry("NPC_PROFILE_REGISTRY", {_SYNTH_PROFILE: object()}):
             with_profile = create_object(NPC, key="t_npc_profile_bearer")
@@ -206,6 +215,9 @@ class NpcProvenanceTests(EvenniaTest):
             )
             self.assertIsNone(official_content_reference_for_entity(tier_only))
 
+    @covers_requirement(
+        "official-content-provenance::dynamically-generated-npcs-may-only-carry-an-explicit-allowed-reference"
+    )
     def test_a_generated_npc_infers_nothing_and_honors_only_an_explicit_reference(self):
         generated = create_object(NPC, key="t_generated_occupant")
         initialize_npc_persona(
@@ -228,6 +240,9 @@ class NpcProvenanceTests(EvenniaTest):
                 OfficialContentReference(OFFICIAL_KIND_NPC, _SYNTH_PROFILE),
             )
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_the_resolver_reads_the_attribute_not_the_persona_meta(self):
         # A profile-keyed persona provenance without the entity attribute (a
         # pre-change host) resolves nothing: this change adds the attribute and
@@ -252,6 +267,9 @@ class MonsterBoundaryTests(EvenniaTest):
         self.addCleanup(official_refs._reported_unresolved.clear)
         self.addCleanup(official.reset_catalog)
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_a_populated_matching_monster_directory_resolves_no_reference(self):
         with tempfile.TemporaryDirectory() as root:
             content = Path(root) / "monster" / _SYNTH_SPECIES
@@ -280,6 +298,9 @@ class PlaceholderIdentityTests(EvenniaTest):
         official_refs._reported_unresolved.clear()
         self.addCleanup(official_refs._reported_unresolved.clear)
 
+    @covers_requirement(
+        "official-content-provenance::entity-identity-is-a-hash-input-only-never-a-manufactured-portrait-subject"
+    )
     def test_placeholder_identity_hashing_creates_no_portrait_state(self):
         entity = create_object(NPC, key="t_placeholder_npc")
         identity = str(entity.pk)

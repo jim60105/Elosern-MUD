@@ -9,11 +9,9 @@ never a literal catalog symbol — the test-data gate) and the diagnostic dedupe
 seam is the module-private reported-key set. Exactly one test imports the
 catalog module, to pin that the resolver answers from the registries alone.
 
-Deferred annotations: the new ``official-content-provenance`` requirement ids
-exist only in this change's delta spec, and ``tools.spec_traceability`` indexes
-main specs only, so this module carries no ``covers_requirement`` annotation
-yet. The archive step adds them in the commit that syncs the spec into
-``openspec/specs/`` — the ``official-artwork-catalog`` precedent.
+Annotated with the canonical ``official-content-provenance`` requirement IDs
+the archive sync published — the follow-up tasks 5.1 deferred, on the
+``official-artwork-catalog`` precedent.
 """
 
 from dataclasses import FrozenInstanceError
@@ -23,6 +21,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from world.art import official_refs
 from world.art.gallery_fallback import (
     NPC_TIER_PROVENANCE_ATTRIBUTE as FALLBACK_TIER_ATTRIBUTE,
@@ -167,6 +166,9 @@ def _monster_reference_constructions(tree: ast.Module) -> list[str]:
 class ReferenceTypeTests(unittest.TestCase):
     """The frozen type: closed kind vocabulary, shared key grammar."""
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_the_vocabulary_is_exactly_the_three_kinds_in_layout_order(self):
         self.assertEqual(
             OFFICIAL_CONTENT_KINDS,
@@ -185,6 +187,9 @@ class ReferenceTypeTests(unittest.TestCase):
         with self.assertRaises(OfficialContentReferenceError):
             OfficialContentReference("t_not_a_kind", _SYNTH_PRESET)
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_reference_rejects_a_key_outside_the_shared_contract(self):
         over_long = "x" * 65
         over_bytes = "\U0001d54f" * 51  # 51 code points, 204 UTF-8 bytes
@@ -259,6 +264,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
         official_refs._reported_unresolved.clear()
         self.addCleanup(official_refs._reported_unresolved.clear)
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_registered_preset_key_resolves_from_provenance(self):
         entity = _RecordingEntity(**{PRESET_PROVENANCE_ATTRIBUTE: _SYNTH_PRESET})
         with patch.object(
@@ -271,6 +279,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
         # Nothing else changed on the entity: resolution is a pure read.
         self.assertEqual(entity._values, {PRESET_PROVENANCE_ATTRIBUTE: _SYNTH_PRESET})
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_registered_profile_key_resolves_as_an_npc_reference(self):
         entity = _RecordingEntity(**{NPC_PROFILE_PROVENANCE_ATTRIBUTE: _SYNTH_PROFILE})
         with patch.object(
@@ -302,6 +313,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
             [PRESET_PROVENANCE_ATTRIBUTE, NPC_PROFILE_PROVENANCE_ATTRIBUTE],
         )
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_display_name_never_becomes_a_key(self):
         # The entity's display text equals a registered key, but it carries no
         # authored provenance: nothing resolves and nothing is logged.
@@ -316,6 +330,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
             self.assertIsNone(official_content_reference_for_entity(entity))
         self.assertEqual(_unresolved_events(logged), [])
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_numeric_tier_never_selects_a_reference(self):
         entity = _RecordingEntity(npc_tier_key=_SYNTH_TIER)
         entity.display_name = _SYNTH_TIER
@@ -327,6 +344,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
         self.assertNotIn("npc_tier_key", entity.read_keys)
         self.assertEqual(_unresolved_events(logged), [])
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_an_unregistered_key_resolves_nothing_and_logs_once(self):
         entity = _RecordingEntity(**{NPC_PROFILE_PROVENANCE_ATTRIBUTE: _SYNTH_PROFILE})
         with (
@@ -343,6 +363,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
         self.assertEqual(context["reason"], "unregistered_key")
         self.assertEqual(context["entity"], "7")
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_a_malformed_key_resolves_nothing_and_logs_once(self):
         for label, declared in {
             "forbidden_character": "t_synth/../escape",
@@ -360,6 +383,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 self.assertEqual(len(events), 1)
                 self.assertEqual(events[0].kwargs["context"]["reason"], "malformed_key")
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_the_diagnostic_ceiling_bounds_distinct_keys(self):
         with (
             patch.object(official_refs, "NPC_PROFILE_REGISTRY", {}),
@@ -372,6 +398,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 self.assertIsNone(official_content_reference_for_entity(entity))
         self.assertEqual(len(_unresolved_events(logged)), MAX_UNRESOLVED_DIAGNOSTICS)
 
+    @covers_requirement(
+        "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
+    )
     def test_two_entities_share_the_reference_value_without_shared_state(self):
         first = _RecordingEntity(**{PRESET_PROVENANCE_ATTRIBUTE: _SYNTH_PRESET})
         second = _RecordingEntity(**{PRESET_PROVENANCE_ATTRIBUTE: _SYNTH_PRESET})
@@ -385,6 +414,9 @@ class ProvenanceResolutionTests(unittest.TestCase):
         self.assertIsNot(one, two)
         self.assertEqual(first._values, second._values)
 
+    @covers_requirement(
+        "official-content-provenance::entity-identity-is-a-hash-input-only-never-a-manufactured-portrait-subject"
+    )
     def test_an_entity_without_a_named_portrait_subject_gets_no_reference(self):
         # Requirement: a runtime identity is a hash input only. An entity with
         # no provenance resolves nothing even though its identity text names
@@ -453,10 +485,16 @@ class MonsterBoundaryTests(unittest.TestCase):
         official_refs._reported_unresolved.clear()
         self.addCleanup(official_refs._reported_unresolved.clear)
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_the_monster_kind_has_no_registry_membership(self):
         self.assertFalse(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
         self.assertIsNone(official_content_reference(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_a_tier_bearing_monster_resolves_no_reference(self):
         entity = _RecordingEntity(npc_tier_key=_SYNTH_TIER)
         entity.key = _SYNTH_TIER
@@ -471,6 +509,9 @@ class MonsterBoundaryTests(unittest.TestCase):
         # was emitted for an entity that declared no provenance.
         self.assertEqual(_unresolved_events(logged), [])
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_an_injected_species_provider_answers_only_the_entities_own_reference(self):
         def provider(entity):
             species = getattr(entity, "species_key", None)
@@ -491,10 +532,16 @@ class MonsterBoundaryTests(unittest.TestCase):
         )
         self.assertNotEqual(wolf_reference, boar_reference)
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_the_default_species_seam_has_no_producer(self):
         entity = _RecordingEntity(species_key="t_synth_wolf")
         self.assertIsNone(official_content_reference_for_entity(entity))
 
+    @covers_requirement(
+        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+    )
     def test_no_production_module_constructs_a_monster_reference(self):
         violations: list[str] = []
         scanned = 0

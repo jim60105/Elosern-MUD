@@ -242,6 +242,7 @@ class NpcCardLoaderTests(BatchFiles, EvenniaTestCase):
             snapshot.provenance, {"kind": "import", "record": "synthetic_llm_npc"}
         )
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_an_imported_npc_records_no_official_content_provenance(self):
         from world.art import official_refs
         from world.art.official_refs import (

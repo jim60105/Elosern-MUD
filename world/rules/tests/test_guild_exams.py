@@ -250,6 +250,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(int(opponent.attributes.get("apparent_age")), 26)
         self.assertEqual(character_ages(opponent), (26, 26))
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_the_spawned_examiner_records_its_authored_profile_provenance(self):
         self._give_merit(50)
         record = start_guild_exam(self.player, self.examiner, "E", requested_by="command")
@@ -268,6 +269,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
             OfficialContentReference(OFFICIAL_KIND_NPC, profile_key),
         )
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_a_rolled_back_examiner_spawn_leaves_no_provenance(self):
         profile_key = _examiner_identity()[2]
         with self.assertRaises(RuntimeError):

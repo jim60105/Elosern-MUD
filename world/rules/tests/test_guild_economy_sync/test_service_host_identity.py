@@ -664,6 +664,7 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
 class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
     """Authored official-content provenance, recorded once at host creation."""
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_every_synced_host_records_its_authored_profile_provenance(self):
         before = {host.pk for host in NPC.objects.all_family()}
         with self.captureOnCommitCallbacks(execute=True):
@@ -685,6 +686,7 @@ class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
                 self.assertEqual(reference.kind, OFFICIAL_KIND_NPC)
                 self.assertEqual(reference.key, profile_key)
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_a_reused_host_keeps_its_recorded_provenance_across_resyncs(self):
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
@@ -699,6 +701,7 @@ class ServiceHostProvenanceTests(ServiceContentIsolation, EvenniaTestCase):
         # never rewrites its recorded authored identity.
         self.assertEqual(same.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE), recorded)
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_a_rolled_back_host_creation_leaves_no_provenance(self):
         from django.db import transaction
 

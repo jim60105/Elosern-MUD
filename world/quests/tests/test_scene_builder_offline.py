@@ -442,6 +442,7 @@ class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
         )
         return characterization, npc
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_a_generated_occupant_records_no_official_content_provenance(self):
         from unittest.mock import patch
 
@@ -462,6 +463,7 @@ class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
         ):
             self.assertIsNone(official_content_reference_for_entity(npc))
 
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
     def test_a_stray_profile_key_in_a_generated_entry_never_becomes_provenance(self):
         import dataclasses
         from unittest.mock import patch
