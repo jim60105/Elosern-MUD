@@ -137,3 +137,23 @@
 - 物種圖片使用真正的物種身分，保持官方資產與個人設定的獨立性。
 
 驗證使用合成物種與隔離的測試資料，不將未核准候選或分級舉例轉成測試所需的正式內容。
+
+### 提案交付
+
+本節於提案產出後追加，不修改上文任何已核准邊界。本設計對應五個 OpenSpec 提案，全部位於 `openspec/changes/`（各自含 proposal、design、delta specs 與 tasks）：
+
+| 提案 | 涵蓋的資料層與行為邊界 |
+| --- | --- |
+| `openspec/changes/monster-species-registry/` | 物種與變體登錄、身分驗證、公開／私有投影、棲地僅供相容、數值與評級槽位待平衡核准（§2、§3） |
+| `openspec/changes/monster-identity-construction/` | 個體建構、由變體解析的層級與評級、無玩家縮放與預併倍率、以持久身分計殺與重複事件去重（§4） |
+| `openspec/changes/monster-site-placement/` | 區域普通族群與明訂營地、巢穴、首領據點、擁有權域、一次性與可恢復生命週期（§5） |
+| `openspec/changes/monster-quest-objectives/` | 區域狩獵與綁定清剿語意、接取時足額普通合格目標的全有全無補量、階級／評級理由／背景風味分離欄位（§6） |
+| `openspec/changes/species-portrait-identity/` | 以穩定物種鍵解析官方圖片身分、禁止層級替代、變體共用物種圖片與個人設定獨立（§7） |
+
+上述八條驗證邊界與提案的對應：邊界一（變體屬於物種、預設為普通變體）由 `monster-species-registry` 驗證；邊界二（公開呈現不含作者私有註記）由 `monster-species-registry` 驗證；邊界三（核准的完整基礎能力、無玩家縮放與預併倍率）由 `monster-identity-construction` 驗證；邊界四（接取時足額可到達普通合格目標、不足時不殘留部分狀態）由 `monster-quest-objectives` 驗證、其合法性以 `monster-site-placement` 的容量、管理權與據點狀態為前提；邊界五（合格較強變體可計入且非必要、區域與特定變體限制生效）由 `monster-quest-objectives` 驗證；邊界六（重複死亡不重複計數、恢復新個體不替換舊綁定）由 `monster-identity-construction` 的去重與 `monster-quest-objectives` 的綁定嚴格性共同驗證；邊界七（普通族群維護不逾越管理域、不略過據點恢復）由 `monster-site-placement` 驗證；邊界八（物種圖片真身分與資產／個人設定獨立）由 `species-portrait-identity` 驗證。
+
+**依賴與外部前置條件。**五提案內部依賴為單鏈：registry → identity-construction → site-placement → quest-objectives；`species-portrait-identity` 另依賴美術提案中的 `official-content-provenance`、`official-artwork-catalog` 與 `official-art-resolution-contracts` 已落地。外部前置條件有三，均未在任何提案中以假實作取代：（一）使用者平衡核准——各變體完整能力數值（HP、MP、SP、物理戰鬥力、敏捷、防禦、魔力）與最終公會危險評級，以及據此發布含數值的正式狩獵委託；在此之前登錄僅含結構與核准敘事，個體數值走既有層級區間暫行規則並記錄來源。（二）特殊能力機制——六項核准能力（風吹落穀、擬燈發光、壓土築埂、接觸吸取魔力、聚霧亂向、敲岩共鳴）需要可執行的技能與行為契約，本波不登錄新技能。（三）官方圖片套裝——六個美術提案（`official-artwork-catalog`、`official-artwork-deployment`、`official-content-provenance`、`builtin-silhouette-stage-fallback`、`official-art-resolution-contracts`、`official-art-personalization`）與其外部的 `monster/<species-key>/` 官方內容包；美術提案本身不以層級別名滿足物種登錄前置。
+
+**共用檔衝突。**`world/lore/sync.py` 與 `world/lore/__init__.py` 由 `monster-species-registry` 與 `monster-site-placement` 相續修改；`world/quests/planner.py` 及其測試由 `monster-identity-construction`（計數身分去重）先行、`monster-quest-objectives`（變體選擇器匹配）其後，`world/quests/runtime.py`（`counted_defeat_ids`）與 `world/quests/compile/` 載體驗證器亦屬此兩提案依序接續的範圍；`world/art/subjects.py`、`world/art/presenter.py`、`world/rules/art_view.py` 為 `species-portrait-identity` 與美術提案共用，須在 `official-content-provenance` 與 `official-art-resolution-contracts` 之後落地；`.github/evennia-shards.json` 為全部提案共用，逐次落地。
+
+**建議平行批次排程。**真正獨立、可立即並行啟動的兩條線：魔物線自 `monster-species-registry` 起，美術線自無依賴的 `official-artwork-catalog` 與 `builtin-silhouette-stage-fallback` 起，兩線檔案互不相犯。有依賴、須依序落地：魔物線四提案依上述單鏈，美術線 `official-artwork-catalog`→`official-content-provenance`→`official-art-resolution-contracts`→`official-art-personalization`（`official-artwork-deployment` 掛在 catalog 之後即可）。無依賴但相互衝突、須序列化：`builtin-silhouette-stage-fallback` 與 `official-art-resolution-contracts` 共用 presenter 與 origin 詞彙（前者先落地建立詞彙，後者再擴展）。兩線收斂點：`species-portrait-identity` 於兩線前置（登錄表與 provenance／resolution 兩提案）都落地後可與 `monster-quest-objectives` 並行；其餘排程以各提案 proposal 的 Batch 節為準。
