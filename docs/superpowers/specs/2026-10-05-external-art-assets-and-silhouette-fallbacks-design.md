@@ -1,14 +1,16 @@
 # External Art Assets and Built-in Silhouette Fallbacks
 
 **Date:** 2026-10-05
-**Status:** Design approved in conversation; written specification awaiting user review.
-**Scope:** Explicit installation of external official artwork, read-only official image resolution for monsters/player presets/NPCs, independent mutable runtime galleries, and attribute-selected built-in missing-image silhouettes.
+**Status:** Design approved in conversation; revised for the user's simpler manual/container deployment requirements; written specification awaiting user review.
+**Scope:** A read-only mounted official artwork directory for monsters/player presets/NPCs, native deployment-time asset preparation, independent mutable runtime galleries, and attribute-selected built-in missing-image silhouettes.
 
 ## 1. Approved requirements
 
 The code is open source. Official artwork is not secret, but its size and distribution requirements make the code repository and GitHub unsuitable publication locations for it. Distribute official artwork independently, with a separate license notice. Do not assume that code licensing grants rights to the artwork or that a particular hosting provider permits every image.
 
-The approved acquisition model is an explicit asset installation command, with both an external download source and a local package input. Neither server startup nor ordinary gameplay downloads artwork.
+The user supersedes the earlier custom installation/release-management proposal with a simpler model. Artwork changes are infrequent, server count is small, and manual per-server deployment is acceptable. A deployment uses native tools to prepare one ordinary external artwork directory. Neither server startup nor ordinary gameplay downloads artwork, manages releases, or updates that directory.
+
+Containers are the primary deployment target. Prefer a read-only bind mount of an operator-prepared host directory, following the existing compose mount pattern. A named volume populated before game startup is also supported. Git submodules, S3 synchronization, and archive extraction are alternative ways to prepare the same directory, not backends implemented inside the game.
 
 Official artwork is a read-only shared baseline. Player selections and runtime-generated images remain independent of it. Characters created from the same player preset may share official image bytes, but must not share mutable gallery state.
 
@@ -33,7 +35,7 @@ Relevant existing seams:
 This design explicitly amends the following approved contracts for its implementation changes:
 
 1. Engine design `2026-07-29-ai-mud-engine-design.md` section 2, D15: official generic-monster artwork is shared by **monster species/content identity**, not by threat tier. The species catalog is a separate prerequisite for actual species-specific monsters; this design does not invent that catalog or treat a display name as a species ID.
-2. Gallery design `2026-09-08-character-gallery-art-design.md`, D10: official packages are resolved read-only, not copied into mutable seed cards. The existing seed-import facility remains valid for operator artwork intentionally imported as mutable cards.
+2. Gallery design `2026-09-08-character-gallery-art-design.md`, D10: official artwork is resolved read-only from the mounted directory, not copied into mutable seed cards. The existing seed-import facility remains valid for operator artwork intentionally imported as mutable cards.
 3. The existing full-color built-in fallback presentation and missing-stage SVG contracts: built-ins are missing-image silhouette resources, not successful/generated portraits. Keep their serving route and attribute selection policy, but change their stage presentation and payload semantics.
 
 Retain the deterministic/generative boundary, existing portrait eligibility checks, character age bounds, gallery ownership, and same-origin browser media contract. Official image presentation must not mutate game mechanics or make a network call.
@@ -42,72 +44,73 @@ Retain the deterministic/generative boundary, existing portrait eligibility chec
 
 | Source | Storage | Mutability | Included with code/image build |
 |---|---|---|---|
-| Official artwork | Installed external package directory | Read-only to the game | No |
+| Official artwork | External bind-mounted directory or prepared named volume | Read-only to the game | No |
 | Runtime/generated/imported gallery artwork | Existing `ART_STORE_ROOT` | Through existing gallery writers | No |
 | Six built-in fallback originals | `web/static/art/defaults/` | Maintained with source, not player-editable | Yes |
 
-Use a dedicated `ART_PACK_ROOT`, distinct from `ART_STORE_ROOT` and `ART_SEED_ROOT`. Its default is a gitignored `server/.art-packs/` directory; allow an explicit directory-root override for an operator-owned location outside the working tree. Container deployments mount it on a separate persistent volume. The installer needs write access; the ordinary game process only needs read access to installed releases and the activation record.
+Use a dedicated `ART_OFFICIAL_ROOT`, distinct from `ART_STORE_ROOT` and `ART_SEED_ROOT`. Its default is a gitignored `art-official/` directory under the game root; allow an explicit directory-root override. Compose uses `ART_OFFICIAL_DIR` for the host source and mounts it read-only at `/app/art-official`, with the existing SELinux labeling convention. An operator can choose a source outside the working tree. These names describe the planned configuration, not settings already implemented.
 
-Do not copy official packages into the code repository, public container layers, frontend bundles, Storybook exports, documentation screenshots, or public CI artifacts. Preserve the six built-in originals as the approved publication exception. Behavioral tests use synthetic artwork rather than official package contents.
+The deployed directory contains the current artwork only. Do not create a package registry, release directories, an activation pointer, a rollback command, or a custom downloader. The host deployment tools own writes; the game only reads. Named-volume deployments maintain the same root/layout contract.
+
+Do not copy official artwork into the code repository, public container layers, frontend bundles, Storybook exports, documentation screenshots, or public CI artifacts. Exclude the local artwork directory from both source tracking and container build contexts. Preserve the six built-in originals as the approved publication exception. Behavioral tests use synthetic artwork rather than official directory contents.
 
 The external host is configurable and provider-neutral. Hosting accounts, publication rights, and provider terms are operator responsibilities; no specific provider or authenticated delivery system is required by this design.
 
-## 4. Asset package contract
+## 4. Directory and optional metadata contract
 
-Use a ZIP package containing one root `manifest.json` and its declared image files. The manifest has a schema version independent of the package release version. Version 1 declares:
+Use a predictable directory layout:
 
-- `pack_id` and `release`: stable package identity and an immutable release identifier.
-- `license_file`: a confined relative path to the artwork license notice bundled with the package.
-- `entries`: official image entries, each with a stable `asset_id`, `content_kind`, `content_key`, relative image path, SHA-256, format, decoded dimensions, `face_rect`, and `stage` placement.
-- `defaults`: one default `asset_id` per content reference represented in the package.
+```text
+art-official/
+  LICENSE
+  monster/<species-key>/<image-file>
+  preset/<preset-key>/<image-file>
+  npc/<npc-or-profile-key>/<image-file>
+```
 
-`content_kind` is `monster`, `preset`, or `npc`. `content_key` identifies authored content, not a runtime database row or a translated display name. `asset_id` distinguishes selectable official images and remains stable across releases when the image is the same conceptual choice. Updating that image's bytes requires a new package release, not editing an installed release in place.
+The content kind is `monster`, `preset`, or `npc`. Its directory key identifies registered authored content, not a runtime database row or translated display name. The image's root-relative path is its stable official asset identity. Replacing the bytes at that path updates the same visual choice; renaming/removing it removes that choice without deleting personal preferences.
 
-A content reference may have several selectable images. Asset IDs and file paths must be unique within a release. Each default must reference an entry with the same content reference. Absence of a default for an included content reference, duplicate identities, incompatible schema versions, missing declared files, digest mismatches, or invalid geometry reject the package before activation.
+A content directory may contain several images. An optional per-content `manifest.json` declares a `default` filename, `face_rect`, and `stage` placement. Follow the existing seed-metadata convention: when there is no valid explicit default, use the first valid image in deterministic filename order. A missing metadata file is normal. Invalid metadata emits a bounded diagnostic and uses the standard fitted face rectangle and identity stage placement; invalid metadata must not prevent unrelated artwork from loading.
 
-Reuse the existing closed image format vocabulary and face-rectangle/stage validators. Verify decoded dimensions against the manifest. A package contains image data and license/manifest metadata only: no Python modules, prototype paths, executable hooks, balance values, or character ages.
+Use the existing closed image format vocabulary and geometry validators. Decode dimensions locally; they need not be duplicated in metadata. If a declared face rectangle is invalid for any image it applies to, ignore that rectangle and use fitted per-image defaults. No mandatory top-level manifest, package ID, release number, declared checksums, or schema/release compatibility matrix is required.
 
-Content references use known registry keys. A package compatible with the installed content may only use registered preset/NPC keys and, once available, registered monster species keys. Unknown references reject installation with a diagnostic naming the unresolved reference. Do not guess a species from a monster's name or silently map it to its threat tier.
+The loader admits only valid image files confined to the configured root. Reject symlinked/out-of-root paths, unsupported formats, unreadable or undecodable files, and images exceeding the existing bounded image limits. Ignore unsupported content directories and unknown registry references with bounded diagnostics rather than rejecting the entire artwork root. Do not guess a species from its display name or map unknown species to a threat tier.
 
-The package describes visual choices only. It never creates NPCs or monsters, changes their attributes, or supplies quest objectives.
+The artwork directory contains visual data and its license notice, never executable hooks, typeclass/prototype paths, balance values, character ages, or quest objectives.
 
-## 5. Explicit installation and activation
+## 5. Native deployment-time preparation
 
-The planned CLI is `uv run --locked python -m tools.art_assets`, with these operations:
+Prefer a host directory bind mount. The operator prepares it with any ordinary transfer method and mounts it read-only into the game. This requires no Git/S3/archive dependency in the runtime image.
 
-- `install --source <https-url-or-local-zip>`: acquire, validate, install, and activate the selected release.
-- `activate --pack <pack-id> --release <release>`: explicitly select an already-installed valid release, including a rollback.
-- `check`: report the active release, invalid references/files, and missing official images for the registered supported content.
+| Preparation method | Contract and trade-off |
+|---|---|
+| Plain directory plus bind mount | Default. Copy or synchronize files manually, then restart the game. Minimal infrastructure and easy inspection/backup. |
+| Separate Git repository/submodule | Checkout artwork from a separately hosted repository; mount its worktree. The parent code repository records only the submodule reference, never the artwork blobs. Artwork history/storage remains the external repository's responsibility. Do not add Git LFS without a demonstrated need. |
+| S3/S3-compatible storage | Use the standard provider CLI to synchronize into the host directory or volume before starting the game. Credentials and network access belong to deployment, not gameplay. |
+| Local archive | Use native `tar`/`unzip` tooling to prepare the same directory. A one-shot preparation service may automatically extract an explicitly supplied archive during deployment. |
 
-These are design interfaces, not commands implemented by this document.
+These alternatives share one filesystem interface. Do not implement a provider abstraction, three backend plugins, or automatic source detection inside the game. The default implementation supports the mounted directory; the other methods are deployment procedures, not mandatory platform integrations.
 
-Version 1 has one active official package release. A release may cover all supported content kinds; unrepresented content uses built-in silhouettes. Do not add package merging, mirror selection, automatic latest-version discovery, or background updates.
+For a named volume, run a one-shot preparation container with write access to that volume, then mount the volume read-only in the game container. A local archive is a read-only input to that preparation container. When archive preparation is selected, supplying the archive and invoking the deployment preparation step causes extraction automatically; the game process never performs extraction itself.
 
-Installation follows this sequence:
+Use a trusted operator-supplied archive, not a player upload or an arbitrary remote archive selected by the game. Native extraction runs in a confined preparation container and an empty temporary directory; refuse unsafe paths/link entries and apply finite resource limits. Prepare the full replacement tree before replacing the destination, rather than extracting or synchronizing over the live prepared tree. A named-volume preparation replaces a content subdirectory within the volume, not the mount point itself; configure `ART_OFFICIAL_ROOT` to that subdirectory. If no input archive is supplied, use the prepared directory/volume as-is; ordinary startup must not erase it or repeatedly re-extract an old archive.
 
-1. Acquire the explicitly selected ZIP into a staging directory under the package root. A remote source uses HTTPS and finite download/time/resource limits. A local source needs no network access.
-2. Validate the manifest, content references, license path, archive entries, decoded image metadata, checksums, and geometry before making the release visible.
-3. Install the completed release under its immutable package/release directory.
-4. Atomically replace the activation record only after validation and installation succeed.
+Artwork updates use a maintenance window: stop the game, prepare the replacement content, update the directory/volume, and start the game again. Sync or extraction failure must not overwrite the currently prepared tree with partial output. Retaining a backup and restoring it manually is sufficient; no release registry or automatic rollback is required.
 
-Reject absolute paths, parent traversal, symlinks, hard-link aliases, special files, executable entries, and archive entries outside the declared package layout. Bound both compressed download size and total extracted bytes/image dimensions. SHA-256 provides byte-integrity checking against the selected manifest; it is not a claim of publisher authentication.
-
-An existing release with matching verified content is an idempotent installation. Reusing the same pack/release identity for different bytes is an error. Never overwrite an installed release. Serialize activation writes and retain previous releases; removal is not part of the initial CLI.
-
-A failed acquisition or validation leaves the previous activation record unchanged. An interrupted staging/install operation never becomes active and does not prevent the current release from being used. The game sees either the previous valid release or the completed new release, never a mixture.
+The preparation step is explicitly invoked during deployment, not automatically fetched on every restart. A missing artwork directory is a valid no-art configuration; the operator can start the game with built-in silhouettes without preparing any official artwork. Do not require Git or S3 availability for startup.
 
 ## 6. Runtime catalog and stable content references
 
-The existing art service owns the runtime read-only package catalog. It reads and validates the local activation record/manifest, refreshes its catalog when activation changes, and exposes the selected release as one immutable snapshot for each resolution. It never calls the installer or an external host.
+The existing art service owns the read-only official artwork catalog. It indexes valid files and optional metadata at startup and reads from that snapshot for ordinary resolution. Updating artwork takes effect after a restart; no file watcher or hot activation is required. It never calls Git, S3, an archive extractor, or an external host.
 
-Installed paths remain internal. Presentation payloads contain a validated same-origin media identity, an origin discriminator, geometry, and the runtime entity's existing name/identity. They do not expose package filesystem roots, download URLs, license text, or prompts.
+Mounted paths remain internal. Presentation payloads contain a validated same-origin media identity, an origin discriminator, geometry, and the runtime entity's existing name/identity. They do not expose filesystem roots, deployment sources, license text, or prompts.
 
 Update the affected versioned art, roster, gallery, and combat portrait contracts together with their producers, validators, and frontend consumers. An official image, a mutable runtime image, and a silhouette must remain distinguishable in those contracts; do not infer origin or successful generation from the presence of a URL.
 
 Separate two identities:
 
 - The entity's runtime art subject identifies mutable gallery state and its existing generated artwork.
-- Its official content reference identifies reusable authored images in the installed package.
+- Its official content reference identifies reusable authored images in the mounted directory.
 
 For preset-born characters, use the existing `creation_preset_key` provenance to resolve the template's reference while retaining the player's own runtime gallery subject. Preset previews can resolve the same official reference without creating a character or gallery record.
 
@@ -119,22 +122,22 @@ Two entities may reference identical official image bytes without sharing mutabl
 
 ## 7. Resolution and image selection
 
-Preserve the existing runtime gallery precedence: matching equipment-bound cards and explicit gallery defaults are resolved through the current APIs. Preserve valid classic runtime assets as part of that existing runtime-art path. A player may instead explicitly select a read-only official image; that personal selection is an art preference, not an edit of the official package.
+Preserve the existing runtime gallery precedence: matching equipment-bound cards and explicit gallery defaults are resolved through the current APIs. Preserve valid classic runtime assets as part of that existing runtime-art path. A player may instead explicitly select a read-only official image; that personal selection is an art preference, not an edit of the mounted source.
 
 The presentation chain is:
 
 1. The valid image selected by the existing runtime gallery rules or an explicit personal official-image selection.
 2. Existing valid classic runtime artwork, when no personal official selection resolves.
-3. The current package's default official image for the entity's content reference.
+3. The mounted directory's default official image for the entity's content reference.
 4. An attribute-selected built-in silhouette.
 
 For the first step, an explicit official selection replaces the personal gallery-default choice; equipment-bound runtime cards retain their existing precedence. A later explicit runtime default selection clears the personal official-default selection, and vice versa. This makes changing the selected default unambiguous without modifying shared artwork.
 
-A missing/stale official selection is ignored for image resolution while retaining the preference; continue to the remaining sources. Updating a package does not switch a player-selected generated image to an official default. A stable selected official asset ID resolves its new revision when the explicitly installed release changes. If that ID disappears, use the normal fallback chain rather than deleting the preference or another image.
+A missing/stale official selection is ignored for image resolution while retaining the preference; continue to the remaining sources. Updating the directory does not switch a player-selected generated image to an official default. A selected root-relative official image identity resolves its updated bytes after restart. If that identity disappears, use the normal fallback chain rather than deleting the preference or another image.
 
 Suppress automatic initial portrait generation when eligible official artwork already satisfies the content reference. Manual generation remains available through the existing generation path. Preserve the creation-time skip flag: the flag prevents automatic generation, not access to safe prebuilt artwork. A silhouette never counts as a generated card or a completed generation request.
 
-Keep portrait age/eligibility validation before presenting official or runtime character artwork. Neither package metadata nor a direct image URL can bypass the existing checks. Safe built-in placeholder selection can use validated entity attributes even when there is no named portrait policy; lack of a generated portrait identity must not force every NPC into the same human shape.
+Keep portrait age/eligibility validation before presenting official or runtime character artwork. Neither directory metadata nor a direct image URL can bypass the existing checks. Safe built-in placeholder selection can use validated entity attributes even when there is no named portrait policy; lack of a generated portrait identity must not force every NPC into the same human shape.
 
 For an entity without a named portrait subject, use its stable runtime entity identity only as the deterministic placeholder selector's hash input. Do not install a `portrait_policy`, create a gallery record, or enqueue generation to obtain that input.
 
@@ -142,11 +145,11 @@ For an entity without a named portrait subject, use its stable runtime entity id
 
 Gallery/read models identify official entries as `official` and runtime cards as their existing sources. Official entries are selectable and previewable but are not appended to `GalleryRecord.cards` as seed cards.
 
-Backend mutation APIs reject attempts to delete, replace, or regenerate-overwrite official entries. The frontend hides/disables inappropriate operations, but the backend remains authoritative. Manual generation creates runtime artwork, never writes into the package directory, and never replaces an official asset file.
+Backend mutation APIs reject attempts to delete, replace, or regenerate-overwrite official entries. The frontend hides/disables inappropriate operations, but the backend remains authoritative. Manual generation creates runtime artwork, never writes into the mounted official directory, and never replaces an official asset file.
 
-A character's face-rectangle or stage-placement adjustment for an official image is a personal override keyed by the selected asset ID. Validate it using the existing geometry rules against the current image dimensions. If a package revision makes a personal rectangle invalid, use the new manifest geometry for rendering, retain the preference, and emit a bounded diagnostic. No other character's display changes.
+A character's face-rectangle or stage-placement adjustment for an official image is a personal override keyed by its stable root-relative image identity. Validate it using the existing geometry rules against the current image dimensions. If an artwork update makes a personal rectangle invalid, use valid directory metadata or fitted default geometry for rendering, retain the preference, and emit a bounded diagnostic. No other character's display changes.
 
-Official package activation never deletes runtime cards, clears player image selections, or imports new copies into every character's gallery.
+Replacing the official directory never deletes runtime cards, clears player image selections, or imports new copies into every character's gallery.
 
 ## 9. Built-in silhouettes
 
@@ -171,46 +174,46 @@ Replace the current stage SVG in `ReferenceArtwork.vue` with this attribute-sele
 
 The portrait's actual missing/pending/failed/unavailable state remains intact. Do not return `DONE` or label the silhouette as generated. If a real image fails in the browser after server resolution, use the already-provided silhouette reference and the load-failure label without another state mutation or remote request.
 
-Built-in resources are present without a database gallery row, an installed package, or a generation service. If even the bundled resource fails to load, retain the actor name and truthful text placeholder; do not leave the interaction surface unusable.
+Built-in resources are present without a database gallery row, an official artwork directory, or a generation service. If even the bundled resource fails to load, retain the actor name and truthful text placeholder; do not leave the interaction surface unusable.
 
 ## 10. Serving and deployment
 
-Extend the existing `/art/` media route with a closed official identity containing the package/release and asset identity. Only manifest-listed files from the addressed installed release can be served. Never expose an arbitrary directory or accept a user-provided filesystem path. Preserve extension/MIME validation and root confinement.
+Extend the existing `/art/` media route with a closed official identity addressing an indexed root-relative image. Only catalog-admitted images can be served. Never expose an arbitrary directory or accept a user-provided filesystem path. Preserve extension/MIME validation and root confinement.
 
-Include the release identity in official URLs so a package update cannot reuse a cached URL for different bytes. Retain the installed previous release directories so in-flight old URLs remain valid across an activation switch. Personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and confinement rules.
+Include a file-content fingerprint in official URLs to invalidate browser caches after replacement. Compute it once when the startup catalog loads, not on every resolution/request. This is a cache token, not a package version or another maintained metadata file. Requests for outdated fingerprints after a maintenance restart may return 404 and use the ordinary silhouette fallback until the client receives the refreshed state. Do not retain historical asset directories just to serve old URLs. Personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and confinement rules.
 
-The frontend continues receiving only same-origin URLs. Official serving is a read-only catalog lookup; missing files return 404 and image resolution degrades rather than triggering installation. Character eligibility remains a presentation/generation rule, not an assertion that publicly distributable artwork is secret.
+The frontend continues receiving only same-origin URLs. Official serving is a read-only catalog lookup; missing files return 404 and image resolution degrades rather than triggering download or extraction. Character eligibility remains a presentation/generation rule, not an assertion that publicly distributable artwork is secret.
 
-Keep the runtime art volume. Add the separate persistent official-package mount and ensure the public container build does not copy package files. Keep existing seed-import mounts for operators who use that separate mutable-import feature. Startup must not copy official packages into the runtime store or recreate official images as seed cards.
+Keep the runtime art volume. Add the separate read-only official bind mount, following the existing `ART_SEED_DIR` mount pattern, and document the named-volume alternative with optional one-shot preparation. Ensure public container builds exclude the official source directory. Keep existing seed-import mounts for operators who use that separate mutable-import feature. Game startup must not copy official artwork into the runtime store or recreate official images as seed cards.
 
 ## 11. Failure behavior and observability
 
 | Failure | Required behavior |
 |---|---|
-| No active package | Report missing official artwork; resolve runtime art or built-in silhouettes; remain playable |
-| Download, extraction, or manifest validation fails | Refuse activation; retain previous release |
-| Active manifest/file is unreadable or corrupt | Emit a bounded diagnostic; continue using other valid image sources; never fetch on startup |
+| No mounted artwork/empty directory | Resolve runtime art or built-in silhouettes; remain playable |
+| Deployment sync/extraction fails | Report failure in preparation; do not replace the prepared tree with partial output |
+| A mounted file/metadata entry is unreadable or corrupt | Emit a bounded diagnostic; skip that entry and continue with valid image sources; never fetch on startup |
 | Content has no official entry | Select the appropriate built-in silhouette when runtime artwork is absent |
 | Runtime or official image fails browser loading | Show the provided silhouette and load-failure label |
 | Player attempts official-file mutation | Named rejection; no file or shared preference changes |
 | SD/LLM/external asset host is offline | No effect on local official images or silhouettes; retain existing manual-generation error behavior |
 
-All new production logging uses `world.observability` named imports with stable English event identifiers and context. Record package install/activation boundaries and bounded invalid-package/image diagnostics. Include available pack, release, asset, content kind/key, and entity identifiers in context; never place player-facing prose or credentials in logs. Image reads must not create art jobs or persistent game state.
+All new game-code logging uses `world.observability` named imports with stable English event identifiers and context. Record the startup catalog-load boundary and bounded invalid-file/metadata diagnostics. Include available asset, content kind/key, and entity identifiers in context; never place player-facing prose or credentials in logs. Native deployment tools retain their ordinary output; do not introduce a game-side transfer workflow just to log them. Image reads must not create art jobs or persistent game state.
 
 ## 12. Verification and acceptance
 
 Implementation acceptance must establish observable behavior, not merely manifest or wiring assertions:
 
-1. Install a synthetic local package, resolve an official image, and fetch its actual same-origin bytes. Reinstalling the same release is idempotent.
-2. Install from a controlled local HTTPS test endpoint; interrupted/corrupt acquisition leaves the previous release active. No external production host is required for tests.
-3. Reject unknown content references, malformed defaults, wrong hashes/dimensions/geometry, archive traversal/link entries, and oversized input before activation. Prove that files outside the package root remain untouched.
-4. Two preset-born characters share official image bytes but can choose different images and geometry. One character's changes cannot affect the other or the package manifest.
+1. Bind-mount a synthetic official tree read-only, resolve an image, and fetch its actual same-origin bytes without copying it into the runtime gallery store.
+2. Exercise the named-volume alternative and a native one-shot local-archive preparation container. Verify successful preparation, reuse without archive input, and a failed extraction that leaves the prepared destination unchanged. No live Git/S3 host is required.
+3. Unknown content directories, unsupported images, bad metadata, out-of-root/symlink paths, and oversized images are refused or skipped as specified without preventing valid unrelated artwork from resolving. Prove files outside the configured root are not served.
+4. Two preset-born characters share official image bytes but can choose different images and geometry. One character's changes cannot affect the other or the mounted source.
 5. NPC provenance and monster species references resolve their own images. A different subject, name, or matching threat tier cannot select another content reference's image accidentally.
-6. Official deletion/overwrite requests fail without changing files; manual generation remains isolated in the runtime store. Activation preserves generated cards and personal selections.
-7. With no package and no generated artwork, adult male/female, boy/girl, elder, and monster actors show the corresponding built-in silhouette. Verify apparent-age boundaries and stable unknown-sex behavior using synthetic entities.
+6. Official deletion/overwrite requests fail without changing files; manual generation remains isolated in the runtime store. A maintenance update/restart preserves generated cards and personal selections.
+7. With no official directory and no generated artwork, adult male/female, boy/girl, elder, and monster actors show the corresponding built-in silhouette. Verify apparent-age boundaries and stable unknown-sex behavior using synthetic entities.
 8. Exercise the actual stage in a focused browser test: silhouettes replace the old SVG, maintain geometry/labels, and transition to a real image when available. Image-load failure returns to the correct silhouette without claiming generation success.
-9. A package switch produces release-specific URLs; old in-flight URLs continue serving retained releases. A missing or incompatible personal geometry override uses valid manifest geometry without affecting other characters.
-10. Verify builds/publication inputs contain no official packages while retaining the six original built-ins. No-package startup and gameplay perform no artwork acquisition.
+9. Replacing an image at the same path and restarting produces a changed cache fingerprint while retaining personal selection identity. Invalid personal geometry uses valid metadata/default geometry without affecting other characters.
+10. Verify builds/publication inputs contain no official artwork while retaining the six original built-ins. Missing-directory startup and gameplay perform no artwork acquisition.
 
 Use package-adjacent tests and the existing shard manifest for new non-browser test modules. Follow the synthetic-data rules, focused-run limits, observability lint when logging changes, contract gate, and player-command documentation requirements for any added administrative command surface. Browser acceptance uses one focused local file/class; complete browser/evidence coverage remains CI-owned.
 
@@ -218,11 +221,10 @@ Use package-adjacent tests and the existing shard manifest for new non-browser t
 
 The design can be decomposed into independently verifiable OpenSpec changes:
 
-1. Package schema, explicit installer, immutable releases, activation, and deployment root.
-2. Read-only official catalog, stable preset/NPC content references, media serving, and resolver integration.
-3. Personal official-image selections/geometry and gallery read-only presentation.
-4. Built-in silhouette payload semantics and the stage SVG replacement; this does not depend on an installed official package and can be implemented independently of package acquisition.
+1. External directory catalog, read-only container mount, optional native archive preparation, media serving, and resolver integration with stable preset/NPC content references.
+2. Personal official-image selections/geometry and gallery read-only presentation.
+3. Built-in silhouette payload semantics and the stage SVG replacement; this does not depend on the official artwork mount and can be implemented independently.
 
-Species-specific monster integration follows the separate monster catalog design. The official package kind is defined here, but a threat-tier alias is not a substitute for that prerequisite. Monster habitat placement, target quantities, guild difficulty, city safety, and quest provisioning are outside this document and remain subject to their own brainstorming and approvals.
+Species-specific monster integration follows the separate monster catalog design. The official directory kind is defined here, but a threat-tier alias is not a substitute for that prerequisite. Monster habitat placement, target quantities, guild difficulty, city safety, and quest provisioning are outside this document and remain subject to their own brainstorming and approvals.
 
 No runtime implementation is included in this design-document change. After the user reviews this written specification, use the repository's specification-driven workflow for proposal and implementation planning.
