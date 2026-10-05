@@ -1,23 +1,49 @@
 """Tests for the read-only art presenter primitives."""
 
 from pathlib import Path
+import io
+import json
+import shutil
 import tempfile
 import uuid
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
+from PIL import Image
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from world.art import official, official_refs
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
-from world.art.gallery import DEFAULT_FACE_RECT, append_card, cards_for, default_face_rect
+from world.art.gallery import (
+    DEFAULT_FACE_RECT,
+    GalleryRecord,
+    append_card,
+    cards_for,
+    default_face_rect,
+    identity_stage,
+)
+from world.art.official import (
+    OfficialCatalog,
+    OfficialContent,
+    OfficialImage,
+    current_catalog,
+    load_catalog,
+    reset_catalog,
+)
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.presenter import (
+    GALLERY_ASPECT_RATIO,
+    MAX_PORTRAIT_MEDIA_URL,
+    ORIGIN_OFFICIAL,
     ORIGIN_PLACEHOLDER,
     ORIGIN_RUNTIME,
     ORIGIN_SILHOUETTE,
+    PAYLOAD_OFFICIAL,
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
     media_url_for,
@@ -845,6 +871,368 @@ class SilhouettePayloadTests(EvenniaTestCase):
         self.assertEqual(payload["fallback"]["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
         self.assertEqual(ArtAssetRecord.objects.count(), before)
         self.assertNotIn("twenty", str(payload))
+
+
+# A file-local synthetic preset key, a real decodable PNG, and the geometry
+# the catalog validates against its 4x4 decoded size.
+_PRESET_KEY = "t_synth_preset"
+_FINGERPRINT = "a" * 64
+_OFFICIAL_RECT = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}
+_OFFICIAL_STAGE = {"scale": 1.4, "x": 0.1, "y": -0.2}
+
+
+def _png(width=4, height=4) -> bytes:
+    """A real, decodable PNG of the given pixel size."""
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _snapshot(identity: str, *, name="hero.png", **overrides) -> OfficialCatalog:
+    """A hand-built official snapshot: one content directory, one image."""
+    image = OfficialImage(
+        identity=identity,
+        kind="preset",
+        key=_PRESET_KEY,
+        fingerprint=_FINGERPRINT,
+        image_size={"width": 4, "height": 4},
+        face_rect=overrides.pop("face_rect", dict(_OFFICIAL_RECT)),
+        stage=overrides.pop("stage", dict(_OFFICIAL_STAGE)),
+    )
+    content = OfficialContent(
+        kind="preset",
+        key=_PRESET_KEY,
+        default_identity=identity,
+        images=(identity,),
+    )
+    return OfficialCatalog({("preset", _PRESET_KEY): content}, {identity: image})
+
+
+class OfficialPayloadTests(EvenniaTestCase):
+    """The official-default payload branch (tasks 2.1, 2.2, 3.1).
+
+    Every case resolves a preset-born character whose stored provenance names
+    a registered content reference, so the official step is the one under
+    test; the catalog snapshot is either loaded from a synthetic tree or
+    injected whole, which is also how the wire-budget boundary is pinned.
+    """
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.store = Path(self.tempdir.name) / "store"
+        self.store.mkdir()
+        self.official_root = Path(self.tempdir.name).resolve() / "official"
+        self.settings = override_settings(
+            ART_STORE_ROOT=str(self.store),
+            ART_OFFICIAL_ROOT=str(self.official_root),
+        )
+        self.settings.enable()
+        self.addCleanup(self.settings.disable)
+        reset_catalog()
+        self.addCleanup(reset_catalog)
+        for patcher in (
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            ),
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    # -- harness ----------------------------------------------------------
+    def _index(self, name="hero.png", **manifest) -> str:
+        folder = self.official_root / "preset" / _PRESET_KEY
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(_png())
+        if manifest:
+            (folder / "manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def _character(self, stable_key="official-hero", *, age=30, apparent_age=30):
+        entity = create_object(PlayerCharacter, key=f"official-{stable_key}")
+        entity.age = age
+        entity.apparent_age = apparent_age
+        entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        entity.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, _PRESET_KEY)
+        return entity
+
+    def _subject(self, stable_key="official-hero") -> ArtSubject:
+        return ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
+
+    def _state(self, entity) -> tuple:
+        """The entity's and the store's observable state, for before/after pins."""
+        return (
+            str(entity.attributes.get("age")),
+            str(entity.attributes.get("apparent_age")),
+            str(entity.attributes.get(PRESET_PROVENANCE_ATTRIBUTE)),
+            repr(entity.db.portrait_policy),
+            tuple(
+                sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*"))
+            ),
+        )
+
+    # -- payload shape ----------------------------------------------------
+    def test_an_official_default_presents_with_its_metadata_geometry(self):
+        identity = self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character()
+        subject = self._subject()
+        with patch("world.observability.log_info") as logged:
+            payload = resolve_character(entity)
+        self.assertEqual(payload["kind"], PAYLOAD_OFFICIAL)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        # An official image is never a generated/done portrait.
+        self.assertIsNone(payload["status"])
+        self.assertNotIn("已生成", str(payload))
+        # The fingerprinted same-origin URL, the declared rectangle and the
+        # non-identity declared stage all survive to the payload.
+        self.assertEqual(payload["url"], current_catalog().url_for(identity))
+        self.assertIn(current_catalog().fingerprint_for(identity), payload["url"])
+        self.assertTrue(payload["url"].startswith("/art/official/"))
+        self.assertEqual(payload["face_rect"], _OFFICIAL_RECT)
+        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
+        self.assertEqual(payload["aspect_ratio"], GALLERY_ASPECT_RATIO)
+        self.assertEqual(payload["subject_key"], subject.full())
+        self.assertEqual(payload["alt"], subject.full())
+        # The decorative silhouette rides beside the presented image and
+        # reports no use (report=False on the real-image rungs).
+        self.assertIsNotNone(payload["fallback"])
+        self.assertEqual(
+            [
+                call
+                for call in logged.call_args_list
+                if call.args and call.args[0] == "gallery_fallback_used"
+            ],
+            [],
+        )
+        # No path, license, manifest, or prompt text, and no state acquired.
+        for leaked in ("ART_OFFICIAL_ROOT", str(self.official_root), "LICENSE", "prompt"):
+            self.assertNotIn(leaked, str(payload))
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryRecord.objects.count(), 0)
+        self.assertEqual(
+            sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
+            [],
+        )
+        self.assertEqual(entity.attributes.get(PRESET_PROVENANCE_ATTRIBUTE), _PRESET_KEY)
+
+    def test_a_runtime_card_outranks_the_official_default(self):
+        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character("card-first")
+        subject = self._subject("card-first")
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=1,
+            checkpoint="t_checkpoint",
+            requested_fields=["appearance"],
+            face_rect=dict(DEFAULT_FACE_RECT),
+            image_size={"width": 8, "height": 8},
+            binding=None,
+            source="generated",
+        )
+        with patch(
+            "world.art.presenter.official_default_for",
+            side_effect=AssertionError("the official step must never be consulted"),
+        ):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(payload["url"], f"/art/{identity}")
+        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+
+    def test_a_classic_done_asset_outranks_the_official_default(self):
+        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character("classic-first")
+        subject = self._subject("classic-first")
+        ensure(subject, "desc")
+        token = str(claim(10)[0].db.generation_token)
+        identity = f"portrait/character/{subject.key}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"asset")
+        settle(
+            subject,
+            generation_token=token,
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
+        )
+        with patch(
+            "world.art.presenter.official_default_for",
+            side_effect=AssertionError("the official step must never be consulted"),
+        ):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(payload["url"], f"/art/{identity}")
+
+    def test_a_disappeared_official_entry_falls_through_to_the_seam(self):
+        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character()
+        self.assertEqual(resolve_character(entity)["origin"], ORIGIN_OFFICIAL)
+        # The artwork update removed the content directory; the new snapshot
+        # simply lacks it, with no restart gap and no preference deletion.
+        shutil.rmtree(self.official_root / "preset")
+        load_catalog()
+        with patch.object(official_refs, "log_warn") as warned:
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        self.assertIsNotNone(payload["fallback"])
+        self.assertEqual(
+            [
+                call
+                for call in warned.call_args_list
+                if call.args and call.args[0] == "official_content_reference_unresolved"
+            ],
+            [],
+        )
+        self.assertEqual(entity.attributes.get(PRESET_PROVENANCE_ATTRIBUTE), _PRESET_KEY)
+
+    def test_the_payload_boundary_revalidates_the_snapshots_geometry(self):
+        # A snapshot carrying geometry that cannot have come from the catalog's
+        # own admission (a non-pixel-square rectangle, an out-of-range stage)
+        # still degrades per contract instead of shipping unvalidated values.
+        identity = f"preset/{_PRESET_KEY}/hero.png"
+        snapshot = _snapshot(
+            identity,
+            face_rect={"x": 0.1, "y": 0.1, "w": 0.9, "h": 0.2},
+            stage={"scale": 0.05, "x": 0.0, "y": 0.0},
+        )
+        entity = self._character()
+        with (
+            patch.object(official, "_CATALOG", snapshot),
+            patch("world.art.presenter.log_warn") as warned,
+        ):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["face_rect"], default_face_rect({"width": 4, "height": 4}))
+        self.assertEqual(payload["stage"], identity_stage())
+        events = [call.args[0] for call in warned.call_args_list if call.args]
+        self.assertIn("art_face_rect_invalid", events)
+        self.assertIn("art_stage_invalid", events)
+
+    def test_a_url_inside_the_wire_budget_is_presented_and_one_outside_falls_through(self):
+        entity = self._character()
+        prefix = f"/art/official/{_FINGERPRINT}/preset/{_PRESET_KEY}/"
+        at_budget = "c" * (MAX_PORTRAIT_MEDIA_URL - len(prefix) - len(".png")) + ".png"
+        identity = f"preset/{_PRESET_KEY}/{at_budget}"
+        self.assertEqual(len(f"/art/official/{_FINGERPRINT}/{identity}"), MAX_PORTRAIT_MEDIA_URL)
+        with patch.object(official, "_CATALOG", _snapshot(identity)):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["url"], f"/art/official/{_FINGERPRINT}/{identity}")
+
+        # One character over the ceiling: the catalog's URL cannot travel the
+        # wire, so the step falls through exactly like an absent reference
+        # rather than failing the whole panel.
+        over = "d" * (MAX_PORTRAIT_MEDIA_URL - len(prefix) - len(".png") + 1) + ".png"
+        over_identity = f"preset/{_PRESET_KEY}/{over}"
+        self.assertGreater(
+            len(f"/art/official/{_FINGERPRINT}/{over_identity}"), MAX_PORTRAIT_MEDIA_URL
+        )
+        with (
+            patch.object(official, "_CATALOG", _snapshot(over_identity)),
+            patch("world.art.presenter.log_warn") as warned,
+        ):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(payload["url"])
+        events = [call.args[0] for call in warned.call_args_list if call.args]
+        self.assertEqual(events.count("art_official_url_over_wire_budget"), 1)
+
+    # -- eligibility ordering --------------------------------------------
+    def test_eligibility_runs_ahead_of_official_presentation(self):
+        # A fully valid directory unlocks nothing for a character whose
+        # canonical ages fail: the official step is never even consulted.
+        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character(age=None, apparent_age=30)
+        with (
+            patch(
+                "world.art.presenter.official_default_for",
+                side_effect=AssertionError("the official step must not run"),
+            ),
+            patch("world.observability.log_info") as logged,
+        ):
+            payload = resolve_character(entity)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(payload["subject_key"])
+        self.assertNotIn(ORIGIN_OFFICIAL, str(payload["origin"]))
+        self.assertEqual(
+            len(
+                [
+                    call
+                    for call in logged.call_args_list
+                    if call.args and call.args[0] == "gallery_fallback_used"
+                ]
+            ),
+            1,
+        )
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertNotIn("portrait rejected", repr(payload))
+
+    def test_a_monster_never_presents_an_official_origin(self):
+        folder = self.official_root / "monster" / "official-monster"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "a.png").write_bytes(_png())
+        load_catalog()
+        # The snapshot really holds the matching content directory...
+        self.assertIsNotNone(current_catalog().content("monster", "official-monster"))
+        monster = create_object(Monster, key="official-monster-actor")
+        # ...and the monster still resolves no reference (no producer), so the
+        # official step resolves nothing for it.
+        payload = resolve_subject(
+            ArtSubject(ArtSubjectKind.MONSTER, "official-monster"), entity=monster
+        )
+        self.assertNotEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertIsNone(payload["url"])
+
+    def test_a_hundred_presentations_write_nothing_and_call_no_network(self):
+        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
+        entity = self._character()
+        tripwires = (
+            patch("world.art.gallery.append_card", side_effect=AssertionError("card write")),
+            patch("world.art.gallery.set_default", side_effect=AssertionError("default write")),
+            patch(
+                "world.art.queue.enqueue_gallery_job",
+                side_effect=AssertionError("enqueue"),
+            ),
+            patch(
+                "world.art.service.request_gallery_image",
+                side_effect=AssertionError("enqueue"),
+            ),
+            patch.object(official, "open_dir_fd", side_effect=AssertionError("re-walk")),
+            patch.object(official, "load_catalog", side_effect=AssertionError("re-load")),
+        )
+        with ExitStack() as stack:
+            for tripwire in tripwires:
+                stack.enter_context(tripwire)
+            before = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
+            payloads = [resolve_character(entity) for _ in range(100)]
+            after = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
+        self.assertTrue(all(payload == payloads[0] for payload in payloads))
+        self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(before, after)
 
 
 if __name__ == "__main__":

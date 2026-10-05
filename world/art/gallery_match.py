@@ -19,12 +19,17 @@ ONLY as the explicit default (step 4); no image the player has not chosen is
 ever displayed as a surprise. Scene subjects have no gallery and always
 resolve to ``None`` here.
 
-Steps 5-7 (the classic ``done`` asset record, the terminal fallback seam, and
-the truthful placeholder) live in the presenter, which owns payload
-construction; this module exposes the seam ``fallback_for(subject)`` and
-fills it from ``gallery-builtin-fallbacks``: the deterministic built-in
-resolver over the six committed defaults, or ``None`` (scenes) when no
-fallback applies.
+The chain's remaining lookups live in the presenter, which owns payload
+construction: the classic ``done`` asset record (step 5), the official
+default for the entity's content reference (step 6,
+``official_default_for`` — resolved from the startup catalog snapshot alone,
+so an entity with no reference, or a reference the snapshot does not hold,
+falls through with no diagnostic beyond the resolver's own bounded event),
+the terminal fallback seam (step 7), and the truthful placeholder (step 8).
+This module exposes the official lookup and the seam
+``fallback_for(subject)``, filling the latter from
+``gallery-builtin-fallbacks``: the deterministic built-in resolver over the
+six committed defaults, or ``None`` (scenes) when no fallback applies.
 
 Every candidate is identity-validated through
 ``validated_card_identity`` — subject prefix, closed store-extension set, and
@@ -209,8 +214,64 @@ def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> di
     return resolution
 
 
+def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None:
+    """Step 6 of the chain: the mounted catalog's default official image.
+
+    ``resolve_card`` (steps 1-4) and the presenter's classic ``done`` asset
+    (step 5) are consulted before this lookup, so a subject with runtime
+    artwork keeps presenting it and a catalog default never replaces the
+    player's own image. The entity's stored provenance supplies the typed
+    content reference (``official_content_reference_for_entity``): no
+    reference — every dynamically generated NPC, every imported NPC, every
+    monster before the separate species catalog lands, and every entity
+    without a named portrait subject — resolves ``None`` here. A reference
+    the snapshot does not hold (absent, refused at admission, or removed by
+    an artwork update) resolves ``None`` just the same, so a stale directory
+    falls through to the remaining chain with no exception, no preference
+    deletion, and no acquisition attempt.
+
+    The returned facts are the snapshot's own: the default image's admitted
+    root-relative ``identity``, its same-origin
+    ``/art/official/<fingerprint>/<identity>`` ``url`` (the fingerprint is the
+    restart-scoped cache token, computed once at load and never re-derived
+    here), the pixel size the catalog decoded, and the ``face_rect``/``stage``
+    it validated at load against those dimensions (declared manifest geometry
+    or the fitted default rectangle / identity placement). The presenter
+    re-validates that geometry at the payload boundary and owns the wire
+    budget, so this step answers from the snapshot alone: no network call, no
+    filesystem write, no job enqueue, and no record mutation.
+
+    Imports stay local — like :func:`fallback_for` — so this module keeps its
+    read-only, transport-free module-level import surface.
+    """
+    from world.art import official
+    from world.art.official_refs import official_content_reference_for_entity
+
+    reference = official_content_reference_for_entity(entity)
+    if reference is None:
+        return None
+    catalog = official.current_catalog()
+    content = catalog.content(reference.kind, reference.key)
+    if content is None or content.default_identity is None:
+        return None
+    image = catalog.entry(content.default_identity)
+    if image is None:
+        return None
+    url = catalog.url_for(image.identity)
+    if url is None:
+        return None
+    return {
+        "identity": image.identity,
+        "url": url,
+        "face_rect": dict(image.face_rect),
+        "stage": dict(image.stage),
+        "image_size": dict(image.image_size),
+    }
+
+
 __all__ = [
     "fallback_for",
+    "official_default_for",
     "resolve_card",
     "validated_card_identity",
 ]

@@ -262,3 +262,52 @@ test("possession_banner is in the production panel allowlist and validates avail
   assert.throws(() => Protocol.validatePossessionBannerPanel({ schema_version: 1, available: true, host_name: "小艾", since_tick: 100, extra: true }));
 });
 
+
+// The roster row carries the art panel's own origin discriminator under the
+// same coherence rules (official-art-resolution): the closed vocabulary,
+// coupled to the row's own media, and never a generated status beside an
+// official image. Both validator sides share the rule.
+test("the roster portrait origin vocabulary is enforced", () => {
+  const placeholderPortrait = (overrides) =>
+    validRosterPortrait(Object.assign({
+      subject_key: null, status: null, url: null, aspect_ratio: null,
+      alt: "無肖像", placeholder: { kind: "unavailable", label: "無肖像" },
+      face_rect: null, stage: null, origin: "placeholder",
+    }, overrides));
+  const panel = (portrait) =>
+    validRosterPanel({ characters: [validRosterCharacter({ portrait })] });
+  const accepts = {
+    runtime: validRosterPortrait(),
+    official: validRosterPortrait({
+      subject_key: "portrait:character:42", status: null,
+      url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
+      alt: "portrait:character:42", origin: "official",
+    }),
+    silhouette: placeholderPortrait({
+      status: "missing",
+      placeholder: { kind: "missing", label: "未生成" },
+      origin: "silhouette",
+    }),
+    placeholder: placeholderPortrait(),
+  };
+  Object.keys(accepts).forEach((origin) => {
+    assert.doesNotThrow(() => Protocol.validateRosterPanel(panel(accepts[origin])), origin);
+  });
+  const rejects = {
+    "unknown origin": validRosterPortrait({ origin: "generated" }),
+    "blank origin": validRosterPortrait({ origin: "" }),
+    "official without a url": placeholderPortrait({ origin: "official" }),
+    "official claiming a done portrait": validRosterPortrait({
+      origin: "official",
+      url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
+    }),
+    "runtime without a url": placeholderPortrait({ origin: "runtime" }),
+    "silhouette hiding a real url": validRosterPortrait({ origin: "silhouette" }),
+  };
+  Object.keys(rejects).forEach((label) => {
+    assert.throws(() => Protocol.validateRosterPanel(panel(rejects[label])), label);
+  });
+  const absent = validRosterPortrait();
+  delete absent.origin;
+  assert.throws(() => Protocol.validateRosterPanel(panel(absent)), /required field origin/);
+});

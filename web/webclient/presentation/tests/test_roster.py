@@ -1,6 +1,9 @@
 """Tests for the version-1 ``roster`` presentation panel (webclient-character-roster)."""
 
 from copy import deepcopy
+import base64
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import PropertyMock, patch
 
@@ -29,7 +32,16 @@ from web.webclient.presentation.roster import (
     validate_roster,
 )
 from world.art.presenter import resolve_character
+from world.art.official import load_catalog, reset_catalog
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.rules.clock import get_world_clock
+
+# A deterministic decodable 1x1 PNG: the official catalog admits an image from
+# its header alone, which is all the roster surface needs.
+_TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
 
 
 class RosterPresenterTests(EvenniaTest):
@@ -90,12 +102,15 @@ class RosterPresenterTests(EvenniaTest):
                 "placeholder",
                 "face_rect",
                 "stage",
+                "origin",
             },
         )
         # A placeholder row carries a null URL and a null rectangle.
         self.assertIsNone(portrait["url"])
         self.assertIsNone(portrait["face_rect"])
         self.assertIsNone(portrait["stage"])
+        # ...and still names its own origin (official-art-resolution).
+        self.assertEqual(portrait["origin"], "silhouette")
 
     @covers_requirement(
         "webclient-character-roster::the-account-roster-is-a-committed-presentation-panel-available-in-every-mode"
@@ -182,6 +197,7 @@ class RosterPresenterTests(EvenniaTest):
                     "subject_key": f"character:{self.char1.pk}",
                     "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
                     "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+                    "origin": "runtime",
                 }
             elif entity.pk == char_active2.pk:
                 return {
@@ -194,6 +210,7 @@ class RosterPresenterTests(EvenniaTest):
                     "subject_key": f"character:{char_active2.pk}",
                     "face_rect": None,
                     "stage": None,
+                    "origin": "silhouette",
                 }
             else:
                 return {
@@ -206,6 +223,7 @@ class RosterPresenterTests(EvenniaTest):
                     "subject_key": None,
                     "face_rect": None,
                     "stage": None,
+                    "origin": "placeholder",
                 }
 
         with patch("web.webclient.presentation.roster.resolve_character", side_effect=mock_resolve):
@@ -242,6 +260,57 @@ class RosterPresenterTests(EvenniaTest):
                 pending_portrait["placeholder"],
                 {"kind": "unavailable", "label": "無肖像"},
             )
+
+    @covers_requirement(
+        "webclient-character-roster::roster-portraits-resolve-through-the-named-portrait-subject-mechanism"
+    )
+    def test_an_official_resolved_row_names_its_origin(self):
+        # The whole wire path for the official branch on the roster surface: a
+        # row whose portrait resolves the mounted catalog's read-only default
+        # carries the official origin, its fingerprinted URL and geometry, and
+        # no generated-portrait claim.
+        from world.art import official, official_refs
+
+        preset_key = "t_synth_preset"
+        self.char1.age = 30
+        self.char1.apparent_age = 30
+        self.char1.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.char1.pk),
+        }
+        self.char1.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, preset_key)
+        with tempfile.TemporaryDirectory() as tempdir:
+            official_root = Path(tempdir).resolve() / "official"
+            folder = official_root / "preset" / preset_key
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "hero.png").write_bytes(_TINY_PNG)
+            try:
+                with (
+                    override_settings(ART_OFFICIAL_ROOT=str(official_root)),
+                    patch.object(
+                        official_refs, "PLAYER_PRESET_REGISTRY", {preset_key: object()}
+                    ),
+                    patch.object(
+                        official,
+                        "_registered_preset_keys",
+                        return_value=frozenset({preset_key}),
+                    ),
+                ):
+                    load_catalog()
+                    payload = self._render()
+            finally:
+                reset_catalog()
+        portrait = payload["characters"][0]["portrait"]
+        self.assertEqual(portrait["origin"], "official")
+        self.assertIsNone(portrait["status"])
+        self.assertIsNone(portrait["placeholder"])
+        self.assertEqual(
+            portrait["subject_key"], f"portrait:character:{self.char1.pk}"
+        )
+        self.assertTrue(portrait["url"].startswith("/art/official/"))
+        self.assertIn("preset/t_synth_preset/hero.png", portrait["url"])
+        self.assertEqual(sorted(portrait["face_rect"]), ["h", "w", "x", "y"])
+        self.assertEqual(sorted(portrait["stage"]), ["scale", "x", "y"])
 
     @covers_requirement(
         "webclient-character-roster::roster-presentation-is-read-only-and-version-mirrored"
@@ -318,6 +387,7 @@ class RosterValidatorTests(unittest.TestCase):
             "placeholder": None,
             "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
             "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+            "origin": "runtime",
         }
         portrait.update(overrides)
         return portrait
@@ -431,6 +501,7 @@ class RosterValidatorTests(unittest.TestCase):
                 placeholder={"kind": "unavailable", "label": "無肖像"},
                 face_rect=None,
                 stage=None,
+                origin="placeholder",
             ),
         )
         normalized = validate_roster(self._valid_payload(characters=[placeholder_row]))
@@ -468,9 +539,92 @@ class RosterValidatorTests(unittest.TestCase):
                                 subject_key=None,
                                 alt="無肖像",
                                 placeholder={"kind": "unavailable", "label": "無肖像"},
+                                origin="placeholder",
                             )
                         )
                     ]
+                )
+            )
+
+    @covers_requirement(
+        "webclient-character-roster::roster-portraits-resolve-through-the-named-portrait-subject-mechanism"
+    )
+    def test_portrait_origin_is_the_closed_coherent_vocabulary(self):
+        # The row carries the art panel's own origin discriminator
+        # (official-art-resolution): the closed vocabulary, coupled to the
+        # row's own media, and never a generated status for an official image.
+        accepts = {
+            "runtime": {},
+            "official": {"status": None},
+            "silhouette": {
+                "url": None,
+                "status": "missing",
+                "aspect_ratio": None,
+                "subject_key": None,
+                "alt": "未生成",
+                "placeholder": {"kind": "missing", "label": "未生成"},
+                "face_rect": None,
+                "stage": None,
+            },
+            "placeholder": {
+                "url": None,
+                "status": None,
+                "aspect_ratio": None,
+                "subject_key": None,
+                "alt": "無肖像",
+                "placeholder": {"kind": "unavailable", "label": "無肖像"},
+                "face_rect": None,
+                "stage": None,
+            },
+        }
+        for origin, overrides in accepts.items():
+            with self.subTest(origin=origin):
+                portrait = self._valid_portrait(origin=origin, **overrides)
+                normalized = validate_roster(
+                    self._valid_payload(
+                        characters=[self._valid_row(portrait=portrait)]
+                    )
+                )
+                self.assertEqual(
+                    normalized["characters"][0]["portrait"]["origin"], origin
+                )
+        placeholders = {
+            "url": None,
+            "status": None,
+            "aspect_ratio": None,
+            "subject_key": None,
+            "alt": "無肖像",
+            "placeholder": {"kind": "unavailable", "label": "無肖像"},
+            "face_rect": None,
+            "stage": None,
+        }
+        rejects = {
+            "unknown origin": {"origin": "generated"},
+            "blank origin": {"origin": ""},
+            "official without a url": dict(placeholders, origin="official"),
+            "official claiming a done portrait": {"origin": "official", "status": "done"},
+            "official claiming a pending portrait": {
+                "origin": "official",
+                "status": "pending",
+            },
+            "runtime without a url": dict(placeholders, origin="runtime"),
+            "silhouette hiding a real url": {"origin": "silhouette"},
+        }
+        for label, overrides in rejects.items():
+            with self.subTest(case=label):
+                portrait = self._valid_portrait(**overrides)
+                with self.assertRaises(ProtocolValidationError):
+                    validate_roster(
+                        self._valid_payload(
+                            characters=[self._valid_row(portrait=portrait)]
+                        )
+                    )
+        absent = self._valid_portrait()
+        absent.pop("origin")
+        with self.assertRaises(ProtocolValidationError):
+            validate_roster(
+                self._valid_payload(
+                    characters=[self._valid_row(portrait=absent)]
                 )
             )
 

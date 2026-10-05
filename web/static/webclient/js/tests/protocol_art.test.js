@@ -193,6 +193,18 @@ test("the catalog origin vocabulary and its decorative fallback are enforced", (
   const placeholder = { kind: "unavailable", label: "無法提供" };
   const accepts = {
     runtime: validArtCatalogEntry(),
+    // The official read-only default: its own fingerprinted URL and never a
+    // generated status (official-art-resolution).
+    official: validArtCatalogEntry({
+      subject_key: "portrait:character:42",
+      status: null,
+      url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
+      alt: "portrait:character:42",
+      stage: { scale: 1.4, x: 0.1, y: -0.2 },
+      origin: "official",
+      fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
+      context: { name: "旅人", role: "人物" },
+    }),
     silhouette: validArtCatalogEntry({
       subject_key: null, status: "missing", url: null, aspect_ratio: null,
       face_rect: null, stage: null, origin: "silhouette",
@@ -216,8 +228,15 @@ test("the catalog origin vocabulary and its decorative fallback are enforced", (
       fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
     }, overrides));
   const rejects = {
-    "unknown origin": validArtCatalogEntry({ origin: "official" }),
+    "unknown origin": validArtCatalogEntry({ origin: "generated" }),
     "missing origin": absentOrigin,
+    "official without a url": validArtCatalogEntry({
+      subject_key: null, status: null, url: null, aspect_ratio: null,
+      face_rect: null, stage: null, origin: "official", placeholder, fallback: null,
+    }),
+    "official claiming a done portrait": validArtCatalogEntry({
+      origin: "official", url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
+    }),
     "silhouette hiding a real url": validArtCatalogEntry({ origin: "silhouette" }),
     "placeholder carrying a fallback": silhouetteEntry({ origin: "placeholder" }),
     "silhouette claiming a done portrait": silhouetteEntry({ status: "done", placeholder: null }),

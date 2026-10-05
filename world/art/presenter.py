@@ -2,20 +2,31 @@
 
 The presenter resolves a validated subject to its status, same-origin media
 URL, aspect, and alternative text, or to a truthful placeholder kind/label.
-Gallery-bearing subjects (characters, monsters) first attempt the
-deterministic gallery display chain in ``world.art.gallery_match``; every
-payload it produces carries ``face_rect`` — the resolved card's rectangle,
-the shared default for a classic asset or a fallback image, or ``null`` for
-every placeholder.
-Every payload also carries ``origin`` (the closed portrait-origin
-discriminator vocabulary this change establishes) and the decorative
-``fallback`` silhouette reference: the resolved built-in key, its committed
-``/art/defaults/`` URL, and that key's rectangle, carried on stage-eligible
-payloads whether or not a real image resolved, so a browser whose real image
-later fails to load renders the already-resolved silhouette without a new
-request. The field is presentation data only: it never becomes a payload's
-own media URL, never reports the portrait as generated, and never changes the
-subject's true status.
+Gallery-bearing subjects (characters, monsters) resolve through the
+deterministic gallery display chain in ``world.art.gallery_match``: the
+equipment-bound/default card, the classic ``done`` asset record, the mounted
+catalog's official default for the entity's content reference
+(``official_default_for``, resolved from the startup snapshot alone), the
+terminal fallback seam, and the truthful placeholder. Every payload it
+produces carries ``face_rect`` — the resolved card's or official image's
+rectangle, the shared default for a classic asset or a fallback image, or
+``null`` for every placeholder — and ``origin``, the closed portrait-origin
+discriminator vocabulary this change completes: ``runtime`` for the payload's
+own card or classic image, ``official`` for the catalog's read-only default,
+``silhouette`` when only the built-in fallback resolved, and ``placeholder``
+when nothing did.
+Every payload also carries the decorative ``fallback`` silhouette reference:
+the resolved built-in key, its committed ``/art/defaults/`` URL, and that
+key's rectangle, carried on stage-eligible payloads whether or not a real
+image resolved, so a browser whose real image later fails to load renders the
+already-resolved silhouette without a new request. The field is presentation
+data only: it never becomes a payload's own media URL, never reports the
+portrait as generated, and never changes the subject's true status.
+An official default is presented only when the catalog's URL fits
+``MAX_PORTRAIT_MEDIA_URL``, the shared wire ceiling: an official identity
+embeds an operator-chosen filename, so an over-budget URL falls through
+exactly like an absent reference instead of failing the whole panel, and an
+official payload never claims a ``done``/generated status.
 It never exposes ``out_path``, the store root, or any absolute filesystem path.
 Change 23f's browser panel consumes these primitives; this change owns them.
 """
@@ -32,7 +43,7 @@ from world.art.gallery import (
     identity_stage,
 )
 from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_for_entity
-from world.art.gallery_match import fallback_for, resolve_card
+from world.art.gallery_match import fallback_for, official_default_for, resolve_card
 from world.art.paths import resolved_under_store_root
 from world.art.queue import record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -56,13 +67,29 @@ PLACEHOLDER_LABELS = {
 
 # The CLOSED portrait-origin discriminator vocabulary (art-gallery-fallback
 # owns it here): ``runtime`` for a card or classic image the payload itself
-# carries, ``silhouette`` when only the built-in fallback resolved, and
-# ``placeholder`` when nothing did. The origin is computed from the branch
-# that produced the payload, never inferred from the presence of a URL;
-# `official-art-resolution-contracts` extends the vocabulary with ``official``.
+# carries, ``official`` for the mounted catalog's read-only default for the
+# entity's content reference, ``silhouette`` when only the built-in fallback
+# resolved, and ``placeholder`` when nothing did. The origin is computed from
+# the branch that produced the payload, never inferred from the presence of a
+# URL; `official-art-resolution-contracts` extends the vocabulary with
+# ``official`` exactly here, and both wire validators mirror the same value.
 ORIGIN_RUNTIME = "runtime"
+ORIGIN_OFFICIAL = "official"
 ORIGIN_SILHOUETTE = "silhouette"
 ORIGIN_PLACEHOLDER = "placeholder"
+
+# The payload kind of a resolved official default: a real image the subject
+# presents, but not a generated asset, so it is never a ``done`` status.
+PAYLOAD_OFFICIAL = "official"
+
+# The wire ceiling every portrait payload URL must fit: the art-panel and
+# roster validators both bound a payload URL at this many code points. Card,
+# classic, and fallback identities are bounded by construction (the shared
+# subject-key contract), but an official identity embeds an
+# operator-chosen filename, so the official step presents a URL only inside
+# this ceiling and otherwise falls through. Pinned equal to the presentation
+# layer's ``MAX_MEDIA_URL`` by ``web.webclient.presentation.tests.test_art_panel``.
+MAX_PORTRAIT_MEDIA_URL = 256
 
 # The fixed aspect ratio of every gallery card / fallback image payload:
 # portrait geometry is a presenter-side constant (cards store no ratio),
@@ -119,11 +146,14 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     chain (``resolve_card``); a resolved card yields an ``asset`` payload
     whose URL is built only from its validated stored identity. When nothing
     in the gallery resolves, the classic ``done`` asset record is resolved
-    exactly as before, the terminal fallback seam is consulted when that
-    record's identity is unusable, and the truthful placeholder closes the
-    chain. Every payload carries ``face_rect``: the card's rectangle, the
-    shared default for a classic asset or fallback image, or ``None`` for a
-    placeholder.
+    exactly as before, the entity's official content reference resolves its
+    default image from the startup catalog snapshot when one is indexed (an
+    absent, unregistered, or removed reference — and a URL outside the wire
+    budget — falls through like the classic record's unusable identity), the
+    terminal fallback seam is consulted, and the truthful placeholder closes
+    the chain. Every payload carries ``face_rect``: the card's or official
+    image's rectangle, the shared default for a classic asset or fallback
+    image, or ``None`` for a placeholder.
 
     A resolved fallback is NEVER the payload's own image: it rides the
     decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
@@ -170,9 +200,29 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
             _silhouette_field(subject, entity, report=False),
             origin=ORIGIN_RUNTIME,
         )
-    # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
-    # EVERY fall-through path — no record, an unfinished record, and an
-    # unusable done identity alike — before the placeholder closes the chain.
+    # Step 6: the mounted catalog's official default for the entity's content
+    # reference, presented as the payload's own read-only image (origin
+    # ``official``) with the decorative silhouette carried beside it — the
+    # official image is the presented figure, so the fallback reports no use.
+    # ``official_default_for`` answers from the startup snapshot alone, and a
+    # URL outside the wire budget falls through exactly like an absent
+    # reference: one oversized operator filename must never fail the panel.
+    official = official_default_for(subject, entity)
+    if official is not None:
+        if len(official["url"]) <= MAX_PORTRAIT_MEDIA_URL:
+            return _carried(
+                _official_payload(subject, official),
+                _silhouette_field(subject, entity, report=False),
+                origin=ORIGIN_OFFICIAL,
+            )
+        log_warn(
+            "art_official_url_over_wire_budget",
+            context={"subject": subject.full(), "identity": official["identity"]},
+        )
+    # Steps 1-6 resolved nothing: consult the terminal seam (step 7) on
+    # EVERY fall-through path — no record, an unfinished record, an unusable
+    # done identity, and an absent/over-budget official reference alike —
+    # before the placeholder closes the chain.
     # The already-resolved entity rides along so the resolver reads its sex,
     # apparent age, and registry provenance directly (gallery-builtin-fallbacks).
     # A resolution here IS the presented figure, so it reports its use exactly
@@ -231,13 +281,57 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     }
 
 
+def _official_payload(subject: ArtSubject, official: dict) -> dict:
+    """The asset payload for one resolved official default (chain step 6).
+
+    The URL is the catalog's admitted same-origin identity (fingerprinted; the
+    media route re-admits the exact path at the exact fingerprint), and the
+    geometry is the catalog's load-time rectangle/stage re-validated here
+    against the decoded image size exactly as a stored card's is: a rectangle
+    that fails validation (including one that is not pixel-square on its own
+    image) degrades to the fitted default for that image, and a malformed
+    stage to identity placement, each with one bounded diagnostic — never a
+    failed payload.
+
+    No status is claimed: an official image is not a generated asset, so the
+    payload reports no ``done``/generated portrait state, and it carries no
+    filesystem root, deployment source, license/manifest text, or prompt.
+    """
+    image_size = official.get("image_size")
+    try:
+        face_rect = validate_face_rect(official["face_rect"], image_size=image_size)
+    except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
+        log_warn("art_face_rect_invalid", context={"subject": subject.full()})
+        face_rect = default_face_rect(image_size) if image_size else dict(DEFAULT_FACE_RECT)
+    try:
+        stage = validate_stage(official["stage"])
+    except GalleryRecordError:  # observability: ignore R2: malformed placement degrades with its bounded diagnostic
+        log_warn(
+            "art_stage_invalid",
+            context={"subject": subject.full(), "identity": official.get("identity")},
+        )
+        stage = identity_stage()
+    return {
+        "kind": PAYLOAD_OFFICIAL,
+        "label": "官方圖片",
+        "status": None,
+        "url": official["url"],
+        "aspect_ratio": GALLERY_ASPECT_RATIO,
+        "alt": subject.full(),
+        "subject_key": subject.full(),
+        "face_rect": face_rect,
+        "stage": stage,
+    }
+
+
 def _carried(payload: dict, silhouette: dict | None, *, origin: str | None = None) -> dict:
     """Attach the origin discriminator and the decorative silhouette.
 
     ``origin`` states the branch that produced the payload's OWN media (a
-    resolved card or classic asset: ``runtime``). Every other payload derives
-    it from what actually resolved: ``silhouette`` when the built-in fallback
-    did, ``placeholder`` when nothing did.
+    resolved card or classic asset: ``runtime``; an official default:
+    ``official``). Every other payload derives it from what actually
+    resolved: ``silhouette`` when the built-in fallback did, ``placeholder``
+    when nothing did.
     """
     payload["fallback"] = silhouette
     payload["origin"] = (

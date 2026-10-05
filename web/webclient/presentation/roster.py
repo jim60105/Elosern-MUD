@@ -1,4 +1,10 @@
-"""Exact schema-version-1 ``roster`` panel and presenter (webclient-character-roster).
+"""Exact schema-version-2 ``roster`` panel and presenter (webclient-character-roster).
+
+Each row's portrait carries the same field vocabulary the art panel's catalog
+entries carry — including the server-authored origin discriminator
+``runtime | official | silhouette | placeholder`` (``official-art-resolution``),
+validated by the shared rule, and no decorative silhouette reference — so the
+client renders roster portraits through its existing portrait treatment.
 
 Discloses the account-level character roster read model: owned characters in
 ascending identity order, each with its identity, display name, live puppet flag,
@@ -23,6 +29,7 @@ from web.webclient.presentation.art import (
     MAX_SUBJECT_KEY,
     PLACEHOLDER_KINDS,
     _validate_face_rect,
+    _validate_portrait_origin,
     _validate_stage,
     _placeholder_for,
 )
@@ -38,7 +45,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.art.presenter import resolve_character
+from world.art.presenter import ORIGIN_PLACEHOLDER, resolve_character
 from world.rules.account_roster import (
     MAX_ROSTER_ROWS,
     ROSTER_LOCK_REASON,
@@ -84,6 +91,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
             "placeholder",
             "face_rect",
             "stage",
+            "origin",
         },
         {},
     )
@@ -124,6 +132,13 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
         raise RosterPanelError("portrait must have either url or placeholder")
     face_rect = _validate_face_rect(value["face_rect"])
     stage = _validate_stage(value["stage"], url)
+    # The same server-authored origin discriminator the art panel catalog
+    # carries, under the same closed-vocabulary and URL-coherence rules
+    # (official-art-resolution): a roster row never states its origin by URL
+    # shape, and an official row never reports a generated status.
+    origin = _validate_portrait_origin(
+        "portrait origin", "portrait", value, url, status
+    )
     # Same rule as the art catalog: the rectangle exists exactly when the
     # row carries a media URL, never for a placeholder.
     if url is not None and face_rect is None:
@@ -140,6 +155,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
         "placeholder": placeholder,
         "face_rect": face_rect,
         "stage": stage,
+        "origin": origin,
     }
 
 
@@ -295,6 +311,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
                 "subject_key": None,
                 "face_rect": None,
                 "stage": None,
+                "origin": ORIGIN_PLACEHOLDER,
             }
         else:
             resolved = resolve_character(entity)
@@ -308,6 +325,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
             "placeholder": _placeholder_for(resolved),
             "face_rect": resolved.get("face_rect"),
             "stage": resolved.get("stage"),
+            "origin": resolved.get("origin"),
         }
 
         character_rows.append(
