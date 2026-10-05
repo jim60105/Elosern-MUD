@@ -143,8 +143,9 @@ isolated static root with `uv run --locked evennia collectstatic --noinput
 can keep serving the static copy collected at fixture startup. Never collect
 against the live user settings/database for a visual review.
 
-See [the final visual-review evidence](2026-10-05-final-visual-review.md) and
-the OpenSpec amendment `repair-retarget-visual-reading`. The two archived
+See the final visual-review evidence at
+`openspec/changes/archive/2026-10-05-repair-retarget-visual-reading/review.md`
+and the OpenSpec amendment `repair-retarget-visual-reading`. The two archived
 retarget changes remain historical records.
 
 ## Narrative palette showcase
