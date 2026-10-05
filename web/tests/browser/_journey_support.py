@@ -257,6 +257,13 @@ def _art_panel(portrait_refs: list) -> dict:
             "placeholder": None,
             "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
             "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+            # The closed portrait-origin discriminator and its decorative
+            # silhouette reference are required exact fields of a catalog
+            # entry on both validators (builtin-silhouette-stage-fallback,
+            # official-art-resolution-contracts): a runtime card carries its
+            # own media URL and has no committed built-in identity to offer.
+            "origin": "runtime",
+            "fallback": None,
             "context": {"name": "角色", "role": "人物"},
         }
     return {

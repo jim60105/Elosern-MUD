@@ -61,6 +61,7 @@ export const ROSTER_CHARACTERS_SAMPLE = [
       placeholder: null,
       face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
       stage: { scale: 1, x: 0, y: 0 },
+      origin: "runtime",
     },
   },
   {
@@ -76,6 +77,7 @@ export const ROSTER_CHARACTERS_SAMPLE = [
       alt: "雷恩的肖像",
       placeholder: { kind: "generating", label: "肖像生成中" },
       stage: null,
+      origin: "silhouette",
     },
   },
   {
@@ -91,6 +93,7 @@ export const ROSTER_CHARACTERS_SAMPLE = [
       alt: "新冒險者的肖像",
       placeholder: { kind: "silhouette", label: "建立中" },
       stage: null,
+      origin: "placeholder",
     },
   },
 ];

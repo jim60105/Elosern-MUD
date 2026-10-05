@@ -15,11 +15,14 @@ URL, aspect, alternative text, and a nullable placeholder) and a bounded
 entities, each entry additionally carrying the resolved normalized face
 rectangle (exactly ``x``, ``y``, ``w``, ``h`` in ``[0, 1]`` whenever the entry
 has a media URL, ``null`` for every placeholder), the server-authored origin
-discriminator (the closed vocabulary ``runtime``/``silhouette``/
-``placeholder``), and the decorative built-in silhouette the fallback seam
-resolved (``key``, committed ``/art/defaults/`` URL and rectangle, see
-``art-gallery-fallback``). It never exposes
-``out_path``, the store root, or rejected prompt content.
+discriminator (the closed vocabulary ``runtime``/``official``/
+``silhouette``/``placeholder``, see ``official-art-resolution``), and the
+decorative built-in silhouette the fallback seam resolved (``key``, committed
+``/art/defaults/`` URL and rectangle, see ``art-gallery-fallback``). It never
+exposes ``out_path``, the store root, or rejected prompt content. The origin
+rules — including that an ``official`` entry always carries its own media URL
+and never a generated status — are shared with the roster row portrait
+(``_validate_portrait_origin``), so the two vocabularies cannot drift.
 """
 
 from typing import Any
@@ -38,6 +41,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.art.presenter import (
+    ORIGIN_OFFICIAL,
     ORIGIN_PLACEHOLDER,
     ORIGIN_RUNTIME,
     ORIGIN_SILHOUETTE,
@@ -75,8 +79,10 @@ MAX_ORIGIN = 16
 PLACEHOLDER_KINDS = frozenset({"missing", "unavailable"})
 ROLES = frozenset({ROLE_ALLY, ROLE_DIALOGUE, ROLE_FOE, ROLE_PERSON})
 # The closed portrait-origin vocabulary (owned by ``world.art.presenter``;
-# `official-art-resolution-contracts` extends both).
-PORTRAIT_ORIGINS = frozenset({ORIGIN_PLACEHOLDER, ORIGIN_RUNTIME, ORIGIN_SILHOUETTE})
+# `official-art-resolution-contracts` extends both sides with ``official``).
+PORTRAIT_ORIGINS = frozenset(
+    {ORIGIN_OFFICIAL, ORIGIN_PLACEHOLDER, ORIGIN_RUNTIME, ORIGIN_SILHOUETTE}
+)
 # The committed built-in identities the decorative fallback may name.
 FALLBACK_URL_PREFIX = "/art/defaults/"
 
@@ -159,6 +165,42 @@ def _validate_portrait_fallback(value: Any) -> dict[str, Any] | None:
     if face_rect is None:
         raise ProtocolValidationError("a fallback carries a face_rect")
     return {"key": key, "url": url, "face_rect": face_rect}
+
+
+def _validate_portrait_origin(
+    field: str, noun: str, portrait: Any, url: str | None, status: str | None
+) -> str:
+    """The server-authored origin discriminator, coherent with its own media.
+
+    Shared by the art catalog entry and the roster row portrait — the same
+    portrait field vocabulary on both wires — so the two can never drift: the
+    value is inside the closed vocabulary
+    ``runtime | official | silhouette | placeholder`` and it names the branch
+    that produced the payload's OWN media, never a URL shape. A ``silhouette``
+    or ``placeholder`` origin therefore never carries that media URL, a
+    ``runtime`` or ``official`` origin always does, and an ``official`` image
+    is never reported with a generated-portrait status, because a read-only
+    catalog default is not a generated asset (``official-art-resolution``).
+    ``field`` and ``noun`` only name the surface in the refusal messages
+    ("catalog origin"/"catalog entry" or "portrait origin"/"portrait"); the
+    wire key itself is always ``origin``.
+    """
+    origin = _require_str(portrait, "origin", maximum=MAX_ORIGIN)
+    if origin not in PORTRAIT_ORIGINS:
+        raise ProtocolValidationError(f"{field} is not a stable value")
+    if url is not None and origin in (ORIGIN_SILHOUETTE, ORIGIN_PLACEHOLDER):
+        raise ProtocolValidationError(
+            f"a {noun} carrying a media URL is not a silhouette or a placeholder"
+        )
+    if url is None and origin in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL):
+        raise ProtocolValidationError(
+            f"an {origin} origin carries the {noun}'s media URL"
+        )
+    if origin == ORIGIN_OFFICIAL and status is not None:
+        raise ProtocolValidationError(
+            "an official image is not a generated portrait"
+        )
+    return origin
 
 
 def _validate_scene(value: Any) -> dict[str, Any]:
@@ -286,9 +328,9 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
     context = _validate_context(value["context"])
     face_rect = _validate_face_rect(value["face_rect"])
     stage = _validate_stage(value["stage"], url)
-    origin = _require_str(value, "origin", maximum=MAX_ORIGIN)
-    if origin not in PORTRAIT_ORIGINS:
-        raise ProtocolValidationError("catalog origin is not a stable value")
+    origin = _validate_portrait_origin(
+        "catalog origin", "catalog entry", value, url, status
+    )
     fallback = _validate_portrait_fallback(value["fallback"])
     # A client never offsets a frame it has no image for: the rectangle is
     # present exactly when the entry carries a media URL.
@@ -296,15 +338,9 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("a catalog entry with a url carries a face_rect")
     if url is None and face_rect is not None:
         raise ProtocolValidationError("a catalog placeholder carries no face_rect")
-    # The origin names the branch that produced the entry's own media, so a
-    # silhouette can never stand where a real image belongs and a placeholder
-    # origin can never hide one.
-    if url is not None and origin in (ORIGIN_SILHOUETTE, ORIGIN_PLACEHOLDER):
-        raise ProtocolValidationError(
-            "a catalog entry carrying a media URL is not a silhouette or a placeholder"
-        )
-    if url is None and origin == ORIGIN_RUNTIME:
-        raise ProtocolValidationError("a runtime origin carries the entry's media URL")
+    # The decorative reference has no meaning on an entry whose own media is
+    # already absent for a different reason, so it is required exactly by the
+    # silhouette origin and refused by the placeholder origin.
     if origin == ORIGIN_SILHOUETTE:
         if fallback is None:
             raise ProtocolValidationError(
@@ -387,7 +423,16 @@ def validate_art(payload: Any) -> dict[str, Any]:
 
 
 def _placeholder_for(value: dict[str, Any]) -> dict[str, Any] | None:
-    if value.get("kind") == "asset":
+    """The placeholder descriptor a payload carries when no image did.
+
+    ``None`` whenever the payload carries its own media URL — a runtime card,
+    a classic asset, or an official default — and the payload's own kind/label
+    otherwise. Keying on the URL rather than on the ``asset`` kind keeps the
+    official branch (a real image, but not a generated asset, so not ``done``)
+    on the same rule: the descriptor exists exactly when no image does, which
+    is also what keeps the roster row's url-XOR-placeholder rule intact.
+    """
+    if value.get("url") is not None:
         return None
     return {"kind": value["kind"], "label": value["label"]}
 
@@ -512,6 +557,7 @@ __all__ = [
     "ROLES",
     "_validate_face_rect",
     "_validate_portrait_fallback",
+    "_validate_portrait_origin",
     "_placeholder_for",
     "art_presenter",
     "validate_art",

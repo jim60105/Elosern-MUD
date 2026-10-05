@@ -26,7 +26,7 @@ With a catalog (change 1) and content references (change 3), resolution must wea
 - `art-gallery-resolution`: the ordered chain gains the official-default step before the terminal fallback seam (both the character and monster-variant wordings), and resolution payloads carry the origin discriminator beside the existing face-rect/stage carriage.
 - `art-gallery-autogen`: the idempotency guard gains the official-satisfied condition — an automatic path requests nothing when eligible official artwork already satisfies the subject's content reference — while every existing guarantee stays unchanged.
 - `webclient-art-panel`: portrait catalog entries carry the origin discriminator; a resolving official image is distinguishable from a runtime image and a placeholder.
-- `webclient-character-roster`: roster rows carry the same origin-bearing portrait vocabulary the art panel catalog carries.
+- `webclient-character-roster`: roster rows carry the same origin-bearing portrait vocabulary the art panel catalog carries, and the row-facts requirement whose clause froze the roster wire shape is amended to admit exactly that one bounded portrait field (its scenarios are carried unchanged).
 
 ## Impact
 

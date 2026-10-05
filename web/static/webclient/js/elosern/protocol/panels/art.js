@@ -28,7 +28,7 @@ var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
 var ART_ROLES = ["隊友", "敵方", "對話對象", "人物"];
 // The closed portrait-origin vocabulary (art-gallery-fallback owns it;
 // official-art-resolution-contracts extends both sides with "official").
-var ART_ORIGINS = ["runtime", "silhouette", "placeholder"];
+var ART_ORIGINS = ["runtime", "official", "silhouette", "placeholder"];
 var ART_MAX_FALLBACK_KEY = 32;
 var ART_FALLBACK_URL_PREFIX = "/art/defaults/";
 
@@ -186,6 +186,30 @@ function validateArtFallback(value) {
   return { key: key, url: url, face_rect: faceRect };
 }
 
+// The server-authored origin discriminator, coherent with its own media:
+// shared by the art catalog entry and the roster row portrait (mirror of
+// web.webclient.presentation.art._validate_portrait_origin). It names the
+// branch that produced the payload's own media, never a URL shape, so a
+// silhouette or placeholder origin never carries that media URL, a runtime or
+// official origin always does, and an official image (a read-only catalog
+// default, not a generated asset) is never reported with a status.
+function validatePortraitOrigin(field, noun, value, url, status) {
+  var origin = requireString(value, field, 16);
+  if (ART_ORIGINS.indexOf(origin) === -1) {
+    throw new Error(field + " is not a stable value");
+  }
+  if (url !== null && (origin === "silhouette" || origin === "placeholder")) {
+    throw new Error("a " + noun + " carrying a media URL is not a silhouette or a placeholder");
+  }
+  if (url === null && (origin === "runtime" || origin === "official")) {
+    throw new Error("an " + origin + " origin carries the " + noun + "'s media URL");
+  }
+  if (origin === "official" && status !== null) {
+    throw new Error("an official image is not a generated portrait");
+  }
+  return origin;
+}
+
 function validateArtCatalogEntry(value) {
   requireExactFields(
     value,
@@ -221,10 +245,7 @@ function validateArtCatalogEntry(value) {
   validateArtContext(value.context);
   var faceRect = validateArtFaceRect(value.face_rect);
   validateArtStage(value.stage, url);
-  var origin = requireString(value.origin, "catalog origin", 16);
-  if (ART_ORIGINS.indexOf(origin) === -1) {
-    throw new Error("catalog origin is not a stable value");
-  }
+  var origin = validatePortraitOrigin("catalog origin", "catalog entry", value.origin, url, status);
   var fallback = validateArtFallback(value.fallback);
   if (url !== null && faceRect === null) {
     throw new Error("a catalog entry with a url carries a face_rect");
@@ -232,15 +253,9 @@ function validateArtCatalogEntry(value) {
   if (url === null && faceRect !== null) {
     throw new Error("a catalog placeholder carries no face_rect");
   }
-  // The origin names the branch that produced the entry's own media, so a
-  // silhouette can never stand where a real image belongs and a placeholder
-  // origin can never hide one.
-  if (url !== null && (origin === "silhouette" || origin === "placeholder")) {
-    throw new Error("a catalog entry carrying a media URL is not a silhouette or a placeholder");
-  }
-  if (url === null && origin === "runtime") {
-    throw new Error("a runtime origin carries the entry's media URL");
-  }
+  // The decorative reference carries a real meaning only on the silhouette
+  // origin's payload, so it is required there and refused by the placeholder
+  // origin.
   if (origin === "silhouette") {
     if (fallback === null) throw new Error("a silhouette origin carries its fallback identity");
     if (status === "done") throw new Error("a silhouette origin is not a done portrait");
@@ -565,6 +580,8 @@ module.exports = {
   validateArtFallback: validateArtFallback,
   validateArtFaceRect: validateArtFaceRect,
   validateArtStage: validateArtStage,
+  validatePortraitOrigin: validatePortraitOrigin,
+  ART_ORIGINS: ART_ORIGINS,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
   GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
   GALLERY_MAX_LABEL: GALLERY_MAX_LABEL,

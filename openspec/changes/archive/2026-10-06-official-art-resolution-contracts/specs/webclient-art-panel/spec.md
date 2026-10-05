@@ -70,6 +70,14 @@ currently present.
 - **WHEN** a present entity resolves to any truthful placeholder
 - **THEN** its catalog entry carries a null URL and a null face rectangle
 
+#### Scenario: A placeholder row can still carry the attribute-selected decorative silhouette
+- **WHEN** a present dialogue-host NPC with no named portrait policy and stored sex/apparent-age attributes resolves to the unavailable placeholder
+- **THEN** the entry's real URL, subject key, and face rectangle are null, and its decorative `fallback` field carries the attribute-selected identity — not one shared shape for every missing actor — with no policy, gallery record, or job created for the entity
+
+#### Scenario: A resolved real row retains the decorative reference
+- **WHEN** a catalog entry resolves a real runtime image
+- **THEN** the entry's real fields carry the image with the `runtime` origin and the decorative `fallback` field remains available for a browser-side load-failure re-render
+
 #### Scenario: Catalog entries name their image origin
 - **WHEN** present entities resolve an official image, a runtime card image, and a built-in silhouette respectively in one snapshot
 - **THEN** each entry carries the discriminator naming its own server-resolved source, and no client-side URL inspection is needed or performed to tell them apart

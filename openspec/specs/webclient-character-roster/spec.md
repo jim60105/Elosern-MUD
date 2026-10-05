@@ -52,8 +52,10 @@ independent of configured capacity, preserving the current owned character withi
 The panel SHALL carry no per-character resources, location, condition or last-played field: a row
 states who the character is, not how they are doing. The panel SHALL NOT synthesize a display label
 for a character whose key is ambiguous; pending is the disambiguating fact, and its presentation
-belongs to the client. Portrait resolution and the exact roster v2 wire shape SHALL remain unchanged
-and read-only.
+belongs to the client. Portrait resolution and the roster wire shape SHALL remain read-only and
+unchanged, except that the portrait vocabulary additionally carries the server-authored origin
+discriminator the `official-art-resolution` capability adds on the row (one bounded enum field on
+the portrait object; the row's own facts and every other field stay exactly as they are).
 
 #### Scenario: Rows name the account's characters in identity order
 - **WHEN** an account owns three characters and a snapshot is built for one of them
@@ -80,7 +82,10 @@ Each roster row's portrait SHALL be resolved through the same named-portrait res
 panel's portrait catalog uses: an explicit named `portrait_policy` on the character, the
 canonical-age eligibility check, and the resolved asset or its placeholder. A row SHALL carry the same portrait
 field vocabulary the art panel's catalog entries carry — the subject key, the asset status, the
-same-origin media URL, the aspect ratio, the alt text, the placeholder descriptor, and the normalized face rectangle (a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` when the row carries a URL, and `null` when it carries a placeholder) — so the
+same-origin media URL, the aspect ratio, the alt text, the placeholder descriptor, the normalized
+face rectangle (a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` when the row carries a URL, and
+`null` when it carries a placeholder), and the server-authored portrait origin discriminator (see the
+`official-art-resolution` capability) on every row that carries a media value — so the
 client renders roster portraits through its existing portrait treatment rather than a second
 vocabulary. Resolution SHALL NOT require the character to be present in the rendering actor's
 current room. A character carrying no named portrait policy — which every character still pending
@@ -109,6 +114,10 @@ no-portrait placeholder with no URL and no subject key.
 #### Scenario: A placeholder roster row carries a null face rectangle
 - **WHEN** a roster row resolves to any truthful placeholder
 - **THEN** the row carries a null URL and a null face rectangle
+
+#### Scenario: An official-resolved roster portrait names its origin
+- **WHEN** a roster row's portrait resolves to an official read-only image through the presentation chain
+- **THEN** the row carries the official-origin discriminator beside its media URL and the subject's own generation state remains untouched
 
 ### Requirement: The roster carries the account's capacity and switch-lock facts
 The `roster` panel SHALL carry, computed once per snapshot from canonical state: the configured

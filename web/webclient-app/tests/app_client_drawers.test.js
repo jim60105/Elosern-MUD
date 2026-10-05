@@ -874,6 +874,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       characters: [{ identity: 1, name: "測試主角", current: true, pending: false, portrait: {
         subject_key: null, status: null, url: null, aspect_ratio: null, alt: "測試主角",
         placeholder: { kind: "missing", label: "無肖像" }, face_rect: null, stage: null,
+        origin: "placeholder",
       } }],
       max_characters: 5, can_create: true, switch_locked: false, lock_reason: null,
     };

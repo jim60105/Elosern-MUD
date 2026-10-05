@@ -44,6 +44,7 @@ var art = require("./art.js");
 var validateArtFaceRect = art.validateArtFaceRect;
 var validateArtStage = art.validateArtStage;
 var validateArtPlaceholder = art.validateArtPlaceholder;
+var validatePortraitOrigin = art.validatePortraitOrigin;
 var questLog = require("./quest_log.js");
 var validateQuestLogPanel = questLog.validateQuestLogPanel;
 
@@ -352,7 +353,7 @@ function validateRosterPortrait(value) {
   requireExactFields(
     value,
     "roster portrait",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage"],
+    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "origin"],
     []
   );
   if (value.subject_key !== null) {
@@ -388,6 +389,10 @@ function validateRosterPortrait(value) {
   }
   var faceRect = validateArtFaceRect(value.face_rect);
   var stage = validateArtStage(value.stage, url);
+  // The art panel catalog's own origin discriminator and coherence rules
+  // (official-art-resolution): the vocabulary and its URL/status coupling are
+  // shared, so a roster row can never state an origin the art panel rejects.
+  var origin = validatePortraitOrigin("portrait origin", "portrait", value.origin, url, status);
   if (url !== null && faceRect === null) {
     throw new Error("a portrait with a url carries a face_rect");
   }
@@ -403,6 +408,7 @@ function validateRosterPortrait(value) {
     placeholder: placeholder,
     face_rect: faceRect,
     stage: stage,
+    origin: origin,
   };
 }
 

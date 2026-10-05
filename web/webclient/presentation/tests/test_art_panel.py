@@ -9,8 +9,10 @@ serialization size.
 """
 
 from pathlib import Path
+import base64
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -25,6 +27,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.presentation.art import (
     ART_SCHEMA_VERSION,
+    MAX_MEDIA_URL,
     ArtPanelError,
     validate_art,
 )
@@ -36,6 +39,9 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.art.fallback_keys import FALLBACK_KEYS
+from world.art.gallery import record_for as gallery_record_for
+from world.art.official import load_catalog, reset_catalog
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -117,6 +123,31 @@ def _bare_placeholder_entry(**overrides):
     return _silhouette_entry(fallback=None, origin="placeholder", **overrides)
 
 
+def _official_entry(**overrides):
+    """A resolved official default: the mounted catalog's read-only image.
+
+    It is a real image but never a generated asset, so it carries its own
+    fingerprinted same-origin URL and NO status or placeholder — only the
+    decorative silhouette reference a browser re-renders when the real image
+    fails to load (``official-art-resolution``).
+    """
+    value = {
+        "subject_key": "portrait:character:42",
+        "status": None,
+        "url": "/art/official/" + "a" * 64 + "/preset/t_synth_preset/hero.webp",
+        "aspect_ratio": "3:4",
+        "alt": "portrait:character:42",
+        "placeholder": None,
+        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+        "stage": {"scale": 1.4, "x": 0.1, "y": -0.2},
+        "origin": "official",
+        "fallback": dict(SILHOUETTE_FALLBACK),
+        "context": {"name": "旅人", "role": "人物"},
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_payload(**overrides):
     value = {
         "schema_version": ART_SCHEMA_VERSION,
@@ -131,6 +162,13 @@ def _valid_payload(**overrides):
 
 T_BAZAAR = "t_synth_bazaar"
 T_BAZAAR_LABEL = SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh
+
+# A deterministic decodable 1x1 PNG: the official catalog admits an image from
+# its header alone, which is all this surface needs.
+TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
 
 
 class ArtSchemaTests(unittest.TestCase):
@@ -236,19 +274,25 @@ class ArtSchemaTests(unittest.TestCase):
                 )
             )
 
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_origin_is_the_closed_vocabulary(self):
         # The server-authored discriminator names the branch that produced the
         # entry's own media, so no client inspects the URL to tell them apart.
         for origin, entry in (
             ("runtime", _valid_catalog_entry()),
+            # The official read-only default: its own fingerprinted URL, no
+            # generated status (official-art-resolution).
+            ("official", _official_entry()),
             ("silhouette", _silhouette_entry()),
             ("placeholder", _bare_placeholder_entry()),
         ):
             with self.subTest(origin=origin):
                 normalized = validate_art(_valid_payload(portrait_catalog={"42": entry}))
                 self.assertEqual(normalized["portrait_catalog"]["42"]["origin"], origin)
-        for rejected in (None, "official", "", "runtime "):
+        for rejected in (None, "", "runtime ", "generated"):
             with self.subTest(origin=rejected):
                 with self.assertRaises(ProtocolValidationError):
                     validate_art(
@@ -260,6 +304,41 @@ class ArtSchemaTests(unittest.TestCase):
         absent.pop("origin")
         with self.assertRaises(ProtocolValidationError):
             validate_art(_valid_payload(portrait_catalog={"42": absent}))
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_official_origin_carries_its_url_and_never_a_generated_status(self):
+        # An official image is a real image, so it always carries its own
+        # URL, and it is never a generated asset, so it reports no status.
+        normalized = validate_art(
+            _valid_payload(portrait_catalog={"42": _official_entry()})
+        )
+        entry = normalized["portrait_catalog"]["42"]
+        self.assertEqual(entry["origin"], "official")
+        self.assertIsNone(entry["status"])
+        self.assertIsNone(entry["placeholder"])
+        self.assertTrue(entry["url"].startswith("/art/official/"))
+        self.assertEqual(entry["fallback"]["key"], "woman")
+        cases = {
+            "official without a url": _official_entry(
+                url=None,
+                face_rect=None,
+                stage=None,
+                placeholder={"kind": "missing", "label": "未生成"},
+            ),
+            "official claiming a done portrait": _official_entry(status="done"),
+            "official claiming a pending portrait": _official_entry(status="pending"),
+        }
+        for label, entry in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_art(_valid_payload(portrait_catalog={"42": entry}))
+
+    def test_the_wire_media_url_bound_matches_the_presenter_ceiling(self):
+        # The official step presents a URL only inside the one ceiling both
+        # panel validators apply; the two constants must never drift.
+        from world.art.presenter import MAX_PORTRAIT_MEDIA_URL
+
+        self.assertEqual(MAX_MEDIA_URL, MAX_PORTRAIT_MEDIA_URL)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_fallback_is_decorative_and_coherent(self):
@@ -729,6 +808,54 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 "subject_key",
                 "url",
             ],
+        )
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_a_present_entity_resolves_the_official_default_it_references(self):
+        # The whole wire path for the official branch: a present named-policy
+        # character whose preset provenance resolves the snapshot's default
+        # image presents that read-only image, with no generated-portrait
+        # claim and no gallery state acquired.
+        from world.art import official, official_refs
+
+        preset_key = "t_synth_preset"
+        official_root = Path(self.tempdir.name).resolve() / "official"
+        folder = official_root / "preset" / preset_key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "hero.png").write_bytes(TINY_PNG)
+        guest = _player(key="official guest")
+        guest.location = self.room
+        guest.db.portrait_policy = {"mode": "named", "stable_key": "official-guest"}
+        guest.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, preset_key)
+        try:
+            with (
+                override_settings(ART_OFFICIAL_ROOT=str(official_root)),
+                patch.object(
+                    official_refs, "PLAYER_PRESET_REGISTRY", {preset_key: object()}
+                ),
+                patch.object(
+                    official,
+                    "_registered_preset_keys",
+                    return_value=frozenset({preset_key}),
+                ),
+            ):
+                load_catalog()
+                entry = self._render()["portrait_catalog"][str(guest.pk)]
+        finally:
+            reset_catalog()
+        self.assertEqual(entry["origin"], "official")
+        self.assertIsNone(entry["status"])
+        self.assertIsNone(entry["placeholder"])
+        self.assertEqual(entry["subject_key"], "portrait:character:official-guest")
+        self.assertTrue(entry["url"].startswith("/art/official/"))
+        self.assertIn("preset/t_synth_preset/hero.png", entry["url"])
+        self.assertEqual(sorted(entry["face_rect"]), ["h", "w", "x", "y"])
+        self.assertEqual(sorted(entry["stage"]), ["scale", "x", "y"])
+        # No mutable state claim: the subject's gallery is still empty.
+        self.assertIsNone(
+            gallery_record_for(
+                ArtSubject(ArtSubjectKind.CHARACTER, "official-guest")
+            )
         )
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")

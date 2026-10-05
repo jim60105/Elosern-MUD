@@ -265,7 +265,7 @@ const renderPlayer = (args) => ({
                   subject_key: "char_1", status: args.grounding,
                   url: null, aspect_ratio: null, alt: "艾莉亞的肖像",
                   placeholder: { kind: "missing", label: "無肖像" }, face_rect: null,
-                  stage: null,
+                  stage: null, origin: "placeholder",
                 } : {
                   subject_key: "char_1",
                   status: "done",
@@ -275,6 +275,7 @@ const renderPlayer = (args) => ({
                   placeholder: null,
                   face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
                   stage: { scale: 1, x: 0, y: 0 },
+                  origin: "runtime",
                 },
               },
             ],

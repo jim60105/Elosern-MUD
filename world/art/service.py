@@ -118,6 +118,31 @@ def _gallery_auto_generation_pending(subject) -> bool:
 _GALLERY_REGISTRY_PRODUCERS = {ArtSubjectKind.MONSTER.value: monster_subject_for}
 
 
+def _official_default_satisfies(subject, entity) -> bool:
+    """True when an eligible official reference already resolves a default image.
+
+    The automatic-generation guard's official-satisfied condition
+    (``official-art-resolution-contracts``): a subject whose stored provenance
+    resolves a REGISTERED content reference and whose entity passes the kind's
+    age precondition (already checked by the caller) is left without an
+    automatic card whenever the startup snapshot holds that reference's
+    default image, exactly as a subject that already holds a card is left
+    alone. The presentation chain then shows the read-only official default.
+
+    The check reuses the chain's own step (``official_default_for``), so the
+    guard and the presentation agree by construction; it reads stored state
+    plus the startup snapshot only — nothing is recorded, enqueued, acquired,
+    or mutated, the subject's named portrait policy is untouched, and the
+    manual generation seams stay available. A subject with no reference (every
+    kind without an official producer, including monsters today) or one the
+    snapshot does not hold answers False, so its automatic request proceeds
+    exactly as before.
+    """
+    from world.art.gallery_match import official_default_for
+
+    return official_default_for(subject, entity) is not None
+
+
 def _standard_gallery_request_kwargs(capability) -> dict:
     """The standard deterministic staff/automatic request shape for a kind.
 
@@ -134,7 +159,11 @@ def _guarded_gallery_request(subject, entity) -> bool:
     """One guarded automatic-path-style request for a resolved gallery subject.
 
     Returns True when a gallery generation was requested, False when the
-    automatic-generation guard suppressed it. For a kind that declares the
+    automatic-generation guard suppressed it: the subject already holds a card
+    or an in-flight job, or (``official-art-resolution-contracts``) its
+    eligible official content reference already resolves a default image in
+    the startup snapshot, in which case the presentation chain shows that
+    read-only image and no card is minted. For a kind that declares the
     canonical-age precondition the age pair is read immediately before the
     request (design D3): a rejection is deterministic and produces no record,
     no prompt, and no worker call. The kind's declaration decides the request
@@ -147,6 +176,8 @@ def _guarded_gallery_request(subject, entity) -> bool:
                 f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
             )
         character_ages(entity)
+    if _official_default_satisfies(subject, entity):
+        return False
     if _gallery_auto_generation_pending(subject):
         return False
     request_gallery_image(

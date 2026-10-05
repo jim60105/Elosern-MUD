@@ -1,11 +1,12 @@
-## Purpose
+# official-art-resolution Specification
 
+## Purpose
 Define official artwork's presentation semantics: the origin discriminator that keeps official, mutable runtime, and built-in-silhouette images distinguishable in every versioned payload; the confined, catalog-derived official payload fields; the eligibility ordering that official presentation must respect; and the deterministic, offline, non-mutating character of the extended chain.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Every presentation payload distinguishes official, runtime, and silhouette origin
-Every portrait presentation payload SHALL carry a server-authored origin discriminator distinguishing an official read-only image from the subject's existing runtime sources (generated/seed card, classic asset) and from a built-in silhouette, for every consumer surface that carries portrait payloads (art panel catalog, roster rows, gallery read models). The discriminator SHALL be computed by the server from the resolution branch that produced the payload, and NO consumer SHALL infer origin, source, or generation success from the mere presence of a media URL.
+Every portrait presentation payload SHALL carry a server-authored origin discriminator distinguishing an official read-only image from the subject's existing runtime sources (generated/seed card, classic asset) and from a built-in silhouette, for every consumer surface that carries a resolved portrait payload (today: the art panel portrait catalog and the roster row portraits; a read model that later carries one joins the same vocabulary). The discriminator SHALL be computed by the server from the resolution branch that produced the payload, and NO consumer SHALL infer origin, source, or generation success from the mere presence of a media URL.
 
 #### Scenario: Three sources, three discriminators
 - **WHEN** three subjects resolve an official image, a generated card, and a built-in silhouette respectively
