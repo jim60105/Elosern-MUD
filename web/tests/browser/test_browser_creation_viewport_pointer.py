@@ -67,11 +67,27 @@ class ViewportCreationJourney(CreationBrowserTest):
         for width, height in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=(width, height)):
                 page.set_viewport_size({"width": width, "height": height})
+                # The app writes its chrome factor from the resize listener, so
+                # a read that straddles that write mixes two layouts (measured:
+                # region 0's right edge past region 1's left). Wait for the
+                # factor this viewport implies, then measure the three regions
+                # in one layout snapshot.
+                page.wait_for_function(
+                    "(v) => getComputedStyle(document.documentElement)"
+                    ".getPropertyValue('--ui-scale').trim() === v",
+                    arg="%g" % ui_scale((width, height)),
+                    timeout=15000,
+                )
                 self.assertLessEqual(
                     page.evaluate("document.documentElement.scrollWidth"), width
                 )
-                regions = page.locator(".creation-region")
-                boxes = [regions.nth(i).bounding_box() for i in range(3)]
+                boxes = page.evaluate(
+                    """() => Array.from(document.querySelectorAll('.creation-region'))
+                      .slice(0, 3)
+                      .map((el) => { const r = el.getBoundingClientRect();
+                        return { x: r.x, y: r.y, width: r.width, height: r.height }; })"""
+                )
+                self.assertEqual(len(boxes), 3, "the custom form renders its three regions")
                 self.assertLessEqual(boxes[0]["x"] + boxes[0]["width"], boxes[1]["x"])
                 # The middle region bounds itself to 640px at the reference,
                 # scaled by the chrome factor at every acceptance size
