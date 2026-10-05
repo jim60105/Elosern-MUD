@@ -39,6 +39,7 @@ from world.art.official import (
     reset_catalog,
 )
 from world.art.store import ArtAssetRecord
+from tools.spec_traceability import covers_requirement
 
 # Deterministic valid PNG transport bytes: 1x1 and 1x2, so a fitted default
 # rectangle and a per-image rectangle applicability differ measurably.
@@ -140,6 +141,9 @@ class _CatalogCase(EvenniaTestCase):
 
 
 class IndexingTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_valid_synthetic_content_indexes_with_root_relative_identities(self):
         self.image("monster", _MONSTER_KEY, "a.png")
         self.image("preset", _PRESET_KEY, "b.png")
@@ -177,6 +181,9 @@ class IndexingTests(_CatalogCase):
         self.assertFalse(catalog.admits("preset/t_synth_absent/x.png", entry.fingerprint))
         self.warn.assert_not_called()
 
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_the_default_image_is_the_first_valid_filename_in_order(self):
         self.image("preset", _PRESET_KEY, "z.png")
         self.image("preset", _PRESET_KEY, "a.png")
@@ -191,6 +198,9 @@ class IndexingTests(_CatalogCase):
         )
         self.assertEqual(content.default_identity, f"preset/{_PRESET_KEY}/a.png")
 
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_unsupported_kind_directories_are_skipped_with_a_diagnostic(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("weapons", "t_synth_weapon", "b.png")
@@ -200,6 +210,9 @@ class IndexingTests(_CatalogCase):
         self.assertIn("unknown_kind_directory_skipped", self.reasons(self.warn))
         self.assertIsNone(current_catalog().content("weapons", "t_synth_weapon"))
 
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_an_unknown_registry_reference_is_skipped_not_fatal(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("preset", "t_synth_ghost", "b.png")
@@ -213,6 +226,9 @@ class IndexingTests(_CatalogCase):
         self.assertIsNone(current_catalog().content("preset", "t_synth_ghost"))
         self.assertIsNotNone(current_catalog().content("preset", _PRESET_KEY))
 
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_a_content_key_outside_the_stable_key_contract_is_skipped(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("npc", "bad:key", "b.png")
@@ -224,6 +240,9 @@ class IndexingTests(_CatalogCase):
             ["invalid_content_key_skipped", "invalid_content_key_skipped"],
         )
 
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_resolution_answers_from_the_snapshot_without_re_walking_the_root(self):
         identity = f"preset/{_PRESET_KEY}/a.png"
         self.image("preset", _PRESET_KEY, "a.png")
@@ -246,6 +265,9 @@ class IndexingTests(_CatalogCase):
 
 
 class AdmissionRefusalTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_an_out_of_root_symlink_is_refused_while_siblings_index(self):
         self.image("preset", _PRESET_KEY, "ok.png")
         outside = Path(self.tempdir.name) / "precious.png"
@@ -262,6 +284,9 @@ class AdmissionRefusalTests(_CatalogCase):
         self.assertIsNotNone(current_catalog().entry(f"preset/{_PRESET_KEY}/ok.png"))
         self.assertTrue(outside.exists())
 
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_unsupported_and_nested_and_non_regular_entries_are_refused(self):
         self.image("preset", _PRESET_KEY, "ok.png")
         folder = self.root / "preset" / _PRESET_KEY
@@ -281,6 +306,9 @@ class AdmissionRefusalTests(_CatalogCase):
             ]),
         )
 
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_an_undecodable_image_is_refused_while_siblings_index(self):
         self.image("preset", _PRESET_KEY, "ok.png")
         self.image("preset", _PRESET_KEY, "broken.png", content=b"definitely not an image")
@@ -288,6 +316,9 @@ class AdmissionRefusalTests(_CatalogCase):
         self.assertEqual(summary["images"], 1)
         self.assertEqual(self.reasons(self.warn), ["image_undecodable"])
 
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_an_image_over_the_dimension_limit_is_refused(self):
         self.image("preset", _PRESET_KEY, "ok.png")
         self.image("preset", _PRESET_KEY, "wide.png", content=_real_png(4, 4))
@@ -301,6 +332,9 @@ class AdmissionRefusalTests(_CatalogCase):
         self.assertIsNotNone(current_catalog().entry(f"preset/{_PRESET_KEY}/ok.png"))
         self.assertIsNone(current_catalog().entry(f"preset/{_PRESET_KEY}/wide.png"))
 
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_an_image_over_the_pixel_limit_is_refused(self):
         self.image("preset", _PRESET_KEY, "ok.png")
         self.image("preset", _PRESET_KEY, "dense.png", content=_real_png(2, 2))
@@ -312,6 +346,9 @@ class AdmissionRefusalTests(_CatalogCase):
         self.assertEqual(summary["refused"], 1)
         self.assertEqual(self.reasons(self.warn), ["image_too_large"])
 
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
     def test_a_refused_entry_never_blocks_unrelated_artwork(self):
         self.image("monster", _MONSTER_KEY, "ok.png")
         self.image("preset", _PRESET_KEY, "ok.png")
@@ -332,6 +369,9 @@ class AdmissionRefusalTests(_CatalogCase):
 
 
 class ManifestTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_a_missing_manifest_is_silent_with_fitted_defaults(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.load()
@@ -340,6 +380,9 @@ class ManifestTests(_CatalogCase):
         self.assertEqual(entry.stage, identity_stage())
         self.warn.assert_not_called()
 
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_a_valid_manifest_supplies_default_rectangle_and_stage(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("preset", _PRESET_KEY, "b.png")
@@ -362,6 +405,9 @@ class ManifestTests(_CatalogCase):
             self.assertEqual(entry.stage, stage)
         self.warn.assert_not_called()
 
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_an_invalid_manifest_degrades_whole_with_one_diagnostic(self):
         cases = {
             "{not json": "manifest_unreadable",
@@ -403,6 +449,9 @@ class ManifestTests(_CatalogCase):
                 )
                 self.assertEqual(entry.stage, identity_stage())
 
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_a_rectangle_invalid_for_one_image_is_fitted_for_that_image_only(self):
         self.image("preset", _PRESET_KEY, "square.png")
         self.image("preset", _PRESET_KEY, "tall.png", content=_TALL_PNG)
@@ -422,6 +471,9 @@ class ManifestTests(_CatalogCase):
         self.assertEqual(square.stage, stage)
         self.assertEqual(tall.stage, stage)
 
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
     def test_an_unreadable_manifest_degrades_with_one_diagnostic(self):
         self.image("preset", _PRESET_KEY, "a.png")
         folder = self.root / "preset" / _PRESET_KEY
@@ -433,6 +485,9 @@ class ManifestTests(_CatalogCase):
 
 
 class FingerprintTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::each-indexed-image-carries-a-startup-computed-content-fingerprint"
+    )
     def test_replacing_bytes_changes_the_fingerprint_after_a_reload(self):
         identity = f"preset/{_PRESET_KEY}/a.png"
         path = self.image("preset", _PRESET_KEY, "a.png")
@@ -448,6 +503,9 @@ class FingerprintTests(_CatalogCase):
             current_catalog().entry(identity).image_size, {"width": 1, "height": 2}
         )
 
+    @covers_requirement(
+        "official-artwork-catalog::each-indexed-image-carries-a-startup-computed-content-fingerprint"
+    )
     def test_hashing_happens_once_at_load_and_never_during_resolution(self):
         identity = f"preset/{_PRESET_KEY}/a.png"
         self.image("preset", _PRESET_KEY, "a.png")
@@ -468,6 +526,9 @@ class FingerprintTests(_CatalogCase):
 
 
 class StartupConfigurationTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
     def test_an_absent_root_is_a_supported_no_art_configuration(self):
         self.root = Path(self.tempdir.name) / "absent"
         with patch("socket.socket", side_effect=AssertionError("no acquisition")):
@@ -482,6 +543,9 @@ class StartupConfigurationTests(_CatalogCase):
         self.assertEqual(context["images"], 0)
         self.assertEqual(context["refused"], 0)
 
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
     def test_an_empty_root_reports_the_empty_condition(self):
         self.root.mkdir(parents=True)
         summary = self.load()
@@ -490,6 +554,9 @@ class StartupConfigurationTests(_CatalogCase):
         self.warn.assert_not_called()
         self.assertEqual(self.boundary()["reason"], "official_root_empty")
 
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
     def test_an_unset_setting_and_an_unreadable_root_report_their_condition(self):
         with override_settings(ART_OFFICIAL_ROOT=""):
             self.load()
@@ -503,6 +570,9 @@ class StartupConfigurationTests(_CatalogCase):
         self.assertEqual(self.boundary()["reason"], "official_root_unreadable")
         self.assertEqual(len(current_catalog()), 0)
 
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
     def test_a_symlinked_root_is_refused_with_one_bounded_event(self):
         target = Path(self.tempdir.name) / "real-root"
         (target / "preset" / _PRESET_KEY).mkdir(parents=True)
@@ -515,6 +585,9 @@ class StartupConfigurationTests(_CatalogCase):
 
 
 class ObservabilityTests(_CatalogCase):
+    @covers_requirement(
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+    )
     def test_one_boundary_event_reports_counts_and_budgeted_refusals(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("npc", _NPC_KEY, "b.png")
@@ -535,6 +608,9 @@ class ObservabilityTests(_CatalogCase):
             self.assertIn("key", event)
             self.assertIn("entry", event)
 
+    @covers_requirement(
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+    )
     def test_refusals_stay_within_the_budget_and_report_the_suppressed_count(self):
         excess = 5
         for index in range(official._MAX_DIAGNOSTICS + excess):
@@ -546,6 +622,9 @@ class ObservabilityTests(_CatalogCase):
         self.assertEqual(context["suppressed_diagnostics"], excess)
         self.assertEqual(context["refused"], official._MAX_DIAGNOSTICS + excess)
 
+    @covers_requirement(
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+    )
     def test_no_event_context_carries_an_absolute_filesystem_root(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.image("preset", "t_synth_ghost", "b.png")
@@ -560,6 +639,9 @@ class ObservabilityTests(_CatalogCase):
                         self.assertNotIn(absolute, str(value))
                         self.assertNotIn(str(self.tempdir.name), str(value))
 
+    @covers_requirement(
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+    )
     def test_catalog_load_writes_no_game_state_and_leaves_the_root_untouched(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.manifest("preset", _PRESET_KEY, {"default": "a.png"})
@@ -578,6 +660,9 @@ class ObservabilityTests(_CatalogCase):
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
         self.assertEqual(GalleryRecord.objects.count(), 0)
 
+    @covers_requirement(
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+    )
     def test_the_event_id_is_the_documented_boundary(self):
         self.image("preset", _PRESET_KEY, "a.png")
         self.load()
@@ -588,6 +673,9 @@ class ObservabilityTests(_CatalogCase):
 
 
 class StartupWiringTests(unittest.TestCase):
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
     def test_the_boot_step_sits_between_the_seed_mirror_and_the_art_sync(self):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 

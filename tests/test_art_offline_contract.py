@@ -76,6 +76,9 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
         gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("server/.art/", gitignore)
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
     def test_art_official_root_is_gitignored_and_the_builtins_stay_tracked(self):
         # The ignored directory IS the documented default root (the package
         # test in server/conf/tests/test_art_settings.py pins
@@ -91,6 +94,9 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
             {f"{key}{FALLBACK_EXTENSION}" for key in FALLBACK_KEYS},
         )
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
     def test_no_module_that_names_the_official_root_can_write_it(self):
         # The official root is read-only to the game (official-artwork-catalog):
         # a production module that resolves a write path under it would be a

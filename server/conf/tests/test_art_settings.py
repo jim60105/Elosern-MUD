@@ -118,6 +118,9 @@ class ArtSettingsTests(unittest.TestCase):
         self.assertFalse(hasattr(settings, "ART_WORKER_CMD"))
         self.assertFalse(hasattr(settings, "ART_WORKER_TIMEOUT_SECONDS"))
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
     def test_official_root_defaults_to_the_gitignored_game_dir_directory(self):
         # A directory root, never a typed ART_SD_* knob: the code default is
         # ``<GAME_DIR>/art-official``, the directory the repository gitignores
@@ -137,6 +140,9 @@ class ArtOfficialRootOverrideTests(_SubprocessSettingsTests):
     production import path) exactly like the typed-knob inventory.
     """
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
     def test_an_unset_variable_yields_the_documented_default(self):
         result = self._run(_settings_repr(["ART_OFFICIAL_ROOT"]))
         self.assertEqual(result.returncode, 0, msg=result.stderr)
@@ -149,6 +155,9 @@ class ArtOfficialRootOverrideTests(_SubprocessSettingsTests):
             msg="the default is an absolute path under GAME_DIR",
         )
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
     def test_the_environment_override_is_honored_verbatim(self):
         result = self._run(
             _settings_repr(["ART_OFFICIAL_ROOT"]),

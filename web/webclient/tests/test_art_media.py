@@ -465,7 +465,8 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         self.assertEqual(self._body(response), path.read_bytes())
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "official-artwork-catalog::each-indexed-image-carries-a-startup-computed-content-fingerprint"
     )
     def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
         identity = "npc/t_synth_profile/a.png"

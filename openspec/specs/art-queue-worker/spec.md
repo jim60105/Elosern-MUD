@@ -2,6 +2,7 @@
 
 ## Purpose
 Defines the persisted asset-record contract (status, deterministic source hash, same-store output identity, attempt/error metadata, aspect ratio), the subject-keyed idempotent queue, and the shared serialization lock and single worker concurrency slot for scenes and portraits. Covers deterministic sd-webui generation confined to the store, settings-configurable scheduling, same-origin media serving that never exposes the store root, wire-stable in-flight status, and claim/settle boundary events.
+
 ## Requirements
 
 ### Requirement: Asset records carry the full contract and never a live object reference
@@ -301,6 +302,7 @@ path, which is status-only today; the gallery-failure path already carries the t
 - **WHEN** the process is interrupted after the gallery file is written and before the card is appended
 - **THEN** no card references the file, the gallery is unchanged, and the startup prune reclaims the
   orphan file
+
 ### Requirement: A changed source-description hash is reported, never silently applied
 `world/art/queue.py` SHALL compare the enqueued `source_hash` and the enqueued rendered-prompt
 digest (sha256 of the rendered positive/negative prompt pair) against the record's stored values.
@@ -360,6 +362,19 @@ directory; an absent file, an unexpected sub-path, a symlink, or an out-of-direc
 SHALL return 404. Serving fallbacks through this one route keeps `/art/...` the single media URL
 vocabulary the wire payloads accept.
 
+The route SHALL additionally serve OFFICIAL-COMPONENT identities of the closed shape
+`official/<fingerprint>/<root-relative-image-path>` addressing an image admitted by the startup
+official-artwork catalog (see the `official-artwork-catalog` capability). An official identity SHALL
+be served only when the catalog's current snapshot indexes that exact root-relative path with that
+exact fingerprint; the request SHALL be answered from the catalog lookup alone — never by accepting
+a caller-supplied filesystem path — under the same closed extension-to-media-type map and the same
+no-symlink, in-root confinement discipline applied to `ART_OFFICIAL_ROOT`. A missing file, an
+unindexed path, a stale fingerprint (for example after a maintenance restart replaced the bytes), a
+sub-path escape, a symlink, or an out-of-root resolution SHALL return 404; the game SHALL NOT retain
+historical artwork to serve old URLs, and a 404 SHALL NOT trigger any download, extraction, or
+re-scan. Personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and
+confinement rules unchanged.
+
 #### Scenario: A built-in fallback identity is served from the defaults directory
 - **WHEN** `defaults/<fallback-key>.<ext>` is requested and that file exists in the in-repo defaults directory
 - **THEN** the file is served same-origin with a 200 status and the media type of its extension, and no store-root path is consulted
@@ -401,6 +416,14 @@ vocabulary the wire payloads accept.
   existing `scene/<key>.png` from before the switch
 - **THEN** the presenter returns that record as an `asset` with the same-origin
   `/art/scene/<key>.png` URL (not a placeholder), and the route serves the PNG
+
+#### Scenario: A catalog-admitted official identity is served with its fingerprint
+- **WHEN** `official/<fingerprint>/<root-relative-path>` is requested for a path the current startup catalog indexes with that fingerprint
+- **THEN** the file is served same-origin with a 200 status and the media type of its extension, read directly from the official root, and nothing was copied into the store
+
+#### Scenario: A stale or bogus official fingerprint returns 404 without acquiring
+- **WHEN** an official identity names a fingerprint the current catalog does not hold for that path, an unindexed path, or a path escaping the official root
+- **THEN** the route returns 404, no download/extraction/re-scan is attempted, and the official root is untouched
 
 ### Requirement: In-flight generation exposes a wire-stable status
 The art presenter SHALL normalize the internal `in_progress` record status to a wire-accepted value
