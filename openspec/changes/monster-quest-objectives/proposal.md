@@ -1,0 +1,36 @@
+## Batch:
+
+- depends-on: monster-species-registry, monster-identity-construction (selectors resolve species/variant keys and defeat entries carry those keys), monster-site-placement (acceptance provisioning calls the ambient/site managers and their capacity/ownership/site-state rules, and the recovered-site rule reads the durable site state that change establishes)
+- conflicts: `world/quests/planner.py` and `world/quests/tests/test_planner.py` with `monster-identity-construction` — the identity change lands first and rewrites the counted-identity dedupe; this change then adds species/variant selector matching on top of that rewritten counter (serialize in that order; both edits touch `_matching_defeats`). `world/quests/definitions.py` + `world/quests/compile/*` are touched only here within the wave. `world/lore/sync.py` is NOT touched here (no new lore sync step), so it does not conflict with the lore-side changes. `.github/evennia-shards.json` gets disjoint new entries; serialize landings. No artwork-change overlap (`world/art/`, `web/art panel` files stay untouched; the quest log OOB panel gains no new field, see design D-Q5).
+- external-prerequisite: the shipped six-species content in the registry has no approved numbers, so no authored production hunt can publish yet; this change lands the objective semantics and provisioning machinery exercised exclusively by synthetic species fixtures, and shipping bestiary-named hunts is gated on the same user balance approval as `monster-species-registry`. Special abilities stay irrelevant to objectives: completion derives only from structured defeat/kill facts, never from an ability narrative.
+
+## Why
+
+Design §6 approves two hunt semantics the quest layer cannot express: a regional species hunt (explicit region, species, quantity, countable variants, with the guarantee that enough reachable living ordinary-eligible targets exist at acceptance) and bound-target clearing where only the bound individuals ever count. Today DEFEAT selectors take a threat tier or a bound dbref set only, so a hunt cannot name a species, a stronger variant can never legitimately count, nothing verifies target availability before acceptance (a player can accept an unsatisfiable hunt), and quest records have no fields for the author's rating rationale or background flavor — completion-adjacent prose today has no lawful home, which invites inference from narrative instead of structured objectives.
+
+## What Changes
+
+- Extend the frozen objective vocabulary: a species hunt objective carries explicit region key, species key, quantity, and the set of countable variant keys (ordinary baseline variants plus any explicitly countable stronger variants); the existing bound-target defeat objective stays the sole mechanism for bound clearing. Registry membership (region key, species key, every variant key owned by that species) is validated at definition registration.
+- General-hunt counting: an eligible stronger same-species variant counts toward a general hunt, once per individual persistent identity; region scoping (the individual's location resolves inside the objective's declared region at defeat time) and specific-variant restriction (a hunt naming particular variants counts only those) both stay enforced. No inference from display name, guild rank, or a single stat.
+- Acceptance provisioning: before a species hunt is accepted, the deterministic core — through the existing ambient/site managers, never by touching individuals directly — guarantees enough reachable, living, ordinary-eligible targets within the region, honoring habitat, placement capacity, ownership markers, and current site state; it does not rebuild existing eligible individuals and does not early-recover cleared sites. If the condition cannot be legally satisfied, acceptance is refused. Provisioning and acceptance are one all-or-nothing transaction: any failure leaves neither a half-valid quest nor a partial target arrangement.
+- Bound clearing stays strict: only the record's bound individuals count; same-species monsters elsewhere, ordinary ambient respawns, and recovered-site newcomers never substitute old bindings — fresh identities can only ever satisfy fresh bindings.
+- Quest records gain the three separate author-specified fields: guild grade (existing `rank`, unchanged semantics), rating rationale prose (why the authored arrangement/abilities/terrain are risky), and background flavor prose (issuer motivation and local events, readable offline). Individual danger grade never auto-becomes the quest grade; completion derives only from the structured objectives, never from the flavor text. Quest detail/listing surfaces render the new prose fields verbatim.
+
+## Capabilities
+
+### New Capabilities
+
+- None. (Both approved semantics are requirement changes on existing quest capabilities; no parallel quest engine is created.)
+
+### Modified Capabilities
+
+- `quest-blueprint`: `QuestObjective` gains the validated species-hunt selector (region, species, quantity, countable variant keys) beside the existing tier/bound selectors with the mutual-exclusion rules restated; `QuestDefinition` gains the separate authored rating-rationale and background-flavor prose fields, and validation records that completion never derives from them.
+- `quest-lifecycle`: acceptance of a species-hunt definition additionally requires the existing managers to guarantee enough reachable living ordinary-eligible targets (transactional, capacity/ownership/site-state-respecting, refuse-when-illegal); bound-stage binding keeps strict identity, and site recovery is explicitly incapable of satisfying old bindings.
+- `quest-progress-tracking`: DEFEAT matching gains the species-hunt selector — countable-variant membership, once-per-identity counting (composing with the identity change's dedupe), region scoping, and stronger-variant-optional semantics.
+- `quest-detail-view`: quest detail renders the authored grade, rating rationale, and background flavor as three distinct fields with deterministic zh-TW rendering of the new selector, still read-only.
+- `guild-quest-board`: board one-line objective guidance renders the species-hunt selector deterministically, and offer acceptance inherits the provisioning refusal with its named reason.
+
+## Impact
+
+- Code: `world/quests/definitions.py` (selector + prose fields + validation), `world/quests/acquire.py` / `world/rules/quest_issuance.py` acceptance path (provisioning hook through `world/maps/` managers), `world/quests/planner.py` (selector matching), `world/quests/describe.py` (rendering), `world/quests/catalog.py` (offline hunt stays tier-based; species hunts ship only after balance approval), compile payload/validators for the new stored fields, `docs/game/commands.md` and `docs/game/command-reference.md` (quest detail/board output gains fields — player-visible surface change, same change), new tests under `world/quests/tests/`, `.github/evennia-shards.json` entries.
+- Tests use synthetic species/variant fixtures and synthetic regions only; approved bestiary species names and tier examples never appear as behavior-test content (data-contract tagging unchanged). All logging via the `world.observability` facade. No new commands, aliases, or syntax — only rendered fields of existing commands change, which the docs update covers.
