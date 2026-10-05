@@ -16,6 +16,14 @@ const COUNT_MARKER = "__OMP_EVENNIA_TEST_COUNT_V1__=";
 const COUNT_RUNNER =
   "omp_evennia_count_runner.CountOnlyRunner";
 
+/*
+ * Count-only twin for the unittest-family entry points (Amendment A6):
+ * lives next to this extension and is importable because PYTHONPATH
+ * carries the extension dir during discovery.
+ */
+const UNITTEST_COUNT_RUNNER =
+  "omp_unittest_count_runner";
+
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 
 /*
@@ -30,8 +38,59 @@ const EVENNIA_TEST_START =
 const EVENNIA_TEST_ANYWHERE =
   /\bevennia[ \t]+test(?![A-Za-z0-9_])/;
 
-const ENV_ASSIGNMENT_PREFIX =
-  /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]/;
+/*
+ * Accepted execution prefixes inside a test segment (Amendment A6). They
+ * never change WHICH tests run, so the count command keeps them and only
+ * swaps the module invocation for the count runner: repeated inline env
+ * assignments, one `timeout N`, `nice`/`stdbuf`, the `uv run`/`poetry run`
+ * wrapper with its flags, and an optional `coverage run`/`coverage run.pth`
+ * with its own flags (the CI-canonical browser-shard form).
+ *
+ * `-m` and `--testrunner*` are NEVER flag-consumable here: `-m` belongs
+ * to the final invocation, and a `--testrunner` smuggled into the prologue
+ * must fail closed, like the reserved-flag check on the invocation itself.
+ */
+const PROLOGUE_PREFIXES: RegExp[] = [
+  /^[ \t]*[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/,
+  /^[ \t]*timeout[ \t]+(?:-[^ \t]+[ \t]+)*\d+[smhd]?(?:[ \t]+|$)/,
+  /^[ \t]*nice(?:[ \t]+-n[ \t]+-?\d+)?[ \t]+/,
+  /^[ \t]*stdbuf(?:[ \t]+-[^ \t]+)+[ \t]+/,
+  /^[ \t]*(?:uv|poetry)[ \t]+run(?:[ \t]+(?!(?:-m|--testrunner)(?:[ \t=]|$))(?:-[^ \t]+|--[^ \t]+=[^\s]+))*[ \t]+/,
+  /^[ \t]*coverage[ \t]+run(?:\.pth)?(?:[ \t]+(?!(?:-m|--testrunner)(?:[ \t=]|$))(?:-[^ \t]+|--[^ \t]+=[^\s]+))*[ \t]+/,
+];
+
+/*
+ * Non-CLI Evennia test entry points (Amendment A6). Every Evennia suite
+ * ultimately runs the stdlib unittest machinery, so the guard policy
+ * extends to the sibling drivers:
+ *
+ *   python -m web.tests.browser.unittest_driver  (browser acceptance)
+ *   python -m unittest [discover]                (top-level regression)
+ *
+ * The driver module is matched anywhere after `-m` (a quoted
+ * `python -m 'web.tests...driver'` still executes it); plain `-m unittest`
+ * is matched only as a whole argv pair so quoted JSON or script text that
+ * merely contains `-m unittest` is not mistaken for an invocation.
+ */
+const DRIVER_ANYWHERE =
+  /(?:^|[ \t])-m[ \t]+(?:[\w.]+[ \t]+)*web\.tests\.browser\.unittest_driver(?![\w./-])/;
+
+const UNITTEST_MODULE_ANYWHERE =
+  /(?:^|[ \t])-m[ \t]+unittest(?=$|[ \t])/;
+
+/*
+ * Module invocation forms a test segment must END its accepted prologue
+ * with (Amendment A6). The `python` lead is optional because the
+ * CI-canonical shard form is `coverage run -m web.tests...` with no
+ * interpreter token. Matching requires the test module immediately after
+ * `-m`, so `-m time -m web.tests...` (an unrelated leading module) is not
+ * a recognized segment and fails closed.
+ */
+const PY_DRIVER_START =
+  /^(?:python[23]?(?:[.]\d+)*[ \t]+)?-m[ \t]+web\.tests\.browser\.unittest_driver(?=$|[ \t])/;
+
+const PY_UNITTEST_START =
+  /^(?:python[23]?(?:[.]\d+)*[ \t]+)?-m[ \t]+unittest(?=$|[ \t])/;
 
 const TESTRUNNER_FLAG =
   /(?:^|[ \t])--testrunner(?:=|[ \t]|$)/;
@@ -175,6 +234,153 @@ function isInertMentionSegment(segment: string): boolean {
   }
 
   return INERT_LEAD_COMMANDS.has(leadCommand(unquoted));
+}
+
+/*
+ * Same inert-mention policy for the unittest-driver entry points: a
+ * display/search command whose driver text lives entirely inside quotes
+ * (a commit message or grep pattern) can never run the driver, but any
+ * unquoted occurrence — e.g. `python -c '... -m web.tests...'` style
+ * python leads, which are NOT inert leads — stays guarded.
+ */
+function isInertDriverMentionSegment(segment: string): boolean {
+  const unquoted = unquotedView(segment);
+
+  if (
+    !DRIVER_ANYWHERE.test(segment) &&
+    !DRIVER_ANYWHERE.test(unquoted) &&
+    !DRIVER_ANYWHERE.test(neutralizeQuoting(segment)) &&
+    !UNITTEST_MODULE_ANYWHERE.test(segment) &&
+    !UNITTEST_MODULE_ANYWHERE.test(unquoted) &&
+    !UNITTEST_MODULE_ANYWHERE.test(neutralizeQuoting(segment))
+  ) {
+    return false;
+  }
+
+  /*
+   * An occurrence surviving quote-stripping is unquoted command text,
+   * hence execution-capable — never inert.
+   */
+  if (
+    DRIVER_ANYWHERE.test(unquoted) ||
+    UNITTEST_MODULE_ANYWHERE.test(unquoted)
+  ) {
+    return false;
+  }
+
+  return INERT_LEAD_COMMANDS.has(leadCommand(unquoted));
+}
+
+type TestInvocation = {
+  kind: "evennia" | "driver" | "unittest";
+  /*
+   * Byte offset in the ORIGINAL segment where the final invocation body
+   * begins, so the count rewrite is anchored to the body start instead
+   * of searching the whole segment (a test label argument must never be
+   * rewritten by accident).
+   */
+  bodyStart: number;
+};
+
+/*
+ * Classify a raw segment: consume the accepted execution prefixes
+ * (PROLOGUE_PREFIXES, repeated until none matches), then require the
+ * remainder to start with one of the recognized final invocations.
+ * Returns the invocation kind plus the prologue boundary, or null when
+ * the segment leads with anything else — including an unknown wrapper
+ * such as `bash -lc`, which must fail closed.
+ */
+function parseTestInvocation(
+  segment: string,
+): TestInvocation | null {
+  let rest = segment;
+  let progressed = true;
+
+  while (progressed) {
+    progressed = false;
+
+    for (const prefix of PROLOGUE_PREFIXES) {
+      const match = prefix.exec(rest);
+
+      if (match) {
+        rest = rest.slice(match[0].length);
+        progressed = true;
+      }
+    }
+  }
+
+  rest = rest.replace(/^[ \t]+/, "");
+
+  const kind = (
+    [
+      ["evennia", EVENNIA_TEST_START],
+      ["driver", PY_DRIVER_START],
+      ["unittest", PY_UNITTEST_START],
+    ] as const
+  ).find(([, pattern]) => pattern.test(rest))?.[0];
+
+  if (kind === undefined) {
+    return null;
+  }
+
+  return {
+    kind,
+    bodyStart: segment.length - rest.length,
+  };
+}
+
+/*
+ * Rewrite only the invocation body (from bodyStart) to its count-only
+ * twin, anchored to the body's own start so no test-label argument can
+ * ever be substituted (Amendment A6).
+ */
+function rewriteCountInvocation(
+  segment: string,
+  invocation: TestInvocation,
+): string {
+  const prologue = segment.slice(0, invocation.bodyStart);
+  const body = segment.slice(invocation.bodyStart);
+
+  const bodyPattern =
+    invocation.kind === "evennia"
+      ? /^evennia[ \t]+test/
+      : invocation.kind === "driver"
+        ? PY_DRIVER_START
+        : PY_UNITTEST_START;
+
+  const moduleMatch = bodyPattern.exec(body);
+
+  if (moduleMatch === null) {
+    /*
+     * Unreachable: parseTestInvocation just matched this body. Fail
+     * closed loudly rather than emit a silently-miscounted command.
+     */
+    throw new Error("unparseable test invocation body");
+  }
+
+  const moduleName =
+    invocation.kind === "evennia"
+      ? null
+      : invocation.kind === "driver"
+        ? "web.tests.browser.unittest_driver"
+        : "unittest";
+
+  const head =
+    moduleName === null
+      ? "evennia test"
+      : moduleMatch[0].slice(
+          0,
+          moduleMatch[0].length - moduleName.length,
+        ) + UNITTEST_COUNT_RUNNER;
+
+  return (
+    prologue +
+    head +
+    (invocation.kind === "evennia"
+      ? ` --testrunner=${COUNT_RUNNER}`
+      : "") +
+    body.slice(moduleMatch[0].length)
+  );
 }
 
 type ShellScanResult =
@@ -363,7 +569,13 @@ function analyzeCommand(command: string): CommandAnalysis {
 
   if (
     !EVENNIA_TEST_ANYWHERE.test(neutralized) &&
-    !EVENNIA_TEST_ANYWHERE.test(command)
+    !EVENNIA_TEST_ANYWHERE.test(command) &&
+    !(
+      DRIVER_ANYWHERE.test(neutralized) ||
+      DRIVER_ANYWHERE.test(command) ||
+      UNITTEST_MODULE_ANYWHERE.test(neutralized) ||
+      UNITTEST_MODULE_ANYWHERE.test(command)
+    )
   ) {
     return {
       kind: "not-evennia-test",
@@ -380,19 +592,27 @@ function analyzeCommand(command: string): CommandAnalysis {
   }
 
   /*
-   * A command that merely *mentions* the words "evennia test" inside
-   * quoted arguments of a display/search command (a commit message, a
-   * grep pattern, an echo line) can never execute a test. Only treat it
-   * as inert when no segment even resembles a real or quoted test
-   * invocation, so any execution-capable context such as
-   * `bash -lc 'evennia test' && git commit -m 'evennia test'' keeps the
-   * guard.
+   * Classify every segment on its RAW text (the count rewrite must be
+   * replayable verbatim); the neutralized view is consulted only for the
+   * inert-mention and obscuration decisions below.
+   */
+  const testIndexes = scan.segments
+    .map((segment, index) =>
+      parseTestInvocation(segment) !== null ? index : -1,
+    )
+    .filter((index) => index >= 0);
+
+  /*
+   * A mention is inert when no segment parses as a test invocation and
+   * every segment whose text resembles a test command (raw or
+   * neutralized) is either an inert display/search mention of the CLI
+   * form or an inert mention of the unittest-driver forms.
    */
   if (
+    testIndexes.length === 0 &&
     scan.segments.every(
       (segment) =>
-        !EVENNIA_TEST_START.test(segment) &&
-        !EVENNIA_TEST_START.test(neutralizeQuoting(segment)),
+        parseTestInvocation(neutralizeQuoting(segment)) === null,
     ) &&
     scan.segments.every(
       (segment) =>
@@ -400,6 +620,15 @@ function analyzeCommand(command: string): CommandAnalysis {
           EVENNIA_TEST_ANYWHERE.test(segment) ||
           EVENNIA_TEST_ANYWHERE.test(neutralizeQuoting(segment))
         ) || isInertMentionSegment(segment),
+    ) &&
+    scan.segments.every(
+      (segment) =>
+        !(
+          DRIVER_ANYWHERE.test(segment) ||
+          DRIVER_ANYWHERE.test(neutralizeQuoting(segment)) ||
+          UNITTEST_MODULE_ANYWHERE.test(segment) ||
+          UNITTEST_MODULE_ANYWHERE.test(neutralizeQuoting(segment))
+        ) || isInertDriverMentionSegment(segment),
     )
   ) {
     return {
@@ -407,16 +636,11 @@ function analyzeCommand(command: string): CommandAnalysis {
     };
   }
 
-  const testIndexes = scan.segments
-    .map((segment, index) =>
-      EVENNIA_TEST_START.test(segment) ? index : -1,
-    )
-    .filter((index) => index >= 0);
-
   /*
-   * The neutralized view mentions an Evennia test command but no raw
-   * segment starts with one (e.g. `evennia 'test' world.tests`). The
-   * real invocation is unambiguous but its quoting cannot be proven
+   * The neutralized view parses as a runnable test command but no raw
+   * segment does (e.g. `evennia 'test' world.tests` or
+   * `python -m 'web.tests.browser.unittest_driver'`). The real
+   * invocation is unambiguous but its quoting cannot be proven
    * replay-safe, so it is blocked fail-closed with a specific reason
    * instead of passing through unguarded.
    */
@@ -426,7 +650,7 @@ function analyzeCommand(command: string): CommandAnalysis {
     if (
       neutralizedSegments.ok &&
       neutralizedSegments.segments.some((segment, index) =>
-        EVENNIA_TEST_START.test(segment) &&
+        parseTestInvocation(segment) !== null &&
         index === neutralizedSegments.segments.length - 1,
       )
     ) {
@@ -439,27 +663,6 @@ function analyzeCommand(command: string): CommandAnalysis {
   }
 
   if (testIndexes.length === 0) {
-    /*
-     * A segment that mentions `evennia test` but starts with an inline
-     * environment assignment (e.g. `MUD_TEST_SETTINGS=1 evennia test ...`)
-     * is outside the supported grammar and stays blocked fail-closed,
-     * but naming the real cause is more actionable than the generic
-     * wrapper message (design.md Amendment A1).
-     */
-    for (const segment of scan.segments) {
-      if (
-        (EVENNIA_TEST_ANYWHERE.test(segment) ||
-          EVENNIA_TEST_ANYWHERE.test(neutralizeQuoting(segment))) &&
-        ENV_ASSIGNMENT_PREFIX.test(segment)
-      ) {
-        return {
-          kind: "unsupported",
-          reason:
-            "inline environment-assignment prefixes before the Evennia test command are not supported; set MUD_TEST_SETTINGS via `uv run --locked --env-file=<file>` (single-token --env-file=<path> form, file containing MUD_TEST_SETTINGS=1) instead",
-        };
-      }
-    }
-
     /*
      * There is text resembling "evennia test", but it is wrapped in
      * another shell construct that this guard can't reason about.
@@ -520,9 +723,26 @@ function analyzeCommand(command: string): CommandAnalysis {
     };
   }
 
-  const countTestCommand = testCommand.replace(
-    /\bevennia[ \t]+test\b/,
-    `evennia test --testrunner=${COUNT_RUNNER}`,
+  /*
+   * Swap only the final invocation for its count-only twin (Amendment
+   * A6); every accepted execution prefix (`cd` segments, inline env
+   * assignments, `timeout`, `uv run --locked`, `coverage run`) rides
+   * along verbatim, and the extension dir is on PYTHONPATH so plain
+   * `python`/`coverage` can import the count module.
+   */
+  const invocation = parseTestInvocation(testCommand);
+
+  if (invocation === null) {
+    return {
+      kind: "unsupported",
+      reason:
+        "Evennia test is wrapped in an unsupported shell command",
+    };
+  }
+
+  const countTestCommand = rewriteCountInvocation(
+    testCommand,
+    invocation,
   );
 
   const countCommand = [
@@ -660,6 +880,7 @@ function blockedBecauseTooManyTests(count: number): string {
     "  evennia test world.tests",
     "  evennia test world.tests.TestSomething",
     "  evennia test world.tests.TestSomething.test_specific_behavior",
+    "  uv run --locked python -m web.tests.browser.unittest_driver <module>",
     "",
     "Do not retry the broad test command.",
   ].join("\n");
@@ -676,6 +897,8 @@ function blockedBecauseUnsupported(reason: string): string {
     "  uv run evennia test <focused-test-label>",
     "  poetry run evennia test <focused-test-label>",
     "  cd <game-dir> && evennia test <focused-test-label>",
+    "  cd <game-dir> && UV_PROJECT_ENVIRONMENT=<venv> timeout <n> uv run --locked python -m web.tests.browser.unittest_driver <focused-module>",
+    "  uv run --locked python -m unittest <focused.module>",
     "",
     `The discovered test count must be <= ${MAX_TESTS}.`,
   ].join("\n");
