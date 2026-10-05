@@ -1362,6 +1362,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     # A placeholder portrait carries no stage (the wire
                     # contract: stage is non-null only beside a url).
                     "stage": None,
+                    # ...and still names its own origin
+                    # (official-art-resolution): a placeholder row is never a
+                    # runtime or official image.
+                    "origin": "placeholder",
                 },
             }],
             "can_create": False,
@@ -1493,6 +1497,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                             "placeholder": {"kind": "missing", "label": "尚無肖像"},
                             "face_rect": None,
                             "stage": None,
+                            "origin": "placeholder",
                         },
                     }],
                     "can_create": False,

@@ -4,6 +4,7 @@ from pathlib import Path
 import io
 import json
 import shutil
+import socket
 import tempfile
 import uuid
 from contextlib import ExitStack
@@ -1211,6 +1212,12 @@ class OfficialPayloadTests(EvenniaTestCase):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character()
         tripwires = (
+            patch.object(
+                socket, "create_connection", side_effect=AssertionError("network")
+            ),
+            patch.object(
+                socket.socket, "connect", side_effect=AssertionError("network")
+            ),
             patch("world.art.gallery.append_card", side_effect=AssertionError("card write")),
             patch("world.art.gallery.set_default", side_effect=AssertionError("default write")),
             patch(
