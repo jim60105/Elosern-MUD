@@ -812,15 +812,39 @@ class SilhouettePayloadTests(EvenniaTestCase):
         "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
     )
     def test_a_monster_without_a_resolvable_tier_carries_monster_anon(self):
+        before = ArtAssetRecord.objects.count()
         monster = create_object(Monster, key="silhouette-monster")
         monster.threat_tier = "mythical"
         payload = resolve_entity(monster)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
         self.assertEqual(payload["fallback"]["key"], "monster_anon")
         self.assertEqual(
             payload["fallback"]["url"],
             f"/art/defaults/monster_anon{FALLBACK_EXTENSION}",
         )
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+
+    @covers_requirement(
+        "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
+    )
+    def test_a_rejected_age_pair_carries_the_decoration_and_writes_nothing(self):
+        # The malformed-age rung of the same terminal path: no subject key, no
+        # URL, no record — and the entity's own attribute-selected silhouette.
+        before = ArtAssetRecord.objects.count()
+        rejected = self._character("silhouette-bad-age")
+        rejected.age = "twenty"
+        payload = resolve_character(rejected)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(payload["stage"])
+        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(payload["fallback"]["key"], "man")
+        self.assertEqual(payload["fallback"]["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
+        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertNotIn("twenty", str(payload))
 
 
 if __name__ == "__main__":

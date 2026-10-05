@@ -251,4 +251,20 @@ describe("stage silhouette mask", () => {
     expect(wrapper.get("img").element.style.objectPosition).toBe("50% 31%");
     wrapper.unmount();
   });
+
+  it("re-arms the mask when the carried identity changes on a live frame", async () => {
+    // A failure must not suppress a LATER identity: the probe's URL change
+    // re-fires the load signal, so a re-pushed entry paints again.
+    const wrapper = mount(ReferenceArtwork, {
+      props: { portrait: silhouetteEntry("man"), initialOf: "灰婆婆", stage: true },
+    });
+    await wrapper.get(PROBE).trigger("load");
+    expect(maskedKey(wrapper)).toBe("url('/art/defaults/man.webp')");
+    await wrapper.setProps({ portrait: silhouetteEntry("girl") });
+    expect(wrapper.get(PROBE).attributes("src")).toBe("/art/defaults/girl.webp");
+    expect(wrapper.find(MASK_FILL).exists()).toBe(false, "the new identity reloads first");
+    await wrapper.get(PROBE).trigger("load");
+    expect(maskedKey(wrapper)).toBe("url('/art/defaults/girl.webp')");
+    wrapper.unmount();
+  });
 });

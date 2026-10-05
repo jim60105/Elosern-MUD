@@ -186,7 +186,9 @@ def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> di
     ``report=False`` only when it carries the resolution as the decorative
     silhouette reference beside a real portrait — the fallback is not
     presented then, so no use event is reported. Selection is identical
-    either way.
+    either way. The event is per presentation, not per entity: every payload
+    that presents the silhouette reports its own resolution (a re-presented
+    subject reports again), so a reader never infers a deduplicated set.
     """
     from world.art.gallery_fallback import resolve_fallback
 
