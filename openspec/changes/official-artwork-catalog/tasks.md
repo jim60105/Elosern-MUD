@@ -22,4 +22,4 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Add the new test modules to the shard manifest and run the package-adjacent tests for settings, catalog, media route, plus the contract gate for changed modules, verifying all pass with synthetic artwork only
+- [x] 5.1 Add the new test modules to the shard manifest and run the package-adjacent tests for settings, catalog, media route, plus the contract gate for changed modules, verifying all pass with synthetic artwork only
