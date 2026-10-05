@@ -402,5 +402,98 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
         self.assertEqual(dict(npc.db.skill_proficiency or {}), {})
 
 
+class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
+    """A generated occupant records no authored official-content provenance.
+
+    The compiled-characterization contract is closed over display name, title,
+    the age pair, an optional stable portrait key, the persona card, and combat
+    traits, so no blueprint names a profile identity; the persona provenance
+    stamped here is ``generated_quest``. A generated channel can never be an
+    authored one, so nothing on this path records ``npc_profile_key`` and
+    nothing infers one from a display name, entity key, tier, or role.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(InstanceRoom, key="t provenance scene")
+
+    def _spawn(self, **entry_overrides):
+        from types import SimpleNamespace
+
+        from world.quests.compile.fields import _compile_characterization
+
+        entry = {
+            "display_name": _OFFLINE_NPC_NAME,
+            "title": "試煉佔用者",
+            "age": 35,
+            "apparent_age": 35,
+            "persona": _OFFLINE_NPC_CARD,
+            "portrait": {"stable_key": "t_synth_provenance_bandit"},
+        }
+        entry.update(entry_overrides)
+        characterization = _compile_characterization(entry)
+        requirement = SimpleNamespace(
+            index=0,
+            archetype=_T_ARCHETYPE,
+            characterizations=(characterization,),
+        )
+        npc = _spawn_npc(
+            self.room, requirement, "bandit", _T_NPC_TIER, None, 0, "t_quest_key"
+        )
+        return characterization, npc
+
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
+    def test_a_generated_occupant_records_no_official_content_provenance(self):
+        from unittest.mock import patch
+
+        from world.art import official_refs
+        from world.art.official_refs import (
+            NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+            official_content_reference_for_entity,
+        )
+        from world.rules.npc_persona import provenance_profile_key
+
+        _, npc = self._spawn()
+        self.assertFalse(npc.attributes.has(NPC_PROFILE_PROVENANCE_ATTRIBUTE))
+        self.assertIsNone(provenance_profile_key(npc))
+        # Even with the occupant's own text registered as a content key, no
+        # reference resolves: nothing here is inferred from a name or a key.
+        with patch.object(
+            official_refs, "NPC_PROFILE_REGISTRY", {npc.key: object(), _OFFLINE_NPC_NAME: object()}
+        ):
+            self.assertIsNone(official_content_reference_for_entity(npc))
+
+    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
+    def test_a_stray_profile_key_in_a_generated_entry_never_becomes_provenance(self):
+        import dataclasses
+        from unittest.mock import patch
+
+        from world.art import official_refs
+        from world.art.official_refs import (
+            NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+            official_content_reference_for_entity,
+        )
+
+        stray_key = "t_synth_smuggled_profile"
+        characterization, npc = self._spawn(profile_key=stray_key)
+        # The compile mapping copies only the documented fields, so a stray
+        # profile-keyed entry field is dropped before any spawn.
+        self.assertEqual(
+            {field.name for field in dataclasses.fields(characterization)},
+            {
+                "display_name",
+                "title",
+                "age",
+                "apparent_age",
+                "portrait_stable_key",
+                "persona",
+                "combat_traits",
+            },
+        )
+        self.assertFalse(npc.attributes.has(NPC_PROFILE_PROVENANCE_ATTRIBUTE))
+        with patch.object(official_refs, "NPC_PROFILE_REGISTRY", {stray_key: object()}):
+            self.assertIsNone(official_content_reference_for_entity(npc))
+
+
 if __name__ == "__main__":
     unittest.main()

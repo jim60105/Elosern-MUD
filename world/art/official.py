@@ -91,11 +91,7 @@ from world.art.gallery import (
     validate_stage,
 )
 from world.art.no_follow import RejectedFile, open_dir_fd, open_file_bytes
-from world.art.subjects import (
-    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
-    MAX_SUBJECT_KEY_BYTES,
-    MAX_SUBJECT_KEY_LENGTH,
-)
+from world.art.subjects import is_valid_subject_key
 from world.observability import log_info, log_warn
 
 # The one boundary/diagnostic event id (design §11): the load boundary and the
@@ -264,24 +260,6 @@ class _Diagnostics:
 def _content_fingerprint(payload: bytes) -> str:
     """The one content fingerprint of an image (sha256, the queue's convention)."""
     return hashlib.sha256(payload).hexdigest()
-
-
-def _content_key_is_valid(key: str) -> bool:
-    """True when ``key`` satisfies the shared stable-key contract.
-
-    The rule set is the one every portrait/scene stable-key producer applies
-    (no ``|``, ``/``, ``:``, ``{``, ``}``, or control character, at most 64
-    characters and 200 UTF-8 bytes), read from its published constants so the
-    two contracts cannot drift. A key outside it can never name registered
-    authored content and is skipped with a bounded diagnostic.
-    """
-    if not key or len(key) > MAX_SUBJECT_KEY_LENGTH:
-        return False
-    if any(character in FORBIDDEN_SUBJECT_KEY_CHARACTERS for character in key):
-        return False
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in key):
-        return False
-    return len(key.encode("utf-8")) <= MAX_SUBJECT_KEY_BYTES
 
 
 def _registered_preset_keys() -> frozenset[str]:
@@ -540,7 +518,7 @@ def _index_kind(
                 # A stray file at kind level (README, license copy, ...) is not
                 # a content directory and carries no identity to report.
                 continue
-            if not _content_key_is_valid(content_name):
+            if not is_valid_subject_key(content_name):
                 counters["refused"] += 1
                 diagnostics.emit(
                     "invalid_content_key_skipped", kind=kind, key=content_name

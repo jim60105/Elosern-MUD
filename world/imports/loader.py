@@ -333,6 +333,15 @@ def _instantiate_validated_character(
         # D3): the validated card plus versioned metadata with ``import``
         # provenance, inside the caller's batch transaction so a later
         # record's failure rolls both back with the batch.
+        #
+        # No authored official-content provenance is recorded
+        # (official-content-provenance): an import record's shape names no
+        # profile identity, and the ``import`` provenance kind below says so.
+        # Inferring one from the record key, the display name, a profession, or
+        # a service anchor would manufacture an authored identity out of
+        # generated/operator text, so this path establishes no
+        # ``npc_profile_key`` and the official reference layer resolves nothing
+        # for an unprofiled imported NPC.
         initialize_npc_persona(
             entity, record["persona"], {"kind": "import", "record": record["key"]}
         )

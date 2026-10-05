@@ -16,6 +16,7 @@ outcome is settled (fix-startup-session-restore-order D1).
 from django.db import transaction
 from evennia.utils.create import create_object
 
+from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
 from world.observability import log_info, log_warn
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.rules.npc_persona import initialize_npc_persona
@@ -163,6 +164,13 @@ def _create_and_initialize_host(row, room, authored_map, profile=None) -> NPC:
         profile.card.to_record(),
         {"kind": "profile", "profile": row.profile_key},
     )
+    # Authored official-content provenance (official-content-provenance): the
+    # host's stable authored profile key, written once at creation inside the
+    # same transaction as every other authored attribute, so the official
+    # reference layer can resolve ``(npc, <profile key>)`` without consulting
+    # the numeric role tier, the display key, or the service anchor. Creation
+    # only: a reused host is never rewritten (never-rename/never-retitle).
+    host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, row.profile_key)
     first_kwargs = authored_map[row.profession.components[0].type_key]
     # Commit-bound: sync runs inside startup transactions; a creation event
     # must never describe a host a later rollback destroyed.
