@@ -136,6 +136,34 @@ def _unresolved_events(logged) -> list:
     ]
 
 
+def _monster_reference_constructions(tree: ast.Module) -> list[str]:
+    """Every monster-kind ``OfficialContentReference`` construction in a module.
+
+    The zero-producer scan's whole body: a construction is a monster reference
+    when any argument — positional or keyword — is the vocabulary's monster
+    kind literal or the ``OFFICIAL_KIND_MONSTER`` name a future producer would
+    reach for. Returned as ``(kind token, line)`` pairs for the report.
+    """
+    monster_kind = OFFICIAL_CONTENT_KINDS[0]
+    monster_tokens = {"OFFICIAL_KIND_MONSTER"}
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+        if name != "OfficialContentReference":
+            continue
+        arguments = [*node.args, *(keyword.value for keyword in node.keywords)]
+        for argument in arguments:
+            if isinstance(argument, ast.Constant) and argument.value == monster_kind:
+                found.append(f"literal:{argument.lineno}")
+            elif isinstance(argument, (ast.Name, ast.Attribute)):
+                token = getattr(argument, "id", None) or getattr(argument, "attr", None)
+                if token in monster_tokens:
+                    found.append(f"{token}:{argument.lineno}")
+    return found
+
+
 class ReferenceTypeTests(unittest.TestCase):
     """The frozen type: closed kind vocabulary, shared key grammar."""
 
@@ -468,35 +496,37 @@ class MonsterBoundaryTests(unittest.TestCase):
         self.assertIsNone(official_content_reference_for_entity(entity))
 
     def test_no_production_module_constructs_a_monster_reference(self):
-        monster_kind = OFFICIAL_CONTENT_KINDS[0]
-        monster_tokens = {"OFFICIAL_KIND_MONSTER"}
         violations: list[str] = []
         scanned = 0
         for path in _production_module_paths():
             scanned += 1
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
-                if name != "OfficialContentReference":
-                    continue
-                arguments = [*node.args, *(keyword.value for keyword in node.keywords)]
-                for argument in arguments:
-                    if isinstance(argument, ast.Constant) and argument.value == monster_kind:
-                        violations.append(
-                            f"{path.relative_to(REPO_ROOT).as_posix()}:{argument.lineno}"
-                        )
-                    elif isinstance(argument, (ast.Name, ast.Attribute)):
-                        token = getattr(argument, "id", None) or getattr(argument, "attr", None)
-                        if token in monster_tokens:
-                            violations.append(
-                                f"{path.relative_to(REPO_ROOT).as_posix()}:{argument.lineno}"
-                            )
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            violations.extend(
+                f"{relative}:{found}"
+                for found in _monster_reference_constructions(tree)
+            )
         self.assertGreater(scanned, 50)
         self.assertEqual(
             violations, [], f"production module constructs a monster reference: {violations}"
         )
+
+    def test_the_scan_detects_a_planted_monster_reference(self):
+        # The scanner's own control: a scan that matches nothing must not pass
+        # as a scan that found nothing. The planted sources exercise both
+        # argument forms (positional and keyword) and both monster-kind
+        # spellings (the literal and the vocabulary constant).
+        monster_constant = "OFFICIAL_KIND_MONSTER"
+        planted = (
+            f"x = OfficialContentReference({monster_constant}, 't_synth')\n"
+            f"y = OfficialContentReference(kind={monster_constant}, key='t_synth')\n"
+            f"z = OfficialContentReference(kind={OFFICIAL_CONTENT_KINDS[0]!r}, key='t_synth')\n"
+        )
+        found = _monster_reference_constructions(ast.parse(planted))
+        self.assertEqual(len(found), 3)
+        # A preset-kind construction with a variable kind is not a monster one.
+        clean = "x = OfficialContentReference(kind, key)\ny = len(another_call())\n"
+        self.assertEqual(_monster_reference_constructions(ast.parse(clean)), [])
 
 
 if __name__ == "__main__":

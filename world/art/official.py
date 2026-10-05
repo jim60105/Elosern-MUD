@@ -91,10 +91,7 @@ from world.art.gallery import (
     validate_stage,
 )
 from world.art.no_follow import RejectedFile, open_dir_fd, open_file_bytes
-from world.art.subjects import (
-    FORBIDDEN_SUBJECT_KEY_CHARACTERS,
-    is_valid_subject_key,
-)
+from world.art.subjects import is_valid_subject_key
 from world.observability import log_info, log_warn
 
 # The one boundary/diagnostic event id (design §11): the load boundary and the

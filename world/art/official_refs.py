@@ -174,9 +174,16 @@ def _emit_unresolved(kind: str, declared: Any, entity: Any, reason: str) -> None
     Deduped per distinct ``(kind, key)`` pair within the per-process ceiling, so
     a presentation-repeating bad key logs once instead of per resolve. The
     context carries business identifiers only: the kind, the (length-bounded)
-    declared key, the entity identity, and the reason.
+    declared key, the entity identity, and the reason. The text is bounded both
+    ways — truncated to the contract's key length and stripped of anything
+    non-printable — because a malformed stored value never passed the grammar
+    that would have made it safe to log verbatim.
     """
-    key_text = str(declared)[:MAX_SUBJECT_KEY_LENGTH]
+    key_text = "".join(
+        character
+        for character in str(declared)[:MAX_SUBJECT_KEY_LENGTH]
+        if character.isprintable()
+    )
     dedupe = (kind, key_text)
     if dedupe in _reported_unresolved:
         return
