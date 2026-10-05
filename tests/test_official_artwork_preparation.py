@@ -24,6 +24,8 @@ import tarfile
 import tempfile
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "prepare-official-artwork.sh"
 
@@ -121,6 +123,7 @@ class _PreparationFixture:
 
 
 class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_the_script_is_posix_shell_syntax_and_never_fetches_anything(self):
         syntax = subprocess.run(
             ["/bin/sh", "-n", str(SCRIPT_PATH)], capture_output=True, text=True
@@ -131,6 +134,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
             with self.subTest(tool=fetch_tool):
                 self.assertNotIn(fetch_tool, source)
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_valid_archive_populates_the_content_subdirectory(self):
         _write_archive(self.archives / "official.tar", _GOOD_TREE)
         # The volume root is never replaced: a sibling of the content
@@ -149,6 +153,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         )
         self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_gzip_compressed_archive_is_extracted(self):
         # Uncompressed and gzip-compressed tar archives are the inputs the
         # runtime image's native tooling (tar + gzip) can read.
@@ -159,6 +164,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertEqual(_snapshot(self.content), _digests(_GOOD_TREE))
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_bare_name_resolves_inside_the_archive_directory(self):
         _write_archive(self.archives / "official.tar", _GOOD_TREE)
 
@@ -167,6 +173,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn(str(self.archives / "official.tar"), result.stderr)
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_replacing_a_prepared_tree_installs_only_the_new_tree(self):
         _write_archive(self.archives / "first.tar", _GOOD_TREE)
         _write_archive(self.archives / "second.tar", _REPLACEMENT_TREE)
@@ -178,6 +185,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(_snapshot(self.content), _digests(_REPLACEMENT_TREE))
         self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_no_archive_supplied_is_a_no_op_that_erases_nothing(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -189,12 +197,14 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(_snapshot(self.content), before)
         self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_no_archive_supplied_creates_nothing_on_an_empty_volume(self):
         result = self.prepare()
 
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertFalse(self.content.exists())
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_missing_or_non_file_archive_is_an_error_not_a_no_op(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -207,6 +217,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
                 self.assertIn("not a regular file", result.stderr)
                 self.assertEqual(_snapshot(self.content), before)
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_corrupt_archive_leaves_the_prepared_tree_byte_for_byte_unchanged(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -219,6 +230,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(_snapshot(self.content), before)
         self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_unsafe_members_are_refused_and_the_prepared_tree_is_unchanged(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -254,6 +266,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
                 self.assertFalse((self.base / "escaped").exists())
                 self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_the_extraction_step_refuses_traversal_and_relocates_absolute_members(self):
         # Belt-and-suspenders for the listing parser above: even if a hostile
         # member reached extraction, the tar invocation the script uses must
@@ -293,6 +306,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
             ["poison.png"],
         )
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_the_entry_count_and_size_caps_are_enforced(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -311,6 +325,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
                 self.assertEqual(_snapshot(self.content), before)
                 self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_invalid_cap_settings_are_refused_before_the_volume_is_touched(self):
         self.seed_content()
         before = _snapshot(self.content)
@@ -327,6 +342,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
                 self.assertIn("ART_OFFICIAL_MAX_ENTRIES", result.stderr)
                 self.assertEqual(_snapshot(self.content), before)
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_an_interrupted_install_is_recovered_by_the_next_run(self):
         _write_archive(self.archives / "official.tar", _GOOD_TREE)
         self.volume.mkdir(parents=True)
@@ -341,6 +357,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
         self.assertEqual(_snapshot(self.content), _digests(_GOOD_TREE))
         self.assert_no_leftovers()
 
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_a_stale_previous_tree_and_staging_directory_are_cleaned_up(self):
         self.seed_content()
         _write_archive(self.archives / "official.tar", _GOOD_TREE)
@@ -360,6 +377,7 @@ class PreparationScriptContractTests(_PreparationFixture, unittest.TestCase):
 
 
 class PreparationScriptScopeTests(unittest.TestCase):
+    @covers_requirement("container-image::one-shot-official-artwork-archive-preparation-service")
     def test_the_game_never_runs_the_preparation_script(self):
         # The extraction path is deployment tooling: the evennia startup script
         # must not reference it, and the game service must not mount it.

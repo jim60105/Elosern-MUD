@@ -253,7 +253,10 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn("art-seed/", ignored)
         self.assertIn("art-seed/", set(_read(".gitignore").splitlines()))
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    @covers_requirement(
+        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::official-artwork-is-excluded-from-publication-inputs-while-built-in-defaults-ship",
+    )
     def test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image(self):
         # official-artwork-deployment: the operator-prepared directory follows
         # the ART_SEED_DIR pattern (read-only, SELinux-relabelled bind mount)
@@ -297,7 +300,10 @@ class ContainerContractTests(unittest.TestCase):
             "art-official-archives/", set(_read(".gitignore").splitlines())
         )
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    @covers_requirement(
+        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::one-shot-official-artwork-archive-preparation-service",
+    )
     def test_the_official_artwork_preparation_service_is_profile_gated_and_confined(self):
         # official-artwork-deployment: one explicitly invoked, non-interactive
         # one-shot service prepares the named volume from a trusted operator
