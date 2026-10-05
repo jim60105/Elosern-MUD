@@ -463,14 +463,22 @@ describe("personal letter folio", () => {
     expect(panel().exists()).toBe(true);
     expect(listPayloads()).toEqual([{ after: 0 }]);
 
-    // Private prose and an unsent draft in the open folio.
+    // Opened private prose and an unsent draft in the open folio.
     deliverResult({
       requestId: "session:1",
       data: collectedPage([letterRow("synthetic-letter")], { branch: true }),
     });
     await nextTick();
+    await panel().find(".letters-folio__letter").trigger("click");
+    deliverResult({
+      requestId: "session:2",
+      data: { source_id: "synthetic-letter", sender_id: "12", read_tick: 20, body_parts: ["合成私密內容"] },
+    });
+    await nextTick();
+    expect(panel().find(".letters-folio__reading").text()).toContain("合成私密內容");
     await panel().find("input").setValue("synthetic-recipient");
     await panel().find("textarea").setValue("synthetic draft");
+    expect(panel().find("textarea").element.value).toBe("synthetic draft");
 
     // 1. Transport loss closes the folio and unmounts it.
     store.setConnected(false);
@@ -479,7 +487,8 @@ describe("personal letter folio", () => {
     expect(panel().exists()).toBe(false);
 
     // 2. A reconnect on a fresh transport generation and a replaced identity:
-    //    the old page and draft must not survive; the new opening loads once.
+    //    the old page, opened prose, and draft must not survive; the new
+    //    opening loads once and renders only its own page.
     store.beginTransport(2);
     store.setConnected(true);
     expect(
@@ -489,9 +498,19 @@ describe("personal letter folio", () => {
     store.openHudDrawer("letters");
     await nextTick();
     expect(panel().exists()).toBe(true);
-    expect(panel().find("textarea").exists()).toBe(false);
-    expect(panel().find(".letters-folio__letter").exists()).toBe(false);
     expect(listPayloads()).toHaveLength(2);
+    deliverResult({
+      requestId: "session:1",
+      data: collectedPage([letterRow("synthetic-fresh")], { branch: true }),
+    });
+    await nextTick();
+    expect(panel().find("input").element.value).toBe("");
+    expect(panel().find("textarea").element.value).toBe("");
+    expect(panel().find(".letters-folio__reading").exists()).toBe(false);
+    expect(panel().findAll(".letters-folio__letter")).toHaveLength(1);
+    expect(panel().text()).toContain("synthetic-fresh");
+    expect(panel().text()).not.toContain("synthetic-letter");
+    expect(panel().text()).not.toContain("合成私密內容");
 
     // 3. A generation reset with an active epoch closes the folio.
     store.beginTransport(3);
@@ -536,6 +555,53 @@ describe("personal letter folio", () => {
     expect(panel().exists()).toBe(false);
   });
 
+  it("cancels a waiting opening and drops a result delivered around the teardown (tasks 1.2, 2.1)", async () => {
+    openSession();
+    const app = mountAppClient();
+    await nextTick();
+    const panel = () => app.find('[data-testid="letters-panel"]');
+
+    // A preceding request owns the dispatch lock, so the folio opens waiting
+    // and submits nothing of its own.
+    const preceding = store.dispatchAction("explore.wait", {});
+    expect(preceding).toBe("session:1");
+    store.openHudDrawer("letters");
+    await nextTick();
+    expect(panel().exists()).toBe(true);
+    expect(panel().text()).toContain("正在載入信件");
+    expect(listPayloads()).toHaveLength(0);
+
+    // The generation boundary tears the waiting opening down.
+    store.beginTransport(2);
+    await nextTick();
+    expect(store.view.hudDrawer).toBe(null);
+    expect(panel().exists()).toBe(false);
+
+    // The preceding opening's result lands after that teardown: the retired
+    // generation drops it, and the closed opening submits nothing new.
+    const late = store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ presentation_epoch: fx.EPOCH_A, request_id: preceding })],
+      {},
+    );
+    expect(late.accepted).toBe(false);
+    await nextTick();
+    expect(panel().exists()).toBe(false);
+    expect(listPayloads()).toHaveLength(0);
+
+    // A later opening on the new epoch owns its own single load.
+    store.setConnected(true);
+    expect(
+      store.receive(2, "ui_snapshot", [fx.snapshot({ presentation_epoch: fx.EPOCH_B })], {}).accepted,
+    ).toBe(true);
+    await nextTick();
+    store.openHudDrawer("letters");
+    await nextTick();
+    expect(listPayloads()).toEqual([{ after: 0 }]);
+    expect(panel().exists()).toBe(true);
+  });
+
   it("keeps the private state isolated from an unrelated draft identity (tasks 1.2, 2.5)", async () => {
     openSession();
     const wrapper = mountPanel();
@@ -557,7 +623,14 @@ describe("personal letter folio", () => {
     wrapper.unmount();
     const reopened = mountPanel();
     await nextTick();
-    expect(reopened.find("textarea").exists()).toBe(false);
+    deliverResult({
+      requestId: "session:2",
+      data: collectedPage([letterRow("synthetic-letter")], { branch: true }),
+    });
+    await nextTick();
+    expect(reopened.find("input").element.value).toBe("");
+    expect(reopened.find("textarea").element.value).toBe("");
+    expect(reopened.findAll(".letters-folio__letter")).toHaveLength(1);
   });
 
   it("provides a keyboard tool and actual text-equivalent echoes", () => {
