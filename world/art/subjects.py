@@ -67,6 +67,56 @@ def is_reserved_player_stable_key(key: str) -> bool:
     return re.fullmatch(DIGITS_ONLY_KEY_PATTERN, key) is not None
 
 
+def subject_key_violation(key: object) -> str | None:
+    """The one stable-key contract rule ``key`` violates, or ``None`` when valid.
+
+    The single implementation behind :func:`is_valid_subject_key` (the silent
+    predicate every producer-side and admission-side caller asks) and
+    :func:`_validate_subject_key` (the raising writer-side caller). Keeping the
+    rules here — rather than copying them per consumer — is what stops the
+    catalog's admission check and the official-reference grammar from drifting
+    apart: a key admitted by one is admitted by the other by construction.
+    """
+    if not isinstance(key, str) or not key:
+        return "non_empty"
+    if len(key) > MAX_SUBJECT_KEY_LENGTH:
+        return "too_long"
+    if len(key.encode("utf-8")) > MAX_SUBJECT_KEY_BYTES:
+        return "too_many_bytes"
+    if any(char in FORBIDDEN_SUBJECT_KEY_CHARACTERS for char in key):
+        return "forbidden_character"
+    if any(
+        not char.isprintable() or unicodedata.category(char).startswith("C")
+        for char in key
+    ):
+        return "control_character"
+    return None
+
+
+def is_valid_subject_key(key: object) -> bool:
+    """True when ``key`` satisfies the shared stable-key contract (never raises).
+
+    The predicate form of the contract above: admission checks, resolver
+    grammar checks, and any other read-side caller ask this instead of
+    re-implementing the bounds, so the writer-side error messages below can be
+    as specific as they need without a second rule set existing.
+    """
+    return subject_key_violation(key) is None
+
+
+_SUBJECT_KEY_VIOLATION_MESSAGES = {
+    "non_empty": "an art subject key must be non-empty text",
+    "too_long": f"an art subject key must be at most {MAX_SUBJECT_KEY_LENGTH} characters",
+    "too_many_bytes": (
+        f"an art subject key must be at most {MAX_SUBJECT_KEY_BYTES} UTF-8 bytes"
+    ),
+    "forbidden_character": (
+        "an art subject key must not contain '|', '/', ':', '{', or '}'"
+    ),
+    "control_character": "an art subject key must not contain control characters",
+}
+
+
 class ArtSubjectError(ValueError):
     """Raised when an art subject is malformed or unresolvable."""
 
@@ -130,25 +180,9 @@ def _validate_subject_key(key: str) -> None:
     with any kind prefix, and always keeps the worker output filename within
     the filesystem name-length limit.
     """
-    if not isinstance(key, str) or not key:
-        raise ArtSubjectError("an art subject key must be non-empty text")
-    if len(key) > MAX_SUBJECT_KEY_LENGTH:
-        raise ArtSubjectError(
-            f"an art subject key must be at most {MAX_SUBJECT_KEY_LENGTH} characters"
-        )
-    if len(key.encode("utf-8")) > MAX_SUBJECT_KEY_BYTES:
-        raise ArtSubjectError(
-            f"an art subject key must be at most {MAX_SUBJECT_KEY_BYTES} UTF-8 bytes"
-        )
-    if any(char in FORBIDDEN_SUBJECT_KEY_CHARACTERS for char in key):
-        raise ArtSubjectError(
-            "an art subject key must not contain '|', '/', ':', '{', or '}'"
-        )
-    if any(
-        not char.isprintable() or unicodedata.category(char).startswith("C")
-        for char in key
-    ):
-        raise ArtSubjectError("an art subject key must not contain control characters")
+    violation = subject_key_violation(key)
+    if violation is not None:
+        raise ArtSubjectError(_SUBJECT_KEY_VIOLATION_MESSAGES[violation])
 
 
 def parse_subject(full_key: str) -> ArtSubject:
