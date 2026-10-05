@@ -48,6 +48,13 @@ request, never read from or written to a metadata file, and never a package
 version. A request naming a fingerprint the current snapshot does not hold is
 refused by the media route (a 404, no historical artwork retention).
 
+Admission validates the image HEADER only (dimensions from ``Image.open``
+under the bounded limits, never a pixel decode) so a hostile file cannot make
+startup allocate a giant buffer; a file whose header is valid but whose pixel
+stream is truncated is therefore admitted and served as-is, exactly like the
+seed mirror's accepted images, and the browser falls back to the built-in
+silhouette when the download fails to render.
+
 **Observability.** Load emits exactly one ``official_art_catalog_loaded`` info
 event carrying the indexed content-directory, image, and refused-entry counts
 plus the empty/absent condition, and every per-entry refusal emits a bounded
@@ -70,6 +77,7 @@ import json
 import os
 from pathlib import Path
 from stat import S_ISDIR, S_ISLNK, S_ISREG
+from urllib.parse import quote
 
 from django.conf import settings
 from PIL import Image
@@ -200,12 +208,17 @@ class OfficialCatalog:
         """The same-origin official media URL for an admitted identity.
 
         ``None`` for an identity this snapshot does not admit, so a URL can
-        never be built for unindexed artwork.
+        never be built for unindexed artwork. The identity is
+        percent-encoded segment-wise (slashes kept), because a content key or
+        filename may legally contain a space, ``#``, ``?``, or ``%`` — an
+        unencoded reserved character would make the URL unfetchable. The
+        server decodes the path before routing, so the served identity is the
+        admitted one exactly.
         """
         fingerprint = self.fingerprint_for(identity)
         if fingerprint is None:
             return None
-        return f"/art/official/{fingerprint}/{identity}"
+        return f"/art/official/{fingerprint}/{quote(identity, safe='/')}"
 
 
 # The current snapshot: empty until the startup step loads it, empty again

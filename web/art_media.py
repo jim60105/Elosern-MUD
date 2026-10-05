@@ -169,6 +169,14 @@ def _serve_official(match: re.Match) -> FileResponse:
     re-resolved strictly inside ``ART_OFFICIAL_ROOT`` through the shared
     confinement helper (no symlinked component, no traversal), which also
     refuses a file swapped for a symlink after load.
+
+    Like the gallery and defaults branches, the last step is a pathname open:
+    a component swapped for a symlink between the confinement check and
+    ``FileResponse``'s open could be followed. That residual race is accepted
+    here for the same reason the other branches accept it — the official root
+    is an operator-owned read-only mount, never a player-writable path — and
+    the catalog contract (admission + fingerprint) is what bounds which paths
+    can be reached at all.
     """
     fingerprint, relative_path = match.group(1), match.group(2)
     if not official.current_catalog().admits(relative_path, fingerprint):

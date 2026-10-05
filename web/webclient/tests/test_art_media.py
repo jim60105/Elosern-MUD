@@ -429,6 +429,44 @@ class OfficialIdentityServingTests(EvenniaTestCase):
     @covers_requirement(
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
     )
+    def test_an_admitted_file_deleted_after_load_404s(self):
+        identity = "npc/t_synth_profile/a.png"
+        path = self._image()
+        official.load_catalog()
+        url = self._url(identity)
+        self.assertEqual(self._get(url).status_code, 200)
+        # A maintenance window that removes artwork between restarts: the
+        # snapshot still names it, the confinement/file check returns 404.
+        path.unlink()
+        self.assertEqual(self._get(url).status_code, 404)
+        # ... and a root that disappears entirely 404s the same way.
+        path.parent.rmdir()
+        path.parent.parent.rmdir()
+        self.official_root.rmdir()
+        self.assertEqual(self._get(url).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_url_for_a_reserved_character_identity_round_trips(self):
+        # A content key and a filename may legally contain a space, '#', or
+        # '?' (the shared stable-key contract forbids only |/:{} and control
+        # characters), so the built URL must be percent-encoded to be
+        # fetchable at all.
+        key = "t_synth profile"
+        name = "a b#c.png"
+        path = self._image(name=name, key=key)
+        official.load_catalog()
+        url = self._url(f"npc/{key}/{name}")
+        self.assertIn("%20", url)
+        self.assertIn("%23", url)
+        response = self._get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._body(response), path.read_bytes())
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
     def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
         identity = "npc/t_synth_profile/a.png"
         path = self._image()

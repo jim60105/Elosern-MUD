@@ -116,6 +116,11 @@ class _CatalogCase(EvenniaTestCase):
     def load(self) -> dict:
         return load_catalog()
 
+    def fresh_root(self, name: str):
+        """Point both the tree builder and the setting at a brand-new root."""
+        self.root = (Path(self.tempdir.name) / name).resolve()
+        return override_settings(ART_OFFICIAL_ROOT=str(self.root))
+
     # -- event assertions -------------------------------------------------
     def contexts(self, mock) -> list[dict]:
         return [call.kwargs["context"] for call in mock.call_args_list]
@@ -373,8 +378,7 @@ class ManifestTests(_CatalogCase):
             with self.subTest(payload=payload):
                 self.warn.reset_mock()
                 reset_catalog()
-                self.root = (Path(self.tempdir.name) / f"case-{index}").resolve()
-                with override_settings(ART_OFFICIAL_ROOT=str(self.root)):
+                with self.fresh_root(f"case-{index}"):
                     self.image("preset", _PRESET_KEY, "a.png")
                     self.image("preset", _PRESET_KEY, "broken.png", content=b"x")
                     self.manifest("preset", _PRESET_KEY, payload)
