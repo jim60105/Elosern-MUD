@@ -421,10 +421,37 @@ jobs:
       - name: Generate aggregate coverage XML
         run: uv run --locked coverage xml -o coverage.xml
 
+      # The Codecov action fetches its CLI from an unpinned CDN at run time, so
+      # a transient refusal of that download (a TLS handshake alert, a CDN edge
+      # error) must not turn a fully verified coverage report into a red gate.
+      # A genuinely unavailable upload still fails the job: the first attempt
+      # only continues the job so the retry can run, and the guard step below
+      # fails it when neither attempt completed.
       - name: Upload coverage reports to Codecov
+        id: codecov-upload
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           disable_search: true
           fail_ci_if_error: true
+
+      - name: Retry the Codecov upload once
+        id: codecov-upload-retry
+        if: steps.codecov-upload.outcome == 'failure'
+        continue-on-error: true
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+
+      - name: Fail when the Codecov upload never completed
+        if: >-
+          steps.codecov-upload.outcome == 'failure'
+          && steps.codecov-upload-retry.outcome == 'failure'
+        run: |
+          echo "The Codecov upload failed on both attempts; the gate cannot report coverage." >&2
+          exit 1
