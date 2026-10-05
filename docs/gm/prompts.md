@@ -1,6 +1,6 @@
 # 提示詞資料庫
 
-所有由應用程式擁有的 LLM 提示詞（旁白、NPC 對話、任務企劃、思考回饋、美術描述）都存放在儲存庫根目錄的 `prompts/` 資料夾，作為唯一來源。調整提示詞不需要改 Python 程式碼或重建映像：編輯 YAML 檔案、驗證、然後重新啟動（或 reload）伺服器即可套用。
+所有由應用程式擁有的 LLM 提示詞（旁白、NPC 對話、任務企劃、思考回饋、美術描述）都存放在儲存庫根目錄的 `prompts/` 資料夾，作為唯一來源。調整提示詞不需要改 Python 程式碼或重建映像，編輯 YAML 檔案、驗證、然後重新啟動（或 reload）伺服器即可套用。
 
 > [!TIP]
 > 若要深入了解使用這些提示詞的業務情境、系統架構與防護機制，請參閱開發者指南中的 [核心架構與邊界契約](/development/llm-architecture)、[7 大業務情境與調度流程](/development/llm-scenarios) 以及 [護欄天梯與語意驗證機制](/development/llm-guardrails)。
@@ -77,16 +77,16 @@ prompts:
 
 ## 故障隔離
 
-一個壞掉的提示詞檔案只會影響它自己的層：載入時該鍵會被標記為不可用，並記錄具名錯誤（檔案、鍵、問題），伺服器照常啟動。消費該鍵的生成層會回到既有的確定性降級路徑：
+一個壞掉的提示詞檔案只會影響它自己的層。載入時該鍵會被標記為不可用，並記錄具名錯誤（檔案、鍵、問題），伺服器照常啟動。消費該鍵的生成層會回到既有的確定性降級路徑：
 
 - 旁白 → 模板渲染器
 - NPC 對話 → 問候或沉默
 - 任務企劃 → 任務模板池
 - 思考回饋 → 不顯示
 - 美術描述 → 以登錄表資料為底的確定性描述
-- 美術生成 → 記錄以具名錯誤碼（如 `sd_prompt_error`）結算為 `failed`，佔位圖不變
+- 美術生成 → 記錄以具名錯誤碼（如 `sd_prompt_error`）結算為 `failed`，佔點陣圖不變
 
-前向註冊的 `character_creation.system` 失敗只會記錄警告，永遠不會阻擋啟動。修復檔案後重新驗證並重新啟動即可復原。
+前瞻註冊的 `character_creation.system` 失敗只會記錄警告，永遠不會阻擋啟動。修復檔案後重新驗證並重新啟動即可復原。
 
 ## 美術生成提示詞（`art.scene_prompt` / `art.portrait_prompt` / `art.negative_prompt`）
 
@@ -113,8 +113,8 @@ prompts:
 | `ART_SD_CLIENT` | —（僅限程式碼） | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket。基於匯入注入風險刻意不提供環境變數 |
 | `ART_SD_MAX_RESPONSE_BYTES` | 同名 | `52428800`（50 MiB） | 回應本文／base64 上限 |
 | `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | 同名 | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
-| `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：首次生成前把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次；僅在生成流程觸發，`@art health` 探測不會觸發）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 執行個體；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
-| `ART_SD_SERVER_RETAIN_IMAGES` | Same name | `True` | Sets the top-level txt2img `save_images` boolean explicitly. `True` enables remote sample/grid saving subject to the server's output settings; `False` disables saving and also sends `do_not_save_samples: true` and `do_not_save_grid: true`. This per-request control does not mutate persistent server settings or affect local art-store persistence. Restart the game server after changing the environment value. |
+| `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：首次生成前把伺服器持久設定 `samples_format` 預先設為 `png`（`POST /sdapi/v1/options`，每行程式一次；僅在生成流程觸發，`@art health` 探測不會觸發）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 執行個體；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
+| `ART_SD_SERVER_RETAIN_IMAGES` | 同名 | `True` | 明確設定 txt2img 頂層的 `save_images` 布林值。`True` 依伺服器輸出設定開啟遠端樣本／圖組儲存；`False` 關閉儲存，並一併送出 `do_not_save_samples: true` 與 `do_not_save_grid: true`。這個逐請求控制不會改動伺服器的持久設定，也不影響本機美術庫的落地。改變環境變數值後請重新啟動遊戲伺服器 |
 | `ART_SD_OUTPUT_FORMAT` | 同名 | `png` | 本機轉碼輸出的格式（`png`／`webp`／`jpeg`／`avif`，大小寫不拘）；衍生副檔名 `.png`／`.webp`／`.jpg`／`.avif`。切換格式後既有資產照常展示與服務，直到個別主題重新生成才換檔（換檔時舊檔在新狀態提交後才刪除） |
 | `ART_SD_OUTPUT_QUALITY` | 同名 | `80` | 有損格式（webp／jpeg／avif）的品質 1–100；png 忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |
@@ -134,18 +134,18 @@ prompts:
 
 ### 翻譯模型種子（zh→en）
 
-提示詞翻譯引擎（`world.art.translate_ct2.CTranslate2Backend`，add-ctranslate2-translate-backend）是本機 CPU 神經機器翻譯：它**不會拒絕**任何描述（這正是選它而非 chat 模型的原因）。模型取得走雙軌政策（add-translate-model-download-policy）：預設（`ART_TRANSLATE_DOWNLOAD_ENABLED=true`）下，若佈局檢查失敗，backend 會在首次使用的引擎建構鎖內、以有界的方式（逾時＋串流大小上限、零重試、失敗即鎖住本行程）把同一個 `translate-zh_en-1_9` 封包抓進持久目錄；設 `false` 則對話伺服器沒有任何下載翻譯模型的執行期網路行為——模型由操作者在主機上種子到持久目錄（下方路線一／二），缺目錄＝有界的 `art_translate_unavailable`。
+提示詞翻譯引擎（`world.art.translate_ct2.CTranslate2Backend`，add-ctranslate2-translate-backend）是本機 CPU 神經機器翻譯，它**不會拒絕**任何描述（這是選它不用 chat 模型的原因）。模型取得走雙軌政策（add-translate-model-download-policy）。預設（`ART_TRANSLATE_DOWNLOAD_ENABLED=true`）下，若佈局檢查失敗，backend 會在首次使用的引擎建構鎖內、以有界的方式（逾時＋串流大小上限、零重試、失敗即鎖住本行程）把同一個 `translate-zh_en-1_9` 封包抓進持久目錄；設 `false` 則對話伺服器沒有任何下載翻譯模型的執行期網路行為，模型改由操作者在主機上種子到持久目錄（下方路線一／二），缺目錄＝有界的 `art_translate_unavailable`。
 
 **佈局契約**：`ART_TRANSLATE_MODEL_DIR`（裸機 `server/.translate`、容器 `/app/server/.translate`）必須包含
 
 - `model/` — CTranslate2 模型目錄（`config.json` + `model.bin`）
 - `sentencepiece.model` — SentencePiece 來源模型
 
-兩條種子路線產生完全相同的佈局，引擎對「模型從哪來」一無所知（D3：換模型是操作者動作，不是程式碼變更）。
+兩條種子路線產生完全相同的佈局，引擎對模型來源不做任何假設（D3：換模型是操作者動作，不是程式碼變更）。
 
 #### 路線一：Argos Open Tech `.argosmodel` 封包（建議，一條指令）
 
-Argos 發行 CTranslate2 模型；只有它的 Python wrapper（本專案刻意不引入的重量級依賴）很肥。封包本身解壓就是上述佈局。使用隨附腳本（在主機執行，只依賴 `curl` 與 `unzip`）：
+Argos 發行 CTranslate2 模型；它的 Python wrapper 體積肥大，是本專案刻意不引入的重量級依賴。封包本身解壓就是上述佈局。使用隨附腳本（在主機執行，只依賴 `curl` 與 `unzip`）：
 
 ```sh
 scripts/fetch-translate-model.sh                # 裸機預設種到 server/.translate
@@ -153,13 +153,13 @@ scripts/fetch-translate-model.sh --force        # 已種過時需 --force 覆蓋
 scripts/fetch-translate-model.sh /some/path     # 指定目錄
 ```
 
-腳本下載 `translate-zh_en-1_9.argosmodel`（官方封包索引指向 `https://argos-net.com/v1/`），驗證 zip 與所需項目（`model/config.json`、`model/model.bin`、`sentencepiece.model`），解出 `model/`＋`sentencepiece.model`，任何一環失敗都大聲退出。封包內含的 `stanza/`（wrapper 的斷句資料）不需要，刻意不解出——seam 已經按行切分。
+腳本下載 `translate-zh_en-1_9.argosmodel`（官方封包索引指向 `https://argos-net.com/v1/`），驗證 zip 與所需項目（`model/config.json`、`model/model.bin`、`sentencepiece.model`），解出 `model/`＋`sentencepiece.model`，任何一環失敗都寫出錯誤訊息並以非零狀態退出。封包內含的 `stanza/`（wrapper 的斷句資料）不需要，刻意不解出，因為 seam 已經按行切分。
 
 ⚠️ **授權**：封包 README 記載其模型衍生自 OPUS-MT zh→en（Tiedemann & Thottingal, EAMT 2020），**CC-BY 4.0**。腳本會把 `README.md` 一併種下作為來源與授權紀錄。
 
 #### 路線二：自 `Helsinki-NLP/opus-mt-zh-en` 離線轉換
 
-在有網路的作業站（不必是遊戲主機）用 CTranslate2 轉換器：
+在有網路的工作站（不必是遊戲主機）用 CTranslate2 轉換器：
 
 ```sh
 ct2-transformers-converter --model Helsinki-NLP/opus-mt-zh-en \
@@ -169,7 +169,7 @@ mv   ct2-zh-en/model.bin ct2-zh-en/config.json ct2-zh-en/shared_vocabulary.json 
 cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 ```
 
-（Helsinki 的 OPUS 倉庫用 `source.spm`／`target.spm` 命名 Marian 的 SentencePiece 檔；轉換輸出直接構成 `model/`，再把 `source.spm` 複製為套件根目錄的 `sentencepiece.model`，即為引擎要求的佈局。轉換前先 `ls ct2-zh-en` 確認產生的是 `source.spm` 這個名字——不同筆轉換指令輸出略有出入，以實際檔名為準。若已存在種子，先確認兩個檔案都在再覆寫。）
+（Helsinki 的 OPUS 倉庫用 `source.spm`／`target.spm` 命名 Marian 的 SentencePiece 檔；轉換輸出直接構成 `model/`，再把 `source.spm` 複製為套件根目錄的 `sentencepiece.model`，即為引擎要求的佈局。轉換前先 `ls ct2-zh-en` 確認產生的是 `source.spm` 這個名字，不同筆轉換指令輸出略有出入，以實際檔名為準。若已存在種子，先確認兩個檔案都在再覆寫。）
 
 ⚠️ **授權**：`Helsinki-NLP/opus-mt-zh-en` 的 model card 標示 **CC-BY 4.0**（與路線一同一模型譜系與授權）。
 
@@ -177,14 +177,14 @@ cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 
 1. **種子**：跑路線一的腳本（或路線二轉換）到 `server/.translate`（裸機）或一個暫存目錄（容器）。
 2. **掛載**：
-   - 裸機：什麼都不用做——`server/.translate` 就是程式碼內預設的 `ART_TRANSLATE_MODEL_DIR`。
+   - 裸機：不做任何事，`server/.translate` 就是程式碼內預設的 `ART_TRANSLATE_MODEL_DIR`。
    - 容器：先 `podman compose up -d` 建立 `evennia-translate` 具名 volume，再一次性把暫存種子拷進 volume（腳本會印出完整指令）；之後 volume 在容器重建間保留。
 3. **開啟**：`.env` 加 `ART_TRANSLATE_ENABLED=true`，重啟。
-4. **確認**：啟動時會記錄 `art_optional_stages`（context 含 `art_translate: {setting: "ART_TRANSLATE_ENABLED", enabled: …}`）——它只反映開關狀態，不載入模型；翻譯階段真正就緒以一張含漢字的圖片生成成功、並記錄 `art_translate_done`（含 lines_total／lines_offered／lines_untranslated）為準，此時存放的中繼資料引用英文提示詞。
+4. **確認**：啟動時會記錄 `art_optional_stages`（context 含 `art_translate: {setting: "ART_TRANSLATE_ENABLED", enabled: …}`），它只反映開關狀態，不載入模型；翻譯階段真正就緒以一張含漢字的圖片生成成功、並記錄 `art_translate_done`（含 lines_total／lines_offered／lines_untranslated）為準，此時存放的中繼資料引用英文提示詞。
 
-**未種子 volume 的降級路徑是設計內行為**：每次生成記錄一條 `art_translate_failed`（`art_translate_unavailable`）警告、以 authored 提示詞出圖、圖片照常產生——翻譯是「提示詞比較差」，不是失敗的工作。`@art status` 與 `@art retry`/`requeue` 的行為不變。
+**未種子 volume 的降級路徑是設計內行為**：每次生成記錄一條 `art_translate_failed`（`art_translate_unavailable`）警告、以 authored 提示詞生成圖片、圖片照常產生。翻譯降級的效果只到提示詞品質變差，工作不會失敗。`@art status` 與 `@art retry`/`requeue` 的行為不變。
 
-**肖像去背的誠實成本**：啟用後，首次生成肖像前 rembg 會下載約 1 GB 的模型檔（快取在持久的 `server/.rembg` volume，跨容器重建保留）；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB（`isnet-anime` 少一個數量級）——小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`）：保留前一份有效輸出、不阻斷批次、`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
+**肖像去背的成本**：啟用後，首次生成肖像前 rembg 會下載約 1 GB 的模型檔（快取在持久的 `server/.rembg` volume，跨容器重建保留）；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`），處理方式是保留前一份有效輸出、不阻斷批次，`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
 
 ### 提示詞編輯流程（美術生成）
 
@@ -196,9 +196,9 @@ cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 
 ## 容器注意事項
 
-- 掛載是唯讀的：伺服器不會寫入提示詞；管理員在主機上編輯。
+- 掛載採唯讀模式，伺服器不會寫入提示詞；管理員在主機上編輯。
 - 同一個資料夾在容器內是世界可讀的；引擎內的 sd-webui 客戶端（設計 D11 修正）讀取 `art.*` 生成提示詞，與其他層共用同一個資料夾與載入驗證。
-- 掛載會覆蓋映像內建的預設檔案，兩邊內容相同，沒有分歧風險。
+- 掛載會覆寫映像內建的預設檔案，兩邊內容相同，沒有分歧風險。
 
 ## 本機預覽文件
 

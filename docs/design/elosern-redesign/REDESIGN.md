@@ -10,13 +10,13 @@
 ## 0. 設計原則（依 Game-UI 教義）
 
 1. **情境化 HUD（contextual show/hide）**：每個遊戲狀態只顯示「此刻需要」的表面，
-   0.3–0.5s 淡入淡出；不顯示的絕對隱藏（不是灰掉）。→ 回應用戶「戰鬥時不需要地圖」。
+   0.3–0.5s 淡入淡出；不顯示就完全隱藏（非灰化）。→ 回應使用者「戰鬥時不需要地圖」。
 2. **單一事實來源**：所有清單（技能、狀態、任務、同伴、圖鑑）消費既有 payload schema，
    不新造資料；未解鎖技能「藏而不禁用」（hide, do not disable）。
 3. **敘事仍是主角**：中樞為量寬限制的 serif 敘流；HUD 錨在四角/邊緣，中央留給情境回饋。
-4. **指令列是 MUD 的心跳，永遠可見**：底部長駐 + 快捷詞 + 歷史；圖形選單是「加速」，不是「取代」。
+4. **指令列是 MUD 的心跳，永遠可見**：底部長駐 + 快捷詞 + 歷史；圖形選單只加速操作，指令列仍是主要輸入途徑。
 5. **多層選單明確、可決定性回退**：每個選單都有父層；Escape 回父層；子選單開啟不重建。
-6. **可達性**：狀態絕不只靠顏色（圖示＋符號＋數值）；focus 環、reduced-motion、
+6. **可達性**：狀態絕不單靠顏色（圖示＋符號＋數值）；focus 環、reduced-motion、
    色盲模式、字級縮放、音量分層；敘述/狀態區 live region。
 7. **成人向、誠實**：親密狀態區塊可折疊、用語節制；圖版缺失用真誠占位，離線仍可玩。
 
@@ -38,7 +38,7 @@
 | 局部地圖/小地圖 | 節點網格（current/已訪/未訪/記憶）；fog-of-war | 點開全地圖 | **戰鬥時隱藏** |
 | 目標追蹤 | 1–3 追蹤任務目標＋路徑 | 點開任務 | 右下角；戰鬥收縮為純目標 |
 | 同伴快帶 | ≤4 同伴（肖像/HP/狀態/羈絆 stage）| 點開同伴面板 | **無專面板＝目前缺口，補上** |
-| 通知 toast | 事件（升級/任務完成/解鎖/金錢）| 點掉 | 優先級隊列，max 4 |
+| 通知 toast | 事件（升級/任務完成/解鎖/金錢）| 點掉 | 優先級佇列，max 4 |
 | 美術背景/頭像 | 場景背景 + 3:4 頭像 | 點開全圖 | 離線＝真誠占位 |
 | 指令列 | 文字解析器（全部 58 指令 + 動態出口）| 永遠 | 長駐底部；快捷詞；歷史；`/` 不再需要 |
 
@@ -121,7 +121,7 @@ Developer `art status/run/retry/requeue`；Builder `@teleport/@open/地圖`；Ev
 行動甲板變戰鬥選單；敘流變戰鬥日誌；生命條醒目＋低血暈影；目標追蹤收縮為純目標。
 
 > ※ 2026-09-06 修訂（webclient-align-11-dialogue-ux）：對話模式的「對話選項」
-> 行動甲板鏡像已移除——對話選項只在敘事對話框呈現（含 `結束對話` 出口列），
+> 行動甲板鏡像已移除，對話選項只在敘事對話方塊呈現（含 `結束對話` 出口列），
 > 行動甲板在對話期間維持普通探索形式。
 
 ---
@@ -153,7 +153,7 @@ Escape 一律回父層；子選單開啟不重建父選單；改動進行中抑�
 ---
 
 ## 5. 可達性清單（實作必達）
-- [x] 狀態/資源：圖示＋符號＋數值（不只顏色）
+- [x] 狀態/資源：圖示＋符號＋數值（不單靠顏色）
 - [x] focus 環（非純色）、disabled 行仍可 focus 讀 reason_message
 - [x] `prefers-reduced-motion` 全停用動畫
 - [x] 字級 scale（A-/A/A+）可於任何選單改
@@ -168,53 +168,53 @@ Escape 一律回父層；子選單開啟不重建父選單；改動進行中抑�
 
 ---
 
-## 7. Map layouts — 局部地圖的兩種版面（design note, English）
+## 7. 局部地圖的兩種版面（Map layouts，設計筆記）
 
-*Pre-wave design for `openspec/changes/webclient-map-02-layout-variants`. The visual draft (`index.html`) implements both layouts; this section records why the split looks the way it does.*
+*\`openspec/changes/webclient-map-02-layout-variants\` 的前期設計。視覺設計稿（\`index.html\`）實作兩種版面；本節記錄版面分成兩種的原因。*
 
-### 7.1 Two data formats, two layouts — never player-selected
+### 7.1 兩種資料格式對應兩種版面，玩家無法選擇
 
-The world ships **two fundamentally different map formats**, and the layout is a pure function of the payload, mirroring the Evennia source model:
+世界帶有**兩種本質不同的地圖格式**，版面是 payload 的純函式，對應 Evennia 來源模型：
 
-| payload layer | Evennia source | coordinates | layout |
+| payload 層 | Evennia 來源 | 座標 | 版面 |
 |---|---|---|---|
-| `grid` | xyzgrid contrib (`XYZNode.X/Y`, 8-way links) | validated world coordinates | 網格圖 (coordinate lattice) |
-| `wilderness` | wilderness contrib (8 direction exits over provider coords) | validated world coordinates | 網格圖 |
-| `interior` / `instance` | plain Evennia room/exit graph | none (node `x` is a layout index, not a place) | 連線圖 (radial graph) |
+| `grid` | xyzgrid contrib（`XYZNode.X/Y`、8 向連結） | 已驗證的世界座標 | 網格圖（座標點陣格，coordinate lattice） |
+| `wilderness` | wilderness contrib（來源座標上的 8 向出口） | 已驗證的世界座標 | 網格圖 |
+| `interior` / `instance` | 一般 Evennia 房間/出口圖 | 無（節點 `x` 是版面索引，並非地點） | 連線圖（輻射狀圖，radial graph） |
 
-`isCoordinateLayer(layer) = layer ∈ {grid, wilderness}` is the one resolver; island and overlay read the same resolved value, so divergence is impossible. The layout's formal names follow Evennia — `grid` for the xyzgrid coordinate space, `wilderness` for the Wilderness contrib's — and the Chinese word 荒野 is a usage example of the coordinate space only, never a code or spec name. There is **no player-facing layout control, preference, or storage of any kind** — a player who stands in a coordinate space sees the lattice, and one who stands in a room cluster sees the graph. (An earlier revision of this note specified a three-segment manual switch; the owner ruled it out: the format follows the world, not taste.) The closed se...
+`isCoordinateLayer(layer) = layer ∈ {grid, wilderness}` 是唯一解析器；島嶼面板與覆蓋層讀取同一解析值，兩者不會出現分歧。版面的正式名稱跟隨 Evennia，`grid` 是 xyzgrid 座標空間、`wilderness` 是 Wilderness contrib 的座標空間；中文詞「荒野」只是該座標空間的一個使用例，從未作為程式或規格名稱。**完全沒有提供玩家端的版面控制、偏好或任何儲存**，站在座標空間的玩家看到網格圖，站在房間群聚的玩家看到連線圖。（本筆記早期修訂版曾規格化一個三段式手動切換器；owner 裁決排除：格式跟隨世界，與玩家喜好無關。）The closed se...
 
-Both layouts share one renderer contract: identical marker states (current seal-red r8/r9 + pin > visited filled > unvisited hollow > gold landmark; seen-not-visited = gold at 0.5 opacity), identical edge colours/widths (solid = traversable, dashed = blocked exit), identical labels and palette. What differs is **what the geometry is allowed to claim**:
+兩種版面共用一套繪製契約，標記狀態相同（目前節點為印紅 r8/r9 加圖釘＞已造訪實心＞未造訪空心＞金色地標；見過但未造訪＝金色、不透明度 0.5），邊線顏色／粗細相同（實線＝可通行，虛線＝受阻出口），標籤與調色盤也相同。兩者差異在**幾何被允許宣稱什麼**：
 
-| | 連線圖 (graph) | 網格圖 (lattice) |
+| | 連線圖（graph） | 網格圖（lattice） |
 |---|---|---|
-| Claims | **connectivity only** — which nodes are reachable from where | **relative position** — nodes sit at committed coordinates, current node is the origin, `+y = 北` |
-| Position meaning | decorative; pixel angles mean nothing | meaningful; lattice pitch = 1 coordinate cell |
-| Header mark | none — a graph asserts no axis | `北↑ 東→` (valid only where axes are drawn) |
-| Readout line | `連線圖` (names the drawing) | `坐標空間` (names the drawing) |
-| Fog vignette | knowledge edge (not terrain) | knowledge edge (not terrain) |
+| 宣稱 | **僅連接性**：哪些節點從哪裡可達 | **相對位置**：節點落在已提交的座標上，目前節點是原點，`+y = 北` |
+| 位置意義 | 裝飾用途；像素角度不承載意義 | 有意義；格距＝1 個座標格 |
+| 標題標記 | 無，連線圖不主張任何軸向 | `北↑ 東→`（僅在繪出軸線時有效） |
+| 顯示列 | `連線圖`（指出繪圖方式） | `坐標空間`（指出繪圖方式） |
+| 迷霧暗角 | 知識邊界（非地形） | 知識邊界（非地形） |
 
-Neither readout ever shows a bearing, compass angle, distance, or coordinate figure. Lattice node placement is driven by committed coordinates/exit directions, never by graph-layer pixel angles.
+兩種顯示列從不顯示方位、羅盤角度、距離或座標數字。網格圖的節點擺位由已提交座標／出口方向驅動，從不由連線圖層的像素角度決定。
 
-### 7.2 Remote-known places: edge direction markers (lattice only)
+### 7.2 遠端已知地點：邊緣方位標記（僅網格圖）
 
-A coordinate payload can remember places **outside the drawn visual range** (the presenter puts them in `remembered` with their real coordinates — e.g. a trade city on the eastern plains or an underground cavern seen before). The lattice SHALL plot every node whose coordinates fall inside the drawn extent at its true cell, and SHALL render each remembered node outside the extent as an **edge direction marker**: a memory diamond (gold ring if landmark) sitting on the canvas's marker-safe border, positioned where the **ray from the current node through the raw coordinate delta** (`dx = remote.x − current.x`, `dy = remote.y − current.y`) crosses that border.
+座標 payload 能記住**繪製範圍以外**的地點（呈現器把它們連同真實座標放進 `remembered`，例如東方平原上的貿易城市，或先前見過的地下洞穴）。網格圖 SHALL 把座標落在繪製範圍內的每個節點畫在真實格子，SHALL 把範圍外的每個記憶節點渲染成**邊緣方位標記**，也就是停在畫布標記安全邊界上的一個記憶菱形（地標則加金環），位置取決於**從目前節點穿過原始座標差值的射線**（`dx = remote.x − current.x`、`dy = remote.y − current.y`）與該邊界的交點。
 
-The direction contract is testable and strict:
+方位契約可測試且嚴格：
 
-- The ray is computed from **raw, pre-compression coordinates** — never from `col`/`row` ranks (rank compression preserves order, not ratios; `(100,1)` must not render as 45°). A pure helper (`remoteDirection(current, remote) → { dx, dy, octant }`) owns this; `+y = 北`, eight octants with explicit half-open sector bounds.
-- The marker conveys **direction only**: no distance figure, no angle, no coordinate readout. A faint ray segment from the current node to the marker is allowed as a pure visual (it encodes direction, which the data backs).
-- Markers are a bounded decoration layer (payload caps at 64 nodes): deterministic ordering, per-edge slotting so markers never overlap each other, the current node, or the axes. They carry no travel action.
-- **Accessibility floor:** on the lattice variant, the island's remembered list is replaced by the named edge direction markers on the canvas border, with an untruncated visually-hidden text alternative mirror (`已知的地圖出入口`) providing the complete reading path for assistive technology; on the graph variant (`interior`/`instance`), the island keeps the bounded, non-focusable remembered list. On the full-map overlay, each marker carries its place name as visible text and as its accessible name.
-- Coordinate-free payloads never get markers — their `x` is a layout index, and an interior remembered node stays list-only.
+- 射線由**未經壓縮的原始座標**計算，從不由 `col`/`row` 排名計算（排名壓縮保住順序、不保住比例；`(100,1)` 不可渲染成 45°）。此計算由純函式（`remoteDirection(current, remote) → { dx, dy, octant }`）負責；`+y = 北`，八個扇區各有明確的半開區間邊界。
+- 標記只傳達**方位**：無距離數字、無角度、無座標顯示。允許從目前節點到標記畫一條淡射線段作為純視覺（它編碼方位，資料支撐這個說法）。
+- 標記是有界裝飾層（payload 上限 64 節點）：決定性排序、逐邊配置槽位，標記彼此、與目前節點、與軸線都不會重疊。標記不帶移動動作。
+- **無障礙底線：**網格圖變體下，島嶼面板的記憶清單改由畫布邊界上的具名邊緣方位標記取代，並配以未截斷、視覺隱藏的文字替代鏡像（`已知的地圖出入口`），為輔助技術提供完整閱讀路徑；連線圖變體（`interior`/`instance`）下，島嶼面板保留有界、不可 focus 的記憶清單。全地圖覆蓋層上，每個標記以可見文字呈現地名，同時作為其無障礙名稱。
+- 無座標 payload 絕不會出現標記，其 `x` 是版面索引，室內部節點僅以清單呈現。
 
-### 7.3 Coordinate semantics: two meanings, one field
+### 7.3 座標語意：一個欄位、兩種意義
 
-The payload's node `x`/`y` carries two distinct semantics, and the spec must say so: under `grid`/`wilderness` they are **validated world coordinates** (from `XYMap` / the wilderness provider) and may drive relative-direction geometry; under `interior`/`instance` they are **renderer-local layout values** and MUST NEVER be read as direction, distance, or place. The old blanket ban on bearing figures stands — it now reads: no numeric angle/distance/coordinate readout anywhere, and direction geometry only from validated coordinates.
+payload 的節點 `x`/`y` 承載兩種不同語意，規格必須明說。`grid`/`wilderness` 下它是**已驗證的世界座標**（來自 `XYMap`／wilderness provider），可用於驅動相對方位幾何；`interior`/`instance` 下它是**繪製器本地的版面值**，MUST NEVER 被讀作方位、距離或地點。舊有對方位數字的全面禁令仍然成立，如今表述為任何地方都不出現數字角度／距離／座標顯示，方位幾何只從已驗證座標推導。
 
-### 7.4 Draft demo device and accessibility
+### 7.4 草稿展示裝置與無障礙
 
-The static draft shows both layouts through a **demo fixture selector** (`.demofx`, bottom-left, dashed border, legend `展示資料（非遊戲控制）`): it swaps which committed fixture payload the mock renders (`無座標房間 payload` = interior graph; `wilderness 座標 payload` = wilderness lattice) and stores nothing. It is review chrome, visually distinct from game HUD, and never ships; the layout still comes from the payload's `layer` through the same resolver the product uses. The variant SVGs carry `role="img"` + per-variant `aria-label` (`局部地圖（連線圖）` / `局部地圖（網格圖）`). Lattice dot-field and axis cross are tuned to be plainly visible (`#3a3344` at 0.85 dot fill-opacity, 1.5px axis at 0.65) — the lattice's geometry is its claim, so it must not be invisible; implementation waves pin their presence and contrast.
+靜態設計稿透過**展示固定資料選擇器**（`.demofx`，左下角、虛線邊框、圖例 `展示資料（非遊戲控制）`）呈現兩種版面。它切換 mock 渲染的已提交固定資料 payload（`無座標房間 payload`＝室內連線圖；`wilderness 座標 payload`＝wilderness 網格圖），且不儲存任何東西。它是評審用的外圍界面，視覺上有別於遊戲 HUD，從不隨產品出貨；版面仍來自 payload 的 `layer`，走產品使用的同一解析器。兩個變體的 SVG 帶有 `role="img"` 及各自的 `aria-label`（`局部地圖（連線圖）`／`局部地圖（網格圖）`）。網格圖的點陣底紋與軸線交叉調整到明顯可見（`#3a3344`、點填充不透明度 0.85、1.5px 軸線、不透明度 0.65），網格圖的幾何就是它的宣稱，因此不可隱形；實作各波次會以測試固定它們的存在與對比。
 
 ```mermaid
 flowchart LR

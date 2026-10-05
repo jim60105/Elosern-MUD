@@ -51,7 +51,7 @@
 
 ### Step 0 — 從設計文件取得數值
 
-在 `2026-08-12-skill-system-redesign-design.md` §4.4 的魔法目錄中挑出（或新增）該魔法的：key、名稱（正體中文）、位階、目標、效果描述、MP。**不要自己發明數值**；若要新增表格外內容，先更新設計文件。
+在 `2026-08-12-skill-system-redesign-design.md` §4.4 的魔法目錄中挑出（或新增）該魔法的 key、名稱（正體中文）、位階、目標、效果描述與 MP。**不要自己發明數值**；若要新增表格外內容，先更新設計文件。
 
 MP 必須落在 §4.3 的對應位階成本帶內：
 
@@ -64,7 +64,7 @@ MP 必須落在 §4.3 的對應位階成本帶內：
 | 主宰 | 90+ | 120–150 | 140–180 |
 | 神格 | — | 180–220 | 200–260 |
 
-`spell_tier_for` 會依位階由低至高先搜尋「目標形狀對應的欄位」（`AREA` 看範圍欄、其餘看單體欄），若無匹配才搜尋相反欄位。重疊成本依欄位優先決定（例如 單體 180 為神格、範圍 180 為主宰；範圍 200 為神格）。神格位階為純顯示資料標籤，無等級門檻或數值施放門檻。成本若落在同一位階的另一欄也算該位階（例如 `dust_veil` 範圍 MP 22 落在術師單體帶）——這是目錄的刻意設計。
+`spell_tier_for` 會依位階由低至高先搜尋「目標形狀對應的欄位」（`AREA` 看範圍欄、其餘看單體欄），若無匹配才搜尋相反欄位。重疊成本依欄位優先決定（例如 單體 180 為神格、範圍 180 為主宰；範圍 200 為神格）。神格位階為純顯示資料標籤，無等級門檻或數值施放門檻。成本若落在同一位階的另一欄也算該位階（例如 `dust_veil` 範圍 MP 22 落在術師單體帶），這種重疊是目錄的刻意設計。
 
 ### Step 1 — 對照目標欄位
 
@@ -126,7 +126,7 @@ _skill(
 ),
 ```
 
-**PASSIVE 技能**：`flight` 是唯一前例——保持既有 `_skill(...)` entry、`kind=SkillKind.PASSIVE`，cost 只是顯示用途（PASSIVE 不會走資源扣減），且**不列入**可施放位階的測試配對。
+**PASSIVE 技能**：`flight` 是唯一前例。保持既有 `_skill(...)` entry、`kind=SkillKind.PASSIVE`，cost 只是顯示用途（PASSIVE 不會走資源扣減），且**不列入**可施放位階的測試配對。
 
 **重新調整既有魔法（recost）**：直接改該 entry 的 `mp=`，**不要複製一份**，也不要變動 `ROWS` 順序（assembly 順序是可觀測契約）。改完記得搜尋是否有測試或程式碼鎖死了舊 MP。
 
@@ -154,7 +154,7 @@ _skill(
 > [!WARNING]
 > `rate` 的 `target` 只能是 gauge trait（`hp`／`mp`／`sp`，見 `world/rules/traits.py::GAUGE_KEYS`）；tick 時對其他目標套 `rate` 會直接拋 `NotImplementedError`。敏捷、防禦、命中這類調整請用 `bounds: {target: <trait>, ceiling: <delta>}`（目前為惰性的前向宣告，無 consumer）。
 
-2. **`world/rules/rulebook/status_display.yaml`** 必須加一列對應的顯示資料（label 為正體中文、`severity` 為 `beneficial`／`informational`／`warning`／`harmful`／`critical`）——`status_display.py` 是 fail-closed 的，新 buff key 沒對應顯示列會讓模組載入失敗：
+2. **`world/rules/rulebook/status_display.yaml`** 必須加一列對應的顯示資料（label 為正體中文、`severity` 為 `beneficial`／`informational`／`warning`／`harmful`／`critical`）。`status_display.py` 採 fail-closed 設計，新 buff key 沒對應顯示列會讓模組載入失敗：
 
 ```yaml
 - code: water_bind
@@ -168,12 +168,12 @@ _skill(
 
 測試與行為同步落地，位置與風格對齊 `spell-catalog-*` 系列：
 
-1. **`world/skills/tests/test_spell_catalogs.py`**：定義 `WATER_SPELL_CATALOG` 形式的 tuple，並加三個測試：
+1. **`world/skills/tests/test_spell_catalogs.py`**：定義 `WATER_SPELL_CATALOG` 形式的 tuple，並加三個測試（下列名稱中的 `<element>` 為元素鍵占位）：
    （註：光屬性目錄與後續複合機制法術採**可執行程式行為測試**驗證，不使用重複目錄資料表鏡像測試，免除資料契約重複維護負擔）
    - `test_all_ten_<element>_spells_declare_the_exact_catalog_fields` — 逐一斷言 label、kind、element、target、faction、cost、effects
    - `test_every_<element>_spell_effect_round_trips_through_typed_dispatch` — 每個 effect 字串經 `parse_effect` 得到正確的 typed dataclass 且存在於 `parsed_effects`
    - `test_<element>_active_spell_keys_are_exactly_the_catalog_set` — 精確 key 集合（元素已有其他 ACTIVE 技能時記得納入，例如 光含 `light_sword_style`、暗含 `shadow_slash`／`dual_blade_mastery`）
-2. **`world/rules/tests/test_progression.py`**：在 `SpellTierLabelTests` 加 `test_<element>_spell_tier_labels_match_the_catalog`——以 `spell_tier_for` 斷言每個位階的兩個代表魔法得到正確位階標籤（施放門檻已除役，位階是資料標籤）；PASSIVE 技能不放進 `spell_tier_for` 配對。
+2. **`world/rules/tests/test_progression.py`**：在 `SpellTierLabelTests` 加 `test_<element>_spell_tier_labels_match_the_catalog`，以 `spell_tier_for` 斷言每個位階的兩個代表魔法得到正確位階標籤（施放門檻已除役，位階是資料標籤）；PASSIVE 技能不放進 `spell_tier_for` 配對。
 3. **`world/rules/tests/test_buffs.py`**：每個新 buff key 恰好一個 `test_buff_<key>`（`buff-handler-integration` 規格有機械式對應檢查）；DoT buff 要實際 `tick_buffs` 驗證扣血。
 4. **traceability 標註**：上述測試以 `tools.spec_traceability.covers_requirement` 標註需求 ID（如 `skill-registry::skill-registry-contains-the-full-火-element-spell-set`）。ID 用 `uv run --locked python -m tools.spec_traceability list` 取得，不要手造。
 
@@ -226,7 +226,7 @@ openspec validate --all --strict
 ## 5. 常見陷阱
 
 - **自我限定技能漏宣告 SELF_ONLY**：違反主規格的自限契約（`hardened_skin` 曾因此在 rubber-duck 審查被擋下）；預設值是 `ANY`，不會 fail-closed，只能靠宣告自律與審查。
-- **`rate` 用在非 gauge trait**：tick 時拋 `NotImplementedError`，會炸掉世界時鐘的 buff 結算。
-- **新 buff key 漏掉 `status_display.yaml`**：模組 import 直接失敗（fail-closed），不是執行期警告。
+- **`rate` 用在非 gauge trait**：tick 時拋 `NotImplementedError`，會中斷世界時鐘的 buff 結算。
+- **新 buff key 漏掉 `status_display.yaml`**：模組 import 直接失敗（fail-closed），失敗發生在載入期，執行期收不到任何警告。
 - **效果字串帶數值**（如 `damage:fire:magic:50`）：`damage` 語法就是三段，量級由公式推導；帶數值會在建構時被拒。
 - **位階註解與成本帶不一致**：`spell_tier_for` 只看 MP 成本帶，註解寫錯位階會誤導後續維護者與位階標籤測試。

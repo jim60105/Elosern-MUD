@@ -25,7 +25,7 @@ Elosern 網頁客戶端由 Django 與 Evennia 範本組合 `web/templates/webcli
 採用 Vue 3 單一檔案元件（SFC），由 Vite 6.x 建置為 ES 模組。開發使用 `pnpm run dev`；正式建置使用 `pnpm run build`。捨棄 React（第二生態系，在此設計導向流程中與 Storybook 契合度較弱）、免建置的全域 Vue（無 SFC 與 HMR），以及繼續停留在 jQuery（無法提供元件優先且可預覽的 UI）。GoldenLayout 的分頁／面板模型由元件樹取代。
 
 ### D2 — 透過 CJS 互通重用邏輯，切勿修改原始碼
-`js/elosern` 的 UMD 模組由 Vite 組合包透過 `web/webclient-app/lib/*` ES 包裝器匯入（Vite 與 esbuild 的 CommonJS 互通）；原始碼與無相依套件的 Node 閘門完全維持不變。注意事項：CJS 互通**不會**設定 `window.Elosern.*` 瀏覽器全域變數，那是 C2 瀏覽器橋接器的工作（D9）。**A2 成果：** 互通性已由 Vite 正式建置（`tests/test_frontend_toolchain_contract.py` 中的 `dist/index.js` 檢查會驗證組合包包含保留的 reducer）與 Vitest 包裝器測試所證實。
+`js/elosern` 的 UMD 模組由 Vite 組合包透過 `web/webclient-app/lib/*` ES 包裝器匯入（Vite 與 esbuild 的 CommonJS 互通）；原始碼與無相依套件的 Node 閘門完全維持不變，注意 CJS 互通**不會**設定 `window.Elosern.*` 瀏覽器全域變數，那是 C2 瀏覽器橋接器的工作（D9）。**A2 成果：** 互通性已由 Vite 正式建置（`tests/test_frontend_toolchain_contract.py` 中的 `dist/index.js` 檢查會驗證組合包包含保留的 reducer）與 Vitest 包裝器測試所證實。
 
 ### D3 — Pinia store 作為檢視狀態的唯一寫入者
 Pinia 3 store 是客戶端檢視狀態的唯一寫入者；它將保留的協定 reducer 接入作為核心，接收傳輸事件（OOB 快照／更新、結果、協定錯誤），並透過傳輸層分派動作。元件是只發出使用者意圖事件的被動消費者。
@@ -37,7 +37,7 @@ Vite 會輸出**穩定、非雜湊的進入點名稱**（`webclient/app/dist/ind
 Vue 應用程式保留 OOB 與瀏覽器契約已相依的識別碼（可聚焦的 `#action-dock`、`action-` 與 `target-` 項目鍵、戰鬥列 id 模式、必要的面板外觀 id）；其他所有外觀均提供穩定的 `data-testid`。這可維持現有的 Playwright 切片及其可追溯性測試正常運作，直到 C4 重新對應其餘部分。
 
 ### D6 — 設計稿為具約束力的視覺與 IA 參考
-經過驗證的單畫面設計稿（`docs/design/elosern-redesign/`，`index.html` + `REDESIGN.md`）是客戶端視覺語言與資訊架構的**具約束力**參考，不只是設計系統的來源。其 tokens 位於 `web/webclient-app/styles/tokens.css`（墨夜色盤、單一印紅強調色、金色焦點、排版級距、間距、動態效果），自我代管的子集化 `.woff2` 字型（Iansui、Noto Serif TC、Noto Sans TC unicode 範圍切片，以及作為等寬字體的 Jim Mono TC 切片）位於 `web/webclient-app/fonts/`。`prefers-reduced-motion` 與非純顏色的狀態標記在 token 與工具類別層級強制執行（`.status-marker--*`），維持其可測試性。
+經過驗證的單畫面設計稿（`docs/design/elosern-redesign/`，`index.html` + `REDESIGN.md`）是客戶端視覺語言與資訊架構的**具約束力**參考，角色超出設計系統來源。其 tokens 位於 `web/webclient-app/styles/tokens.css`（墨夜色盤、單一印紅強調色、金色焦點、排版級距、間距、動態效果），自我代管的子集化 `.woff2` 字型（Iansui、Noto Serif TC、Noto Sans TC unicode 範圍切片，以及作為等寬字體的 Jim Mono TC 切片）位於 `web/webclient-app/fonts/`。`prefers-reduced-motion` 與非純顏色的狀態標記在 token 與工具類別層級強制執行（`.status-marker--*`），維持其可測試性。
 
 ### D7 — 測試策略：四道閘門
 - **Node 閘門（維持不變，邏輯）：** `node --test web/static/webclient/js/tests/*.test.js`，無相依套件。
@@ -65,50 +65,25 @@ Vue 應用程式保持相同的穩定公開契約介面：`window.Elosern.Protoc
 - **穩定非雜湊的進入點名稱** → Evennia 自身的 `/static` 服務無需特殊處理；若部署環境後續置於長期快取 `/static` 的反向代理之後，請為 `app/dist/index.js` 與 `index.css` 設定 `no-cache`（或較短的 TTL），或加入建置版本查詢字串，於 C4（正式切換）時再次檢視。
 - **持久化 `.static` 磁碟卷殘留過期雜湊資產** → 進入點的 `collectstatic`（未帶 `--clear`）會留下被取代的 `assets/*`；此為無害現象（進入點會引用目前的雜湊）。在確認多副本行為之前，切勿加入 `--clear`。
 
-## Companion portrait lineup
+## 同伴頭像列（Companion portrait lineup）
 
-`CompanionLineup` replaces the former party quickbar. The party drawer remains
-reachable through the character-status drawer. Party schema v2 retains its six
-row keys; `portrait_ref` is null or 1–32 ASCII decimal digits, resolved only
-through the committed art catalog. Missing/default-less/cap-evicted art uses the
-shared initial-letter placeholder. Presenters never create gallery records or
-request generation.
+`CompanionLineup` 取代先前的隊伍快捷列（party quickbar）。隊伍抽屜仍可經角色狀態抽屜開啟。隊伍 schema v2 保留六個列索引鍵；`portrait_ref` 為 null 或 1–32 位 ASCII 十進位數字，僅透過已提交的圖資目錄解析。缺少圖資、沒有預設圖資或被容量上限擠退的圖資，一律改用共用的首字母佔位顯示。呈現端不會建立圖庫紀錄，也不會要求生成圖資。
 
-The controlled figure is rightmost; party order extends leftward with equal
-full-size figures on one ground line. Only horizontal overlap compresses,
-including to clear dialogue choices. Possession exchanges the controlled
-companion and the roster character's exact positions. `status.actor.identity`
-is the controlled session actor's bounded **string** identity (also during
-possession); party identities remain safe integers, normalized to decimal
-strings for this join. Other status fields retain their owner-keyed hybrid
-contract.
+受控角色立於最右側，隊伍順序向左延伸，所有立繪等比例、全尺寸，站在同一條地面線上。只有水平重疊會被壓縮，包含為清空對話選項所做的壓縮。附身（possession）會交換受控同伴與名冊角色的精確位置。`status.actor.identity` 是受控工作階段角色的有界**字串**識別碼（附身期間也相同）；隊伍識別碼仍是安全整數，在此處 join 時正規化為十進位字串。其他狀態列位維持以擁有者為索引鍵的混合契約。
 
-While possessing, the roster stays rooted in the authenticated puppet's account.
-The live bound owner must belong to that account; A remains roster-current with
-its existing portrait/pending marker, and B never becomes an account character.
-Roster switch lock/reason still follow B's combat predicate, not A's; possession
-alone creates no new switch lock or payload fields.
+附身期間，名冊仍以已驗證 puppet 所屬帳號為根。即時綁定的擁有者必須屬於該帳號；A 維持名冊現行狀態並保留既有頭像與待處理標記，B 絕不會變成帳號角色。名冊切換鎖定與原因仍依 B 的戰鬥述詞判定，而非 A 的；僅有附身這件事不會新增切換鎖定或承載欄位。
 
-Companions reuse StageActor's listener dim. A companion whose identity matches
-the committed dialogue host while the existing speaker signal is `host`
-temporarily receives the highest paint z and full brightness. Speaker changes,
-dialogue exit, possession and count changes restore baseline z without moving
-the figure. Only the controlled figure receives combat beats. Motion off and
-reduced-motion preserve these state changes without animation. A dialogue host
-already present in the committed party/controlled lineup is not duplicated in
-actor-right; non-party hosts retain their existing portrait and motion, with
-name plate, pagination and focus unchanged. The foe lineup,
-vitals dock and place-card column are unchanged.
+同伴沿用 StageActor 的傾聽變暗機制。身分符合已提交對話主持者、且既有說話者訊號為 `host` 的同伴，會暫時取得最高的繪製 z 層級與完整亮度。說話者變更、離開對話、附身與數量變更都會讓 z 層級回到基準，且不會移動立繪。只有受控立繪會收到戰鬥節拍。關閉動態與 `prefers-reduced-motion` 下，這些狀態變更仍會生效，只是沒有動畫。已存在於已提交隊伍／受控陣容中的對話主持者不會在 actor-right 重複出現；非隊伍主持者保留既有頭像與動態，名牌、分頁與焦點不變。敵人陣容、生命狀態 dock 與地點卡片欄維持不變。
 
 ## Store 切片契約（固定供 C1 與 Wave B 使用）
 
-Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相同的介面：
+Wave B 依此結建構置離線元件；C1 進行實作，雙方必須鎖定相同的介面：
 
 - **單一 Pinia store 擁有檢視狀態**（`web/webclient-app/stores/`）。其核心為匯入的協定 reducer（`lib/protocol.js`，絕不另外手寫第二個 reducer）以及用於焦點狀態的匯入鍵盤路由器。
 - **不可部分發布，僅讀取已認可狀態：** store 僅在完成完整的 reducer 交易後才發布新的不可變狀態快照；元件絕不讀取處理中的暫存狀態。每個 OOB 訊息（快照／更新／結果／協定錯誤）均先由 reducer 套用；發布是觀察者能看見該狀態的唯一時刻。
 - **檢視切片：** 元件從 store 的公開 getters 讀取狹窄的衍生切片（例如 `context_actions` 面板、敘事日誌、傳輸鎖定狀態）；元件發出使用者意圖事件（動作提交、文字輸入），store 透過單一分派進入點路由它們，僅限分派，且維持單一進行中狀態異動。
 - **事件進入，意圖輸出：** store 訂閱傳輸事件頻道（由 C3 綁定）；元件絕不直接訂閱傳輸層。
-- Wave B 元件的 Storybook stories 會接收作為純 fixture 物件的切片（與 store 的 getters 回傳形狀相同），確保離線 stories 與線上檢視不會脫鉤。
+- Wave B 元件的 Storybook stories 會接收作為純 fixture 物件的切片（與 store 的 getters 回傳形狀相同），讓離線 stories 與線上檢視不會脫鉤。
 
 ## 跨變更執行機制（路線圖摘要）
 

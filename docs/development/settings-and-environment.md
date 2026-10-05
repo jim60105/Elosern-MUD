@@ -1,6 +1,6 @@
 # 設定與環境變數
 
-本專案的部署設定有三層機制。本文件是唯一的完整模型說明：圖示優先順序、目前所有「活的」環境變數清單（含型別、預設值、驗證規則）、哪些值必須留在 `secret_settings.py`，以及把未來某個設定變成可用環境變數覆蓋的步驟。
+本專案的部署設定有三層機制。本文件是唯一的完整模型說明：圖示優先順序、目前所有「活的」環境變數清單（含型別、預設值、驗證規則）、哪些值必須留在 `secret_settings.py`、把未來某個設定變成可用環境變數覆寫的步驟。
 
 美術生成（`ART_SD_*`）參照表見 [提示詞資料庫](/gm/prompts)；容器編排細節見 [維運與驗證](/gm/operations)。
 
@@ -13,19 +13,19 @@ flowchart LR
 ```
 
 優先順序：`程式碼預設值 < 環境變數 < secret_settings.py`。
-（LLM profile 家族例外：環境層是兩級，且 secret 層以「整層取代」方式合併，見下方 LLM knob 節。）
+（LLM profile 家族例外，環境層是兩級，且 secret 層以「整層取代」方式合併，見下方 LLM knob 節。）
 
-1. **`server/conf/settings.py` 預設值** — 所有設定的來源與文件。
-2. **環境變數覆蓋** — 下表列出的變數在 settings 匯入時被讀取、轉型、驗證。變數不存在（或 typed／布林／URL knob 存在但為空白）時使用預設值。
-3. **`server/conf/secret_settings.py`** — 在 settings.py 匯入之後才載入，因此永遠是最終裁決者。這是私密值（`SECRET_KEY` 等）唯一核准的位置；即使環境裡有繼承來的骯髒變數，它也是逃生氣閘。
+1. **`server/conf/settings.py` 預設值** — 所有設定的來源與說明文件。
+2. **環境變數覆寫** — 下表列出的變數在 settings 匯入時被讀取、轉型、驗證。變數不存在（或 typed／布林／URL knob 存在但為空白）時使用預設值。
+3. **`server/conf/secret_settings.py`** — 在 settings.py 匯入之後才載入，因此永遠是最終裁決者。這是私密值（`SECRET_KEY` 等）唯一核准的位置；即使繼承環境帶有髒值，它也是逃生氣閘。
 
-失敗語意（fail-closed）：**存在但無效**的值會在 settings 匯入時丟出 `ImproperlyConfigured`，錯誤訊息包含變數名稱、引號括住的原始值、以及被違反的規則，例如：
+失敗語意（fail-closed）：**存在但無效**的值會在 settings 匯入時丟出 `ImproperlyConfigured`，錯誤訊息包含變數名稱、引號括住的原始值、違反的規則，例如：
 
 ```text
 django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid environment value 'twelve' (expected a positive integer)
 ```
 
-絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
+絕對不會不報錯就退回預設值，也不會 clamp 或延後到第一次使用時才報錯。
 
 ## 本變更提供的 31 個環境變數（加上 SD_WEBUI_BASE_URL）
 
@@ -52,44 +52,44 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_MAX_IMAGE_DIMENSIONS` | `ART_SD_MAX_IMAGE_DIMENSIONS` | 整數 | `4096` | 正整數；解碼 PNG 邊長上限 |
 | `ART_SD_MAX_IMAGE_PIXELS` | `ART_SD_MAX_IMAGE_PIXELS` | 整數 | `16777216`（16 MiP） | 正整數；總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | `ART_SD_PREPIN_SAMPLES_FORMAT` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；⚠️ 會永久修改共用伺服器持久預設 |
-| `ART_SD_SERVER_RETAIN_IMAGES` | `ART_SD_SERVER_RETAIN_IMAGES` | Boolean | `True` | Case-insensitive boolean words (`1/true/yes/on` / `0/false/no/off`). Sets top-level txt2img `save_images` explicitly: `True` enables remote saving subject to the server's sample/grid output settings; `False` disables saving and also sets `do_not_save_samples` and `do_not_save_grid` to `true`. Request-scoped; never mutates persistent server settings or affects local art-store persistence. |
+| `ART_SD_SERVER_RETAIN_IMAGES` | `ART_SD_SERVER_RETAIN_IMAGES` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；明確設定 txt2img 頂層的 `save_images`，`True`＝在伺服器的 sample／grid 輸出設定範圍內允許遠端儲存；`False`＝停用儲存，並把 `do_not_save_samples` 與 `do_not_save_grid` 設為 `true`。作用範圍僅及單次請求，永不修改伺服器的持久設定，也不影響本機 art-store 的持久化 |
 | `ART_SD_OUTPUT_FORMAT` | `ART_SD_OUTPUT_FORMAT` | 選擇 | `png` | 不分大小寫限於封閉集合 `png/webp/jpeg/avif`；集合外值（如 `heic`）啟動即失敗；決定本機轉換格式與庫存檔副檔名 |
 | `ART_SD_OUTPUT_QUALITY` | `ART_SD_OUTPUT_QUALITY` | 整數 | `80` | 1 到 100 包含兩端（拒絕 0、負數、大於 100）；僅影響有損格式（webp/jpeg/avif）；png 為無損重存、完全忽略此值 |
-| `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`——latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |
+| `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`，latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |
 | `ART_SD_PROBE_TIMEOUT_MS` | `ART_SD_PROBE_TIMEOUT_MS` | 整數 | `5000` | 1000 到 60000 包含兩端（拒絕低於 1000 或高於 60000）；單次 samplers 探測的總預算；僅診斷用途 |
 | `ART_SD_PROBE_CACHE_SECONDS` | `ART_SD_PROBE_CACHE_SECONDS` | 整數 | `300` | 5 到 3600 包含兩端（拒絕低於 5 或高於 3600）；探測判定可重複使用的最長秒數；`@art health` 一律強制重新探測 |
 
 ### 美術肖像去背（rembg）
 
-本機 CPU 去背階段（`rembg`），在生成與本機轉碼之間對傳輸 PNG bytes 作用，僅套用於角色與怪物肖像（classic 記錄與 gallery 卡片同一處理；scene 完全不進入 backend）。以一行 `ART_REMBG_ENABLED=true` 開啟。誠實成本：首次使用下載約 1 GB 模型（快取於持久的 `server/.rembg` volume）、每張肖像約 10 秒 CPU、且 ONNX session 建立後 Evennia 伺服器行程的常駐記憶體永久增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。
+本機 CPU 去背階段（`rembg`），在生成與本機轉碼之間對傳輸 PNG bytes 作用，僅套用於角色與怪物肖像（classic 記錄與 gallery 卡片採相同處理；scene 完全不進入 backend）。以一行 `ART_REMBG_ENABLED=true` 開啟。開啟的實際成本有：首次使用下載約 1 GB 模型（快取於持久的 `server/.rembg` volume）、每張肖像約 10 秒 CPU、ONNX session 建立後 Evennia 伺服器行程的常駐記憶體永久增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ART_REMBG_ENABLED` | `ART_REMBG_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時整條管線與變更前逐位元組相同（設計 D2：程式碼與測試預設不得隱含 1 GB 下載） |
-| `ART_REMBG_MODEL` | `ART_REMBG_MODEL` | 選擇 | `bria-rmbg` | 不分大小寫限於封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`；集合外值啟動即失敗。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重——非商業免費，商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
-| `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；False＝支援的離線配置——backend 先檢查模型檔是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
+| `ART_REMBG_MODEL` | `ART_REMBG_MODEL` | 選擇 | `bria-rmbg` | 不分大小寫限於封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`；集合外值啟動即失敗。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重，非商業免費，商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
+| `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；False＝支援的離線配置，backend 先檢查模型檔是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
 | `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；首次模型下載刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
 | `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.69 的唯一機制），屬刻意的行程全域設定 |
 
 ### 美術提示詞翻譯
 
-本機提示詞翻譯階段在 worker 讀取 claimed record 的 `source_description` 後、呼叫 sd-webui 前執行。它只交給 backend 含 Han 字的行，保留原本的行數與順序，且不會回寫 authored text 或 `source_hash`。backend 尚未由本 change 提供時，啟用後會記錄 `art_translate_unavailable`，再以原始提示詞生成圖片。
+本機提示詞翻譯階段在 worker 讀取 claimed record 的 `source_description` 後、呼叫 sd-webui 前執行。backend 只收到含 Han 字的行，行數與順序保持原樣，且翻譯結果不會回寫 authored text 或 `source_hash`。backend 尚未由本 change 提供時，啟用後會記錄 `art_translate_unavailable`，再以原始提示詞生成圖片。
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ART_TRANSLATE_ENABLED` | `ART_TRANSLATE_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；`True` 時啟用本機提示詞前處理，翻譯失敗只降級提示詞，不會令圖片工作失敗。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
-| `ART_TRANSLATE_DOWNLOAD_ENABLED` | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；True（預設）＝佈局檢查失敗時 backend 首次使用可把 Argos Open Tech `translate-zh_en-1_9` 封包（約 74 MB）抓進持久的 `server/.translate` volume，與 `ART_REMBG_DOWNLOAD_ENABLED` 完全同型；False＝支援的離線配置——backend 先檢查種子佈局，缺席時立即以 `art_translate_unavailable` 有界失敗（不 import 翻譯函式庫、不觸網、不等待） |
+| `ART_TRANSLATE_DOWNLOAD_ENABLED` | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；True（預設）＝佈局檢查失敗時 backend 首次使用可把 Argos Open Tech `translate-zh_en-1_9` 封包（約 74 MB）抓進持久的 `server/.translate` volume，與 `ART_REMBG_DOWNLOAD_ENABLED` 完全同型；False＝支援的離線配置，backend 先檢查種子佈局，缺席時立即以 `art_translate_unavailable` 有界失敗（不 import 翻譯函式庫、不觸網、不等待） |
 | `ART_TRANSLATE_THREADS` | `ART_TRANSLATE_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝CTranslate2 自行決定；非零值在 translator 建構時送達 intra-op 執行緒數（建構參數，非行程全域環境變數；鎖定的 ctranslate2 4.8.2 機制） |
 
 **翻譯 backend（僅限程式碼）**：`ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"` 是第三個會執行匯入的 dotted-path seam，因此不讀環境變數。測試與瀏覽器 harness 指向 `world.art.fake_translate.FakeTranslator`，避免載入翻譯函式庫或連線。
 
-**翻譯模型目錄（code-only）**：`ART_TRANSLATE_MODEL_DIR = <GAME_DIR>/server/.translate`，不讀任何環境變數（理由同 `ART_STORE_ROOT` 與 `ART_REMBG_MODEL_DIR`：打錯字會把翻譯模型悄悄搬離持久 volume，把每一次翻譯變成有界的 `art_translate_unavailable`）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-translate` 掛載於 `/app/server/.translate`。
+**翻譯模型目錄（code-only）**：`ART_TRANSLATE_MODEL_DIR = <GAME_DIR>/server/.translate`，不讀任何環境變數（理由同 `ART_STORE_ROOT` 與 `ART_REMBG_MODEL_DIR`：打錯字會把翻譯模型搬離持久 volume，讓每一次翻譯變成有界的 `art_translate_unavailable`）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-translate` 掛載於 `/app/server/.translate`。
 
-**模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`——正是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。取得方式為雙軌（`add-translate-model-download-policy`）：`ART_TRANSLATE_DOWNLOAD_ENABLED=true`（預設）時，backend 在首次使用、建構引擎的鎖內抓取同一個封包進這個目錄（有界、單次、原子落地、驗證 zip 與佈局並保留 CC-BY 4.0 README）；`false` 時未種子的目錄是「有界不可用」而非下載——每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。操作者預先以 `scripts/fetch-translate-model.sh` 種子＋設 `false` 即為離線配置。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
+**模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`，也就是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。取得方式為雙軌（`add-translate-model-download-policy`）。`ART_TRANSLATE_DOWNLOAD_ENABLED=true`（預設）時，backend 在首次使用、建構引擎的鎖內抓取同一個封包進這個目錄（有界、單次、原子落地、驗證 zip 與佈局並保留 CC-BY 4.0 README）；`false` 時未種子的目錄是「有界不可用」，不是下載功能，每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。操作者事先以 `scripts/fetch-translate-model.sh` 種子＋設 `false` 即為離線配置。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
 
-**模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物悄悄搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
+**模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
 
-**Alpha 敵對組合啟動即拒絕**：`ART_REMBG_ENABLED=true` 搭配有效 `ART_SD_OUTPUT_FORMAT=jpeg` 在 settings 匯入時直接 `ImproperlyConfigured`（JPEG 的 RGB 正規化會丟掉 alpha，存下帶背景的肖像卻宣稱是去背成品）。檢查位於 `secret_settings` 匯入之後，因此環境與 `secret_settings.py` 兩條覆蓋路徑由同一個檢查把關；`png`／`webp`／`avif` 攜帶 alpha，三者啟用階段皆正常啟動。
+**Alpha 敵對組合啟動即拒絕**：`ART_REMBG_ENABLED=true` 搭配有效 `ART_SD_OUTPUT_FORMAT=jpeg` 在 settings 匯入時直接 `ImproperlyConfigured`（JPEG 的 RGB 正規化會丟掉 alpha，存下帶背景的肖像卻宣稱是去背成品）。檢查位於 `secret_settings` 匯入之後，因此環境與 `secret_settings.py` 兩條覆寫路徑都經過同一個檢查驗證；`png`／`webp`／`avif` 攜帶 alpha，三者啟用階段皆正常啟動。
 
 ### 美術佇列排空控制
 
@@ -103,7 +103,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
-| `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退到 legacy webclient |
+| `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退方案，改用 legacy webclient |
 
 ### 敗戰後續內容開關
 
@@ -121,11 +121,11 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
-| `HTTP_USER_AGENT` | `HTTP_USER_AGENT` | 自由文字 | `elosern-mud/1.0` | 去除前後空白之字串；伺服器外發 HTTP 請求（提示詞翻譯下載、sd-webui worker、LLM 客戶端）所攜帶之 User-Agent 標頭。未設定、空白或僅含空白字元時回退至預設值（不允許送出空標頭） |
+| `HTTP_USER_AGENT` | `HTTP_USER_AGENT` | 自由文字 | `elosern-mud/1.0` | 去除前後空白後使用的字串，是伺服器外發 HTTP 請求（提示詞翻譯下載、sd-webui worker、LLM 客戶端）所攜帶的 User-Agent 標頭。未設定、空白或僅含空白字元時回退至預設值（不允許送出空標頭） |
 
-驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
+驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族。`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
-**衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名：`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。
+**衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名，`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。
 
 **輸出格式切換程序**：改 `ART_SD_OUTPUT_FORMAT` 並重啟後，新生成以新格式寫入；既有資產仍以舊副檔名持續正確呈現與服務（媒體路由接受全部四種庫副檔名，presentation 驗證庫存身份而非比對現行設定），直到該主題被重新生成（GM 指令 `@art retry`／`@art requeue`）。切換本身不動任何既有檔案。
 
@@ -143,7 +143,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 > [!TIP]
 > 關於 7 個生成層的多模型分工範例、本地 Ollama/vLLM 與雲端 API 部署最佳實踐，請參閱專題指南 [端點配置與模型調優指南](/development/llm-configuration)。
 
-讀者一律是 `server/conf/settings.py`：名稱、型別與邊界由宣告式 knob 表
+讀者一律是 `server/conf/settings.py`，名稱、型別與邊界由宣告式 knob 表
 `server/conf/llm_knobs.py`（純資料、零環境讀取）產生，解析結果注入
 `world/ai/profiles.py` 的 `default_profiles(defaults=...)`；`world/ai/profiles.py`
 本身不讀取任何環境變數。每個欄位的優先次序：
@@ -157,11 +157,11 @@ profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Eve
 **序列化語意**：這 23 個 knob 經 `LLM_PROFILES` registry 進入
 `world/ai/client.py` 的請求組裝。請求體依序帶 `model`／`messages`／
 `temperature`，輸出長度欄位在 `max_completion_tokens` 有設定時以該欄位名
-**取代** `max_tokens`（兩者絕不並存），否則帶 `max_tokens`；已設定的取樣
+**取代** `max_tokens`（兩個欄位絕不並存），否則帶 `max_tokens`；已設定的取樣
 欄位逐字通過、未設定者完全不出現；reasoning 依 `reasoning_style` 映射
 （`openrouter` → 巢狀 `reasoning` 物件、`vllm` →
-`chat_template_kwargs.enable_thinking`、`off` → 不發送）。標頭部分，非空的
-`api_key`／`app_title`／`app_url` 分別衍生 `Authorization: Bearer …`／
+`chat_template_kwargs.enable_thinking`、`off` → 不發送）。標頭部分，
+`api_key`／`app_title`／`app_url` 為非空值時分別衍生 `Authorization: Bearer …`／
 `X-Title`／`HTTP-Referer`，並由 `world/http_identity.py` 衍生 `User-Agent`
 （值來自 `HTTP_USER_AGENT` 設定），profile 明設的 `headers` 最後覆寫
 （同名的明設標頭獲勝，不分大小寫）。所有可省略欄位未設定時，除新增的
@@ -221,10 +221,10 @@ export LLM_APP_URL=https://example.test
 
 **compose 轉發**：compose.yaml 的 evennia 服務除了保留 `LLM_BASE_URL` 的
 host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）都以
-`${LLM_X:-}` 空白預設轉進容器——宿主要沒設定的變數會以空字串送達，而空
+`${LLM_X:-}` 空白預設轉進容器。宿主要沒設定的變數會以空字串送達，而空
 字串正是 settings 層的「省略」sentinel，等於不貢獻任何值；compose 檔本身
-永遠不含任何金鑰字面值。注意轉發值是 compose 從環境／專案 `.env` 解析的，
-不是從服務 `env_file:`——行內轉發列在專案 `.env` 有金鑰時會讓金鑰出現在渲染
+永遠不含任何金鑰字面值。compose 從環境／專案 `.env` 解析轉發值，
+不會讀服務 `env_file:`。行內轉發列在專案 `.env` 有金鑰時會讓金鑰出現在渲染
 後的 `compose config`；要走 env_file-only 緩和必須刪掉該行內列。要把金鑰完全
 留在環境之外，就拒絕此例外並改用 `secret_settings.py`。
 
@@ -247,19 +247,19 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `OPENSPEC_TEST_EVIDENCE`、`COVERAGE_FILE` | `tools/spec_traceability`／CI | 追溯證據與覆蓋率資料檔（quality-gate workflow 設定） |
 | `ELOSERN_BROWSER_*` | `web/tests/browser/` | 受管理瀏覽器測試 harness 的隔離根、埠、身分、場景開關 |
 
-**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆蓋名稱、以及 `llm_env_names()` 產生的全部 253 個 LLM knob 名稱（23 個全域 + 23 × 10 層）從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*`／`LLM_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
+**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆寫名稱與 `llm_env_names()` 產生的全部 253 個 LLM knob 名稱（23 個全域 + 23 × 10 層）從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*`／`LLM_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
 
 ## 必須留在 secret_settings.py 的內容
 
 | 項目 | 為什麼不走環境 |
 | --- | --- |
-| `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏進程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
+| `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏行程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_REMBG_BACKEND`／`ART_TRANSLATE_BACKEND` | 這兩個 local art stage seam 也會執行 dotted-path 匯入；它們分別是第二與第三個 import-executing seam，維持 code-only 可阻止繼承環境載入任意程式碼 |
-| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境打字錯誤會把約 1 GB 去背模型／翻譯模型悄悄搬離其 volume（`ART_STORE_ROOT` 同規則）；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
-| `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
-| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
+| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境變數打錯字會把約 1 GB 去背模型／翻譯模型搬離其 volume（`ART_STORE_ROOT` 同規則）；非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_STORE_ROOT` | 環境變數打錯字會把生成美術搬到持久卷之外的路徑；非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏行程序清單與 `compose inspect`。客戶端只在兩個值都非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
 
 ## Bare-metal（非容器）設定步驟
 
@@ -283,19 +283,19 @@ uv run --locked evennia reload   # 或 evennia stop && evennia start
 
 容器：`podman compose up -d --force-recreate evennia`。
 
-## 讓未來的設定可用環境變數覆蓋（4 步驟）
+## 讓未來的設定可用環境變數覆寫（4 步驟）
 
 1. 在 `server/conf/settings.py` 用 `_env_str`／`_env_int`／`_env_int_bounded`／`_env_float`／`_env_bool`／`_env_dimension`（或 `_env_typed`）指派該設定。
 2. 在 `.env.example` 新增附註解的範列（說明型別、預設值、界線；typed knob 絕不出現未註解的空值條目）。
 3. 在 `docs/development/settings-and-environment.md` 與（若適用）`docs/gm/prompts.md` 補表格列。
-4. 在 `server/conf/tests/test_env_overrides.py` 補一筆有效值 case 與無效值 case，並在 `server/conf/test_settings.py` 的 `_ENV_OVERRIDES` 加入名稱——清單同步由該模組的 AST 盤點測試強制。
+4. 在 `server/conf/tests/test_env_overrides.py` 補一筆有效值 case 與無效值 case，並在 `server/conf/test_settings.py` 的 `_ENV_OVERRIDES` 加入名稱，清單同步由該模組的 AST 盤點測試強制。
 
 ## 疑難排解
 
 | 症狀 | 原因與解法 |
 | --- | --- |
-| 啟動時 `ImproperlyConfigured: setting <NAME>: invalid environment value '<raw>' (<rule>)` | 該環境變數值無效。**所有**匯入這些 settings 的 Evennia 程序（portal 與 server 皆然）都會無法啟動——關閉美術排程器無法救援。解法：改正或 unset 該變數後重啟。compose 環境檢查 `podman compose config` 與容器日誌。 |
+| 啟動時 `ImproperlyConfigured: setting <NAME>: invalid environment value '<raw>' (<rule>)` | 該環境變數值無效。**所有**匯入這些 settings 的 Evennia 程序（portal 與 server 皆然）都會無法啟動，關閉美術排程器也擋不下來。解法：改正或 unset 該變數後重啟。compose 環境檢查 `podman compose config` 與容器日誌。 |
 | `.env` 裡留著空白的 `VAR=` | typed／布林／URL knob 視為未設定（用預設值）；自由文字 knob 取其正當的「伺服器預設」空值。Podman 會把未註解的空值原樣傳進容器，這是文件化行為。 |
-| 測試結果疑似受 shell 環境影響 | 不該再發生：test settings 會 pop 所有覆蓋名稱。若仍見到，檢查是否用了未 sanitized 的 settings 模組並回報。 |
-| `@art health` 顯示 `server: unreachable` 但生成仍成功 | 正常：health 探測僅診斷，unreachable 判定永不阻擋佇列、跳過或延後任何工作（伺服器正在恢復時就會出現這種短暫時差）。生成嘗試不受 `ART_SD_PROBE_*` 影響。 |
+| 測試結果疑似受 shell 環境影響 | 不該再發生，test settings 會 pop 所有覆寫名稱。若仍見到，檢查是否用了未 sanitized 的 settings 模組並回報。 |
+| `@art health` 顯示 `server: unreachable` 但生成仍成功 | 正常。health 探測僅供診斷，unreachable 判定永不阻擋佇列、跳過或延後任何工作（伺服器正在恢復時就會出現這種短暫時差）。生成嘗試不受 `ART_SD_PROBE_*` 影響。 |
 | 想知道某個變數是否真的被讀取 | `server/conf/tests/test_env_overrides.py` 的 AST 盤點測試保證 `.env.example` 每個 active 條目都有真實讀者；死變數會讓該測試失敗。 |

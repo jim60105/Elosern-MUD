@@ -1,6 +1,6 @@
 # LLM 10 大業務情境與調度流程
 
-《伊洛瑟恩》的生成體系共涵蓋 10 個落地的業務情境層（Generative Layers）。每個情境層均擁有專屬的業務觸發點、上下文組裝管線、Prompt 契約以及確定性離線降級機制。
+《伊洛瑟恩》的生成體系共涵蓋 10 個落地的業務情境層（Generative Layers）。每個情境層均擁有專屬的業務觸發點、脈絡組裝管線、Prompt 契約以及確定性離線降級機制。
 
 > [!TIP]
 > **快速導航指引**
@@ -15,7 +15,7 @@
 
 | 層級名稱 (`LAYER_NAMES`) | 核心模組 | 業務觸發點 | 輸出類型 | 離線降級結果 (Fallback) |
 | :--- | :--- | :--- | :--- | :--- |
-| **`narrator`** | `world/ai/narrator.py` | 戰鬥/行動事件日誌結算 | 正體中文散文 | 呼叫本地模板渲染器輸出標準文字 |
+| **`narrator`** | `world/ai/narrator.py` | 戰鬥/行動事件日誌結算 | 正體中文散文 | 呼叫本地範本渲染器輸出標準文字 |
 | **`npc_dialogue`** | `world/ai/npc_dialogue.py` | 玩家發起對話（`talk`） | JSON（台詞 + 8 種意圖） | 回退為作者手寫問候語或保持沉默 |
 | **`dialogue_summary`** | `world/narrative/epochs.py` | 決定性擁有者要求紀元壓縮 | JSON（衍生摘要） | 保留原始對話與目前紀元，使用有界的近期脈絡 |
 | **`correspondence`** | `world/ai/correspondence.py` | 決定性擁有者明確要求回信 | JSON（信文與受限關係提案） | 來信照常送達，回信工作保留待處理 |
@@ -44,7 +44,7 @@
 ```
 
 ### 輸入與提示詞
-* **提示詞鍵值**：`prompts/narrator.yaml` $\rightarrow$ `narrator.system`（無動態占位符）。
+* **提示詞鍵值**：`prompts/narrator.yaml` $\rightarrow$ `narrator.system`（無動態預留位置）。
 * **使用者輸入**：將結構化的 `EventLog` 清單序列化為嚴格受限的文字字串，包含發動者、目標、行為與數值。
 * **邊界限制**：輸入記錄數最多 20 筆、每筆最多 60 個條目、總序列化上限 12,000 字元。
 
@@ -74,8 +74,8 @@
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/npc_dialogue.yaml` $\rightarrow$ `npc_dialogue.system`。
-* **白名單占位符**：`{name}`（NPC 名字）、`{desc}`（外觀特徵）、`{location}`（API 保留，穩定定錨傳入空字串）、`{persona}`（人設區塊）。當前位置放在新回合框架；歷史框架保留原始時間與資料。
-* **動態記憶與上下文**：
+* **白名單預留位置**：`{name}`（NPC 名字）、`{desc}`（外觀特徵）、`{location}`（API 保留，穩定定錨傳入空字串）、`{persona}`（人設區塊）。當前位置放在新回合框架；歷史框架保留原始時間與資料。
+* **動態記憶與脈絡**：
   * 最近 12 輪交談記憶（Memory Window）。
   * 玩家對象資訊：公開形象、表觀特徵與社交連結（玩家的真實隱藏身分與隱藏背景絕不進入 Prompt）。
   * 秘密清單（`no_leak_secrets`）：包含 NPC 內部數值好感度、玩家被偽裝的真實屬性數值。
@@ -124,7 +124,7 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/scenario_director.yaml` $\rightarrow$ `scenario_director.system`。
-* **占位符**：`{name_inspiration}`（種族命名風格參考）。
+* **預留位置**：`{name_inspiration}`（種族命名風格參考）。
 * **任務類型（5 大類別）**：採集（`GATHER`）、討伐（`DEFEAT`）、護衛（`ESCORT`）、探索（`EXPLORE`）、緊急（`EMERGENCY`）。
 
 ### 輸出規格與藍圖結構
@@ -136,7 +136,7 @@ LLM 必須輸出 JSON 格式：
 * `failure`：期限時數與失敗代價。
 
 ### 語意防護與降級
-* **登錄表存在性校驗**：藍圖中引用的怪物階級、物品代碼、錨點與公會分部，必須 100% 存在於 `world.lore` 靜態登錄表，杜絕幻覺產生不存在的獎勵或目標。
+* **登錄表存在性校驗**：藍圖中引用的怪物階級、物品程式碼、錨點與公會分部，必須 100% 存在於 `world.lore` 靜態登錄表，杜絕幻覺產生不存在的獎勵或目標。
 * **獎勵邊界保護**：報酬銅幣不得超過該公會階級的上限。
 * **人物卡契約**：每個 `npc_req` 的人物卡都透過共用的 `world/quests/characterization.py` 依精簡人物卡契約（`world/lore/npc_card.py`）驗證必填欄位與字數上限；編譯、持久化還原與場景具現化時都會再驗證一次，具現化時經 `initialize_npc_persona` 以 `generated_quest` 來源寫入 NPC。
 * **降級機制**：若失敗，立即由 `world/ai/director_templates.py` 根據請求的階級與地點，隨機抽出一張預先編寫的手寫任務範本編譯交付。
@@ -160,7 +160,7 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/scene_builder.yaml` $\rightarrow$ `scene_builder.system`。
-* **占位符**：`{scene_sentence}`（核心場景句）、`{quest_context}`（任務背景）、`{room_name}`（房間名稱）、`{region}`（所在區域）。
+* **預留位置**：`{scene_sentence}`（核心場景句）、`{quest_context}`（任務背景）、`{room_name}`（房間名稱）、`{region}`（所在區域）。
 
 ### 語意防護與降級
 * **無數字鐵律（No Fabricated Numbers）**：**文本中嚴禁出現任何半形或全形阿拉伯數字**。若出現數字（例如「3 隻哥布林」、「長度 10 公尺」），驗證器立即判定失敗並要求重試，防止 LLM 越權虛構實體數量或規格。
@@ -185,7 +185,7 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/character_creation.yaml` $\rightarrow$ `character_creation.system`。
-* **占位符**：`{concept}`（玩家原始輸入）、`{race_catalog}`（動態種族/子種族屬性上下限與親和預算清單）。
+* **預留位置**：`{concept}`（玩家原始輸入）、`{race_catalog}`（動態種族/子種族屬性上下限與親和預算清單）。
 
 ### 輸出規格與核心校驗
 輸出為結構化 JSON 提案：
@@ -193,7 +193,7 @@ LLM 必須輸出 JSON 格式：
 * `allocations`：7 大屬性配點（`hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power`），總和必須精確等於該種族預算。
 * `suggested_skills`：推薦初始技能（最多 8 個）。
 * `persona`：三人設草稿（`personality` 性格、`life_story` 生平、`habit` 習慣）。
-* **年齡合理值（Age Range Bound）**：`age` 與 `apparent_age` 為 $0$ 至 $10000$ 的整數，越界的提案由底層驗證器直接夾取修正。
+* **年齡合理值（Age Range Bound）**：`age` 與 `apparent_age` 為 $0$ 至 $10000$ 的整數，越界的提案由底層驗證器直接修正到範圍內。
 
 ---
 
@@ -214,7 +214,7 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/action_options.yaml` $\rightarrow$ `action_options.system` 與 `action_options.user`。
-* **使用者輸入占位符**：`{room_name}`、`{room_summary}`、`{npc_entries}`、`{monster_entries}`、`{objective}`、`{narrative_tail}`、`{affordances}`（現場確實可執行的動作清單）。
+* **使用者輸入預留位置**：`{room_name}`、`{room_summary}`、`{npc_entries}`、`{monster_entries}`、`{objective}`、`{narrative_tail}`、`{affordances}`（現場確實可執行的動作清單）。
 * **結構化需求**：此層級要求 Profile 必須支援 `supports_response_format: True`。
 
 ### 12 階驗證天梯（Ladder）
@@ -239,7 +239,7 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/title_nomination.yaml` $\rightarrow$ `title_nomination.system` 與 `title_nomination.user`。
-* **占位符**：`{player_name}`、`{full_title}`、`{recent_events}`（近期事件紀錄）、`{declined}`（歷史拒絕清單）、`{removed}`（主動卸除清單）。
+* **預留位置**：`{player_name}`、`{full_title}`、`{recent_events}`（近期事件紀錄）、`{declined}`（歷史拒絕清單）、`{removed}`（主動卸除清單）。
 
 ### 輸出與碰撞過濾
 * **輸出格式**：5 筆 `{"display": "2~8字異名", "basis": "80字以內事蹟引用"}`。
@@ -269,46 +269,26 @@ LLM 必須輸出 JSON 格式：
 
 ### 輸入與提示詞
 * **提示詞鍵值**：`prompts/story_director.yaml` $\rightarrow$ `story_director.system`。
-* **占位符**：無（有界的候選／請求脈絡以使用者訊息中的確定性 JSON 影格傳入）。
+* **預留位置**：無（有界的候選／請求脈絡以使用者訊息中的確定性 JSON 影格傳入）。
 * **輸出欄位**：`kind`（`follow_up`／`clue`／`invitation`／`letter`／`quest_seed`）、`summary`（1–600 字正體中文），可選 `recipient`、`relation_delta`（0–10）、`writes`（必須為空陣列）。
 
 ### 效果路由（確定性核心決定）
 * `follow_up`／`clue`／`invitation` $\rightarrow$ `narrative_statement`：敘事擁有者寫入敘事事件並登錄故事線發展。
 * `letter` $\rightarrow$ `letter_send`：敘事擁有者以 `send_letter` 送出並登錄為故事線陳述。
-* `quest_seed` → `generate_beat_quest_blueprint()` → deterministic quest compilation and linked publication. Missing or degraded beat blueprints produce `no_content`, never an authored-template replacement.
+* `quest_seed` → `generate_beat_quest_blueprint()` → 確定性的任務編譯與連結發布。缺少或降級的節拍藍圖產生 `no_content`，絕不會改用作者範本取代。
 * `relation_delta`：關係屬於規則擁有者的資料，敘事僅把提案值路由給規則套用器；失敗則整筆拒絕且不留部分狀態。
 
 ---
 
-### Quest-beat compilation boundary (2026-10-04)
+### 任務節拍編譯邊界（2026-10-04）
 
-`attempt_decision()` captures the permitted immutable director frame, then
-requests a quest blueprint outside the settlement transaction. The beat-specific
-client is supplied through `quest_client` or constructed by the server composition
-root using the ScenarioDirector profile, never the story director's transport.
-The beat-specific ScenarioDirector entry uses the existing profile, guardrail,
-schema and semantic
-validators. Unlike generic `generate_quest_blueprint()`, it returns no content on
-disabled transport, exhausted validation, context misfit or an oversized frame.
-The generic entry retains its authored offline templates.
+`attempt_decision()` 先擷取允許的不可變導演框架，再於結算交易之外請求任務藍圖。節拍專用的客戶端透過 `quest_client` 傳入，或由伺服器組合根以 ScenarioDirector 設定檔建構，絕不使用故事導演的傳輸通道。節拍專用的 ScenarioDirector 入口沿用既有的設定檔、護欄、schema 與語意驗證器。與一般的 `generate_quest_blueprint()` 不同，它在傳輸停用、驗證耗盡、脈絡不合或框架過大時回傳空內容。一般入口保留其作者離線範本。
 
-The issuer is either the owner's registered guild branch or an authorized NPC
-participant explicitly named by the beat. Publication rechecks source/request
-version, thread revision/access, current rank, issuer identity and location
-anchor. The quest compiler remains authoritative for rewards, lore references,
-scene requirements and issuer authorization. No prose can accept a commission,
-advance an objective, assert a completed action, or create a room.
+發行人是擁有者已登錄的公會分支，或由節拍明確指名的授權 NPC 參與者。發布時重檢來源／請求版本、故事線修訂與存取權、當前階級、發行人身分與地點錨點。任務編譯器對獎勵、典據參考、場景需求與發行人授權仍具權威。任何散文都不能承接委託、推進目標、宣稱已完成的行動，或建立房間。
 
-`ScheduledBeat.payload.quest` retains the normalized blueprint, definition key,
-issuer key and context snapshot ID. The beat and durable generated-quest mirror
-commit together; quest-owner publication scopes restore process registries and
-Evennia attribute caches after a failed savepoint. Replaying the captured source
-identity returns the existing decision without another model call. SceneBuilder,
-instance reclamation, contact-based acceptance and quest runtime are unchanged.
+`ScheduledBeat.payload.quest` 保留正規化的藍圖、定義鍵、發行人鍵與脈絡快照 ID。節拍與持久的產生任務鏡像一起提交；任務擁有者的發布範圍在 savepoint 失敗後還原程序註冊表與 Evennia 屬性快取。重播已擷取的來源身分會回傳既有的決策，不再呼叫模型。SceneBuilder、執行個體回收、接觸式承接與任務執行期都不變。
 
-Change log: enabled real quest-seed publication, added no-filler generation and
-source revalidation, and retained generic offline behavior. No player command or
-browser action changed.
+變更紀錄：啟用真實的任務種子發布，加入無填充產生與來源重驗證，並保留一般的離線行為。玩家指令與瀏覽器動作都沒有變更。
 
 ## 相關延伸閱讀
 

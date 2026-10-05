@@ -7,9 +7,9 @@
 - `webclient-vue-08-wire-bridge-contracts`（**C2**）為凍結 façade 橋接介面（§1）的**約束性消費者（binding consumer）**，並套用指定它的增量項目（§3）。
 - `webclient-vue-10-wire-views-browser`（**C4**）套用指定它的切換期增量項目（§3），並執行 DOM 重新對應決策（§2.3）。
 
-本文件為 Phase-0 設計（A1 設計 D1/D2）的 Phase-0 契約審查：列舉了 `openspec/specs/webclient-*/spec.md`（17 個 `webclient-*` 主要能力）與受管 Playwright 套件 `web/tests/browser/` 中所有綁定實作的客戶端契約，將每個契約分類為「透過橋接保留」或「增量變更」，並凍結 (a) 瀏覽器橋接器（C2）必須暴露的確切 `window.Elosern.*` façade 橋接介面，以及 (b) 完整的 `MODIFIED`/`RENAMED` 增量清單。增量**不由 A1 套用**；每個項目皆註明其套用變更。
+本文件為 Phase-0 設計（A1 設計 D1/D2）的 Phase-0 契約審查，列舉了 `openspec/specs/webclient-*/spec.md`（17 個 `webclient-*` 主要能力）與受管 Playwright 套件 `web/tests/browser/` 中所有綁定實作的客戶端契約，將每個契約分類為「透過橋接保留」或「增量變更」，並凍結 (a) 瀏覽器橋接器（C2）必須暴露的確切 `window.Elosern.*` façade 橋接介面，以及 (b) 完整的 `MODIFIED`/`RENAMED` 增量清單。增量**不由 A1 套用**；每個項目皆註明其套用變更。
 
-列舉方法（A1 設計 D2）：grep 驅動。擷取了所有出現的 `window.Elosern.`、`onKeydown` 外掛路徑、Playwright 套件與鍵盤路由器中的 `getElementById` 與 `#`-id 目標，以及版面配置持久化索引鍵，並加以分類；讀取了客戶端原始碼（`web/static/webclient/js/`）與 `web/templates/webclient/base.html` 中的分類位置以確立定義證據。§1 中的 façade 成員清單是直接從 UMD 模組本身機械式衍生（在 `protocol.js` 與 `keyboard_router.js` 上執行 Node `Object.keys`），而非手動抄錄。
+列舉方法（A1 設計 D2）為 grep 驅動。擷取了所有出現的 `window.Elosern.`、`onKeydown` 外掛路徑、Playwright 套件與鍵盤路由器中的 `getElementById` 與 `#`-id 目標，以及版面配置持久化索引鍵，並加以分類；讀取了客戶端原始碼（`web/static/webclient/js/`）與 `web/templates/webclient/base.html` 中的分類位置以確立定義證據。§1 中的 façade 成員清單是直接從 UMD 模組本身機械式衍生（在 `protocol.js` 與 `keyboard_router.js` 上執行 Node `Object.keys`），而非手動抄錄。
 
 本文件中的每個實作綁定識別碼皆恰好落入單一分組（§2）。沒有任何識別碼被重複分類，且每個分組項目皆具備理由說明。
 
@@ -17,7 +17,7 @@
 
 ## 1. Frozen façade-bridge surface
 
-瀏覽器橋接器（C2）應在 `window.Elosern.*` 恰好暴露這四個 façade，且恰好包含這些成員。`Protocol` 與 `KeyboardRouter` 為保留的 UMD 模組本身，以位元組完全相同的方式附加（橋接器重新暴露匯入，不重新實作）。`narrativeInput` 與 `actions` 為單一擁有者 façade：分別為 store 的單一敘事／抉擇點附加路徑，以及單一動作分派進入點。
+瀏覽器橋接器（C2）應在 `window.Elosern.*` 恰好暴露這四個 façade，且恰好包含這些成員。`Protocol` 與 `KeyboardRouter` 為保留的 UMD 模組本身，以位元組完全相同的方式附加（橋接器重新暴露匯入，不重新實作）。`narrativeInput` 與 `actions` 為單一擁有者 façade，分別為 store 的單一敘事／抉擇點附加路徑，以及單一動作分派進入點。
 
 ```json
 {
@@ -266,7 +266,7 @@
 }
 ```
 
-Façade 說明（行為契約，橋接器必須保留行為而不僅僅是名稱）：
+Façade 說明（行為契約，橋接器必須保留行為本身，名稱相符並不足夠）：
 
 - **`Protocol`** — 傳輸生成 reducer 及其驗證器表格。`createStore` 回傳 store 介面 `create_store_members`（不可部分發布的快照採用、epoch 與修訂版本門控、過期 epoch 集合、每次認可一次通知的語意，即由 `webclient-oob-protocol` 與 `webclient-desktop-shell` 狀態化簡需求所固定的行為）。`envelope_names` 清單為確切的版本化 OOB 訊息集合（`PROTOCOL_VERSION = 1`）。
 - **`KeyboardRouter`** — 選單堆疊焦點路由器。`createRouter(options)` 回傳恰好具備 `router_instance_members` 的路由器；`handle(key, repeat)` 為單一按鍵進入轉接器。宣告語意：`press`/`handle` 恰好在路由器消耗該按鍵（方向鍵／Enter／Escape／Space／`/`）時回傳 `true`，且重複的 Enter 與 Space 會被壓制；未消耗的按鍵回傳 `false` 並向下傳遞。`setMutationInFlight`/`isAwaitingRevision` 為提交門控。正式環境的 `window.Elosern.keyboard` 執行個體是*相鄰*的測試架構全域變數，非凍結模組介面的一部份（§2.1）。
@@ -309,7 +309,7 @@ Façade 說明（行為契約，橋接器必須保留行為而不僅僅是名稱
 
 ### 2.3 DOM identifiers (managed browser tests + keyboard router targets) — re-frozen at the post-redesign client (H6)
 
-H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合。本節為更新後的凍結清單：包含 H1 凍結的保留契約掛鉤，加上 H1 至 H5 執行的所有 `data-testid` 重新對應，以及受管瀏覽器套件鎖定的 CSS 類別掛鉤。
+H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合。本節為更新後的凍結清單，包含 H1 凍結的保留契約掛鉤，加上 H1 至 H5 執行的所有 `data-testid` 重新對應，以及受管瀏覽器套件鎖定的 CSS 類別掛鉤。
 
 **Preserved contract hooks** — Vue 主架構算繪這些不變的識別碼；受管瀏覽器測試持續以其為目標，無規格增量：
 
@@ -327,7 +327,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 **Re-mapped `data-testid` set (H1–H5)** — 下列各家族重新對應至穩定的 `data-testid` 掛鉤；受管 Playwright 切片由所屬波次重新導向。前綴項目涵蓋動態後綴。
 
-The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-persona-editor-<suffix>` family (`version`, `total`, `notice-spoiler`, `notice-static`, `save`, `cancel`, `conflict`, `reload`, `discard`, `confirm-keep`, `confirm-discard`) and `npc-persona-field-<suffix>` (`speech_style`, `offline_greeting`, and the other labeled card controls). These action-result-backed hooks are frozen as REMAP-TO-TESTID and exercised by `test_browser_npc_persona_editor.py`; the existing `hud-drawer-scrim` remains its dismissal target.
+`npc-persona-editor-window` 功能加入 `npc-persona-editor` 與 `npc-persona-editor-<suffix>` 家族（`version`、`total`、`notice-spoiler`、`notice-static`、`save`、`cancel`、`conflict`、`reload`、`discard`、`confirm-keep`、`confirm-discard`）以及 `npc-persona-field-<suffix>`（`speech_style`、`offline_greeting`，以及其餘帶標籤的卡片控制）。這些由 action result 支撐的掛鉤以 REMAP-TO-TESTID 凍結，並由 `test_browser_npc_persona_editor.py` 驗證；既有的 `hud-drawer-scrim` 仍是其關閉目標。
 
 | Hook family | Wave | Bucket |
 |---|---|---|
@@ -358,7 +358,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 | `participant-frame`, `participant-portrait-placeholder` + `participant-frame__<suffix>` (`participant-frame__row`, `participant-frame__name`, `participant-frame__group-label`, `img.participant-frame__portrait`) | H3 | REMAP-TO-TESTID |
 | `quest-drawer` + `quest-drawer__<suffix>` (`quest-drawer__counter-absent` 任務抽屜內「公會櫃台需在公會職員面前才能辦理」的明示標記, `quest-drawer__counter-unavailable` 攜帶 `services` 面板自身註冊表原因的櫃台不可用標記) (split 後任務抽屜主體 wrapper：容納任務簿與公會櫃台兩個 surface；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
 | `quest-log` + `quest-log__<suffix>` (prefix quest-log__: `quest-log__title`, `quest-log__unavailable`, `quest-log__absent`, `quest-log__empty`, `quest-log__group--<state>`, `quest-log__row--<quest_id>`, `quest-log__quest-state`, `quest-log__issuer`, `quest-log__settlement`, `quest-log__quest-stage`, `quest-log__quest-deadline`, `quest-log__quest-detail`, `quest-log__reward`, `quest-log__track`, `quest-log__untrack`, `quest-log__track-reason`, `quest-log__abandon`, `quest-log__abandon-reason`, `quest-log__abandon-confirm`, `quest-log__abandon-confirm-text`, `quest-log__abandon-confirm-yes`, `quest-log__abandon-confirm-no`, `quest-log__turnin`, `quest-log__turnin-reason`) (任務簿：host 無關的 `quest_log` 面板客戶端面，依狀態分組、逐列標示發布者與結算方式；追蹤控制一律在列，放棄／回報僅在櫃台端同 `quest_id` 列存在時鏡像其描述子；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
-| `guild-counter` + `guild-counter__<suffix>` (prefix guild-counter__: `guild-counter__title`, `guild-counter__unavailable`, `guild-counter__absent`, `guild-counter__registration`, `guild-counter__register`, `guild-counter__register-reason`, `guild-counter__board-row--<definition_key>`, `guild-counter__accept`, `guild-counter__accept-reason`, `guild-counter__rank-level`, `guild-counter__rankblock`, `guild-counter__merit`, `guild-counter__exam`, `guild-counter__exam-reason`) (公會櫃台：註冊、任務板接取與等級考核三節；不再列出持有者的任務紀錄——任務簿擁有它們；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
+| `guild-counter` + `guild-counter__<suffix>` (prefix guild-counter__: `guild-counter__title`, `guild-counter__unavailable`, `guild-counter__absent`, `guild-counter__registration`, `guild-counter__register`, `guild-counter__register-reason`, `guild-counter__board-row--<definition_key>`, `guild-counter__accept`, `guild-counter__accept-reason`, `guild-counter__rank-level`, `guild-counter__rankblock`, `guild-counter__merit`, `guild-counter__exam`, `guild-counter__exam-reason`) (公會櫃台：註冊、任務板接取與等級考核三節；不再列出持有者的任務紀錄，任務簿擁有它們；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
 | `art-panel` + `.art-panel__<suffix>` (`.art-panel__portrait-tile`) | H1 (still mounted) | REMAP-TO-TESTID |
 | `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
 | `combat-detail` | H3 | REMAP-TO-TESTID |
@@ -408,7 +408,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 | `base.html` 提供建置後的 Vite 組合包（`web/static/webclient/app/dist`）— jQuery、GoldenLayout 與外掛腳本載入已在 C4 切換時移除；階段透過 `main.js` 掛載 | RETIRED-WITH-SHELL |
 | `evennia.js` 傳輸層與 `Evennia.*` 全域變數（`sendInputField`、`connection`、`.msg`）由橋接器保留 | PRESERVE-VIA-BRIDGE |
 
-**H6 驗證（工作 3.4）：** `window.Elosern.*` 公開 façade 介面（§1 `frozen-facade-surface` JSON — `Protocol`、`KeyboardRouter`、`narrativeInput`、`actions`）與鍵盤路由器宣告契約（C2 在 `webclient-pointer-activation` 中的重新表述）在 H1 至 H5 重設計中**維持不變**：重設計為現有傳輸層之上的檢視層變更，因此 §1 中的凍結成員清單維持為約束性介面，且鍵盤路由器消耗契約（`routeKeyboard` 宣告規則、強制回應擷取搶佔）由橋接器完整承載。
+**H6 驗證（工作 3.4）：** `window.Elosern.*` 公開 façade 介面（§1 `frozen-facade-surface` JSON — `Protocol`、`KeyboardRouter`、`narrativeInput`、`actions`）與鍵盤路由器宣告契約（C2 在 `webclient-pointer-activation` 中的重新表述）在 H1 至 H5 重設計中**維持不變**，重設計為現有傳輸層之上的檢視層變更，因此 §1 中的凍結成員清單維持為約束性介面，且鍵盤路由器消耗契約（`routeKeyboard` 宣告規則、強制回應擷取搶佔）由橋接器完整承載。
 
 ### 2.4 Layout-persistence keys
 
@@ -442,7 +442,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 
 ## 3. Delta list (MODIFIED / RENAMED)
 
-完整的 `MODIFIED`/`RENAMED` 增量集合。每個項目皆指明受影響的主規格需求（能力名稱與需求標題，截至 A1）、套用變更、給套用變更的指示，以及理由。項目互不重疊：沒有任何 `(capability, requirement)` 配對出現兩次。套用變更在自身的實作期間撰寫確切的重新表述，並在同一個變更中重新指向該需求的追溯性測試（C2 設計 D2）。所有在遷移過程中文字維持為真的需求**未**列於此處（已在 §2 分類為保留）。
+完整的 `MODIFIED`/`RENAMED` 增量集合。每個項目皆指明受影響的主規格需求（能力名稱與需求標題，截至 A1）、套用變更、給套用變更的指示，以及理由。項目互不重疊，沒有任何 `(capability, requirement)` 配對出現兩次。套用變更在自身的實作期間撰寫確切的重新表述，並在同一個變更中重新指向該需求的追溯性測試（C2 設計 D2）。所有在遷移過程中文字維持為真的需求**未**列於此處（已在 §2 分類為保留）。
 
 ```json
 {
@@ -535,7 +535,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 
 - **C2-01 至 C2-03** 為橋接契約重新表述。橋接器（C2）帶有建立各重新表述契約的測試（在 `KeyboardRouter` 模組上斷言按鍵路徑、單一進入點 `narrativeInput`/`actions`、無外掛參與），因此每個重新表述的需求在 C2 封存時皆具備通過的測試（C2 設計 D2）。
 - **C4-01、C4-02、C4-03** 為切換時編輯，於正式切換時套用，此時主規格在封存時對 Vue 桌面主架構為真（路線圖 §5 C4：「`webclient-desktop-shell` 從 GoldenLayout 主架構更名為 Vue SPA 桌面主架構」）。C4-03 的敘事標記修正隨 C4 落地（而非 C2），因為其停止命名的內建外掛在切換前仍留存在舊版載入路徑中。C4 亦在同一個變更中執行 §2.3 重新對應決策，並將其餘 Playwright 行為切片重新對應至保留掛鉤與 `data-testid`。
-- 無其他 `webclient-*` 需求文字失效：其餘所有綁定實作的識別碼皆分類為保留（§2）— 四個 façade 透過橋接器存續，DOM 契約掛鉤獲得保留，版面配置持久化契約由保留的 `LayoutStore` 擁有，且敘事／回顯／傳輸行為具實作中立性。
+- 無其他 `webclient-*` 需求文字失效，其餘所有綁定實作的識別碼皆分類為保留（§2）：四個 façade 透過橋接器存續，DOM 契約掛鉤獲得保留，版面配置持久化契約由保留的 `LayoutStore` 擁有，且敘事／回顯／傳輸行為具實作中立性。
 
 ---
 
@@ -559,7 +559,7 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 
 ### npc-persona-editor-window-hook-registration — 2026-10-02（master 凍結契約復綠）
 
-- **§2.3 補登 hook：** `.npe-confirm`（NPC persona 編輯器的髒關閉確認對話框根元素）登記於 CSS class hooks 表為 REMAP-TO-TESTID。該掛鉤由 npc-persona-editor-window 變更連同 `npc-persona-editor-*` testid 家族一併加入，受管套件在 `test_browser_npc_persona_editor.py` 以 `page.locator(".npe-confirm")` 斷言確認關閉後其缺席；`tests/test_webclient_frozen_contract.py` 的受管瀏覽器目標掃描自此轉綠。
+- **§2.3 補登 hook：** `.npe-confirm`（NPC persona 編輯器的髒關閉確認對話方塊根元素）登記於 CSS class hooks 表為 REMAP-TO-TESTID。該掛鉤由 npc-persona-editor-window 變更連同 `npc-persona-editor-*` testid 家族一併加入，受管套件在 `test_browser_npc_persona_editor.py` 以 `page.locator(".npe-confirm")` 斷言確認關閉後其缺席；`tests/test_webclient_frozen_contract.py` 的受管瀏覽器目標掃描自此轉綠。
 - **§5 完整性聲明維持成立：** 本項為補登的文件同步，未改變凍結 façade（§1）或增量清單（§3）。
 
 ### frozen-audit-renewal-sweep-2 — 2026-09-30（master 凍結契約復綠）
@@ -576,24 +576,24 @@ The `npc-persona-editor-window` feature adds the `npc-persona-editor` and `npc-p
 ### webclient-retire-exploration-submenus — 2026-09-26（webclient-retire-exploration-submenus）
 
 - **§2.3 退役識別碼：** `.dock-menu__outlet` 與 `.dock-menu__outlet-tile` 自 CSS class hooks 表移除。探索 dock 的根框架是場景總覽（webclient-scene-overview-swap），出口即總覽的 chips，因此移動子選單連同其 exit-outlet pane 一併刪除；受管瀏覽器套件對該 pane 的引用同步改指場景總覽的 chips。
-- **§2.3 新增 hooks：** `.scene-chip`（場景總覽的 chips）、`.action-dock__pane`（dock 的捲動面板）、`.dock-menu-item__label` 與 `.dock-menu-item__glyph`（chip 的文字與方向字形）——皆為既有的 `.dock-menu-item` 列所描述的同一個共享列渲染器之穩定鉤點，本變更把該列展開為明列項目。
+- **§2.3 新增 hooks：** `.scene-chip`（場景總覽的 chips）、`.action-dock__pane`（dock 的捲動面板）、`.dock-menu-item__label` 與 `.dock-menu-item__glyph`（chip 的文字與方向字形），三者皆為既有的 `.dock-menu-item` 列所描述的同一個共享列渲染器之穩定鉤點，本變更把該列展開為明列項目。
 - **§5 完整性聲明維持成立：** 本變更只退役並新增受管目標，未遺留未註冊的識別碼；`tests/test_webclient_frozen_contract.py` 的單向涵蓋檢查維持與本變更前相同的判定結果。
 
 ### quest-drawer-split — 2026-09-06（webclient-quest-drawer-split）
 
-- **§2.3 新 families：** `quest-board` 家族退役，改為三個 family——`quest-drawer`（任務抽屜主體 wrapper：抽屜內兩個 quest surface 的穩定鉤點，含 `__counter-absent` 明示「櫃台需職員」標記與 `__counter-unavailable` 攜帶 `services` 註冊表原因的櫃台不可用標記）、`quest-log`（任務簿：host 無關的 `quest_log` 面板客戶端面——依狀態分組的 `__row--<quest_id>` 列、發布者與結算標示、永遠在列的追蹤控制，以及僅在櫃台端同 `quest_id` 列存在時鏡像的放棄／回報控制與兩段式放棄確認）、`guild-counter`（公會櫃台：註冊、任務板接取、等級考核三節；**不再**列出持有者的任務紀錄，任務不會在同一抽屜出現兩次）。
-- **退役：** `QuestBoard.vue`（496 行、單一資料源）連同其 story（`world-questboard--*`）與 `quest_board.test.js` 刪除；`quest-board__*` 識別碼自 §2.3 移除，受管瀏覽器套件的所有引用同步改指新 family。`manifest` 以 `World/QuestLog`、`World/GuildCounter` 取代 `World/QuestBoard`（凍結集 46 → 47）。`世界圖鑑` 按鈕不隨 split 帶回——圖鑑觸發點仍在指令列 `.cmdutil` 的 `command-line-lore`。
+- **§2.3 新 families：** `quest-board` 家族退役，改為三個 family：`quest-drawer`（任務抽屜主體 wrapper：抽屜內兩個 quest surface 的穩定鉤點，含 `__counter-absent` 明示「櫃台需職員」標記與 `__counter-unavailable` 攜帶 `services` 註冊表原因的櫃台不可用標記）、`quest-log`（任務簿：host 無關的 `quest_log` 面板客戶端面，依狀態分組的 `__row--<quest_id>` 列、發布者與結算標示、永遠在列的追蹤控制，以及僅在櫃台端同 `quest_id` 列存在時鏡像的放棄／回報控制與兩段式放棄確認）、`guild-counter`（公會櫃台：註冊、任務板接取、等級考核三節；**不再**列出持有者的任務紀錄，任務不會在同一抽屜出現兩次）。
+- **退役：** `QuestBoard.vue`（496 行、單一資料源）連同其 story（`world-questboard--*`）與 `quest_board.test.js` 刪除；`quest-board__*` 識別碼自 §2.3 移除，受管瀏覽器套件的所有引用同步改指新 family。`manifest` 以 `World/QuestLog`、`World/GuildCounter` 取代 `World/QuestBoard`（凍結集 46 → 47）。`世界圖鑑` 按鈕不隨 split 帶回，圖鑑觸發點仍在指令列 `.cmdutil` 的 `command-line-lore`。
 - **§5 完整性聲明維持成立：** 受管瀏覽器套件的每個 `data-testid` 目標皆落入 §2.3 的 `quest-drawer__`、`quest-log__` 或 `guild-counter__` 前綴（或既有條目）；`tests/test_webclient_frozen_contract.py` 的完整清單檢查維持綠燈。
 
 ### lore-codex-drawer — 2026-09-06（webclient-lore-codex-drawer）
 
-- **§2.3 新 family：** 加入 `lore-codex-drawer` / `lore-codex-drawer__<suffix>`（世界圖鑑抽屜主體：表頭、分類藥丸列、逐分類已發現計數控制、項目列、選取項目卡，以及誠實空狀態與不可用形式）。`command-line` 家族加入 `command-line-lore`：指令列工具列的第五個控制，開啟 `lore` 抽屜——經 store 的單一 `openHudDrawer` 進入點，既有的互斥與收合規則不變（`lore` 本就在 `HUD_DRAWER_NAMES` 內，store 無變更）。
-- **退役：** `LoreDrawer.vue`（公會任務散文，非圖鑑）連同其 story 與測試刪除；`quest-board__open-lore` 按鈕與其 `open_lore` emit 一併移除——任務抽屜不再含任何開啟圖鑑的控制。兩個退役識別碼皆未列於 §2.3（受管套件僅以 `REFERENCE_SURFACE_TESTIDS` 執行期清單引用前者），該清單已同步改指 `lore-codex-drawer`。
+- **§2.3 新 family：** 加入 `lore-codex-drawer` / `lore-codex-drawer__<suffix>`（世界圖鑑抽屜主體：表頭、分類藥丸列、逐分類已發現計數控制、項目列、選取項目卡，以及誠實空狀態與不可用形式）。`command-line` 家族加入 `command-line-lore`：指令列工具列的第五個控制，開啟 `lore` 抽屜，經 store 的單一 `openHudDrawer` 進入點，既有的互斥與收合規則不變（`lore` 本就在 `HUD_DRAWER_NAMES` 內，store 無變更）。
+- **退役：** `LoreDrawer.vue`（公會任務散文，非圖鑑）連同其 story 與測試刪除；`quest-board__open-lore` 按鈕與其 `open_lore` emit 一併移除，任務抽屜不再含任何開啟圖鑑的控制。兩個退役識別碼皆未列於 §2.3（受管套件僅以 `REFERENCE_SURFACE_TESTIDS` 執行期清單引用前者），該清單已同步改指 `lore-codex-drawer`。
 - **§5 完整性聲明維持成立：** 本變更新增掛鉤，未遺留未註冊的受管目標；`command-line-lore` 由既有的 `command-line-<suffix>` 前綴涵蓋。
 
 ### action-feedback — 2026-09-03（add-action-feedback-toasts）
 
-- **§2.3 新 family：** 加入 `feedback-toast-queue` / `feedback-toast-<id>`（動作回饋 toast 佇列）。此佇列是純客戶端本地 surface（store 為唯一寫入者、不讀任何 OOB panel 欄位），凍結測試對 toast 的禁令同步**縮窄而非解除**：仍延後的是由 `event_log` 讀模型餵食的遊戲事件 toast 佇列，其 `toast-`／`event-log-` testid 綁定在 authored view layer 持續缺席（`deferred_surfaces_absent.test.js` 的來源級掃描不變）；`feedback-` 前綴自此合法並由該測試正向斷言其存在與純 props 綁定。層級契約：`.toasts` 採 `calc(var(--z-surface-modal) + 100)`（與 `.inventory-confirm` 同層、AppClient 根節點最後一個子節點），凌駕所有產品 overlay，僅次於保留的 `--z-offline`。
+- **§2.3 新 family：** 加入 `feedback-toast-queue` / `feedback-toast-<id>`（動作回饋 toast 佇列）。此佇列是純客戶端本地 surface（store 為唯一寫入者、不讀任何 OOB panel 欄位），凍結測試對 toast 的禁令同步**縮窄而非解除**：仍延後的是以 `event_log` 讀模型為資料來源的遊戲事件 toast 佇列，其 `toast-`／`event-log-` testid 綁定在 authored view layer 持續缺席（`deferred_surfaces_absent.test.js` 的來源級掃描不變）；`feedback-` 前綴自此合法並由該測試正向斷言其存在與純 props 綁定。層級契約：`.toasts` 採 `calc(var(--z-surface-modal) + 100)`（與 `.inventory-confirm` 同層、AppClient 根節點最後一個子節點），凌駕所有產品 overlay，僅次於保留的 `--z-offline`。
 - **§5 完整性聲明維持成立：** 本變更只新增掛鉤，未退役或重新命名任何既有識別碼；§1／§2／§3 其餘章節不受影響。
 
 ### A1.1 — 2026-08-20（封存後，同步 rubber-duck 審查）

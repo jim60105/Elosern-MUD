@@ -31,7 +31,7 @@
 | 對話形態 | 條件 | 降級行為 |
 |---|---|---|
 | 劇本對話（`talk` 關鍵詞查表） | NPC 帶 `ScriptedDialogue` 元件，`dialogue_key` 指向 `world/lore/dialogue/` 已登錄的表 | 未知關鍵詞回覆無理解行；查得到的表永遠可用，完全離線可玩 |
-| 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `resolve_greeting(npc)` 的離線問候語（實例欄位優先，次為劇本／Profile）或沉默 |
+| 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `resolve_greeting(npc)` 的離線問候語（執行個體欄位優先，次為劇本／Profile）或沉默 |
 
 匯入器預設建 `NPC`（純劇本對話／無對話）。生成對話人物必須顯式傳 `typeclass=LLMNPC`。
 
@@ -137,7 +137,7 @@ ROWS = {
 2. **語音台詞分配規則**：
    - **劇本主人**：地點對話表的首句問候語（`greeting`）為唯一來源，設定檔內的 `voice.greeting` 保持 `None`，消除問候語雙頭維護的風險；設定檔必須填寫 `voice.misunderstood`（理解失敗回覆語）。
    - **考核官**：純戰鬥考核對象不具備對話能力，其設定檔內的 `voice.greeting` 與 `voice.misunderstood` 皆設定為 `None`。
-   - **同行夥伴**：夥伴預設卡（`PlayerPreset`）直接提供 `speech_style` 與 `greeting`（離線問候語），夥伴實例化時將問候語寫入實例專屬的 `db.npc_offline_greeting`。
+   - **同行夥伴**：夥伴預設卡（`PlayerPreset`）直接提供 `speech_style` 與 `greeting`（離線問候語），夥伴實例化時將問候語寫入執行個體專屬的 `db.npc_offline_greeting`。
 3. **出貨名冊清單（Inventory）**：所有出貨來源（地點主人、對話表、公會考核官、同行夥伴、離線任務模板佔位者、匯入範例卡）必須登記在 `world/lore/npc_profiles/inventory.py` 的 `NPC_SOURCE_INVENTORY` 之中，並標記所屬內容切片。
 4. **伺服器啟動驗證門禁**：伺服器開機程序包含 `npc_persona_roster_validation` 步驟，置於 `STARTUP_STEP_ORDER` 中 `state_reaction_rules` 之後、`sync_all` 之前。驗證函式 `validate_npc_roster()` 比對名冊雙向一致性、檢驗所有角色卡契約、確認每張對話表皆由單一服務主人應答，並檢查語音覆蓋完整度。任一處不合規範即觸發例外中止開機，阻止寫入不完整資料。
 
@@ -145,7 +145,7 @@ ROWS = {
 
 作者在遊戲內可透過目標互動面板的「編輯人物設定」開啟編輯視窗，檢視或修改 NPC 執行期角色卡與離線問候語覆寫值：
 
-1. **固定劇本不重產原則**：劇本對話（固定問候語、關鍵詞回應、服務說明）在創作時針對初始設定檔撰寫。在遊戲內編輯人物設定後，語言模型不會重新生成或改寫既有的劇本對話。關鍵詞回應與服務引導皆維持作者手寫原文；編輯器僅更新執行期精簡角色卡（供受護欄保護的生成對話使用）以及實例離線問候語覆寫欄位。
+1. **固定劇本不重產原則**：劇本對話（固定問候語、關鍵詞回應、服務說明）在創作時針對初始設定檔撰寫。在遊戲內編輯人物設定後，語言模型不會重新生成或改寫既有的劇本對話。關鍵詞回應與服務引導皆維持作者手寫原文；編輯器僅更新執行期精簡角色卡（供受護欄保護的生成對話使用）以及執行個體離線問候語覆寫欄位。
 2. **權限與版本控制**：編輯器透過單一交易提交更新，寫入時檢查版本序號以防並發衝突。
 3. **建造者旁路物件處理**：透過 Evennia 建造者指令建立的 NPC 因未經過正式初始化管線，未具備精簡卡，其編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
 
@@ -178,7 +178,7 @@ from world.rules.npc_schedules import set_npc_schedule
 set_npc_schedule(npc, {"schema_version": 1, "template": "resident"})
 ```
 
-唯二合法儲存形狀是模板引用（`{"schema_version": 1, "template": <key>, "overrides": {...}}`，overrides 以條目索引字串為鍵）與完整自訂條目列表；狀態值只能取自頂層 `states` 詞彙，移動條目的 `target` 由執行期經 lore 登錄表解析。模板鍵未知→`ScheduleTemplateError`，任何形狀錯誤在寫入狀態前以具名 `ScheduleError` 子類別拒絕。
+唯二合法儲存形狀是模板引用（`{"schema_version": 1, "template": <key>, "overrides": {...}}`，overrides 以條目索引字串為鍵）與完整自訂條目列表；狀態值只能取自頂層 `states` 詞彙，移動條目的 `target` 由執行期經 lore 登錄表解析。模板鍵未知→`ScheduleTemplateError`，任何形狀錯誤在寫入狀態前以具名 `ScheduleError` 子類別別別拒絕。
 
 ### Step 7 — 補測試與驗證
 
@@ -212,7 +212,7 @@ uv run --locked python -m tools.spec_traceability check
 | `anchor_room` 無房間／多房間／非 Room | 載入（交易內解析） | `ValueError` 點名記錄與 tag |
 | `dialogue_key` 未登錄（服務主人路徑） | `validate_service_hosts`（啟動載入） | `GuildConfigError` 點名地點與鍵 |
 | 出貨名冊不一致、卡片損壞、問候語漂移、孤立設定檔 | `npc_persona_roster_validation`（伺服器啟動門禁，`sync_all` 之前） | `NpcRosterError` 具名列出所有違規項目並中止啟動 |
-| 排程形狀／模板／狀態詞彙 | `set_npc_schedule`→`resolve_schedule` | 具名 `ScheduleError` 子類別，寫入前拒絕 |
+| 排程形狀／模板／狀態詞彙 | `set_npc_schedule`→`resolve_schedule` | 具名 `ScheduleError` 子類別別別，寫入前拒絕 |
 
 ---
 
@@ -235,12 +235,12 @@ uv run --locked python -m tools.spec_traceability check
 
 ---
 
-## 6. 什麼時候這不是一篇指南能帶你走完的事
+## 6. 什麼時候已超出這篇指南的範圍
 
 加一張內容卡（新旅店老闆、新委託人、新劇情人物）照上面的流程做即可。以下超出「加資料」範圍：
 
 - **永久服務主人**：改 `world/lore/settlements/places.py` 的地點宣告（`host_*`＋`profession`＋服務 kwargs），商店商品與時段見[新增物品指南](/development/adding-items) Step 4。
 - **新職業列、新元件型別、新元件綁定**：職業是組裝期元件組的閉合詞彙，擴充會波及 `professions.yaml`、`typeclasses/components.py`、`world/rules/profession_config.py` 與對稱測試，請走 OpenSpec 流程（`openspec-propose`）。
 - **新角色階級（`NPCTier`）或新場景人物原型**：任務場景人物的數值由 `race_key`＋`static_tier_key` 從 lore 表推導，新階級是 lore＋規格變更。
-- **新對話關鍵詞行為**（像 `回報` 那樣解析規則狀態的關鍵詞）：屬於規則行為，超出表格資料的範圍。
+- **新對話關鍵詞行為**（與 `回報` 同類、會解析規則狀態的關鍵詞）：屬於規則行為，超出表格資料的範圍。
 - **玩家角色**：見[新增角色模板指南](/development/adding-player-presets)。

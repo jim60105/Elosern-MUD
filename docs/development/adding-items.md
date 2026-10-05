@@ -22,7 +22,7 @@
 | 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all-allies`／`all-enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
-`ItemDefinition` 是 frozen dataclass，`__post_init__` 在構造時驗證 presentation 與機制的形狀及互斥關係（`key`、名稱、`price_table_key`、`sellable` 本身不做驗證），壞定義會讓 registry 載入直接失敗，不會拖到運行時才爆。機制部分是**唯一的行為縫隙**，三選一：
+`ItemDefinition` 是 frozen dataclass，`__post_init__` 在構造時驗證 presentation 與機制的形狀及互斥關係（`key`、名稱、`price_table_key`、`sellable` 本身不做驗證），壞定義會讓 registry 載入直接失敗，不會拖到執行期才爆。機制部分是**唯一的行為縫隙**，三選一：
 
 | 形狀 | 宣告 | 結果 |
 |---|---|---|
@@ -31,7 +31,7 @@
 | 純觀察 | 兩者都不給 | 只能持有、檢視、買賣，沒有行前驗證可用的動作 |
 
 > [!NOTE]
-> `use_mechanics` 與 `equipment_slot` 同時出現會直接拋錯。`equipment_slot` 與 `modifier_key` 則必須**成對**出現：有槽沒鍵、有鍵沒槽、鍵不是 `EquipmentModifierKey` 成員，都在構造時被拒絕。對正式註冊的物品而言，`modifier_key` 的**值還必須等於物品自己的 key**（例如 `wooden_club` 只能綁 `EquipmentModifierKey.WOODEN_CLUB`），這條身份規則由裝備效果 rulebook 載入器在啟動時檢查、不符即啟動失敗——借別人名義綁定的已註冊物品會直接搶走別人的效果與預算。外觀的 `kind`（food／weapon／…）純視覺，規則與前端一律不得從 `kind` 或名稱推測行為。
+> `use_mechanics` 與 `equipment_slot` 同時出現會直接拋錯。`equipment_slot` 與 `modifier_key` 則必須**成對**出現：有槽沒鍵、有鍵沒槽、鍵不是 `EquipmentModifierKey` 成員，都在構造時被拒絕。對正式註冊的物品而言，`modifier_key` 的**值還必須等於物品自己的 key**（例如 `wooden_club` 只能綁 `EquipmentModifierKey.WOODEN_CLUB`），這條身份規則由裝備效果 rulebook 載入器在啟動時檢查、不符即啟動失敗。冒用別人名義綁定的已註冊物品會直接取用別人的效果與預算。外觀的 `kind`（food／weapon／…）純視覺，規則與前端一律不得從 `kind` 或名稱推測行為。
 
 ---
 
@@ -107,7 +107,7 @@ items:
 
 載入器 `world/rules/item_effects.py` 做**雙向封閉檢查**：每件已註冊可使用物品恰好一筆條目、rulebook 裡不能出現非可使用物品的 key、每筆至少一個效果。條目級驗證：動詞欄位互斥（恰好一個）、`stat` 是封閉計量條、`amount` 非零且絕對值不超過 9999、`apply_status` 只收 `buffs.yaml` 的具體狀態鍵、`remove_status` 收具體鍵或 `all`／`positive`／`negative` 選擇器、同一件物品不得對同一計量條宣告兩筆調整、`scope` 是五檔封閉詞彙（`self` 預設／`single`／`all-allies`／`all-enemies`／`all`，各自映射到技能共用目標解析器的一條驗證規則）。任何違規，載入即拋 `ItemEffectsRulebookError`。
 
-使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items/` 與 `world/rules/equipment.py` 的共同寫入路徑處理：結算依宣告順序逐條執行，每個條目先經共用目標解析器解析出目標集合（`single` 缺少玩家指定以 `no_target` 拒絕、無法解析的目標以 `target_invalid` 拒絕、群體範圍在無可觸及對象時拒絕），單獨無效的步驟（目標計量條已滿、狀態遭裝備免疫擋下、移除選擇器沒命中任何狀態）被跳過，全部步驟都無效才拒絕並退還物品；群體範圍一次使用只消耗一件物品，回滾日記按每個被觸及實體各自捕獲與復原。新增資料不需要寫新的狀態變更程式碼，也**不需要任何效果鍵列舉擴充**——既有動詞（含負值、快感計量條、具體狀態、移除選擇器）與五檔 `scope` 就是全部詞彙。
+使用流程（非戰鬥與戰鬥中的先驗證、提交、回滾語意）都已由 `world/rules/items/` 與 `world/rules/equipment.py` 的共同寫入路徑處理：結算依宣告順序逐條執行，每個條目先經共用目標解析器解析出目標集合（`single` 缺少玩家指定以 `no_target` 拒絕、無法解析的目標以 `target_invalid` 拒絕、群體範圍在無可觸及對象時拒絕），單獨無效的步驟（目標計量條已滿、狀態因裝備免疫而未生效、移除選擇器沒命中任何狀態）被跳過，全部步驟都無效才拒絕並退還物品；群體範圍一次使用只消耗一件物品，回滾日記按每個被觸及實體各自捕獲與復原。新增資料不需要寫新的狀態變更程式碼，也**不需要任何效果鍵列舉擴充**，既有動詞（含負值、快感計量條、具體狀態、移除選擇器）與五檔 `scope` 就是全部詞彙。
 
 ### Step 2b — 可裝備物品：接上裝備效果 rulebook
 
@@ -130,11 +130,11 @@ effects:
 載入器 `world/rules/equipment_effects.py` 驗證（任一失敗即拋 `EquipmentEffectsRulebookError`，伺服器啟動時就爆）：
 
 - 雙向封閉：每個 `EquipmentModifierKey` 恰好一個條目、條目 key 必須已綁定、`adjustments` 欄位與 `gauge_caps` 目標都在封閉詞彙內、`attached_buffs` 必須是 `buffs.yaml` 存在的 buff key。
-- 數值種類：平值欄（`atk_phys`／`defense`／`magic_power`／`exposure_bias`）是整數；百分比欄（`mp_cost`／`sp_cost`／`pleasure_gain`／`heal_gain`）是帶正負號字串（`"-10%"`／`"+15%"`，`^[+-]\d+%$`）；唯獨 `agility` 兩種皆可，種類決定預算欄位。`bool` 一律不是合法整數。
+- 數值種類：平值欄（`atk_phys`／`defense`／`magic_power`／`exposure_bias`）是整數；百分比欄（`mp_cost`／`sp_cost`／`pleasure_gain`／`heal_gain`）是帶正負號字串（`"-10%"`／`"+15%"`，`^[+-]\d+%$`）；唯獨 `agility` 兩種皆可，種類決定預算欄位。`bool` 一律拒收，連整數也不算。
 - 預算：條目所綁物品 `presentation.rarity` 對應的預算列決定每欄上限，`abs(值)` 超過即拒絕（`bias` 欄允許 0 上限）。護盾上限只收正整數（hp／mp／sp），單筆上限 ≤ 9999。
 - 空條目合法（`storage_pouch: {}`），代表「純觀察的裝備，無效果」；同一條目不得同時宣告 `immune` 與 `attached_buffs` 的同源矛盾。
 
-數值來自設計文件（`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` 的平衡表），不得自行發明。**注意**：本 rulebook 在 P1 階段僅由啟動驗證載入，尚無遊戲消費端——消費端由後續 change 接管。
+數值來自設計文件（`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` 的平衡表），不得自行發明。**注意**：本 rulebook 在 P1 階段僅由啟動驗證載入，消費端由後續 change 接管。
 
 ### Step 4 — 可交易物品：價格帶與商店 offer
 
@@ -154,7 +154,7 @@ AssortmentDefinition(
 ),
 ```
 
-再把物品加進商店引用的分類，並在該定居點的 commerce 分檔（`world/rules/rulebook/commerce/<settlement>.yaml`）中該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品；同一個 key 宣告在兩個分檔會直接失敗載入並指名兩檔）。載入器的驗證是不對稱的，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
+再把物品加進商店引用的分類，並在該定居點的 commerce 分檔（`world/rules/rulebook/commerce/<settlement>.yaml`）中該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品；同一個 key 宣告在兩個分檔會直接失敗載入並指名兩檔）。載入器的驗證不對稱，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
 
 ```yaml
 assortments:
@@ -173,7 +173,7 @@ shops:
     restock_hour: 6
 ```
 
-同一間店引用的兩個分類若出現同一個 `item_key`，載入器會指名商店、物品與兩個分類直接拒絕——解析器不會替你挑價格。`relic`（信物）帶的物品永遠不能進分類，載入時指名分類與物品直接拒絕。
+同一間店引用的兩個分類若出現同一個 `item_key`，載入器會指名商店、物品與兩個分類直接拒絕，解析器不會替你挑價格。`relic`（信物）帶的物品永遠不能進分類，載入時指名分類與物品直接拒絕。
 
 ### Step 5 — 檢查受影響的消費端（既有數值通常零程式碼）
 
@@ -183,7 +183,7 @@ shops:
 - 指令端：`使用`（`use`）、`裝備`（`equip`）在 `commands/items.py`；`丟`（`drop`）、`給`（`give`）在 `commands/localized/general.py`；商店為 `shop stock`（別名 `商店庫存`）、`buy`（`購買`）、`sell`（`販賣`），見 `commands/economy.py`
 - WebClient：服務面板背包列與確認框（`web/webclient/actions/service_actions.py` 走同一份 preflight，前端不自行推斷行為）
 
-零程式碼的前提是數值沿用現有詞彙。`kind`、`icon_key`、`rarity` 都是封閉列舉，需要一個新的視覺分類或圖示就不是加資料能了事：得擴充 `world/lore/items/vocab.py` 的列舉、`web/webclient-app` 的圖示對應與對應測試／展示，前端遇到未知 icon key 一律退回 unknown Treatment。
+零程式碼的前提是數值沿用現有詞彙。`kind`、`icon_key`、`rarity` 都是封閉列舉，需要一個新的視覺分類或圖示就超出加資料的範圍，得擴充 `world/lore/items/vocab.py` 的列舉、`web/webclient-app` 的圖示對應與對應測試／展示，前端遇到未知 icon key 一律退回 unknown Treatment。
 
 若你只是加了資料，上面這些檔案不需要修改；需要修改的那個檔案，就是你發現設計違反的地方，先回頭檢查。
 
@@ -220,7 +220,7 @@ uv run --locked python -m tools.spec_traceability check
 | 百分比欄寫成裸數字或平值欄寫成字串 | 數值種類由欄位決定，`agility` 以外不容許另一種形態；`bool` 也不算整數 |
 | 分類 `buy_copper` 超出價格帶 | `guild_config` 載入失敗，啟動即爆；注意 `sell_copper` 不受價格帶約束 |
 | 只改 commerce 分檔沒把物品加進分類的 `item_keys`（或反之） | 兩邊不一致，載入時 `GuildConfigError`，指名分類與物品 |
-| 把信物（`relic` 帶）物品放進分類 | 載入時直接拒絕——信物永不交易，指名分類與物品 |
+| 把信物（`relic` 帶）物品放進分類 | 載入時直接拒絕，信物永不交易，指名分類與物品 |
 | 商店行誤留舊的 `offers` 欄位 | `shops` 區段只接受 `shop_key` 與三個時段欄位，多餘欄位直接拒絕 |
 | 摘要塞了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |
 | 為新物品發明新的 kind／icon／rarity 值卻只改 registry | 構造被封閉列舉拒絕；擴充視覺詞彙見 §5 |
@@ -228,11 +228,11 @@ uv run --locked python -m tools.spec_traceability check
 
 ---
 
-## 5. 什麼時候這不是一篇指南能帶你走完的事
+## 5. 什麼時候已超出這篇指南的範圍
 
 新增一筆資料（新藥水、新飾品、新商店 offer）照上面的流程做即可。但有兩類例外超出「加資料」的範圍：
 
-1. **新行為**，例如新的目標範圍（`scope` 五檔詞彙已是全開放的最終詞彙，再擴充新範圍會擴及目標解析器）、新的裝備槽、消耗品以外的冷卻、或改變使用耗時的規則，會擴及規則解析與既有規格需求。「給現有動詞加新效果」（新藥水回 SP、施加既有狀態鍵、用負值扣計量條）與「為既有條目選一個 `scope`」都不是新行為，是 YAML 資料。
+1. **新行為**，例如新的目標範圍（`scope` 五檔詞彙已是全開放的最終詞彙，再擴充新範圍會擴及目標解析器）、新的裝備槽、消耗品以外的冷卻、或改變使用耗時的規則，會擴及規則解析與既有規格需求。「給現有動詞加新效果」（新藥水回 SP、施加既有狀態鍵、用負值扣計量條）與「為既有條目選一個 `scope`」都屬於 YAML 資料變更，不算新行為。
 2. **新視覺詞彙**，即新的 `ItemKind`、`ItemIconKey` 或 `ItemRarity` 值，會擴及三個封閉列舉、前端圖示對應與展示層。
 
 兩者都屬於規格驅動變更，請走 OpenSpec 流程（`openspec-propose`），並同步 `equipment-inventory`、`item-use-resolution`、`inventory-item-actions` 相關主規格。

@@ -102,65 +102,22 @@ uv run --locked python tools/gen_mono_cells.py
 
 瀏覽器測試與最上層契約測試皆帶有 `@covers_requirement(...)` 標註（從 `tools.spec_traceability` 匯入）；請參閱 [`spec-test-traceability.md`](spec-test-traceability.md)。A2 閘門由 `tests/test_frontend_toolchain_contract.py`（pnpm 執行）、`tests/test_browser_verification_contract.py`（工作流程與靜態檢查）以及 `web/tests/browser/test_vue_foundation.py`（瀏覽器行為）所涵蓋。
 
-## Desktop visual-reading repair (2026-10-05)
+## 桌面視覺可讀性修復（2026-10-05）
 
-The acceptance viewport is exactly **1451 × 790 CSS px**, not an outer browser
-window size. Desktop chrome uses
-`clamp(1, min(innerHeight / 790, innerWidth / 1451), 1.4)`; 1741 × 948 is an
-uncapped spot check and 2560 × 1440 exercises the cap. Message and full-log
-prose use the bundled Jim Mono TC face at **16 / 18 / 20 CSS px** for A− / A /
-A+ at reference. Measure actual drawn glyphs after `document.fonts.ready`;
-the computed family token alone does not prove which face drew a character.
+驗收視埠恰為 **1451 × 790 CSS px**，指的是視埠尺寸，非瀏覽器外框視窗尺寸。桌面框架層使用 `clamp(1, min(innerHeight / 790, innerWidth / 1451), 1.4)`；1741 × 948 是不設上限的抽樣檢查，2560 × 1440 則驗證上限是否生效。訊息與完整日誌的散文在基準縮放下，以隨附的 Jim Mono TC 字型呈現，A− / A / A+ 對應 **16 / 18 / 20 CSS px**。量測要在 `document.fonts.ready` 之後對實際繪出的字形進行；光看計算後的 family token，無法證明某個字由哪個字型繪出。
 
-The 240px minimap clips oversized lattice and radial drawings through a
-current-centered, scale-1 window rather than shrinking 16-unit SVG labels.
-Its lattice pitch reserves horizontal label clearance and vertical clearance
-between an upper label and the lower marker, including lower wilderness nodes
-whose shared name is suppressed. The full map also has a scale-1 zoom-out
-floor: oversized drawings open around the current location and remain
-reachable with pan, zoom, focus reveal and remembered-location controls.
-Do not restore historical whole-map fits or a 0.75 island floor: those produce
-effective text smaller than 16 CSS px.
+240px 小地圖對過大的格線與放射狀圖形，改用以現位置為中心、scale-1 的視窗裁切，不縮小 16 單位的 SVG 標籤。格線間距同時保留標籤的水平淨空，以及上方標籤與下方標記之間的垂直淨空，包含共用名稱被隱藏的下方荒野節點。全圖也有 scale-1 的最小縮出下限，過大的圖形圍繞現位置展開，平移、縮放、焦點揭示與記憶地點控制仍可達。切勿恢復過往的整圖 fit 行為或 0.75 島嶼下限，那會讓文字的有效尺寸小於 16 CSS px。
 
-Opening the full log and appending to the response being read must retain the
-message page when its box and prose setting are unchanged. Actual layout
-reflow still follows the response-space reveal anchor. Mount-time
-`document.fonts.ready` does not load Jim Mono TC slices for characters that
-have not appeared yet: prepare the actual rendered response/beat glyph stream
-in both weights before performing synchronous page-fit probes. Superseded and
-unmounted preparations cannot commit; an uncommitted response/binding cannot
-pace combat beats or advance the previous response. Reader tests must keep
-their baseline from before opening the log, not reset it after an append.
+開啟完整日誌並追加正在閱讀的回應時，只要訊息框與散文設定未變，訊息頁必須保留。實際版面 reflow 仍跟隨回應空間的 reveal anchor。掛載期的 `document.fonts.ready` 不會為尚未出現的字元載入 Jim Mono TC 切片，因此進行同步的頁面貼合探測前，要先以兩種字重準備好實際渲染的回應／節拍字形串流。已被取代或未掛載的準備不可提交；未提交的回應／綁定不可驅動戰鬥節拍，也不可推進前一則回應。閱讀器測試的基準要取在開啟日誌之前，不可在追加後重設。
 
-Inventory headings allow their informational tag to wrap onto a new row
-without splitting the two-character heading vertically. Informational tags,
-counts, money units and empty-equipment text use the readable muted-paper
-step, not the low-contrast disabled-ink step.
+背包標題讓資訊標籤換行到新列即可，不得把兩個字的標題垂直切開。資訊標籤、計數、貨幣單位與空裝備文字使用可讀的 muted-paper 色階，不用低對比的 disabled-ink 色階。
 
-After rebuilding a running managed fixture's SPA, refresh **that fixture's**
-isolated static root with `uv run --locked evennia collectstatic --noinput
---settings browser_settings` using its existing `runtime.env`. A reload alone
-can keep serving the static copy collected at fixture startup. Never collect
-against the live user settings/database for a visual review.
+重建執行中受管 fixture 的 SPA 後，要用該 fixture 現有的 `runtime.env`，透過 `uv run --locked evennia collectstatic --noinput --settings browser_settings` 重新整理**該 fixture** 的隔離靜態根目錄。只重新整理頁面仍可能持續提供 fixture 啟動時收集的靜態複本。視覺檢視時絕不可針對正式使用者設定／資料庫執行 collectstatic。
 
-See the final visual-review evidence at
-`openspec/changes/archive/2026-10-05-repair-retarget-visual-reading/review.md`
-and the OpenSpec amendment `repair-retarget-visual-reading`. The two archived
-retarget changes remain historical records.
+最終視覺檢視證據見 `openspec/changes/archive/2026-10-05-repair-retarget-visual-reading/review.md`，OpenSpec 修正案為 `repair-retarget-visual-reading`。兩個已封存的 retarget 變更維持為歷史記錄。
 
-## Narrative palette showcase
+## 敘事色調展示（Narrative palette showcase）
 
-`Core/MessageWindow/NarrativeTones` renders the generated ANSI palette on the
-message-band gradient and opens the same markup in the real full-log overlay.
-Storybook imports `web/static/webclient/css/ansi_palette.css`; do not add a
-story-local palette. Regenerate that stylesheet with
-`uv run --locked python tools/gen_ansi_palette.py`.
+`Core/MessageWindow/NarrativeTones` 在訊息帶漸層背景上算繪產生的 ANSI 色板，並在真正的完整日誌 overlay 中開啟同一段標記。Storybook 匯入 `web/static/webclient/css/ansi_palette.css`；切勿再加 story 本地色板。該樣式表以 `uv run --locked python tools/gen_ansi_palette.py` 重新產生。
 
-Foreground mapping uses twelve authored ANSI tones and an inward-rounded
-0.62 cube saturation cap before the existing paper contrast floor against
-`#141019`. Backgrounds remain raw. Hue/lightness preservation is a pre-floor
-invariant; the paper blend can shift both. The 3:1 floor does not establish
-WCAG AA for normal-sized grayscale/cube prose or arbitrary artwork behind
-the translucent band. Inspect both surfaces at their actual font sizes.
-The change's [verification record](../../openspec/changes/webclient-ansi-narrative-tones/design.md)
-includes measured contrast and the tested viewport/motion matrix.
+前景對映使用十二個作者製 ANSI 色調，並在套用到 `#141019` 的既有紙面對比下限之前，先把 cube 飽和度封頂在內收的 0.62。背景維持原始值。色相／明度保持是下限之前的不變量；紙面混色可能讓兩者都偏移。3:1 下限不足以讓一般尺寸的灰階／cube 散文或半透明帶後方的任意圖資達成 WCAG AA。兩個表面都要在實際字寸下檢視。該變更的[驗證記錄](../../openspec/changes/webclient-ansi-narrative-tones/design.md)內含實測對比與受測的視埠／動態矩陣。

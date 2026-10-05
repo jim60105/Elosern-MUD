@@ -1,12 +1,12 @@
 # Evennia 測試效能優化指南
 
-Evennia 的測試建立在 Django 測試框架之上。當測試數量增加後，執行時間通常不只來自被測程式碼，也包含 Django test database、Evennia 測試 fixture、Typeclass 物件建立、session 初始化，以及每個 test method 重複執行的 `setUp()`。
+Evennia 的測試建立在 Django 測試框架之上。當測試數量增加後，執行時間來自被測程式碼之外的多項成本，包含 Django test database、Evennia 測試 fixture、Typeclass 物件建立、session 初始化，以及每個 test method 重複執行的 `setUp()`。
 
 Evennia 目前提供的 `EvenniaTest` 會在 `setUp()` 中建立 accounts、rooms、objects、characters、script 與 session。這些工作會在每個 test method 前重新執行。相較之下，`EvenniaTestCase` 不經過 `EvenniaTestMixin`，官方文件也明確指出這種測試可以較快。
 
 因此，優化 Evennia 測試時，建議從減少 fixture 成本開始，再考慮 test database 重用與平行處理。這個順序也比較容易維持測試隔離。
 
-本文以目前 Evennia `main`／latest 文件與 Django 6.0 測試框架為依據。本專案已套用本文第一階段優化（`EvenniaTestCase`、`setUpTestData()`、test-only settings），實測數據與最終取捨記錄於「[Evennia 測試效能報告](evennia-test-performance)」。
+本文以目前 Evennia `main`／latest 文件與 Django 6.0 測試框架為依據。本專案已套用本文第一階段優化（`EvenniaTestCase`、`setUpTestData()`、test-only settings），實測資料與最終取捨記錄於「[Evennia 測試效能報告](evennia-test-performance)」。
 
 !> **本專案已採用 `--parallel 16` 作為日常完整 suite 指令**（24-core 開發機實測 ~45s）。平行 runner 曾因測試非確定性（unseeded dice tie-break、共享 registry 未還原、直接覆寫共享 rulebook 檔）造成 race condition；這些問題已逐一修正（見「[Evennia 測試效能報告](evennia-test-performance)」的 Parallel Evaluation 一節），並以連續兩次全綠的完整 parallel run 作為證據。序列執行仍保留為最終 handoff 證據的標準做法。
 
@@ -290,7 +290,7 @@ TestCrafting
 
 如果多個 test methods 都需要相同 DB 物件，可以使用 Django `TestCase.setUpTestData()`。
 
-Django 會在 class level 建立一次資料，而不是每個 method 都重新建立。官方文件明確指出，相較於 `setUp()`，這種方式可以縮短測試時間。
+Django 會在 class level 建立一次資料，供所有 method 共用，不再每個 method 都重新建立。官方文件明確指出，相較於 `setUp()`，這種方式可以縮短測試時間。
 
 ```python
 from evennia.utils import create
@@ -539,7 +539,7 @@ Django test runner 原生支援 `--tag` 與 `--exclude-tag`。
 
 完整驗證路徑再加入 integration tests、完整 game flow 與外部系統測試。
 
-這樣改善的是開發者每次修改後等待結果的時間，而不只是完整 CI suite 的總秒數。
+這樣改善的主要是開發者每次修改後等待結果的時間，也一併縮短完整 CI suite 的總秒數。
 
 ## 監控 ORM query 數量
 
@@ -764,7 +764,7 @@ Django `TestCase` 會把 test code 包在 database transaction 中，測試結�
 第二次 --keepdb    FAIL
 ```
 
-就值得調查資料是否逃出了 transaction boundary。
+就值得調查是否有資料在 transaction boundary 之外寫入資料庫。
 
 常見來源包括 background thread、額外 database connection、subprocess、background task，以及不合適的 test base class。
 
@@ -1097,8 +1097,8 @@ Evennia 測試的主要優化空間通常存在於 fixture 粒度。
 2. 只有「資料契約測試」可以引用正式資料：在 module docstring 的第一行加上
    `Data-contract test: <一句理由>`（JS/TS 檔用首行 `// Data-contract test: <理由>`），
    並在 `tools/test_data_freeze.json` 的 `contract` 登記同一路徑與理由。
-3. 斷言必須建立機制，不是回貼 fixture 或 registry 的內容；純回貼資料的測試要被替換而不是倍增
-   （aggregate 覆蓋率門維持 ≥80% 地板，不是目標）。
+3. 斷言必須驗證行為機制，禁止原樣回貼 fixture 或 registry 的內容；純回貼資料的測試要被替換，
+   不可倍增（aggregate 覆蓋率門維持 ≥80% 地板，僅為下限）。
 
 執行門：
 
@@ -1123,22 +1123,22 @@ universe 經自我測試證明不碰撞。
 測試直接用 `synthetic_registries("items", "npc_tiers", ...)`（context manager、函式
 decorator、class decorator 皆可，每個 test method 取得獨立 scope）。需要共享字典裡
 沒有的特殊形狀時，用 `make_item(...)`／`make_skill(...)` 等 factory 建一筆，經
-`extra={"items": {key: entry}}` 只在自己的 scope 註冊——**不要**把單筆測試專用的
-條目塞進共享 catalog（沒人斷言的 fixture 是債，不是覆蓋率）。
+`extra={"items": {key: entry}}` 只在自己的 scope 註冊。**不要**把單筆測試專用的
+條目寫進共享 catalog（沒人斷言的 fixture 是債，對覆蓋率無貢獻）。
 
 **Frozen catalog seam**：`MappingProxyType` catalog（例如 `NPC_TIER_REGISTRY`）以
 attribute-swap 注入：kit 先解析所有 discovery pass 找到的 consumer 名稱綁定，再依序
-`patch.object` 換成合成 proxy，離開 scope 時逐一還原成原物件——還原語義與
+`patch.object` 換成合成 proxy，離開 scope 時逐一還原成原物件。還原語義與
 `evennia-test-optimization` 的 registry-restoration 契約相同。mutable catalog 則走
 `patch.dict(clear=True)` 原地替換，consumer 綁定本身就是同一個 dict。
 `world/lore/sync.py` 的 import-time capture 是具名目標：只有會呼叫 `sync_all()` 的
 scope 才需要 `include_sync_capture=True`。
 
-**行程程序安裝（browser harness）**：seed／server 是獨立程序、開機就鏡像 catalog 進
+**行程層級安裝（browser harness）**：seed／server 是獨立行程、開機就鏡像 catalog 進
 私有 DB，in-process patch 到不了。設 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 後，
 `web/tests/browser/browser_settings.py` 走 `browser_startstop` wrapper 在
 `at_server_init`（`evennia._init()` 之後、任何開機鏡像之前）安裝合成 catalog，seed
-程序則在 `main()` 同等時點安裝。flag 開啟時 seed 仍可跑完：基礎角色改由 kit 的
+行程則在 `main()` 同等時點安裝。flag 開啟時 seed 仍可跑完：基礎角色改由 kit 的
  preset 卡（`t_pale_wren`）啟動，讀取 shipped key 的選配 fixture（combat 授權、
  monster 生成等）自動略過，因此本 flag 的文件語義是「不與其他 fixture 開關併用」。
 完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。

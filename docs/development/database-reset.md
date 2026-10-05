@@ -8,8 +8,8 @@
 
 依據設計文件 `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §13b 條款，本專案在發布前之開發階段遵循**全新初始化原則**，不提供執行期向上相容解碼器（no legacy compatibility decoders）或資料庫線上遷移腳本（no database migration scripts）：
 
-1. **全新初始化保證完整性**：所有生產環境 NPC 生成機制（服務公會主持人、考核官、開局夥伴、劇本生成任務佔位者等）在實例建立時，便直接寫入完整的七欄位緊湊人物設定卡（Compact NpcCard）與內容世代標記（`generation = NPC_PERSONA_CONTENT_GENERATION`）。
-2. **開機校驗阻擋不完整世界**：伺服器開機時由 `npc_persona_roster_validation` 嚴格把關，若有名冊未完整初始化則立即中止開機（fail-loud）。
+1. **全新初始化保證完整性**：所有生產環境 NPC 生成機制（服務公會主持人、考核官、開局夥伴、劇本生成任務佔位者等）在執行個體建立時，便直接寫入完整的七欄位緊湊人物設定卡（Compact NpcCard）與內容世代標記（`generation = NPC_PERSONA_CONTENT_GENERATION`）。
+2. **開機校驗阻擋不完整世界**：伺服器開機時由 `npc_persona_roster_validation` 嚴格驗證，若有名冊未完整初始化則立即中止開機（fail-loud）。
 3. **舊版酬載嚴格阻擋（Fail-Closed）**：任務儲存庫採用嚴格解碼器，任何未升級的舊格式酬載（如帶有已淘汰的 `background` 欄位或舊三欄位設定者）在還原時均會拋出明確例外並拒絕載入。
 4. **開發者唯一支援復原途徑**：當本機資料庫持有舊版資料時，支援的操作程序為**銷毀現有資料庫並重新初始化**。
 5. **已淘汰離線套件子系統**：依據 §13c 條款（KISS 原則），已完全移除未使用的離線角色卡套件與選擇器（22 張卡片與 11 個池），不提供別名或相容解碼器；若舊開發庫帶有已淘汰的 `offline_bundle` 中繼資料，讀取時會判定為 corrupt_meta 停用，支援的復原方式同樣為銷毀並重置資料庫（若未來需要該子系統，可從 Git 歷史紀錄復原）。
@@ -22,7 +22,7 @@
 > - 所有帳號與帳號關聯（Accounts）
 > - 所有玩家角色、等級、能力值與背包物品（Player Characters & Inventory）
 > - 所有 NPC 互動歷史、好感度記錄（Affinity & Relations）
-> - 進行中的任務實例與世界動態狀態（Active Quests & Runtime State）
+> - 進行中的任務執行個體與世界動態狀態（Active Quests & Runtime State）
 >
 > 本程序**僅限於開發環境、測試環境與內部預發布驗證**使用。
 
@@ -59,7 +59,7 @@
 請在專案根目錄下依序執行以下 5 個步驟：
 
 ### 步驟 1：停止 Evennia 伺服器
-確保沒有正在運行的 Evennia 處理程序持有資料庫檔案鎖定：
+確認沒有正在執行的 Evennia 處理程序持有資料庫檔案鎖定：
 ```bash
 uv run evennia stop
 ```
@@ -82,7 +82,7 @@ uv run --locked evennia migrate
 ```bash
 uv run evennia start
 ```
-Evennia 開機程序會自動呼叫 `server/conf/at_server_startstop.py` 中的 `at_server_start()`，按 `STARTUP_STEP_ORDER` 執行世界與 NPC 全新同步：
+Evennia 開機流程會自動呼叫 `server/conf/at_server_startstop.py` 中的 `at_server_start()`，按 `STARTUP_STEP_ORDER` 執行世界與 NPC 全新同步：
 1. `npc_persona_roster_validation`：在世界同步前執行，嚴格檢驗所有靜態名冊設定、人物卡規範與對話表引用。
 2. `sync_grid` 與 `sync_service_interiors`：同步王都、城鎮網格與服務室內空間地圖。
 3. `sync_quest_runtime`：初始化任務系統執行期環境。
@@ -97,7 +97,7 @@ tail -n 100 server/logs/server.log
 驗證重點：
 - 搜尋 `startup_step` 事件，確認各步驟均正常耗時紀錄並回傳成功。
 - 確認 `npc_persona_roster_validation` 步驟成功執行，證明靜態名冊定義完整無誤。
-- 透過檢視腳本或登入確認經由 `sync_guild_economy` 生成的實例全體皆帶有最新版本標記（`generation == 1`，`persona_version >= 1`）與合規的緊湊人物設定卡。
+- 透過檢視腳本或登入確認經由 `sync_guild_economy` 生成的執行個體全體皆帶有最新版本標記（`generation == 1`，`persona_version >= 1`）與合規的緊湊人物設定卡。
 
 ---
 
@@ -106,7 +106,7 @@ tail -n 100 server/logs/server.log
 本專案本機測試常使用 `--keepdb` 旗標以加速測試執行。若在結構變更後遭遇保留資料庫狀態殘留或無法載入的錯誤：
 
 1. **直接刪除保留測試庫**：
-   請先確保無正在運行的測試行程，然後刪除保留資料庫檔案：
+   請先確認無正在執行的測試行程，然後刪除保留資料庫檔案：
    ```bash
    rm -f server/db/evennia-test.sqlite3
    ```
@@ -120,7 +120,7 @@ tail -n 100 server/logs/server.log
 
 ## 6. 容器持久化磁碟區重置（Container Volume）
 
-若在容器化開發環境中運行：
+若開發環境以容器執行：
 
 1. **僅重置資料庫磁碟區（建議）**：
    為了保留美術圖片快取（`evennia-art`）、去背模型（`evennia-rembg`）、日誌（`evennia-logs`）等無關資料，僅移除 `evennia-db` 磁碟區：

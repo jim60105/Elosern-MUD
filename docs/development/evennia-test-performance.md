@@ -1,6 +1,6 @@
 # Evennia 測試效能報告
 
-本報告記錄了 `optimize-evennia-testing` 變更的測量基準。各項時間皆為參考機器的觀測值，並非跨平台的絕對限制。一般性的優化指導原則請參見「[Evennia 測試效能優化指南](evennia-testing-guide)」。
+本報告記錄了 `optimize-evennia-testing` 變更的測量基準。各項時間皆為參考機器的觀測值，僅在相同環境條件下成立。一般性的優化指導原則請參見「[Evennia 測試效能優化指南](evennia-testing-guide)」。
 
 ## 環境
 
@@ -20,7 +20,7 @@
 
 鎖定版本的 Evennia 啟動器會將確切的 `test` 操作與未知選項轉發給 Django 執行器。直接探測已驗證了以點分隔的模組／類別／方法標籤、`--keepdb`、`--noinput`、`--timing` 與 `--durations`。Django 6.0 可接受 `--parallel 4` 與單獨的 `--parallel`；其適用性評估如下。測試設定防護要求 `sys.argv[1]` 的操作參數必須恰好為 `test` 且帶有 `MUD_TEST_SETTINGS=1`；後續包含該 token 的參數無法授權伺服器或遷移命令。
 
-原始備註中結合 `:memory:` 與 `--keepdb` 的建議已被拒絕：記憶體資料庫無法在行程結束後繼續留存。原始備註中無條件啟用平行 worker 的建議同樣被拒絕，除非證據、覆蓋率、資源隔離與重複計時皆證明具備同等效果。
+原始備註中結合 `:memory:` 與 `--keepdb` 的建議已被拒絕，原因是記憶體資料庫無法在行程結束後繼續留存。原始備註中無條件啟用平行 worker 的建議同樣被拒絕，除非證據、覆蓋率、資源隔離與重複計時皆證明具備同等效果。
 
 ## 基準版本
 
@@ -168,7 +168,7 @@ Evennia 套件現已移出 CI 關鍵路徑：其最慢分片（2 分 46 秒）�
 - 閘門的聚合契約維持不變：各分片工件保持 `coverage-browser-shard-<n>*` 與 `evidence.browser-shard-<n>.jsonl` 名稱，完整性迴圈、證據串接與 `coverage combine coverage-browser-shard-*` 皆以索引為基準運作。20 個並行工作上限計算的是工作數量而非行程：1 preflight + 6 evennia + 11 browser + 1 top-level + 1 gate = 20。
 - 瀏覽器擁有權契約測試由檔案層級移至**方法層級分割**（基於 AST，無匯入）：每個 `web/tests/browser/test_*.py` 檔案的每個 `test_*` 方法皆由 22 個行程清單中的恰好一個所擁有。後續 CI 觀察後的重新平衡僅為清單編輯加上契約測試，非工作流程編輯。
 
-預期效果：戰鬥分片的 19 分 09 秒拆分至約 5 個平行行程清單（各約 4 至 5 分鐘），使瀏覽器關鍵路徑降至約 5 至 6 分鐘，並與 Evennia 機器分片一同將整體品質閘門總耗時壓在 10 分鐘以內。
+預期效果：戰鬥分片的 19 分 09 秒拆分至約 5 個平行行程清單（各約 4 至 5 分鐘），使瀏覽器關鍵路徑降至約 5 至 6 分鐘，並與 Evennia 機器分片一同使整體品質閘門總耗時不超過 10 分鐘。
 
 **初次 CI 觀測（分支 `feat/pack-browser-ci-shards`）：**
 
@@ -181,7 +181,7 @@ Evennia 套件現已移出 CI 關鍵路徑：其最慢分片（2 分 46 秒）�
 
 CI run 33979656279 的分級實測（job 總時數）顯示僅兩個家族超出 5 分鐘預算：Evennia 分片 5（maps-webclient-imports-prompts-tests）為 5 分 06 秒（run-step 4.8 分鐘、1,568 項測試 268.6 秒），以及多個瀏覽器分片（5.2 至 9.1 分鐘）。瀏覽器 runner 的固定開銷（雙 checkout、雙 uv sync、pnpm install+build、Chromium 安裝）約為 54 秒，Evennia runner 約 15–55 秒，因此重打包直接以 run-step 預算為目標。
 
-- `.github/evennia-shards.json` 由 6 個分片重切為 **10 個**：rules-a/b/c 與 quests-skills-art-ai-lore 原封不動（實測 1.8–2.8 分鐘）；原分片 5 依成本拆為四個專責分片——`webclient-actions`（含 `world.tests`）、`webclient-evidence`（`web.webclient.tests`，節點/vitest 轉接子行程最昂貴）、`maps-imports-prompts-observability`，以及按測試數對半切分的 `webclient-presentation-a`/`-b`（684 項測試，341/343）；`commands-server-typeclasses` 移至索引 5。預計每個 Evennia run-step ≤ 約 2 分鐘。
-- `.github/browser-shards.json` 由 16 個分片重打包為 **18 個**（36 個行程清單）：以每個類別/method 的 CI 實測每測試權重（重型專用伺服器類別 40–55 秒、共享伺服器類別約 6–12 秒加一次開機）做 LPT 打包，單一走清單上限約 235 秒，預計最壞瀏覽器 job 總時數約 4.8 分鐘。重型類別維持方法層級分割（每清單最多 3–4 個 method），共享伺服器類別以類別層級標籤打包，確保每個類別只在單一行程執行一次開機。
+- `.github/evennia-shards.json` 由 6 個分片重切為 **10 個**：rules-a/b/c 與 quests-skills-art-ai-lore 原封不動（實測 1.8–2.8 分鐘）；原分片 5 依成本拆為四個專責分片：`webclient-actions`（含 `world.tests`）、`webclient-evidence`（`web.webclient.tests`，節點/vitest 轉接子行程最昂貴）、`maps-imports-prompts-observability`，以及按測試數對半切分的 `webclient-presentation-a`/`-b`（684 項測試，341/343）；`commands-server-typeclasses` 移至索引 5。預計每個 Evennia run-step ≤ 約 2 分鐘。
+- `.github/browser-shards.json` 由 16 個分片重打包為 **18 個**（36 個行程清單）：以每個類別/method 的 CI 實測每測試權重（重型專用伺服器類別 40–55 秒、共享伺服器類別約 6–12 秒加一次開機）做 LPT 打包，單一走清單上限約 235 秒，預計最壞瀏覽器 job 總時數約 4.8 分鐘。重型類別維持方法層級分割（每清單最多 3–4 個 method），共享伺服器類別以類別層級標籤打包，使每個類別只在單一行程執行一次開機。
 - 擁有權契約（`tests/test_evennia_test_optimization_contract.py`）在離線以相同 AST 解析演算法驗證：378 個非瀏覽器模組各由恰好一個分片擁有；269 個瀏覽器 method 各由 36 個行程清單中的恰好一個擁有。索引皆唯一且排序；本次未改動 workflow 與測試檔。
 - 並行工作數為 1 preflight + 10 evennia + 18 browser + 1 frontend + 1 top-level + 1 gate = 32；超出 20 並行上限的工作排隊執行，因每個 job 本身 ≤ 5 分鐘，僅影響總牆鐘時間而非單一 job 預算。

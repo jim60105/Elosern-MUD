@@ -42,9 +42,7 @@
 | [`dream`](/game/command-reference?id=dream) | 查看夢境剩餘交流次數，商談故事方向、儲存草稿、確認或醒來。 |
 | [`wait`](/game/command-reference?id=wait) | 等待直到指定時段。 |
 
-In the web client, **等待／休息** offers dawn, full-recovery sleep, and
-custom rest in hours (up to 12 hours). Declared practice has a separate screen:
-open **角色狀態 → 技能書**, then choose **修煉** beside an active skill.
+網頁客戶端的 **等待／休息** 提供黎明、完全恢復的睡眠與自訂時數的休息，自訂休息上限為 12 小時。宣告修煉另有獨立畫面，請開啟 **角色狀態 → 技能書**，在啟用中的技能旁選擇 **修煉**。
 
 夢境協作需明確選擇。文字客戶端使用 `sleep dream`，網頁客戶端在等待畫面選擇「睡眠並進入夢境協作」。一般睡眠、休息與等待不會開啟對話。安全檢查拒絕睡眠時也不會開啟夢境；已完全恢復時仍可透過零秒睡眠進入。
 

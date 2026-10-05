@@ -4,7 +4,7 @@
 
 ## 建立角色卡
 
-複製 `world/imports/examples/example_character.json` 的參考角色卡，修改後存放在受版本控制的內容資料夾。請保留 `record_type: "character"` 與 `schema_version: 1`。匯入器不接受未宣告的欄位，因此不要以自訂欄位承載任務、帳號或臨時備註。
+複製 `world/imports/examples/example_character.json` 的參考角色卡，修改後存放在受版本控制的內容資料夾。請保留 `record_type: "character"` 與 `schema_version: 1`。匯入器不接受未宣告的欄位，因此不要在自訂欄位寫入任務、帳號或臨時備註。
 
 下列欄位為必填欄位。`subrace` 可省略，其他欄位都必須存在。
 
@@ -12,7 +12,7 @@
 | --- | --- |
 | `key` | 非空白的穩定物件識別。 |
 | `display_name` | 非空白顯示名稱。此版本要求它存在；目前載入器仍以 `key` 建立 Evennia 物件。 |
-| `title` | NPC 稱號（職稱／異名）：單行純文字；驗證與落庫前會先去除首尾空白，**限制套用在去除首尾空白後的正規形上**：1–32 個碼點、不得含任何空白（含全形空格 U+3000）、控制字元或 `\|`。完整規則由 `world.rules.npc_identity.validate_npc_title` 唯一執行。**只對 NPC 匯入生效**；以 `PlayerCharacter` 為目標時此欄為惰性，不會被持久化。 |
+| `title` | NPC 稱號（職稱／異名）為單行純文字；驗證與落庫前會先去除首尾空白，**限制套用在去除首尾空白後的正規形上**：1–32 個碼點、不得含任何空白（含全形空格 U+3000）、控制字元或 `\|`。完整規則由 `world.rules.npc_identity.validate_npc_title` 唯一執行。**只對 NPC 匯入生效**；以 `PlayerCharacter` 為目標時此欄為惰性，不會被持久化。 |
 | `age`、`apparent_age` | 皆為 `0` 至 `10000` 的整數。 |
 | `race`、`subrace` | 必須分別存在於種族與亞種登錄表，亞種須屬於指定種族。 |
 | `sex` | 必須是 `female`、`male` 或 `other` 其中之一。 |
@@ -23,11 +23,11 @@
 | `sexual_baseline` | 必須含 `arousal`、`virgin` 與 `sensitivity`，值域受正規詞彙表限制。 |
 | `persona` | 物件型別的敘事資料。結構驗證只確認它是物件。**以 NPC 為匯入目標時**（預設），它必須是完整的精簡 NPC 角色卡：恰好七個欄位 `identity`（含 `public` 與 `hidden`）、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection`，全為純文字；`identity.hidden` 與 `social_connection` 可為空字串，其餘必填。不接受 `background` 或任何其他欄位。單一欄位上限 600 個碼點，身分段與整張卡都以渲染後的區塊（含欄位標籤與換行）計算，上限分別為 600 與 2000。驗證失敗時以 `persona.<欄位>` 點名並附穩定原因碼（如 `missing_field`、`unknown_field`、`required_empty`、`leaf_too_long`）。落庫的是去除首尾空白並統一換行後的正規形，並由共用的 NPC 人設寫入器同時寫入版本 1 的中繼資料（來源為 `import` 與記錄 `key`）。**以 `PlayerCharacter` 為目標時**此欄維持不透明，匯入器不解析其內部欄位，原樣落庫。 |
 | `profession` | 選填。非空白字串或 `null`；值必須是職業規則書列（`world/rules/rulebook/professions.yaml`）的金鑰。缺席時行為與變更前完全相同。**只對 NPC 匯入有效**；以 `PlayerCharacter` 為目標且宣告此欄時整批拒絕。職業列的預設階級僅在 `stats` 為空時作為特質基準；只要記錄宣告任何字面數值，職業不影響特質。 |
-| `components` | 選填。`{ "type": 字串, "kwargs": 物件 }` 條目陣列，只能與 `profession` 併用。條目定義最終組裝的元件集合：與藍圖同型的條目完全取代藍圖條目（kwargs 只取記錄值），藍圖未列的詞彙型別按記錄順序附加。身分辨識欄位（`service_id`、`shop_key`、`branch_key`、`dialogue_key`）一律由記錄手寫；匯入器絕不憑空補值——解析後仍缺身份欄的規畫會以具名問題整批拒絕。 |
+| `components` | 選填。`{ "type": 字串, "kwargs": 物件 }` 條目陣列，只能與 `profession` 併用。條目定義最終組裝的元件集合。與藍圖同型的條目完全取代藍圖條目（kwargs 只取記錄值），藍圖未列的詞彙型別按記錄順序附加。身分辨識欄位（`service_id`、`shop_key`、`branch_key`、`dialogue_key`）一律由記錄手寫；匯入器絕不憑空補值，解析後仍缺身份欄的規畫會以具名問題整批拒絕。 |
 
 `stats` 可提供 `hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power` 與 `guild_merit`。未提供的特質會以種族基準補足。`hp` 至少為 `1`；其餘數值為非負整數。若值落在種族建議區間外，驗證器會提出警告；`magic_power` 超過種族魔力帶上界、未知種族、錯誤亞種、未知技能與不合格的結構會直接拒絕匯入。
 
-NPC 在遊戲中的顯示姓名來自 `key`（`display_name` 目前仍不被載入器使用）：要讓人物列顯示中文姓名，就把 `key` 寫成中文。房間人物列與探索面板會把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
+NPC 在遊戲中的顯示姓名來自 `key`（`display_name` 目前仍不被載入器使用）。要讓人物列顯示中文姓名，就把 `key` 寫成中文。房間人物列與探索面板會把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
 
 ```json
 {
@@ -63,7 +63,7 @@ NPC 在遊戲中的顯示姓名來自 `key`（`display_name` 目前仍不被載�
 }
 ```
 
-範例中的鍵值必須先和目前的登錄表核對，例如 `basic_attack` 是否仍在 `world/skills/registry.py`。角色卡不應用人物敘述取代這些可計算的資料。
+範例中的鍵值必須先和目前的登錄表核對，例如 `basic_attack` 是否仍在 `world/skills/registry.py`。人物敘述不應取代這些可計算的資料。
 
 ## 驗證角色卡
 
@@ -75,7 +75,7 @@ uv run --locked -m world.imports.validate path/to/character.json
 
 批次資料應全部通過驗證後再載入。`load_batch()` 會先驗證整批檔案，並在資料庫交易中建立全部角色；其中任一檔案失敗時，該批次不會留下部分建立的角色。
 
-驗證的責任線：CLI 只檢查檔案本身與批次內的一致性（含批次內重名）；**與資料庫既有 NPC 的重名由 `load_batch()` 在載入時整批把關**，CLI 不做這件事，也不會把它回報為降級檢查。
+驗證的責任分兩層。CLI 只檢查檔案本身與批次內的一致性（含批次內重名）；**與資料庫既有 NPC 的重名由 `load_batch()` 在載入時整批把關**，CLI 不負責這一環，也不會把它回報為降級檢查。
 
 ## 匯入 NPC
 
@@ -109,20 +109,13 @@ characters = load_batch(
 )
 ```
 
-請不要改用 `create_object()` 略過角色卡驗證。若需要建立服務 NPC，請使用既有的啟動同步程序或在受測試的內容程式中附加對應元件；公會服務人員需要 `GuildStaff` 元件，商人需要 `Merchant` 元件。
-# Player character registration
+請不要改用 `create_object()` 略過角色卡驗證。若需要建立服務 NPC，請使用既有的啟動同步程式或在受測試的內容程式中附加對應元件；公會服務人員需要 `GuildStaff` 元件，商人需要 `Merchant` 元件。
 
-New accounts receive one inert, account-owned character shell. The player must
-activate that shell before world commands become available. `character` lists
-the two supported modes:
+# 玩家角色註冊
 
-- `character preset <key>` selects a shipped character.
-- `character create` prompts for a name, actual age (`實際年齡（0 至 10000，可輸入 cancel 取消）：`),
-  apparent age (`外表年齡（0 至 10000，可輸入 cancel 取消）：`), race,
-  optional compatible subrace, and six stat allocations.
+新帳號會取得一具待啟動、由帳號持有的角色空殼。玩家必須先啟動那具空殼，世界指令才會開放。`character` 列出兩種支援模式：
 
-Both ages must be integers within `0..10000`. Custom allocations must remain inside the
-selected lore bands and spend the exact displayed budget. Magic level is not a
-player input; activation samples it inside ±10% of the selected race's average.
-After activation, ordinary commands such as `look`, `inventory`, and `rest 5s`
-become available.
+- `character preset <key>` 選用一張出貨角色卡。
+- `character create` 依序詢問名字、實際年齡（`實際年齡（0 至 10000，可輸入 cancel 取消）：`）、外表年齡（`外表年齡（0 至 10000，可輸入 cancel 取消）：`）、種族、選填且相容的亞種，以及六軸配點。
+
+兩個年齡都必須是 `0..10000` 內的整數。自訂配點必須落在所選種族與亞種的設定帶內，且恰好花完畫面顯示的預算。魔力等級不是玩家輸入項；啟動流程在所選種族平均值的 ±10% 內抽樣。啟動完成後，`look`、`inventory`、`rest 5s` 這類一般指令即可使用。

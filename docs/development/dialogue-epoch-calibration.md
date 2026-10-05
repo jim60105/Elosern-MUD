@@ -1,57 +1,18 @@
-# Dialogue epoch rendered-budget calibration
+# 對話紀元渲染預算校準
 
-Measured offline on 2026-10-04 with the shipped prompt library and `token_est_v3`.
-No live model or image service was used. This calibrates the currently supported
-local-first profiles, not provider tokenizers or model-quality claims.
+以出貨版提示詞庫與 `token_est_v3` 於 2026-10-04 離線量測。量測全程沒有模型或圖像服務在線，結果適用於目前支援的本地優先設定檔，不適用於業者的 token 計算器，也不涉及模型品質主張。
 
-| Capability profile | Context window | Completion reservation | Deep Recall | Safety | Maximum input | Summary soft target | Summary hard rendered limit |
+| 能力設定檔 | 脈絡視窗 | 完成輸出預留 | Deep Recall | 安全邊界 | 輸入上限 | 摘要軟性目標 | 摘要渲染硬性上限 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | npc_dialogue | 16384 | 250 | 512 | 256 | 15366 | 400 | 800 |
 | dialogue_summary | 4096 | 1024 | 512 | 256 | 2304 | 400 | 800 |
 
-The npc_dialogue window is sized by the persona-card bounds, not a provider
-window: a fully-authored NPC card is capped at 2000 rendered code points
-(about 4000 `token_est_v3` tokens) inside the mandatory character anchor, and
-the speaking player's public persona block rides the mandatory current frame.
-Under the old 4096 window (3078 maximum input) that mandatory floor alone could
-exceed the budget with zero history, so every fully-authored card degraded with
-`ContextBudgetExceededError`. The dialogue `turn_frames` hard bound is the
-maximum input itself: the mandatory current frame lives inside that section, so
-a smaller bound could reject after the aggregate reduction loop had already
-converged.
+npc_dialogue 的視窗大小由人物角色卡邊界決定，並非取自業者視窗。一張完整作者化的 NPC 卡在強制人物錨定區塊內上限為 2000 個渲染碼點（約 4000 個 `token_est_v3` token），說話玩家的公開人設區塊則放在必含的目前框架之內。舊的 4096 視窗（輸入上限 3078）之下，光是這層強制下限在零歷史的情況下就可能超出預算，所以每張完整作者化的卡都會以 `ContextBudgetExceededError` 降級。對話 `turn_frames` 的硬性上限直接等於輸入上限本身，原因在於必含的目前框架就位於該區塊內，較小的上限可能在外層彙整縮減迴圈已經收斂之後才把內容拒掉。
 
-Both profiles use the same persisted summary representation. The dedicated
-summary output reservation permits a bounded JSON summary, while ordinary
-NPC replies keep their existing 250-token completion allowance. Explicit
-`max_completion_tokens` overrides replace `max_tokens` for reservation accounting.
-Deployment-specific smaller completion budgets additionally bound summary JSON
-output; they never weaken the 800-token rendered summary bound.
+兩個設定檔共用同一套持久化摘要表示法。專用的摘要輸出預留額度讓摘要 JSON 有明確上限，一般 NPC 回覆則維持原有的 250 token 完成額度。明確給定的 `max_completion_tokens` 會取代 `max_tokens` 參與預留額度計算。部署端更小的完成預算也會另外限制摘要 JSON 輸出，但只會收緊，不會放寬 800 token 的摘要渲染上限。
 
-The synthetic measurement used twelve original-turn records with source IDs,
-revision 1, 64-character speech hashes, tick 0, speaker `Synthetic player` and
-speech `Can you repair this?`. Their exact sorted JSON plus double-newline
-separators measured **1306 estimated tokens**. The shared global rules measured
-**106** and the summary instruction **49** before section headings. A recorded
-summary, `The player asked about repairs; the NPC offered advice.`, measured
-**17** in plain text and **26** as the completion JSON object. Heading and
-attribution costs are included by final assembly, not deducted from reservations.
+量測使用十二筆合成原始輪次紀錄，帶有來源識別碼、修訂版本 1、64 字元台詞雜湊、tick 0、說話者 `Synthetic player` 與台詞 `Can you repair this?`。它們排序後的精確 JSON 加上雙換行分隔符，量得 **1306 個估算 token**。共通全域規則量得 **106**，區塊標題之前的摘要指令為 **49**。一筆已記錄的摘要 `The player asked about repairs; the NPC offered advice.`，純文字量得 **17**，完成 JSON 物件則為 **26**。標題與出處歸屬的成本由最終組裝計入，沒有從預留額度中扣掉。
 
-Selection uses a contiguous source prefix of at most twelve original turns and
-1800 estimated rendered-frame tokens, below the 2000-token section hard bound.
-The unchanged context assembler enforces the final 2304-token input budget,
-including headings, global rules, attribution and any prior summary. Provenance
-claims only exact source frames actually present in that rendered snapshot.
-Summary acceptance measures the epoch-summary heading plus text against 800,
-and the completion JSON against the profile completion reservation. A prior
-summary generation is referenced only when it was actually supplied.
+選取範圍是一段連續的來源前綴，最多十二筆原始輪次、1800 個估算的渲染框架 token，低於該區塊 2000 token 的硬性上限。未改動的脈絡組裝器負責執行最終 2304 token 的輸入預算，標題、全域規則、出處歸屬與既有摘要都算在內。出處宣稱只承認該渲染快照中實際存在的精確來源框架。摘要驗收時，紀元摘要標題加上內文對照 800 檢查，完成 JSON 則對照設定檔的完成輸出預留額度。先前摘要的生成版本只有確實提供時才會被引用。
 
-Oversized or invalid output uses the existing guardrail's bounded retry/degrade
-behavior and leaves original turns and the current epoch untouched. Oversized
-source turns remain durable and are never sliced into misleading partial
-summary sources; compaction can defer while ordinary dialogue uses its bounded
-recent view. Historical prompt frames are trimmed oldest-first before optional
-current memory/recall, and mandatory current state rejects rather than silently
-disappearing. `DialogueEpochTests` exercises accepted, oversized, offline and
-stale compaction with recorded responses, exact original provenance, movement
-and cache-disabled behavior. These numbers are conservative estimates; provider
-reported cached tokens are optional operational metadata only.
+輸出過大或無效時，沿用既有護欄的重試與降級行為（bounded retry/degrade），原始輪次與目前紀元都不受影響。過大的來源輪次維持持久保存，不會被切成誤導性的部分摘要來源；壓縮可以延後執行，一般對話則使用有界的近期視圖。歷史提示詞框架依最舊優先修剪，先於選擇性的目前記憶與召回；強制目前狀態遇到預算不足時選擇拒絕，不會無聲消失。`DialogueEpochTests` 以記錄的回應驗收通過、過大、離線與過期壓縮四種情境，同時檢查精確的原始出處、推進與停用快取行為。這些數字都是保守估算；業者回報的快取 token 數僅供維運參考。

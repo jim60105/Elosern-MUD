@@ -7,7 +7,7 @@
 > * 欲了解具體遊戲場景（如 NPC 對話、公會任務、戰鬥旁白）的調度細節，請參閱 [7 大業務情境與調度流程](/development/llm-scenarios)。
 > * 欲了解提案如何經過嚴格格式校驗、語意過濾與數值防洩漏，請參閱 [護欄天梯與語意驗證機制](/development/llm-guardrails)。
 > * 欲配置 API 端點（Ollama、vLLM、OpenRouter）與 23 個 Knobs 參數，請參閱 [端點配置與模型調優指南](/development/llm-configuration)。
-> * 欲檢視或調整提示詞（Prompt）模板，請參閱 [提示詞資料庫](/gm/prompts)。
+> * 欲檢視或調整提示詞（Prompt）範本，請參閱 [提示詞資料庫](/gm/prompts)。
 
 ---
 
@@ -41,7 +41,7 @@ flowchart LR
 ### 2. 確定性離線可玩性（Offline-Playable Invariant）
 
 * **零網路依賴性**：遊戲引擎在所有外部 LLM 服務、圖像生成服務或網路全部中斷時，仍必須保持 100% 可玩。
-* **必定優雅降級**：當遇到 API 逾時、連線失敗、伺服器錯誤、輸入資料超長、或者模型輸出無法通過語意驗證時，各生成層絕不會拋出未捕獲例外（Unhandled Exception）中斷遊戲，而是必然降級為確定性的本地回退（Fallback）邏輯（例如手寫範本池、預設問候語或基礎字串渲染）。
+* **必定優雅降級**：當遇到 API 逾時、連線失敗、伺服器錯誤、輸入資料超長、或者模型輸出無法通過語意驗證時，各生成層不會拋出未捕獲例外（Unhandled Exception）中斷遊戲，必然降級為確定性的本地回退（Fallback）邏輯（例如手寫範本池、預設問候語或基礎字串渲染）。
 
 ---
 
@@ -76,11 +76,11 @@ server/                          # 服務整合與雙向匯入邊界
 
 ### 1. 外部提示詞資料庫（`prompts/` & `world/prompts/`）
 * 所有系統與使用者 Prompt 範本集中於 `prompts/*.yaml`，管理員調整提示詞毋須修改 Python 程式碼，亦毋須重新建置容器映像檔。
-* `world/prompts/registry.py` 定義了嚴格的白名單占位符（Allowed Placeholders）與長度上限。未授權的變數置換會在載入時立即報錯，阻斷潛在錯誤。
+* `world/prompts/registry.py` 定義了嚴格的白名單預留位置（Allowed Placeholders）與長度上限。未授權的變數置換會在載入時立即報錯，阻斷潛在錯誤。
 
 ### 2. 生成提案層（`world/ai/`）
-* **無直接連線建立**：所有生成函式（如 `narrate_event_logs`、`generate_npc_reply`）均採依賴注入（Dependency Injection）方式傳入 `client`，模組內部不得在全域範圍建立 Socket 或連線。
-* **純粹的資料轉換**：輸入為不可變的上下文（Context），輸出為凍結的提案資料類別（Frozen Dataclass）或純字串。
+* **無直接連線建立**：所有生成函式（如 `narrate_event_logs`、`generate_npc_reply`）均採相依性注入（Dependency Injection）方式傳入 `client`，模組內部不得在全域範圍建立 Socket 或連線。
+* **純粹的資料轉換**：輸入為不可變的脈絡（Context），輸出為凍結的提案資料類別（Frozen Dataclass）或純字串。
 
 ### 3. 服務整合層（`server/`）
 * 由於程式碼架構契約嚴格限制匯入方向（`world/rules` 不得碰 `world/ai`，反之亦然），`server/` 是少數被允許同時匯入兩端的黏合層。
@@ -90,14 +90,14 @@ server/                          # 服務整合與雙向匯入邊界
 
 ## 執行期非同步調度模型
 
-Evennia 運行於 Twisted 非同步事件迴圈之上。為了防止長時間的模型推論阻塞遊戲主迴圈，LLM 調度遵循以下原則：
+Evennia 執行於 Twisted 非同步事件迴圈之上。為了防止長時間的模型推論阻塞遊戲主迴圈，LLM 調度遵循以下原則：
 
 1. **非同步 Deferred 管道**：
    `world/ai/client.py` 封裝 Twisted 的 `Agent` 與 HTTP 連線池，實作 `OpenAICompatClient`。所有網路呼叫皆回傳 `defer.Deferred`，完全不佔用主執行緒。
 2. **交易後提交觸發（Post-Commit Triggering）**：
-   對於因為玩家移動或狀態變更所引起的 LLM 請求（如移動進房觸發行動卡片計算、通關觸發異名提名），一律透過 `transaction.on_commit` 排程，確保資料庫實質提交後才向外部發送請求，避免交易回滾導致幽靈請求。
+   對於因為玩家移動或狀態變更所引起的 LLM 請求（如移動進房觸發行動卡片計算、通關觸發異名提名），一律透過 `transaction.on_commit` 排程，資料庫實質提交後才向外部發送請求，避免交易回滾導致幽靈請求。
 3. **即時思考回饋（UX 體驗）**：
-   在等待 LLM 回應的延遲期間（如 NPC 對話），系統利用 `twisted.internet.task.deferLater` 在達到預設延遲門檻後發送思考提示訊息（`npc.thinking`），並於收到回應時及時取消，確保玩家能感知 NPC 正在思考。
+   在等待 LLM 回應的延遲期間（如 NPC 對話），系統利用 `twisted.internet.task.deferLater` 在達到預設延遲門檻後發送思考提示訊息（`npc.thinking`），並於收到回應時及時取消，讓玩家能感知 NPC 正在思考。
 
 ---
 

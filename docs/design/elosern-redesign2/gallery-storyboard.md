@@ -1,86 +1,47 @@
-# Character portrait gallery storyboard
+# 角色肖像圖庫故事板
 
-## Run the interactive storyboard
+## 執行互動式故事板
 
-From the repository root, run `pnpm install --frozen-lockfile`, then
-`pnpm run serve-storybook`. Open `Data / GalleryPanel / Storyboard`.
-For an offline build, run `pnpm run build-storybook` and serve
-`.storybook-out` over HTTP. No Evennia, LLM, or image-generation service is
-required. All fonts, styles, and sample images are local assets.
+在倉庫根目錄執行 `pnpm install --frozen-lockfile`，接著執行 `pnpm run serve-storybook`，開啟 `Data / GalleryPanel / Storyboard`。離線展示則以 `pnpm run build-storybook` 建置，再透過 HTTP 提供 `.storybook-out`。整個流程不需要 Evennia、LLM 或圖像生成服務。所有字型、樣式與範例圖片都是本地資產。
 
-The storyboard mounts the real gallery, drawers and face editor. Its top
-control strip is a **story-only publication driver**, not a production service.
-After submitting an action, choose **發布成功** or **發布拒絕** to publish its
-explicit result. **檢視操作意圖** shows the submitted action and payload.
-**發布初始圖庫** publishes the initial synthetic eight-row fixture again.
-Offline portraits reuse the existing `art/defaults` artwork; the story media
-adapter substitutes their URLs and illustrative face rectangles, while integration tests use protocol-valid
-`/art/gallery` URLs. These are fictional subjects and equipment.
+故事板掛載真實的圖庫、抽屜與臉部編輯器。頂部控制條是**僅故事的發布驅動器**，不串接正式服務。送出動作後，選擇 **發布成功** 或 **發布拒絕** 發布該動作的明確結果。**檢視操作意圖** 顯示已送出的動作與載荷。**發布初始圖庫** 會再次發布最初的合成八列固定資料。離線肖像沿用既有的 `art/defaults` 美術；故事媒體介面卡替換它們的 URL 與示意性臉部矩形，整合測試則使用協定合法的 `/art/gallery` URL。這些主體與裝備都屬虛構。
 
-## Visual references
+## 視覺參考
 
-The implementation was designed after viewing all four reference images:
+實作在檢視過全部四張參考圖之後設計完成。
 
-- [Gallery overview](角色肖像圖庫管理頁-圖庫主畫面.webp)
-- [Generate portrait](角色肖像圖庫管理頁-生成新圖.webp)
-- [Equipment binding](角色肖像圖庫管理頁-裝備綁定.webp)
-- [Face selection](角色肖像圖庫管理頁-臉部框選.webp)
+- [圖庫總覽](角色肖像圖庫管理頁-圖庫主畫面.webp)
+- [生成新肖像](角色肖像圖庫管理頁-生成新圖.webp)
+- [裝備綁定](角色肖像圖庫管理頁-裝備綁定.webp)
+- [臉部框選](角色肖像圖庫管理頁-臉部框選.webp)
 
-Shared visual language: ink-black surfaces, restrained gold borders, gold serif
-headings, muted supporting copy, explicit pending/failure states, and selected
-cards outlined in gold. The live gallery leaves the character column and the
-bottom command area visible. Drawers sit on the right; face selection uses a
-bounded two-column modal rather than replacing the game shell.
+共用的視覺語言：墨黑表面、克制的金黃色邊框、金黃色襯線標題、淡化輔助文字、明確的待處理與失敗狀態，選中的卡片以金黃色描邊。即時圖庫讓角色欄與底部命令區保持可見。抽屜位於右側；臉部框選使用有邊界的兩欄式彈窗，不取代遊戲外框。
 
-## Frames and transitions
+## 框架與轉換
 
-| Frame | Trigger | Visible state and next action | Recovery |
+| 框架 | 觸發 | 可見狀態與下一步 | 復原 |
 | --- | --- | --- | --- |
-| 1. Browse | Open **角色肖像圖庫** beside the live portrait, or open the storyboard | Eight cards; five server-counted filters; subject rail; grid/list controls; default crown; selected portrait details | Empty and unavailable stories show their explicit states; no invented portraits |
-| 2. Inspect | Select a card; change filters or grid/list locally | Original card order, server chips and the local relative date (exact local instant on hover); pending rows use a spinner; failed rows preserve the server label | Select another card; unavailable binding details are labelled as unavailable |
-| 3. Generate | Choose **生成新圖** | Five optional character-data selections, committed equipment summary, raw prompt and Unicode code-point counter | **取消** or Escape returns focus to the opener without dispatch |
-| 4. Submit and settle | Choose **開始生成**, then use the story publication controls | Controls lock during admission; only the matching successful result and its committed revision close the editor; published pending row appears in the grid | Publish rejection: retain the draft; **查看伺服器訊息** exposes the message. Oversized prompts are not silently truncated |
-| 5. Bind | Select a completed card and choose **編輯設定** | Checkbox-only slot mask, current equipment, explicit server condition lines and warning cards; no item picker | Save requires a slot; **查看** selects the warning's card; cancel discards the draft |
-| 6. Crop | Choose **臉部框選** | Original image with movable gold rectangle and resize handle; normalized numeric keyboard controls; square preview | Move/resize clamps to the original image. Cancel sends nothing; save sends rectangle coordinates only |
-| 7. Default | Select a non-default completed card, choose **設為預設**, publish success | The next story publication moves the default marker | Rejection leaves the published marker unchanged |
-| 8. Delete | Choose **刪除** | An inline confirmation identifies the destructive action | **取消** sends nothing; **確認刪除** submits once. The card disappears only after publication |
-| 9. Monster | Select **測試魔物**, publish success | Single-card replacement explanation; generation has no field selection or free text; no equipment binding | Switch back through subject selection; all visibility follows published capabilities |
-| 10. Transform | Select a completed card and choose **比例調整** | Live preview of the figure against the static adult reference; paired slider/number controls, drag-to-offset, local-only **重設**; the storyboard publishes the save result and the updated card row itself | Save is gated on image load; publish rejection retains the draft with **查看伺服器訊息**; Escape or **取消** dispatches nothing and restores the opener |
+| 1. 瀏覽 | 在即時肖像旁開啟 **角色肖像圖庫**，或開啟故事板 | 八張卡片；五個伺服器計數的篩選器；主體軌道；網格/清單控制；預設冠飾；選中肖像的細節 | 空的與不可用的展示故事呈現各自的明確狀態；不虛構肖像 |
+| 2. 檢視 | 選取一張卡片；在地變更篩選器或網格/清單 | 原始卡片順序、伺服器 chips 與在地相對日期（懸停顯示精確的本地時間點）；待處理列使用轉圈指標；失敗列保留伺服器標籤 | 選取另一張卡片；不可用的綁定細節標示為不可用 |
+| 3. 生成 | 選擇 **生成新圖** | 五個選用的角色資料選項、已提交的裝備摘要、原始提示詞與 Unicode 碼位計數器 | **取消** 或 Escape 把焦點還給開啟者，不派送任何動作 |
+| 4. 送出與結算 | 選擇 **開始生成**，接著使用故事發布控制 | 受理期間控制鎖定；只有相符的成功結果與其已提交修訂版本會關閉編輯器；已發布的待處理列出現在網格中 | 發布拒絕時保留草稿；**查看伺服器訊息** 顯示訊息。過大的提示詞絕不被無聲截斷 |
+| 5. 綁定 | 選取一張完成的卡片並選擇 **編輯設定** | 僅核選方塊的欄位遮罩、目前裝備、明確的伺服器條件列與警告卡；沒有物品選擇器 | 儲存需要一個欄位；**查看** 選取警告對應的卡片；取消會丟棄草稿 |
+| 6. 框選 | 選擇 **臉部框選** | 原圖帶可移動的金黃色矩形與縮放手把；正規化的數字鍵盤控制；方形預覽 | 移動與縮放夾在原圖範圍內；取消不傳送任何內容，儲存只傳送矩形座標 |
+| 7. 預設 | 選取一張非預設的完成卡片，選擇 **設為預設**，發布成功 | 下一次故事發布會移動預設標記 | 拒絕讓已發布的標記維持不變 |
+| 8. 刪除 | 選擇 **刪除** | 行內確認指出這個破壞性動作 | **取消** 不傳送任何內容；**確認刪除** 提交一次；卡片只在發布後才消失 |
+| 9. 魔物 | 選取 **測試魔物**，發布成功 | 單卡替換的說明；生成沒有欄位選擇或自由文字；沒有裝備綁定 | 透過主體選擇切回；所有可見性都跟隨已發布的能力 |
+| 10. 比例 | 選取一張完成的卡片並選擇 **比例調整** | 身材對比靜態成人參考的即時預覽、成對的滑桿/數字控制、拖曳位移、純在地的 **重設**；故事板發布儲存結果與更新後的卡片列本身 | 儲存以圖片完成載入為條件；發布拒絕保留草稿並提供 **查看伺服器訊息**；Escape 或 **取消** 不派送任何動作並還原開啟者 |
 
-Standalone stories also cover locked, unavailable, empty, unmatched-binding,
-and rejected-editor states. The production character-data shortcut opens the
-existing puppet status drawer directly; the isolated storyboard describes that
-transition instead of pretending to contain live character data.
+獨立的展示故事也涵蓋鎖定、不可用、空、綁定不符與編輯器拒絕等狀態。正式環境的角色資料快捷方式直接開啟既有的木偶狀態抽屜；隔離的故事板描述那段轉換，不宣稱自身帶有即時角色資料。
 
-The transform frame's entry button, reset, save, and rejection states are
-fixture publications in the storyboard: the slider edits, drag offsets, and
-reset are pure local draft state that never dispatch anything, exactly as in
-production, while the save round-trip and the committed row are driven by the
-story's publication controls rather than a live server.
+比例框架的進入按鈕、重設、儲存與拒絕狀態在故事板裡都是固定資料發布。滑桿編輯、拖曳位移與重設屬純粹的在地草稿狀態，絕不派送任何動作，與正式環境的行為完全一致；儲存的往返與已提交的列則由故事的發布控制驅動，沒有線上伺服器在背後。
 
-## Deliberate differences from the reference pictures
+## 與參考圖的刻意差異
 
-The current gallery v1 wire panel does not expose full historical equipment
-bindings, original pixel dimensions, or the currently resolved image. The UI
-therefore never reconstructs these facts from equipment IDs or chips. Binding
-conditions appear only from explicit `binding_warnings`; an absent entry is
-marked unavailable. A default crown does not claim that the image is currently
-resolved by equipment rules. Header and filter labels are static chrome;
-counts, card labels and failure labels are server facts. Embedded failure codes
-remain intact when the server includes them in its label.
+目前的圖庫 v1 wire 面板不揭露完整的歷史裝備綁定、原始像素尺寸或目前解析出的圖片。UI 因此絕不從裝備 ID 或 chips 重建這些事實。綁定條件只來自明確的 `binding_warnings`；沒有的條目標示為不可用。預設冠飾不宣稱圖片目前由裝備規則解析而來。標題列與篩選器標籤是靜態外框；計數、卡片標籤與失敗標籤屬伺服器事實。伺服器把失敗程式碼放進標籤時，內嵌的程式碼維持完整。
 
-The four shipped binding slots replace the reference's illustrative fifth
-slot. Monster capabilities hide both optional fields and free text. Only the
-puppet's generation drawer links to the puppet's character data. Existing
-thumbnail face anchoring remains shared with the HUD; the editor preview clips
-the selected normalized rectangle into its square output frame. Non-square
-selections are letterboxed rather than stretched.
+出貨的四個綁定欄位取代參考圖中示意性的第五欄。魔物能力同時隱藏選用欄位與自由文字。只有木偶的生成抽屜連結到該木偶的角色資料。既有的縮圖臉部錨定仍與 HUD 共用；編輯器預覽把選取的正規化矩形裁剪進方形輸出框。非方形的選取以黑邊補白，不拉伸影像。
 
-## Live verification boundaries
+## 即時驗證邊界
 
-Storybook publishes synthetic state deliberately and never contacts a real
-backend. Vitest application integration uses the actual Pinia store, protocol
-validator, dispatcher, global mutation gate and result/narrative handling.
-Visual browser verification covers the actual authored component surfaces.
-Real image generation and matching rules remain owned by the previously
-implemented deterministic backend, not by this UI change.
+Storybook 刻意發布合成狀態，絕不接觸真實後端。Vitest 應用整合使用真實的 Pinia store、協定驗證器、派送器、全域變更閘門與結果/敘事處理。瀏覽器視覺驗證涵蓋實際撰寫的元件表面。真實的圖像生成與比對規則仍由先前已實作的確定性後端負責，屬於這份 UI 變更之外的範圍。

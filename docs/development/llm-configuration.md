@@ -29,7 +29,7 @@ flowchart LR
 4. **`server/conf/secret_settings.py`**：最高裁決者，永遠覆寫環境變數。推薦將敏感的 API 密鑰保留於此處。
 
 ### 嚴格閉合失敗語意（Fail-Closed）
-若環境變數存在但提供無效格式（例如在浮點數字段傳入英文字串、或數值超出上下限），系統會在**開機時立即丟出 `ImproperlyConfigured` 並中止程序**，點名出錯的變數名稱與規則。系統絕不會靜默忽略錯誤或自動退回預設值。
+若環境變數存在但提供無效格式（例如在浮點數字段傳入英文字串、或數值超出上下限），系統會在**開機時立即丟出 `ImproperlyConfigured` 並中止程式啟動**，同時列出出錯的變數名稱與規則。系統絕不會靜默忽略錯誤或自動退回預設值。
 
 ---
 
@@ -41,7 +41,7 @@ flowchart LR
 
 | 變數後綴 (`<SUFFIX>`) | 型別 | 預設值 | 說明 |
 | :--- | :---: | :---: | :--- |
-| `BASE_URL` | URL 字串 | `http://127.0.0.1:11434` | OpenAI 相容 API 根位址（Compose 容器內預設為指向宿主機網關）。 |
+| `BASE_URL` | URL 字串 | `http://127.0.0.1:11434` | OpenAI 相容 API 根位址（Compose 容器內預設為指向宿主機閘道器）。 |
 | `PATH` | 字串 | `/v1/chat/completions` | Chat Completions 端點路徑。 |
 | `TIMEOUT_SECONDS` | 整數 | `60` | 單次 HTTP 請求的牆鐘截止秒數（正整數）。 |
 | `API_KEY` | 字串 | 空（未設定） | 認證 Bearer Token。非空時自動附帶 `Authorization: Bearer <KEY>`。 |
@@ -128,7 +128,7 @@ LLM_PATH=/v1/chat/completions
 LLM_MODEL=qwen2.5:7b
 ```
 
-### 2. 本地 vLLM 高併發實例（含思考推理）
+### 2. 本地 vLLM 高併發執行個體（含思考推理）
 若使用 vLLM 託管具備思考鏈（Thinking/Reasoning）的模型（如 DeepSeek-R1 系列）：
 
 ```ini

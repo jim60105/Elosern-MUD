@@ -46,8 +46,8 @@
 ## 2. 事前決定：寫卡之前要回答的四個問題
 
 1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。
-2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 的 `magic_power` 項目就是該卡的開局魔力字面值（成長重設計 D-A5 已刪除種族平均取樣器），模板的魔力是作者寫的，不是隨機抽樣出來的。
-3. 技能組碰不碰血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。kit 裡若有 `requires_divine_arts` 的技能，種族必須 `can_use_divine_arts`，否則載入即爆。
+2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 的 `magic_power` 項目就是該卡的開局魔力字面值（成長重設計 D-A5 已刪除種族平均取樣器），模板的魔力全部由作者手寫決定。
+3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。kit 裡若有 `requires_divine_arts` 的技能，種族必須 `can_use_divine_arts`，否則載入即爆。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
 
 ---
@@ -108,7 +108,7 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 ### Step 5.5 — 頭像回退鍵（選填）
 
-`fallback_key` 宣告這張模板的角色在**尚無生成頭像**時改顯示哪張內建回退圖。值是閉合詞彙表的成員——`man`、`woman`、`boy`、`girl`、`elder`、`monster_anon` 六鍵之一（常數住在 `world/art/fallback_keys.py`）——其餘一律留 `None`：玩家模板未設定時，解析器依存放的性別與外表年齡落到 child／adult／elder 年齡帶，`female`／`male` 直取該帶的性別鍵，其他性別以 subject 鍵雜湊到該帶的有序圖池（怪物不受模板影響，未宣告時一律 `monster_anon`）。這層純粹是顯示層回退，一旦該角色有了生成頭像卡片，頭像解析永遠優先於回退圖。詞彙表由 `_validate_preset_fallback_keys` 在 lore 匯入時逐卡檢查（見 §4），typo 直接在載入期爆。
+`fallback_key` 宣告這張模板的角色在**尚無生成頭像**時改顯示哪張內建回退圖。值是閉合詞彙表的成員，即 `man`、`woman`、`boy`、`girl`、`elder`、`monster_anon` 六鍵之一（常數住在 `world/art/fallback_keys.py`），其餘一律留 `None`。玩家模板未設定時，解析器依存放的性別與外表年齡落到 child／adult／elder 年齡帶，`female`／`male` 直取該帶的性別鍵，其他性別以 subject 鍵雜湊到該帶的有序圖池（怪物不受模板影響，未宣告時一律 `monster_anon`）。這層純粹是顯示層回退，一旦該角色有了生成頭像卡片，頭像解析永遠優先於回退圖。詞彙表由 `_validate_preset_fallback_keys` 在 lore 匯入時逐卡檢查（見 §4），typo 直接在載入期爆。
 
 ### Step 6 — 宣告同行夥伴
 
@@ -118,7 +118,7 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 ### Step 7 — 補測試與驗證
 
-新卡會自動進建立畫面（`build_preset_cards()` 讀 registry），通常零程式碼。但 `world/lore/tests/test_player_presets.py` 釘住了目錄現況：種族覆蓋、恰好八張卡的名單與鍵順序、每張卡的核准開局裝載。加卡時要**有意識地更新**這些釘值，它們是目錄契約，不是要繞過的障礙。依序跑最小聚焦集：
+新卡會自動進建立畫面（`build_preset_cards()` 讀 registry），通常零程式碼。但 `world/lore/tests/test_player_presets.py` 釘住了目錄現況：種族覆蓋、恰好八張卡的名單與鍵順序、每張卡的核准開局裝載。加卡時要**有意識地更新**這些釘值，它們屬於目錄契約的一環。依序跑最小聚焦集：
 
 ```sh
 MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb \
@@ -153,7 +153,7 @@ uv run --locked python -m tools.spec_traceability check
 
 配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超跨度，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
 
-「非神性種族不得帶偽裝層」這條規則不是模板路徑獨有，`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
+「非神性種族不得帶偽裝層」這條規則同樣適用於 JSON 匯入路徑，`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
 
 | 驗證函式 | 觸發於 | 何時爆 | 錯誤訊息（節錄） |
 |---|---|---|---|
@@ -171,7 +171,7 @@ uv run --locked python -m tools.spec_traceability check
 | 精靈卡宣告非空 `affinity_elements` | lore 匯入即爆。精靈的親附永遠由亞種在啟動時播種，模板不得代宣告 |
 | 神術技能落在無神性種族 | lore 匯入即爆；先確認 `can_use_divine_arts` |
 | 非精靈（無神性種族）的卡或匯入記錄宣告非空 `disguised_stats` | lore 匯入或匯入驗證即爆；偽裝層只有神之秘法能寫，見 §4 |
-| `allocations` 總和不等於預算 | 載入無事、CI 與啟動爆。這是配點制最容易踩的一條，Step 0 先算預算 |
+| `allocations` 總和不等於預算 | 載入無事、CI 與啟動爆。這是配點制最容易觸發的一條錯誤，Step 0 先算預算 |
 | `starting_equipment` 的鍵不在 `starting_items` | lore 匯入即爆。背包是持有事實唯一來源，穿戴只能是子集 |
 | persona 散文欄寫超過 600 碼點 | `world.rules.character_creation` 匯入即爆，訊息點名卡與欄 |
 | `persona.background` 寫超過 256 碼點 | rules 掃描過得了、`tests/test_creation_parity_contract.py` 爆。卡契約界比 persona 散文界緊 |
@@ -183,12 +183,12 @@ uv run --locked python -m tools.spec_traceability check
 
 ---
 
-## 6. 什麼時候這不是一篇指南能帶你走完的事
+## 6. 什麼時候已超出這篇指南的範圍
 
 加一張卡（新種族的代表角色、新開局裝載）照上面的流程做即可。以下三類工作超出模板本身的範圍，請改走對應指南：
 
 - 卡片需要新的物品、新的裝備槽或新的效果鍵：見[新增物品指南](/development/adding-items)。
 - 卡片需要新的魔法、新的技能或新的血脈前置邊：見[新增魔法指南](/development/adding-spells)。
-- 要建立的不是玩家模板，而是 NPC 或測試資料用的絕對數值角色卡：見[角色建立與匯入](/gm/characters)。
+- 要建立的對象是 NPC 或測試資料用的絕對數值角色卡，請走匯入卡路徑：見[角色建立與匯入](/gm/characters)。
 
 要動驗證器本身（新邊界、新詞彙、新資料域）就屬於規格驅動變更，請走 OpenSpec 流程並同步 `player-character-creation` 相關主規格。
