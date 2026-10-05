@@ -34,9 +34,10 @@ describe("gallery application integration", () => {
     opener.element.focus();
     await opener.trigger("click");
   }
-  // The suite's first test pays the cold-transform cost of mounting the
-  // whole AppClient on CI runners (measured 5.6–5.9s at the default 5s
-  // vitest timeout); it completes in well under a second once warm.
+  // Every test in this file pays the mount cost of the whole AppClient on a
+  // loaded CI runner (measured 5.3–12.8s per test against vitest's 5s
+  // default, with the same tests completing in well under a second locally),
+  // so each one carries this file's explicit budget.
   it("offers a real opener only with committed availability and shows a degradation reason", async () => {
     await snapshot(null);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
@@ -70,7 +71,7 @@ describe("gallery application integration", () => {
     await button(wrapper.get('[data-testid="gallery-panel"]'), "生成新圖").trigger("click");
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
     expect(sender.sent.actions).toHaveLength(1);
-  });
+  }, 20000);
   it("keeps a rejected generation draft and exposes exactly one server error through the log", async () => {
     await open();
     await button(wrapper.get('[data-testid="gallery-panel"]'), "生成新圖").trigger("click");
@@ -86,7 +87,7 @@ describe("gallery application integration", () => {
     expect(store.narrative.filter((line) => line.text === rejection.message)).toHaveLength(1);
     await button(drawer, "查看伺服器訊息").trigger("click");
     expect(wrapper.text()).toContain(rejection.message);
-  });
+  }, 20000);
   it("tears down an editor on transport loss and cannot dispatch from the stale surface", async () => {
     await open();
     await button(wrapper.get('[data-testid="gallery-panel"]'), "生成新圖").trigger("click");
@@ -95,7 +96,7 @@ describe("gallery application integration", () => {
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
     expect(store.dispatchAction("gallery.generate", { subject_key: "portrait:character:7001", fields: [], custom_prompt: "" })).toBeNull();
     expect(sender.sent.actions).toEqual([]);
-  });
+  }, 20000);
   it("saves a stage draft once, closes only on its revision, and retains a rejected draft", async () => {
     await open();
     const panel = () => wrapper.get('[data-testid="gallery-panel"]');
