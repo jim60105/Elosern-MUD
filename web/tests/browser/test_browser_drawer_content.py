@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     inject_update,
     valid_character_panel,
@@ -112,7 +112,15 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
 
                 _open_drawer(page, "status")
                 probe = page.evaluate(_ART_PROBE)
-                bound = min(360, 0.28 * probe["workspaceWidth"])
+                # `.hud-drawer__art` is `flex: 0 0 min(360px * var(--ui-scale), 28%)`,
+                # so the bound scales with the chrome factor at every size. The
+                # scaled literal is rounded to a subpixel: the layout engine
+                # rounds 360px * 1.4 to 504, and the float product's tail must
+                # not decide the assertion.
+                bound = min(
+                    round(360 * ui_scale(viewport), 3),
+                    0.28 * probe["workspaceWidth"],
+                )
                 self.assertIsNotNone(probe["artWidth"], "the status drawer stands its portrait column")
                 self.assertLessEqual(probe["artWidth"], bound + 1)
                 self.assertNotIn("肖像生成中", probe["artText"] or "")

@@ -13,6 +13,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
+from .browser_base import ui_scale
 from .test_browser_creation_base import CreationBrowserTest
 
 
@@ -72,7 +73,12 @@ class ViewportCreationJourney(CreationBrowserTest):
                 regions = page.locator(".creation-region")
                 boxes = [regions.nth(i).bounding_box() for i in range(3)]
                 self.assertLessEqual(boxes[0]["x"] + boxes[0]["width"], boxes[1]["x"])
-                self.assertLessEqual(boxes[1]["width"], 640)
+                # The middle region bounds itself to 640px at the reference,
+                # scaled by the chrome factor at every acceptance size
+                # (`.creation-persona { max-width: calc(640px * var(--ui-scale)) }`).
+                self.assertLessEqual(
+                    boxes[1]["width"], 640 * ui_scale((width, height)) + 1
+                )
                 self.assertLessEqual(boxes[1]["x"] + boxes[1]["width"], boxes[2]["x"])
                 fields = page.locator(
                     '[data-testid="creation-body"] input, '

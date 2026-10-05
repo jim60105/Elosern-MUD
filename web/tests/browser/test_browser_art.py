@@ -17,7 +17,7 @@ import os
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
@@ -114,7 +114,14 @@ def assert_scene_caption_on_stage_floor(test, page, viewport):
     test.assertAlmostEqual(cmd["bottom"], band["top"], delta=1.0)
     gap = cmd["top"] - plate["bottom"]
     test.assertGreaterEqual(gap, 0, "the caption intrudes into the command line at %s" % size)
-    test.assertLessEqual(gap, 16, "the caption floats %.0fpx above the command line at %s" % (gap, size))
+    # The plate stands 12px above the command line at the reference, scaled by
+    # the chrome factor like every other inset (`.scene-backdrop__plate`'s
+    # `bottom: calc(var(--stage-content-bottom) + 12px * var(--ui-scale))`).
+    test.assertLessEqual(
+        gap,
+        12 * ui_scale(viewport) + 1,
+        "the caption floats %.0fpx above the command line at %s" % (gap, size),
+    )
     # Centred in the open stage between the portrait anchors' boxes.
     left_edge = geo["actorLeft"]["right"]
     right_edge = geo["actorRight"]["left"]
