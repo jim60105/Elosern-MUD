@@ -35,7 +35,7 @@ A character created from a player preset SHALL resolve its preset official conte
 - **THEN** no preset reference resolves and its portrait resolution proceeds through runtime artwork and fallbacks exactly as today
 
 ### Requirement: Authored NPCs carry a stable profile provenance established at creation
-Every NPC instantiated from an authored NPC/profile identity — settlement service hosts, guild examiners, and blueprint-characterized occupants whose blueprint names a profile identity — SHALL have its authored profile key recorded as stable provenance in the same owning creation/import/spawn path that already establishes its other authored attributes, subject to the same transactional discipline (a rolled-back spawn/import leaves no provenance). Resolution SHALL bind the `npc` official reference to that provenance. The numeric `npc_tier_key` SHALL NOT select an NPC's official content reference: two NPCs sharing one numeric tier SHALL NOT thereby share a named character's image.
+Every NPC instantiated from an authored NPC/profile identity — settlement service hosts, guild examiners, and blueprint-characterized occupants whose blueprint names a profile identity — SHALL have its authored profile key recorded as stable provenance in the same owning creation/import/spawn path that already establishes its other authored attributes, subject to the same transactional discipline (a rolled-back spawn/import leaves no provenance). Resolution SHALL bind the `npc` official reference to that provenance. The numeric `npc_tier_key` SHALL NOT select an NPC's official content reference: two NPCs sharing one numeric tier SHALL NOT thereby share a named character's image. The occupant clause is conditional and unsatisfied by construction today: the compiled occupant contract is closed over a display name, a title, the age pair, an optional stable portrait key, a persona card, and combat traits, so no blueprint/characterization shape names a profile identity and no import record names one either. For those two populations the engine SHALL record no provenance: a profile identity SHALL never be inferred from a display name, an entity key, a numeric tier, a quest role, a service anchor, or any generated field.
 
 #### Scenario: A spawned host resolves its profile reference
 - **WHEN** a settlement service host with an authored `host_profile_key` spawns and later presents
@@ -48,6 +48,14 @@ Every NPC instantiated from an authored NPC/profile identity — settlement serv
 #### Scenario: Rolled-back spawn leaves no provenance
 - **WHEN** a spawn or import transaction rolls back after provenance would have been written
 - **THEN** no entity carries the new provenance attribute
+
+#### Scenario: A generated occupant establishes no authored profile provenance
+- **WHEN** a blueprint-characterized occupant spawns from a compiled characterization that names no authored profile identity
+- **THEN** no `npc_profile_key` provenance is recorded for it and no official `npc` reference resolves for it
+
+#### Scenario: A generated payload cannot smuggle a profile identity
+- **WHEN** a generated scene `npc_req` entry carries an unexpected profile-keyed field and the occupant is still compiled
+- **THEN** the compiled characterization drops that field and the occupant carries no profile provenance, because a generated channel is never an authored one
 
 ### Requirement: Dynamically generated NPCs may only carry an explicit allowed reference
 A dynamically generated NPC (no authored profile identity) SHALL resolve an official content reference only when an allowed authored channel explicitly attaches one to it; the engine SHALL NOT infer a reference from its display name, tier, quest role, or generator output text. Without an explicit reference it presents through its runtime portrait path and the existing fallback chain unchanged.
