@@ -189,12 +189,144 @@ class PlayerCorrespondenceTests(EvenniaTest):
         command.func()
         self.other.msg.assert_called_once_with(record.body)
 
+    @covers_requirement("correspondence-player-surface::sending-and-collection-require-any-branch")
+    def test_branch_page_after_leaving_grants_no_remote_send_or_collection(self):
+        incoming = self.due_letter()
+        self.player.location = self.room2
+        page = surface.list_letters(self.player)
+        self.assertTrue(page["branch"])
+        # Walking away from the branch the page was loaded at re-checks
+        # server-side on every collect/send: the stale capability grants
+        # nothing, and nothing is acquired or sent.
+        untagged = create_object("typeclasses.rooms.Room", key="Synthetic untagged room")
+        self.player.location = untagged
+        self.assertFalse(surface.branch_available(self.player))
+        before = (
+            LetterSend.objects.count(),
+            LetterState.objects.count(),
+            NarrativeEvent.objects.count(),
+            ProjectionProgress.objects.count(),
+        )
+        collected = actions.collect_adapter(self.player, {})
+        self.assertEqual(collected["outcome"], "rejected")
+        self.assertNotIn("data", collected)
+        sent = actions.send_adapter(
+            self.player,
+            actions.validate_send(
+                {
+                    "recipient": self.npc.key,
+                    "body_parts": ["合成遠端內容"],
+                    "source_id": "synthetic_remote_send",
+                }
+            ),
+        )
+        self.assertEqual(sent["outcome"], "rejected")
+        self.assertNotIn("data", sent)
+        self.assertEqual(LetterSend.objects.filter(source_id="synthetic_remote_send").count(), 0)
+        self.assertEqual(
+            before,
+            (
+                LetterSend.objects.count(),
+                LetterState.objects.count(),
+                NarrativeEvent.objects.count(),
+                ProjectionProgress.objects.count(),
+            ),
+        )
+        state = LetterState.objects.get(letter__source_id=incoming.source_id)
+        self.assertEqual(state.status, "available")
+        self.assertIsNone(state.read_tick)
+
+    @covers_requirement("correspondence-player-surface::collection-and-reading-remain-distinct")
+    def test_collected_unread_letter_is_portable_and_reads_exactly_once(self):
+        incoming = self.due_letter(body="合成隨身內容")
+        baseline = ProjectionProgress.objects.count()
+        self.player.location = self.room1
+        collected = actions.collect_adapter(self.player, {})
+        self.assertEqual(collected["outcome"], "success")
+        self.assertEqual(collected["data"]["count"], 1)
+        # Collection is not reading: the acquired letter stays unread and no
+        # knowledge source is created.
+        state = LetterState.objects.get(letter__source_id=incoming.source_id)
+        self.assertEqual(state.status, "collected")
+        self.assertIsNone(state.read_tick)
+        self.assertFalse(NarrativeEvent.objects.filter(event_type="correspondence_read").exists())
+        self.assertEqual(ProjectionProgress.objects.count(), baseline)
+
+        # Portable reading anywhere: away from every branch the owned
+        # collected-but-unread letter is listed and still opens.
+        self.player.location = None
+        page = surface.list_letters(self.player)
+        self.assertFalse(page["branch"])
+        self.assertEqual([row["source_id"] for row in page["letters"]], [incoming.source_id])
+        self.assertIsNone(page["letters"][0]["read_tick"])
+        read_result = actions.read_adapter(self.player, {"source_id": incoming.source_id})
+        self.assertEqual(read_result["outcome"], "success")
+        self.assertEqual("".join(read_result["data"]["body_parts"]), "合成隨身內容")
+        first_tick = LetterState.objects.get(pk=state.pk).read_tick
+        self.assertIsNotNone(first_tick)
+        self.assertEqual(NarrativeEvent.objects.filter(event_type="correspondence_read").count(), 1)
+        self.assertEqual(ProjectionProgress.objects.count(), baseline + 1)
+        # Rereading, still away from every branch, writes nothing.
+        first = surface.read(self.player, incoming.source_id)
+        self.clock.advance(1, AdvanceSource.COMMAND, [])
+        self.assertEqual(surface.read(self.player, incoming.source_id), first)
+        reread_tick = LetterState.objects.get(pk=state.pk).read_tick
+        self.assertEqual(reread_tick, first_tick)
+        self.assertEqual(NarrativeEvent.objects.filter(event_type="correspondence_read").count(), 1)
+        self.assertEqual(ProjectionProgress.objects.count(), baseline + 1)
+
+    @covers_requirement("correspondence-player-surface::browser-and-text-channels-share-authoritative-permissions")
+    def test_foreign_and_uncollected_reads_leak_no_prose_or_read_state(self):
+        mine = self.due_letter(body="synthetic_secret")
+        foreign = self.due_letter(self.other, "synthetic_foreign", "foreign_secret")
+        self.player.location = self.room1
+        surface.collect(self.player)
+        self.other.location = self.room2
+        surface.collect(self.other)
+        self.player.location = None
+        before = (ProjectionProgress.objects.count(), NarrativeEvent.objects.count())
+        for source_id in (foreign.source_id, "synthetic_missing"):
+            denied = actions.read_adapter(self.player, {"source_id": source_id})
+            self.assertEqual(denied["outcome"], "rejected")
+            self.assertNotIn("data", denied)
+            self.assertNotIn("secret", str(denied))
+        # A forged or uncollected read establishes nothing for anyone.
+        self.assertEqual(before, (ProjectionProgress.objects.count(), NarrativeEvent.objects.count()))
+        self.assertFalse(NarrativeEvent.objects.filter(event_type="correspondence_read").exists())
+        self.assertIsNone(LetterState.objects.get(letter__source_id=foreign.source_id).read_tick)
+        self.assertIsNone(LetterState.objects.get(letter__source_id=mine.source_id).read_tick)
+
     def test_anchor_duplicates_and_pagination_fail_closed(self):
         duplicate = create_object("typeclasses.rooms.Room", key="Synthetic duplicate anchor", tags=["synthetic_branch_a"])
         self.assertFalse(surface.branch_available(self.player))
         with self.assertRaises(surface.CorrespondenceError):
             surface.collect(self.player)
+        # The browser adapters are refused identically: a duplicate-tagged
+        # anchor is never an authorized branch, and an unauthored room is not
+        # one either.
+        rejected = actions.collect_adapter(self.player, {})
+        self.assertEqual(rejected["outcome"], "rejected")
+        self.assertNotIn("data", rejected)
+        self.assertEqual(
+            actions.send_adapter(
+                self.player,
+                actions.validate_send(
+                    {
+                        "recipient": self.npc.key,
+                        "body_parts": ["合成重複錨點"],
+                        "source_id": "synthetic_duplicate_anchor",
+                    }
+                ),
+            )["outcome"],
+            "rejected",
+        )
+        self.assertEqual(LetterSend.objects.filter(source_id="synthetic_duplicate_anchor").count(), 0)
         duplicate.delete()
+        unauthored = create_object("typeclasses.rooms.Room", key="Synthetic unauthored room")
+        self.player.location = unauthored
+        self.assertFalse(surface.branch_available(self.player))
+        self.assertEqual(actions.collect_adapter(self.player, {})["outcome"], "rejected")
+        self.player.location = self.room1
         for index in range(21):
             send_letter(sender_id=self.npc.pk, recipient_id=self.player.pk, body="Synthetic page", source_id=f"synthetic_page_{index}")
         self.clock.advance(3600, AdvanceSource.COMMAND, [])
