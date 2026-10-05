@@ -91,6 +91,12 @@ from world.art.gallery import (
     set_default,
     validate_face_rect,
 )
+from world.art.no_follow import (
+    RejectedFile,
+    open_dir_fd,
+    open_file_bytes,
+    open_nofollow,
+)
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 from world.observability import log_info, log_warn
@@ -120,10 +126,6 @@ _MAX_DIAGNOSTICS = 32
 _MAX_FILE_BYTES = 32 * 1024 * 1024
 
 
-class _SeedFileRejected(Exception):
-    """Internal: an opened file failed post-open verification."""
-
-
 def derive_image_id(relative_path: str) -> str:
     """The canonical lowercase uuid5 image_id for a seed-root-relative path.
 
@@ -151,54 +153,6 @@ class _Diagnostics:
             self.suppressed += 1
 
 
-def _open_dir_fd(name: str, *, dir_fd: int | None = None) -> int:
-    """Open a directory no-follow (``O_NOFOLLOW``), raising ``OSError`` on refusal.
-
-    With ``dir_fd`` the name is resolved relative to an already-verified
-    parent directory fd, so no intermediate component of the walk is ever
-    re-resolved through a swappable pathname.
-    """
-    return os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
-
-
-def _open_file_bytes(name: str, *, dir_fd: int) -> bytes:
-    """Read a no-follow regular single-link file relative to a verified fd.
-
-    Raises ``FileNotFoundError`` when the name is absent, ``OSError`` when it
-    cannot be opened (a planted symlink answers ``ELOOP`` at open), and
-    ``_SeedFileRejected`` when post-open verification fails: not a regular
-    file, hard-linked (``st_nlink != 1``, so two names can never alias the
-    bytes we classify), or past the size cap (checked on the ``fstat`` size
-    before reading, so a hostile giant is never buffered).
-    """
-    fd = _open_nofollow(name, dir_fd=dir_fd, flags=os.O_RDONLY)
-    try:
-        stat_result = os.fstat(fd)
-        if not S_ISREG(stat_result.st_mode) or stat_result.st_nlink != 1:
-            raise _SeedFileRejected(name)
-        if stat_result.st_size > _MAX_FILE_BYTES:
-            raise _SeedFileRejected(name)
-        chunks: list[bytes] = []
-        remaining = _MAX_FILE_BYTES + 1
-        while remaining:
-            chunk = os.read(fd, min(remaining, 1 << 20))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        payload = b"".join(chunks)
-    finally:
-        os.close(fd)
-    if len(payload) > _MAX_FILE_BYTES:
-        raise _SeedFileRejected(name)
-    return payload
-
-
-def _open_nofollow(name: str, *, dir_fd: int, flags: int) -> int:
-    """``openat``-style open of the final component with ``O_NOFOLLOW``."""
-    return os.open(name, flags | os.O_NOFOLLOW, dir_fd=dir_fd)
-
-
 def _publish_under_store(identity: str, payload: bytes) -> bool:
     """Materialize ``identity`` under the store root; True when bytes changed.
 
@@ -212,39 +166,39 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
     content leaves the file byte-untouched; different content is written in
     place on the same inode (readers never see an unlinked gap).
 
-    Raises ``_SeedFileRejected`` for any refusal and ``OSError`` for I/O
+    Raises ``RejectedFile`` for any refusal and ``OSError`` for I/O
     failure; callers map both to bounded diagnostics.
     """
     store_root = Path(str(settings.ART_STORE_ROOT)).resolve()
     parts = identity.split("/")
     opened: list[int] = []
     try:
-        parent_fd = _open_dir_fd(str(store_root))
+        parent_fd = open_dir_fd(str(store_root))
         opened.append(parent_fd)
         for part in parts[:-1]:
             try:
-                child_fd = _open_dir_fd(part, dir_fd=parent_fd)
+                child_fd = open_dir_fd(part, dir_fd=parent_fd)
             except FileNotFoundError:  # observability: ignore R2: a missing component is created below, not a fault
                 try:
                     os.mkdir(part, dir_fd=parent_fd)
                 except FileExistsError:  # observability: ignore R2: a lost creation race is resolved by the reopen below
                     pass  # lost a creation race; the reopen below resolves it
-                child_fd = _open_dir_fd(part, dir_fd=parent_fd)
+                child_fd = open_dir_fd(part, dir_fd=parent_fd)
             opened.append(child_fd)
             parent_fd = child_fd
         try:
-            fd = _open_nofollow(
+            fd = open_nofollow(
                 parts[-1], dir_fd=parent_fd, flags=os.O_RDWR | os.O_CREAT
             )
         except OSError as error:
             # A planted symlink at the destination answers ELOOP at open.
             if error.errno == errno.ELOOP:
-                raise _SeedFileRejected(identity) from error
+                raise RejectedFile(identity) from error
             raise
         opened.append(fd)
         stat_result = os.fstat(fd)
         if not S_ISREG(stat_result.st_mode) or stat_result.st_nlink != 1:
-            raise _SeedFileRejected(identity)
+            raise RejectedFile(identity)
         existing = b""
         remaining = _MAX_FILE_BYTES + 1
         while remaining:
@@ -254,7 +208,7 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
             existing += chunk
             remaining -= len(chunk)
         if len(existing) > _MAX_FILE_BYTES:
-            raise _SeedFileRejected(identity)
+            raise RejectedFile(identity)
         if existing == payload:
             return False
         os.lseek(fd, 0, os.SEEK_SET)
@@ -289,13 +243,15 @@ def _parse_manifest(
     shared rectangle apply.
     """
     try:
-        raw_bytes = _open_file_bytes(MANIFEST_FILENAME, dir_fd=subject_fd)
+        raw_bytes = open_file_bytes(
+            MANIFEST_FILENAME, dir_fd=subject_fd, max_bytes=_MAX_FILE_BYTES
+        )
     except FileNotFoundError:  # observability: ignore R2: an absent manifest is the documented silent fallback
         return None, None
     except OSError:  # observability: ignore R2: an unreadable manifest degrades whole via the diagnostic below
         diagnostics.emit("manifest_unreadable", subject=subject)
         return None, None
-    except _SeedFileRejected:  # observability: ignore R2: degradation is the bounded diagnostic below
+    except RejectedFile:  # observability: ignore R2: degradation is the bounded diagnostic below
         diagnostics.emit("manifest_unreadable", subject=subject)
         return None, None
     try:
@@ -387,7 +343,7 @@ def _sync_subject(
         return
     subject_key = subject.full()
     try:
-        subject_fd = _open_dir_fd(subject_name, dir_fd=kind_fd)
+        subject_fd = open_dir_fd(subject_name, dir_fd=kind_fd)
     except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
         diagnostics.emit("subject_directory_unreadable", subject=subject_key)
         return
@@ -440,7 +396,9 @@ def _sync_subject_open(
     image_payloads: dict[str, bytes] = {}
     for name in images:
         try:
-            payload = _open_file_bytes(name, dir_fd=subject_fd)
+            payload = open_file_bytes(
+                name, dir_fd=subject_fd, max_bytes=_MAX_FILE_BYTES
+            )
             image_payloads[name] = payload
             with Image.open(io.BytesIO(payload)) as img:
                 w, h = img.size
@@ -504,17 +462,19 @@ def _sync_subject_open(
         try:
             payload = image_payloads.get(name)
             if payload is None:
-                payload = _open_file_bytes(name, dir_fd=subject_fd)
+                payload = open_file_bytes(
+                    name, dir_fd=subject_fd, max_bytes=_MAX_FILE_BYTES
+                )
                 image_payloads[name] = payload
         except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
             diagnostics.emit("source_unreadable", subject=subject_key, entry=name)
             continue
-        except _SeedFileRejected:  # observability: ignore R2: reported through the bounded diagnostic emitter below
+        except RejectedFile:  # observability: ignore R2: reported through the bounded diagnostic emitter below
             diagnostics.emit("source_rejected", subject=subject_key, entry=name)
             continue
         try:
             changed = _publish_under_store(identity, payload)
-        except _SeedFileRejected:  # observability: ignore R2: reported through the bounded diagnostic emitter below
+        except RejectedFile:  # observability: ignore R2: reported through the bounded diagnostic emitter below
             diagnostics.emit("destination_refused", subject=subject_key, entry=name)
             continue
         except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
@@ -610,7 +570,7 @@ def sync_all() -> dict:
             )
             return {"skipped": True, **counters}
         try:
-            root_fd = _open_dir_fd(str(root))
+            root_fd = open_dir_fd(str(root))
         except OSError:  # observability: ignore R2: the unreadable root below is the one bounded skip event
             log_warn(
                 SEED_SYNC_EVENT,
@@ -650,7 +610,7 @@ def sync_all() -> dict:
                 if not S_ISDIR(kind_stat.st_mode):
                     continue
                 try:
-                    kind_fd = _open_dir_fd(kind_name, dir_fd=root_fd)
+                    kind_fd = open_dir_fd(kind_name, dir_fd=root_fd)
                 except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
                     diagnostics.emit("kind_directory_unreadable", kind=kind_name)
                     continue

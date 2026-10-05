@@ -603,6 +603,17 @@ PROMPT_ROOT = os.environ.get("PROMPT_ROOT", os.path.join(GAME_DIR, "prompts"))
 # "synchronize nothing", never an error.
 ART_SEED_ROOT = os.environ.get("ART_SEED_ROOT", os.path.join(GAME_DIR, "art-seed"))
 
+# Root directory of the operator-prepared official-artwork folder
+# (official-artwork-catalog): <official root>/<kind>/<content-key>/<image-file>
+# with <kind> exactly monster|preset|npc. Read-only to the game — no code path
+# writes under it. A directory root like PROMPT_ROOT/ART_SEED_ROOT — a plain
+# environment read, never a typed ART_SD_* knob. A missing or empty directory
+# means "no official artwork", never an error: the startup catalog loads empty
+# and resolution falls through to the existing runtime-art/fallback chain.
+ART_OFFICIAL_ROOT = os.environ.get(
+    "ART_OFFICIAL_ROOT", os.path.join(GAME_DIR, "art-official")
+)
+
 # Periodic queue drain control. When ART_SCHEDULER_ENABLED is False the
 # ArtDrainScript never drains; records stay missing/pending and placeholders
 # remain.

@@ -76,6 +76,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_nomination_triggers",
     "art_gallery_prune",
     "art_seed_sync",
+    "art_official_catalog",
     "art_sync_all",
     "connect_art_push",
     "narrative_projection_init",
@@ -589,6 +590,23 @@ def at_server_start():
     _startup_step(
         "art_seed_sync",
         lambda: _late("world.art.gallery_seed", "sync_all"),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
+
+    # Official-artwork catalog (official-artwork-catalog): indexes the
+    # operator-prepared read-only ART_OFFICIAL_ROOT into an in-memory snapshot
+    # once per boot — restart is the only refresh path, and nothing is
+    # acquired, downloaded, or extracted. A missing, empty, or unreadable root
+    # is the supported no-art configuration. Runs beside the seed mirror so
+    # both external art directories are indexed before the automatic art sync
+    # below. The seam is internally bounded and never raises; the tolerant
+    # wrapper is the last-resort guard, degrading at error level like the seed
+    # mirror.
+    _startup_step(
+        "art_official_catalog",
+        lambda: _late("world.art.official", "load_catalog"),
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",

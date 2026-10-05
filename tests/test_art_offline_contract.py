@@ -14,9 +14,34 @@ through the fake client and asserts the presenter keeps its placeholders).
 from pathlib import Path
 import unittest
 
+from world.art.fallback_keys import (
+    FALLBACK_DEFAULTS_DIRECTORY,
+    FALLBACK_EXTENSION,
+    FALLBACK_KEYS,
+)
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# Every token that can only appear in a path that is written. The official
+# artwork root is read-only to the game, so no module that names it may
+# contain one (checked below).
+_WRITE_TOKENS = (
+    "O_CREAT",
+    "O_WRONLY",
+    "O_RDWR",
+    "os.mkdir",
+    "os.rmdir",
+    "os.remove",
+    "os.unlink",
+    "os.rename",
+    "os.replace",
+    "os.symlink",
+    "os.link",
+    "shutil.copy",
+    "shutil.move",
+    "write_bytes",
+)
 
 
 class ArtOfflineAcceptanceContract(unittest.TestCase):
@@ -51,11 +76,51 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
         gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("server/.art/", gitignore)
 
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_art_official_root_is_gitignored_and_the_builtins_stay_tracked(self):
+        # The ignored directory IS the documented default root (the package
+        # test in server/conf/tests/test_art_settings.py pins
+        # ``<GAME_DIR>/art-official``), so no official artwork blob can ever
+        # be committed while the six built-in originals — the approved
+        # publication exception — remain tracked in the repository.
+        ignored = set((REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines())
+        self.assertIn("art-official/", ignored)
+        defaults = REPO_ROOT / FALLBACK_DEFAULTS_DIRECTORY
+        committed = {path.name for path in defaults.iterdir() if path.is_file()}
+        self.assertEqual(
+            committed,
+            {f"{key}{FALLBACK_EXTENSION}" for key in FALLBACK_KEYS},
+        )
+
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_no_module_that_names_the_official_root_can_write_it(self):
+        # The official root is read-only to the game (official-artwork-catalog):
+        # a production module that resolves a write path under it would be a
+        # contract violation no runtime test could rule out.
+        readers = [
+            path
+            for root in ("world", "web", "server", "typeclasses", "commands")
+            for path in sorted((REPO_ROOT / root).rglob("*.py"))
+            if "tests" not in path.parts
+            and "ART_OFFICIAL_ROOT" in path.read_text(encoding="utf-8")
+        ]
+        self.assertTrue(readers, msg="nothing reads ART_OFFICIAL_ROOT")
+        for path in readers:
+            source = path.read_text(encoding="utf-8")
+            with self.subTest(module=path.relative_to(REPO_ROOT).as_posix()):
+                for token in _WRITE_TOKENS:
+                    self.assertNotIn(token, source)
+
     def test_startup_wires_art_sync_after_the_deterministic_core(self):
         source = (REPO_ROOT / "server" / "conf" / "at_server_startstop.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("art_sync_all", source)
+        self.assertIn("art_official_catalog", source)
 
     def test_external_worker_command_and_tool_are_fully_removed(self):
         settings_source = (REPO_ROOT / "server" / "conf" / "settings.py").read_text(

@@ -5,10 +5,16 @@ CI/test invocations must not export ``ART_SD_*`` environment overrides;
 values pinned here are always the documented code defaults.
 """
 
+import os
 import unittest
 
 from django.conf import settings
 
+from server.conf.tests.test_env_overrides._support import (
+    _printed_map,
+    _settings_repr,
+    _SubprocessSettingsTests,
+)
 from tools.spec_traceability import covers_requirement
 
 
@@ -111,3 +117,54 @@ class ArtSettingsTests(unittest.TestCase):
     def test_external_worker_settings_are_removed(self):
         self.assertFalse(hasattr(settings, "ART_WORKER_CMD"))
         self.assertFalse(hasattr(settings, "ART_WORKER_TIMEOUT_SECONDS"))
+
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_official_root_defaults_to_the_gitignored_game_dir_directory(self):
+        # A directory root, never a typed ART_SD_* knob: the code default is
+        # ``<GAME_DIR>/art-official``, the directory the repository gitignores
+        # so no official artwork blob can ever be committed.
+        self.assertTrue(settings.ART_OFFICIAL_ROOT.startswith(settings.GAME_DIR))
+        self.assertEqual(
+            settings.ART_OFFICIAL_ROOT,
+            os.path.join(settings.GAME_DIR, "art-official"),
+        )
+
+
+class ArtOfficialRootOverrideTests(_SubprocessSettingsTests):
+    """The ``ART_OFFICIAL_ROOT`` seam (official-artwork-catalog).
+
+    A directory root follows the ``PROMPT_ROOT``/``ART_SEED_ROOT`` precedent,
+    so the override is proved in a bare subprocess (a clean environment, the
+    production import path) exactly like the typed-knob inventory.
+    """
+
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_an_unset_variable_yields_the_documented_default(self):
+        result = self._run(_settings_repr(["ART_OFFICIAL_ROOT"]))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        printed = _printed_map(result.stdout, {"ART_OFFICIAL_ROOT"})
+        # repr() pins the type as well: an absolute path under GAME_DIR whose
+        # last component is the gitignored ``art-official`` directory.
+        self.assertTrue(printed["ART_OFFICIAL_ROOT"].endswith("/art-official'"))
+        self.assertTrue(
+            printed["ART_OFFICIAL_ROOT"].startswith("'/"),
+            msg="the default is an absolute path under GAME_DIR",
+        )
+
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_the_environment_override_is_honored_verbatim(self):
+        result = self._run(
+            _settings_repr(["ART_OFFICIAL_ROOT"]),
+            ART_OFFICIAL_ROOT="/srv/official-art",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(
+            _printed_map(result.stdout, {"ART_OFFICIAL_ROOT"}),
+            {"ART_OFFICIAL_ROOT": "'/srv/official-art'"},
+        )

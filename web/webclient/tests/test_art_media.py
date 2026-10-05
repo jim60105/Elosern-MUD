@@ -1,5 +1,6 @@
 """Tests for the same-origin art media route (art-assets D8)."""
 
+import io
 from pathlib import Path
 import shutil
 import tempfile
@@ -8,9 +9,11 @@ import uuid
 from unittest.mock import patch
 
 from django.test import override_settings
+from PIL import Image
 
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art import official
 from world.art.gallery import append_card
 from world.art.queue import ensure, settle
 from world.art.store import ArtAssetStatus
@@ -21,6 +24,24 @@ from tools.spec_traceability import covers_requirement
 
 def _scene(key="t_synth_bazaar"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
+
+
+def _encoded(format_name: str, size=(2, 2)) -> bytes:
+    """Real, decodable image bytes in one of the closed store formats."""
+    buffer = io.BytesIO()
+    Image.new("L", size).save(buffer, format=format_name)
+    return buffer.getvalue()
+
+
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    """Every regular file under ``root`` keyed by relative path (byte snapshot)."""
+    if not root.exists():
+        return {}
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
 
 
 class ArtMediaViewTests(EvenniaTestCase):
@@ -334,6 +355,210 @@ class DefaultsServingTests(EvenniaTestCase):
         store_defaults.mkdir()
         (store_defaults / "sneaky.png").write_bytes(b"x")
         self.assertEqual(self._get("defaults/sneaky.png").status_code, 404)
+
+
+class OfficialIdentityServingTests(EvenniaTestCase):
+    """The official branch: a catalog lookup alone (official-artwork-catalog).
+
+    ``npc/`` content is used because its keys carry no registry membership
+    check (the authored npc/profile provenance lands with its own change), so
+    this module never touches a shipped registry.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.official_root = Path(self.tempdir.name).resolve() / "art-official"
+        self.store_temp = tempfile.TemporaryDirectory()
+        self.store_root = Path(self.store_temp.name).resolve() / "store"
+        self.art_settings = override_settings(
+            ART_OFFICIAL_ROOT=str(self.official_root),
+            ART_STORE_ROOT=str(self.store_root),
+        )
+        self.art_settings.enable()
+        official.reset_catalog()
+        self.addCleanup(official.reset_catalog)
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        self.store_temp.cleanup()
+        super().tearDown()
+
+    def _image(self, name="a.png", content=None, key="t_synth_profile") -> Path:
+        folder = self.official_root / "npc" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / name
+        path.write_bytes(content if content is not None else _encoded("PNG"))
+        return path
+
+    def _url(self, identity: str) -> str:
+        """The same-origin URL the catalog builds for an admitted identity."""
+        url = official.current_catalog().url_for(identity)
+        self.assertIsNotNone(url, msg=f"{identity} is not admitted")
+        return url
+
+    def _get(self, target: str):
+        from django.test import Client
+
+        return Client().get(target if target.startswith("/art/") else f"/art/{target}")
+
+    @staticmethod
+    def _body(response) -> bytes:
+        return b"".join(response.streaming_content)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_catalog_admitted_identity_is_served_with_its_exact_bytes(self):
+        cases = (
+            ("a.png", "PNG", "image/png"),
+            ("b.jpg", "JPEG", "image/jpeg"),
+            ("c.webp", "WEBP", "image/webp"),
+        )
+        for name, format_name, media_type in cases:
+            with self.subTest(name=name):
+                path = self._image(name=name, content=_encoded(format_name))
+                official.load_catalog()
+                identity = f"npc/t_synth_profile/{name}"
+                response = self._get(self._url(identity))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], media_type)
+                self.assertEqual(self._body(response), path.read_bytes())
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_an_admitted_file_deleted_after_load_404s(self):
+        identity = "npc/t_synth_profile/a.png"
+        path = self._image()
+        official.load_catalog()
+        url = self._url(identity)
+        self.assertEqual(self._get(url).status_code, 200)
+        # A maintenance window that removes artwork between restarts: the
+        # snapshot still names it, the confinement/file check returns 404.
+        path.unlink()
+        self.assertEqual(self._get(url).status_code, 404)
+        # ... and a root that disappears entirely 404s the same way.
+        path.parent.rmdir()
+        path.parent.parent.rmdir()
+        self.official_root.rmdir()
+        self.assertEqual(self._get(url).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_url_for_a_reserved_character_identity_round_trips(self):
+        # A content key and a filename may legally contain a space, '#', or
+        # '?' (the shared stable-key contract forbids only |/:{} and control
+        # characters), so the built URL must be percent-encoded to be
+        # fetchable at all.
+        key = "t_synth profile"
+        name = "a b#c.png"
+        path = self._image(name=name, key=key)
+        official.load_catalog()
+        url = self._url(f"npc/{key}/{name}")
+        self.assertIn("%20", url)
+        self.assertIn("%23", url)
+        response = self._get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._body(response), path.read_bytes())
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "official-artwork-catalog::each-indexed-image-carries-a-startup-computed-content-fingerprint"
+    )
+    def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
+        identity = "npc/t_synth_profile/a.png"
+        path = self._image()
+        official.load_catalog()
+        stale = self._url(identity)
+        self.assertEqual(self._get(stale).status_code, 200)
+        # A maintenance restart replaces the bytes at the same path.
+        path.write_bytes(_encoded("PNG", size=(3, 3)))
+        official.load_catalog()
+        self.assertEqual(self._get(stale).status_code, 404)
+        response = self._get(self._url(identity))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._body(response), path.read_bytes())
+        self.assertNotEqual(self._url(identity), stale)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_unindexed_paths_and_bogus_fingerprints_404_without_acquiring(self):
+        identity = "npc/t_synth_profile/a.png"
+        self._image()
+        official.load_catalog()
+        fingerprint = official.current_catalog().fingerprint_for(identity)
+        self._image(key="t_synth_late")
+        targets = (
+            f"official/{'0' * 64}/{identity}",
+            f"official/{fingerprint}/npc/t_synth_profile/absent.png",
+            f"official/{fingerprint}/npc/t_synth_late/a.png",
+            f"official/{fingerprint}/monster/t_synth_species/a.png",
+        )
+        with patch("socket.socket", side_effect=AssertionError("no acquisition")):
+            for target in targets:
+                with self.subTest(target=target):
+                    self.assertEqual(self._get(target).status_code, 404)
+        # The unindexed-but-present file was never touched or copied.
+        self.assertTrue(
+            (self.official_root / "npc" / "t_synth_late" / "a.png").is_file()
+        )
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_escaping_and_post_load_swapped_symlinks_404(self):
+        identity = "npc/t_synth_profile/a.png"
+        path = self._image()
+        official.load_catalog()
+        fingerprint = official.current_catalog().fingerprint_for(identity)
+        self.assertEqual(self._get(self._url(identity)).status_code, 200)
+        outside = Path(self.tempdir.name).parent / "media-precious.png"
+        outside.write_bytes(b"do not serve")
+        # The file admitted at load is swapped for a symlink afterwards: the
+        # confinement re-check refuses it rather than serving the target.
+        path.unlink()
+        path.symlink_to(outside)
+        self.assertEqual(self._get(self._url(identity)).status_code, 404)
+        self.assertTrue(outside.exists())
+        for target in (
+            f"official/{fingerprint}/npc/../../etc/passwd.png",
+            f"official/{fingerprint}/..%2Fnpc/t_synth_profile/a.png",
+            f"official/{fingerprint}/npc/t_synth_profile/a.txt",
+            f"official//npc/t_synth_profile/a.png",
+            f"official/{fingerprint}/",
+        ):
+            with self.subTest(target=target):
+                self.assertEqual(self._get(target).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_serving_copies_nothing_into_the_runtime_store(self):
+        identity = "npc/t_synth_profile/a.png"
+        self._image()
+        official.load_catalog()
+        store_before = _tree_bytes(self.store_root)
+        official_before = _tree_bytes(self.official_root)
+        response = self._get(self._url(identity))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self._body(response))
+        self.assertEqual(_tree_bytes(self.store_root), store_before)
+        self.assertEqual(_tree_bytes(self.official_root), official_before)
+        self.assertEqual(_tree_bytes(self.store_root), {})
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_an_unloaded_catalog_serves_no_official_identity(self):
+        identity = "npc/t_synth_profile/a.png"
+        self._image()
+        official.reset_catalog()
+        self.assertEqual(self._get(f"official/{'a' * 64}/{identity}").status_code, 404)
+        self.assertEqual(self._get(identity).status_code, 404)
 
 
 if __name__ == "__main__":
