@@ -3,14 +3,15 @@
 // chrome supplies the brass mounting; metadata recedes behind the letter text.
 import { useLetters } from "../composables/use-letters.js";
 const props = defineProps({ store: { type: Object, required: true } });
-const { page, opened, message, recipient, body, locked, refresh, collect, read, send } = useLetters(props.store);
+const { page, opened, message, recipient, body, locked, listPage, collect, read, send } = useLetters(props.store);
 </script>
 
 <template>
   <section class="letters-folio" aria-label="個人信件" data-testid="letters-panel">
-    <div class="letters-folio__tools">
-      <button type="button" :disabled="locked" @click="refresh()">重新載入</button>
-      <button v-if="page?.branch" type="button" :disabled="locked" @click="collect()">領取來信</button>
+    <!-- No reload control (correspondence-panel-open-once D1): the opening loads
+         the first page once, and closing and reopening is the refresh boundary. -->
+    <div v-if="page?.branch" class="letters-folio__tools">
+      <button type="button" :disabled="locked" @click="collect()">領取來信</button>
     </div>
     <p class="letters-folio__notice" role="status">{{ message }}</p>
     <template v-if="page">
@@ -25,7 +26,7 @@ const { page, opened, message, recipient, body, locked, refresh, collect, read, 
             <small>{{ letter.read_tick === null && opened?.sourceId !== letter.source_id ? '未讀' : '已讀' }}</small>
             <span class="letters-folio__id">{{ letter.source_id }}</span>
           </button>
-          <button v-if="page.next !== null" type="button" :disabled="locked" @click="refresh(page.next)">下一頁</button>
+          <button v-if="page.next !== null" type="button" :disabled="locked" @click="listPage(page.next)">下一頁</button>
         </div>
         <article v-if="opened" class="letters-folio__reading" aria-label="信件內容">
           <h3>來自 #{{ opened.senderId }}</h3>
