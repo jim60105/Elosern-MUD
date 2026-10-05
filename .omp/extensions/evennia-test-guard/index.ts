@@ -866,6 +866,19 @@ function tail(value: string, maxLength = 3000): string {
   return `…${value.slice(-maxLength)}`;
 }
 
+/*
+ * Output capture inside a guarded command is impossible by design: the
+ * shell grammar rejects pipes and redirects around a test invocation,
+ * because a trailing `; python3 -c ...` trailer hides which output the
+ * agent actually depends on. The Bash tool already persists the full
+ * output of truncated runs, so point callers at that instead of teaching
+ * them a blocked syntax.
+ */
+const OUTPUT_CAPTURE_GUIDANCE =
+  "Do not wrap the test command in pipes, redirects, or `;` trailers " +
+  "(they are blocked). Run it standalone; if the tool truncates the " +
+  "output, read the complete log from the reported artifact:// path.";
+
 function blockedBecauseTooManyTests(count: number): string {
   return [
     `Evennia test guard blocked this command: ${count} tests were discovered.`,
@@ -883,6 +896,8 @@ function blockedBecauseTooManyTests(count: number): string {
     "  uv run --locked python -m web.tests.browser.unittest_driver <module>",
     "",
     "Do not retry the broad test command.",
+    "",
+    OUTPUT_CAPTURE_GUIDANCE,
   ].join("\n");
 }
 
@@ -899,6 +914,8 @@ function blockedBecauseUnsupported(reason: string): string {
     "  cd <game-dir> && evennia test <focused-test-label>",
     "  cd <game-dir> && UV_PROJECT_ENVIRONMENT=<venv> timeout <n> uv run --locked python -m web.tests.browser.unittest_driver <focused-module>",
     "  uv run --locked python -m unittest <focused.module>",
+    "",
+    OUTPUT_CAPTURE_GUIDANCE,
     "",
     `The discovered test count must be <= ${MAX_TESTS}.`,
   ].join("\n");
