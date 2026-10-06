@@ -60,6 +60,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "sync_npc_schedules",
     "register_correspondence_delivery",
     "register_title_planner",
+    "register_monster_sites",
     "restore_persisted_sessions",
     "sync_wilderness",
     "load_prompt_library",
@@ -499,6 +500,15 @@ def at_server_start():
     _startup_step(
         "register_title_planner",
         lambda: _late("world.rules.titles", "register_title_planner"),
+    )
+    # Every world-event clock source is registered before any startup
+    # operation can advance time (fix-startup-clock-source-order D1). The
+    # site-lifecycle source ships its advance-surface contract with it, and a
+    # startup advance in this window finds no wilderness script yet and
+    # settles nothing.
+    _startup_step(
+        "register_monster_sites",
+        lambda: _late("world.maps.monster_sites", "register_monster_site_lifecycle"),
     )
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a

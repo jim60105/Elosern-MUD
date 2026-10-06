@@ -70,6 +70,7 @@ _STAGE_ORDER = (
     "npc_schedules",
     "correspondence_delivery",
     "instance_reclamation",
+    "monster_site_lifecycle",
 )
 
 
@@ -628,6 +629,29 @@ def _refresh_advance_entity_caches(entity: Any) -> None:
         )
 
 
+def _flush_rolled_back_instances() -> None:
+    """Evict cached instances whose rows the rolled-back advance removed.
+
+    Evennia's idmapper is not transaction-aware, and a stage that *creates*
+    objects (monster-site-placement's settlement) has no pre-advance snapshot
+    to restore: the row is gone with the transaction while the instance stays
+    cached, and a later row that reuses that primary key would be served as the
+    stale object. This runs only on the failure path, where the number of
+    cached objects is small, and flushes exactly the entries the database no
+    longer backs.
+    """
+    from evennia.objects.models import ObjectDB
+
+    cache = getattr(ObjectDB, "__instance_cache__", None)
+    if cache is None:
+        return
+    for key, instance in list(cache.items()):
+        if key is None or getattr(instance, "_is_deleted", False):
+            continue
+        if not ObjectDB.objects.filter(pk=key).exists():
+            instance.flush_from_cache(force=True)
+
+
 @dataclass
 class WorldClock:
     """The sole mutable driver of elapsed game time."""
@@ -674,6 +698,7 @@ class WorldClock:
         except Exception:
             _restore_clock_tick(self, tick_snapshot)
             _restore_advance_registry(registry, scope)
+            _flush_rolled_back_instances()
             raise
         return events
 

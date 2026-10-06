@@ -85,6 +85,7 @@ class NoGenerativeImportTests(unittest.TestCase):
             "sync_quest_runtime",
             "sync_guild_economy",
             "sync_npc_schedules",
+            "register_monster_sites",
         ):
             with self.subTest(sync=sync):
                 self.assertLess(

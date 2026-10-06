@@ -32,6 +32,7 @@ EXPECTED_STAGE_ORDER = (
     "npc_schedules",
     "correspondence_delivery",
     "instance_reclamation",
+    "monster_site_lifecycle",
 )
 BLOCKING_PIN = "quest:1:stage:0"
 

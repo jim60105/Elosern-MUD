@@ -270,6 +270,7 @@ class ClockTests(unittest.TestCase):
                 "npc_schedules",
                 "correspondence_delivery",
                 "instance_reclamation",
+                "monster_site_lifecycle",
             ),
         )
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
@@ -763,6 +764,7 @@ class AdvanceSurfaceContractUnitTests(unittest.TestCase):
                 "npc_schedules",
                 "correspondence_delivery",
                 "instance_reclamation",
+                "monster_site_lifecycle",
             ),
         )
         self.assertEqual(MAX_ADVANCE_SECONDS, 86400)
@@ -783,6 +785,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
     @covers_requirement("world-clock::every-registered-boundary-stage-source-declares-the-durable-surfaces-it-may-write")
     def test_completeness_guard_writing_sources_declare_contracts(self):
         from world.maps.instance import register_instance_reclamation
+        from world.maps.monster_sites import register_monster_site_lifecycle
         from world.narrative.correspondence import register_correspondence_delivery
         from world.quests.bootstrap import sync_quest_runtime
         from world.rules.caravan_arrivals import register_caravan_arrivals
@@ -793,6 +796,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
         register_caravan_arrivals()
         register_npc_schedules()
         register_instance_reclamation()
+        register_monster_site_lifecycle()
         register_correspondence_delivery()
         register_shop_hours()
         for kind in (
@@ -801,6 +805,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
             "npc_schedules",
             "correspondence_delivery",
             "instance_reclamation",
+            "monster_site_lifecycle",
         ):
             registration = _EVENT_SOURCES[kind]
             self.assertIsNotNone(
