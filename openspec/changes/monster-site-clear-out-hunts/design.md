@@ -63,8 +63,8 @@ directly is told what is missing rather than receiving a generic ineligibility.
 
 **D-C3 Refusals reuse the landed named-refusal discipline.** The quest layer raises the existing
 `QuestTargetsUnavailable` with the site key and one reason from the closed set `world_unavailable`,
-`unknown_site`, `site_cleared`, `site_short`, so the board path, the command surface, and the rejection
-mapping need no new handling.
+`unknown_site`, `site_unpopulated`, `site_cleared`, `site_short`, so the board path, the command surface,
+and the rejection mapping need no new handling.
 
 **D-C4 The stage-zero binding happens inside the acceptance transaction, with no instance pin.** The
 record is written first, then `bind_stage_runtime` binds exactly the site's living individuals as its
