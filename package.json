@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gm": "vite build --config vite.gm.config.js",
     "test": "vitest run",
+    "test:gm-boundary": "node --test scripts/tests/gm-import-boundary.test.mjs",
     "build-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook build -o .storybook-out",
     "serve-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook dev -p 6006",
     "showcase-coverage": "node scripts/component-coverage.mjs"
@@ -26,6 +28,7 @@
     "storybook": "^10.4.6",
     "vite": "^7.3.6",
     "vitest": "^5.0.0",
-    "vue": "^3.5.16"
+    "vue": "^3.5.16",
+    "vue-router": "^5.3.1"
   }
 }

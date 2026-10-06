@@ -115,3 +115,7 @@ Thumbs.db
 .claude/worktrees/
 .worktrees/
 server/.rembg/models/
+
+# GM portal Vite build output (gm-portal-s1-foundation): always built from
+# web/admin-app sources by `pnpm run build:gm`, never hand-authored.
+web/static/gm/dist/
