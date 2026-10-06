@@ -5,17 +5,19 @@ passing Vitest evidence record.
 The dream stage (webclient-dream-avg-stage) is implemented and verified in the
 Vue layer (``DreamPanel.vue``, ``tests/dream.test.js``). ``covers_requirement``
 can only attach to a Python ``test_*`` function, so this module executes the
-relevant Vitest files and asserts every test passes. The capability is new in
-that change: its canonical requirement IDs exist only once the archive's delta
-sync creates ``openspec/specs/webclient-dream-stage/spec.md``, and the
-``covers_requirement`` annotations are attached to the methods below at that
-point (the ID each method will carry is named in its comment).
+relevant Vitest files and asserts every test passes. Following the B1/B2
+precedent, the ``@covers_requirement`` annotations linking this module to the
+new ``webclient-dream-stage`` requirements were applied at this change's
+archive, once the delta spec synced into the main spec put the requirement IDs
+into the traceability index.
 """
 
 from pathlib import Path
 import re
 import subprocess
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
@@ -56,8 +58,10 @@ def _assert_cases_pass(label, names, *extra_files):
 
 
 class VueDreamStageEvidenceTest(unittest.TestCase):
+    @covers_requirement(
+        "webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork"
+    )
     def test_full_stage_avg_scene_over_official_artwork(self):
-        # webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork
         _assert_cases_pass(
             "dream stage regions and artwork fallback",
             (
@@ -67,8 +71,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::exchange-budget-and-goddess-excitement-have-visual-non-colour-only-forms"
+    )
     def test_tracks_have_visual_non_colour_only_forms(self):
-        # webclient-dream-stage::exchange-budget-and-goddess-excitement-have-visual-non-colour-only-forms
         _assert_cases_pass(
             "dream budget pips and excitement gauge",
             (
@@ -78,8 +84,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::narration-and-dialogue-are-paced-by-beats-that-only-animate-on-a-live-exchange"
+    )
     def test_beats_animate_only_on_live_exchange(self):
-        # webclient-dream-stage::narration-and-dialogue-are-paced-by-beats-that-only-animate-on-a-live-exchange
         _assert_cases_pass(
             "dream beat pacing",
             (
@@ -91,8 +99,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             MOTION_SUITE,
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::the-reply-bar-sends-bounded-free-text-and-hands-it-back-on-failure"
+    )
     def test_reply_bar_bounded_send_and_failure_handback(self):
-        # webclient-dream-stage::the-reply-bar-sends-bounded-free-text-and-hands-it-back-on-failure
         _assert_cases_pass(
             "dream reply bar",
             (
@@ -106,8 +116,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::the-keepsake-card-shows-the-念頭-that-would-be-carried-out-and-offers-distinct-exits"
+    )
     def test_keepsake_card_and_distinct_exits(self):
-        # webclient-dream-stage::the-keepsake-card-shows-the-念頭-that-would-be-carried-out-and-offers-distinct-exits
         _assert_cases_pass(
             "dream keepsake card and exits",
             (
@@ -119,8 +131,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::the-念頭-sheet-edits-the-direction-in-one-flat-modal-layer"
+    )
     def test_direction_sheet_flat_modal_layer(self):
-        # webclient-dream-stage::the-念頭-sheet-edits-the-direction-in-one-flat-modal-layer
         _assert_cases_pass(
             "dream 念頭 sheet",
             (
@@ -131,8 +145,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::direction-confirmation-is-validated-locally-without-discarding-words"
+    )
     def test_direction_confirmation_validated_locally(self):
-        # webclient-dream-stage::direction-confirmation-is-validated-locally-without-discarding-words
         _assert_cases_pass(
             "dream local direction validation",
             (
@@ -143,8 +159,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::escape-never-awakens-and-awakening-protects-unsaved-local-words"
+    )
     def test_escape_never_awakens_and_awaken_check(self):
-        # webclient-dream-stage::escape-never-awakens-and-awakening-protects-unsaved-local-words
         _assert_cases_pass(
             "dream Escape and awaken check",
             (
@@ -156,8 +174,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::republished-drafts-rehydrate-without-overwriting-the-player-s-own-edits"
+    )
     def test_republished_drafts_rehydrate_without_overwriting_edits(self):
-        # webclient-dream-stage::republished-drafts-rehydrate-without-overwriting-the-player-s-own-edits
         _assert_cases_pass(
             "dream draft rehydration",
             (
