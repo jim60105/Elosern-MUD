@@ -31,6 +31,18 @@ class LoreRecord(DefaultScript):
     """Persistent, non-ticking mirror of one frozen lore entry."""
 
 
+# The species/variant categories are mirrored by their own named
+# synchronization step (monster-species-registry design D-S7) rather than by
+# the generic loop, so the mirror's one boundary event can carry the
+# registry-scoped context. This is the single declaration both the mirror
+# table below and that step read, so the skip set and the step can never
+# disagree.
+MONSTER_SPECIES_REGISTRIES: dict[str, Mapping[str, Any]] = {
+    "monster_species": MONSTER_SPECIES_REGISTRY,
+    "monster_variants": MONSTER_VARIANT_REGISTRY,
+}
+MONSTER_SPECIES_CATEGORIES: tuple[str, ...] = tuple(MONSTER_SPECIES_REGISTRIES)
+
 _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "races": RACE_REGISTRY,
     "static_tiers": STATIC_TIER_REGISTRY,
@@ -41,8 +53,7 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "guild_ranks": GUILD_RANK_REGISTRY,
     "titles": FIXED_TITLE_REGISTRY,
     "monster_tiers": MONSTER_TIER_REGISTRY,
-    "monster_species": MONSTER_SPECIES_REGISTRY,
-    "monster_variants": MONSTER_VARIANT_REGISTRY,
+    **MONSTER_SPECIES_REGISTRIES,
     "anchors": ANCHOR_REGISTRY,
     "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
     "name_packs": NAME_PACK_REGISTRY,
@@ -52,13 +63,6 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "places": PLACE_REGISTRY,
     "prices": PRICE_TABLE,
 }
-
-# The species/variant categories are mirrored by their own named
-# synchronization step (monster-species-registry design D-S7) rather than by
-# the generic loop, so the mirror's one boundary event can carry the
-# registry-scoped context. `sync_all` delegates exactly these categories to
-# `sync_monster_species`, so every entry is still mirrored once per startup.
-MONSTER_SPECIES_CATEGORIES: tuple[str, ...] = ("monster_species", "monster_variants")
 
 
 def _db_safe(value: Any) -> Any:
@@ -122,13 +126,13 @@ def sync_monster_species() -> None:
     ``_startup_step`` wrapper (one per catalog step, in catalog order), and
     this step is not a catalog step.
     """
-    for category in MONSTER_SPECIES_CATEGORIES:
-        for key, entry in _ALL_REGISTRIES[category].items():
+    for category, registry in MONSTER_SPECIES_REGISTRIES.items():
+        for key, entry in registry.items():
             sync_one(category, key, entry)
     log_info(
         "monster_species_sync",
         context={
-            "monster_species": len(_ALL_REGISTRIES["monster_species"]),
-            "monster_variants": len(_ALL_REGISTRIES["monster_variants"]),
+            category: len(registry)
+            for category, registry in MONSTER_SPECIES_REGISTRIES.items()
         },
     )
