@@ -238,6 +238,11 @@ def _defeated_entry(
     entry but tags it ``simulated``, so kill-credit consumers can skip the
     defeat without hiding that the HP really crossed zero
     (exam-simulated-battle-redesign D4).
+
+    A species-backed monster additionally carries its registered
+    ``species_key``/``variant_key`` (never inferred from a display key or a
+    tier); a tier-only target keeps exactly the fields it always had, so every
+    existing consumer stays byte-compatible.
     """
     if amount <= 0:
         return None
@@ -260,6 +265,10 @@ def _defeated_entry(
     data: dict[str, Any] = {"target_id": int(dbref)}
     if not nonlethal:
         data["monster_tier"] = getattr(entity, "threat_tier", None)
+        species_key = getattr(entity, "species_key", None)
+        if species_key is not None:
+            data["species_key"] = species_key
+            data["variant_key"] = getattr(entity, "variant_key", None)
     if simulated:
         data["simulated"] = True
     return EventEntry(

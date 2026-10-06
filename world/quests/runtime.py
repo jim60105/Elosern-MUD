@@ -60,6 +60,7 @@ _RECORD_FIELDS = frozenset(
         "protected_entity_ids",
         "failure_reason",
         "tracked",
+        "counted_defeat_ids",
     }
 )
 
@@ -81,6 +82,11 @@ class QuestRecord:
     protected_entity_ids: tuple[int, ...]
     failure_reason: str | None
     tracked: bool = False
+    #: The integer persistent identities this record has already credited for
+    #: its current DEFEAT objective. Cleared on stage transition together with
+    #: the other runtime bindings, so a new objective counts from empty and a
+    #: redelivered defeat event for a counted identity advances nothing.
+    counted_defeat_ids: tuple[int, ...] = ()
 
 
 def to_storage(record: QuestRecord) -> dict[str, Any]:
@@ -99,6 +105,7 @@ def to_storage(record: QuestRecord) -> dict[str, Any]:
         "protected_entity_ids": list(record.protected_entity_ids),
         "failure_reason": record.failure_reason,
         "tracked": record.tracked,
+        "counted_defeat_ids": list(record.counted_defeat_ids),
     }
 
 
@@ -120,9 +127,10 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     unknown = set(data) - _RECORD_FIELDS
     if unknown:
         raise QuestDataError(f"quest-log entry has unknown fields {sorted(unknown)}")
-    # ``tracked`` is the one optional-with-default key: an entry written
-    # before the field existed loads as untracked without being rewritten.
-    missing = (_RECORD_FIELDS - {"tracked"}) - set(data)
+    # ``tracked`` and ``counted_defeat_ids`` are the optional-with-default keys:
+    # an entry written before either field existed loads under its default
+    # (untracked / nothing counted) without being rewritten.
+    missing = (_RECORD_FIELDS - {"tracked", "counted_defeat_ids"}) - set(data)
     if missing:
         raise QuestDataError(f"quest-log entry is missing fields {sorted(missing)}")
     quest_id = data["quest_id"]
@@ -162,6 +170,9 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     tracked = data.get("tracked", False)
     if not isinstance(tracked, bool):
         raise QuestDataError(f"record field 'tracked' must be a boolean, got {tracked!r}")
+    counted_defeat_ids = _parse_id_list(
+        data.get("counted_defeat_ids", []), "counted_defeat_ids"
+    )
     return QuestRecord(
         quest_id=quest_id,
         definition_key=definition_key,
@@ -176,6 +187,7 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
         protected_entity_ids=protected_entity_ids,
         failure_reason=failure_reason,
         tracked=tracked,
+        counted_defeat_ids=counted_defeat_ids,
     )
 
 
@@ -227,8 +239,9 @@ def validate_record_runtime(record: QuestRecord) -> None:
     Every record must reference a known definition whose ``stage_index`` is in
     range and still matches its definition, with progress within the current
     objective's quantity. A terminal record must additionally be final (no
-    runtime bindings) and, when failed, must carry a reason. Violations raise
-    ``QuestDataError`` instead of silently reinterpreting the record.
+    runtime bindings, no counted defeat identities) and, when failed, must carry
+    a reason. Violations raise ``QuestDataError`` instead of silently
+    reinterpreting the record.
     """
     from world.rules.quest_issuance import IssuerKeyError, parse_issuer_key
 
@@ -263,6 +276,10 @@ def validate_record_runtime(record: QuestRecord) -> None:
             raise QuestDataError(
                 f"terminal quest {record.quest_id!r} still has runtime bindings"
             )
+        if record.counted_defeat_ids:
+            raise QuestDataError(
+                f"terminal quest {record.quest_id!r} still counts defeated identities"
+            )
         if record.state is QuestState.FAILED and not record.failure_reason:
             raise QuestDataError(
                 f"failed quest {record.quest_id!r} lacks a failure reason"
@@ -289,6 +306,7 @@ def fail_record(record: QuestRecord, reason: str) -> QuestRecord:
         stage_room_id=None,
         objective_target_ids=(),
         protected_entity_ids=(),
+        counted_defeat_ids=(),
     )
 
 
@@ -308,6 +326,7 @@ def fulfill_record(record: QuestRecord, definition: QuestDefinition) -> QuestRec
             stage_room_id=None,
             objective_target_ids=(),
             protected_entity_ids=(),
+            counted_defeat_ids=(),
         )
     objective = definition.stages[stage_index].objective
     return replace(
@@ -317,6 +336,7 @@ def fulfill_record(record: QuestRecord, definition: QuestDefinition) -> QuestRec
         stage_room_id=None,
         objective_target_ids=(),
         protected_entity_ids=(),
+        counted_defeat_ids=(),
     )
 
 
@@ -452,6 +472,7 @@ def abandon_quest(actor: Any, quest_id: str) -> QuestRecord:
         stage_room_id=None,
         objective_target_ids=(),
         protected_entity_ids=(),
+        counted_defeat_ids=(),
     )
     pin_operations = release_stage_binding(actor, record)
     new_records = [failed if candidate.quest_id == quest_id else candidate for candidate in current]

@@ -5,6 +5,7 @@ from tools.spec_traceability import covers_requirement
 import json
 import importlib
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -12,6 +13,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.quests.catalog import register_catalog
+from world.quests.definitions import QuestStage
 from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
@@ -25,6 +27,7 @@ from world.quests.runtime import (
     fail_record,
     find_record,
     from_storage,
+    fulfill_record,
     fulfill_record_for,
     read_records,
     register_quest_completion_observer,
@@ -33,7 +36,14 @@ from world.quests.runtime import (
 )
 from world.quests.transitions import apply_quest_log_replacement
 
-from ._fixtures import TEST_ISSUER_KEY, QuestRegistryIsolation, accept, quest, register
+from ._fixtures import (
+    TEST_ISSUER_KEY,
+    QuestRegistryIsolation,
+    accept,
+    defeat,
+    quest,
+    register,
+)
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
     GuildQuestOffer,
@@ -668,3 +678,86 @@ class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
         self.assertTrue(failed.tracked)  # the flag rides the record
         released = set_quest_tracked(self.player, failed.quest_id, False)
         self.assertFalse(released.tracked)
+
+
+class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
+    """The per-record counted defeat identities that make kill accounting idempotent."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="counted-player")
+        register_catalog()
+
+    def _accept(self, key: str):
+        return accept(self.player, register(quest(key)))
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    def test_a_record_round_trips_with_counted_identities(self):
+        counted = replace(
+            self._accept("counted_round_trip"), counted_defeat_ids=(11, 12)
+        )
+        restored = from_storage(json.loads(json.dumps(to_storage(counted))))
+        self.assertEqual(restored, counted)
+        self.assertEqual(restored.counted_defeat_ids, (11, 12))
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    def test_accepting_starts_with_nothing_counted(self):
+        record = self._accept("counted_accept")
+        self.assertEqual(record.counted_defeat_ids, ())
+        self.assertEqual(read_records(self.player)[0].counted_defeat_ids, ())
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    def test_a_legacy_entry_without_the_key_loads_empty_without_rewriting(self):
+        record = self._accept("counted_legacy")
+        legacy = {
+            key: value
+            for key, value in to_storage(record).items()
+            if key != "counted_defeat_ids"
+        }
+        self.player.db.quest_log = [legacy]
+        self.assertEqual(read_records(self.player)[0].counted_defeat_ids, ())
+        # The strict reader never rewrites the stored entry.
+        self.assertNotIn("counted_defeat_ids", dict(self.player.db.quest_log[0]))
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    def test_a_transition_and_a_terminal_record_clear_the_counted_set(self):
+        definition = register(
+            quest(
+                "counted_two_stage",
+                stages=(
+                    QuestStage(0, defeat(quantity=1)),
+                    QuestStage(1, defeat(quantity=1)),
+                ),
+            )
+        )
+        counted = replace(
+            accept(self.player, definition.key), counted_defeat_ids=(7,)
+        )
+        # A satisfied stage advances and starts the next objective from empty.
+        self.assertEqual(fulfill_record(counted, definition).counted_defeat_ids, ())
+        final = register(quest("counted_final"))
+        terminal = replace(accept(self.player, final.key), counted_defeat_ids=(7,))
+        completed = fulfill_record(terminal, final)
+        self.assertEqual(completed.state, QuestState.COMPLETED)
+        self.assertEqual(completed.counted_defeat_ids, ())
+        self.assertEqual(fail_record(terminal, "abandoned").counted_defeat_ids, ())
+        apply_quest_log_replacement(self.player, [terminal])
+        abandoned = abandon_quest(self.player, terminal.quest_id)
+        self.assertEqual(abandoned.state, QuestState.FAILED)
+        self.assertEqual(abandoned.counted_defeat_ids, ())
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    def test_a_terminal_record_carrying_counted_identities_is_rejected(self):
+        record = self._accept("counted_terminal")
+        residual = {
+            **to_storage(record),
+            "state": "completed",
+            "stage_progress": 1,
+            "counted_defeat_ids": [11],
+        }
+        self.player.db.quest_log = [residual]
+        with self.assertRaises(QuestDataError):
+            read_records(self.player)
+        # The same record with nothing counted is final and loads clean.
+        self.player.db.quest_log = [{**residual, "counted_defeat_ids": []}]
+        self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)

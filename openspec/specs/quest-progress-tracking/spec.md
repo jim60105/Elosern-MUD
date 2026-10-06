@@ -5,6 +5,7 @@ Automatic quest progress driven by committed player actions (DEFEAT) and room ar
 with stable dbref identity, one transition per event, and instance-pin release on every stage exit.
 
 ## Requirements
+
 ### Requirement: DEFEAT progress is planned automatically from committed player action events
 The quest event-effect planner SHALL inspect `target_defeated` entries produced by an
 `ActionResolver` request or by the combat upkeep settlement. It SHALL advance only active DEFEAT
@@ -14,7 +15,10 @@ party binding) and is not knocked out; a companion's entries SHALL follow the sa
 and one-transition rules as the owner's own. A
 bound-target objective SHALL match `data["target_id"]` against the record's `objective_target_ids`; an
 unbound objective SHALL match its declared `monster_tier`. Display
-keys SHALL NOT be used as entity identity. The resulting quest mutation SHALL commit in the same
+keys SHALL NOT be used as entity identity. Counting SHALL key on the defeated individual's persistent
+identity, and each record SHALL keep the set of individual identities already counted for its current
+objective: a duplicate or redelivered `target_defeated` entry for an identity this record has already
+counted SHALL advance nothing. The resulting quest mutation SHALL commit in the same
 action or combat-round transaction as the lethal damage. The planner SHALL aggregate every matching
 defeat entry in one EventLog per quest, cap progress at the current objective quantity, perform at
 most one stage transition, and discard surplus kills rather than applying them to the next stage.
@@ -29,6 +33,10 @@ not fail a protected entity.
 #### Scenario: Bound objective matches exact dbref
 - **WHEN** two monsters share a display key but only one dbref is in `objective_target_ids`
 - **THEN** defeating the unbound monster does not advance the quest and defeating the bound monster does
+
+#### Scenario: A duplicate defeat event for one individual counts once
+- **WHEN** the planner is presented twice with the same defeat entry for one individual against the same active record
+- **THEN** the objective's progress advances once across both presentations
 
 #### Scenario: A bound companion's kill advances the owner's objective
 - **WHEN** a bound, non-knocked-out companion defeats a monster matching the owner's active DEFEAT stage

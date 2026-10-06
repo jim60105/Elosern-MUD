@@ -5,6 +5,11 @@ the immutable ``EventLog`` of a successful action and returns them as action
 ``PendingEffect`` values, so ``ActionResolver`` commits them in the same
 transaction as damage, resource cost, and progression. It never writes while
 planning.
+
+DEFEAT progress counts the defeated individual's persistent identity (its
+database row), never a display key or a tier: each record keeps the identities
+it has already credited for its current objective, so a duplicate or redelivered
+``target_defeated`` entry can never advance the same objective twice.
 """
 
 from dataclasses import replace
@@ -51,23 +56,34 @@ def _matching_defeats(
     record: Any,
     objective: Any,
     defeated: tuple[tuple[int, str | None], ...],
-) -> int:
-    """Count distinct matching kills under this DEFEAT objective's selector."""
+) -> tuple[int, ...]:
+    """Return the identities this objective still has to credit, in event order.
+
+    Selector matching is unchanged — a bound objective matches the record's
+    ``objective_target_ids``, an unbound one matches its declared tier — but an
+    identity the record already counted for its current objective is skipped, so
+    re-presenting an already-credited defeat entry grants nothing.
+    """
+    counted = set(record.counted_defeat_ids)
     seen: set[int] = set()
-    matches = 0
+    matches: list[int] = []
     if objective.requires_bound_targets:
         bound = set(record.objective_target_ids)
         for target_id, _ in defeated:
-            if target_id in bound and target_id not in seen:
+            if target_id in bound and target_id not in seen and target_id not in counted:
                 seen.add(target_id)
-                matches += 1
+                matches.append(target_id)
     else:
         tier = objective.monster_tier
         for target_id, defeated_tier in defeated:
-            if defeated_tier == tier and target_id not in seen:
+            if (
+                defeated_tier == tier
+                and target_id not in seen
+                and target_id not in counted
+            ):
                 seen.add(target_id)
-                matches += 1
-    return matches
+                matches.append(target_id)
+    return tuple(matches)
 
 
 def _defeat_progress_changes(
@@ -85,18 +101,27 @@ def _defeat_progress_changes(
         objective = definition.stages[record.stage_index].objective
         if objective.kind is not ObjectiveKind.DEFEAT:
             continue
-        matches = _matching_defeats(record, objective, defeated)
-        if matches == 0:
+        new_ids = _matching_defeats(record, objective, defeated)
+        if not new_ids:
+            # Every matching identity was already credited by this record: a
+            # redelivered event plans no write at all.
             continue
-        gained = min(matches, objective.quantity - record.stage_progress)
+        gained = min(len(new_ids), objective.quantity - record.stage_progress)
         new_progress = record.stage_progress + gained
         if new_progress >= objective.quantity:
+            # Fulfilment clears the counted set with the other runtime bindings,
+            # so surplus kills are discarded rather than applied to the next
+            # stage (a new objective counts its own identities from empty).
             replacements[record.quest_id] = fulfill_record_for(
                 owner, record, definition
             )
             pin_operations.extend(release_stage_binding(owner, record))
         else:
-            replacements[record.quest_id] = replace(record, stage_progress=new_progress)
+            replacements[record.quest_id] = replace(
+                record,
+                stage_progress=new_progress,
+                counted_defeat_ids=record.counted_defeat_ids + new_ids,
+            )
     return replacements, pin_operations
 
 
