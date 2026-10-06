@@ -1,0 +1,24 @@
+## 1. Approved values in the registry
+
+- [ ] 1.1 Populate `world/lore/monster_species.py::_VARIANT_DECLARATIONS` with the twelve approved `MonsterCombatProfile` literals (hp, mp, sp, atk_phys, agility, defense, magic_power) and the twelve approved `danger_grade` values exactly as the proposal's table records them; change nothing else in those rows (key, species, display name, description, threat tier, ordinary classification stay byte-identical) and extend the module's shipped-content comment to name the 2026-10-06 approval and the literal-only rule
+- [ ] 1.2 Confirm the module still imports: shipped validation runs at import, so an omitted, negative, or non-literal value fails there; a focused test asserts each of the twelve rows equals the approval record field by field and that no shipped row carries `None` in either slot
+
+## 2. Tier-band and rank-range invariant
+
+- [ ] 2.1 Extend `validate_monster_species_registry` with the band membership rule: `hp` inside the tier's `hp_band`, `atk_phys`/`agility`/`defense` inside the tier's physical band, `magic_power` inside the tier's magic band, and `danger_grade` inside the tier's `guild_rank_range`, all read from `MONSTER_TIER_REGISTRY` through a new injectable `tier_band_face` that defaults to it (the existing habitat/tier/grade face discipline); the named error names the variant, the axis, the value, and the band it left, and MP/SP stay deliberately unchecked with the reason recorded in the docstring
+- [ ] 2.2 Verify with a new unregistered behavior module under `world/lore/tests/` using invented tiers and bands only: over-band HP rejected, under-band HP rejected, each physical axis rejected in both directions, nonzero `magic_power` rejected against a `(0, 0)` band, grade outside the rank range rejected, an in-band profile and grade accepted, and MP/SP unconstrained — with no shipped species, variant, tier, or number named in the test
+
+## 3. Contracts that pin the previous "no numbers" state
+
+- [ ] 3.1 Replace `BalanceSlotContentTests` in `world/lore/tests/test_monster_species_content.py`: the "no shipped variant carries an invented number or grade" pin becomes the approved-literal pin (all twelve rows against the approval table), plus the assertion that every shipped row lies inside its declared tier band and that no shipped key outside the twelve carries a value; update the module docstring's first line and scope sentence so the data-contract tag stays accurate, and add `covers_requirement` annotations for the modified and the two added requirement ids
+- [ ] 3.2 Update `tools/test_data_freeze.json` and `tools/test_data_lint_seed.json` so the frozen reason string for that module describes its new role (approved first-batch balance and grade contract, not "honestly empty slots"); both ledgers change together because `seed-mismatch` pins the frozen fields
+- [ ] 3.3 Pin the numeric-source flip in the same registered contract module: constructing an individual for each of the twelve shipped variants yields `NUMERIC_SOURCE_APPROVED_PROFILE` and the approved literals in its stored trait config, so the proposal's claim — "no caller change is needed for the numbers to take effect" — is a tested fact rather than an assumption
+
+## 4. Approval record in the design documents
+
+- [ ] 4.1 Append the "平衡核准落地（2026-10-06）" subsection (verbatim from `design.md`'s amendment block) to `docs/superpowers/specs/2026-10-05-monster-data-model-design.md` §8 after "提案交付", and the matching subsection to `docs/lore/bestiary.md` after "提案交付對應", recording the granted scope, the values' location, the accepted rationale, the two changes that publish the hunts, and that prerequisites (二) and (三) remain unmet; no approved boundary above either insertion is rewritten
+
+## 5. Verification
+
+- [ ] 5.1 Run the focused suite (`world.lore.tests.test_monster_species_content`, the new band-invariant module, `world.rules.tests.test_monster_individual`, `world.lore.tests.test_sync`), then `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, and `uv run --locked python -m tools.contract_gate`; no logging path changes, so the observability lint is not implicated — confirm that by inspection rather than assumption
+- [ ] 5.2 Confirm no shard manifest edit is required (the existing `world.lore` label already owns every `world/lore/**/test*.py` module) by running `tests.test_evennia_test_optimization_contract` locally, and confirm `tests/test_command_docs.py` is untouched because no command surface changes
