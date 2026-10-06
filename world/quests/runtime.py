@@ -7,7 +7,7 @@ from typing import Any
 
 from django.db import transaction
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -46,17 +46,22 @@ class QuestIssuanceNotFound(ValueError):
 
 
 class QuestTargetsUnavailable(ValueError):
-    """A species-hunt acceptance cannot legally guarantee its targets.
+    """An acceptance cannot legally guarantee its declared targets.
 
-    The named refusal of the acceptance-time guarantee: the region's ambient and
-    site managers could not legally provide enough reachable, living,
-    ordinary-eligible targets for the objective's quantity. Nothing was
-    persisted and no target arrangement was left behind.
+    The named refusal of the acceptance-time guarantee: a regional species hunt's
+    region could not legally provide enough reachable, living,
+    ordinary-eligible targets for the objective's quantity, or a bound site
+    clear-out's authored site cannot currently supply its living individuals.
+    Nothing was persisted and no target arrangement was left behind.
+
+    The first argument is the objective's own supply key — the hunt's region key
+    or the clear-out's site key — and ``reason`` is the closed named refusal,
+    which both this refusal and the board's availability predicate answer with.
     """
 
     def __init__(self, region_key: str, reason: str) -> None:
         super().__init__(
-            f"species hunt targets unavailable in region {region_key!r}: {reason}"
+            f"quest targets unavailable for {region_key!r}: {reason}"
         )
         self.region_key = region_key
         self.reason = reason
@@ -492,6 +497,120 @@ def _provision_hunt_targets(definition: QuestDefinition) -> None:
         raise QuestTargetsUnavailable(objective.region_key, result.reason)
 
 
+#: The quest layer's own refusal for a site clear-out: the site holds living
+#: individuals, but fewer than the objective asks for. The other four reasons
+#: are the site owner's own verdicts (``world/maps/monster_sites.py`` owns their
+#: spelling), so the closed set the acceptance and the board share is
+#: ``world_unavailable`` / ``unknown_site`` / ``site_unpopulated`` /
+#: ``site_cleared`` / ``site_short``.
+SITE_CLEAR_OUT_SHORT = "site_short"
+
+
+def _stage_zero_site_clear_out(definition: QuestDefinition) -> QuestObjective | None:
+    """The definition's current objective when it is a bound site clear-out."""
+    objective = definition.stages[0].objective
+    return objective if objective.site_key is not None else None
+
+
+def _site_clear_out_read(objective: QuestObjective) -> Any:
+    """The site owner's binding-source read for this clear-out's site."""
+    from world.maps.monster_sites import site_living_members
+
+    return site_living_members(objective.site_key)
+
+
+def _site_clear_out_plan(
+    definition: QuestDefinition,
+) -> tuple[QuestObjective, Any] | None:
+    """The stage-zero objective and its site read, or ``None`` when not one.
+
+    Read exactly once per acceptance (and once per board listing): the
+    guarantee, the bound set, and the emitted context all describe the same
+    moment.
+    """
+    objective = _stage_zero_site_clear_out(definition)
+    if objective is None:
+        return None
+    return objective, _site_clear_out_read(objective)
+
+
+def _site_clear_out_refusal(objective: QuestObjective, read: Any) -> str | None:
+    """The named reason this read cannot supply the objective, or ``None``."""
+    if read.reason is not None:
+        return read.reason
+    if len(read.members) < objective.quantity:
+        return SITE_CLEAR_OUT_SHORT
+    return None
+
+
+def site_clear_out_refusal(definition: QuestDefinition) -> str | None:
+    """The named reason this definition's clear-out cannot be accepted now.
+
+    ``None`` when the definition is not a bound site clear-out, or when its site
+    currently holds at least the objective's quantity of living individuals.
+    This is the definition-driven shared predicate: the board hides an offer
+    exactly when this answers, and an acceptance refuses with exactly this
+    reason, so the two can never disagree about one clear-out.
+    """
+    plan = _site_clear_out_plan(definition)
+    if plan is None:
+        return None
+    objective, read = plan
+    return _site_clear_out_refusal(objective, read)
+
+
+def site_clear_out_available(definition: QuestDefinition) -> bool:
+    """Whether this definition can be accepted right now (the board's seam).
+
+    A definition that is not a bound site clear-out is always available: only a
+    clear-out's supply lives outside the acceptance-time managers' control.
+    """
+    return site_clear_out_refusal(definition) is None
+
+
+def _site_read_context(objective: QuestObjective, read: Any) -> dict[str, object]:
+    """The boundary-event context a site clear-out carries (no prose)."""
+    from world.lore.monster_placement import variant_species_key
+
+    site = read.site
+    return {
+        "site": objective.site_key,
+        "region": None if site is None else site.region_key,
+        "species": (
+            ()
+            if site is None
+            else tuple(
+                sorted({variant_species_key(key) for key in site.variant_keys})
+            )
+        ),
+        "variant": () if site is None else tuple(site.variant_keys),
+        "required": objective.quantity,
+        "available": len(read.members),
+    }
+
+
+def _emit_site_targets_bound(objective: QuestObjective, read: Any) -> None:
+    """Record the bound set on the enclosing durable commit."""
+    frozen = _site_read_context(objective, read)
+    transaction.on_commit(
+        lambda: log_info("hunt_site_targets_bound", context=frozen)
+    )
+
+
+def _emit_site_targets_unavailable(
+    objective: QuestObjective, read: Any, reason: str
+) -> None:
+    """Record a refused clear-out immediately (the acceptance then rolls back).
+
+    Scheduled directly rather than on commit: this path always ends in a
+    rejected acceptance whose transaction rollback would discard an on-commit
+    callback, and no persistent state changed on it.
+    """
+    context = _site_read_context(objective, read)
+    context["reason"] = reason
+    log_warn("hunt_site_targets_unavailable", context=context)
+
+
 def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecord:
     """Create one deterministic stage-zero active record for ``definition_key``.
 
@@ -507,8 +626,17 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
     back both, leaving no active record and no partial target arrangement. A
     hunt whose condition cannot be legally satisfied raises
     ``QuestTargetsUnavailable`` before any persistence.
+
+    When it is a bound clear-out over an authored site, the guarantee is a read
+    of the site owner's own state and population — acceptance never creates,
+    populates, moves, or recovers an individual — and a site that cannot supply
+    the quantity refuses with its own named reason. When the guarantee holds,
+    exactly the site's living individuals are bound as the record's stage-zero
+    objective targets, inside the same transaction and with no instance pin, and
+    the returned record is that persisted, bound record.
     """
     from world.rules.quest_issuance import resolve_issuance
+    from .binding import bind_stage_runtime
 
     definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
     if definition is None:
@@ -558,7 +686,32 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
     try:
         with transaction.atomic():
             _provision_hunt_targets(definition)
+            site_plan = _site_clear_out_plan(definition)
+            if site_plan is not None:
+                site_objective, site_read = site_plan
+                refusal = _site_clear_out_refusal(site_objective, site_read)
+                if refusal is not None:
+                    _emit_site_targets_unavailable(
+                        site_objective, site_read, refusal
+                    )
+                    raise QuestTargetsUnavailable(
+                        site_objective.site_key, refusal
+                    )
             apply_quest_log_replacement(actor, [*current, record])
+            if site_plan is not None:
+                site_objective, site_read = site_plan
+                # The binder performs this acceptance's second full quest-log
+                # replacement, so the value written a moment ago — which carries
+                # an empty target set — must not be what this returns. The
+                # snapshot/restore discipline above stays sufficient here *only
+                # because* this binding creates no instance pin: no room is
+                # supplied, because a site is a permanent wilderness location,
+                # not a spawned scene. A future binding that pins a room must
+                # extend the acceptance snapshot.
+                record = bind_stage_runtime(
+                    actor, quest_id, objective_targets=site_read.members
+                )
+                _emit_site_targets_bound(site_objective, site_read)
     except Exception:
         restore_quest_log(actor, quest_log_snapshot)
         restore_provisioning(provisioning)
