@@ -1,4 +1,10 @@
-"""Monster threat registry from design section 5.1 and lore-world-data."""
+"""Monster threat registry from design section 5.1 and lore-world-data.
+
+A threat tier is the coarse threat classification (monster-data-model design
+§3) and stays exactly that: this module is unchanged by the species registry,
+which lives beside it in ``world.lore.monster_species`` and carries the stable
+species/variant identity plus the approved bestiary narrative.
+"""
 
 from dataclasses import dataclass
 
