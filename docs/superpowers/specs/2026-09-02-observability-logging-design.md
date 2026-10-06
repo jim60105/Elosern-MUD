@@ -190,6 +190,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `monster_site_recovery_rejected` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`reason`（`one_shot`／`condition_unmet`／`not_cleared`／`capacity_reached`／`state_unreadable`／`unknown_site`，warn 級；未改變任何持久狀態） |
 | `hunt_targets_provisioned` | `region`、`species`、`variant`、`required`、`available`、`created`（區域物種狩獵於接受時向環境擁有者補足目標的邊界，僅於耐用提交時發出） |
 | `hunt_targets_unavailable` | `region`、`species`、`variant`、`required`、`available`、`reason`（`world_unavailable`／`no_ambient_rule`／`no_eligible_variant`／`capacity_exhausted`，warn 級；供給無法合法成立而拒絕接受，未改變任何持久狀態） |
+| `hunt_site_targets_bound` | `site`、`region`、`species`、`variant`、`required`、`available`（站點清剿委託綁定站點自有的存活個體為目標的邊界，僅於耐用提交時發出） |
+| `hunt_site_targets_unavailable` | `site`、`region`、`species`、`variant`、`required`、`available`、`reason`（`world_unavailable`／`unknown_site`／`site_unpopulated`／`site_cleared`／`site_short`，warn 級；站點無法供應綁定目標而拒絕接受，未改變任何持久狀態） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 | `npc_persona_initialized` | `npc`、`source`（provenance kind）、`profile`（若有）、`version` |
 | `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |
