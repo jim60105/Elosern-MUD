@@ -131,6 +131,7 @@
         "world.rules.tests.test_monster_behaviour_profile",
         "world.rules.tests.test_monster_behaviour_selection",
         "world.rules.tests.test_monster_flee_decision",
+        "world.rules.tests.test_monster_individual",
         "world.rules.tests.test_monster_scale",
         "world.rules.tests.test_monster_sexual_baseline",
         "world.rules.tests.test_movement",

@@ -9,6 +9,7 @@ except Exception:  # pragma: no cover - fallback when django settings not loaded
     class GaugeTrait:  # type: ignore[no-redef]
         pass
 
+from world.lore.monster_species import MonsterVariant
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import (
     RACE_REGISTRY,
@@ -22,6 +23,20 @@ GAUGE_KEYS = ("hp", "mp", "sp")
 STATIC_KEYS = ("atk_phys", "agility", "defense", "magic_power")
 COUNTER_KEYS = ("guild_merit",)
 TRAIT_KEYS = GAUGE_KEYS + STATIC_KEYS + COUNTER_KEYS
+
+#: The numeric sources a species-backed individual's configuration may come
+#: from (monster-data-model design D-I3). ``approved_profile`` means the variant
+#: carried a balance-approved complete profile; ``interim_tier_band`` means the
+#: only currently approved source was used — the existing tier-band construction
+#: at the variant's declared tier. The construction boundary event records which
+#: one built an individual, so the interim rule is never mistaken for balance
+#: truth, and a later approved profile replaces it without a schema change.
+NUMERIC_SOURCE_APPROVED_PROFILE = "approved_profile"
+NUMERIC_SOURCE_INTERIM_TIER_BAND = "interim_tier_band"
+
+#: The seven literal combat values an authored complete profile carries
+#: (design §3). ``guild_merit`` is not part of a profile.
+PROFILE_VALUE_KEYS = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
 
 
 class DeterministicGaugeTrait(GaugeTrait):
@@ -193,6 +208,36 @@ def initial_trait_config_for_monster_tier(
     """Return monster construction data ready for ``TraitHandler.add``."""
     values = build_initial_traits_for_monster_tier(tier_key, position)
     return trait_config_for_values(values)
+
+
+def initial_trait_config_for_variant(
+    variant: MonsterVariant, position: str = "floor"
+) -> tuple[dict[str, dict[str, Any]], str]:
+    """Resolve one species-backed individual's stored configuration and its source.
+
+    The variant's balance-approved complete profile is used literally when one
+    exists; while none does, the existing threat-tier band construction runs at
+    the variant's declared tier — the interim rule and the only currently
+    approved numeric source — and the returned ``numeric_source`` names which
+    rule was used. A flavour-sounding name or description never contributes a
+    number: the tier band's zero MP/SP and its documented ``magic_power`` band
+    are used exactly as they are, and ``guild_merit`` keeps the value the tier
+    path already builds (it belongs to no profile).
+
+    The signature takes no player, level, clock, or progression input, so no
+    scaling can be threaded through this surface, and no skill multiplier is
+    folded into the returned values: multipliers stay applied at resolution
+    time by the existing combat path.
+    """
+    profile = variant.combat_profile
+    if profile is None:
+        return (
+            initial_trait_config_for_monster_tier(variant.threat_tier, position),
+            NUMERIC_SOURCE_INTERIM_TIER_BAND,
+        )
+    values = {name: getattr(profile, name) for name in PROFILE_VALUE_KEYS}
+    values["guild_merit"] = 0
+    return trait_config_for_values(values), NUMERIC_SOURCE_APPROVED_PROFILE
 
 
 def restore_gauges_to_full(entity: Any) -> None:
