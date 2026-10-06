@@ -266,7 +266,7 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     from world.rules.guild import GuildDataError
     from world.rules.guild_offers import (
         BoardAccessError,
-        list_guild_offers,
+        eligible_guild_offers,
     )
     from world.rules.quest_issuance import (
         IssuerKeyError,
@@ -319,8 +319,13 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
         )
 
     if guild_registered:
+        # The eligibility seam, not the availability-filtered board listing: an
+        # assignment attempt is an acceptance attempt, so an offer whose site
+        # cannot currently supply its targets must reach the quest lifecycle's
+        # named refusal rather than being reported as ineligible here (the same
+        # discipline ``accept_guild_offer`` follows).
         try:
-            eligible = list_guild_offers(player, npc)
+            eligible = eligible_guild_offers(player, npc)
         except (BoardAccessError, GuildDataError) as error:
             return IntentOutcome(False, _reason_text(error))
         if not any(offer.definition_key == quest_key for offer in eligible):

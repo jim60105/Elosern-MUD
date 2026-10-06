@@ -23,6 +23,13 @@ D-P4). A one-shot site stays cleared until an author-side re-issue, which the
 authoring registry expresses — this module deliberately offers no player
 command and no re-issue verb.
 
+The quest layer's binding source is the pure read below (``site_living_members``):
+it answers which of a site's own individuals stand and what the site's durable
+state is, and a clear-out's bound set is exactly that answer. It populates,
+recovers, moves, and deletes nothing — a site's first population and its
+recovery stay this module's own clock-settled decisions — so no quest, board
+read, or acceptance can become a second population owner (design D-C2).
+
 The settlement runs inside ``WorldClock.advance()``'s transaction, so its
 declared advance-surface contract (``snapshot_monster_site_surfaces``) snapshots
 the wilderness bookkeeping and per-site state it may write, and every created
@@ -43,7 +50,7 @@ from world.lore.monster_placement import (
     MonsterSite,
     variant_species_key,
 )
-from world.maps.wilderness_population import _session_participant_ids, _stored_hp
+from world.maps.wilderness_population import _session_participant_ids
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot, register_event_source
@@ -58,6 +65,16 @@ SITE_STAGE_KIND = "monster_site_lifecycle"
 SITE_STATE_POPULATED = "populated"
 SITE_STATE_CLEARED = "cleared"
 
+# The closed verdict vocabulary of ``site_living_members`` (monster-site-clear-out
+# -hunts D-C2/D-C3). ``None`` is the "the site can supply its individuals"
+# answer; each value below names why it cannot. A shortfall against a caller's
+# own required quantity is deliberately absent: that comparison belongs to the
+# caller's objective, not to the site's state.
+SITE_READ_WORLD_UNAVAILABLE = "world_unavailable"
+SITE_READ_UNKNOWN_SITE = "unknown_site"
+SITE_READ_UNPOPULATED = "site_unpopulated"
+SITE_READ_CLEARED = "site_cleared"
+
 # The wilderness script attribute holding the per-site durable state.
 _SITES_ATTRIBUTE = "monster_sites"
 _ITEMCOORDINATES_ATTRIBUTE = "itemcoordinates"
@@ -70,6 +87,29 @@ class SiteState:
     key: str
     state: str
     cleared_at_tick: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SiteLivingMembers:
+    """One site's own living individuals plus the state that answered.
+
+    ``reason`` is ``None`` exactly when the site could answer; otherwise it is
+    one of the ``SITE_READ_*`` verdicts. ``members`` is always the site's own
+    living set at the moment of the read, so a refused read never carries a
+    partial set a caller could mistake for a binding source.
+    """
+
+    site_key: str
+    site: MonsterSite | None
+    state: str | None
+    cleared_at_tick: int | None
+    members: tuple[Monster, ...]
+    reason: str | None
+
+    @property
+    def available(self) -> bool:
+        """Whether the site answered with a usable set of living individuals."""
+        return self.reason is None
 
 
 def _wilderness() -> Any | None:
@@ -120,9 +160,79 @@ def _members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
     )
 
 
+def _persisted_hp(member: Monster) -> float:
+    """The individual's persisted HP, read without materializing its Trait.
+
+    ``world.maps.wilderness_population::_stored_hp`` reads ``member.traits.hp``,
+    which constructs the ``Trait``; Evennia's ``TraitHandler.get`` builds it from
+    the persisted ``_SaverDict`` and the constructor's validation calls
+    ``trait_data.update(...)``, and ``_SaverDict.update`` saves the attribute on
+    every call. Both this module's settlement and the binding-source read below
+    must leave storage alone, so they read the persisted trait record directly
+    (the ``world/rules/status_query`` no-create read) and apply the same stored
+    gauge rule, failing closed to "not living" on anything unreadable instead of
+    raising.
+    """
+    traits = member.attributes.get("traits", category="traits")
+    record = None if not isinstance(traits, Mapping) else traits.get("hp")
+    if not isinstance(record, Mapping):
+        return 0.0
+    if "current" in record:
+        return float(record["current"])
+    return float(record.get("base", 0) + record.get("mod", 0)) * float(
+        record.get("mult", 1)
+    )
+
+
 def _living_members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
     return tuple(
-        member for member in _members(wilderness, site) if _stored_hp(member) > 0
+        member for member in _members(wilderness, site) if _persisted_hp(member) > 0
+    )
+
+
+def site_living_members(
+    site_key: str, *, wilderness: Any | None = None
+) -> SiteLivingMembers:
+    """One site's own living individuals and its durable state (a pure read).
+
+    The quest layer's binding source (monster-site-clear-out-hunts D-C2): a
+    clear-out's bound set is exactly what this answers, so it decides nothing
+    and therefore writes nothing, moves nothing, emits no event, and never
+    treats a not-yet-populated, cleared, unknown, or absent world as a recovery
+    opportunity. Every one of those four conditions is a named verdict rather
+    than an exception, so a caller can refuse by name.
+    """
+    world = _wilderness() if wilderness is None else wilderness
+    if world is None:
+        return SiteLivingMembers(
+            site_key, None, None, None, (), SITE_READ_WORLD_UNAVAILABLE
+        )
+    site = MONSTER_SITE_REGISTRY.get(site_key)
+    if site is None:
+        return SiteLivingMembers(
+            site_key, None, None, None, (), SITE_READ_UNKNOWN_SITE
+        )
+    state = site_state(site_key, wilderness=world)
+    if state is None:
+        return SiteLivingMembers(
+            site_key, site, None, None, (), SITE_READ_UNPOPULATED
+        )
+    if state.state == SITE_STATE_CLEARED:
+        return SiteLivingMembers(
+            site_key,
+            site,
+            state.state,
+            state.cleared_at_tick,
+            (),
+            SITE_READ_CLEARED,
+        )
+    return SiteLivingMembers(
+        site_key,
+        site,
+        state.state,
+        state.cleared_at_tick,
+        _living_members(world, site),
+        None,
     )
 
 
@@ -318,7 +428,7 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
             continue
         if record.get("state") == SITE_STATE_POPULATED:
             members = _members(wilderness, site)
-            if any(_stored_hp(member) > 0 for member in members):
+            if any(_persisted_hp(member) > 0 for member in members):
                 continue
             if members and _session_participant_ids().intersection(
                 member.pk for member in members

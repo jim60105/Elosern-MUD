@@ -170,15 +170,13 @@ def _rank_order(rank_key: str) -> int:
     return rank.order
 
 
-def list_guild_offers(
-    actor: Any,
-    staff: Any,
-) -> tuple[GuildQuestOffer, ...]:
-    """Return local branch offers whose quest rank is at or below the actor's.
+def _local_branch_and_order(actor: Any, staff: Any) -> tuple[str, int]:
+    """The local host's branch key plus the actor's canonical rank order.
 
-    Eligibility uses the actor's canonical ``guild_rank`` only; registration
-    snapshot values and ``disguised_stats`` are never read here. Results are
-    ordered by (quest rank order, definition key).
+    The shared precondition of both the board listing and an acceptance attempt:
+    registration, a local ``GuildStaff`` host carrying a branch key, and a
+    canonical ``guild_rank``. Registration snapshot values and
+    ``disguised_stats`` are never read.
     """
     from world.rules.guild import parse_guild_registration
     from typeclasses.components import GuildStaff
@@ -196,8 +194,20 @@ def list_guild_offers(
     actor_rank = getattr(actor, "guild_rank", None)
     if actor_rank is None:
         raise BoardAccessError("actor has no guild rank")
-    actor_order = _rank_order(actor_rank)
+    return branch_key, _rank_order(actor_rank)
 
+
+def _rank_eligible_offers(
+    branch_key: str, actor_order: int
+) -> tuple[GuildQuestOffer, ...]:
+    """Local offers at or below the actor's rank, in (rank, definition key) order.
+
+    Rank eligibility and ordering only — never supply availability. An
+    acceptance attempt must use this seam rather than the board listing, so the
+    availability rule can never become a second acceptance gate and a site that
+    changed state between a listing and an acceptance still reaches the
+    lifecycle's named refusal instead of being reported as ineligible.
+    """
     eligible = [
         offer
         for offer in GUILD_OFFER_REGISTRY.values()
@@ -213,6 +223,57 @@ def list_guild_offers(
                 offer.definition_key,
             ),
         )
+    )
+
+
+def eligible_guild_offers(
+    actor: Any,
+    staff: Any,
+) -> tuple[GuildQuestOffer, ...]:
+    """The actor's board-eligible offers, without the availability rule.
+
+    The public eligibility seam: registration, the local branch, and the actor's
+    canonical rank alone, in stable (rank, definition key) order.
+    """
+    branch_key, actor_order = _local_branch_and_order(actor, staff)
+    return _rank_eligible_offers(branch_key, actor_order)
+
+
+def _offer_available_now(offer: GuildQuestOffer) -> bool:
+    """Whether an eligible offer can currently be accepted.
+
+    Only a bound site clear-out is availability-sensitive: every other offer's
+    acceptance-time guarantee is satisfiable by the managers themselves. The
+    predicate is the quest layer's own, so the board and an acceptance answer
+    the same question about the same site read.
+    """
+    definition = QUEST_DEFINITION_REGISTRY.get(offer.definition_key)
+    if definition is None:
+        return True
+    from world.quests.runtime import site_clear_out_available
+
+    return site_clear_out_available(definition)
+
+
+def list_guild_offers(
+    actor: Any,
+    staff: Any,
+) -> tuple[GuildQuestOffer, ...]:
+    """Return local branch offers whose quest rank is at or below the actor's.
+
+    Eligibility uses the actor's canonical ``guild_rank`` only; registration
+    snapshot values and ``disguised_stats`` are never read here. Results are
+    ordered by (quest rank order, definition key), and a bound site clear-out is
+    omitted while its authored site cannot supply the objective's living
+    individuals, so the board never advertises work that acceptance would
+    refuse. The rule narrows this listing only: rank eligibility, ordering, and
+    the objective-summary rendering are untouched, and an acceptance attempt
+    still asks the eligibility seam alone.
+    """
+    return tuple(
+        offer
+        for offer in eligible_guild_offers(actor, staff)
+        if _offer_available_now(offer)
     )
 
 
@@ -234,13 +295,19 @@ def accept_guild_offer(
     bookkeeping surfaces a species-hunt acceptance may have provisioned (the
     affinity write happens after ``accept_quest`` returns, so the runtime's own
     failure path cannot cover this boundary).
+
+    The precheck is the eligibility seam alone — the issuing branch plus the
+    actor's rank — never the availability-filtered listing: the availability
+    rule narrows what the board *lists*, so a clear-out whose site changed state
+    between a listing and an acceptance, or whose key was named directly, still
+    reaches the lifecycle's named refusal instead of a generic ineligibility.
     """
     from typeclasses.components import GuildStaff
     from world.rules.affinity import AffinitySource, apply_affinity_change
     from world.rules.quest_issuance import guild_issuer_key
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 
-    offers = list_guild_offers(actor, staff)
+    offers = eligible_guild_offers(actor, staff)
     if not any(offer.definition_key == definition_key for offer in offers):
         raise BoardAccessError(f"offer {definition_key!r} is not board-eligible")
     if not isinstance(staff, NPC):

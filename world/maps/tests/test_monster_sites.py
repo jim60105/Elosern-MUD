@@ -33,8 +33,13 @@ from world.maps.monster_sites import (
     SITE_STAGE_KIND,
     SITE_STATE_CLEARED,
     SITE_STATE_POPULATED,
+    SITE_READ_CLEARED,
+    SITE_READ_UNKNOWN_SITE,
+    SITE_READ_UNPOPULATED,
+    SITE_READ_WORLD_UNAVAILABLE,
     settle_monster_sites,
     settle_site_recovery,
+    site_living_members,
     site_state,
     snapshot_monster_site_surfaces,
 )
@@ -502,6 +507,186 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                     self.wilderness.db.itemcoordinates[probe], PROBE
                 )
 
+    # -- the quest layer's binding source ----------------------------------
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_a_populated_site_whose_members_are_all_dead_answers_an_empty_set(self):
+        # Until the world clock's own settlement declares the clearing, the
+        # durable state still says populated: the read answers the truth about
+        # what stands (nothing) with no reason, and it is the caller's own
+        # quantity comparison that then refuses the clear-out as short.
+        self._settle()
+        nest = self.sites[NEST_KEY]
+        self._defeat(nest)
+
+        read = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+        self.assertTrue(read.available)
+        self.assertIsNone(read.reason)
+        self.assertEqual(read.state, SITE_STATE_POPULATED)
+        self.assertEqual(read.members, ())
+        # The settlement is what turns it into the cleared verdict, not the read.
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        settled = site_living_members(NEST_KEY, wilderness=self.wilderness)
+        self.assertEqual(settled.reason, SITE_READ_CLEARED)
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_the_read_returns_the_sites_living_members_and_only_those(self):
+        from evennia.utils.create import create_object
+
+        self._settle()
+        nest = self.sites[NEST_KEY]
+        ambient = create_object(Monster, key="t_read_ambient_witness")
+        ambient.threat_tier = _WITNESS_TIER
+        ambient.apply_monster_tier("floor")
+        ambient.db.population_key = _population_key(*PROBE)
+        self.wilderness.db.itemcoordinates[ambient] = PROBE
+        foreign = create_object(Monster, key="t_read_foreign_site_witness")
+        foreign.threat_tier = _WITNESS_TIER
+        foreign.apply_monster_tier("floor")
+        foreign.db.site_key = "t_read_elsewhere"
+        self.wilderness.db.itemcoordinates[foreign] = PROBE
+        members = _members(self.wilderness, nest)
+        dead = members[0]
+        dead.traits.hp.current = 0
+
+        read = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+        self.assertTrue(read.available)
+        self.assertEqual(
+            [member.pk for member in read.members],
+            [member.pk for member in members if member.pk != dead.pk],
+        )
+        for member in read.members:
+            with self.subTest(member=member.pk):
+                self.assertEqual(member.db.site_key, NEST_KEY)
+        for excluded in (ambient, foreign, dead):
+            with self.subTest(excluded=excluded.key):
+                self.assertNotIn(excluded.pk, {m.pk for m in read.members})
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_the_read_modifies_nothing_even_from_a_cold_trait_handler(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._settle()
+        nest = self.sites[NEST_KEY]
+        members = _members(self.wilderness, nest)
+        # Force every member's trait handler cold: a read that materializes a
+        # Trait from here issues a stored-attribute UPDATE (Evennia's Trait
+        # constructor calls ``_SaverDict.update``, which saves on every call),
+        # which is what this capture would catch.
+        for member in members:
+            member.__dict__.pop("traits", None)
+        state_before = dict(self.wilderness.db.monster_sites)
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+        surfaces_before = {
+            member.pk: (
+                member.db.site_key,
+                self.wilderness.db.itemcoordinates.get(member),
+                dict(member.attributes.get("traits", category="traits") or {}),
+            )
+            for member in members
+        }
+
+        with CaptureQueriesContext(connection) as queries:
+            first = site_living_members(NEST_KEY, wilderness=self.wilderness)
+            second = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+        self.assertEqual(first, second)
+        self.assertEqual(first.members, second.members)
+        self.assertEqual(dict(self.wilderness.db.monster_sites), state_before)
+        self.assertEqual(
+            dict(self.wilderness.db.itemcoordinates), coordinates_before
+        )
+        self.assertEqual(
+            {
+                member.pk: (
+                    member.db.site_key,
+                    self.wilderness.db.itemcoordinates.get(member),
+                    dict(member.attributes.get("traits", category="traits") or {}),
+                )
+                for member in members
+            },
+            surfaces_before,
+        )
+        writes = [
+            query["sql"]
+            for query in queries
+            if query["sql"].lstrip().upper().startswith(
+                ("UPDATE", "INSERT", "DELETE")
+            )
+        ]
+        self.assertEqual(writes, [])
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_a_cleared_site_offers_no_members_and_stays_cleared(self):
+        self._settle()
+        nest = self.sites[NEST_KEY]
+        self._defeat(nest)
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        cleared = site_state(NEST_KEY, wilderness=self.wilderness)
+        self.assertEqual(cleared.state, SITE_STATE_CLEARED)
+        state_before = dict(self.wilderness.db.monster_sites)
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+
+        read = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+        self.assertFalse(read.available)
+        self.assertEqual(read.reason, SITE_READ_CLEARED)
+        self.assertEqual(read.members, ())
+        self.assertEqual(read.state, SITE_STATE_CLEARED)
+        self.assertEqual(read.cleared_at_tick, cleared.cleared_at_tick)
+        self.assertEqual(dict(self.wilderness.db.monster_sites), state_before)
+        self.assertEqual(
+            dict(self.wilderness.db.itemcoordinates), coordinates_before
+        )
+        self.assertEqual(
+            site_state(NEST_KEY, wilderness=self.wilderness), cleared
+        )
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_a_never_populated_site_is_not_populated_by_the_read(self):
+        # No settlement has run, so neither site holds a durable state yet.
+        self.assertIsNone(site_state(NEST_KEY, wilderness=self.wilderness))
+        monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
+
+        read = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+        self.assertFalse(read.available)
+        self.assertEqual(read.reason, SITE_READ_UNPOPULATED)
+        self.assertEqual(read.members, ())
+        self.assertIsNone(read.state)
+        self.assertEqual(read.site.key, NEST_KEY)
+        self.assertIsNone(site_state(NEST_KEY, wilderness=self.wilderness))
+        self.assertEqual(
+            sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
+        )
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_the_read_answers_an_unknown_site_without_creating_anything(self):
+        self._settle()
+        monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
+        states_before = dict(self.wilderness.db.monster_sites)
+
+        read = site_living_members("t_absent_site", wilderness=self.wilderness)
+
+        self.assertFalse(read.available)
+        self.assertEqual(read.reason, SITE_READ_UNKNOWN_SITE)
+        self.assertEqual(read.members, ())
+        self.assertIsNone(read.site)
+        self.assertIsNone(read.state)
+        self.assertEqual(dict(self.wilderness.db.monster_sites), states_before)
+        self.assertEqual(
+            sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
+        )
+
     # -- advance-surface contract ------------------------------------------
 
     @covers_requirement(
@@ -641,6 +826,22 @@ class MonsterSiteStageWithoutWorldTests(EvenniaTest):
             [event.kind for event in events if event.kind == "monster_site_recovered"],
             [],
         )
+
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
+    def test_the_read_refuses_when_no_world_is_provisioned(self):
+        # Refusing is the read's answer, not an exception, and it provisions
+        # nothing: no wilderness script may appear because a quest asked.
+        self.assertFalse(search_script(WILDERNESS_NAME))
+
+        read = site_living_members("t_absent_site")
+
+        self.assertFalse(read.available)
+        self.assertEqual(read.reason, SITE_READ_WORLD_UNAVAILABLE)
+        self.assertEqual(read.members, ())
+        self.assertIsNone(read.site)
+        self.assertIsNone(read.state)
+        self.assertFalse(search_script(WILDERNESS_NAME))
 
 
 class SiteRowVocabularyTests(EvenniaTest):

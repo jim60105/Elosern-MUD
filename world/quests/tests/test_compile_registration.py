@@ -10,6 +10,7 @@ payload helpers come from ``_compile_helpers``.
 from unittest.mock import patch
 import unittest
 
+from world.lore.monster_placement import MonsterSite
 from world.quests.compile import (
     CompiledQuest,
     IssuanceDescriptor,
@@ -551,6 +552,189 @@ class SpeciesHuntPayloadTests(CompileRegistryIsolation, unittest.TestCase):
                 mutate(payload)
                 with self.assertRaises(QuestCompileError):
                     payload_to_registrations(payload)
+
+
+# ---------------------------------------------------------------------------
+# The durable mirror of a bound site clear-out (task 1.2): the stored payload
+# carries the site key with an absent-key default, the generative compile
+# boundary never authors one, and a corrupt stored clear-out fails loudly at
+# the payload boundary. Every key below is a kit row or an invented one.
+# ---------------------------------------------------------------------------
+_CLEAR_OUT_SITE = "t_payload_site"
+_CLEAR_OUT_SITES = {
+    _CLEAR_OUT_SITE: MonsterSite(
+        _CLEAR_OUT_SITE,
+        "nest",
+        _HUNT_REGION,
+        (4, 4),
+        (_HUNT_ORDINARY,),
+        1,
+        True,
+    )
+}
+_CLEAR_OUT_EXTRA = {"monster_sites": _CLEAR_OUT_SITES}
+
+
+def _clear_out_definition() -> QuestDefinition:
+    return QuestDefinition(
+        key="t_payload_clear_out",
+        display_name="合成清剿委託",
+        quest_type=QuestType.DEFEAT,
+        rank="E",
+        stages=(
+            QuestStage(
+                0,
+                QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=1,
+                    requires_bound_targets=True,
+                    site_key=_CLEAR_OUT_SITE,
+                ),
+            ),
+        ),
+        deadline_hours=None,
+    )
+
+
+def _compiled_clear_out() -> CompiledQuest:
+    return CompiledQuest(
+        definition=_clear_out_definition(),
+        reward=QuestReward(copper=100, items=(), merit=0),
+        issuance=IssuanceDescriptor(
+            issuer_key=npc_issuer_key("t_payload_clear_out_commission"),
+            settlement=Settlement.AUTO,
+        ),
+        stage_requirements=(
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.DEFEAT,
+                location=None,
+                archetype=None,
+                anchor_near=None,
+                scene_sentence=None,
+                npc_reqs=(),
+            ),
+        ),
+    )
+
+
+def _stored_clear_out_objective(payload: dict) -> dict:
+    return payload["definition"]["stages"][0]["objective"]
+
+
+@synthetic_registries(
+    "regions",
+    "monster_species",
+    "monster_variants",
+    "monster_tiers",
+    "monster_sites",
+    extra=_CLEAR_OUT_EXTRA,
+)
+class SiteClearOutPayloadTests(CompileRegistryIsolation, unittest.TestCase):
+    """The stored payload codec carries the bound clear-out's site key."""
+
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
+    def test_a_stored_clear_out_payload_round_trips_the_site_key(self):
+        compiled = _compiled_clear_out()
+        payload = _compiled_to_payload(compiled)
+        self.assertEqual(
+            _stored_clear_out_objective(payload)["site_key"], _CLEAR_OUT_SITE
+        )
+        restored = payload_to_registrations(payload)
+        self.assertEqual(restored, compiled)
+        objective = restored.definition.stages[0].objective
+        self.assertEqual(objective.site_key, _CLEAR_OUT_SITE)
+        self.assertTrue(objective.requires_bound_targets)
+        # The restored aggregate publishes through the same writer a startup
+        # restore uses, so a clear-out survives a server restart.
+        register_restored_quest(restored)
+        self.assertIn(restored.definition.key, QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
+    def test_an_absent_stored_site_key_decodes_to_the_bound_family(self):
+        # A payload written before the selector existed decodes to exactly the
+        # objective it recorded: an absent key is the *bound-with-no-site*
+        # family, never an invented site.
+        payload = _compiled_to_payload(_compiled_clear_out())
+        _stored_clear_out_objective(payload).pop("site_key")
+        restored = payload_to_registrations(payload)
+        objective = restored.definition.stages[0].objective
+        self.assertIsNone(objective.site_key)
+        self.assertTrue(objective.requires_bound_targets)
+
+    def test_a_corrupt_stored_clear_out_fails_loudly_at_the_payload_boundary(self):
+        tier_key = next(iter(SYNTH_MONSTER_TIERS))
+        cases = {
+            "unknown-site": lambda payload: _stored_clear_out_objective(
+                payload
+            ).update(site_key="t_absent_site"),
+            "non-string-site": lambda payload: _stored_clear_out_objective(
+                payload
+            ).update(site_key=5),
+            "empty-site": lambda payload: _stored_clear_out_objective(payload).update(
+                site_key=""
+            ),
+            "site-without-the-bound-flag": lambda payload: (
+                _stored_clear_out_objective(payload).update(
+                    requires_bound_targets=False
+                )
+            ),
+            "site-beside-a-tier": lambda payload: _stored_clear_out_objective(
+                payload
+            ).update(monster_tier=tier_key),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(case=name):
+                payload = _compiled_to_payload(_compiled_clear_out())
+                mutate(payload)
+                with self.assertRaises(QuestCompileError):
+                    payload_to_registrations(payload)
+
+
+class ClearOutCompileBoundaryTests(unittest.TestCase):
+    """The generative boundary never authors a site key (design D-C1)."""
+
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
+    def test_no_compiled_proposal_authors_a_site_key(self):
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        stages = 0
+        for entry in QUEST_TEMPLATE_POOL:
+            with self.subTest(entry=entry.name):
+                compiled = compile_quest_blueprint(entry.to_payload())
+                for stage in compiled.definition.stages:
+                    stages += 1
+                    self.assertIsNone(stage.objective.site_key)
+        self.assertGreater(stages, 0)
+
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
+    def test_a_proposal_declaring_a_site_key_is_rejected(self):
+        # Presence is rejected, not just a value: a proposal can never smuggle a
+        # hand-written site key in and have it silently ignored.
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        rejected = 0
+        for entry in QUEST_TEMPLATE_POOL:
+            for payload_stage in entry.to_payload()["stages"]:
+                if payload_stage["objective"]["kind"] != "defeat":
+                    continue
+                payload = entry.to_payload()
+                payload["stages"][payload_stage["index"]]["objective"]["site_key"] = (
+                    _CLEAR_OUT_SITE
+                )
+                with self.assertRaises(QuestCompileError) as caught:
+                    compile_quest_blueprint(payload)
+                self.assertIn("site_key", str(caught.exception))
+                rejected += 1
+        self.assertGreater(rejected, 0)
 
 
 if __name__ == "__main__":

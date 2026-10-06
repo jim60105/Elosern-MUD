@@ -44,6 +44,9 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
                 "southwest_coast_tide_lamp_crab",
                 "western_hills_valleys_ridge_burrow_hare",
                 "western_hills_valleys_rock_echo_goat",
+                "ridge_burrow_nest_clear_out",
+                "cliff_echo_camp_clear_out",
+                "tide_mouth_boss_site_clear_out",
             },
         )
 
