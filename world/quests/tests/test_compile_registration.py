@@ -15,13 +15,19 @@ from world.quests.compile import (
     IssuanceDescriptor,
     QuestCompileError,
     SCENE_REQUIREMENT_REGISTRY,
+    StageSpawnRequirement,
     compile_quest_blueprint,
+    payload_to_registrations,
     register_generated_quest,
     register_restored_quest,
     scene_requirements_for,
 )
+from world.quests.compile.payload import _compiled_to_payload
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
+    ObjectiveKind,
+    QuestDefinition,
+    QuestObjective,
     QuestStage,
     QuestType,
     register_quest_definition,
@@ -39,6 +45,14 @@ from world.rules.guild_offers import (
 from world.rules.quest_issuance import (
     QUEST_ISSUANCE_REGISTRY,
     Settlement,
+    npc_issuer_key,
+)
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_MONSTER_VARIANTS,
+    SYNTH_REGIONS,
+    synthetic_registries,
 )
 
 from tools.spec_traceability import covers_requirement
@@ -400,5 +414,144 @@ class SharedPayloadContractTests(CompileRegistryIsolation, unittest.TestCase):
                     self.assertEqual(validator_fn(payload), [])
                 compiled = compile_quest_blueprint(payload)
                 validate_definition(compiled.definition)
+
+
+# ---------------------------------------------------------------------------
+# The durable mirror of a species-hunt definition (task 3.3): the stored
+# payload round-trips the new objective and prose fields, and a corrupt stored
+# hunt fails loudly at the payload boundary. Every key below is a kit row or an
+# invented one.
+# ---------------------------------------------------------------------------
+_HUNT_SPECIES = next(iter(SYNTH_MONSTER_SPECIES))
+_HUNT_VARIANTS = tuple(
+    key
+    for key, row in SYNTH_MONSTER_VARIANTS.items()
+    if row.species_key == _HUNT_SPECIES
+)
+_HUNT_ORDINARY = next(
+    key for key in _HUNT_VARIANTS if SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_STRONGER = next(
+    key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_REGION = next(iter(SYNTH_REGIONS))
+_PAYLOAD_RATIONALE = "合成評價理由：合成隘口的合成強勢型成群巡守，落單者風險極高。"
+_PAYLOAD_FLAVOR = "合成背景：合成議會懸賞合成鬃毛，合成獵場因而喧鬧。"
+
+
+def _hunt_definition() -> QuestDefinition:
+    return QuestDefinition(
+        key="t_payload_hunt",
+        display_name="合成討伐委託",
+        quest_type=QuestType.DEFEAT,
+        rank="F",
+        stages=(
+            QuestStage(
+                0,
+                QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=2,
+                    region_key=_HUNT_REGION,
+                    species_key=_HUNT_SPECIES,
+                    countable_variant_keys=(_HUNT_ORDINARY, _HUNT_STRONGER),
+                ),
+            ),
+        ),
+        deadline_hours=48,
+        rating_rationale_zh=_PAYLOAD_RATIONALE,
+        background_flavor_zh=_PAYLOAD_FLAVOR,
+    )
+
+
+def _compiled_hunt() -> CompiledQuest:
+    return CompiledQuest(
+        definition=_hunt_definition(),
+        reward=QuestReward(copper=25, items=(), merit=0),
+        issuance=IssuanceDescriptor(
+            issuer_key=npc_issuer_key("t_payload_commission"),
+            settlement=Settlement.AUTO,
+        ),
+        stage_requirements=(
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.DEFEAT,
+                location=None,
+                archetype=None,
+                anchor_near=None,
+                scene_sentence=None,
+                npc_reqs=(),
+            ),
+        ),
+    )
+
+
+@synthetic_registries(
+    "regions", "monster_species", "monster_variants", "monster_tiers"
+)
+class SpeciesHuntPayloadTests(CompileRegistryIsolation, unittest.TestCase):
+    """The stored payload codec carries the hunt selector and the prose fields."""
+
+    def test_a_stored_hunt_payload_round_trips_and_restores(self):
+        compiled = _compiled_hunt()
+        restored = payload_to_registrations(_compiled_to_payload(compiled))
+        self.assertEqual(restored, compiled)
+        objective = restored.definition.stages[0].objective
+        self.assertEqual(objective.region_key, _HUNT_REGION)
+        self.assertEqual(objective.species_key, _HUNT_SPECIES)
+        self.assertEqual(
+            objective.countable_variant_keys, (_HUNT_ORDINARY, _HUNT_STRONGER)
+        )
+        self.assertIsInstance(objective.countable_variant_keys, tuple)
+        self.assertEqual(restored.definition.rating_rationale_zh, _PAYLOAD_RATIONALE)
+        self.assertEqual(restored.definition.background_flavor_zh, _PAYLOAD_FLAVOR)
+        # The restored aggregate publishes through the same writer a startup
+        # restore uses, so a hunt survives a server restart.
+        register_restored_quest(restored)
+        self.assertIn(
+            restored.definition.key, QUEST_DEFINITION_REGISTRY
+        )
+
+    def test_a_corrupt_stored_hunt_fails_loudly_at_the_payload_boundary(self):
+        tier_key = next(iter(SYNTH_MONSTER_TIERS))
+        cases = {
+            "partial-selector": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].pop("species_key"),
+            "unknown-region": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].update(region_key="t_absent_region"),
+            "unknown-species": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].update(species_key="t_absent_species"),
+            "unknown-variant": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].update(countable_variant_keys=["t_absent_variant"]),
+            "string-variants": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].update(countable_variant_keys=_HUNT_ORDINARY),
+            "no-ordinary-variant": lambda payload: payload["definition"]["stages"][
+                0
+            ]["objective"].update(countable_variant_keys=[_HUNT_STRONGER]),
+            "tier-beside-hunt": lambda payload: payload["definition"]["stages"][0][
+                "objective"
+            ].update(monster_tier=tier_key),
+            "prose-not-a-string": lambda payload: payload["definition"].update(
+                rating_rationale_zh=5
+            ),
+            "prose-too-long": lambda payload: payload["definition"].update(
+                background_flavor_zh="評" * 501
+            ),
+            "prose-ascii-only": lambda payload: payload["definition"].update(
+                rating_rationale_zh="synthetic rationale"
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(case=name):
+                payload = _compiled_to_payload(_compiled_hunt())
+                mutate(payload)
+                with self.assertRaises(QuestCompileError):
+                    payload_to_registrations(payload)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -37,10 +37,17 @@ from commands.guild import (
 from commands.combat import CmdEngage, CmdGuildExam
 from commands.economy import CmdBuy, CmdSell, CmdShopStock
 from world.quests.catalog import register_catalog
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.definitions import (
+    QUEST_DEFINITION_REGISTRY,
+    ObjectiveKind,
+    QuestObjective,
+    QuestStage,
+)
+from world.quests.describe import describe_objective
 from world.quests.runtime import fulfill_record, read_records
 from world.quests.tests._fixtures import QuestRegistryIsolation, quest, register
 from world.quests.transitions import apply_quest_log_replacement
+from world.rules.guild import register_adventurer
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
     GuildQuestOffer,
@@ -60,7 +67,14 @@ from world.rules.tests._guild_service_probes import (
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.skills.equipment import list_items
-from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_SHOPS
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+    SYNTH_REGIONS,
+    SYNTH_SHOPS,
+    synthetic_registries,
+)
 
 # Board identity is the kit synthetic branch, the store is the kit synthetic
 # shop, and the traded goods are kit rows — no shipped identity is named.
@@ -476,6 +490,104 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
             clock.return_value.tick = 12 * 3600
             self.call(CmdBuy(), f"{_MEAL} 2", "你買了 2 個")
         self.assertEqual(self.char1.db.wallet, 500 - 2 * (floor + 2))
+
+
+# ---------------------------------------------------------------------------
+# The board row of a regional species hunt (monster-quest-objectives task 3.2).
+# The offer and the objective run on kit rows and a synthetic region key only.
+# ---------------------------------------------------------------------------
+_HUNT_SPECIES = next(iter(SYNTH_MONSTER_SPECIES))
+_HUNT_VARIANTS = tuple(
+    key
+    for key, row in SYNTH_MONSTER_VARIANTS.items()
+    if row.species_key == _HUNT_SPECIES
+)
+_HUNT_ORDINARY = next(
+    key for key in _HUNT_VARIANTS if SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_STRONGER = next(
+    key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_REGION = next(iter(SYNTH_REGIONS))
+
+
+class SpeciesHuntBoardCommandTests(
+    CommandIsolation, EvenniaCommandTestMixin, EvenniaTest
+):
+    """`guild list` renders the hunt's deterministic one-line objective."""
+
+    def setUp(self):
+        self.enterContext(
+            synthetic_registries("regions", "monster_species", "monster_variants")
+        )
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "items",
+            "prices",
+            "elements",
+            "guild_branches",
+        )
+        super().setUp()
+        self.hall = create_object(Room, key="guild hall")
+        self.char1.location = self.hall
+        self.char1.race = "t_duskmari"
+        self.char1.apply_race_baseline()
+        self.staff = create_object(NPC, key="staff", location=self.hall)
+        self.staff.components.add(
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
+        )
+        self.objective = QuestObjective(
+            kind=ObjectiveKind.DEFEAT,
+            quantity=2,
+            region_key=_HUNT_REGION,
+            species_key=_HUNT_SPECIES,
+            countable_variant_keys=(_HUNT_ORDINARY, _HUNT_STRONGER),
+        )
+        self.hunt_key = register(
+            quest("t_board_hunt", stages=(QuestStage(0, self.objective),))
+        ).key
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=self.hunt_key,
+                issuer_branch_key=BRANCH,
+                reward=QuestReward(
+                    copper=rank_reward_band("F")[0], items=(), merit=0
+                ),
+            )
+        )
+        _register_board_offer("introductory_hunt")
+        register_adventurer(self.char1, self.staff)
+
+    @covers_requirement(
+        "guild-quest-board::board-listing-and-quest-log-surface-objective-guidance"
+    )
+    def test_board_rows_render_a_species_hunt_one_liner(self):
+        output = self.call(CmdGuildList(), "", caller=self.char1)
+        self.assertIn(self.hunt_key, output)
+        # The row reuses the canonical objective seam: region, species, and the
+        # required count in one deterministic Traditional Chinese line.
+        self.assertIn(describe_objective(self.objective), output)
+        self.assertIn(SYNTH_REGIONS[_HUNT_REGION].display_name_zh, output)
+        self.assertIn(SYNTH_MONSTER_SPECIES[_HUNT_SPECIES].display_name_zh, output)
+        self.assertIn("2", output)
+        for key in (_HUNT_REGION, _HUNT_SPECIES, _HUNT_ORDINARY, _HUNT_STRONGER):
+            self.assertNotIn(key, output)
+
+    @covers_requirement(
+        "guild-quest-board::board-listing-and-quest-log-surface-objective-guidance"
+    )
+    def test_objective_summaries_never_change_eligibility_or_ordering(self):
+        output = self.call(CmdGuildList(), "", caller=self.char1)
+        # Both same-rank offers still list, in the shared (rank, definition key)
+        # order, exactly as they would without the summaries.
+        self.assertLess(
+            output.index("introductory_hunt"), output.index(self.hunt_key)
+        )
+        self.assertIn("討伐", output)
 
 
 if __name__ == "__main__":
