@@ -5,6 +5,8 @@ the tier keys are the kit's, so no shipped key, display string, tier, or grade
 appears here.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
@@ -51,6 +53,9 @@ class MonsterIdentityTests(EvenniaTestCase):
         with self.assertRaisesRegex(ValueError, "threat_tier"):
             monster.apply_monster_tier()
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_a_tier_only_individual_keeps_the_plain_attribute(self):
         monster = create_object(Monster, key="tier-only")
         monster.threat_tier = TIER_KEY
@@ -67,6 +72,9 @@ class MonsterIdentityTests(EvenniaTestCase):
             monster.apply_monster_tier("floor")
         self.assertEqual(monster.threat_tier, TIER_KEY)
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_a_species_backed_individual_resolves_its_variant(self):
         monster = construct_species_individual(SPECIES_KEY, ORDINARY.key)
         self.assertEqual(monster.species_key, SPECIES_KEY)
@@ -77,12 +85,18 @@ class MonsterIdentityTests(EvenniaTestCase):
         # truth, so nothing can hold a value that disagrees with it.
         self.assertFalse(monster.attributes.has("threat_tier"))
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_the_variant_resolves_the_danger_grade(self):
         monster = construct_species_individual(SPECIES_KEY, STRONGER.key)
         self.assertEqual(monster.threat_tier, STRONGER.threat_tier)
         self.assertEqual(monster.danger_grade, STRONGER.danger_grade)
         self.assertEqual(monster.danger_grade, STRONGER.danger_grade)
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_a_tier_assignment_is_rejected_and_the_derived_tier_stands(self):
         monster = construct_species_individual(SPECIES_KEY, ORDINARY.key)
         for value in (OTHER_TIER_KEY, None, ORDINARY.threat_tier):
@@ -92,6 +106,9 @@ class MonsterIdentityTests(EvenniaTestCase):
                 self.assertEqual(monster.threat_tier, ORDINARY.threat_tier)
                 self.assertFalse(monster.attributes.has("threat_tier"))
 
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+    )
     def test_a_display_name_never_carries_identity(self):
         monster = create_object(Monster, key=SYNTH_MONSTER_SPECIES["t_whisper_quail"].display_name_zh)
         self.assertIsNone(monster.species_key)
@@ -101,6 +118,9 @@ class MonsterIdentityTests(EvenniaTestCase):
         self.assertEqual(monster.threat_tier, TIER_KEY)
         self.assertIsNone(monster.danger_grade)
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_identity_and_derived_reads_survive_a_reload_and_a_registry_rename(self):
         monster = construct_species_individual(SPECIES_KEY, ORDINARY.key)
         reloaded = Monster.objects.get(pk=monster.pk)

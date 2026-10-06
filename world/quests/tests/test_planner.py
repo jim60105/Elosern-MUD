@@ -782,6 +782,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         )
         accept(self.player, definition.key)
 
+    @covers_requirement(
+        "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
+    )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_a_redelivered_defeat_entry_advances_once(self):
         self._counted_hunt()
@@ -816,6 +819,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             stored["counted_defeat_ids"], [int(first.pk), int(second.pk)]
         )
 
+    @covers_requirement(
+        "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
+    )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_two_individuals_with_one_display_key_count_separately(self):
         self._counted_hunt()
@@ -830,6 +836,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             stored["counted_defeat_ids"], [int(first.pk), int(second.pk)]
         )
 
+    @covers_requirement(
+        "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
+    )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_a_newcomer_never_credits_an_old_bound_identity(self):
         definition = register(
@@ -855,6 +864,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         )
         self.assertEqual(self._records()[0]["stage_progress"], 1)
 
+    @covers_requirement(
+        "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
+    )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_a_new_objective_counts_its_own_identities_from_empty(self):
         accept(self.player, self.two_stage.key)

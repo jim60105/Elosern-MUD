@@ -5,6 +5,8 @@ rows with invented keys and prose, and tiers whose bands are invented for these
 tests. No shipped key, display string, tier, or grade is named.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import inspect
 import unittest
 from dataclasses import replace
@@ -124,6 +126,9 @@ def _stored_values(individual) -> dict[str, int]:
 class MonsterIndividualConstructionTests(EvenniaTestCase):
     """The one validated entry point and the numeric sources it may use."""
 
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+    )
     def test_unknown_and_mismatched_identities_build_nothing(self):
         cases = (
             ("unknown species", ABSENT_SPECIES, ORDINARY),
@@ -144,6 +149,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
             construct_species_individual(SPECIES, ORDINARY, position="nowhere")
         self.assertEqual(_object_count(), before)
 
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+    )
     def test_a_failed_application_leaves_no_individual_and_no_event(self):
         before = _object_count()
         with (
@@ -171,6 +179,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(_object_count(), before)
         self.assertEqual(info.call_count, 0)
 
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+    )
     def test_a_rolled_back_construction_leaves_no_row_and_no_event(self):
         before = _object_count()
         with (
@@ -186,6 +197,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(_object_count(), before)
         self.assertEqual(info.call_count, 0)
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_a_retired_variant_record_degrades_the_reads(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
         before = _stored_values(individual)
@@ -200,6 +214,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         # The identity keys survive, so a registry repair restores the reads.
         self.assertEqual(individual.threat_tier, TIER)
 
+    @covers_requirement(
+        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers"
+    )
     def test_the_interim_source_is_the_declared_tier_band_literally(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
         expected = trait_rules.initial_trait_config_for_monster_tier(TIER, "floor")
@@ -216,6 +233,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         )
         self.assertEqual(individual.traits.hp.base, TIER_ROW.hp_band[0])
 
+    @covers_requirement(
+        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers"
+    )
     def test_an_approved_profile_replaces_the_interim_source(self):
         individual = construct_species_individual(SPECIES, STRONGER)
         self.assertEqual(
@@ -236,6 +256,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(individual.traits.atk_phys.mod, 0)
         self.assertEqual(individual.traits.magic_power.mod, 0)
 
+    @covers_requirement(
+        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers"
+    )
     def test_construction_takes_no_player_input_and_repeats_identically(self):
         parameters = set(inspect.signature(construct_species_individual).parameters)
         self.assertEqual(
@@ -248,6 +271,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(first.threat_tier, second.threat_tier)
         self.assertEqual(first.traits.hp.max, second.traits.hp.max)
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_the_variant_resolves_the_individual_tier_and_grade(self):
         individual = construct_species_individual(SPECIES, STRONGER)
         self.assertEqual(individual.threat_tier, STRONGER_ROW.threat_tier)
@@ -256,6 +282,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         # away from the registry record it resolves from.
         self.assertFalse(individual.attributes.has("threat_tier"))
 
+    @covers_requirement(
+        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers"
+    )
     def test_one_boundary_event_records_the_numeric_source(self):
         cases = (
             (ORDINARY, NUMERIC_SOURCE_INTERIM_TIER_BAND),
@@ -282,6 +311,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
                     },
                 )
 
+    @covers_requirement(
+        "monster-individual-construction::threat-tier-and-individual-danger-resolve-from-the-variant-never-as-independent-truth"
+    )
     def test_a_registry_edit_does_not_rescale_an_existing_individual(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
         before = _stored_values(individual)
@@ -313,6 +345,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
             # resources it already holds.
             self.assertEqual(individual.threat_tier, STRONGER_TIER)
 
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+    )
     def test_identity_is_carried_by_keys_and_survives_a_reload(self):
         individual = construct_species_individual(SPECIES, ORDINARY, key="標籤")
         self.assertEqual(str(individual.key), "標籤")

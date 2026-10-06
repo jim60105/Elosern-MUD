@@ -163,6 +163,9 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertEqual(len(defeated), 1)
         self.assertEqual(defeated[0].data["target_id"], monster_b.pk)
 
+    @covers_requirement(
+        "action-resolution-pipeline::the-defeat-entry-carries-species-and-variant-identity-for-species-backed-monsters"
+    )
     def test_a_species_backed_defeat_carries_its_registered_identity(self):
         _enter_monster_scope(self)
         species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
@@ -180,6 +183,9 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertEqual(defeated[0].data["variant_key"], variant.key)
         self.assertNotEqual(defeated[0].data["species_key"], species.display_name_zh)
 
+    @covers_requirement(
+        "action-resolution-pipeline::the-defeat-entry-carries-species-and-variant-identity-for-species-backed-monsters"
+    )
     def test_a_tier_only_defeat_carries_exactly_its_old_fields(self):
         monster = self._monster("tier-only", hp=1)
         result = self._resolve([monster])
