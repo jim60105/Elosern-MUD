@@ -69,3 +69,31 @@ no wire vocabulary changes — the `webclient-combat-beats` kind vocabulary is u
 
 None; the balance-approval change replaces D-I3's interim source and is tracked as an external
 prerequisite in the proposal.
+
+## Implementation Dispositions
+
+The pre-implementation review of this plan raised findings that changed what
+landed; every one is folded into the implementation, not deferred:
+
+- **Both registry references are validated.** `resolve_variant` checks the
+  species registry *and* the variant registry before the cross-species check: the
+  synthetic kit patches the two registries independently, so variant-registry
+  membership plus the owner check alone would accept a species key that resolves
+  nowhere.
+- **Derived truth stores nothing (D-I2 taken literally).** `threat_tier` is
+  `autocreate=False` and stores no copy for a species-backed individual: reads
+  resolve from the variant on every read, and *any* assignment is rejected rather
+  than only a contradicting one, because a stored copy is exactly the drift the
+  decision forbids once the registry changes. The construction entry point
+  therefore assigns identity only. The rejected write raises
+  `MonsterTierConflictError`; every construction failure raises
+  `MonsterConstructionError`, so one named family covers the whole entry point.
+- **The boundary event fires on durable commit** (`transaction.on_commit`, the
+  existing rules-boundary contract), so a construction rolled back with its
+  caller leaves no log fiction. It is emitted for both numeric sources with
+  `numeric_source` naming the rule used.
+- **`location` is not a construction parameter.** Placement stays with the
+  placement change; the entry point takes identity, an optional display label
+  (identity is never inferred from it), and the band position.
+- **`apply_monster_tier` refuses a species-backed individual**, so the tier path
+  can never silently overwrite an approved profile.

@@ -180,6 +180,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `quest_auto_settlement` | `char`、`quest`（quest_id，即領取憑證）、`issuer`、`copper`、`items`（item keys）；自動結算的付款邊界，與櫃檯交回（`settlement_done`）可區辨 |
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
 | `defeat_aftermath` | `char`、`room`、`tick`、`hp_after`（擊敗善後邊界；defeat-aftermath-core） |
+| `monster_individual_constructed` | `individual`（dbref）、`species`、`variant`、`numeric_source`（物種個體建構邊界；`approved_profile` 或暫行 `interim_tier_band`，僅於耐用提交時發出） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 | `npc_persona_initialized` | `npc`、`source`（provenance kind）、`profile`（若有）、`version` |
 | `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |
