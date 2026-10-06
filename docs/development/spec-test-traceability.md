@@ -60,6 +60,8 @@ uv run --locked python -m tools.spec_traceability check
 
 此命令會解析規格與測試原始碼，而不會匯入遊戲模組。若有標註錯誤或任何現行需求缺乏有效關聯，命令即告失敗。加入 `--json-output <path>` 可輸出確定性報告，供交接或自動化處理使用。
 
+在封存流程中，此檢查僅於同步後階段具權威性。檢查只索引 `openspec/specs/` 與儲存庫測試；變更自身的需求在 OpenSpec CLI 封存並同步增量規格之前，仍位於 `openspec/changes/`，因此同步前的執行看不到這些新需求。同步前通過並不代表同步後仍會通過。
+
 ## 成功執行證據
 
 僅具備靜態存在性不足以通過 CI 閘門。裝飾器僅在已標註的測試成功返回且已設定 `OPENSPEC_TEST_EVIDENCE` 時，才會寫入 JSON Lines 記錄。失敗、略過、預期失敗與未收集的測試均無法滿足需求。
