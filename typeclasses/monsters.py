@@ -1,12 +1,15 @@
 """Monster typeclass from design section 5.2 (entity-traits)."""
 
+from collections.abc import Callable
 from typing import Any
 
 from evennia.typeclasses.attributes import AttributeProperty
 
 from world.rules.monster_individual import (
     MonsterIdentityError,
+    guard_individual_species_key_write,
     guard_individual_tier_write,
+    guard_individual_variant_key_write,
     individual_danger_grade,
     resolve_individual_tier,
 )
@@ -22,11 +25,13 @@ class _VariantResolvedThreatTier(AttributeProperty):
     read, and an assignment is rejected by the deterministic owner rather than
     stored as a copy that could drift once the registry changes.
 
-    ``autocreate=False`` is deliberate: Evennia's object-creation path fetches
-    every ``AttributeProperty`` and swallows whatever it raises, so an
-    autocreating ``at_set`` (which runs there with the ``None`` default) could
-    silently leave the attribute missing. Without autocreation the default read
-    goes through ``at_get``, which resolves deterministically and stores nothing.
+    ``autocreate=False`` is load-bearing: with Evennia's default autocreation the
+    object-creation path stores the ``None`` default for every fresh object, and
+    that stored row would survive into species-backed state — contradicting the
+    "no stored copy" rule this descriptor exists to enforce. The accepted side
+    effect is that a tier-only individual which never receives a tier carries no
+    stored attribute at all; its tier still resolves to ``None`` exactly as
+    before, and no consumer reads the raw attribute.
     """
 
     def at_get(self, value: str | None, obj: Any) -> str | None:
@@ -34,6 +39,27 @@ class _VariantResolvedThreatTier(AttributeProperty):
 
     def at_set(self, value: str | None, obj: Any) -> str | None:
         guard_individual_tier_write(obj, value)
+        return value
+
+
+class _GuardedIdentityKey(AttributeProperty):
+    """``species_key``/``variant_key`` for a ``Monster``: validated writes only.
+
+    The deterministic owner validates the pair on every write (identity is
+    written variant-first), so a half-assigned or mismatched identity cannot be
+    entered through this API and no read has to guess — the validated
+    construction entry point (``construct_species_individual``) is the only
+    writer that produces a complete identity.
+    """
+
+    def __init__(
+        self, guard: Callable[[Any, object], None], **kwargs: Any
+    ) -> None:
+        super().__init__(**kwargs)
+        self._guard = guard
+
+    def at_set(self, value: str | None, obj: Any) -> str | None:
+        self._guard(obj, value)
         return value
 
 
@@ -48,8 +74,12 @@ class Monster(LivingEntity):
     field is left holding truth that could contradict the registry.
     """
 
-    species_key: str | None = AttributeProperty(default=None, autocreate=False)
-    variant_key: str | None = AttributeProperty(default=None, autocreate=False)
+    species_key: str | None = _GuardedIdentityKey(
+        guard_individual_species_key_write, default=None, autocreate=False
+    )
+    variant_key: str | None = _GuardedIdentityKey(
+        guard_individual_variant_key_write, default=None, autocreate=False
+    )
     threat_tier: str | None = _VariantResolvedThreatTier(
         default=None, autocreate=False
     )

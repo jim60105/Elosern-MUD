@@ -22,6 +22,8 @@ from world.tests.synthetic_data import (
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     SYNTH_MONSTER_VARIANTS,
+    make_monster_species,
+    make_monster_variant,
     synthetic_registries,
 )
 
@@ -121,6 +123,47 @@ class MonsterIdentityTests(EvenniaTestCase):
         # The approved profile is untouched: the tier path cannot overwrite it.
         self.assertEqual(monster.traits.atk_phys.base, before)
         self.assertEqual(monster.traits.atk_phys.base, STRONGER.combat_profile.atk_phys)
+
+    def test_identity_writes_are_validated(self):
+        monster = create_object(Monster, key="write-guard")
+        # A species key alone is not an identity, and an unresolvable key never
+        # lands: the validated entry point is the only complete-identity writer.
+        with self.assertRaises(MonsterIdentityError):
+            monster.species_key = SPECIES_KEY
+        with self.assertRaises(MonsterIdentityError):
+            monster.species_key = "t_never_registered"
+        with self.assertRaises(MonsterIdentityError):
+            monster.variant_key = "t_never_registered"
+        self.assertIsNone(monster.species_key)
+        self.assertIsNone(monster.variant_key)
+        self.assertIsNone(monster.threat_tier)
+        # The registered pair is accepted variant-first and then reads derived.
+        monster.variant_key = ORDINARY.key
+        self.assertIsNone(monster.threat_tier)
+        monster.species_key = SPECIES_KEY
+        self.assertEqual(monster.threat_tier, ORDINARY.threat_tier)
+
+    def test_a_cross_species_pair_cannot_be_written(self):
+        species = make_monster_species(
+            "t_other_species", default_variant_key="t_other_variant"
+        )
+        variant = make_monster_variant("t_other_variant", species_key=species.key)
+        with (
+            patch(
+                "world.rules.monster_individual.MONSTER_SPECIES_REGISTRY",
+                {**SYNTH_MONSTER_SPECIES, species.key: species},
+            ),
+            patch(
+                "world.rules.monster_individual.MONSTER_VARIANT_REGISTRY",
+                {**SYNTH_MONSTER_VARIANTS, variant.key: variant},
+            ),
+        ):
+            monster = create_object(Monster, key="cross-species")
+            monster.variant_key = ORDINARY.key
+            with self.assertRaises(MonsterIdentityError):
+                monster.species_key = species.key
+            self.assertIsNone(monster.species_key)
+            self.assertIsNone(monster.threat_tier)
 
 
 if __name__ == "__main__":

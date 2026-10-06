@@ -33,23 +33,32 @@ behind.
 ### Requirement: Threat tier and individual danger resolve from the variant, never as independent truth
 For a species-backed individual, the threat tier and the individual danger grade SHALL resolve from the
 variant's registry record on every read. Assigning a threat tier that contradicts the individual's
-variant SHALL be rejected, and no stored attribute SHALL be permitted to hold a tier or danger grade
-that disagrees with the registry. Renaming a registry display string SHALL NOT change an individual's
+variant SHALL be rejected — the field is not independently editable truth, so the assignment is refused
+whether or not its value happens to agree with the variant — and no stored attribute SHALL be permitted
+to hold a tier or danger grade that disagrees with the registry. Renaming a registry display string SHALL NOT change an individual's
 identity, and editing registry data SHALL NOT silently rescale the traits of already-existing
 individuals. A tier-only individual — one whose owning caller has not adopted species identity — SHALL
 continue to resolve its tier from its existing tier field with unchanged behaviour.
 
 #### Scenario: A contradicting tier assignment is rejected
 - **WHEN** code attempts to set a species-backed individual's threat tier to a value different from its variant's registered tier
-- **THEN** the assignment raises a named error and the stored/derived tier remains the variant's value
+- **THEN** the assignment raises a named error and the stored/derived tier remains the variant's value,
+  and an assignment of the variant's own registered tier is rejected the same way
 
 #### Scenario: Registry edits do not rescale existing individuals
 - **WHEN** a variant's registered numeric profile or narrative text is edited after individuals exist
 - **THEN** those individuals' stored traits and resources are unchanged
 
+#### Scenario: A retired variant record degrades the derived read
+- **WHEN** a species-backed individual's variant key is no longer present in the registry
+- **THEN** its tier and danger grade read as the same optional absence a tier-only individual has,
+  rather than raising out of a read that rendering, examination, or combat depends on
+
 #### Scenario: Tier-only individuals are unaffected
 - **WHEN** a wilderness or scene-materialization caller creates a monster through the existing tier path with no species identity
-- **THEN** its tier and traits resolve exactly as they do today
+- **THEN** its tier and traits resolve exactly as they do today — the same value and the same trait set;
+  a tier-only individual that never receives a tier simply carries no stored tier attribute, which no
+  consumer reads
 
 ### Requirement: Individual numerics come only from approved sources, with no scaling and no baked multipliers
 A species-backed individual's stored combat configuration SHALL come from the variant's

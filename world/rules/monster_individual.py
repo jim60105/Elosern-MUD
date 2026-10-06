@@ -7,15 +7,22 @@ configuration through the existing trait path. ``world.lore`` stays read-only;
 this module is the mutation owner of the individual layer, so every spawn path
 (placement, quest provisioning) calls :func:`construct_species_individual`.
 
-Two boundaries are pinned here:
+Three boundaries are pinned here:
 
-* **Identity is never inferred** (requirement R1). A display name, an object key,
-  a threat tier, a quest role, or generative output never produces species
-  identity: only the two validated registry keys do.
+* **Identity is never inferred and never half-assigned** (requirement R1). Only
+  the two validated registry keys carry species identity, and they are written
+  through guarded attributes that accept one registered species/variant pair
+  (variant first), so a display name, an object key, a tier, a quest role, or
+  generative output can never produce identity, and no writer can leave an
+  individual with an identity no read could resolve.
 * **Derived truth is not editable** (requirement R2). ``threat_tier`` and
   ``danger_grade`` resolve from the variant record on every read, so nothing
   stores a copy that could drift away from the registry; a tier assignment on a
   species-backed individual is rejected instead.
+* **Reads never raise** — every consumer reads the tier as optional
+  (``getattr(entity, "threat_tier", None)``), so an identity that no longer
+  resolves (a retired variant record) degrades to the same optional value
+  instead of breaking rendering or combat for an unrelated surface.
 
 Construction emits one ``monster_individual_constructed`` boundary info event
 through the ``world.observability`` facade, naming the individual, species,
@@ -31,7 +38,7 @@ from world.lore.monster_species import (
     MONSTER_VARIANT_REGISTRY,
     MonsterVariant,
 )
-from world.observability import log_info, log_warn
+from world.observability import log_info
 from world.rules.traits import initial_trait_config_for_variant
 
 
@@ -52,28 +59,49 @@ class MonsterTierConflictError(MonsterIdentityError):
     """
 
 
+def _registered_variant(species_key: object, variant_key: object) -> MonsterVariant | None:
+    """The variant these keys name when the pair resolves, else ``None``.
+
+    The lenient half of the module's validation: the read path and the write
+    guards use it so an unresolvable identity can be reported or degraded
+    without raising from inside an ``at_get``.
+    """
+    if not isinstance(species_key, str) or not species_key:
+        return None
+    if not isinstance(variant_key, str) or not variant_key:
+        return None
+    if species_key not in MONSTER_SPECIES_REGISTRY:
+        return None
+    variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+    if variant is None or variant.species_key != species_key:
+        return None
+    return variant
+
+
 def resolve_variant(species_key: object, variant_key: object) -> MonsterVariant:
     """Return the registered variant this identity names, validated as a pair.
 
     Both keys must resolve in the shipped registries and the variant must belong
-    to the supplied species; anything else raises the named identity error, so no
-    caller can build (or read) an individual whose identity is half-resolved.
+    to the supplied species. The strict half of the module's validation: the
+    construction entry point uses it, so anything else raises the named identity
+    error and no individual is built from a half-resolved identity.
     """
+    variant = _registered_variant(species_key, variant_key)
+    if variant is not None:
+        return variant
     if not isinstance(species_key, str) or not species_key:
         raise MonsterIdentityError("species-backed monster has no species key")
-    if not isinstance(variant_key, str) or not variant_key:
-        raise MonsterIdentityError("species-backed monster has no variant key")
     if species_key not in MONSTER_SPECIES_REGISTRY:
         raise MonsterIdentityError(f"unknown monster species {species_key!r}")
-    variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
-    if variant is None:
+    if not isinstance(variant_key, str) or not variant_key:
+        raise MonsterIdentityError("species-backed monster has no variant key")
+    known = MONSTER_VARIANT_REGISTRY.get(variant_key)
+    if known is None:
         raise MonsterIdentityError(f"unknown monster variant {variant_key!r}")
-    if variant.species_key != species_key:
-        raise MonsterIdentityError(
-            f"monster variant {variant_key!r} belongs to species "
-            f"{variant.species_key!r}, not {species_key!r}"
-        )
-    return variant
+    raise MonsterIdentityError(
+        f"monster variant {variant_key!r} belongs to species "
+        f"{known.species_key!r}, not {species_key!r}"
+    )
 
 
 def resolve_individual_tier(individual: Any, stored_tier: object) -> Any:
@@ -82,10 +110,20 @@ def resolve_individual_tier(individual: Any, stored_tier: object) -> Any:
     A tier-only individual (no species identity) keeps the plain attribute, so
     wilderness and scene-materialization callers are untouched; a species-backed
     individual reads its variant's declared tier instead of any stored copy.
+
+    A read never raises. When the identity cannot resolve — a registry edit
+    retired the variant record, or a raw ``.db`` write left a pair this module
+    would not accept — the stored value is returned (``None`` for an
+    identity-bearing individual, which stores no tier), because every consumer
+    reads this attribute as optional and an unrelated surface must not break.
     """
-    if getattr(individual, "species_key", None) is None:
+    species_key = getattr(individual, "species_key", None)
+    if species_key is None:
         return stored_tier
-    return resolve_variant(individual.species_key, individual.variant_key).threat_tier
+    variant = _registered_variant(
+        species_key, getattr(individual, "variant_key", None)
+    )
+    return stored_tier if variant is None else variant.threat_tier
 
 
 def guard_individual_tier_write(individual: Any, value: object) -> None:
@@ -97,22 +135,68 @@ def guard_individual_tier_write(individual: Any, value: object) -> None:
     """
     if getattr(individual, "species_key", None) is None:
         return
-    variant = resolve_variant(individual.species_key, individual.variant_key)
-    raise MonsterTierConflictError(
-        f"monster tier {value!r} cannot be assigned: variant {variant.key!r} "
-        f"derives tier {variant.threat_tier!r} and stores no copy"
+    variant = _registered_variant(
+        individual.species_key, getattr(individual, "variant_key", None)
     )
+    derived = "its variant record" if variant is None else f"variant {variant.key!r}"
+    raise MonsterTierConflictError(
+        f"monster tier {value!r} cannot be assigned: {derived} derives this "
+        "individual's tier and stores no copy"
+    )
+
+
+def guard_individual_species_key_write(individual: Any, value: object) -> None:
+    """Reject a species key that cannot form one registered identity pair.
+
+    Identity is written variant-first (the construction entry point assigns
+    ``variant_key`` and then ``species_key``), so a species key is accepted only
+    when the individual already carries a variant of exactly that species: a
+    species key alone would be an identity no read could resolve.
+    """
+    if value is None:
+        return
+    if not isinstance(value, str) or value not in MONSTER_SPECIES_REGISTRY:
+        raise MonsterIdentityError(f"unknown monster species {value!r}")
+    variant_key = getattr(individual, "variant_key", None)
+    variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+    if variant is None or variant.species_key != value:
+        raise MonsterIdentityError(
+            f"species key {value!r} cannot pair with variant {variant_key!r}: "
+            "identity is written variant-first and must be one registered pair"
+        )
+
+
+def guard_individual_variant_key_write(individual: Any, value: object) -> None:
+    """Reject a variant key that does not resolve, or that contradicts the species key."""
+    if value is None:
+        return
+    if not isinstance(value, str) or value not in MONSTER_VARIANT_REGISTRY:
+        raise MonsterIdentityError(f"unknown monster variant {value!r}")
+    species_key = getattr(individual, "species_key", None)
+    if species_key is None:
+        return
+    variant = MONSTER_VARIANT_REGISTRY[value]
+    if variant.species_key != species_key:
+        raise MonsterIdentityError(
+            f"monster variant {value!r} belongs to species "
+            f"{variant.species_key!r}, not {species_key!r}"
+        )
 
 
 def individual_danger_grade(individual: Any) -> str | None:
     """Return the individual's danger grade, resolved from its variant record.
 
-    A tier-only individual carries no grade: the tier registry documents none,
-    and nothing stores one that could disagree with the registry.
+    A tier-only individual carries no grade — the tier registry documents none,
+    and nothing stores one that could disagree — and an identity that no longer
+    resolves degrades to ``None`` for the same no-raising reason as the tier.
     """
-    if getattr(individual, "species_key", None) is None:
+    species_key = getattr(individual, "species_key", None)
+    if species_key is None:
         return None
-    return resolve_variant(individual.species_key, individual.variant_key).danger_grade
+    variant = _registered_variant(
+        species_key, getattr(individual, "variant_key", None)
+    )
+    return None if variant is None else variant.danger_grade
 
 
 def construct_species_individual(
@@ -132,10 +216,12 @@ def construct_species_individual(
     declared tier band.
 
     Validation (species/variant keys, their membership, and the resolved numeric
-    source) completes before anything is persisted, so a rejected construction
-    leaves no partially built individual behind. Call this inside the caller's
-    ``transaction.atomic()`` — that transaction is the real rollback boundary;
-    a failure after the row is written compensates by deleting it.
+    source) completes before anything is persisted, and the create/assign/apply
+    sequence runs inside its own ``transaction.atomic()`` block, so a failure at
+    any point — including inside Evennia's own creation hooks — leaves no
+    partially built individual behind and surfaces as the named construction
+    error. A caller wrapping this in a larger transaction still governs the final
+    commit; the boundary event is scheduled on that commit.
     """
     try:
         variant = resolve_variant(species_key, variant_key)
@@ -145,47 +231,26 @@ def construct_species_individual(
             f"cannot construct variant {variant_key!r} of species {species_key!r}"
         ) from error
 
+    from django.db import transaction
     from evennia.utils.create import create_object
     from typeclasses.monsters import Monster
 
-    individual = create_object(
-        Monster, key=key if key is not None else variant.display_name_zh
-    )
     try:
-        individual.species_key = species_key
-        individual.variant_key = variant_key
-        individual._apply_trait_config(config)
+        with transaction.atomic():
+            individual = create_object(
+                Monster, key=key if key is not None else variant.display_name_zh
+            )
+            individual.variant_key = variant_key
+            individual.species_key = species_key
+            individual._apply_trait_config(config)
     except Exception as error:
-        _discard_individual(individual, species_key, variant_key)
         raise MonsterConstructionError(
-            f"failed to apply the combat configuration for variant {variant_key!r}"
+            f"failed to build variant {variant_key!r} of species {species_key!r}"
         ) from error
-    _schedule_construction_event(individual.pk, species_key, variant_key, numeric_source)
+    _schedule_construction_event(
+        individual.pk, species_key, variant_key, numeric_source
+    )
     return individual
-
-
-def _discard_individual(
-    individual: Any, species_key: str, variant_key: str
-) -> None:
-    """Compensate a failed construction by deleting the freshly created row.
-
-    Deletion can itself fail (a vetoing delete hook, a concurrent removal); that
-    must never mask the construction failure, so it is reported through the
-    facade and contained here — the caller's transaction remains the rollback
-    boundary for any residue.
-    """
-    try:
-        individual.delete()
-    except Exception as error:  # noqa: BLE001 - contained compensate step, logged below
-        log_warn(
-            "monster_individual_discard_failed",
-            exc=error,
-            context={
-                "individual": getattr(individual, "pk", None),
-                "species": species_key,
-                "variant": variant_key,
-            },
-        )
 
 
 def _schedule_construction_event(

@@ -72,8 +72,9 @@ prerequisite in the proposal.
 
 ## Implementation Dispositions
 
-The pre-implementation review of this plan raised findings that changed what
-landed; every one is folded into the implementation, not deferred:
+Two review rounds ran against this change — one on the plan, one on the finished
+diff. Every finding either changed the implementation or is recorded here as an
+explicit disposition; none was left implicit:
 
 - **Both registry references are validated.** `resolve_variant` checks the
   species registry *and* the variant registry before the cross-species check: the
@@ -88,6 +89,11 @@ landed; every one is folded into the implementation, not deferred:
   therefore assigns identity only. The rejected write raises
   `MonsterTierConflictError`; every construction failure raises
   `MonsterConstructionError`, so one named family covers the whole entry point.
+  `autocreate=False` is what makes the no-copy rule structural — with Evennia's
+  default autocreation the object-creation path would store a `None` tier that
+  survives into species-backed state — and it is the one deliberate, documented
+  delta on the tier-only path (a never-assigned tier-only individual carries no
+  stored attribute; its tier still resolves to `None`).
 - **The boundary event fires on durable commit** (`transaction.on_commit`, the
   existing rules-boundary contract), so a construction rolled back with its
   caller leaves no log fiction. It is emitted for both numeric sources with
@@ -97,3 +103,16 @@ landed; every one is folded into the implementation, not deferred:
   (identity is never inferred from it), and the band position.
 - **`apply_monster_tier` refuses a species-backed individual**, so the tier path
   can never silently overwrite an approved profile.
+- **Identity writes are guarded, not conventional.** `species_key`/`variant_key`
+  are validated on write (one registered pair, written variant-first), so a
+  half-assigned or mismatched identity cannot be entered through the class API at
+  all — the validated entry point is the only writer that produces a complete
+  identity.
+- **Derived reads never raise.** A variant record retired from the registry
+  degrades the tier and danger-grade reads to the same optional absence a
+  tier-only individual has, instead of raising out of a read that rendering,
+  examination, and combat depend on (the tier is read as optional at ~66 sites).
+- **The create/assign/apply sequence is one atomic block of its own.** A failure
+  anywhere in it — including inside Evennia's creation hooks — leaves no row
+  behind and surfaces as the named construction error, rather than relying on the
+  caller's transaction for the no-half-built-individual guarantee.

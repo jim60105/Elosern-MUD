@@ -10,6 +10,8 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
+from django.db import transaction
+
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -153,6 +155,50 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
                 construct_species_individual(SPECIES, ORDINARY)
         self.assertEqual(_object_count(), before)
         self.assertEqual(info.call_count, 0)
+
+    def test_a_creation_failure_surfaces_as_the_named_construction_error(self):
+        before = _object_count()
+        with (
+            patch(
+                "evennia.utils.create.create_object",
+                side_effect=RuntimeError("creation hook failed"),
+            ),
+            patch("world.rules.monster_individual.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with self.assertRaises(MonsterConstructionError):
+                construct_species_individual(SPECIES, ORDINARY)
+        self.assertEqual(_object_count(), before)
+        self.assertEqual(info.call_count, 0)
+
+    def test_a_rolled_back_construction_leaves_no_row_and_no_event(self):
+        before = _object_count()
+        with (
+            patch("world.rules.monster_individual.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with transaction.atomic():
+                individual = construct_species_individual(SPECIES, ORDINARY)
+                self.assertIsNotNone(individual.pk)
+                transaction.set_rollback(True)
+        # The construction boundary records a durable commit, so a rollback
+        # leaves neither the individual nor a log line for it.
+        self.assertEqual(_object_count(), before)
+        self.assertEqual(info.call_count, 0)
+
+    def test_a_retired_variant_record_degrades_the_reads(self):
+        individual = construct_species_individual(SPECIES, ORDINARY)
+        before = _stored_values(individual)
+        with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", {}):
+            # A read must not raise out of the surfaces that render, examine, or
+            # attack this individual: the derived values become the same optional
+            # absence a tier-only individual carries.
+            self.assertIsNone(individual.threat_tier)
+            self.assertIsNone(individual.danger_grade)
+            self.assertEqual(str(individual.key), ORDINARY_ROW.display_name_zh)
+            self.assertEqual(_stored_values(individual), before)
+        # The identity keys survive, so a registry repair restores the reads.
+        self.assertEqual(individual.threat_tier, TIER)
 
     def test_the_interim_source_is_the_declared_tier_band_literally(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
