@@ -26,11 +26,12 @@ TRAIT_KEYS = GAUGE_KEYS + STATIC_KEYS + COUNTER_KEYS
 
 #: The numeric sources a species-backed individual's configuration may come
 #: from (monster-data-model design D-I3). ``approved_profile`` means the variant
-#: carried a balance-approved complete profile; ``interim_tier_band`` means the
-#: only currently approved source was used — the existing tier-band construction
-#: at the variant's declared tier. The construction boundary event records which
-#: one built an individual, so the interim rule is never mistaken for balance
-#: truth, and a later approved profile replaces it without a schema change.
+#: carried a balance-approved complete profile; ``interim_tier_band`` means no
+#: approved profile existed and the sanctioned fallback was used — the existing
+#: tier-band construction at the variant's declared tier. The construction
+#: boundary event records which one built an individual, so the fallback is
+#: never mistaken for balance truth, and a later approved profile replaces it
+#: without a schema change.
 NUMERIC_SOURCE_APPROVED_PROFILE = "approved_profile"
 NUMERIC_SOURCE_INTERIM_TIER_BAND = "interim_tier_band"
 
@@ -216,13 +217,13 @@ def initial_trait_config_for_variant(
     """Resolve one species-backed individual's stored configuration and its source.
 
     The variant's balance-approved complete profile is used literally when one
-    exists; while none does, the existing threat-tier band construction runs at
-    the variant's declared tier — the interim rule and the only currently
-    approved numeric source — and the returned ``numeric_source`` names which
-    rule was used. A flavour-sounding name or description never contributes a
-    number: the tier band's zero MP/SP and its documented ``magic_power`` band
-    are used exactly as they are, and ``guild_merit`` keeps the value the tier
-    path already builds (it belongs to no profile).
+    exists (every shipped first-batch variant carries one); while none does, the
+    existing threat-tier band construction runs at the variant's declared tier —
+    the sanctioned interim fallback — and the returned ``numeric_source`` names
+    which rule was used. A flavour-sounding name or description never
+    contributes a number: the tier band's zero MP/SP and its documented
+    ``magic_power`` band are used exactly as they are, and ``guild_merit`` keeps
+    the value the tier path already builds (it belongs to no profile).
 
     The signature takes no player, level, clock, or progression input, so no
     scaling can be threaded through this surface, and no skill multiplier is

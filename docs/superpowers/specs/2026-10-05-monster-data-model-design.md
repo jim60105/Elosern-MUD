@@ -157,3 +157,23 @@
 **共用檔衝突。**`world/lore/sync.py` 與 `world/lore/__init__.py` 由 `monster-species-registry` 與 `monster-site-placement` 相續修改；`world/quests/planner.py` 及其測試由 `monster-identity-construction`（計數身分去重）先行、`monster-quest-objectives`（變體選擇器匹配）其後，`world/quests/runtime.py`（`counted_defeat_ids`）與 `world/quests/compile/` 載體驗證器亦屬此兩提案依序接續的範圍；`world/art/subjects.py`、`world/art/presenter.py`、`world/rules/art_view.py` 為 `species-portrait-identity` 與美術提案共用，須在 `official-content-provenance` 與 `official-art-resolution-contracts` 之後落地；`.github/evennia-shards.json` 為全部提案共用，逐次落地。
 
 **建議平行批次排程。**真正獨立、可立即並行啟動的兩條線：魔物線自 `monster-species-registry` 起，美術線自無依賴的 `official-artwork-catalog` 與 `builtin-silhouette-stage-fallback` 起，兩線檔案互不相犯。有依賴、須依序落地：魔物線四提案依上述單鏈，美術線 `official-artwork-catalog`→`official-content-provenance`→`official-art-resolution-contracts`→`official-art-personalization`（`official-artwork-deployment` 掛在 catalog 之後即可）。無依賴但相互衝突、須序列化：`builtin-silhouette-stage-fallback` 與 `official-art-resolution-contracts` 共用 presenter 與 origin 詞彙（前者先落地建立詞彙，後者再擴展）。兩線收斂點：`species-portrait-identity` 於兩線前置（登錄表與 provenance／resolution 兩提案）都落地後可與 `monster-quest-objectives` 並行；其餘排程以各提案 proposal 的 Batch 節為準。
+
+### 平衡核准落地（2026-10-06）
+
+本節於平衡核准後追加，不修改上文任何已核准邊界與使用邊界。
+
+§8 外部前置條件（一）「使用者平衡核准」——各變體完整能力數值（HP、MP、SP、物理戰鬥力、敏捷、
+防禦、魔力）與最終公會危險評級——已於 2026-10-06 由使用者核准，範圍限於首批十二個變體，以及據此
+發布的正式狩獵委託。核准數值逐字登錄於 `world/lore/monster_species.py` 的變體登錄
+（`monster-balance-profiles`），並由登錄建構期不變式檢查落在該變體宣告的層級區間內。
+
+核准判準（設計理由，非再次推導）：每個數值都落在該變體宣告的層級區間；普通變體取該層級
+`guild_rank_range` 下緣、較強變體取上緣；低階 HP 取區間下緣，因為創造預算角色的單次傷害面對
+防禦 3–8 很小；中階數值調整為創造預算角色只能微量削血（防禦 12–20 對上該角色的攻擊），這正是
+「一支普通冒險者隊伍」的意思；MP、SP 與 `magic_power` 維持 0，因為魔物魔法在任何地方都沒有文件，
+每個層級的魔法區間刻意為 `(0,0)`，而六項特殊能力尚無可執行機制，資源池沒有消費者。
+
+（一）的剩餘部分——據此發布含數值的正式狩獵委託——由 `monster-regional-species-hunts`（四個有環境
+配置地區的區域狩獵）與 `monster-site-clear-out-hunts`（三處明訂據點的綁定清剿）承接；東南海岸沒有
+環境配置，因此不發布區域狩獵。個體危險評級不會成為任何委託的階級。前置條件（二）特殊能力機制與
+（三）官方圖片套裝維持未滿足。
