@@ -147,7 +147,7 @@ brainstorming pass before its OpenSpec change.
 | --- | --- |
 | `GET /gm/` and `GET /gm/<path:rest>` | Serve the SPA shell template (client-side history routing). `rest` never matches the `api/` prefix. |
 | `GET /gm/api/session` | Current operator: account name, permission level, server time, game version. |
-| `GET /gm/api/health` | Skeleton health: Django responding, database readable. S2 extends this. |
+| `GET /gm/api/health` | Skeleton health: Django responding, database readable. S2 folds this into `/gm/api/dashboard` and removes it. |
 
 S1 adds only these endpoints. Data endpoints belong to later sub-projects.
 Unknown `/gm/api/*` paths return the JSON error envelope with `404`, not the
@@ -267,16 +267,11 @@ SPA shell.
 
 ### S2 Operations dashboard
 
-- Service connectivity via `world/art/connectivity.py` probes (SD, translator,
-  cutout) plus LLM profile endpoint probes.
-- Art queue counts and lists from `world/art/queue.py`.
-- World: clock tick and in-game time, connected sessions, active combats and
-  instances.
-- Recent errors.
-- Polling refresh; no websocket.
-- Decision deferred to S2: the queryable source for LLM call statistics and
-  recent errors (in-memory ring buffer, log-file parsing, or a database
-  table). Events are currently only written to log files.
+Designed in `docs/superpowers/specs/2026-10-06-gm-portal-s2-dashboard-design.md`
+and split into S2a (LLM transcript log and the repeal of the
+no-prose-in-logs rule) and S2b (the dashboard, fed by an in-memory
+recent-event buffer and the transcript). LLM health is passive, derived from
+recent calls; no endpoint probes are sent.
 
 ### S3 Runtime state inspection
 
