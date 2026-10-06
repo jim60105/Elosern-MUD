@@ -12,6 +12,14 @@ authored ambient placement covers. Numbers and narrative are literals — each
 value is the approved value transcribed verbatim, never re-derived, re-tuned,
 or interpolated from a display name, a threat tier, another definition, or a
 variant's individual danger grade.
+
+The bound site clear-outs below are the approved published content of
+``monster-site-clear-out-hunts`` (the same approval): each names one authored
+site, binds exactly that site's own living individuals as its targets, and
+carries its own authored rank, rationale, flavor, and rank-banded reward. They
+are the hand-written half of the objective vocabulary — the compile boundary
+never authors a site key — and their prose states the local conflict at the site
+rather than an effect of an ability that has no executable mechanics.
 """
 
 from .definitions import (
@@ -224,9 +232,109 @@ REGIONAL_SPECIES_HUNTS: tuple[QuestDefinition, ...] = (
     ),
 )
 
+#: The approved bound site clear-outs (``monster-site-clear-out-hunts``).
+#: Each objective is a DEFEAT stage declaring ``requires_bound_targets=True``
+#: plus the key of one authored site, so acceptance binds that site's own living
+#: individuals — the site is a source, never a spawn — and its quantity never
+#: exceeds the site's authored capacity.
+#: Ranks are authored from the arrangement, exactly as the hunts' are: the
+#: recurrable camp and the single sheltered boss site stay ``D`` although their
+#: strongest individual is danger-graded ``C``, so the shipped content again
+#: demonstrates that a grade never supplies a rank. The one-shot nest is ``E``:
+#: a low-tier bound pair, including the stronger guard, in a narrow entrance.
+#: No published rationale or flavor asserts an effect of one of the six approved
+#: special abilities, none of which has executable mechanics; each states the
+#: composition and terrain instead (the crocodile's flavor names the berth
+#: conflict rather than the bestiary example's drain symptom, and the goat's
+#: rationale describes narrow loose-scree terrain rather than rockfall). No
+#: clear-out carries a deadline, and the three below are the only definitions
+#: that declare each of their sites.
+SITE_CLEAR_OUTS: tuple[QuestDefinition, ...] = (
+    QuestDefinition(
+        key="ridge_burrow_nest_clear_out",
+        display_name="清剿掘巢兔巢穴",
+        quest_type=QuestType.DEFEAT,
+        rank="E",
+        stages=(
+            QuestStage(
+                index=0,
+                objective=QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=2,
+                    requires_bound_targets=True,
+                    site_key="ridge_burrow_nest",
+                ),
+            ),
+        ),
+        deadline_hours=None,
+        rating_rationale_zh=(
+            "據點入口狹窄，較強個體會擋在通道上；兩隻綁定目標必須一次清除，"
+            "洞道又妨礙隊伍輪替。"
+        ),
+        background_flavor_zh=(
+            "谷地的灌溉渠岸出現一整片加固過的土埂，渠水已被堵住。"
+            "公會受託一次清出這個巢穴，讓下游恢復供水。"
+        ),
+    ),
+    QuestDefinition(
+        key="cliff_echo_camp_clear_out",
+        display_name="掃蕩回聲崖營地",
+        quest_type=QuestType.DEFEAT,
+        rank="D",
+        stages=(
+            QuestStage(
+                index=0,
+                objective=QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=2,
+                    requires_bound_targets=True,
+                    site_key="cliff_echo_camp",
+                ),
+            ),
+        ),
+        deadline_hours=None,
+        rating_rationale_zh=(
+            "岩坡入口的營地，兩隻中階個體會守住通道；坡面狹窄、碎石鬆動，"
+            "隊伍只能沿單側接近，撤退也不容易。"
+        ),
+        background_flavor_zh=(
+            "採石場上方的營地再度聚集岩響山羊，運料路每天都有人被趕下山坡。"
+            "業主請公會一次掃蕩整座營地。"
+        ),
+    ),
+    QuestDefinition(
+        key="tide_mouth_boss_site_clear_out",
+        display_name="清剿河口守灣鱷",
+        quest_type=QuestType.DEFEAT,
+        rank="D",
+        stages=(
+            QuestStage(
+                index=0,
+                objective=QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=1,
+                    requires_bound_targets=True,
+                    site_key="tide_mouth_boss_site",
+                ),
+            ),
+        ),
+        deadline_hours=None,
+        rating_rationale_zh=(
+            "單一個體，但佔據有遮蔽的泊岸入口；水深妨礙長兵器展開，"
+            "近身纏鬥的風險集中在一次交手。"
+        ),
+        background_flavor_zh=(
+            "河口渡運站的側灣出現吞潮鱷，船員已停用該泊位。"
+            "渡運站請公會清出這條水道，讓貨船重新靠岸。"
+        ),
+    ),
+)
+
+
 QUEST_CATALOG: tuple[QuestDefinition, ...] = (
     INTRODUCTORY_HUNT,
     *REGIONAL_SPECIES_HUNTS,
+    *SITE_CLEAR_OUTS,
 )
 
 

@@ -20,7 +20,9 @@ merit_thresholds:
 # The six regional species hunts below are the approved published commissions of
 # `monster-regional-species-hunts`; their copper sits inside the rank's own band
 # (F 10-100, E 100-500, D 500-5000) and their merit is authored per rank, inside
-# the span to the next rank's examination threshold.
+# the span to the next rank's examination threshold. The three bound site
+# clear-outs of `monster-site-clear-out-hunts` follow the same rules and carry no
+# item: monster loot is the monster side's business, not a commission's.
 quest_rewards:
   - definition_key: introductory_hunt
     reward:
@@ -59,6 +61,21 @@ quest_rewards:
       copper: 1100
       items: []
       merit: 120
+  - definition_key: ridge_burrow_nest_clear_out
+    reward:
+      copper: 250
+      items: []
+      merit: 60
+  - definition_key: cliff_echo_camp_clear_out
+    reward:
+      copper: 1400
+      items: []
+      merit: 140
+  - definition_key: tide_mouth_boss_site_clear_out
+    reward:
+      copper: 1800
+      items: []
+      merit: 160
 
 # Guild examination opponent profiles, keyed by the target rank. Physical stats
 # must lie inside the required StaticTier band and every skill key must exist.
