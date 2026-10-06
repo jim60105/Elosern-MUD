@@ -27,10 +27,12 @@ acts on a site-, quest-, story-, session-, or foreign-owned monster.
 """
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from django.db import transaction
 from evennia.utils.create import create_object
 
 from world.observability import log_info, log_warn
@@ -128,6 +130,17 @@ def population_for_coordinates(x: int, y: int) -> MonsterPopulation | None:
 def _population_key(x: int, y: int) -> str:
     """Return the ownership marker this service stamps on every created monster."""
     return f"wilderness:{x}:{y}"
+
+
+def _emit_ambient(event: str, context: Mapping[str, object]) -> None:
+    """Schedule one ambient decision event on the enclosing durable commit.
+
+    Room preparation runs inside transactional movement, so a boundary line for
+    a placement that the transaction then rolled back must never be written
+    (the same commit contract ``clock_advance`` follows).
+    """
+    frozen = dict(context)
+    transaction.on_commit(lambda: log_info(event, context=frozen))
 
 
 def species_rule_for_coordinates(x: int, y: int) -> AmbientPlacementRule | None:
@@ -316,9 +329,9 @@ def _reconcile_ambient_species(
             continue
         reason = "dead" if monster.species_key else "branch_migration"
         _remove_monster(wilderness, monster)
-        log_info(
+        _emit_ambient(
             "monster_ambient_removed",
-            context={
+            {
                 "region": rule.region_key,
                 "coordinate": coordinates,
                 "species": monster.species_key,
@@ -332,7 +345,12 @@ def _reconcile_ambient_species(
         ambient_variant_for_slot(rule, x, y, slot) for slot in range(target)
     )
     deficit = expected - Counter(monster.variant_key for monster in living)
-    budget = max(0, rule.capacity - len(living))
+    # Both authored numbers are ceilings: the quantity is the population this
+    # coordinate maintains and the capacity the hard bound, so a living
+    # individual outside the selected variant multiset (an authoring change
+    # after it was placed) is preserved without letting the pass add past the
+    # authored quantity.
+    budget = max(0, target - len(living))
     for variant_key in sorted(deficit):
         for _ in range(deficit[variant_key]):
             if budget <= 0:
@@ -341,9 +359,9 @@ def _reconcile_ambient_species(
                 wilderness, coordinates, variant_key, population_key
             )
             budget -= 1
-            log_info(
+            _emit_ambient(
                 "monster_ambient_placed",
-                context={
+                {
                     "region": rule.region_key,
                     "coordinate": coordinates,
                     "species": individual.species_key,

@@ -143,6 +143,7 @@ def _restore_round_touched(
 ) -> None:
     """Restore every snapshotted surface after a rolled-back round."""
     from world.rules.action import _restore_attribute
+    from world.rules.clock import _flush_rolled_back_instances
 
     for obj, surfaces, snapshot in touched:
         _restore_touched_best_effort(obj, snapshot, surfaces)
@@ -154,3 +155,6 @@ def _restore_round_touched(
 
         restore_membership_surfaces(actor, party_before, members_before)
         restore_relations_surfaces(relations_before)
+    # A round's advance can populate a monster site; the rolled-back rows leave
+    # no snapshot behind, so evict their cached instances last.
+    _flush_rolled_back_instances()

@@ -275,6 +275,30 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     # -- recovery -----------------------------------------------------------
 
+    def test_an_active_combat_session_defers_the_clearing_decision(self):
+        from world.rules.combat_session import engage
+
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self._settle()
+        members = _members(self.wilderness, self.sites[NEST_KEY])
+        engage(self.char1, members[0])
+        for member in members:
+            member.traits.hp.current = 0
+
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        self.assertEqual(
+            site_state(NEST_KEY, wilderness=self.wilderness).state,
+            SITE_STATE_POPULATED,
+            "a committed session still owns this defeat",
+        )
+
+        self.char1.db.active_combat = None
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        state = site_state(NEST_KEY, wilderness=self.wilderness)
+        self.assertEqual(state.state, SITE_STATE_CLEARED)
+        self.assertEqual(state.cleared_at_tick, 120)
+
     def test_a_recoverable_site_recovers_at_its_condition_with_fresh_identities(self):
         self._settle()
         defeated = self._defeat(self.sites[CAMP_KEY])
@@ -290,6 +314,14 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             SITE_STATE_CLEARED,
         )
         self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
+        # Re-entering the room before the condition matures recovers nothing.
+        self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
+        sync_wilderness()
+        self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
+        self.assertEqual(
+            site_state(CAMP_KEY, wilderness=self.wilderness).state,
+            SITE_STATE_CLEARED,
+        )
 
         tick = self.clock.tick + 1800
         with (
@@ -492,6 +524,54 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(
             {member.pk: member.db.site_key for member in members}, markers_before
         )
+
+    @covers_requirement(
+        "world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities"
+    )
+    def test_a_failure_after_the_state_write_restores_it_and_evicts_the_created_individuals(self):
+        created: list[Monster] = []
+        real_construct = construct_species_individual
+
+        def recording(species_key, variant_key, **kwargs):
+            individual = real_construct(species_key, variant_key, **kwargs)
+            created.append(individual)
+            return individual
+
+        states_before = self.wilderness.db.monster_sites
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+
+        def boom(tick):
+            raise RuntimeError("injected tick persistence failure")
+
+        with (
+            patch(
+                "world.maps.monster_sites.construct_species_individual",
+                side_effect=recording,
+            ),
+            patch.object(self.clock, "_persist", side_effect=boom),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.clock.advance(60, AdvanceSource.SKIP, [])
+
+        self.assertTrue(created)
+        # The whole-value per-site state write happened before the failure, so
+        # the declared contract is what puts it back.
+        self.assertEqual(self.wilderness.db.monster_sites, states_before)
+        self.assertEqual(
+            dict(self.wilderness.db.itemcoordinates), coordinates_before
+        )
+        for individual in created:
+            self.assertFalse(ObjectDB.objects.filter(pk=individual.pk).exists())
+            self.assertNotIn(individual.pk, ObjectDB.__instance_cache__)
+        # A retry still populates every site normally, with fresh rows.
+        self._settle()
+        for key, site in self.sites.items():
+            with self.subTest(site=key):
+                self.assertEqual(len(_members(self.wilderness, site)), site.capacity)
+                self.assertEqual(
+                    site_state(key, wilderness=self.wilderness).state,
+                    SITE_STATE_POPULATED,
+                )
 
     @covers_requirement(
         "world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities"

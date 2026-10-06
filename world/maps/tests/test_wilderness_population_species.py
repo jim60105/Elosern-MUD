@@ -203,6 +203,37 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         after = sorted(member.pk for member in _species_members(self.wilderness, PROBE))
         self.assertEqual(after, before)
 
+    def test_a_living_drifted_individual_still_bounds_the_pass_by_quantity(self):
+        # An authoring change can leave a living owned individual outside the
+        # selected variant multiset. It is preserved, and the authored quantity
+        # is still a ceiling: the pass adds nothing to exceed it, even though
+        # the capacity alone would allow one more.
+        narrow = AmbientPlacementRule(self.region, (ORDINARY,), 1, 2)
+        self.enterContext(
+            synthetic_registries(
+                "ambient_placements",
+                extra={"ambient_placements": {self.region: narrow}},
+            )
+        )
+        # One living owned individual, whose variant the narrowed rule no
+        # longer selects.
+        members = _species_members(self.wilderness, PROBE)
+        spare = members[1]
+        self.wilderness.db.itemcoordinates.pop(spare, None)
+        spare.delete()
+        drifted = members[0]
+        drifted.variant_key = STRONGER
+        drifted.species_key = variant_species_key(STRONGER)
+        before = sorted(
+            member.pk for member in _species_members(self.wilderness, PROBE)
+        )
+        self.assertEqual(len(before), 1)
+
+        ensure_population(self.wilderness, PROBE)
+
+        after = sorted(member.pk for member in _species_members(self.wilderness, PROBE))
+        self.assertEqual(after, before)
+
     # -- determinism --------------------------------------------------------
 
     @covers_requirement(

@@ -27,6 +27,7 @@ from world.rules.clock import (
     ScheduledEvent,
     WorldClock,
     _flush_deleted_instance,
+    _flush_rolled_back_instances,
     _refresh_advance_entity_caches,
     _restore_advance_location,
     _restore_clock_tick,
@@ -200,11 +201,16 @@ def _cached_db_instances() -> Iterable[Any]:
     The registry's discovery queries populate this cache before the snapshot
     resolves contract-discovered objects into the settlement entries, so
     restore never needs to re-query: the very instances the contract touched
-    are the ones restored, exactly like the sibling's restore step.
+    are the ones restored, exactly like the sibling's restore step. Scripts are
+    included because a declared surface may live on either idmapper model (the
+    wilderness script carries the monster-site lifecycle state).
     """
     from evennia.objects.models import ObjectDB
+    from evennia.scripts.models import ScriptDB
 
-    return ObjectDB.get_all_cached_instances()
+    return tuple(ObjectDB.get_all_cached_instances()) + tuple(
+        ScriptDB.get_all_cached_instances()
+    )
 
 
 def _restore_attribute_direct(
@@ -285,6 +291,10 @@ def _restore_settlement_state(
     for entry in snapshot.objects.values():
         if entry.refresh_caches:
             _refresh_advance_entity_caches(entry.obj)
+    # Instances the rolled-back transaction created (a nested clock advance may
+    # populate a monster site) have no pre-action snapshot: evict them last, so
+    # a later row that reuses one of their primary keys is served fresh.
+    _flush_rolled_back_instances()
 
 
 @dataclass(frozen=True)
