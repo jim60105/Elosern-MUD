@@ -14,7 +14,7 @@ design doc §6.5's four built stages plus
 `instance_reclamation` as the final stage), and SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
 
-#### Scenario: The stage order is exactly the fixed sequence, including practice_settlement, instance_reclamation, and monster_site_lifecycle
+#### Scenario: The stage order is exactly the fixed sequence, including practice_settlement and instance_reclamation
 - **WHEN** the settlement stage sequence is inspected
 - **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "practice_settlement", "daily_resets",
   "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "correspondence_delivery",
