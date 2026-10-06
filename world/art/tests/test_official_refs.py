@@ -189,6 +189,13 @@ def _monster_kind_reference_sites(tree: ast.Module) -> list[tuple[str, str]]:
     the vocabulary's monster-kind literal or the ``OFFICIAL_KIND_MONSTER``
     name/attribute. Comparisons and container literals are not call sites, and
     the call's innermost enclosing function is what a site is attributed to.
+
+    This is a static tripwire over the fixed reference-callee set, not a
+    runtime guarantee: a producer whose kind is computed before the call (a
+    local variable, a tuple index, a lookup) is invisible to it, and nothing
+    here prevents a second producer from being written. It exists so that any
+    NEW textual use of the monster kind on the reference path has to be
+    deliberate — the paired behavioral evidence is the species arm's own tests.
     """
     monster_kind = OFFICIAL_CONTENT_KINDS[0]
     owners: dict[int, str] = {}
@@ -660,10 +667,12 @@ class MonsterBoundaryTests(unittest.TestCase):
             self.assertIsNone(official_content_reference_for_entity(entity))
         self.assertEqual(_unresolved_events(logged), [])
 
-    @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
-    )
-    def test_no_production_module_constructs_a_monster_reference(self):
+    def test_no_production_module_constructs_a_monster_reference_from_a_literal_kind(self):
+        # Structural guard for the producer's shape, not a zero-producer claim:
+        # the species arm reaches the constructor through ``_declared_reference``
+        # with a VARIABLE kind, so a direct monster-kind construction anywhere
+        # in production is what this scan refuses (it would bypass the shared
+        # registry-membership check and the bounded diagnostic).
         violations: list[str] = []
         scanned = 0
         for path in _production_module_paths():
@@ -676,7 +685,9 @@ class MonsterBoundaryTests(unittest.TestCase):
             )
         self.assertGreater(scanned, 50)
         self.assertEqual(
-            violations, [], f"production module constructs a monster reference: {violations}"
+            violations,
+            [],
+            f"production module constructs a monster reference directly: {violations}",
         )
 
     def test_the_scan_detects_a_planted_monster_reference(self):

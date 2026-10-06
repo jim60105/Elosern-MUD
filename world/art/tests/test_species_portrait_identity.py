@@ -309,7 +309,18 @@ class SpeciesSubjectVocabularyTests(unittest.TestCase):
 
 
 class SpeciesPortraitChainTests(EvenniaTestCase):
-    """The chain's existing official-default step, now reachable for monsters."""
+    """The chain's existing official-default step, now reachable for monsters.
+
+    Scope note, asserted rather than assumed: the official default is the
+    presented figure whenever no runtime card image exists for the subject
+    (``resolve_display`` steps 1-4 validate a card's stored image before it can
+    outrank official, and every test here starts with an empty gallery), and a
+    generated card image still outranks it — the chain's documented ordering.
+    The personal preferences are written through the gallery API's own writers
+    (``set_official_selection``/``set_official_geometry``), which are
+    subject-keyed; exposing them to a client for a registry-keyed monster
+    subject belongs to the gallery rail/action surface, not to this change.
+    """
 
     def setUp(self):
         open_synthetic_scope(self, "monster_species", "monster_tiers")
@@ -369,12 +380,28 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
 
     def _state(self, monster: Monster) -> tuple:
-        """One monster's observable state, for a before/after pin."""
+        """One monster's observable state, for a before/after pin.
+
+        The gallery records are pinned by CONTENT, not only by count, so a
+        mutation of an existing record could not hide behind an unchanged row
+        count.
+        """
         return (
             str(monster.pk),
             str(monster.threat_tier),
             str(monster.attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)),
-            GalleryRecord.objects.count(),
+            tuple(
+                sorted(
+                    (
+                        str(record.db_key),
+                        repr(record.db.official_selection),
+                        repr(record.db.official_geometry),
+                        repr(record.db.default_image_id),
+                        repr(record.db.cards),
+                    )
+                    for record in GalleryRecord.objects.all()
+                )
+            ),
             ArtAssetRecord.objects.count(),
             self._tree(self.store),
             self._tree(self.official_root),
@@ -455,6 +482,10 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
 
     def test_a_tier_named_monster_directory_is_indexed_but_unreachable(self):
         # An operator error: a content directory named after a threat tier.
+        # The catalog still indexes it — membership checking at ADMISSION for
+        # the monster kind is the catalog change's pending work — while the
+        # reference layer never admits the tier as a species key, so nothing
+        # presents those bytes.
         tier_identity = self._index(_SYNTH_TIER, face_rect=dict(_OFFICIAL_RECT))
         self.assertIsNotNone(current_catalog().content(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
         monster = self._monster()
@@ -515,6 +546,26 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             payload["url"], current_catalog().url_for(f"{OFFICIAL_KIND_MONSTER}/{_SYNTH_SPECIES}/a.png")
         )
         self.assertNotIn(foreign_identity, json.dumps(payload, sort_keys=True))
+
+    def test_a_personal_selection_inside_the_species_reference_presents_for_a_monster(self):
+        # The personal layer's positive path, through the gallery API's own
+        # subject-keyed writers: a choice INSIDE the individual's reference
+        # replaces the catalog default, the same way it does for a character.
+        default_identity = self._index(
+            _SYNTH_SPECIES, name="a.png", face_rect=dict(_OFFICIAL_RECT)
+        )
+        chosen_identity = self._index(
+            _SYNTH_SPECIES, name="b.png", face_rect=dict(_OFFICIAL_RECT)
+        )
+        monster = self._monster(species=_SYNTH_SPECIES)
+        set_official_selection(self._subject(), chosen_identity)
+        self.assertEqual(
+            official_selection_for(self._subject(), monster)["identity"], chosen_identity
+        )
+        payload = resolve_subject(self._subject(), entity=monster)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["url"], current_catalog().url_for(chosen_identity))
+        self.assertNotEqual(payload["url"], current_catalog().url_for(default_identity))
 
     # -- purity -----------------------------------------------------------
     def test_resolution_reads_only_stored_identity_and_the_loaded_snapshot(self):

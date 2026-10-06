@@ -313,6 +313,12 @@ def _species_content_reference(entity: Any) -> OfficialContentReference | None:
     resolves through the shared :func:`_declared_reference` path, so a malformed
     or unregistered one degrades with the same single bounded diagnostic and
     falls through to the runtime/silhouette chain exactly as an absent one does.
+
+    The arm is deliberately kind-agnostic: it reads the attribute NAME, so any
+    entity that ever stores a registered species key resolves that species'
+    reference. Today only ``typeclasses.monsters.Monster`` carries the field
+    (the sibling change owns writing it); this module may not import
+    ``typeclasses`` to check the class, and no other producer writes the name.
     """
     attributes = _entity_attributes(entity)
     if attributes is None:
