@@ -53,6 +53,13 @@ world not provisioned, unknown site, never-populated site, cleared site, and few
 required. The consequence is deliberate and documented: an authoring that wants a clear-out to be
 repeatable must use a recoverable site, and a player who has already killed part of a nest sees the
 clear-out refused as short rather than receiving a commission that could not be completed.
+A fresh world is the sharpest case of the never-populated branch: sites are populated by the site owner's
+own settlement on the world clock's first advance, so before that no site has living individuals and all
+three clear-outs are absent from the board. That is the honest answer — the world's authored encounters do
+not exist yet — and it resolves within the first clock-advancing action rather than at boot, because
+populating a site from anywhere but the owner's settlement would contradict the lifecycle the site
+placement change established. The refusal is named (`site_unpopulated`) so a player who names a key
+directly is told what is missing rather than receiving a generic ineligibility.
 
 **D-C3 Refusals reuse the landed named-refusal discipline.** The quest layer raises the existing
 `QuestTargetsUnavailable` with the site key and one reason from the closed set `world_unavailable`,
@@ -66,6 +73,14 @@ by construction because no room is supplied. Rejected alternative: bind when the
 site. A permanent-layer stage has no scene entry — `commands/scene.py` materializes instance-layer stages
 only — and writing quest state on room entry is precisely what the site lifecycle forbids; binding at
 acceptance also tells the player what they must defeat before they travel.
+Two mechanics are pinned because they are easy to get wrong: the operation SHALL return the persisted,
+bound record (the log replacement the binder performs is the second full-log write inside the same atomic
+block, so a caller that returned the earlier value would hand out a record with an empty target set), and
+the snapshot/restore discipline stays sufficient here *only because* a site binding creates no instance
+pin — a future binding that pins a room must extend the acceptance snapshot, and the task records that as
+a comment at the call site. `quest_transition`'s bound flag is derived from a bound room, so a site-bound
+record is observed through the new `hunt_site_targets_bound` event instead; that event stays even though
+the board rule is a listing filter.
 
 **D-C5 One availability read, owned by the quest layer, shared with the board.** The predicate is
 definition-driven ("can this clear-out be accepted right now?") and lives in `world/quests/runtime.py`,
@@ -136,7 +151,7 @@ ability symptom):
 | event | context | level |
 | --- | --- | --- |
 | `hunt_site_targets_bound` | `site`, `region`, `species`, `variant`, `required`, `available` | info, on the enclosing durable commit |
-| `hunt_site_targets_unavailable` | `site`, `region`, `species`, `variant`, `required`, `available`, `reason` (`world_unavailable` / `unknown_site` / `site_cleared` / `site_short`) | warn, emitted immediately, no persistent state changed |
+| `hunt_site_targets_unavailable` | `site`, `region`, `species`, `variant`, `required`, `available`, `reason` (`world_unavailable` / `unknown_site` / `site_unpopulated` / `site_cleared` / `site_short`) | warn, emitted immediately, no persistent state changed |
 
 ## Risks / Trade-offs
 
@@ -152,6 +167,10 @@ ability symptom):
   established binder with an entity-only binding, inside the acceptance transaction, and the delta
   restates the guarantee as a scenario per refusal path so a regression is a test failure rather than a
   silent partial state.
+- One kill can legitimately credit two records: a site's individuals are ordinary species individuals, so
+  defeating one advances both its bound clear-out and any active regional hunt of that species. That is
+  intended (each record credits each persistent identity once) and the implementer SHALL NOT "fix" it by
+  excluding another owner's individuals.
 
 ## Open Questions
 

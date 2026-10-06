@@ -66,7 +66,10 @@ content form: the deterministic compile boundary SHALL NOT author a site key fro
 and the stored payload SHALL round-trip the key with an absent-key default rather than inventing one.
 Registration SHALL also reject a definition declaring a site key that another registered definition
 already declares: two clear-outs over one site would bind the same living individuals, so each would
-credit the same defeats.
+credit the same defeats. That uniqueness check SHALL compare the declared site key against definitions
+registered under a different definition key only, and SHALL leave the equal-content idempotent
+re-registration path unchanged, so registering the same catalog again neither collides with itself nor
+becomes a conflicting-content rejection.
 The objective SHALL bind the site's own individuals — the site's authored variant set, placed at its
 authored coordinate under its ownership marker — and SHALL NOT cause any individual to be spawned,
 moved, populated, or recovered: a clear-out never becomes a second population owner. The bound set SHALL
@@ -84,6 +87,10 @@ are strangers to an existing binding and can only be bound by a clear-out issued
 #### Scenario: A second clear-out over one site is rejected
 - **WHEN** a definition declares a site key an already registered definition declares
 - **THEN** registration raises `QuestDefinitionError` naming the colliding definition and the registry is unchanged
+
+#### Scenario: Re-registering the same catalog is still an idempotent no-op
+- **WHEN** a definition declaring a site key is registered again with equal content
+- **THEN** the registration is a no-op and raises nothing, because the uniqueness check compares only other definition keys
 
 #### Scenario: The clear-out spawns nothing
 - **WHEN** a clear-out's individuals are bound

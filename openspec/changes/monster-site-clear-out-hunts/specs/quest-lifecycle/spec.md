@@ -19,13 +19,16 @@ When the definition's current stage is a bound clear-out over an authored site, 
 additionally require that the site currently owns at least the objective's quantity of living
 individuals. That guarantee SHALL be a read of the site owner's own state and population — acceptance
 SHALL NOT create, populate, move, recover, or delete an individual, and a site the world has not yet
-populated SHALL refuse exactly as a cleared one does. The site's durable lifecycle state SHALL be the
-sole answer: a one-shot site already cleared and a cleared recoverable site whose authored in-game
-condition has not matured each refuse with their own named reason, and no path SHALL early-recover a
-site. When the guarantee holds, acceptance SHALL bind exactly the site's living individuals as the
-record's stage-zero objective targets through the existing binding writer, inside the same all-or-nothing
-transaction as the record write, and SHALL create no instance pin: the site is a permanent wilderness
-location, not a spawned scene.
+populated SHALL refuse with its own named reason, distinct from both a cleared site and a shortfall. The
+site's durable lifecycle state SHALL be the sole answer — world absent, unknown site, never populated,
+cleared, or short — and no path SHALL early-recover a site. When the guarantee holds, acceptance SHALL
+bind exactly the site's living individuals as the record's stage-zero objective targets through the
+existing binding writer, inside the same all-or-nothing transaction as the record write, and SHALL create
+no instance pin: the site is a permanent wilderness location, not a spawned scene. The record the
+operation returns SHALL be the persisted, bound record rather than the unbound value written a moment
+earlier.
+The refusal vocabulary SHALL be closed and named: `world_unavailable`, `unknown_site`, `site_unpopulated`,
+`site_cleared`, and `site_short`.
 Guarantee, binding, and record creation SHALL form one all-or-nothing transaction: any validation or
 manager failure SHALL roll back all of them, leaving no active record, no binding, and no partial target
 arrangement. When the condition cannot be legally satisfied, acceptance SHALL be refused with a named
@@ -91,4 +94,8 @@ reason before any persistence.
 
 #### Scenario: Acceptance never populates a site
 - **WHEN** a clear-out is accepted against a site the world has not yet populated
-- **THEN** acceptance is refused, and a before/after comparison shows the site still unpopulated with no individual created for it
+- **THEN** acceptance is refused with the not-yet-populated reason, and a before/after comparison shows the site still unpopulated with no individual created for it
+
+#### Scenario: The returned record carries the binding
+- **WHEN** a clear-out acceptance succeeds
+- **THEN** the returned record's objective target set equals the site's living individuals that were bound, the same set a fresh read of the quest log returns, and a rollback of an injected failure restores the log to its pre-acceptance value

@@ -9,9 +9,11 @@ offered only while its site can currently supply the objective's quantity of liv
 through the same quest-layer read the acceptance-time guarantee uses, so the board never advertises work
 that acceptance would refuse; a cleared one-shot site's clear-out is therefore absent from the board, and
 a recoverable site's clear-out returns once its authored in-game condition has matured and it has
-repopulated. That availability rule SHALL be independent of rank eligibility, of the objective-summary
-rendering, and of the ordering key: a board listed with summaries and without them returns the same
-offers in the same order.
+repopulated. A site the world has not yet populated SHALL be treated the same way: its clear-out is absent
+until the world clock's own settlement populates the site, and no quest, board read, or acceptance ever
+populates one. The availability rule SHALL narrow the listing only: it SHALL NOT change the acceptance
+precheck, and it SHALL be independent of rank eligibility, of the objective-summary rendering, and of the
+ordering key: a board listed with summaries and without them returns the same offers in the same order.
 
 #### Scenario: F member sees only local F offers
 - **WHEN** an F member lists a board containing local F/E offers and a remote F offer
@@ -28,6 +30,10 @@ offers in the same order.
 #### Scenario: A recovered site's clear-out returns to the board
 - **WHEN** a cleared recoverable site's authored condition matures and it repopulates with fresh individuals
 - **THEN** its clear-out is offered again, and acceptance binds those fresh individuals rather than any previously defeated one
+
+#### Scenario: An unpopulated site's clear-out is absent until the world settles it
+- **WHEN** the board is listed before any world-clock advance has populated a site
+- **THEN** that site's clear-out is absent, and no individual is created for it by listing or accepting
 
 #### Scenario: Availability never reorders the board
 - **WHEN** a board containing clear-outs and species hunts is listed with and without objective summaries
@@ -52,6 +58,10 @@ target-availability guarantee fails) — a regional species hunt whose region ca
 bound clear-out whose site cannot supply its living individuals — the board path SHALL surface that named
 refusal as an ordinary rejection: no quest record, no affinity gain, and no partial provisioning,
 population, or binding left behind.
+The acceptance precheck SHALL remain the issuing branch plus the actor's rank alone: the availability rule
+narrows what the board lists, never what acceptance will attempt, so a player who names an offer's key
+directly or who accepts a listing taken before the site changed state receives the lifecycle's named
+refusal instead of a generic eligibility error.
 `abandon_guild_quest()` SHALL invoke `abandon_quest()` for the exact quest ID.
 The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts itself.
 
@@ -78,6 +88,10 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 #### Scenario: A legally unsatisfiable clear-out offer is refused cleanly
 - **WHEN** a member accepts a bound clear-out whose site can no longer supply its living individuals
 - **THEN** the refusal names the site-cleared or site-short reason, no quest record and no affinity gain exist, and the site's durable state and its individuals are unchanged
+
+#### Scenario: A state change between listing and acceptance is reported by name
+- **WHEN** a site's individuals are defeated after the board was listed and the member then accepts the now-unsatisfiable offer from that listing or by naming its key directly
+- **THEN** the lifecycle's named refusal reaches the member, and the board precheck does not present it as an unknown or ineligible offer
 
 #### Scenario: Abandonment preserves quest-runtime semantics
 - **WHEN** a member abandons an active offered quest
