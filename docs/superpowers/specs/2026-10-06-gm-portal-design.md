@@ -3,11 +3,38 @@
 - Date: 2026-10-06
 - Status: Approved design (roadmap + S1 detail)
 - Scope: An operator-facing web portal under `/gm/` for inspecting game data,
-  monitoring services, and performing rule-backed operations. It is not part of
-  the player experience; it is functional in design and shares the webclient's
-  visual design system.
+  monitoring services, managing saves, and repairing world state through
+  rule-backed operations. It is not part of the player experience; it is
+  functional in design and shares the webclient's visual design system.
 
-## 1. Goals and non-goals
+## 1. Purpose, goals, and non-goals
+
+### Why a second interface
+
+Elosern is single-player: the player and the operator are the same person in
+two roles. The game webclient is deliberately in-character and immersive. NPCs
+never name mechanics, vitals hide at full, and failed LLM calls degrade
+silently so play continues. It exists to hide things from the player.
+
+The portal is the out-of-character, omniscient view: it shows what the game
+hides and does what the game deliberately does not let a player do. Keeping
+that in a separate interface protects immersion while playing. The operator
+switches to it:
+
+1. When the experience goes wrong or feels wrong: the silent degradation leaves
+   no trace in game, so diagnosis happens here (S2, S3). This is the primary
+   use.
+2. To see the truth behind the play: hidden identities, true traits behind
+   disguises, NPC memories, story threads, scheduled beats (S3).
+3. During authoring time outside play: content and balance work against the
+   authored data and its references (S4).
+4. Before experimenting: a world snapshot is the save slot (S5).
+5. When a save is broken: there is no other GM to ask, and hand-patching state
+   in a Django shell is forbidden, so repairs go through validated, audited
+   operations (S6).
+
+Multi-user server concerns (account administration, broadcasts, bans) are out
+of scope.
 
 ### Goals
 
@@ -105,11 +132,14 @@ world/rules/, world/maps/, world/quests/, world/narrative/, world/art/
    `LOGIN_URL` with `next=`; unauthenticated API requests return `401`;
    authenticated accounts without the permission get `403`.
 2. **Single writer.** `web/gm/` never mutates persistent state itself. Every
-   write in S5/S6 maps to one named API in a single-writer package
-   (`world/rules/`, `world/maps/`, `world/quests/`, `world/narrative/`) or the
-   art queue API; `web/gm/` only validates transport shape and forwards.
+   S6 game-state write maps to one named API in a single-writer package
+   (`world/rules/`, `world/maps/`, `world/quests/`, `world/narrative/`);
+   `web/gm/` only validates transport shape and forwards. S5 snapshots and
+   restores operate below game rules through `server/saves/`, never through
+   field-level writes.
 3. **Authored data is read-only.** S4 reads module-level registries and loaded
-   rulebooks. No code path writes source files.
+   rulebooks. No code path writes source files. S4's prompt reload only
+   re-reads `prompts/` into the in-memory library.
 4. **Offline.** The bundle is served from the project origin. With LLM and SD
    services offline, the portal still loads and reports those services as
    offline.
@@ -131,8 +161,8 @@ tasks) in this order.
 | S2 | Operations dashboard | S1 |
 | S3 | Runtime state inspection | S1 |
 | S4 | Authored data browser and cross-references | S1 |
-| S5 | Operations through existing deterministic APIs | S1, S3 |
-| S6 | GM intervention tools: new rule APIs plus audit trail | S1, S3, S5 |
+| S5 | Save management: snapshot and restore of the world state | S1 |
+| S6 | Save repair: new validated rule APIs plus audit trail, each preceded by an automatic snapshot | S1, S3, S5 |
 
 This document specifies S1 in full. S2–S6 are scoped in §6; each gets its own
 brainstorming pass before its OpenSpec change.
@@ -172,7 +202,7 @@ SPA shell.
   response `data: {"items": [...], "next_cursor": <opaque|null>}`.
 - Writes use `POST` only and require the Django CSRF token, read by the SPA
   from the `csrftoken` cookie and sent as `X-CSRFToken`. S1 wires and tests
-  this path with no write endpoint yet; S5 is the first consumer.
+  this path with no write endpoint yet; S4 prompt reload is the first consumer.
 - No Django REST framework (Evennia's `REST_API_ENABLED` stays `False`). Plain
   Django views plus a small JSON helper in `web/gm/responses.py`.
 
@@ -288,20 +318,20 @@ a hand-maintained registry index, reference declarations on dataclass fields
 with references and referrers, cross-registry search, and a read-only source
 viewer for rulebook and prompt YAML.
 
-### S5 Operations through existing APIs
+### S5 Save management
 
-- Art requeue through the same path as `@art requeue`.
-- NPC persona editing through the existing persona writer and its
-  validation.
-- World clock skip/advance through `world/rules/time_skip.py` and its safety
-  gate.
+Designed in `docs/superpowers/specs/2026-10-06-gm-portal-s5-saves-design.md`.
+Responsibility: save and restore the world state (database plus art store).
+Operations a player can already perform in game (art requeue, persona
+editing, time skip) are not portal features.
 
-### S6 GM intervention tools
+### S6 Save repair
 
 - Granting items and currency (integer copper), correcting quest progress,
   flagging or retracting memory records, and similar interventions.
 - Each capability first lands as a validated, all-or-nothing API in its
   owning single-writer package; the portal only calls it.
+- Every intervention first creates an `auto_intervention` save through S5.
 - A persistent GM audit record: operator, timestamp, target, before/after
   diff, stated reason.
 - Decision deferred to S6: the package that owns the audit record. AGENTS.md

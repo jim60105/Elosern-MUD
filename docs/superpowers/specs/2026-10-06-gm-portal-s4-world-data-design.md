@@ -8,7 +8,8 @@
 
 S4 lets the operator browse the authored world data the server has loaded and
 follow references between registry entries in both directions. Authored data
-stays read-only source in git; S4 never writes a source file.
+stays read-only source in git; S4 never writes a source file. Its one action
+is reloading the prompt library from disk (§4.5).
 
 ## 1. Terminology
 
@@ -176,6 +177,16 @@ Runtime fields that hold registry keys (a character's `race`, a monster's
 `species` and `variant`, a quest record's `definition_key`, ...) render through
 `GmEntityLink` as links to the S4 entry page.
 
+### 4.5 Prompt reload
+
+The prompts source view has a 重新載入 action that calls
+`world/prompts/loader.reset_prompt_library()` then `load_prompt_library()` and
+shows the load diagnostics. It re-reads `prompts/` into the in-memory library
+so prompt iteration needs no restart. It changes no world state and no source
+file; it emits `gm_prompts_reloaded` with the outcome. A failed load leaves
+the diagnostics on screen and the game uses whatever the loader's own failure
+handling yields, exactly as on startup.
+
 ## 5. API
 
 | Route | Purpose |
@@ -185,6 +196,7 @@ Runtime fields that hold registry keys (a character's `race`, a monster's
 | `GET /gm/api/registry/<registry>/<key>` | Entry detail: fields, references, referrers |
 | `GET /gm/api/sources/` | Source viewer allowlist |
 | `GET /gm/api/sources/<name>` | One source file's text |
+| `POST /gm/api/sources/prompts/reload` | Reload the prompt library; returns diagnostics |
 
 - Unknown registry: `404` `registry_not_found`. Unknown key: `404`
   `entry_not_found`. Name outside the allowlist: `404` `source_not_found`.
