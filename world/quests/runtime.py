@@ -5,11 +5,18 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
+from django.db import transaction
+
 from world.observability import log_warn
 
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
-from .definitions import QUEST_DEFINITION_REGISTRY, QuestDefinition
+from .definitions import (
+    QUEST_DEFINITION_REGISTRY,
+    QuestDefinition,
+    QuestObjective,
+    ordinary_countable_variant_keys,
+)
 from .transitions import apply_quest_log_replacement, release_stage_binding
 
 
@@ -31,6 +38,23 @@ class QuestAlreadyActive(ValueError):
 
 class QuestIssuanceNotFound(ValueError):
     """accept_quest named an issuer key with no registered issuance."""
+
+
+class QuestTargetsUnavailable(ValueError):
+    """A species-hunt acceptance cannot legally guarantee its targets.
+
+    The named refusal of the acceptance-time guarantee: the region's ambient and
+    site managers could not legally provide enough reachable, living,
+    ordinary-eligible targets for the objective's quantity. Nothing was
+    persisted and no target arrangement was left behind.
+    """
+
+    def __init__(self, region_key: str, reason: str) -> None:
+        super().__init__(
+            f"species hunt targets unavailable in region {region_key!r}: {reason}"
+        )
+        self.region_key = region_key
+        self.reason = reason
 
 
 class QuestState(StrEnum):
@@ -405,6 +429,64 @@ def _current_tick() -> int:
     return get_world_clock().tick
 
 
+def _stage_zero_hunt(definition: QuestDefinition) -> QuestObjective | None:
+    """The definition's current (stage-zero) objective when it is a species hunt."""
+    objective = definition.stages[0].objective
+    return objective if objective.region_key is not None else None
+
+
+def provisioning_snapshot_for(definition: QuestDefinition) -> Any | None:
+    """The map-owned surfaces a rolled-back acceptance's provisioning touched.
+
+    ``None`` when the definition's current objective is not a regional species
+    hunt, so every other acceptance pays nothing. The acceptance owners that
+    wrap ``accept_quest`` in their own transaction capture this before opening
+    it and call :func:`restore_provisioning` in their failure path: provisioning
+    writes the wilderness owner's bookkeeping, whose in-process cache a database
+    rollback does not reach (the idmapper/attribute caches are not
+    transaction-aware).
+    """
+    if _stage_zero_hunt(definition) is None:
+        return None
+    from world.maps.monster_provisioning import snapshot_provisioning_surfaces
+
+    return snapshot_provisioning_surfaces()
+
+
+def restore_provisioning(snapshot: Any | None) -> None:
+    """Restore the target-arrangement surfaces of a rolled-back acceptance."""
+    if snapshot is None:
+        return
+    from world.maps.monster_provisioning import restore_provisioning_surfaces
+
+    restore_provisioning_surfaces(snapshot)
+
+
+def _provision_hunt_targets(definition: QuestDefinition) -> None:
+    """Guarantee the current hunt's ordinary-eligible targets, or refuse.
+
+    The quest layer never creates, moves, or deletes an individual itself: it
+    asks the ambient/site managers' own ensure API for the guarantee, and that
+    API decides legality under habitat, authored placement capacity, ownership
+    markers, and current site state. A shortfall raises the named refusal before
+    anything is persisted, so an acceptance that cannot be legally satisfied
+    leaves no partial target arrangement behind.
+    """
+    objective = _stage_zero_hunt(definition)
+    if objective is None:
+        return
+    from world.maps.monster_provisioning import ensure_hunt_targets
+
+    result = ensure_hunt_targets(
+        objective.region_key,
+        objective.species_key,
+        ordinary_countable_variant_keys(objective),
+        objective.quantity,
+    )
+    if not result.satisfied:
+        raise QuestTargetsUnavailable(objective.region_key, result.reason)
+
+
 def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecord:
     """Create one deterministic stage-zero active record for ``definition_key``.
 
@@ -412,6 +494,14 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
     must resolve through the shared read seam before any write. A malformed
     key raises ``IssuerKeyError``; a well-formed key with no registered
     issuance raises ``QuestIssuanceNotFound``.
+
+    When the definition's current stage is a regional species hunt, the
+    acceptance additionally obtains the target-availability guarantee through
+    the ambient/site managers, and provisioning plus record creation commit in
+    one all-or-nothing transaction: any validation or manager failure rolls
+    back both, leaving no active record and no partial target arrangement. A
+    hunt whose condition cannot be legally satisfied raises
+    ``QuestTargetsUnavailable`` before any persistence.
     """
     from world.rules.quest_issuance import resolve_issuance
 
@@ -453,7 +543,14 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
         protected_entity_ids=(),
         failure_reason=None,
     )
-    apply_quest_log_replacement(actor, [*current, record])
+    provisioning = provisioning_snapshot_for(definition)
+    try:
+        with transaction.atomic():
+            _provision_hunt_targets(definition)
+            apply_quest_log_replacement(actor, [*current, record])
+    except Exception:
+        restore_provisioning(provisioning)
+        raise
     return record
 
 

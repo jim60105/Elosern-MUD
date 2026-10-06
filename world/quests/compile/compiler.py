@@ -39,6 +39,7 @@ from world.quests.compile.fields import (
 )
 from world.quests.definitions import (
     DestinationKind,
+    MAX_DEFINITION_PROSE_LENGTH,
     ObjectiveKind,
     QuestDefinition,
     QuestDefinitionError,
@@ -116,6 +117,26 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
 
     _validate_strings(None, "payload.name", payload.get("name"), 80, required=True)
     name = payload["name"]
+
+    # The two authored prose fields beside the guild grade (design D-Q5): both
+    # ride the same bounded zh-TW validator and are optional, so a blueprint
+    # that authors neither still compiles with both absent.
+    _validate_strings(
+        None,
+        "payload.rating_rationale_zh",
+        payload.get("rating_rationale_zh"),
+        MAX_DEFINITION_PROSE_LENGTH,
+        required=False,
+    )
+    _validate_strings(
+        None,
+        "payload.background_flavor_zh",
+        payload.get("background_flavor_zh"),
+        MAX_DEFINITION_PROSE_LENGTH,
+        required=False,
+    )
+    rating_rationale_zh = payload.get("rating_rationale_zh")
+    background_flavor_zh = payload.get("background_flavor_zh")
 
     quest_type_value = payload.get("quest_type")
     if not isinstance(quest_type_value, str) or quest_type_value not in _QUEST_TYPE_BY_VALUE:
@@ -238,6 +259,8 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
             for stage in quest_stages
         ],
         "deadline_hours": deadline,
+        "rating_rationale_zh": rating_rationale_zh,
+        "background_flavor_zh": background_flavor_zh,
     }
     key = _definition_key(definition_fields, tuple(stage_requirements))
     definition = QuestDefinition(
@@ -247,6 +270,8 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
         rank=rank,
         stages=tuple(quest_stages),
         deadline_hours=deadline,
+        rating_rationale_zh=rating_rationale_zh,
+        background_flavor_zh=background_flavor_zh,
     )
     try:
         validate_definition(definition)

@@ -14,8 +14,14 @@ raises ``QuestDescribeError`` so drift fails loudly in tests.
 from typing import TYPE_CHECKING, Any
 
 from world.lore.anchors import ANCHOR_REGISTRY
+from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.lore.monster_species import (
+    MONSTER_SPECIES_REGISTRY,
+    MONSTER_VARIANT_REGISTRY,
+)
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -64,6 +70,8 @@ def describe_destination(locator: RoomLocator | None) -> str:
 def describe_objective(objective: QuestObjective) -> str:
     """Render one objective into a single Traditional Chinese requirement line."""
     if objective.kind is ObjectiveKind.DEFEAT:
+        if objective.region_key is not None:
+            return _describe_species_hunt(objective)
         if objective.requires_bound_targets:
             return f"討伐綁定的目標 {objective.quantity} 個"
         tier = MONSTER_TIER_REGISTRY.get(objective.monster_tier)
@@ -85,6 +93,47 @@ def describe_objective(objective: QuestObjective) -> str:
             raise QuestDescribeError(f"unknown item {objective.item_key!r}")
         return f"交付 {objective.quantity} 個{item.display_name_zh}"
     raise QuestDescribeError(f"unknown ObjectiveKind {objective.kind!r}")
+
+
+def _countable_variant_names(objective: QuestObjective) -> tuple[str, ...]:
+    """The countable variants' display names in one stable (key) order."""
+    names: list[str] = []
+    for variant_key in sorted(objective.countable_variant_keys):
+        variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+        if variant is None:
+            raise QuestDescribeError(f"unknown monster variant {variant_key!r}")
+        names.append(variant.display_name_zh)
+    return tuple(names)
+
+
+def _describe_species_hunt(objective: QuestObjective) -> str:
+    """Render one regional species-hunt objective from the shared registries."""
+    region = WILDERNESS_REGION_REGISTRY.get(objective.region_key)
+    if region is None:
+        raise QuestDescribeError(
+            f"unknown wilderness region {objective.region_key!r}"
+        )
+    species = MONSTER_SPECIES_REGISTRY.get(objective.species_key)
+    if species is None:
+        raise QuestDescribeError(
+            f"unknown monster species {objective.species_key!r}"
+        )
+    variants = "、".join(_countable_variant_names(objective))
+    return (
+        f"在{region.display_name_zh}討伐 {objective.quantity} 隻"
+        f"{species.display_name_zh}（計數變體：{variants}）"
+    )
+
+
+def _grade_line(definition: QuestDefinition) -> str:
+    """Render the authored guild grade the definition alone carries.
+
+    The grade is never derived from a targeted individual's danger grade; an
+    authored rank with no registry row still renders as authored rather than
+    failing a view over a definition registration accepted.
+    """
+    rank = GUILD_RANK_REGISTRY.get(definition.rank)
+    return f"階級：{definition.rank if rank is None else rank.display_name_zh}"
 
 
 def _deadline_line(deadline_tick: int | None, current_tick: int) -> str | None:
@@ -140,7 +189,10 @@ def describe_quest_detail(
     """Render one quest record's full detail from a definition and optional offer.
 
     ``current_tick`` is injected by the caller so the renderer never reads the
-    world clock. The reward section is omitted when ``offer`` is ``None``.
+    world clock. The reward section is omitted when ``offer`` is ``None``. The
+    authored grade is always rendered; the rating rationale and background
+    flavor sections render verbatim and are omitted when the definition does
+    not carry them (never fabricated).
     """
     stage = definition.stages[record.stage_index]
     state_value = getattr(record.state, "value", record.state)
@@ -150,7 +202,12 @@ def describe_quest_detail(
         f"階段：{record.stage_index + 1}",
         f"目標：{describe_objective(stage.objective)}",
         f"進度：{record.stage_progress} / {stage.objective.quantity}",
+        _grade_line(definition),
     ]
+    if definition.rating_rationale_zh is not None:
+        lines.append(f"評價理由：{definition.rating_rationale_zh}")
+    if definition.background_flavor_zh is not None:
+        lines.append(f"背景：{definition.background_flavor_zh}")
     deadline = _deadline_line(record.deadline_tick, current_tick)
     if deadline is not None:
         lines.append(deadline)

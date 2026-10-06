@@ -10,6 +10,11 @@ DEFEAT progress counts the defeated individual's persistent identity (its
 database row), never a display key or a tier: each record keeps the identities
 it has already credited for its current objective, so a duplicate or redelivered
 ``target_defeated`` entry can never advance the same objective twice.
+
+A regional species-hunt objective matches on the entry's registered species and
+variant keys plus the defeated individual's location resolved inside the
+objective's declared region at defeat time; a tier-only individual carries no
+species identity, so it can never satisfy a hunt.
 """
 
 from dataclasses import replace
@@ -48,6 +53,62 @@ def _defeated_targets(event_log: Any) -> tuple[tuple[int, str | None], ...]:
     return tuple(defeated)
 
 
+def _defeat_identities(event_log: Any) -> dict[int, tuple[str | None, str | None]]:
+    """Return ``target_id -> (species_key, variant_key)`` from defeat entries.
+
+    A species-backed individual's identity rides its own committed defeat entry
+    (the construction owner writes the pair onto the individual, and the defeat
+    entry carries it verbatim). A tier-only individual's entry has neither key,
+    which is exactly why it can never satisfy a species hunt. Display names,
+    tiers, guild rank, and single stats are never identity.
+    """
+    identities: dict[int, tuple[str | None, str | None]] = {}
+    for entry in event_log.entries:
+        if entry.kind != "target_defeated":
+            continue
+        data = entry.data
+        if data.get("simulated"):
+            continue
+        target_id = data.get("target_id")
+        if not isinstance(target_id, int) or isinstance(target_id, bool):
+            continue
+        if target_id in identities:
+            continue
+        species_key = data.get("species_key")
+        variant_key = data.get("variant_key")
+        identities[target_id] = (
+            species_key if isinstance(species_key, str) else None,
+            variant_key if isinstance(variant_key, str) else None,
+        )
+    return identities
+
+
+def _defeat_region(target_id: int, cache: dict[int, str | None]) -> str | None:
+    """The wilderness region the defeated individual's location resolved to.
+
+    Region scoping reads the individual's location at defeat time (design
+    D-Q4): the entry carries the persistent dbref, and its row is still present
+    inside the same commit, so the read stays deterministic. An individual with
+    no location, or a location outside the wilderness, resolves to ``None`` and
+    therefore never satisfies a hunt. The per-computation cache keeps the read
+    bounded to one lookup per defeated identity.
+    """
+    if target_id in cache:
+        return cache[target_id]
+    from evennia.objects.models import ObjectDB
+
+    from .room_observation import resolve_room_region
+
+    entity = ObjectDB.objects.filter(id=target_id).first()
+    region_key = (
+        None
+        if entity is None
+        else resolve_room_region(getattr(entity, "location", None))
+    )
+    cache[target_id] = region_key
+    return region_key
+
+
 def _distinct_target_ids(defeated: tuple[tuple[int, str | None], ...]) -> tuple[int, ...]:
     return tuple(dict.fromkeys(target_id for target_id, _ in defeated))
 
@@ -56,13 +117,18 @@ def _matching_defeats(
     record: Any,
     objective: Any,
     defeated: tuple[tuple[int, str | None], ...],
+    identities: dict[int, tuple[str | None, str | None]],
+    region_cache: dict[int, str | None],
 ) -> tuple[int, ...]:
     """Return the identities this objective still has to credit, in event order.
 
-    Selector matching is unchanged — a bound objective matches the record's
-    ``objective_target_ids``, an unbound one matches its declared tier — but an
-    identity the record already counted for its current objective is skipped, so
-    re-presenting an already-credited defeat entry grants nothing.
+    A bound objective matches the record's ``objective_target_ids``; an unbound
+    tier objective matches its declared ``monster_tier``; a regional species
+    hunt matches the entry's species key, a variant key among the objective's
+    countable variants, and the defeated individual's location resolved inside
+    the declared region. An identity the record already counted for its current
+    objective is always skipped, so re-presenting an already-credited defeat
+    entry grants nothing.
     """
     counted = set(record.counted_defeat_ids)
     seen: set[int] = set()
@@ -73,6 +139,21 @@ def _matching_defeats(
             if target_id in bound and target_id not in seen and target_id not in counted:
                 seen.add(target_id)
                 matches.append(target_id)
+    elif objective.region_key is not None:
+        countable = frozenset(objective.countable_variant_keys)
+        for target_id, _ in defeated:
+            if target_id in seen or target_id in counted:
+                continue
+            identity = identities.get(target_id)
+            if identity is None:
+                continue
+            species_key, variant_key = identity
+            if species_key != objective.species_key or variant_key not in countable:
+                continue
+            if _defeat_region(target_id, region_cache) != objective.region_key:
+                continue
+            seen.add(target_id)
+            matches.append(target_id)
     else:
         tier = objective.monster_tier
         for target_id, defeated_tier in defeated:
@@ -90,10 +171,15 @@ def _defeat_progress_changes(
     owner: Any,
     records: list[Any],
     defeated: tuple[tuple[int, str | None], ...],
+    identities: dict[int, tuple[str | None, str | None]],
 ) -> tuple[dict[str, Any], list[tuple[Any, tuple[str, ...], tuple[str, ...]]]]:
     """Compute per-quest DEFEAT advances for one quest owner."""
     replacements: dict[str, Any] = {}
     pin_operations: list[tuple[Any, tuple[str, ...], tuple[str, ...]]] = []
+    # Region resolution is the one defeat-time read a hunt adds; it stays lazy
+    # (inside ``_matching_defeats``) so a tier or bound objective performs no
+    # extra lookup at all.
+    region_cache: dict[int, str | None] = {}
     for record in records:
         if record.state is not QuestState.IN_PROGRESS:
             continue
@@ -101,7 +187,7 @@ def _defeat_progress_changes(
         objective = definition.stages[record.stage_index].objective
         if objective.kind is not ObjectiveKind.DEFEAT:
             continue
-        new_ids = _matching_defeats(record, objective, defeated)
+        new_ids = _matching_defeats(record, objective, defeated, identities, region_cache)
         if not new_ids:
             # Every matching identity was already credited by this record: a
             # redelivered event plans no write at all.
@@ -151,12 +237,15 @@ def _compute_owner_changes(
     owner: Any,
     records: list[Any],
     defeated: tuple[tuple[int, str | None], ...],
+    identities: dict[int, tuple[str | None, str | None]],
     defeated_ids: tuple[int, ...],
 ) -> tuple[list[Any], list[tuple[Any, tuple[str, ...], tuple[str, ...]]]] | None:
     replacements: dict[str, Any] = {}
     pin_operations: list[tuple[Any, tuple[str, ...], tuple[str, ...]]] = []
     if defeat_credit:
-        defeat_changes, defeat_pins = _defeat_progress_changes(owner, records, defeated)
+        defeat_changes, defeat_pins = _defeat_progress_changes(
+            owner, records, defeated, identities
+        )
         replacements.update(defeat_changes)
         pin_operations.extend(defeat_pins)
     failure_changes, failure_pins = _protected_failure_changes(owner, records, defeated_ids)
@@ -214,6 +303,7 @@ def quest_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
     if not defeated:
         return []
     defeated_ids = _distinct_target_ids(defeated)
+    identities = _defeat_identities(event_log)
 
     actor = request.actor
     companion_owner = _bound_defeat_owner(
@@ -262,6 +352,7 @@ def quest_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
             owner=owner,
             records=records,
             defeated=defeated,
+            identities=identities,
             defeated_ids=defeated_ids,
         )
         if changes is None:

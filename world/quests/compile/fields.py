@@ -294,6 +294,22 @@ def _compile_objective(
     )
 
     if kind is ObjectiveKind.DEFEAT:
+        # The regional species-hunt selector is hand-authored content, not part
+        # of the blueprint objective schema (design D-Q1: the AI boundary adopts
+        # it only through its own change). The keys are rejected outright rather
+        # than ignored, so a proposal that carries one can never be silently
+        # reinterpreted as a tier or bound objective.
+        declared_hunt_fields = sorted(
+            key
+            for key in ("region_key", "species_key", "countable_variant_keys")
+            if key in objective
+        )
+        if declared_hunt_fields:
+            _reject(
+                f"stage {stage_index} DEFEAT objective declares "
+                f"{declared_hunt_fields}; the regional species-hunt selector is "
+                "not part of the blueprint objective schema"
+            )
         monster_tier = objective.get("monster_tier")
         has_tier = monster_tier is not None
         if has_tier == has_npc_reqs:

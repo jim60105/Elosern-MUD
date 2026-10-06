@@ -9,6 +9,7 @@ from world.quests.runtime import (
     QuestDataError,
     QuestNotFound,
     QuestState,
+    QuestTargetsUnavailable,
     definition_for,
     find_record,
     read_records,
@@ -204,7 +205,7 @@ class CmdGuildAccept(_GuildCommandBase):
             return
         try:
             record = accept_guild_offer(self.caller, staff, definition_key)
-        except (BoardAccessError, GuildOfferError) as error:
+        except (BoardAccessError, GuildOfferError, QuestTargetsUnavailable) as error:
             self.caller.msg(f"無法接取任務：{error}")
             return
         self.caller.msg(f"你接取了任務 {record.quest_id}。")
