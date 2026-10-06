@@ -1,14 +1,16 @@
 ## ADDED Requirements
 
 ### Requirement: Published regional species hunts are legally provisionable in their authored region
-A published regional species hunt SHALL be meetable by the region's own authored placement: the hunt's
+A published regional species hunt SHALL be provisionable by the region's own authored placement: the hunt's
 region SHALL have an ambient placement rule, at least one of the hunt's ordinary countable variants SHALL
 be in that rule's eligible variant set (otherwise the acceptance-time guarantee could only ever refuse),
 and the hunt's required quantity SHALL NOT exceed the region's authored per-coordinate legal supply —
 `min(quantity, capacity)` of that rule. A region with no authored ambient placement SHALL carry no
 regional hunt, because such a hunt could never be satisfied and the board is not an inventory of
 impossible work. The shipped catalog SHALL carry exactly one regional hunt per species that a
-placement-covered region actually places.
+placement-covered region actually places. This is a property of published content, not a promise that
+every acceptance succeeds: the acceptance-time guarantee still refuses with its named reason when the
+world is not provisioned or the region's authored capacity is momentarily exhausted.
 
 #### Scenario: Every published hunt can be provisioned by its region
 - **WHEN** each published regional hunt is compared against its region's authored ambient placement rule

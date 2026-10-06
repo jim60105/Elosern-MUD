@@ -51,12 +51,13 @@ the authored number is a solvable target in principle and an authored-overflow i
 prevents.
 
 **D-R3 Ranks are authored from the arrangement, and the mid hunts are `D`.** The rank registry's own
-descriptions separate the work: `F`/`E` are low-tier monster hunts, `D` is party-based work, and `C` is
-work for an adventurer capable of acting alone. The approved calibration says a creation-budget character
-can only chip a mid-tier defense of 12–20, which is exactly "a party of ordinary adventurers" — so the two
-mid-tier hunts are authored `D`, not `C`, and no hunt in this batch is authored above `D`. Consequence
-worth recording: the mid hunts' strongest countable variants are graded `C`, so the shipped content itself
-demonstrates that a danger grade does not become a quest's rank.
+descriptions separate the work (`world/lore/guild.py`): `F` "Simple collection and caravan escort
+tasks.", `E` "Low-tier monster hunts.", `D` "Party-based dungeon runs.", `C` "Work for an adventurer
+capable of acting alone." The approved calibration says a creation-budget character can only chip a
+mid-tier defense of 12–20, which is exactly "a party of ordinary adventurers" — so the two mid-tier hunts
+are authored `D`, not `C`, and no hunt in this batch is authored above `D`. Consequence worth recording:
+the mid hunts' strongest countable variants are graded `C`, so the shipped content itself demonstrates
+that a danger grade does not become a quest's rank.
 
 **D-R4 Prose: background flavor reuses the approved bestiary example; rating rationale is newly authored
 composition/terrain prose.** The bestiary's boundary forbids treating its example as a published
@@ -126,6 +127,11 @@ Background flavors (the bestiary's approved example for that species, verbatim):
   hunts remain completable; change 1 documents the divergence and builds no migration.
 - Six new offers change the board's contents for every rank → intended; the two F hunts are the first
   board rows a fresh member can afford in rank order, which is the point of publishing them.
+- One kill can legitimately credit two records: a species hunt counts any eligible defeat in its region,
+  and the ambient owner's own count includes site-owned individuals, so killing a site's individual can
+  also advance a regional hunt of the same species. That is intended — both are hunts over the same
+  world, each record credits each persistent identity once, and excluding another owner's individuals
+  would contradict the landed definition of region-eligible targets. The implementer SHALL NOT "fix" it.
 
 ## Open Questions
 
