@@ -21,7 +21,7 @@ from world.observability import log_info
 # lives in the operator-prepared official-artwork directory (never in git,
 # never bundled into the frontend). An absent official root degrades to the
 # empty URL, exactly like every other missing-official-art case. The identity
-# is a fixed ASCII node, so the resolved URL is a fixed 113 characters and the
+# is a fixed ASCII node, so the resolved URL is a fixed 114 characters and the
 # client's shared 256-unit media bound (``MAX_SCENE_ART_URL`` in
 # web/static/webclient/js/elosern/protocol/panels/dream.js, mirroring
 # world.art.presenter.MAX_PORTRAIT_MEDIA_URL) stays inert — which is why that

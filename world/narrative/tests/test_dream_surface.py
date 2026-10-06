@@ -1,6 +1,7 @@
 """Synthetic sleep-to-dream behavior and recorded/offline changed-path smoke."""
 
 import json
+import tempfile
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -457,14 +458,37 @@ class DreamSurfaceTests(EvenniaTest):
         # The stage artwork is resolved out of the official catalog and served
         # by the media route, so the identity must keep parsing as
         # <kind>/<key>/<file> with an admitted kind, a stable subject key, and a
-        # stored extension. The tripwire matters because admission is silent:
-        # the day a kind gains a registry-membership check (the deferred
-        # authored npc/profile provenance), a non-registered key would stop
-        # being indexed and the stage would lose its artwork with no failing
-        # request anywhere.
+        # stored extension — and the shipped admission path must actually index
+        # it out of a real root. That functional half is the tripwire that
+        # matters: admission is silent (a refused identity leaves the stage with
+        # no artwork and no failing request anywhere), and the deferred authored
+        # npc/profile provenance adds a membership check this key — deliberately
+        # not an authored npc/profile — would not satisfy.
         parts = surface.DREAM_GODDESS_SCENE_IDENTITY.split("/")
         self.assertEqual(len(parts), 3)
         kind, key, filename = parts
         self.assertIn(kind, official_art.OFFICIAL_CONTENT_KINDS)
         self.assertTrue(subjects.is_valid_subject_key(key))
         self.assertIn(Path(filename).suffix, formats.STORE_EXTENSIONS)
+        with tempfile.TemporaryDirectory() as root:
+            target = Path(root) / surface.DREAM_GODDESS_SCENE_IDENTITY
+            target.parent.mkdir(parents=True)
+            target.write_bytes(_synthetic_webp())
+            with override_settings(ART_OFFICIAL_ROOT=root):
+                official_art.reset_catalog()
+                try:
+                    official_art.load_catalog()
+                    self.assertTrue(surface.scene_art_url())
+                finally:
+                    official_art.reset_catalog()
+
+
+def _synthetic_webp():
+    """A real, decodable WebP for the catalog's header-admission probe."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), (200, 200, 200)).save(buffer, format="WEBP")
+    return buffer.getvalue()
