@@ -201,6 +201,12 @@ class VueComponentGateTests(unittest.TestCase):
         dist_check = steps["Verify dist artifact"]["run"]
         self.assertIn("web/static/webclient/app/dist/index.js", dist_check)
         self.assertIn("web/static/webclient/app/dist/index.css", dist_check)
+        # The GM portal builds and gates alongside the game bundle
+        # (gm-portal-s1-foundation).
+        self.assertIn("pnpm run build:gm", steps["Build GM portal with Vite"]["run"])
+        self.assertIn("pnpm run test:gm-boundary", steps["Check GM import boundary"]["run"])
+        self.assertIn("web/static/gm/dist/index.js", dist_check)
+        self.assertIn("web/static/gm/dist/index.css", dist_check)
 
         # The dist is built into each browser-test checkout so the portal
         # serves the bundle from the project origin (delta: "built in the
@@ -209,11 +215,11 @@ class VueComponentGateTests(unittest.TestCase):
         dist_build = browser_steps["Build Vue dist in browser workspaces"]["run"]
         self.assertIn(f"npm install --global {pinned_pnpm}", dist_build)
         self.assertIn(
-            "(cd w-a && pnpm install --frozen-lockfile && pnpm run build)",
+            "(cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)",
             dist_build,
         )
         self.assertIn(
-            "(cd w-b && pnpm install --frozen-lockfile && pnpm run build)",
+            "(cd w-b && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)",
             dist_build,
         )
 
@@ -234,6 +240,31 @@ class VueComponentGateTests(unittest.TestCase):
         evennia_pnpm_step = evennia_steps["Install locked pnpm toolchain"]["run"]
         self.assertIn(f"npm install --global {pinned_pnpm}", evennia_pnpm_step)
         self.assertIn("pnpm install --frozen-lockfile", evennia_pnpm_step)
+
+
+class GmPortalDeliveryContractTests(unittest.TestCase):
+    """The GM bundle ships with the image beside the game bundle."""
+
+    def test_container_builds_and_ships_both_bundles_and_the_version_source(self):
+        containerfile = _read("Containerfile")
+        self.assertIn("vite.gm.config.js", containerfile)
+        self.assertIn("RUN pnpm run build && pnpm run build:gm", containerfile)
+        self.assertIn(
+            "--from=vue-dist /build/web/static/gm/dist/ /app/web/static/gm/dist/",
+            containerfile,
+        )
+        self.assertIn(
+            "--from=vue-dist /build/web/static/webclient/app/dist/ "
+            "/app/web/static/webclient/app/dist/",
+            containerfile,
+        )
+        self.assertIn("COPY --chown=root:0 pyproject.toml /app/pyproject.toml", containerfile)
+        package = json.loads(_read("package.json"))
+        self.assertEqual(package["scripts"]["build:gm"], "vite build --config vite.gm.config.js")
+        self.assertIn("vue-router", package["devDependencies"])
+        # The game Vite entry stays single and unchanged.
+        self.assertIn('index: "web/webclient-app/main.js"', _read("vite.config.js"))
+        self.assertNotIn("admin-app", _read("vite.config.js"))
 
 
 class FrontendLayoutContractTests(unittest.TestCase):

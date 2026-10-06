@@ -63,14 +63,16 @@ WORKDIR /build
 # install method, so the pin above is the actual source of truth.
 RUN npm install --global pnpm@12.5.1
 
-COPY --chown=root:0 package.json pnpm-lock.yaml pnpm-workspace.yaml vite.config.js ./
+COPY --chown=root:0 package.json pnpm-lock.yaml pnpm-workspace.yaml vite.config.js vite.gm.config.js ./
 RUN --mount=type=cache,id=pnpm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 COPY --chown=root:0 web/ /build/web/
-# Emits the stable-entry dist (index.js + index.css + hashed assets/) into the
-# static tree; the app-layout stage copies it into the served image root.
-RUN pnpm run build
+# Emits the stable-entry dists (index.js + index.css + hashed assets/) into the
+# static tree: the game webclient and, from its own config and output, the GM
+# portal (gm-portal-s1-foundation). The app-layout stage copies both into the
+# served image root.
+RUN pnpm run build && pnpm run build:gm
 
 ########################################
 # Application layout stage
@@ -94,6 +96,10 @@ COPY --chown=root:0 prompts/ /app/prompts/
 # Vue SPA dist produced by the vue-dist stage, served from the project origin
 # like every other web/static asset (webclient-vue-01-foundation, design D2).
 COPY --chown=root:0 --from=vue-dist /build/web/static/webclient/app/dist/ /app/web/static/webclient/app/dist/
+COPY --chown=root:0 --from=vue-dist /build/web/static/gm/dist/ /app/web/static/gm/dist/
+# The project version source: the GM session API reads [project].version
+# from the game root (gm-portal-s1-foundation).
+COPY --chown=root:0 pyproject.toml /app/pyproject.toml
 
 RUN find /app -type d -exec chmod 0755 {} + && \
     find /app -type f -exec chmod 0644 {} + && \
