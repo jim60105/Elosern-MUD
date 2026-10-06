@@ -122,6 +122,11 @@ def _classify_subject(entity: Any) -> str:
     a character carrying an explicit named ``portrait_policy`` is a named
     character; anything else is ``none``. It is never inferred from display
     name, key shape, or LLM authorship.
+
+    ``monster`` here means the generic tier subject only. A species-backed
+    individual classifies the same way (its tier still resolves) and resolves
+    its species image identity separately, at the official content reference
+    layer — this classification never sees a species key.
     """
     threat_tier = getattr(entity, "threat_tier", None)
     if threat_tier in MONSTER_TIER_REGISTRY:

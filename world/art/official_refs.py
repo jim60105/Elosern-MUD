@@ -19,17 +19,19 @@ The key grammar is *not* duplicated: it is the published shared predicate
 also calls, so a key the catalog indexed can never be refused here.
 
 **Derived only from provenance.** ``official_content_reference_for_entity``
-reads exactly two entity attributes — ``creation_preset_key`` (written by the
-preset activation and companion-build paths) and ``npc_profile_key`` (written
-by this change at the settlement-host and guild-examiner creation paths). It
-reads no display name, translated label, quest role, database row identity,
-service anchor, threat tier, or free text, and its read surface is pinned to
-exactly those two names by a test, so no inference path can exist. A declared
-key that is malformed or absent from the owning registry resolves to nothing
-and emits one bounded ``official_content_reference_unresolved`` warning
-(deduped per distinct key, capped per process). A caller-supplied key — the
-preset-preview entry point — resolves silently: a direct authored-channel
-lookup is not a named entity's stored provenance.
+reads exactly three entity attributes — ``creation_preset_key`` (written by the
+preset activation and companion-build paths), ``npc_profile_key`` (written at
+the settlement-host and guild-examiner creation paths) and ``species_key``
+(``typeclasses.monsters.Monster``, written by ``monster-identity-construction``,
+the sibling change that owns the field). It reads no display name, translated
+label, quest role, database row identity, service anchor, threat tier, variant
+key, or free text, and its read surface is pinned to exactly those three names
+by a test, so no inference path can exist. A declared key that is malformed or
+absent from the owning registry resolves to nothing and emits one bounded
+``official_content_reference_unresolved`` warning (deduped per distinct key,
+capped per process). A caller-supplied key — the preset-preview entry point —
+resolves silently: a direct authored-channel lookup is not a named entity's
+stored provenance.
 
 **Provenance writes are owned elsewhere, one writer per path.** This module
 never writes: no record, no card, no store copy, no attribute. The writers are
@@ -41,26 +43,33 @@ one: blueprint-characterized quest occupants (their persona provenance is
 Neither infers a profile identity from a display name, an entity key, a tier, a
 role, or a service anchor.
 
-**Monsters are an honest prerequisite.** The ``monster`` kind exists in the
-vocabulary with ZERO producers in this change: species-specific official artwork
-requires the separate, still-unapproved monster species catalog design, which
-owns the species vocabulary. Until it lands, ``_species_content_reference``
-answers nothing and monsters present runtime artwork or the built-in silhouette
-exactly as today. No code path here maps a threat tier — or a display name — to
-a species, and no production module constructs a monster-kind reference; the
-future catalog supplies its producer behind this same function, keyed by the
-individual's own stored species identity (shared by species, never by tier).
-The provider receives the entity, so it can only ever answer with that entity's
-own reference.
+**Monsters: one official image per species key** (``species-portrait-identity``).
+The ``monster`` kind's membership authority is
+``world.lore.monster_species.MONSTER_SPECIES_REGISTRY``; the single producer,
+``_species_content_reference``, reads the individual's own stored ``species_key``
+and answers that species' reference, so a species-backed monster presents the
+mounted ``monster/<species-key>/`` artwork as its official default and every
+variant of one species shares that one image identity. No code path here maps a
+threat tier, a display name, or a variant key to a species: a present-but-bad
+stored value is refused exactly like any other unregistered key, and a tier-only
+individual (no stored species identity) resolves no reference at all. An
+unmounted species directory is pure fall-through — the chain continues with
+runtime artwork or the built-in silhouette — and the tier-validated
+``portrait:monster:<tier>`` subject keeps serving the generic silhouette/gallery
+layer unchanged, so the two identity layers can never be confused. A
+tier-named ``monster/<tier>/`` directory may be indexed by the catalog, but it
+is unreachable through this layer: a threat tier is not a registered species
+key, and no alias table exists.
 
-Two operator-facing statements of this prerequisite belong to other owners and
-are recorded here as the pointer rather than restated: authoring a
+Two operator-facing statements of this layer belong to other owners and are
+recorded here as the pointer rather than restated: authoring a
 ``monster/<tier>/`` directory does not select artwork, and species-specific
-official monster art activates only once the separate monster species catalog
-lands. The deployment guide (``docs/development/official-artwork-deployment.md``,
-owned by the ``official-artwork-deployment`` change) carries the operator-facing
-layout statement, and ``docs/development/settings-and-environment.md`` carries
-the ``ART_OFFICIAL_ROOT`` contract.
+official monster art presents only for a registered species key whose directory
+the mounted catalog holds. The deployment guide
+(``docs/development/official-artwork-deployment.md``, owned by the
+``official-artwork-deployment`` change) carries the operator-facing layout
+statement, and ``docs/development/settings-and-environment.md`` carries the
+``ART_OFFICIAL_ROOT`` contract.
 
 **Entity identity is a hash input only.** An entity with no named portrait
 subject is never manufactured into one here: this module installs no
@@ -82,6 +91,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.art.subjects import MAX_SUBJECT_KEY_LENGTH, is_valid_subject_key
+from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.observability import log_warn
@@ -104,6 +114,13 @@ OFFICIAL_CONTENT_KINDS = (
 # provenance, written at the host/examiner creation sites.
 PRESET_PROVENANCE_ATTRIBUTE = "creation_preset_key"
 NPC_PROFILE_PROVENANCE_ATTRIBUTE = "npc_profile_key"
+# The monster arm's provenance name: the field
+# ``typeclasses.monsters.Monster`` carries (``monster-identity-construction``,
+# the sibling change that owns and writes it). This module reads it as a stored
+# attribute name only — it may not import ``typeclasses`` — so the reference
+# chain stays a leaf, and one named constant keeps the name in a single place
+# beside the other two read names.
+SPECIES_PROVENANCE_ATTRIBUTE = "species_key"
 
 # The one bounded diagnostic id for a declared-but-unresolvable reference.
 UNRESOLVED_REFERENCE_EVENT = "official_content_reference_unresolved"
@@ -204,11 +221,13 @@ def _emit_unresolved(kind: str, declared: Any, entity: Any, reason: str) -> None
 def _registry_for(kind: str) -> Mapping[str, Any] | None:
     """The live registry owning a kind's content keys, or ``None`` when absent.
 
-    ``preset`` resolves against the player-preset registry and ``npc`` against
-    the authored NPC profile registry. ``monster`` has no registry yet: the
-    separate monster species catalog owns its vocabulary, so the kind has no
-    membership authority and therefore no producer in this change.
+    ``preset`` resolves against the player-preset registry, ``npc`` against the
+    authored NPC profile registry, and ``monster`` against the species registry
+    (``monster-species-registry``): the species vocabulary IS the monster kind's
+    content vocabulary, so a threat tier is never a member of it.
     """
+    if kind == OFFICIAL_KIND_MONSTER:
+        return MONSTER_SPECIES_REGISTRY
     if kind == OFFICIAL_KIND_PRESET:
         return PLAYER_PRESET_REGISTRY
     if kind == OFFICIAL_KIND_NPC:
@@ -221,8 +240,9 @@ def registered_content_key(kind: str, key: str) -> bool:
 
     Read from the live registries per call (the
     ``gallery_fallback._declared_key_for_entity`` precedent), never cached at
-    import, so a registry entry added after this module loaded is honored. A
-    kind with no registry (``monster``) registers nothing.
+    import, so a registry entry added after this module loaded is honored. Every
+    kind has exactly one membership authority: ``preset``, ``npc``, and
+    ``monster`` (the species registry), and an unknown kind registers nothing.
     """
     registry = _registry_for(kind)
     if registry is None:
@@ -236,10 +256,10 @@ def official_content_reference(
     """The validated reference for an authored ``(kind, key)`` pair, else ``None``.
 
     The authored-channel entry point: a caller that already holds a content key
-    (a creation preview, a future species provider's own lookup) asks here. An
+    (a creation preview, the species arm's own lookup) asks here. An
     unknown kind, a key outside the shared stable-key contract, and a key the
     owning registry does not declare each answer ``None`` — never a substituted
-    reference — and a kind with no registry answers ``None`` for every key.
+    reference.
     """
     if kind not in OFFICIAL_CONTENT_KINDS:
         return None
@@ -281,24 +301,26 @@ def _declared_reference(
 def _species_content_reference(entity: Any) -> OfficialContentReference | None:
     """The species-keyed official reference for a monster, or ``None``.
 
-    ZERO PRODUCERS IN THIS CHANGE. The ``monster`` kind's content vocabulary is
-    the separate, still-unapproved monster species catalog design (source design
-    §2 amendment 1: official monster artwork is shared by species/content
-    identity, never by threat tier). Until that catalog's owner supplies the
-    producer, every monster resolves no official reference and presents runtime
-    artwork or the built-in monster silhouette exactly as today; the existing
-    guarded seams stay intact.
+    The ``monster`` kind's content key is the individual's own stored species
+    identity, which every variant of that species shares (design §7: official
+    monster artwork is shared by species, never by threat tier). The value is
+    read here as a stored attribute of the entity passed in — never the threat
+    tier, the display name, or the variant key — so this function can only ever
+    answer with that entity's own reference.
 
-    The future producer reads the individual's own stored species identity here
-    and constructs that individual's reference — this function receives the
-    entity, so it can never answer with a sibling's content key, and no caller
-    may substitute a threat tier, a display name, or a variant key for a species
-    identity. Tests inject a synthetic provider through this module-private name
-    (``patch`` on ``world.art.official_refs._species_content_reference``) to
-    establish the contingent behavior; production code constructs no
-    monster-kind reference anywhere.
+    An absent attribute (a tier-only individual) answers ``None`` silently, the
+    way the preset and profile arms treat a missing provenance. A present value
+    resolves through the shared :func:`_declared_reference` path, so a malformed
+    or unregistered one degrades with the same single bounded diagnostic and
+    falls through to the runtime/silhouette chain exactly as an absent one does.
     """
-    return None
+    attributes = _entity_attributes(entity)
+    if attributes is None:
+        return None
+    declared = attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)
+    if declared is None:
+        return None
+    return _declared_reference(OFFICIAL_KIND_MONSTER, declared, entity)
 
 
 def official_content_reference_for_entity(entity: Any) -> OfficialContentReference | None:
@@ -307,11 +329,12 @@ def official_content_reference_for_entity(entity: Any) -> OfficialContentReferen
     The ordered arms are exactly the provenance attributes an authored path
     writes: ``creation_preset_key`` (preset-born characters and companions),
     then ``npc_profile_key`` (authored settlement hosts and guild examiners),
-    then the species seam (no producer yet). An entity carrying none of them —
-    every dynamically generated NPC, every imported NPC, every blueprint
-    occupant, every monster today — resolves ``None``, so its presentation stays
-    on the runtime chain. Nothing here is inferred from a display name, a tier,
-    a role, a row identity, a service anchor, or any other stored text.
+    then the species arm (``species_key``, a monster's stored species identity).
+    An entity carrying none of them — every dynamically generated NPC, every
+    imported NPC, every blueprint occupant, every tier-only monster — resolves
+    ``None``, so its presentation stays on the runtime chain. Nothing here is
+    inferred from a display name, a threat tier, a variant key, a role, a row
+    identity, a service anchor, or any other stored text.
     """
     attributes = _entity_attributes(entity)
     if attributes is not None:
@@ -338,6 +361,7 @@ __all__ = [
     "OFFICIAL_KIND_NPC",
     "OFFICIAL_KIND_PRESET",
     "PRESET_PROVENANCE_ATTRIBUTE",
+    "SPECIES_PROVENANCE_ATTRIBUTE",
     "UNRESOLVED_REFERENCE_EVENT",
     "OfficialContentReference",
     "OfficialContentReferenceError",

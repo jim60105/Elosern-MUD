@@ -207,7 +207,15 @@ def scene_subject_for(archetype: str) -> ArtSubject:
 
 
 def monster_subject_for(archetype: str) -> ArtSubject:
-    """Resolve and re-validate one generic-monster subject from the bestiary."""
+    """Resolve and re-validate one generic-monster subject from the bestiary.
+
+    The archetype is a threat tier and this tier-validated subject is the
+    built-in silhouette/gallery layer's ONLY monster subject vocabulary: a
+    species key is never a valid ``portrait:monster`` key here, because a
+    species-backed individual's species image identity lives exclusively in the
+    official content reference layer (``world.art.official_refs``), beside this
+    one rather than inside it.
+    """
     if archetype not in MONSTER_TIER_REGISTRY:
         raise ArtSubjectError(f"unknown monster archetype {archetype!r}")
     _validate_subject_key(archetype)
