@@ -28,10 +28,10 @@ so it is recorded here in prose only.
 ## What Changes
 
 - Record the shipped dream-stage retheme as a `dream-explicit-presentation` delta:
-  the collaborator inhabits a white throne standing on a sea of clouds, an
-  obscured goddess-like counterpart of stable persona pleasures herself while
-  speaking with the player, her exaggerated well-used genitals spurt visibly, and
-  the ankle-deep flood across the floor is recognized as her fluids.
+  an obscured goddess-like counterpart of stable persona sits on a white throne
+  standing on a sea of clouds and pleasures herself while speaking with the player
+  who stands in the ankle-deep flood of her own fluids, her exaggerated well-used
+  genitals spurting visibly, and that flood is recognized as hers.
 - Record that the dream stage's artwork is served from the external
   official-artwork system as a server-resolved same-origin URL
   (`npc/dream_goddess/dream-throne.webp`), never bundled into the client, and

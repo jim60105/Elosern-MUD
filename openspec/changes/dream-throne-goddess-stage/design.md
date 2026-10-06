@@ -142,7 +142,7 @@ consequence plus five non-blocking items. Dispositions:
   `scene_art_url()`.** The value can only be the catalog's own URL or `""`, and the
   proposed guard would import the heavy `world.art.presenter` → Evennia gallery chain
   into a pure narrative read model to defend an unreachable case; the fixed ASCII
-  identity and its 113-character URL are documented at the constant instead, with the
+  identity and its 114-character URL are documented at the constant instead, with the
   client bound recorded as deliberately inert.
 - **Deferred — an ops note that a schema bump strands a stale browser tab.** The
   property is inherent to every panel bump, the project is pre-release with no
