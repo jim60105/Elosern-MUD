@@ -11,25 +11,6 @@ feature work. It is the architectural source of truth for every OpenSpec change;
 if a change conflicts with it, the design document wins unless the change
 explicitly amends the design.
 
-The main code areas are:
-
-- `typeclasses/`: persistent Evennia entities such as characters, NPCs,
-  monsters, rooms, and objects.
-- `world/lore/`: immutable, registry-backed world data, mirrored idempotently
-  into Evennia Scripts at startup.
-- `world/rules/`: primary deterministic engine and general-purpose state resolver.
-- `world/narrative/`: deterministic narrative owner (events, memory, threads,
-  correspondence, attention, context snapshots, authoring records, validated
-  beat scheduling) as each is progressively implemented; invokes existing
-  subsystem owners for non-narrative state and never permits generative mutation.
-- `world/imports/`: versioned JSON schemas, validation, and transactional
-  loading.
-- `world/ai/`: generative systems. They may read state and emit validated
-  proposals, but must never mutate game state directly.
-- `commands/`, `server/`, and `web/`: Evennia command, configuration, and web
-  extension points.
-- `openspec/`: main specifications, active changes, and archived changes.
-
 ## Architectural invariants
 
 - Preserve the single-writer boundary: it separates generative from
@@ -95,12 +76,6 @@ The main code areas are:
 
 ## Python and Evennia conventions
 
-- Match the surrounding Python style: four spaces, modern type annotations
-  (`str | None`, built-in generics), short focused functions, and descriptive
-  module/class docstrings.
-- Group imports as standard library, third party, then project imports. Use
-  absolute imports across top-level packages and concise relative imports
-  within one package.
 - Use `AttributeProperty`, Evennia handlers, or `entity.db` for persistent
   typeclass state as appropriate; do not rely on ordinary instance attributes
   for data that must survive reloads.
@@ -118,19 +93,11 @@ The main code areas are:
 - Write code comments, docstrings, commit messages, and technical documentation
   in English. Preserve canonical Traditional Chinese lore terms and use
   Traditional Chinese for player-facing game prose.
-- No formatter, linter, or static type checker is currently configured. Follow
-  the existing idiom and keep `git diff --check` clean.
 
 ## uv workflow
 
 Use uv 0.12.0 or newer for every Python environment and command. The interpreter
 is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
-
-```sh
-uv sync --locked
-uv run --locked -m world.imports.validate world/imports/examples/example_character.json
-uv run --locked python -m compileall -q world typeclasses commands server
-```
 
 ### Frontend (pnpm)
 
@@ -139,80 +106,17 @@ from `web/webclient-app/` sources plus locked pnpm dependencies. The pnpm toolch
 is a dev/CI-time dependency only (no runtime npm or pnpm dependency); the built page is
 served entirely from the project origin.
 
-```sh
-corepack enable
-pnpm install --frozen-lockfile
-pnpm run build
-pnpm test
-pnpm run build-storybook
-pnpm run showcase-coverage
-```
-
-- `pnpm run build` → the Vite production bundle (`web/static/webclient/app/dist`).
-- `pnpm test` → the Vitest component suite under `web/webclient-app/tests/`.
-- `pnpm run build-storybook` → the offline component showcase (Storybook).
-- `pnpm run showcase-coverage` → the component-coverage check against the frozen
-  required-set manifest.
-
-### Webclient design direction
-
-The webclient is being redesigned as an AVG (visual-novel) + RPG hybrid in which
-artwork is a primary subject, not a MUD text column. Frame UI proposals and
-changes accordingly, and ship them as OpenSpec changes (no standalone HTML
-prototypes; the real app differs too much for a prototype to be useful).
-
-- Target desktop 16:9 only.
-- Layout: full-bleed stage on top; bottom band = message window (2/3 width) plus
-  command panel (1/3, bottom-right). Keep the image area large; do not put a
-  narrative column and minimap side by side eating ~60% of the width.
-- The player's own generated portrait stands on stage at all times; NPCs and
-  enemies stand opposite in dialogue and combat.
-- Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
-  condition; always shown in combat.
-- Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen
-  immediately (the server has `greeting_for()` in `world/rules/dialogue.py` for a
-  no-keyword opener).
-- The command line is hidden by default and expands via `/` or an icon.
-- The message window uses AVG click-to-advance paging with a typewriter effect,
-  paged per action response and never breaking mid-sentence; the player may act
-  while pages remain (leftover pages flush to the log).
-- A motion layer covers scene/mode transitions, typewriter, and beat-by-beat combat
-  choreography; structured combat beats in the server protocol are accepted.
-- Minimap has no legend and a thin frame, the full map fits the view, the full log
-  opens scrolled to the bottom, the dock has a fixed height, and redundant head
-  cards, 美術展示, and quick-word chips are removed.
-
-`web/webclient-app/styles/app-shell.css` contains `.elosern-root …` rules that
-duplicate or override component `<style>` blocks, and Storybook does not render
-under `.elosern-root`. When restyling a component, grep app-shell.css for its
-class names and remove or update the `.elosern-root` duplicates, and verify
-geometry with a live-client browser test, not only Storybook.
-
 ## NPC and dialogue content
 
 - NPC authored dialogue, voice lines, and persona cards are strictly in-character
-  (no OOC). An NPC knows only its own world: it never names a command (`rest`,
-  `buy`, `shop stock`, `前往`, `guild list` ...), never explains game operations
-  (熟練度, 整點結算, 指令), and never mentions UI. It describes the world-side
-  equivalent instead (「樓上有床」「看看架上有什麼」「去公會大廳的看板找委託」).
-- Setting is JRPG 劍與魔法奇幻, never 中式武俠 vocabulary (avoid 過招, 劍招, 招式,
-  祕技, 拜師, 功夫). Elves have no fixed trades, schooling, or inherited posts.
-- Register: casual settings (shops, taverns, inns, baths, homes) use natural spoken
-  colloquial zh-TW (particles 喔/啦/吧/嘛, short clauses), never essay-like prose;
-  only formal settings (on-duty officials, ceremonies, nobility) use formal phrasing.
-- Apply the `chinese-content-writing-guideline` bans (banned phrases, contrastive
-  不是…而是, em-dash, physical verbs on abstract objects). Also: no sentence-final
-  的, no mid-sentence colon, no reduplication, no 您/不舒服; mechanic paraphrases
-  (歇下來, 越久越熟, 不適 for a negative status) count as OOC.
-- A merchant only buys back goods its own assortment offers.
-- Existing specs or tests that require dialogue to "name the commands" must be
-  MODIFIED in the change's delta spec, with the tests switched to a "no backticked
-  token / no OOC" assertion.
-- Content slices are authored directly by the lead agent, not delegated to
-  subagents, to keep one unified style.
-- When content slices branch from master independently, shared test edits must be
-  byte-identical hunks so they merge cleanly. Host-less test fixtures that
-  `replace()` a shipped row must also set `host_profile_key=None`.
+  (no OOC): an NPC never names a command, game mechanic, or UI element, and
+  describes the world-side equivalent instead.
+- Setting is JRPG 劍與魔法奇幻, never 中式武俠 vocabulary.
+- Read `.agents/skills/npc-dialogue-content/SKILL.md` before writing or reviewing
+  NPC content.
+
+Webclient design direction and styling pitfalls live in
+`web/webclient-app/AGENTS.md`; read it before changing webclient UI.
 
 ## Python-vs-pnpm split
 
@@ -255,13 +159,7 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 - The full managed browser suite and `tools.spec_traceability verify --evidence`
   are CI-only. Local browser testing uses one class or file within the budget.
 - Do not run CI shard commands locally. They share database and pidfile paths.
-- Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are fast;
-  `tools.spec_traceability check` is the local traceability gate.
-- JS gates: the dependency-free Node gate, the Vitest component suite
-  (`pnpm test`), and the Storybook build + component-coverage
-  (`pnpm run build-storybook`, `pnpm run showcase-coverage`) are the applicable JS
-  gates. The full managed browser suite, `tools.spec_traceability verify
-  --evidence`, and the aggregate Python branch-coverage gate are CI-owned.
+- `tools.spec_traceability check` is the local traceability gate.
 - A browser test file that exceeds five minutes in CI must be split.
 - Browser tests: pick the specific affected `def test_` methods (or one class or
   file) and run each batch as its own short command, e.g.
