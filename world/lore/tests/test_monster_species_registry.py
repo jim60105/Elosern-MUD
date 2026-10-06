@@ -19,6 +19,8 @@ from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.objects.models import ObjectDB
 from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
@@ -180,6 +182,9 @@ class PublishedRegistryReadOnlyTests(unittest.TestCase):
     def _published(name: str):
         return getattr(registry, name)
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_the_published_registries_are_read_only_proxies(self):
         for name in self.REGISTRY_NAMES:
             with self.subTest(registry=name):
@@ -215,6 +220,9 @@ class PublishedRegistryReadOnlyTests(unittest.TestCase):
 class StableIdentityTests(unittest.TestCase):
     """Requirement: keys are the identity; names and tiers are not."""
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_a_rename_and_a_tier_change_leave_every_lookup_by_key_intact(self):
         species, variants = _valid_registry()
         registry.validate_monster_species_registry(species, variants, **_faces())
@@ -257,6 +265,9 @@ class StableIdentityTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, mismatched, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_no_lookup_by_display_name_exists(self):
         for name in dir(registry):
             if name.startswith("_"):
@@ -271,6 +282,9 @@ class StableIdentityTests(unittest.TestCase):
         for absent in ("species_by_name", "variant_by_name", "lookup_by_display_name"):
             self.assertFalse(hasattr(registry, absent))
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_the_shared_key_contract_gates_both_key_faces(self):
         species, variants = _valid_registry()
 
@@ -296,13 +310,22 @@ class RecordShapeTests(unittest.TestCase):
     def _field_names(self, cls: type) -> set[str]:
         return {field.name for field in dataclasses.fields(cls)}
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_the_species_declares_no_ability_baseline(self):
         self.assertEqual(self._field_names(MonsterSpecies) & ABILITY_BASELINE_FIELDS, set())
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_neither_class_carries_an_inheritance_or_override_field(self):
         self.assertEqual(self._field_names(MonsterSpecies) & INHERITANCE_FIELDS, set())
         self.assertEqual(self._field_names(MonsterVariant) & INHERITANCE_FIELDS, set())
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_the_declared_field_sets_are_exactly_the_contract(self):
         self.assertEqual(
             self._field_names(MonsterSpecies),
@@ -334,6 +357,9 @@ class RecordShapeTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "monster-species-registry::species-and-variant-registries-are-frozen-keyed-read-only-lore-data"
+    )
     def test_a_variant_is_a_standalone_complete_record(self):
         variant = _variant()
         for field in dataclasses.fields(MonsterVariant):
@@ -347,12 +373,18 @@ class RecordShapeTests(unittest.TestCase):
 class MembershipValidationTests(unittest.TestCase):
     """Requirement: membership, default-variant, and classification rules."""
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_an_orphan_variant_is_rejected(self):
         species, variants = _valid_registry()
         variants = dict(variants, t_fixture_ordinary=_variant(species_key="t_fixture_absent"))
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, variants, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_a_variant_key_cannot_be_stolen_by_another_species(self):
         first = _variant("t_contested", species_key="t_fixture_species")
         thief = _variant("t_contested", species_key="t_fixture_other")
@@ -362,11 +394,17 @@ class MembershipValidationTests(unittest.TestCase):
         merged = registry.build_monster_variant_registry((first, first))
         self.assertEqual(sorted(merged), ["t_contested"])
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_a_default_variant_that_is_not_registered_is_rejected(self):
         species = {"t_fixture_species": _species(default_variant_key="t_fixture_absent")}
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, {}, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_a_default_variant_from_another_species_is_rejected(self):
         species = {
             "t_fixture_species": _species(default_variant_key="t_fixture_foreign"),
@@ -383,6 +421,9 @@ class MembershipValidationTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, variants, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_a_stronger_variant_cannot_be_the_species_baseline(self):
         species = {"t_fixture_species": _species(default_variant_key="t_fixture_stronger")}
         variants = {
@@ -393,6 +434,9 @@ class MembershipValidationTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, variants, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_the_authored_flag_classifies_and_the_name_never_does(self):
         # A strength-sounding name with an authored ordinary classification is
         # ordinary; the same name with the stronger classification cannot be a
@@ -413,6 +457,9 @@ class MembershipValidationTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(species, stronger, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_an_unknown_habitat_tier_or_grade_is_rejected(self):
         species = {"t_fixture_species": _species(habitat_tags=("t_fixture_unmapped",))}
         with self.assertRaises(MonsterSpeciesRegistryError):
@@ -433,6 +480,9 @@ class MembershipValidationTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(good_species, bad_grade, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_the_species_classification_must_be_a_boolean_agreeing_with_its_baseline(self):
         species, variants = _valid_registry()
         registry.validate_monster_species_registry(species, variants, **_faces())
@@ -464,16 +514,25 @@ class BalanceSlotTests(unittest.TestCase):
         values.update(overrides)
         return MonsterCombatProfile(**values)  # type: ignore[arg-type]
 
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_a_partial_profile_cannot_be_constructed(self):
         with self.assertRaises(MonsterSpeciesRegistryError):
             MonsterCombatProfile(hp=1, mp=0, sp=0, atk_phys=1, agility=1, defense=1)
 
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_an_unpopulated_or_non_integer_or_negative_value_is_rejected(self):
         for overrides in ({"magic_power": None}, {"hp": 1.5}, {"hp": True}, {"hp": -1}):
             with self.subTest(overrides=overrides):
                 with self.assertRaises(MonsterSpeciesRegistryError):
                     self._complete(**overrides)
 
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_a_complete_profile_is_accepted_and_projected_verbatim(self):
         profile = self._complete()
         species, variants = _valid_registry()
@@ -497,6 +556,9 @@ class BalanceSlotTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_a_magic_flavoured_variant_reads_none_and_never_an_inferred_number(self):
         species, variants = _valid_registry()
         variants["t_fixture_ordinary"] = replace(
@@ -518,6 +580,9 @@ class BalanceSlotTests(unittest.TestCase):
 class PublishedProjectionTests(unittest.TestCase):
     """Requirement: the published views are allowlists; private notes never leak."""
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_the_species_view_is_exactly_the_allowlist(self):
         view = registry.published_species_view(_species())
         self.assertEqual(
@@ -532,6 +597,9 @@ class PublishedProjectionTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_the_variant_view_is_exactly_the_allowlist(self):
         view = registry.published_variant_view(_variant())
         self.assertEqual(
@@ -548,6 +616,9 @@ class PublishedProjectionTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_private_notes_absent_from_the_serialized_payload_and_its_keys(self):
         row = _species(
             author_hidden_truth_zh="試製隱秘真相哨兵字串",
@@ -560,6 +631,9 @@ class PublishedProjectionTests(unittest.TestCase):
                 self.assertNotIn(field, payload)
             self.assertNotIn("哨兵字串", payload)
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_a_missing_public_description_is_not_backfilled_from_private_text(self):
         row = _species(
             published_appearance_zh="",
@@ -570,6 +644,9 @@ class PublishedProjectionTests(unittest.TestCase):
         self.assertEqual(view["published_appearance_zh"], "")
         self.assertNotIn("哨兵字串", json.dumps(view, ensure_ascii=False))
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_published_conjecture_keeps_its_uncertainty_marking(self):
         colophon = "（未經證實的說法）試製學者相信牠們來自北方。"
         normalised = colophon.replace("未經證實", "已知")
@@ -581,6 +658,9 @@ class PublishedProjectionTests(unittest.TestCase):
         # normalised text instead; the published view never transforms prose.
         self.assertNotEqual(view["published_ecology_zh"], normalised)
 
+    @covers_requirement(
+        "monster-species-registry::published-projections-expose-only-marked-public-fields"
+    )
     def test_no_whole_record_serializer_is_exposed(self):
         for absent in ("to_dict", "asdict", "dump", "serialize", "species_to_dict"):
             self.assertFalse(hasattr(registry, absent))
@@ -589,12 +669,18 @@ class PublishedProjectionTests(unittest.TestCase):
 class HabitatCompatibilityTests(unittest.TestCase):
     """Requirement: habitat tags are compatibility data and authorize no spawning."""
 
+    @covers_requirement(
+        "monster-species-registry::habitat-tags-are-compatibility-data-and-never-authorize-spawning"
+    )
     def test_the_module_offers_no_spawn_or_placement_callable(self):
         public = {name for name in dir(registry) if not name.startswith("_")}
         for fragment in PLACEMENT_NAME_FRAGMENTS:
             offending = [name for name in public if fragment in name.lower()]
             self.assertEqual(offending, [], f"{fragment} appears in {offending}")
 
+    @covers_requirement(
+        "monster-species-registry::habitat-tags-are-compatibility-data-and-never-authorize-spawning"
+    )
     def test_the_public_callables_are_exactly_the_read_validate_project_set(self):
         public_callables = {
             name
@@ -606,6 +692,9 @@ class HabitatCompatibilityTests(unittest.TestCase):
         }
         self.assertEqual(public_callables, set(EXPECTED_PUBLIC_CALLABLES))
 
+    @covers_requirement(
+        "monster-species-registry::habitat-tags-are-compatibility-data-and-never-authorize-spawning"
+    )
     def test_no_row_or_projection_carries_a_placement_payload(self):
         species_fields = {field.name for field in dataclasses.fields(MonsterSpecies)}
         variant_fields = {field.name for field in dataclasses.fields(MonsterVariant)}
@@ -625,6 +714,9 @@ class HabitatCompatibilityTests(unittest.TestCase):
         self.assertEqual(view["habitat_tags"], (HABITAT, SPARE_HABITAT))
         self.assertEqual(set(view) & placement_fields, set())
 
+    @covers_requirement(
+        "monster-species-registry::habitat-tags-are-compatibility-data-and-never-authorize-spawning"
+    )
     def test_a_tag_matching_species_is_resolvable_only_as_its_own_record(self):
         # Compatibility is not presence: matching every known habitat changes
         # nothing about where the species is, because no callable answers that
@@ -660,6 +752,9 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
             _runtime_digest(ScriptDB, exclude_prefix="lore:"),
         )
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_the_step_mirrors_exactly_the_species_and_variant_records(self):
         expected = self._expected_record_keys()
         self.assertTrue(expected)
@@ -673,6 +768,9 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
                 self.assertEqual(len(records), 1, f"{category}:{key}")
                 self.assertEqual(records[0].db.category, category)
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_repeating_the_step_is_a_no_op(self):
         def mirrored_rows():
             return [
@@ -694,6 +792,9 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         self.assertEqual(first_rows, second_rows)
         self.assertEqual(first_keys, second_keys)
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_the_mirror_touches_no_monster_room_quest_or_art_record(self):
         before = self._runtime_state()
         sync_monster_species()
@@ -702,6 +803,9 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         sync_monster_species()
         self.assertEqual(after_first_run, self._runtime_state())
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_one_boundary_event_carries_the_registry_context(self):
         with patch("world.lore.sync.log_info") as info:
             sync_monster_species()

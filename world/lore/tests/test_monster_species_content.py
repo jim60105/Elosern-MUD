@@ -14,6 +14,8 @@ import pathlib
 import re
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.art.subjects import is_valid_subject_key, subject_key_violation
 from world.lore.combat_traits import COMBAT_TRAITS_VOCABULARY
 from world.lore.monster_species import (
@@ -118,6 +120,9 @@ def _string_values(value: object, seen: set[int], out: set[str]) -> None:
 
 
 class ApprovedBestiaryContentTests(unittest.TestCase):
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_the_registry_carries_the_six_approved_species_and_no_others(self):
         self.assertEqual(set(MONSTER_SPECIES_REGISTRY), set(APPROVED_SPECIES))
         for key, (display_name, default_variant) in APPROVED_SPECIES.items():
@@ -128,6 +133,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                 self.assertEqual(species.default_variant_key, default_variant)
                 self.assertTrue(species.ordinary_variant)
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_each_species_baseline_is_its_own_ordinary_variant(self):
         for key, (_display_name, default_variant) in APPROVED_SPECIES.items():
             with self.subTest(species=key):
@@ -135,6 +143,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                 self.assertEqual(variant.species_key, key)
                 self.assertTrue(variant.ordinary_variant)
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_the_registry_carries_the_twelve_approved_variant_directions(self):
         self.assertEqual(set(MONSTER_VARIANT_REGISTRY), set(APPROVED_VARIANTS))
         for key, (species_key, display_name, tier, ordinary) in APPROVED_VARIANTS.items():
@@ -146,6 +157,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                 self.assertEqual(variant.threat_tier, tier)
                 self.assertEqual(variant.ordinary_variant, ordinary)
 
+    @covers_requirement(
+        "monster-species-registry::every-variant-belongs-to-its-species-and-the-default-variant-is-an-ordinary-variant-of-it"
+    )
     def test_every_variant_is_an_ordinary_or_stronger_form_of_one_species(self):
         owners = {
             key: row.species_key for key, row in MONSTER_VARIANT_REGISTRY.items()
@@ -161,6 +175,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                 sum(MONSTER_VARIANT_REGISTRY[key].ordinary_variant for key in owned), 1
             )
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
         for key in APPROVED_SPECIES:
             with self.subTest(species=key):
@@ -195,6 +212,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                             getattr(species, private), getattr(species, published)
                         )
 
+    @covers_requirement(
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+    )
     def test_every_published_string_is_verbatim_approved_prose_in_order(self):
         """Each published sentence is the approved bestiary text, in its order."""
         haystack = _normalised(BESTIARY.read_text(encoding="utf-8"))
@@ -229,6 +249,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                     key, "description_zh", MONSTER_VARIANT_REGISTRY[key].description_zh
                 )
 
+    @covers_requirement(
+        "monster-species-registry::habitat-tags-are-compatibility-data-and-never-authorize-spawning"
+    )
     def test_habitat_compatibility_tags_name_known_habitats(self):
         for key in APPROVED_SPECIES:
             with self.subTest(species=key):
@@ -239,6 +262,9 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
 
 
 class BalanceSlotContentTests(unittest.TestCase):
+    @covers_requirement(
+        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
     def test_no_shipped_variant_carries_an_invented_number_or_grade(self):
         for key, variant in MONSTER_VARIANT_REGISTRY.items():
             with self.subTest(variant=key):
@@ -293,6 +319,9 @@ class AbilitySeamNegativeTests(unittest.TestCase):
         self.assertTrue(MONSTER_BEHAVIOUR_YAML["archetypes"])
         self.assertTrue(COMBAT_TRAITS_VOCABULARY)
 
+    @covers_requirement(
+        "monster-species-registry::special-abilities-are-narrative-boundaries-with-a-named-mechanics-prerequisite-never-fake-skills"
+    )
     def test_no_registry_string_names_a_skill_behaviour_or_combat_trait(self):
         faces = self._forbidden_faces()
         for source, registry in (
@@ -306,12 +335,18 @@ class AbilitySeamNegativeTests(unittest.TestCase):
                     self.assertTrue(strings)
                     self.assertEqual(strings & faces, set())
 
+    @covers_requirement(
+        "monster-species-registry::special-abilities-are-narrative-boundaries-with-a-named-mechanics-prerequisite-never-fake-skills"
+    )
     def test_no_registry_field_stands_in_for_an_ability_seam(self):
         for cls in (MonsterSpecies, MonsterVariant):
             with self.subTest(cls=cls.__name__):
                 names = {field.name for field in dataclasses.fields(cls)}
                 self.assertEqual(names & FORBIDDEN_SEAM_FIELDS, set())
 
+    @covers_requirement(
+        "monster-species-registry::special-abilities-are-narrative-boundaries-with-a-named-mechanics-prerequisite-never-fake-skills"
+    )
     def test_the_behaviour_selection_path_reads_no_species_identity(self):
         # Nothing in the existing behaviour-selection path reads species or
         # variant identity, so a variant's ability narrative cannot unlock an
