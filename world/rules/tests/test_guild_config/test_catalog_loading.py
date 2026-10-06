@@ -36,7 +36,15 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         )
         self.assertEqual(
             {offer.definition_key for offer in catalog.quest_offers},
-            {"introductory_hunt"},
+            {
+                "introductory_hunt",
+                "eastern_plains_sway_whistle_sparrow",
+                "eastern_plains_ridge_burrow_hare",
+                "northwest_highland_forest_fog_mane_lynx",
+                "southwest_coast_tide_lamp_crab",
+                "western_hills_valleys_ridge_burrow_hare",
+                "western_hills_valleys_rock_echo_goat",
+            },
         )
 
     def test_reward_copper_lies_inside_quest_rank_band(self):
