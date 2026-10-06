@@ -71,6 +71,9 @@ export function createGmApi({
   onForbidden = () => {},
   cookies = () => globalThis.document?.cookie ?? "",
 } = {}) {
+  // One login hand-off per page: parallel calls that all see 401 navigate once.
+  let loginStarted = false;
+
   async function request(path, { method = "GET", body } = {}) {
     const headers = { Accept: "application/json" };
     const init = { method, credentials: "same-origin", headers };
@@ -88,7 +91,10 @@ export function createGmApi({
     }
 
     if (response.status === 401) {
-      navigate(loginRedirectUrl(loginUrl, location));
+      if (!loginStarted) {
+        loginStarted = true;
+        navigate(loginRedirectUrl(loginUrl, location));
+      }
       throw new GmApiError("unauthenticated", { status: 401, message: "請先登入。" });
     }
 

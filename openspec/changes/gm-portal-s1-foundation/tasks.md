@@ -26,3 +26,5 @@
 - [x] 4.1 Run registered GM Evennia tests, GM Vitest tests, dependency-boundary Node tests, and the showcase coverage gate after implementation integration; verify all delta-spec scenarios are covered and report actual results.
 - [x] 4.2 Build both frontends and the container delivery path, then exercise authenticated shell/history loading, overview data, unauthorized API envelopes, and service-offline loading; verify stable asset delivery and that `/admin/`, game bundle behavior, and player/OOB contracts remain unchanged.
 - [x] 4.3 Update existing project build/test/operator documentation or changelog with GM access, dual-build commands, coverage registration, and the S1-only boundary; verify documented commands match delivered scripts and no S2–S6 feature is represented as available.
+
+> Archive follow-up (not an implementation task): when the delta specs sync into `openspec/specs/`, attach `@covers_requirement` annotations for the new `gm-portal-access-api` and `gm-portal-spa` requirement IDs to the `web/gm/tests/` tests and the `test_spa_evidence` bridge, following the precedent of earlier Vue evidence bridges.

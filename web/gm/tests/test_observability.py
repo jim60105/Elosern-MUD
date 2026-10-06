@@ -10,7 +10,10 @@ import json
 from pathlib import Path
 from unittest import mock
 
+from django.db import DatabaseError
 from django.test import Client
+
+from web.gm.access import ROUTE_LABEL_LIMIT
 
 from web.gm.tests._support import GmTestCase
 
@@ -75,6 +78,26 @@ class GmEventTest(GmTestCase):
             response, requests, _ = self.request("developer", "/gm/api/health", client=client)
         self.assertEqual(response.status_code, 500)
         self.assertEqual([r["status"] for r in requests], [500])
+
+    def test_an_unreadable_session_store_still_answers_and_logs_the_api(self):
+        client = self.client_for("developer")
+        with mock.patch(
+            "web.gm.middleware.access_decision", side_effect=DatabaseError("locked")
+        ), mock.patch("web.gm.middleware.log_info") as log_info, \
+                mock.patch("web.gm.middleware.log_warn") as log_warn:
+            response = client.get("/gm/api/session")
+        self.assert_error_envelope(response, 503, "database_unreadable")
+        self.assertEqual(log_warn.call_args.args[0], "gm_access_unavailable")
+        statuses = [c.kwargs["context"]["status"] for c in log_info.call_args_list
+                    if c.args[0] == "gm_request"]
+        self.assertEqual(statuses, [503])
+
+    def test_event_routes_are_truncated(self):
+        url = "/gm/api/" + "x" * 500
+        _, requests, denied = self.request("anonymous", url)
+        self.assertEqual(len(requests[0]["route"]), ROUTE_LABEL_LIMIT + 1)
+        self.assertTrue(requests[0]["route"].startswith("/gm/api/xxx"))
+        self.assertEqual(denied[0]["route"], requests[0]["route"])
 
     def test_event_context_carries_no_cookie_or_token_values(self):
         client = self.client_for("developer")

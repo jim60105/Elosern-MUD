@@ -7,8 +7,6 @@ performs one real database read and never probes LLM or SD services.
 
 from __future__ import annotations
 
-import tomllib
-
 from django.conf import settings
 from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse
@@ -19,6 +17,7 @@ from django.views.decorators.http import require_safe
 from evennia.accounts.models import AccountDB
 
 from web.gm import responses
+from web.gm.access import route_label
 from web.gm.version import game_version
 from world.observability import log_error, log_warn
 
@@ -54,11 +53,11 @@ def session(request: HttpRequest) -> HttpResponse:
         return rejected
     try:
         version = game_version()
-    except (OSError, KeyError, ValueError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, ValueError) as exc:  # TOMLDecodeError is a ValueError
         log_error(
             "gm_version_unavailable",
             exc=exc,
-            context={"route": request.path_info, "account": request.user.username},
+            context={"route": route_label(request.path_info), "account": request.user.username},
         )
         return responses.error("version_unavailable", 500)
     user = request.user
@@ -84,7 +83,7 @@ def health(request: HttpRequest) -> HttpResponse:
         log_warn(
             "gm_health_database_unreadable",
             exc=exc,
-            context={"route": request.path_info, "account": request.user.username},
+            context={"route": route_label(request.path_info), "account": request.user.username},
         )
         return responses.error("database_unreadable", 503)
     return responses.ok({"django": "ok", "database": "readable"})

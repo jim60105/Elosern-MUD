@@ -24,7 +24,7 @@ Define cursor/limit and POST-only write conventions in the contract; there is no
 
 ### 3. Request logging covers early denials and API fallback
 
-Use facade calls from the GM boundary: `gm_denied` on all access refusals and `gm_request` once per API request after the final response status is known. Wrap access handling within the request logging boundary so early 401/403 responses and API misses are included. Ensure middleware-originated responses relevant to GM APIs are covered by a narrowly scoped response-logging hook if needed; do not log cookie/token contents. Account context is the account name or `anonymous`; route is the request path. No freeze-file entry and no audit model are needed.
+Use facade calls from the GM boundary: `gm_denied` on all access refusals and `gm_request` once per API request after the final response status is known. Wrap access handling within the request logging boundary so early 401/403 responses and API misses are included. Ensure middleware-originated responses relevant to GM APIs are covered by a narrowly scoped response-logging hook if needed; do not log cookie/token contents. Account context is the account name or `anonymous`; route is the request path, truncated to a fixed length so probing long paths cannot inflate log lines. If resolving the session user itself fails on a database error, a GM API request still answers with the 503 `database_unreadable` envelope and its `gm_request` event. No freeze-file entry and no audit model are needed.
 
 ### 4. Independent Vite output and shared tooling, not a shared runtime
 

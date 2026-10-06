@@ -56,6 +56,18 @@ class GmSessionApiTest(GmTestCase):
         self.assertEqual(log_error.call_args.args[0], "gm_version_unavailable")
 
 
+    def test_misshapen_version_source_is_an_error_envelope(self):
+        from web.gm import version
+
+        version.game_version.cache_clear()
+        try:
+            with mock.patch("web.gm.version.tomllib.load", return_value={"project": "0.1.0"}):
+                response = self.client_for("developer").get("/gm/api/session")
+        finally:
+            version.game_version.cache_clear()
+        self.assert_error_envelope(response, 500, "version_unavailable")
+
+
 class GmHealthApiTest(GmTestCase):
     def test_health_reports_django_and_database_without_network(self):
         with mock.patch.object(

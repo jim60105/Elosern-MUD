@@ -68,6 +68,15 @@ describe("GM fetch boundary", () => {
     expect(onForbidden).not.toHaveBeenCalled();
   });
 
+  it("hands off to login once even when parallel calls all see 401", async () => {
+    const { api, navigate } = client(
+      reply(401, { ok: false, error: { code: "unauthenticated", message: "請先登入。" } }),
+    );
+    const results = await Promise.allSettled([api.get("/session"), api.get("/health")]);
+    expect(results.map((result) => result.reason.code)).toEqual(["unauthenticated", "unauthenticated"]);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
   it("routes a 403 forbidden to the permission-denied view, not login", async () => {
     const { api, navigate, onForbidden } = client(
       reply(403, { ok: false, error: { code: "forbidden", message: "權限不足" } }),

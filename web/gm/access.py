@@ -30,6 +30,17 @@ FORBIDDEN = "forbidden"
 #: Attribute the URL-resolver contract test reads on every GM view callback.
 PROTECTED_MARKER = "gm_protected"
 
+#: Event context carries at most this many characters of a request path, so a
+#: scanner probing long /gm/ paths cannot inflate every log line.
+ROUTE_LABEL_LIMIT = 200
+
+
+def route_label(path: str) -> str:
+    """The request path for event context, truncated to a fixed length."""
+    if len(path) <= ROUTE_LABEL_LIMIT:
+        return path
+    return path[:ROUTE_LABEL_LIMIT] + "…"
+
 
 def is_gm_path(path: str) -> bool:
     """True for every path under the mounted ``/gm/`` namespace."""
@@ -65,7 +76,10 @@ def denial_response(request: HttpRequest, decision: str) -> HttpResponse:
     route = request.path_info
     log_warn(
         "gm_denied",
-        context={"account": account_label(getattr(request, "user", None)), "route": route},
+        context={
+            "account": account_label(getattr(request, "user", None)),
+            "route": route_label(route),
+        },
     )
     if is_gm_api_path(route):
         if decision == ANONYMOUS:

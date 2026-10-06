@@ -21,7 +21,8 @@ def game_version() -> str:
     path = Path(settings.GAME_DIR) / "pyproject.toml"
     with path.open("rb") as handle:
         data = tomllib.load(handle)
-    version = data["project"]["version"]
+    project = data.get("project")
+    version = project.get("version") if isinstance(project, dict) else None
     if not isinstance(version, str) or not version:
         raise ValueError("pyproject.toml [project].version is not a non-empty string")
     return version

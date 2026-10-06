@@ -89,11 +89,11 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         suites = sorted(str(path) for path in GM_TESTS.glob("*.test.js"))
         self.assertEqual(
             [Path(path).name for path in suites],
-            ["api.test.js", "components.test.js", "overview.test.js", "router.test.js", "shell.test.js"],
+            ["api.test.js", "components.test.js", "overview.test.js", "router.test.js", "session.test.js", "shell.test.js"],
         )
         result = _run(["npx", "--no-install", "vitest", "run", *suites])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+5 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+6 passed")
 
     def test_showcase_coverage_includes_every_gm_component(self):
         result = _run(["node", "scripts/component-coverage.mjs"], timeout=120)

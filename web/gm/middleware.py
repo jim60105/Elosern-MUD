@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from typing import Callable
 
+from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse
 
+from web.gm import responses
 from web.gm.access import (
     ALLOWED,
     access_decision,
@@ -25,8 +27,9 @@ from web.gm.access import (
     denial_response,
     is_gm_api_path,
     is_gm_path,
+    route_label,
 )
-from world.observability import log_info
+from world.observability import log_info, log_warn
 
 
 class GmBoundaryMiddleware:
@@ -40,19 +43,36 @@ class GmBoundaryMiddleware:
         if not is_gm_path(path):
             return self.get_response(request)
         user = getattr(request, "user", None)
-        decision = access_decision(user)
+        try:
+            # Resolving the lazy session user reads the database.
+            decision = access_decision(user)
+        except DatabaseError as exc:
+            if not is_gm_api_path(path):
+                raise
+            log_warn(
+                "gm_access_unavailable",
+                exc=exc,
+                context={"route": route_label(path), "method": request.method},
+            )
+            response = responses.error("database_unreadable", 503)
+            self._log_request(request, "unknown", path, response)
+            return response
         if decision != ALLOWED:
             response = denial_response(request, decision)
         else:
             response = self.get_response(request)
         if is_gm_api_path(path):
-            log_info(
-                "gm_request",
-                context={
-                    "account": account_label(user),
-                    "route": path,
-                    "method": request.method,
-                    "status": response.status_code,
-                },
-            )
+            self._log_request(request, account_label(user), path, response)
         return response
+
+    @staticmethod
+    def _log_request(request: HttpRequest, account: str, path: str, response: HttpResponse) -> None:
+        log_info(
+            "gm_request",
+            context={
+                "account": account,
+                "route": route_label(path),
+                "method": request.method,
+                "status": response.status_code,
+            },
+        )
