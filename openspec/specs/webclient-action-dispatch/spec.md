@@ -51,8 +51,10 @@ adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`,
 the seven gallery management adapters `gallery.subject.select`,
 `gallery.generate`, `gallery.default.set`, `gallery.card.delete`,
 `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`,
-and the four dream collaboration adapters `dream.say`, `dream.draft`,
-`dream.confirm`, and `dream.awaken`.
+the four personal official-art preference adapters `gallery.official.select`,
+`gallery.official.clear_selection`, `gallery.official.geometry.set`, and
+`gallery.official.geometry.clear`, and the four dream collaboration adapters
+`dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`.
 
 #### Scenario: Unknown action cannot become a command
 
@@ -71,9 +73,10 @@ and the four dream collaboration adapters `dream.say`, `dream.draft`,
 
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
 
-- **WHEN** the production registry is loaded after the practice-webclient change, the gallery management changes add their seven gallery adapters, the correspondence change adds its four letter adapters, the NPC author-editor change adds its two adapters, and the dream-sleep-surface change adds its four dream adapters
+- **WHEN** the production registry is loaded after the practice-webclient change, the gallery management changes add their seven gallery adapters, the personal official-art preference change adds its four gallery preference adapters, the correspondence change adds its four letter adapters, the NPC author-editor change adds its two adapters, and the dream-sleep-surface change adds its four dream adapters
 - **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `npc.persona.read`, `npc.persona.update`,
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, `gallery.stage.update`,
+`gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, `gallery.official.geometry.clear`,
 `letters.list`, `letters.collect`, `letters.read`, `letters.send`, `dream.say`,
 `dream.draft`, `dream.confirm`, and `dream.awaken`, each with its own exact
 validator and deterministic adapter

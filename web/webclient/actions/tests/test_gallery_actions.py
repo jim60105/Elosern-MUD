@@ -795,6 +795,9 @@ class OfficialPreferenceActionTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
+    @covers_requirement(
+        "webclient-gallery-management-actions::personal-official-selection-and-override-adapters-reject-official-file-mutation-authoritatively"
+    )
     def test_each_preference_adapter_writes_only_the_preference_and_publishes_once(self):
         identity = self._index("a.png")
         rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
@@ -941,6 +944,9 @@ class OfficialPreferenceActionTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
+    @covers_requirement(
+        "webclient-gallery-management-actions::personal-official-selection-and-override-adapters-reject-official-file-mutation-authoritatively"
+    )
     def test_an_out_of_reference_or_unindexed_identity_is_refused_with_no_write(self):
         mine = self._index("a.png")
         theirs = self._index("a.png", key=_OTHER_PRESET_KEY)
@@ -1072,6 +1078,12 @@ class OfficialPreferenceActionTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
+    @covers_requirement(
+        "webclient-gallery-management-actions::personal-official-selection-and-override-adapters-reject-official-file-mutation-authoritatively"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-mutation-attempts-fail-named-with-no-file-or-shared-change"
+    )
     def test_existing_mutation_adapters_refuse_an_official_identity_with_no_side_effects(self):
         identity = self._index("a.png")
         card = self._card()
@@ -1108,6 +1120,9 @@ class OfficialPreferenceActionTests(EvenniaTest):
         )
         self.assertEqual(api.official_preferences_for(self.subject).selection, identity)
 
+    @covers_requirement(
+        "official-art-personalization::official-mutation-attempts-fail-named-with-no-file-or-shared-change"
+    )
     def test_manual_generation_writes_only_the_runtime_store(self):
         self._index("a.png")
         official_before = self._world()[0]

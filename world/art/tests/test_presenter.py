@@ -1387,6 +1387,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
     @covers_requirement(
         "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
     )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_a_selected_official_image_presents_ahead_of_the_default_card(self):
         identity = self._index(
             face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
@@ -1432,6 +1435,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
     )
+    @covers_requirement(
+        "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
+    )
     def test_a_selection_resolves_ahead_of_the_classic_asset_and_falls_back_when_stale(self):
         identity = self._index()
         entity = self._character()
@@ -1453,6 +1459,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
     # -- personal geometry ------------------------------------------------
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
     )
     def test_a_personal_override_beats_the_catalog_geometry_and_never_writes(self):
         identity = self._index(
@@ -1479,6 +1488,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
 
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
     )
     def test_an_update_invalidated_override_degrades_with_one_diagnostic(self):
         identity = self._index("hero.png", width=4, height=4)
@@ -1560,6 +1572,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
     # -- acceptance criterion 4 -------------------------------------------
     @covers_requirement(
         "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
     )
     def test_two_characters_sharing_official_bytes_choose_independently(self):
         # One content directory (one manifest) holding two admitted images, so

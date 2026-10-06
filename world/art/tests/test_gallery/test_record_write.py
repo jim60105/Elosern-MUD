@@ -392,6 +392,12 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
             if path.is_file()
         }
 
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_a_selection_write_creates_a_card_less_record(self):
         subject = _character("selects")
         self.assertIsNone(record_for(subject))
@@ -417,6 +423,9 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
         self.assertEqual(record_for(subject).db.default_image_id, image_id)
         self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
 
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_an_explicit_default_clears_the_selection(self):
         subject = _character("mutuala")
         image_id = _new_id()
@@ -430,6 +439,9 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
         # The card list itself was never touched by either act.
         self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
 
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_a_selection_clears_an_explicit_default(self):
         subject = _character("mutualb")
         image_id = _new_id()
@@ -472,6 +484,9 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
         with self.assertRaises(GalleryRecordError):
             set_official_geometry(subject, _OFFICIAL)
 
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
     def test_clearing_absent_preferences_creates_nothing(self):
         subject = _character("clearsnothing")
         clear_official_selection(subject)
@@ -534,6 +549,12 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
                     clear_official_geometry(subject, identity)
         self.assertIsNone(record_for(subject))
 
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_preference_writes_touch_no_file_and_no_card(self):
         subject = _character("nofiles")
         image_id = _new_id()

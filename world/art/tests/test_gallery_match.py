@@ -769,6 +769,9 @@ class OfficialSelectionStepTests(EvenniaTestCase):
         append_card(subject, **fields)
         return fields["image_id"]
 
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_a_selection_outranks_the_default_card_and_stays_behind_a_binding(self):
         self._write_image("a.png", face_rect=dict(DEFAULT_FACE_RECT), stage={"scale": 1.0, "x": 0.0, "y": 0.0})
         selected = self._index("b.png", stage={"scale": 1.4, "x": 0.1, "y": -0.2})
@@ -799,6 +802,9 @@ class OfficialSelectionStepTests(EvenniaTestCase):
         # The selection survived both resolutions untouched.
         self.assertEqual(official_preferences_for(subject).selection, selected)
 
+    @covers_requirement(
+        "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
+    )
     def test_a_stale_selection_falls_through_to_the_default_card_and_is_retained(self):
         selected = self._index("b.png")
         subject = self._subject()
@@ -819,6 +825,9 @@ class OfficialSelectionStepTests(EvenniaTestCase):
         self.assertEqual(resolve_display(bare, self._entity(pk=12)), ("none", None))
         self.assertEqual(official_preferences_for(bare).selection, selected)
 
+    @covers_requirement(
+        "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
+    )
     def test_a_selection_outside_the_reference_resolves_nothing(self):
         self._index("a.png")
         subject = self._subject()
@@ -836,6 +845,9 @@ class OfficialSelectionStepTests(EvenniaTestCase):
                 )
                 self.assertEqual(official_preferences_for(subject).selection, identity)
 
+    @covers_requirement(
+        "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
+    )
     def test_the_retained_identity_resolves_new_bytes_after_a_restart(self):
         selected = self._index("b.png", width=4, height=4)
         subject = self._subject()
@@ -878,6 +890,9 @@ class OfficialSelectionStepTests(EvenniaTestCase):
             resolve_display(other, self._entity(pk=12))[1],
         )
 
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
     def test_mutual_clearing_between_the_two_writers(self):
         selected = self._index("b.png")
         subject = self._subject()

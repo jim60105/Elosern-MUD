@@ -748,6 +748,9 @@ class OfficialEntryProjectionTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
     )
+    @covers_requirement(
+        "webclient-gallery-panel::the-personal-selection-state-is-server-authored-in-the-panel-payload"
+    )
     def test_three_admitted_images_mark_the_selection_without_touching_cards(self):
         first = self._index("a.png")
         self._index("b.png")
@@ -795,6 +798,9 @@ class OfficialEntryProjectionTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    @covers_requirement(
+        "webclient-gallery-panel::the-personal-selection-state-is-server-authored-in-the-panel-payload"
     )
     def test_no_reference_or_absent_snapshot_presents_an_empty_list(self):
         self.assertEqual(gallery_presenter(self.context)["official_entries"], [])

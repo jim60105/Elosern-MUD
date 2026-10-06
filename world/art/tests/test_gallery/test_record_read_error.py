@@ -401,6 +401,9 @@ class OfficialPreferenceReadTests(EvenniaTestCase):
         self.assertEqual(self._events(warned), [])
         self.assertIsNone(record_for(subject))
 
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
     def test_a_malformed_stored_selection_reads_as_absent_with_one_event(self):
         subject = _character("prefbadsel")
         append_card(subject, **_card_fields(subject))
