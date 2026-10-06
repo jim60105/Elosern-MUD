@@ -53,7 +53,7 @@ The SPA SHALL use history routing with base `/gm/`. The home section SHALL be th
 - **THEN** routing stays under `/gm/` and authorization failure reaches the permission-denied view without repeated redirects or protected content display
 
 ### Requirement: Single GM fetch boundary
-All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 responses to the permission-denied view, and surface other errors by stable code. Network failure and malformed bodies SHALL produce explicit client errors, never fabricated success data. S1 SHALL test POST header wiring without introducing a production write endpoint.
+All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 `forbidden` responses to the permission-denied view, and surface other errors by stable code; a 403 `csrf_failed` is a transport failure and SHALL surface by its code rather than selecting the permission-denied view. Network failure and malformed bodies SHALL produce explicit client errors, never fabricated success data. S1 SHALL test POST header wiring without introducing a production write endpoint.
 
 #### Scenario: Success and POST wiring
 - **WHEN** a success envelope is fetched or a test POST is issued with a CSRF cookie
@@ -61,7 +61,7 @@ All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django se
 
 #### Scenario: Authentication and permission outcomes
 - **WHEN** an API call receives 401 or 403
-- **THEN** 401 initiates login with a GM return path and 403 selects the permission-denied view rather than login
+- **THEN** 401 initiates login with a GM return path and a 403 `forbidden` selects the permission-denied view rather than login, while a 403 `csrf_failed` surfaces its code without either
 
 #### Scenario: Other error outcomes
 - **WHEN** an API call receives a 404 envelope, a network failure, or a malformed JSON/envelope body
