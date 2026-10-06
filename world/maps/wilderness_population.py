@@ -14,18 +14,37 @@ in the wilderness script's ``itemcoordinates`` (never room contents, which the
 contrib's pooled-room design would strand), and it reconciles only monsters it
 owns via the ``population_key`` marker so future scripted encounters, bosses,
 or event content are never deleted, moved, or modified.
+
+Two disjoint ambient branches cover the bounded map (monster-site-placement
+design D-P5): a coordinate whose region carries an authored species placement
+rule (``world.lore.monster_placement``) is reconciled by that rule, building
+species-bearing individuals through the one construction entry point, and every
+other coordinate keeps the tier-example model above exactly as it was. The
+hunting band always stays with the tier-example branch, so the introductory
+hunt's pinned behaviour is untouched until species content covers the whole
+map. Both branches use this module's one ownership marker, and neither ever
+acts on a site-, quest-, story-, session-, or foreign-owned monster.
 """
 
+from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from django.db import transaction
 from evennia.utils.create import create_object
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from typeclasses.monsters import Monster
+from world.lore.monster_placement import (
+    AMBIENT_PLACEMENT_REGISTRY,
+    AmbientPlacementRule,
+    variant_species_key,
+)
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.rules.monster_individual import construct_species_individual
 from world.maps.wilderness_provider import region_for_coordinates
 
 # D-2 / wilderness-anchor-footprint: the entry coordinate is the capital's
@@ -111,6 +130,47 @@ def population_for_coordinates(x: int, y: int) -> MonsterPopulation | None:
 def _population_key(x: int, y: int) -> str:
     """Return the ownership marker this service stamps on every created monster."""
     return f"wilderness:{x}:{y}"
+
+
+def _emit_ambient(event: str, context: Mapping[str, object]) -> None:
+    """Schedule one ambient decision event on the enclosing durable commit.
+
+    Room preparation runs inside transactional movement, so a boundary line for
+    a placement that the transaction then rolled back must never be written
+    (the same commit contract ``clock_advance`` follows).
+    """
+    frozen = dict(context)
+    transaction.on_commit(lambda: log_info(event, context=frozen))
+
+
+def species_rule_for_coordinates(x: int, y: int) -> AmbientPlacementRule | None:
+    """The authored species placement rule covering ``(x, y)``, or ``None``.
+
+    A coordinate is covered by *exactly one* ambient branch (design D-P5):
+    coordinates inside the hunting band stay with the tier-example branch
+    because their cells are contract-pinned to the introductory hunt, and a
+    region without an authored rule keeps its tier-example behaviour until
+    species content covers it.
+    """
+    if _in_hunting_band(x, y):
+        return None
+    return AMBIENT_PLACEMENT_REGISTRY.get(region_for_coordinates(x, y))
+
+
+def ambient_variant_for_slot(
+    rule: AmbientPlacementRule, x: int, y: int, slot: int
+) -> str:
+    """The variant the rule's ``slot`` selects at ``(x, y)`` -- pure and shared.
+
+    The same closed-form coordinate hash the terrain and tier models use, mixed
+    with the rule's authored determinism salt and the individual's creation
+    slot: no RNG, no database state, and no wall clock, so the same coordinate
+    selects the same variant in every process.
+    """
+    index = (
+        _coordinate_hash(x, y) + rule.selection_salt + slot
+    ) % len(rule.variant_keys)
+    return rule.variant_keys[index]
 
 
 def _stored_hp(monster: Monster) -> float:
@@ -205,6 +265,111 @@ def _spawn(wilderness, coordinates: tuple[int, int], expected: MonsterPopulation
         monster.location = room
 
 
+def _spawn_species_individual(
+    wilderness,
+    coordinates: tuple[int, int],
+    variant_key: str,
+    population_key: str,
+) -> Monster:
+    """Create one species-bearing ambient individual through the construction owner.
+
+    Identity comes from the approved species/variant registries (the variant's
+    species key is read from the one variant registry, never duplicated here)
+    and the numbers from the construction owner's balance-gated rule, so no
+    species constant is restated in this module. The individual carries the
+    same ambient ownership marker as the tier-example population and is
+    registered in the wilderness bookkeeping like every other wilderness
+    monster.
+    """
+    individual = construct_species_individual(
+        variant_species_key(variant_key), variant_key
+    )
+    individual.db.population_key = population_key
+    wilderness.db.itemcoordinates[individual] = coordinates
+    room = wilderness.db.rooms.get(coordinates)
+    if room is not None:
+        individual.location = room
+    return individual
+
+
+def _reconcile_ambient_species(
+    wilderness, coordinates: tuple[int, int], rule: AmbientPlacementRule
+) -> None:
+    """Reconcile the species-bearing ambient individuals of one coordinate.
+
+    Only monsters carrying this coordinate's ambient ownership marker are
+    considered, so site-, quest-, story-, session-, and foreign-owned monsters
+    are never touched. Identity-less marker-matching rows are the branch
+    migration for a coordinate the species rules now cover: they are the same
+    model drift the tier-example branch already reconciles for itself, so they
+    are removed while the coordinate belongs to this branch. Living
+    species-bearing individuals are never deleted: the authored quantity is a
+    target and the authored capacity is a ceiling, never a reshuffle, so a
+    coordinate that already holds its population is left exactly as it is.
+    """
+    x, y = coordinates
+    population_key = _population_key(x, y)
+    matching = [
+        obj
+        for obj in wilderness.get_objs_at_coordinates(coordinates)
+        if isinstance(obj, Monster) and obj.db.population_key == population_key
+    ]
+    if matching and any(
+        monster.pk in _session_participant_ids() for monster in matching
+    ):
+        # A persisted active combat session still references one of these
+        # monsters; skip the whole pass exactly as the tier-example branch
+        # does, so a participant is neither deleted nor duplicated.
+        return
+
+    living: list[Monster] = []
+    for monster in matching:
+        if monster.species_key and _stored_hp(monster) > 0:
+            living.append(monster)
+            continue
+        reason = "dead" if monster.species_key else "branch_migration"
+        _remove_monster(wilderness, monster)
+        _emit_ambient(
+            "monster_ambient_removed",
+            {
+                "region": rule.region_key,
+                "coordinate": coordinates,
+                "species": monster.species_key,
+                "variant": monster.variant_key,
+                "reason": reason,
+            },
+        )
+
+    target = min(rule.quantity, rule.capacity)
+    expected = Counter(
+        ambient_variant_for_slot(rule, x, y, slot) for slot in range(target)
+    )
+    deficit = expected - Counter(monster.variant_key for monster in living)
+    # Both authored numbers are ceilings: the quantity is the population this
+    # coordinate maintains and the capacity the hard bound, so a living
+    # individual outside the selected variant multiset (an authoring change
+    # after it was placed) is preserved without letting the pass add past the
+    # authored quantity.
+    budget = max(0, target - len(living))
+    for variant_key in sorted(deficit):
+        for _ in range(deficit[variant_key]):
+            if budget <= 0:
+                break
+            individual = _spawn_species_individual(
+                wilderness, coordinates, variant_key, population_key
+            )
+            budget -= 1
+            _emit_ambient(
+                "monster_ambient_placed",
+                {
+                    "region": rule.region_key,
+                    "coordinate": coordinates,
+                    "species": individual.species_key,
+                    "variant": individual.variant_key,
+                },
+            )
+
+
 def _matches_expected(monster: Monster, expected: MonsterPopulation) -> bool:
     """Return whether ``monster`` is a living, model-conformant population entry.
 
@@ -259,6 +424,12 @@ def _session_participant_ids() -> frozenset[int]:
 def ensure_population(wilderness, coordinates: tuple[int, int]) -> None:
     """Reconcile one wilderness coordinate against its deterministic population.
 
+    Two disjoint ambient branches cover the map: a coordinate whose region has
+    an authored species placement rule is reconciled by that rule, and every
+    other coordinate keeps the tier-example model's behaviour unchanged. The
+    hunting band stays tier-example, so the introductory hunt's pinned
+    behaviour is untouched.
+
     Only ``Monster`` objects bearing the matching ``population_key`` marker are
     ever reconciled. When a persisted active combat session references any
     marker-matching monster, the whole pass is skipped so the participant is
@@ -275,6 +446,10 @@ def ensure_population(wilderness, coordinates: tuple[int, int]) -> None:
     currently active at that coordinate, if any.
     """
     x, y = coordinates
+    rule = species_rule_for_coordinates(x, y)
+    if rule is not None:
+        _reconcile_ambient_species(wilderness, coordinates, rule)
+        return
     expected = population_for_coordinates(x, y)
     key = _population_key(x, y)
     matching = [

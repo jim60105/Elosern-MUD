@@ -17,6 +17,10 @@ from .elements import ELEMENT_REGISTRY
 from .guild import GUILD_RANK_REGISTRY
 from .magic import MAGIC_TIER_REGISTRY
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+from .monster_placement import (
+    AMBIENT_PLACEMENT_REGISTRY,
+    MONSTER_SITE_REGISTRY,
+)
 from .names import NAME_PACK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
@@ -43,6 +47,22 @@ MONSTER_SPECIES_REGISTRIES: dict[str, Mapping[str, Any]] = {
 }
 MONSTER_SPECIES_CATEGORIES: tuple[str, ...] = tuple(MONSTER_SPECIES_REGISTRIES)
 
+# The placement categories are mirrored by their own named step
+# (`sync_monster_placement`, monster-site-placement task 1.2) for the same
+# reason: the mirror's one boundary event carries placement-scoped context.
+# This is the single declaration both the mirror table below and that step
+# read, so the skip set and the step can never disagree.
+MONSTER_PLACEMENT_REGISTRIES: dict[str, Mapping[str, Any]] = {
+    "ambient_placements": AMBIENT_PLACEMENT_REGISTRY,
+    "monster_sites": MONSTER_SITE_REGISTRY,
+}
+MONSTER_PLACEMENT_CATEGORIES: tuple[str, ...] = tuple(MONSTER_PLACEMENT_REGISTRIES)
+
+# Categories mirrored by a named step instead of the generic loop below.
+_NAMED_STEP_CATEGORIES: tuple[str, ...] = (
+    MONSTER_SPECIES_CATEGORIES + MONSTER_PLACEMENT_CATEGORIES
+)
+
 _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "races": RACE_REGISTRY,
     "static_tiers": STATIC_TIER_REGISTRY,
@@ -54,6 +74,7 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "titles": FIXED_TITLE_REGISTRY,
     "monster_tiers": MONSTER_TIER_REGISTRY,
     **MONSTER_SPECIES_REGISTRIES,
+    **MONSTER_PLACEMENT_REGISTRIES,
     "anchors": ANCHOR_REGISTRY,
     "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
     "name_packs": NAME_PACK_REGISTRY,
@@ -97,6 +118,8 @@ def sync_all() -> None:
     The species/variant categories are mirrored by
     :func:`sync_monster_species` (the named species synchronization step), so
     each of their entries is still mirrored exactly once per startup.
+    The ambient-placement and monster-site categories are mirrored by
+    :func:`sync_monster_placement` for the same reason.
     """
 
     # wilderness-anchor-footprint: malformed authored wilderness data fails at
@@ -105,11 +128,12 @@ def sync_all() -> None:
     validate_wilderness_entries()
 
     for category, registry in _ALL_REGISTRIES.items():
-        if category in MONSTER_SPECIES_CATEGORIES:
+        if category in _NAMED_STEP_CATEGORIES:
             continue
         for key, entry in registry.items():
             sync_one(category, key, entry)
     sync_monster_species()
+    sync_monster_placement()
 
 
 def sync_monster_species() -> None:
@@ -134,5 +158,29 @@ def sync_monster_species() -> None:
         context={
             category: len(registry)
             for category, registry in MONSTER_SPECIES_REGISTRIES.items()
+        },
+    )
+
+
+def sync_monster_placement() -> None:
+    """Mirror the placement registries, then emit one boundary event.
+
+    Idempotent through the shared ``sync_one`` upsert (create-or-overwrite by
+    ``lore:<category>:<key>``), so repeating the step leaves the mirrored state
+    unchanged. It creates and updates only ``LoreRecord`` Scripts: no monster,
+    room, quest, or art record is created, modified, or deleted. The single
+    boundary ``monster_placement_sync`` info event carries the registry
+    identifiers and their entry counts; like ``monster_species_sync`` it is
+    deliberately not named ``startup_step``, because that event belongs to the
+    composition root's catalog wrapper and this step is not a catalog step.
+    """
+    for category, registry in MONSTER_PLACEMENT_REGISTRIES.items():
+        for key, entry in registry.items():
+            sync_one(category, key, entry)
+    log_info(
+        "monster_placement_sync",
+        context={
+            category: len(registry)
+            for category, registry in MONSTER_PLACEMENT_REGISTRIES.items()
         },
     )

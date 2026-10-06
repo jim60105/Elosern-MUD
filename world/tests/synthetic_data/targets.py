@@ -21,6 +21,10 @@ from world.tests.synthetic_data.data_monster_species import (
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_VARIANTS,
 )
+from world.tests.synthetic_data.data_monster_placement import (
+    SYNTH_AMBIENT_PLACEMENTS,
+    SYNTH_MONSTER_SITES,
+)
 from world.tests.synthetic_data.data_world import (
     SYNTH_ANCHORS,
     SYNTH_ANCHOR_PLACEMENTS,
@@ -66,6 +70,8 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "monster_tiers": lambda: SYNTH_MONSTER_TIERS,
         "monster_species": lambda: SYNTH_MONSTER_SPECIES,
         "monster_variants": lambda: SYNTH_MONSTER_VARIANTS,
+        "ambient_placements": lambda: SYNTH_AMBIENT_PLACEMENTS,
+        "monster_sites": lambda: SYNTH_MONSTER_SITES,
         "anchors": lambda: SYNTH_ANCHORS,
         "anchor_placements": lambda: SYNTH_ANCHOR_PLACEMENTS,
         "regions": lambda: SYNTH_REGIONS,
@@ -113,6 +119,8 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "monster_tiers": content["monster_tiers"](),
         "monster_species": content["monster_species"](),
         "monster_variants": content["monster_variants"](),
+        "ambient_placements": content["ambient_placements"](),
+        "monster_sites": content["monster_sites"](),
         "anchors": content["anchors"](),
         "anchor_placements": content["anchor_placements"](),
         "settlements": content["settlements"](),
@@ -139,6 +147,11 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "monster_tiers": ("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"),
     "monster_species": ("world.lore.monster_species", "MONSTER_SPECIES" + "_REGISTRY"),
     "monster_variants": ("world.lore.monster_species", "MONSTER_VARIANT" + "_REGISTRY"),
+    "ambient_placements": (
+        "world.lore.monster_placement",
+        "AMBIENT_PLACEMENT" + "_REGISTRY",
+    ),
+    "monster_sites": ("world.lore.monster_placement", "MONSTER_SITE" + "_REGISTRY"),
     "anchors": ("world.lore.anchors", "ANCHOR" + "_REGISTRY"),
     "anchor_placements": ("world.lore.anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"),
     "regions": ("world.lore.wilderness_regions", "WILDERNESS_REGION" + "_REGISTRY"),

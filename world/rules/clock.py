@@ -70,6 +70,7 @@ _STAGE_ORDER = (
     "npc_schedules",
     "correspondence_delivery",
     "instance_reclamation",
+    "monster_site_lifecycle",
 )
 
 
@@ -558,14 +559,20 @@ def _restore_advance_registry(
     instance evicted from the idmapper without deletion (a theoretical
     maintenance path; nothing flushes the cache inside a synchronous
     ``advance()``) is still restored from the caller's reference -- then from
-    the idmapper cache for contract-discovered objects. Caller-scope entities
-    finish with the existing trait/sexual cache refresh.
+    the object *and script* idmapper caches for contract-discovered objects,
+    because a declared surface may live on either model. Caller-scope entities
+    finish with the existing trait/sexual cache refresh, and instances the
+    rolled-back transaction created are evicted last.
     """
     from evennia.objects.models import ObjectDB
+    from evennia.scripts.models import ScriptDB
 
     objects: dict[int, Any] = {id(obj): obj for obj in entities}
     objects.update(
         {id(obj): obj for obj in ObjectDB.get_all_cached_instances()}
+    )
+    objects.update(
+        {id(obj): obj for obj in ScriptDB.get_all_cached_instances()}
     )
     for obj_id, snapshot in registry.items():
         obj = objects.get(obj_id)
@@ -603,6 +610,7 @@ def _restore_advance_registry(
         if not hasattr(entity, "attributes"):
             continue
         _refresh_advance_entity_caches(entity)
+    _flush_rolled_back_instances()
 
 
 def _refresh_advance_entity_caches(entity: Any) -> None:
@@ -626,6 +634,29 @@ def _refresh_advance_entity_caches(entity: Any) -> None:
             exc=error,
             context={"stage": "sexual_cache", "obj": str(entity), "key": "sexual"},
         )
+
+
+def _flush_rolled_back_instances() -> None:
+    """Evict cached instances whose rows the rolled-back advance removed.
+
+    Evennia's idmapper is not transaction-aware, and a stage that *creates*
+    objects (monster-site-placement's settlement) has no pre-advance snapshot
+    to restore: the row is gone with the transaction while the instance stays
+    cached, and a later row that reuses that primary key would be served as the
+    stale object. This runs only on the failure path, where the number of
+    cached objects is small, and flushes exactly the entries the database no
+    longer backs.
+    """
+    from evennia.objects.models import ObjectDB
+
+    cache = getattr(ObjectDB, "__instance_cache__", None)
+    if cache is None:
+        return
+    for key, instance in list(cache.items()):
+        if key is None or getattr(instance, "_is_deleted", False):
+            continue
+        if not ObjectDB.objects.filter(pk=key).exists():
+            instance.flush_from_cache(force=True)
 
 
 @dataclass

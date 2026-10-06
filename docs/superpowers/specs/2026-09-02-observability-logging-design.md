@@ -181,6 +181,13 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
 | `defeat_aftermath` | `char`、`room`、`tick`、`hp_after`（擊敗善後邊界；defeat-aftermath-core） |
 | `monster_individual_constructed` | `individual`（dbref）、`species`、`variant`、`numeric_source`（物種個體建構邊界；`approved_profile` 或暫行 `interim_tier_band`，僅於耐用提交時發出） |
+| `monster_placement_sync` | 各 placement 類別的項目數（`ambient_placements`、`monster_sites`；lore 鏡射步驟邊界，啟動時一次） |
+| `monster_ambient_placed` | `region`、`coordinate`、`species`、`variant`（物種環境個體建立決策，僅於耐用提交時發出） |
+| `monster_ambient_removed` | `region`、`coordinate`、`species`、`variant`、`reason`（`dead` 或 `branch_migration`；移除決策，僅於耐用提交時發出） |
+| `monster_site_populated` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`created`（首次建立站點個體，僅於耐用提交時發出） |
+| `monster_site_cleared` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`cleared_at_tick`（站點個體全數被擊敗後由世界時鐘結算宣告清空） |
+| `monster_site_recovered` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`cleared_at_tick`、`created`（站點於遊戲內條件成熟後以全新個體復原；一次復原僅一條事件） |
+| `monster_site_recovery_rejected` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`reason`（`one_shot`／`condition_unmet`／`not_cleared`／`capacity_reached`／`state_unreadable`／`unknown_site`，warn 級；未改變任何持久狀態） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 | `npc_persona_initialized` | `npc`、`source`（provenance kind）、`profile`（若有）、`version` |
 | `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |

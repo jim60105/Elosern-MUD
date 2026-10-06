@@ -11,6 +11,15 @@ from .economy import (
 from .elements import ELEMENT_REGISTRY, Element
 from .guild import GUILD_RANK_REGISTRY, GuildRank
 from .magic import MAGIC_TIER_REGISTRY, MagicTier
+from .monster_placement import (
+    AMBIENT_PLACEMENT_REGISTRY,
+    MONSTER_SITE_KINDS,
+    MONSTER_SITE_REGISTRY,
+    AmbientPlacementRule,
+    MonsterPlacementRegistryError,
+    MonsterSite,
+    validate_monster_placement_registry,
+)
 from .monster_species import (
     MONSTER_SPECIES_REGISTRY,
     MONSTER_VARIANT_REGISTRY,
@@ -56,6 +65,7 @@ from .titles import (
 )
 
 __all__ = [
+    "AMBIENT_PLACEMENT_REGISTRY",
     "ANCHOR_REGISTRY",
     "AROUSAL_LEVELS",
     "CLIMAX_PHASE_LEVELS",
@@ -66,6 +76,8 @@ __all__ = [
     "FIXED_TITLE_REGISTRY",
     "GUILD_RANK_REGISTRY",
     "MAGIC_TIER_REGISTRY",
+    "MONSTER_SITE_KINDS",
+    "MONSTER_SITE_REGISTRY",
     "MONSTER_SPECIES_REGISTRY",
     "MONSTER_TIER_REGISTRY",
     "MONSTER_VARIANT_REGISTRY",
@@ -77,6 +89,7 @@ __all__ = [
     "STARTER_EPITHET",
     "STATIC_TIER_REGISTRY",
     "SUBRACE_REGISTRY",
+    "AmbientPlacementRule",
     "Anchor",
     "AnchorKind",
     "Element",
@@ -84,6 +97,8 @@ __all__ = [
     "GuildRank",
     "MagicTier",
     "MonsterCombatProfile",
+    "MonsterPlacementRegistryError",
+    "MonsterSite",
     "MonsterSpecies",
     "MonsterSpeciesRegistryError",
     "MonsterTier",
@@ -106,5 +121,6 @@ __all__ = [
     "published_variant_view",
     "to_copper",
     "validate_fixed_titles",
+    "validate_monster_placement_registry",
     "validate_monster_species_registry",
 ]
