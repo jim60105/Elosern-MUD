@@ -14,6 +14,7 @@ from django.shortcuts import resolve_url
 from django.urls import URLPattern, URLResolver, get_resolver, include, path, resolve
 
 from web.gm.access import PROTECTED_MARKER, is_gm_path
+from tools.spec_traceability import covers_requirement
 from web.gm.tests._support import GmTestCase
 
 PAGES = ("/gm/", "/gm/some/history/path")
@@ -40,6 +41,10 @@ def unprotected(patterns):
 
 
 class GmPageAccessTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_anonymous_pages_redirect_to_login_with_next(self):
         client = self.client_for("anonymous")
         login = resolve_url(settings.LOGIN_URL)
@@ -49,6 +54,10 @@ class GmPageAccessTest(GmTestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], f"{login}?next={quote(page, safe='/')}")
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_ordinary_account_gets_403_page_even_with_staff_flag(self):
         for staff in (False, True):
             self.account2.is_staff = staff
@@ -61,6 +70,10 @@ class GmPageAccessTest(GmTestCase):
                     self.assertContains(response, "權限不足", status_code=403)
                     self.assertNotContains(response, "gm/dist/index.js", status_code=403)
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_privileged_accounts_receive_the_shell_independent_of_staff(self):
         self.assertFalse(self.account.is_staff)
         for kind in ("developer", "superuser"):
@@ -71,6 +84,9 @@ class GmPageAccessTest(GmTestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertContains(response, 'id="gm-app"')
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+    )
     def test_slashless_mount_never_serves_the_shell(self):
         response = self.client_for("anonymous").get("/gm")
         self.assertNotEqual(response.status_code, 200)
@@ -78,12 +94,22 @@ class GmPageAccessTest(GmTestCase):
 
 
 class GmApiAccessTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::consistent-json-transport",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_anonymous_api_requests_get_401_envelope_not_redirect(self):
         client = self.client_for("anonymous")
         for url in APIS + UNKNOWN_APIS:
             with self.subTest(url=url):
                 self.assert_error_envelope(client.get(url), 401, "unauthenticated")
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::consistent-json-transport",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_ordinary_account_api_requests_get_403_envelope(self):
         self.account2.is_staff = True
         self.account2.save()
@@ -92,6 +118,10 @@ class GmApiAccessTest(GmTestCase):
             with self.subTest(url=url):
                 self.assert_error_envelope(client.get(url), 403, "forbidden")
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_privileged_accounts_reach_both_apis(self):
         for kind in ("developer", "superuser"):
             client = self.client_for(kind)
@@ -99,6 +129,10 @@ class GmApiAccessTest(GmTestCase):
                 with self.subTest(kind=kind, url=url):
                     self.assert_ok_envelope(client.get(url))
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_unknown_api_paths_return_404_envelope_not_the_shell(self):
         client = self.client_for("developer")
         for url in UNKNOWN_APIS:
@@ -116,6 +150,10 @@ class GmResolverCoverageTest(GmTestCase):
     registration-level half of a defence in depth.
     """
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_every_mounted_gm_pattern_is_protected(self):
         routes = dict(gm_patterns(get_resolver().url_patterns))
         self.assertEqual(unprotected(get_resolver().url_patterns), [])
@@ -124,6 +162,9 @@ class GmResolverCoverageTest(GmTestCase):
                          "gm/api/<path:rest>", "gm/", "gm/<path:rest>"):
             self.assertIn(expected, routes)
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+    )
     def test_contract_detects_an_unwrapped_gm_pattern(self):
         def bare_view(request):
             return None
@@ -131,6 +172,9 @@ class GmResolverCoverageTest(GmTestCase):
         synthetic = [path("gm/", include([path("api/new", bare_view), path("x", bare_view)]))]
         self.assertEqual(unprotected(synthetic), ["gm/api/new", "gm/x"])
 
+    @covers_requirement(
+        "gm-portal-access-api::protected-gm-namespace",
+    )
     def test_every_gm_path_resolves_into_the_protected_gm_map(self):
         for url in PAGES + APIS + UNKNOWN_APIS:
             with self.subTest(url=url):

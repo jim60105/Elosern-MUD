@@ -20,6 +20,7 @@ from django.shortcuts import resolve_url
 from django.test import Client
 from django.utils import timezone
 
+from tools.spec_traceability import covers_requirement
 from web.gm.tests._support import GmTestCase
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -31,6 +32,10 @@ def project_version() -> str:
 
 
 class GmSessionApiTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_session_reports_developer_identity_time_and_version(self):
         data = self.assert_ok_envelope(self.client_for("developer").get("/gm/api/session"))
         self.assertEqual(
@@ -43,11 +48,18 @@ class GmSessionApiTest(GmTestCase):
         self.assertIsNotNone(server_time.tzinfo)
         self.assertLess(abs(timezone.now() - server_time), timedelta(minutes=1))
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+    )
     def test_session_reports_superuser_level(self):
         data = self.assert_ok_envelope(self.client_for("superuser").get("/gm/api/session"))
         self.assertEqual(data["account_name"], self.superuser.username)
         self.assertEqual(data["permission_level"], "superuser")
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_unreadable_version_source_is_an_error_not_a_fabricated_value(self):
         with mock.patch("web.gm.views.game_version", side_effect=OSError("gone")), \
                 mock.patch("web.gm.views.log_error") as log_error:
@@ -56,6 +68,10 @@ class GmSessionApiTest(GmTestCase):
         self.assertEqual(log_error.call_args.args[0], "gm_version_unavailable")
 
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_misshapen_version_source_is_an_error_envelope(self):
         from web.gm import version
 
@@ -69,6 +85,10 @@ class GmSessionApiTest(GmTestCase):
 
 
 class GmHealthApiTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-spa::independent-same-origin-gm-build",
+    )
     def test_health_reports_django_and_database_without_network(self):
         with mock.patch.object(
             socket, "create_connection", side_effect=AssertionError("network probe")
@@ -77,12 +97,19 @@ class GmHealthApiTest(GmTestCase):
         self.assertEqual(data, {"django": "ok", "database": "readable"})
         connect.assert_not_called()
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+    )
     def test_health_reads_the_database(self):
         with mock.patch("web.gm.views.AccountDB") as account_db:
             account_db.objects.order_by.return_value.values_list.return_value = [1]
             self.assert_ok_envelope(self.client_for("developer").get("/gm/api/health"))
         account_db.objects.order_by.assert_called_once_with()
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_unreadable_database_returns_503_without_claiming_readable(self):
         client = self.client_for("developer")
         with mock.patch("web.gm.views.AccountDB") as account_db, \
@@ -95,6 +122,10 @@ class GmHealthApiTest(GmTestCase):
 
 
 class GmMethodAndWriteSurfaceTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_read_only_apis_reject_other_methods_with_envelope(self):
         client = self.client_for("developer")  # CSRF checks are off by default
         for url in ("/gm/api/session", "/gm/api/health"):
@@ -104,6 +135,10 @@ class GmMethodAndWriteSurfaceTest(GmTestCase):
                     self.assert_error_envelope(response, 405, "method_not_allowed")
                     self.assertEqual(response["Allow"], "GET, HEAD")
 
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_no_production_gm_route_accepts_a_write(self):
         client = self.client_for("developer")
         for url in ("/gm/", "/gm/x", "/gm/api", "/gm/api/session", "/gm/api/health",
@@ -111,15 +146,25 @@ class GmMethodAndWriteSurfaceTest(GmTestCase):
             with self.subTest(url=url):
                 self.assertGreaterEqual(client.post(url, {"x": "1"}).status_code, 400)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_rest_api_stays_disabled(self):
         self.assertFalse(settings.REST_API_ENABLED)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_api_responses_are_not_cacheable(self):
         response = self.client_for("developer").get("/gm/api/session")
         self.assertEqual(response["Cache-Control"], "no-store")
 
 
 class GmShellTest(GmTestCase):
+    @covers_requirement(
+        "gm-portal-access-api::s1-route-and-payload-scope",
+        "gm-portal-spa::independent-same-origin-gm-build",
+    )
     def test_shell_references_stable_gm_assets_and_configured_login(self):
         response = self.client_for("developer").get("/gm/")
         self.assertEqual(response.status_code, 200)
@@ -132,6 +177,9 @@ class GmShellTest(GmTestCase):
         self.assertNotIn("webclient/app/dist", content)
         self.assertNotIn("evennia.js", content)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_shell_issues_a_readable_csrf_cookie(self):
         client = Client()
         client.force_login(self.account)

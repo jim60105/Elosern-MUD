@@ -15,6 +15,7 @@ from django.test import Client
 
 from web.gm.access import ROUTE_LABEL_LIMIT
 
+from tools.spec_traceability import covers_requirement
 from web.gm.tests._support import GmTestCase
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -33,6 +34,10 @@ class GmEventTest(GmTestCase):
                   if c.args[0] == "gm_denied"]
         return response, requests, denied
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_api_outcomes_each_emit_one_gm_request_with_final_status(self):
         cases = (
             ("developer", "/gm/api/session", 200, self.account.username),
@@ -51,6 +56,9 @@ class GmEventTest(GmTestCase):
                 self.assertEqual(requests[0]["route"], url)
                 self.assertEqual(requests[0]["account"], account)
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_denials_emit_gm_denied_for_pages_and_apis(self):
         cases = (
             ("anonymous", "/gm/", "anonymous"),
@@ -63,6 +71,9 @@ class GmEventTest(GmTestCase):
                 _, _, denied = self.request(kind, url)
                 self.assertEqual(denied, [{"account": account, "route": url}])
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_allowed_requests_and_pages_emit_no_denial_and_pages_no_request(self):
         _, requests, denied = self.request("developer", "/gm/")
         self.assertEqual((requests, denied), ([], []))
@@ -70,6 +81,9 @@ class GmEventTest(GmTestCase):
         self.assertEqual(denied, [])
         self.assertEqual(len(requests), 1)
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_a_view_crash_still_logs_the_final_500(self):
         client = Client(raise_request_exception=False)
         client.force_login(self.account)
@@ -79,6 +93,10 @@ class GmEventTest(GmTestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual([r["status"] for r in requests], [500])
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_an_unreadable_session_store_still_answers_and_logs_the_api(self):
         client = self.client_for("developer")
         with mock.patch(
@@ -92,6 +110,9 @@ class GmEventTest(GmTestCase):
                     if c.args[0] == "gm_request"]
         self.assertEqual(statuses, [503])
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_event_routes_are_truncated(self):
         url = "/gm/api/" + "x" * 500
         _, requests, denied = self.request("anonymous", url)
@@ -99,6 +120,9 @@ class GmEventTest(GmTestCase):
         self.assertTrue(requests[0]["route"].startswith("/gm/api/xxx"))
         self.assertEqual(denied[0]["route"], requests[0]["route"])
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_event_context_carries_no_cookie_or_token_values(self):
         client = self.client_for("developer")
         client.get("/gm/")
@@ -108,6 +132,9 @@ class GmEventTest(GmTestCase):
         for secret in secrets:
             self.assertNotIn(secret, rendered)
 
+    @covers_requirement(
+        "gm-portal-access-api::facade-request-and-denial-events",
+    )
     def test_gm_modules_never_enter_the_observability_freeze_list(self):
         frozen = json.loads((REPO_ROOT / "tools/observability_freeze.json").read_text())
         flat = json.dumps(frozen)

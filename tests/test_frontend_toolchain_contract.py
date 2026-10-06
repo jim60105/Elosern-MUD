@@ -245,6 +245,7 @@ class VueComponentGateTests(unittest.TestCase):
 class GmPortalDeliveryContractTests(unittest.TestCase):
     """The GM bundle ships with the image beside the game bundle."""
 
+    @covers_requirement("gm-portal-spa::independent-same-origin-gm-build")
     def test_container_builds_and_ships_both_bundles_and_the_version_source(self):
         containerfile = _read("Containerfile")
         self.assertIn("vite.gm.config.js", containerfile)

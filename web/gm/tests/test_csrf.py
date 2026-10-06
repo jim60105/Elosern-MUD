@@ -15,6 +15,7 @@ from django.conf import settings
 from django.shortcuts import resolve_url
 from django.test import override_settings
 
+from tools.spec_traceability import covers_requirement
 from web.gm.tests._support import GmTestCase
 
 WRITE_URL = "/gm/api/_test/write"
@@ -33,6 +34,11 @@ class GmCsrfConventionTest(GmTestCase):
     def gm_requests(self, log_info):
         return [c for c in log_info.call_args_list if c.args[0] == "gm_request"]
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+        "gm-portal-access-api::facade-request-and-denial-events",
+        "gm-portal-access-api::registered-backend-acceptance-coverage",
+    )
     def test_permitted_post_without_or_with_invalid_token_is_csrf_failed(self):
         client, token = self.enforced("developer")
         for headers in ({}, {"HTTP_X_CSRFTOKEN": "x" * len(token)}):
@@ -45,6 +51,9 @@ class GmCsrfConventionTest(GmTestCase):
                 self.assertEqual(len(events), 1)
                 self.assertEqual(events[0].kwargs["context"]["status"], 403)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_permitted_post_with_matching_token_succeeds(self):
         client, token = self.enforced("developer")
         with mock.patch("web.gm.middleware.log_info") as log_info:
@@ -53,6 +62,11 @@ class GmCsrfConventionTest(GmTestCase):
         self.assertEqual(self.assert_ok_envelope(response), {"accepted": True})
         self.assertEqual(self.gm_requests(log_info)[0].kwargs["context"]["status"], 200)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+        "gm-portal-access-api::facade-request-and-denial-events",
+        "gm-portal-access-api::protected-gm-namespace",
+    )
     def test_anonymous_post_is_401_before_token_validation(self):
         client, _ = self.enforced("anonymous")
         for headers in ({}, {"HTTP_X_CSRFTOKEN": "a" * 32}):
@@ -67,11 +81,18 @@ class GmCsrfConventionTest(GmTestCase):
                 self.assertEqual(log_warn.call_args.args[0], "gm_denied")
                 self.assertEqual(log_warn.call_args.kwargs["context"]["account"], "anonymous")
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+        "gm-portal-access-api::protected-gm-namespace",
+    )
     def test_unauthorized_post_is_403_forbidden_before_token_validation(self):
         client, _ = self.enforced("player")
         response = client.post(WRITE_URL)
         self.assert_error_envelope(response, 403, "forbidden")
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_non_gm_csrf_failure_keeps_the_stock_page(self):
         client, _ = self.enforced("anonymous")
         response = client.post(resolve_url(settings.LOGIN_URL), {"username": "x"})
@@ -79,6 +100,9 @@ class GmCsrfConventionTest(GmTestCase):
         self.assertNotEqual(response.get("Content-Type"), "application/json")
         self.assertNotIn(b"csrf_failed", response.content)
 
+    @covers_requirement(
+        "gm-portal-access-api::consistent-json-transport",
+    )
     def test_logout_through_the_project_flow_uses_the_cookie_token(self):
         client, token = self.enforced("developer")
         response = client.post(resolve_url(settings.LOGOUT_URL),
