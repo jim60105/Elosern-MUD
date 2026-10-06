@@ -526,6 +526,9 @@ class OwnerTargetSubstitutionTests(
         )
         return record.state.value, record.stage_progress
 
+    @covers_requirement(
+        "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
+    )
     def test_a_recovered_site_newcomer_never_credits_an_old_binding(self):
         settle_monster_sites(0, 1)
         members = [
@@ -562,6 +565,9 @@ class OwnerTargetSubstitutionTests(
         self._commit(self._plan([self._defeat_entry(self.char1, newcomer)]))
         self.assertEqual(self._progress(fresh.quest_id), ("completed", 1))
 
+    @covers_requirement(
+        "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
+    )
     def test_a_same_species_individual_elsewhere_never_credits_a_binding(self):
         record = accept(self.char1, self.bound_key)
         bound = [
@@ -587,6 +593,9 @@ class OwnerTargetSubstitutionTests(
         self._commit(self._plan([self._defeat_entry(self.char1, bound[0])]))
         self.assertEqual(self._progress(record.quest_id), ("completed", 1))
 
+    @covers_requirement(
+        "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
+    )
     def test_an_ambient_respawn_never_credits_an_old_binding(self):
         record = accept(self.char1, self.bound_key)
         original = next(

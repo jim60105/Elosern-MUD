@@ -489,6 +489,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
+    )
     def test_a_complete_hunt_registers_immutably(self):
         candidate = quest(
             "hunt-valid",
@@ -510,6 +513,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_partial_hunt_selectors_are_rejected(self):
         partial = (
@@ -534,6 +540,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_unknown_registry_keys_and_foreign_variants_are_rejected(self):
         invalid = (
@@ -562,6 +571,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
+    )
     def test_a_hunt_without_an_ordinary_variant_is_rejected(self):
         # Without an ordinary baseline variant the "guarantee ordinary targets"
         # contract could not be expressed at acceptance.
@@ -576,6 +588,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_two_selector_families_at_once_are_rejected(self):
         combined = (
@@ -593,6 +608,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_display_names_are_never_selectors(self):
         species_name = SYNTH_MONSTER_SPECIES[_HUNT_SPECIES].display_name_zh
@@ -616,6 +634,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_hunt_fields_are_rejected_on_other_objective_kinds(self):
         invalid = (
@@ -648,6 +669,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime"
+    )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
     )
     def test_grade_rationale_and_flavor_stay_three_separate_fields(self):
         stronger = SYNTH_MONSTER_VARIANTS[_HUNT_STRONGER]
@@ -686,6 +710,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime"
     )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
+    )
     def test_prose_fields_are_bounded_traditional_chinese(self):
         invalid = (
             ("prose-too-long", "評" * 501),
@@ -707,6 +734,9 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime"
+    )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
     )
     def test_the_combined_prose_budget_is_enforced(self):
         # Two individually legal fields can still overflow the rendered detail

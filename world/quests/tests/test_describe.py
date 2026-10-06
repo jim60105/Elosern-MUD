@@ -451,6 +451,9 @@ class AuthoredProseDescribeTests(unittest.TestCase):
     @covers_requirement(
         "quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail"
     )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
+    )
     def test_grade_rationale_and_flavor_render_as_three_sections(self):
         definition = self._definition(
             rating_rationale_zh=_RATIONALE, background_flavor_zh=_FLAVOR
@@ -468,6 +471,9 @@ class AuthoredProseDescribeTests(unittest.TestCase):
     @covers_requirement(
         "quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail"
     )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
+    )
     def test_absent_prose_is_omitted_not_fabricated(self):
         text = describe_quest_detail(_record(), self._definition(), None, 0)
         self.assertIn("階級：", text)
@@ -476,6 +482,9 @@ class AuthoredProseDescribeTests(unittest.TestCase):
 
     @covers_requirement(
         "quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail"
+    )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
     )
     def test_the_targeted_variants_danger_grade_never_becomes_the_grade(self):
         stronger = SYNTH_MONSTER_VARIANTS[_HUNT_STRONGER]

@@ -856,6 +856,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
     )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    @covers_requirement(
+        "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
+    )
     def test_a_newcomer_never_credits_an_old_bound_identity(self):
         definition = register(
             quest(
@@ -1081,6 +1084,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
     )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
     def test_a_countable_stronger_variant_counts_once(self):
         self._hunt_quest(quantity=3)
         stage_active_record(self.player, "species_hunt")
@@ -1102,6 +1108,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
     )
     def test_an_unlisted_variant_does_not_count(self):
         self._hunt_quest(countable=(_HUNT_ORDINARY,), quantity=1)
@@ -1126,6 +1135,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
     )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
     def test_a_kill_outside_the_declared_region_does_not_count(self):
         self._hunt_quest(quantity=1)
         stage_active_record(self.player, "species_hunt")
@@ -1146,6 +1158,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
     )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
     def test_a_tier_only_individual_never_satisfies_a_hunt(self):
         self._hunt_quest(quantity=1)
         stage_active_record(self.player, "species_hunt")
@@ -1161,6 +1176,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
     )
     def test_ordinary_targets_alone_always_suffice(self):
         self._hunt_quest(quantity=2)
@@ -1179,6 +1197,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
     )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
     def test_a_real_action_defeat_of_a_countable_target_completes_the_hunt(self):
         # The whole producer path, not a fabricated log: a real ActionResolver
         # kill emits the identity entry, the planner resolves the individual's
@@ -1195,6 +1216,9 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
     )
     def test_flavor_prose_never_advances_or_completes_a_quest(self):
         # Gameplay events the authored flavor narrates, but which do not satisfy
