@@ -138,6 +138,32 @@ function sendOfficial(action, extra = {}, editorName = null) {
     pending.value = { id, editor: editorName, official: true };
   }
 }
+function sameRect(left, right) {
+  return !!left && !!right && ["x", "y", "w", "h"].every((field) => Math.abs(left[field] - right[field]) < 1e-9);
+}
+function isIdentityStage(value) {
+  return !!value && value.scale === 1 && value.x === 0 && value.y === 0;
+}
+// The committed official row carries the catalog's own rectangle and no stage,
+// so the shared editors are seeded from those facts and can never show a stored
+// personal override. An UNTOUCHED save must therefore not cross the wire: it
+// would silently overwrite a stored override with the seed. Only a real edit
+// dispatches, and only for the component the player edited (the server keeps
+// the other one exactly as stored); 清除個人調整 is the truthful way to drop an
+// override the editors cannot display.
+function submitOfficialGeometry(component, value) {
+  const entry = selectedEntry.value;
+  if (!entry) {
+    closeEditor();
+    return;
+  }
+  const untouched = component === "face_rect" ? sameRect(value, entry.face_rect) : isIdentityStage(value);
+  if (untouched) {
+    closeEditor();
+    return;
+  }
+  sendOfficial("gallery.official.geometry.set", { [component]: value }, component === "face_rect" ? "face" : "stage");
+}
 function send(action, extra = {}) {
   if (locked.value || pending.value || !props.dispatch) return;
   const isCard = !["gallery.generate", "gallery.subject.select"].includes(action);
@@ -231,9 +257,9 @@ function selectSubject(subject) {
         <GalleryStageTransformModal v-if="editor === 'stage' && selectedCard?.status === 'card'" :card="selectedCard" :disabled="locked || !!pending" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.stage.update', $event)" @log="emit('log')" />
         <GalleryFaceRectModal v-if="entryEditor === 'face' && selectedEntry" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
-          @close="closeEditor" @submit="sendOfficial('gallery.official.geometry.set', { face_rect: $event.face_rect }, 'face')" @log="emit('log')" />
+          @close="closeEditor" @submit="submitOfficialGeometry('face_rect', $event.face_rect)" @log="emit('log')" />
         <GalleryStageTransformModal v-if="entryEditor === 'stage' && selectedEntry" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
-          @close="closeEditor" @submit="sendOfficial('gallery.official.geometry.set', { stage: $event.stage }, 'stage')" @log="emit('log')" />
+          @close="closeEditor" @submit="submitOfficialGeometry('stage', $event.stage)" @log="emit('log')" />
       </Teleport>
     </template>
   </section>

@@ -408,6 +408,10 @@ describe("official read-only entries", () => {
     Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
     Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
     await image.trigger("load");
+    // A real edit: the modal seeds from the committed rectangle, so only a
+    // changed value may cross the wire (an untouched save would overwrite a
+    // stored personal override with the catalog seed).
+    await modal.findAll('input[type="number"]')[2].setValue("0.4");
     await button(modal, "儲存框選").trigger("click");
     expect(dispatch).toHaveBeenCalledTimes(1);
     const [actionId, sent] = dispatch.mock.calls[0];
@@ -415,11 +419,10 @@ describe("official read-only entries", () => {
     expect(Object.keys(sent).sort()).toEqual(["face_rect", "identity", "subject_key"]);
     expect(sent.subject_key).toBe(GALLERY_SAMPLE.selected);
     expect(sent.identity).toBe(OFFICIAL_CURRENT.identity);
-    // The editor re-squares the committed rectangle on the real image size, so
-    // the submitted rect matches it within float tolerance.
-    Object.keys(OFFICIAL_CURRENT.face_rect).forEach((field) => {
-      expect(Math.abs(sent.face_rect[field] - OFFICIAL_CURRENT.face_rect[field])).toBeLessThan(1e-6);
-    });
+    expect(sent.face_rect.w).toBeCloseTo(0.4, 6);
+    // The editor re-squares the edited rectangle on the real image size.
+    expect(Math.abs(sent.face_rect.w * 768 - sent.face_rect.h * 1024)).toBeLessThanOrEqual(1);
+    expect(sent.face_rect).not.toEqual(OFFICIAL_CURRENT.face_rect);
     // The untouched component is never smuggled along.
     expect(sent).not.toHaveProperty("stage");
   });
@@ -431,12 +434,38 @@ describe("official read-only entries", () => {
     await button(rail(wrapper), "比例調整").trigger("click");
     const modal = wrapper.getComponent(GalleryStageTransformModal);
     await modal.get(".stage-transform__figure").trigger("load");
+    await modal.get('input[type="range"]').setValue("0.6");
     await button(modal, "儲存調整").trigger("click");
     expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.set", {
       subject_key: GALLERY_SAMPLE.selected,
       identity: OFFICIAL_CURRENT.identity,
-      stage: { scale: 1, x: 0, y: 0 },
+      stage: { scale: 0.6, x: 0, y: 0 },
     });
     expect(dispatch.mock.calls[0][1]).not.toHaveProperty("face_rect");
+  });
+
+  it("never dispatches an untouched official geometry save", async () => {
+    // The committed row carries no personal override, so an untouched save
+    // would silently overwrite one with the seed. It closes instead.
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    await button(rail(wrapper), "比例調整").trigger("click");
+    const modal = wrapper.getComponent(GalleryStageTransformModal);
+    await modal.get(".stage-transform__figure").trigger("load");
+    await button(modal, "儲存調整").trigger("click");
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(wrapper.findComponent(GalleryStageTransformModal).exists()).toBe(false);
+    // The face editor is seeded from the committed rectangle: saving it as-is
+    // dispatches nothing either.
+    await button(rail(wrapper), "臉部框選").trigger("click");
+    const face = wrapper.getComponent(GalleryFaceRectModal);
+    const image = face.get(".gallery-face__original > img");
+    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
+    await image.trigger("load");
+    await button(face, "儲存框選").trigger("click");
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
   });
 });

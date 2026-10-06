@@ -1001,6 +1001,73 @@ class OfficialPreferenceActionTests(EvenniaTest):
         self.assertEqual(write.call_count, 1)
         self.assertEqual(api.official_preferences_for(self.subject).selection, identity)
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_a_stale_stored_rectangle_never_blocks_a_later_stage_edit(self):
+        """An artwork update invalidates the stored rect, not the stage editor."""
+        identity = self._index("a.png", width=4, height=4)
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        self.assertEqual(
+            self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "face_rect": dict(rect)},
+            )["outcome"],
+            "success",
+        )
+        # A maintenance update replaces the bytes at other dimensions, so the
+        # stored square no longer validates against the image's decoded size.
+        (self.official_root / "preset" / _PRESET_KEY / "a.png").write_bytes(
+            _png(768, 1024)
+        )
+        load_catalog()
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        result = self._dispatch(
+            "gallery.official.geometry.set",
+            {"subject_key": SUBJECT, "identity": identity, "stage": dict(stage)},
+        )
+        self.assertEqual(result["outcome"], "success")
+        # The omitted (stale) rectangle is carried through verbatim and the sent
+        # stage landed: only a SENT component is validated against the image.
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry,
+            {identity: {"face_rect": rect, "stage": stage}},
+        )
+
+    def test_clearing_an_absent_preference_reports_the_state_it_leaves(self):
+        identity = self._index("a.png")
+
+        def message(action, payload):
+            return self.action_registry.spec(action).adapter(self.actor, payload)["message"]
+
+        self.assertEqual(
+            message("gallery.official.clear_selection", {"subject_key": SUBJECT}),
+            "目前沒有官方圖片選取。",
+        )
+        self.assertEqual(
+            message(
+                "gallery.official.geometry.clear",
+                {"subject_key": SUBJECT, "identity": identity},
+            ),
+            "這張官方圖片沒有個人調整。",
+        )
+        # A real write makes the very same clear claim its change.
+        api.set_official_selection(self.subject, identity)
+        api.set_official_geometry(
+            self.subject, identity, stage={"scale": 1, "x": 0, "y": 0}
+        )
+        self.assertEqual(
+            message("gallery.official.clear_selection", {"subject_key": SUBJECT}),
+            "已清除官方圖片選取。",
+        )
+        self.assertEqual(
+            message(
+                "gallery.official.geometry.clear",
+                {"subject_key": SUBJECT, "identity": identity},
+            ),
+            "已清除官方圖片的個人調整。",
+        )
+
     # -- the read-only guarantee ------------------------------------------
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"

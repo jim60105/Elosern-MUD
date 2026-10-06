@@ -192,8 +192,10 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
         # an official identity embeds an operator-chosen filename.
         if len(resolved["url"]) <= MAX_PORTRAIT_MEDIA_URL:
             return _carried(
-                # One tolerant preference read per presentation: the same
-                # snapshot feeds the payload's geometry override.
+                # A selection presentation performs two tolerant preference
+                # reads — the chain's step-4 read and this payload's override
+                # read — so corrupt stored state is reported once per read,
+                # the same discipline the tolerant card read follows.
                 _official_payload(subject, resolved, official_preferences_for(subject)),
                 _silhouette_field(subject, entity, report=False),
                 origin=ORIGIN_OFFICIAL,

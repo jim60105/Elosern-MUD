@@ -70,6 +70,13 @@ _SUCCESS_OFFICIAL = {
         "已清除官方圖片的個人調整。",
     ),
 }
+# A clear of an ABSENT preference is a legal no-op (the preference requirement),
+# so its success message states the resulting state instead of claiming a change
+# that did not happen. The stable code stays the same.
+_ALREADY_CLEAR_MESSAGES = {
+    "gallery.official.clear_selection": "目前沒有官方圖片選取。",
+    "gallery.official.geometry.clear": "這張官方圖片沒有個人調整。",
+}
 
 
 class GalleryActionError(ValueError):
@@ -387,17 +394,27 @@ def _merge_official_geometry(subject, identity, image, payload):
     before the write — the same squareness rule the stored card contract uses
     — so a rectangle illegal for the image's CURRENT bytes never reaches the
     record. The write itself goes through the sole writer's public API.
+
+    A STORED component is carried through verbatim rather than re-validated
+    against the current dimensions: after an artwork update replaces the bytes,
+    a stored rectangle may legitimately no longer be pixel-square, and
+    re-checking it here would refuse every later stage-only edit for that
+    identity. The payload boundary degrades such a rectangle at render time
+    and the preference is retained (change
+    ``official-art-personalization``'s update tolerance).
     """
     stored = gallery_api.official_preferences_for(subject).geometry.get(identity, {})
-    face_rect = payload["face_rect"] if "face_rect" in payload else stored.get("face_rect")
-    stage = payload["stage"] if "stage" in payload else stored.get("stage")
     merged = {}
-    if face_rect is not None:
+    if "face_rect" in payload:
         merged["face_rect"] = gallery_api.validate_face_rect(
-            face_rect, image_size=image.image_size
+            payload["face_rect"], image_size=image.image_size
         )
-    if stage is not None:
-        merged["stage"] = gallery_api.validate_stage(stage)
+    elif stored.get("face_rect") is not None:
+        merged["face_rect"] = dict(stored["face_rect"])
+    if "stage" in payload:
+        merged["stage"] = gallery_api.validate_stage(payload["stage"])
+    elif stored.get("stage") is not None:
+        merged["stage"] = dict(stored["stage"])
     if not merged:
         raise gallery_api.GalleryRecordError(
             "an official geometry override needs a face_rect, a stage, or both"
@@ -411,6 +428,7 @@ def _mutate_official(action_id, payload):
     """One personal official-art preference write, re-resolving its identity."""
     context = _context(action_id, payload)
     subject = None
+    already_clear = False
     try:
         parsed = validate_gallery_subject_key(payload["subject_key"])
         if parsed.kind is ArtSubjectKind.CHARACTER:
@@ -422,6 +440,7 @@ def _mutate_official(action_id, payload):
         if action_id == "gallery.official.clear_selection":
             # Clearing touches only the subject's own record: no identity is
             # named, so no reference scope applies.
+            already_clear = gallery_api.official_preferences_for(subject).selection is None
             gallery_api.clear_official_selection(subject)
         else:
             identity = payload["identity"]
@@ -434,13 +453,15 @@ def _mutate_official(action_id, payload):
             elif action_id == "gallery.official.geometry.set":
                 _merge_official_geometry(subject, identity, image, payload)
             elif action_id == "gallery.official.geometry.clear":
-                gallery_api.clear_official_geometry(subject, identity)
+                already_clear = not gallery_api.clear_official_geometry(subject, identity)
             else:
                 raise ValueError("unregistered gallery preference action")
     except (ArtSubjectError, gallery_api.GalleryRecordError) as error:
         log_warn("gallery_action", context=context, exc=error)
         return _rejected(_error_code(error, resolved=subject is not None))
     code, message = _SUCCESS_OFFICIAL[action_id]
+    if already_clear:
+        message = _ALREADY_CLEAR_MESSAGES[action_id]
     log_info("gallery_action", context=context)
     return {
         "outcome": "success",
