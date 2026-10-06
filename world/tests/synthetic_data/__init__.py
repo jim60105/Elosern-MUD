@@ -160,6 +160,10 @@ from world.tests.synthetic_data.data_monster_species import (
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_VARIANTS,
 )
+from world.tests.synthetic_data.data_monster_placement import (
+    SYNTH_AMBIENT_PLACEMENTS,
+    SYNTH_MONSTER_SITES,
+)
 from world.tests.synthetic_data.data_world import (
     SYNTH_GUILD_RANKS,
     SYNTH_GUILD_BRANCHES,
@@ -230,6 +234,8 @@ from world.tests.synthetic_data.factories import (
     make_monster_tier,
     make_monster_species,
     make_monster_variant,
+    make_ambient_placement_rule,
+    make_monster_site,
     make_anchor,
     make_region,
     make_city_gate,
