@@ -517,9 +517,6 @@ class SpeciesHuntBoardCommandTests(
     """`guild list` renders the hunt's deterministic one-line objective."""
 
     def setUp(self):
-        self.enterContext(
-            synthetic_registries("regions", "monster_species", "monster_variants")
-        )
         open_synthetic_scope(
             self,
             "races",
@@ -532,6 +529,13 @@ class SpeciesHuntBoardCommandTests(
             "guild_branches",
         )
         super().setUp()
+        # The shipped catalog's regional hunts validate their region, species,
+        # and variant keys against the live lore registries, so the shared
+        # ``register_catalog()`` above runs before the monster scope replaces
+        # them; this class's own hunt rows below are kit rows.
+        self.enterContext(
+            synthetic_registries("regions", "monster_species", "monster_variants")
+        )
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
         self.char1.race = "t_duskmari"
