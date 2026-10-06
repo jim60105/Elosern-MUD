@@ -52,6 +52,10 @@ GET /gm/api/llm/calls/<call_id> SHALL accept only ^[0-9a-f]{32}$, rejecting malf
 - **WHEN** permitted requests use malformed, absent, retained, disabled, exchange-only and outcome-only call identifiers
 - **THEN** they receive the specified 400, 404, success, 409 and partial-record success results respectively in S1 envelopes
 
+#### Scenario: Best-effort lookup read failure
+- **WHEN** the never-raising transcript lookup skips unreadable files or malformed lines and returns no records or some readable records
+- **THEN** empty results receive 404 transcript_not_found and readable results receive the normal available-record response without fabricated missing records or a guarantee that the scan was complete
+
 ### Requirement: Visibility-aware overview and payload drawer
 The /gm/ overview SHALL render service status, layer metrics, world state, art queue, recent calls, recent warnings/errors and process freshness. It SHALL poll every five seconds, pause while document visibility is hidden, resume on visibility change, display last-updated time and provide manual refresh. Offline services SHALL render critical status cards without disabling the dashboard; partial errors SHALL be localized. Status SHALL use GmStatusBadge/.status-marker ok/warn/crit with text and shape, never color alone. A selected call SHALL open a drawer with outcome summary and one tab per exchange attempt, messages grouped by role, raw response JSON/text, matching outcome validation errors and copy-JSON control. Empty/disabled/expired transcript cases SHALL show explicit states. UI SHALL use Traditional Chinese and preserve data identifiers verbatim. Every new component SHALL have showcase-gated Storybook stories.
 
