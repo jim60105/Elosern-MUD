@@ -156,6 +156,10 @@ from world.tests.synthetic_data.data_characters import (
     SYNTH_NPC_TIERS,
     SYNTH_MONSTER_TIERS,
 )
+from world.tests.synthetic_data.data_monster_species import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+)
 from world.tests.synthetic_data.data_world import (
     SYNTH_GUILD_RANKS,
     SYNTH_GUILD_BRANCHES,
@@ -224,6 +228,8 @@ from world.tests.synthetic_data.factories import (
     make_price,
     make_npc_tier,
     make_monster_tier,
+    make_monster_species,
+    make_monster_variant,
     make_anchor,
     make_region,
     make_city_gate,

@@ -166,6 +166,8 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             "SYNTH_PRESETS": "world.lore.player_presets",
             "SYNTH_NPC_TIERS": "world.lore.npc_tiers",
             "SYNTH_MONSTER_TIERS": "world.lore.monsters",
+            "SYNTH_MONSTER_SPECIES": "world.lore.monster_species",
+            "SYNTH_MONSTER_VARIANTS": "world.lore.monster_species",
             "SYNTH_REGIONS": "world.lore.wilderness_regions",
             "SYNTH_QUESTS": "world.quests.definitions",
             "SYNTH_TITLES": "world.lore.titles",

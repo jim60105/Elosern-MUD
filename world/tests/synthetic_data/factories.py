@@ -19,6 +19,7 @@ from world.lore.items import (
     ItemUseMechanics,
 )
 from world.lore.magic import MagicTier
+from world.lore.monster_species import MonsterSpecies, MonsterVariant
 from world.lore.monsters import MonsterTier
 from world.lore.names import FrozenDict, NamePack, NamePart
 from world.lore.nations import Nation
@@ -77,6 +78,10 @@ from world.tests.synthetic_data.data_characters import (
     SYNTH_RACES,
     SYNTH_STATIC_TIERS,
     SYNTH_SUBRACES,
+)
+from world.tests.synthetic_data.data_monster_species import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
 )
 from world.tests.synthetic_data.data_world import (
     SYNTH_ANCHORS,
@@ -148,6 +153,16 @@ def make_npc_tier(key: str = "t_made_tier", **overrides: object) -> NPCTier:
 def make_monster_tier(key: str = "t_made_monster_tier", **overrides: object) -> MonsterTier:
     """One synthetic monster threat tier."""
     return _make(key, SYNTH_MONSTER_TIERS["t_faint"], overrides)
+
+
+def make_monster_species(key: str = "t_made_species", **overrides: object) -> MonsterSpecies:
+    """One synthetic monster species row."""
+    return _make(key, SYNTH_MONSTER_SPECIES["t_whisper_quail"], overrides)
+
+
+def make_monster_variant(key: str = "t_made_variant", **overrides: object) -> MonsterVariant:
+    """One synthetic monster variant row."""
+    return _make(key, SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"], overrides)
 
 
 def make_anchor(key: str = "t_made_anchor", **overrides: object) -> Anchor:

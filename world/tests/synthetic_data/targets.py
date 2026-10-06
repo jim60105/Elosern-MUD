@@ -17,6 +17,10 @@ from world.tests.synthetic_data.data_characters import (
     SYNTH_STATIC_TIERS,
     SYNTH_SUBRACES,
 )
+from world.tests.synthetic_data.data_monster_species import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+)
 from world.tests.synthetic_data.data_world import (
     SYNTH_ANCHORS,
     SYNTH_ANCHOR_PLACEMENTS,
@@ -60,6 +64,8 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "presets": lambda: SYNTH_PRESETS,
         "npc_tiers": lambda: SYNTH_NPC_TIERS,
         "monster_tiers": lambda: SYNTH_MONSTER_TIERS,
+        "monster_species": lambda: SYNTH_MONSTER_SPECIES,
+        "monster_variants": lambda: SYNTH_MONSTER_VARIANTS,
         "anchors": lambda: SYNTH_ANCHORS,
         "anchor_placements": lambda: SYNTH_ANCHOR_PLACEMENTS,
         "regions": lambda: SYNTH_REGIONS,
@@ -105,6 +111,8 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "guild_ranks": content["guild_ranks"](),
         "titles": content["titles"](),
         "monster_tiers": content["monster_tiers"](),
+        "monster_species": content["monster_species"](),
+        "monster_variants": content["monster_variants"](),
         "anchors": content["anchors"](),
         "anchor_placements": content["anchor_placements"](),
         "settlements": content["settlements"](),
@@ -129,6 +137,8 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "presets": ("world.lore.player_presets", "PLAYER_PRESET" + "_REGISTRY"),
     "npc_tiers": ("world.lore.npc_tiers", "NPC_TIER" + "_REGISTRY"),
     "monster_tiers": ("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"),
+    "monster_species": ("world.lore.monster_species", "MONSTER_SPECIES" + "_REGISTRY"),
+    "monster_variants": ("world.lore.monster_species", "MONSTER_VARIANT" + "_REGISTRY"),
     "anchors": ("world.lore.anchors", "ANCHOR" + "_REGISTRY"),
     "anchor_placements": ("world.lore.anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"),
     "regions": ("world.lore.wilderness_regions", "WILDERNESS_REGION" + "_REGISTRY"),
