@@ -45,6 +45,21 @@ PLACEHOLDER_CARD = ACTOR + " .reference-artwork__chest"
 # antialiased alpha edge needs.
 FILL_RGB = (23, 25, 31)
 FILL_TOLERANCE = 26
+# The figure's own edges, told apart from the fill's drop shadow and the floor
+# glow that share the element's box and sit within the loose tolerance above.
+# Masked edges are the art's own soft rim rather than a hard cut, so a filled
+# edge sits ~4px inside the alpha bounds the mask was cut from at this frame;
+# FIGURE_EDGE_TOLERANCE_PX leaves room for that. A stretched fill moves this
+# frame's horizontal edges ~17px (15-23px across the committed keys) and a
+# `cover` fit cuts the figure's own top away, so both stay outside it. The
+# ratio check is the scale-free half of the same claim and the area check
+# catches a fill that fades or erodes inside those edges: this frame's own
+# mask measures ~0.91 of the expected alpha area, the missing part being the
+# art's soft rim, so the floor leaves that room.
+FILL_STRICT_TOLERANCE = 4
+FIGURE_EDGE_TOLERANCE_PX = 8.0
+FIGURE_RATIO_TOLERANCE = 0.06
+FIGURE_AREA_FLOOR = 0.7
 
 
 def _fallback(key: str) -> dict:
@@ -140,14 +155,102 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
             MASK_FILL,
         )
 
-    def _fill_share(self, page, fraction: dict) -> float:
-        """The share of sampled pixels inside ``fraction`` painted with the fill.
-
-        ``fraction`` gives each edge as a share of the element's own box, so a
-        caller can ask about the top strip, the floor band, or the body.
-        """
+    def _painted_rect(
+        self, page
+    ) -> tuple[tuple[float, float, float, float], int]:
+        """The filled figure's bounds and pixel count, from the element's screenshot."""
         image = Image.open(io.BytesIO(page.locator(MASK_FILL).screenshot())).convert("RGBA")
-        return self._painted_share(image, fraction)
+        width, height = image.size
+        xs: list[int] = []
+        ys: list[int] = []
+        painted = 0
+        for x in range(0, width):
+            for y in range(0, height):
+                red, green, blue, alpha = image.getpixel((x, y))
+                if alpha > 200 and all(
+                    abs(channel - target) <= FILL_STRICT_TOLERANCE
+                    for channel, target in zip((red, green, blue), FILL_RGB)
+                ):
+                    painted += 1
+                    xs.append(x)
+                    ys.append(y)
+        self.assertTrue(painted, "the mask paints the figure")
+        rect = (min(xs) / width, min(ys) / height, max(xs) / width, max(ys) / height)
+        return rect, painted
+
+    def _source_alpha_box(self, page) -> dict:
+        """The mask image's own alpha bounds, from the browser's own decode.
+
+        The frame is asked to render this image's proportions, so the
+        expectation is read from the very resource the mask binds — the same
+        URL the probe image carries — rather than copied into the test.
+        """
+        return page.evaluate(
+            """async (sel) => {
+              const fill = document.querySelector(sel);
+              const probe = fill.parentElement.querySelector('.reference-artwork__mask-probe');
+              const image = new Image();
+              image.src = probe.src;
+              await image.decode();
+              const canvas = document.createElement('canvas');
+              canvas.width = image.naturalWidth;
+              canvas.height = image.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(image, 0, 0);
+              const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+              let left = canvas.width;
+              let top = canvas.height;
+              let right = -1;
+              let bottom = -1;
+              let painted = 0;
+              for (let y = 0; y < canvas.height; y += 1) {
+                for (let x = 0; x < canvas.width; x += 1) {
+                  if (pixels[(y * canvas.width + x) * 4 + 3] > 200) {
+                    painted += 1;
+                    if (x < left) left = x;
+                    if (y < top) top = y;
+                    if (x > right) right = x;
+                    if (y > bottom) bottom = y;
+                  }
+                }
+              }
+              if (right < 0) {
+                throw new Error('the mask image carries no alpha');
+              }
+              return {
+                width: canvas.width,
+                height: canvas.height,
+                left: left,
+                top: top,
+                right: right,
+                bottom: bottom,
+                pixels: painted,
+              };
+            }""",
+            MASK_FILL,
+        )
+
+    @staticmethod
+    def _contained_figure_rect(geometry: dict, source: dict) -> tuple[float, float, float, float]:
+        """The figure's bounds under a contained, bottom-centered mask.
+
+        `contain` scales the image uniformly to fit the box, so the image's
+        alpha bounds map linearly onto it; the mask is anchored at the box's
+        bottom-center, so the image's bottom edge is the box's.
+        """
+        box_width = geometry["boxWidth"]
+        box_height = geometry["boxHeight"]
+        scale = min(box_width / source["width"], box_height / source["height"])
+        rendered_width = source["width"] * scale
+        rendered_height = source["height"] * scale
+        origin_x = (box_width - rendered_width) / 2
+        origin_y = box_height - rendered_height
+        return (
+            (origin_x + source["left"] * scale) / box_width,
+            (origin_y + source["top"] * scale) / box_height,
+            (origin_x + source["right"] * scale) / box_width,
+            (origin_y + source["bottom"] * scale) / box_height,
+        )
 
     @staticmethod
     def _painted_share(image, fraction: dict) -> float:
@@ -221,10 +324,19 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         "webclient-art-panel::the-reference-artwork-frame-presents-a-portrait-entry-truthfully-through-cover-fit-and-rect-crop"
     )
     def test_the_masked_figure_is_floor_aligned_aspect_preserved_and_unstretched(self):
-        """The figure stands on the stage floor at its own proportions: the
-        mask is contained and bottom-centered inside the actor's box, so the
-        frame above the figure stays unpainted while the floor band carries
-        the figure — a stretched fill would paint the whole box."""
+        """The figure stands on the stage floor at its own proportions.
+
+        `contain` fits the whole image inside the actor's box with one uniform
+        scale and `bottom center` anchors it at the box's floor — pinned above
+        by the computed style and the box's own bottom edge — so the figure
+        keeps the committed image's proportions: the filled pixels must occupy
+        the box-space the image's own alpha bounds imply, at their own area.
+        A stretched mask would widen the figure to the box and a `cover` fit
+        would cut its top away. The committed silhouettes carry their own alpha
+        from near their top edge, so the frame above the figure is not uniform
+        — this measures the geometry those bounds imply instead of assuming an
+        empty top strip.
+        """
         page = self._open_dialogue(_entry(fallback=_fallback("woman")))
         page.wait_for_selector(MASK_FILL, timeout=15000)
         page.wait_for_timeout(200)
@@ -241,6 +353,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
                 repeat: style.maskRepeat,
                 boxBottom: box.bottom,
                 boxHeight: box.height,
+                boxWidth: box.width,
                 stageBottom: stage.bottom,
                 stageHeight: stage.height,
               };
@@ -253,12 +366,53 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         # The figure's box bottoms out on the stage floor: the actor's bottom.
         self.assertAlmostEqual(geometry["boxBottom"], geometry["stageBottom"], delta=1.5)
         self.assertGreaterEqual(geometry["boxHeight"], geometry["stageHeight"] - 1.5)
-        top = self._fill_share(page, {"left": 0.0, "right": 1.0, "top": 0.0, "bottom": 0.06})
-        floor = self._fill_share(page, {"left": 0.2, "right": 0.8, "top": 0.94, "bottom": 1.0})
-        body = self._fill_share(page, {"left": 0.3, "right": 0.7, "top": 0.4, "bottom": 0.7})
-        self.assertLess(top, 0.02, "the frame above the figure must stay unpainted")
-        self.assertGreater(floor, 0.02, "the figure must reach the stage floor")
-        self.assertGreater(body, 0.2, "the figure's own proportions must paint the body band")
+        source = self._source_alpha_box(page)
+        expected = self._contained_figure_rect(geometry, source)
+        painted, painted_pixels = self._painted_rect(page)
+        sizes = (
+            geometry["boxWidth"],
+            geometry["boxHeight"],
+            geometry["boxWidth"],
+            geometry["boxHeight"],
+        )
+        for index, edge in enumerate(("left", "top", "right", "bottom")):
+            with self.subTest(edge=edge):
+                self.assertAlmostEqual(
+                    painted[index] * sizes[index],
+                    expected[index] * sizes[index],
+                    delta=FIGURE_EDGE_TOLERANCE_PX,
+                    msg=(
+                        f"the figure's {edge} edge must carry the image's own alpha "
+                        "bounds, uniformly scaled and floored"
+                    ),
+                )
+        # The same claim without the letterbox origin: the figure's own
+        # width-to-height ratio is the image's alpha bounds' ratio, which a
+        # stretched mask would widen by ~20%.
+        painted_ratio = ((painted[2] - painted[0]) * geometry["boxWidth"]) / (
+            (painted[3] - painted[1]) * geometry["boxHeight"]
+        )
+        expected_ratio = ((expected[2] - expected[0]) * geometry["boxWidth"]) / (
+            (expected[3] - expected[1]) * geometry["boxHeight"]
+        )
+        self.assertAlmostEqual(
+            painted_ratio / expected_ratio,
+            1.0,
+            delta=FIGURE_RATIO_TOLERANCE,
+            msg="the figure keeps the image's own proportions, never stretched",
+        )
+        # And it is the figure's whole area rather than an eroded or faded copy
+        # of it: `contain` scales the source uniformly, so the filled pixels are
+        # the source's own alpha pixels at that scale.
+        scale = min(
+            geometry["boxWidth"] / source["width"],
+            geometry["boxHeight"] / source["height"],
+        )
+        self.assertGreaterEqual(
+            painted_pixels,
+            source["pixels"] * scale * scale * FIGURE_AREA_FLOOR,
+            "the mask paints the figure's own alpha area",
+        )
         page.close()
 
     @covers_requirement(
