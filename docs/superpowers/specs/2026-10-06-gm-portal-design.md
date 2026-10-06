@@ -275,13 +275,10 @@ recent calls; no endpoint probes are sent.
 
 ### S3 Runtime state inspection
 
-- Read-only views of accounts and characters (true traits and
-  `disguised_stats` shown and labelled separately), NPCs, quest records,
-  `GeneratedQuestStore`, narrative records (events, memory and revisions,
-  story threads, dialogue epochs, letters, dreams, director decisions,
-  scheduled beats), art assets and gallery.
-- Character-centred navigation: a character page links to its memories,
-  letters, and quests.
+Designed in `docs/superpowers/specs/2026-10-06-gm-portal-s3-runtime-state-design.md`:
+curated read-only entity views reusing the existing read models, a generic
+raw-data tab for every Evennia object, cross-linked navigation, and a
+read-only NPC recall preview.
 
 ### S4 Authored data browser
 
