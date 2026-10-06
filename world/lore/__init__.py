@@ -11,6 +11,17 @@ from .economy import (
 from .elements import ELEMENT_REGISTRY, Element
 from .guild import GUILD_RANK_REGISTRY, GuildRank
 from .magic import MAGIC_TIER_REGISTRY, MagicTier
+from .monster_species import (
+    MONSTER_SPECIES_REGISTRY,
+    MONSTER_VARIANT_REGISTRY,
+    MonsterCombatProfile,
+    MonsterSpecies,
+    MonsterSpeciesRegistryError,
+    MonsterVariant,
+    published_species_view,
+    published_variant_view,
+    validate_monster_species_registry,
+)
 from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
 from .nations import NATION_REGISTRY, Nation
 from .races import (
@@ -55,7 +66,9 @@ __all__ = [
     "FIXED_TITLE_REGISTRY",
     "GUILD_RANK_REGISTRY",
     "MAGIC_TIER_REGISTRY",
+    "MONSTER_SPECIES_REGISTRY",
     "MONSTER_TIER_REGISTRY",
+    "MONSTER_VARIANT_REGISTRY",
     "NATION_REGISTRY",
     "PRICE_TABLE",
     "RACE_REGISTRY",
@@ -70,7 +83,11 @@ __all__ = [
     "FixedTitleDef",
     "GuildRank",
     "MagicTier",
+    "MonsterCombatProfile",
+    "MonsterSpecies",
+    "MonsterSpeciesRegistryError",
     "MonsterTier",
+    "MonsterVariant",
     "Nation",
     "PriceEntry",
     "RaceProfile",
@@ -85,6 +102,9 @@ __all__ = [
     "TitleRegistryError",
     "Vitals",
     "WETNESS_LEVELS",
+    "published_species_view",
+    "published_variant_view",
     "to_copper",
     "validate_fixed_titles",
+    "validate_monster_species_registry",
 ]

@@ -65,6 +65,10 @@
       "reason": "monster tier data contract"
     },
     {
+      "path": "world/lore/tests/test_monster_species_content.py",
+      "reason": "approved first-batch bestiary species and variant narrative contract"
+    },
+    {
       "path": "world/lore/tests/test_names.py",
       "reason": "name-pack corpus contract"
     },
