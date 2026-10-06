@@ -8,11 +8,15 @@ record. This change backfills the missing artifacts so the shipped behavior has 
 proposal, design, delta spec, and task list and can be archived like every other
 change.
 
-**This is a retroactive backfill of already-shipped behavior.** No new code is
-written by this change, and `openspec/specs/dream-explicit-presentation/spec.md`
-already reflects the contract restated below: the delta's two MODIFIED
-requirement bodies are byte-identical to the current main spec, so the archive
-sync is content-neutral.
+**This is a retroactive backfill of already-shipped behavior.**
+`openspec/specs/dream-explicit-presentation/spec.md` already reflects the
+contract restated below: the delta's two MODIFIED requirement bodies are
+byte-identical to the current main spec, so the archive sync is content-neutral.
+One bounded review round followed the implementation (a `rubber-duck` critique of
+`f09feb1e`, no blocking findings): its adopted follow-ups — the panel's
+failed-artwork fallback, the catalog-admissibility tripwire test, the corrected
+requirement wording, and the documentation corrections — are part of this change
+and are listed under What Changes.
 
 Because the delta restates two requirement blocks the implementation commit already
 applied in place, the archive sync rewrites those two blocks with identical text —
@@ -39,8 +43,15 @@ so it is recorded here in prose only.
 - Record the dream panel wire schema bump v1 → v2 adding the bounded `scene_art`
   field, mirrored across the presenter constant, the registry registration, the
   UMD `PANEL_ALLOWLIST`, and the client available-form re-check.
-- No production, test, or web source changes: the implementation already shipped
-  as `f09feb1e` and is documented here.
+- Record the review round's adopted follow-ups: the dream panel degrades to the
+  flat stage when the artwork URL fails to load (a withdrawn or replaced file
+  404s by design because the URL embeds the startup fingerprint); a tripwire test
+  pins the artwork identity to the catalog's admitted kinds, stable-key contract,
+  and stored extensions; the `dream-explicit-presentation` requirement prose now
+  names the shipped staging (the counterpart seated on the throne, the player
+  standing in her flood); and the developer/operator documentation describes the
+  external artwork instead of the deleted bundled AVIF.
+- No further production behavior beyond `f09feb1e` plus that review follow-up.
 
 ## Capabilities
 
@@ -66,8 +77,18 @@ so it is recorded here in prose only.
   `web/webclient-app/components/DreamPanel.vue`, the vitest/Storybook fixtures, the
   gallery-fallback pin, and the deletion of
   `web/webclient-app/assets/redesign/dream-white-bed.avif`.
+- Review follow-up commit: `web/webclient-app/components/DreamPanel.vue` (failed
+  artwork falls back to the flat stage), `world/narrative/dream_surface.py` (the
+  identity's fixed-URL commentary), `world/narrative/tests/test_dream_surface.py`
+  (the admissibility tripwire), `world/ai/tests/test_dream_presentation.py`
+  (re-themed synthetic fixture), `web/webclient-app/tests/dream.test.js` (the
+  failed-load vitest case), `docs/development/narrative-memory-and-recall.md`,
+  `docs/development/official-artwork-deployment.md`, and the requirement-body
+  rewording in both the main spec and this change's delta.
 - `openspec/specs/dream-explicit-presentation/spec.md` was updated in place by that
-  same commit; this change adds no further edit to `openspec/specs/**`.
+  same commit, and the review follow-up reworded the first requirement body there
+  and in this change's delta in the same form, so the delta stays byte-identical to
+  the main spec and the archive sync remains content-neutral.
 - Operator side, gitignored and **not** part of the commit:
   `art-official/npc/dream_goddess/dream-throne.webp`, the external
   `npc/<key>/<file>` official-artwork layout served same-origin through

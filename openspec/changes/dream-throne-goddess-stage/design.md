@@ -21,8 +21,9 @@ not an option still under consideration.
   four mirrored version sites.
 
 **Non-Goals:**
-- No new behavior, no refactor, no compatibility layer — the code is already
-  shipped and this backfill changes no source file.
+- No new feature, no refactor, no compatibility layer — the code shipped in
+  `f09feb1e`, and the only source edits this change adds are the bounded review
+  follow-ups recorded below.
 - Not the official-artwork catalog itself (owned by `official-artwork-catalog`),
   not the other panels' schemas, not the player's live sexual state.
 
@@ -109,10 +110,44 @@ not an option still under consideration.
   (`/art/official/<64 hex>/npc/dream_goddess/dream-throne.webp`, well inside every
   ceiling) and always same-origin; a data-driven identity would need the sibling
   `requireString`/`/art/` prefix discipline first.
-- [Two pre-existing docs still describe the pre-retheme staging] → recorded, not
-  fixed: `docs/development/narrative-memory-and-recall.md` and the narrative-memory
-  design doc still name the bundled white-bed AVIF and the pure-white-bed scene, and
-  this change writes nothing outside its own directory.
+- [Documentation still described the pre-retheme staging] → fixed in the review
+  follow-up: `docs/development/narrative-memory-and-recall.md` now describes the
+  externally served stage artwork (and the text client's prose-only view), and
+  `docs/development/official-artwork-deployment.md` names the dream identity and the
+  verification step that proves it indexed.
+
+## Review Round
+
+An independent `rubber-duck` critique of `f09feb1e` (whole-implementation review,
+self-contained request) returned **no blocking findings** and one implementation
+consequence plus five non-blocking items. Dispositions:
+
+- **Adopted — failed artwork must not leave a broken image.** The stage URL embeds
+  the startup fingerprint of the file bytes, so replacing or withdrawing the file
+  404s by design; `DreamPanel.vue` now drops the `<img>` on a load error (falling back
+  to the flat stage) and retries only when the published URL changes, covered by the
+  vitest case.
+- **Adopted — a committed tripwire for the artwork identity.** Admission is silent
+  (a refused or unindexed identity simply yields `""`), and the deferred authored
+  npc/profile provenance will give the `npc` kind a registry-membership check that
+  `dream_goddess` would fail. A test now asserts the identity parses as
+  `<kind>/<key>/<file>` with an admitted kind, a valid stable subject key, and a
+  stored extension.
+- **Adopted — requirement prose accuracy.** The first requirement said the
+  collaborator "inhabits a white throne"; it now states the shipped staging (the
+  counterpart seated on the throne, the player standing in her flood). The change's
+  delta and the main spec were reworded in the same form so the archive sync stays
+  content-neutral.
+- **Rejected — a server-side `/art/official/` prefix + ceiling re-check in
+  `scene_art_url()`.** The value can only be the catalog's own URL or `""`, and the
+  proposed guard would import the heavy `world.art.presenter` → Evennia gallery chain
+  into a pure narrative read model to defend an unreachable case; the fixed ASCII
+  identity and its 113-character URL are documented at the constant instead, with the
+  client bound recorded as deliberately inert.
+- **Deferred — an ops note that a schema bump strands a stale browser tab.** The
+  property is inherent to every panel bump, the project is pre-release with no
+  released clients, and the reload requirement is already implied by the
+  server-and-client-ship-together decision.
 
 ## Migration Plan
 
