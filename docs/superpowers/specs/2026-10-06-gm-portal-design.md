@@ -30,8 +30,8 @@ switches to it:
    authored data and its references (S4).
 4. Before experimenting: a world snapshot is the save slot (S5).
 5. When a save is broken: there is no other GM to ask, and hand-patching state
-   in a Django shell is forbidden, so repairs go through validated, audited
-   operations (S6).
+   in a Django shell is forbidden, so repairs go through the developer console
+   (S6), which also sets up test situations.
 
 Multi-user server concerns (account administration, broadcasts, bans) are out
 of scope.
@@ -132,9 +132,10 @@ world/rules/, world/maps/, world/quests/, world/narrative/, world/art/
    `LOGIN_URL` with `next=`; unauthenticated API requests return `401`;
    authenticated accounts without the permission get `403`.
 2. **Single writer.** `web/gm/` never mutates persistent state itself. Every
-   S6 game-state write maps to one named API in a single-writer package
+   S6 domain verb maps to a `gm.py` API in its owning single-writer package
    (`world/rules/`, `world/maps/`, `world/quests/`, `world/narrative/`);
-   `web/gm/` only validates transport shape and forwards. S5 snapshots and
+   S6 raw edits go through `server/console/raw.py`; `web/gm/` only validates
+   transport shape and forwards. S5 snapshots and
    restores operate below game rules through `server/saves/`, never through
    field-level writes.
 3. **Authored data is read-only.** S4 reads module-level registries and loaded
@@ -144,8 +145,8 @@ world/rules/, world/maps/, world/quests/, world/narrative/, world/art/
    services offline, the portal still loads and reports those services as
    offline.
 5. **Observability.** GM writes emit facade events (`gm_action`) with the
-   operator account and target identifiers in `context`. S6 additionally
-   persists an audit record.
+   operator account and target identifiers in `context`. There is no audit
+   model; the operator is the only user.
 6. **Isolation.** The portal bundle is built and served separately from the
    game bundle. The webclient frozen contracts, `.elosern-root` styles, and OOB
    protocol are untouched.
@@ -162,7 +163,7 @@ tasks) in this order.
 | S3 | Runtime state inspection | S1 |
 | S4 | Authored data browser and cross-references | S1 |
 | S5 | Save management: snapshot and restore of the world state | S1 |
-| S6 | Save repair: new validated rule APIs plus audit trail, each preceded by an automatic snapshot | S1, S3, S5 |
+| S6 | Developer console: raw editing plus validated domain verbs, preceded by a save when in-game time advanced | S1, S3, S5 |
 
 This document specifies S1 in full. S2–S6 are scoped in §6; each gets its own
 brainstorming pass before its OpenSpec change.
@@ -325,18 +326,15 @@ Responsibility: save and restore the world state (database plus art store).
 Operations a player can already perform in game (art requeue, persona
 editing, time skip) are not portal features.
 
-### S6 Save repair
+### S6 Developer console
 
-- Granting items and currency (integer copper), correcting quest progress,
-  flagging or retracting memory records, and similar interventions.
-- Each capability first lands as a validated, all-or-nothing API in its
-  owning single-writer package; the portal only calls it.
-- Every intervention first creates an `auto_intervention` save through S5.
-- A persistent GM audit record: operator, timestamp, target, before/after
-  diff, stated reason.
-- Decision deferred to S6: the package that owns the audit record. AGENTS.md
-  requires every writing package to be named explicitly, so S6 amends
-  AGENTS.md in the same change.
+Designed in `docs/superpowers/specs/2026-10-06-gm-portal-s6-console-design.md`.
+General tools instead of a catalogue of predefined repairs, because
+unanticipated faults have no predefined repair: raw editing of Evennia object
+Attributes, tags, and location as the general core, plus a small first batch
+of validated domain verbs in each owning package's `gm.py`. A save is taken
+before a console write only when in-game time has advanced since the last
+save. No audit trail.
 
 ## 7. Error handling principles
 

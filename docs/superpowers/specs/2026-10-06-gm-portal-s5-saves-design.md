@@ -4,7 +4,7 @@
 - Status: Approved design
 - Parent: `docs/superpowers/specs/2026-10-06-gm-portal-design.md` (sub-project S5)
 - Depends on: S1 (portal skeleton)
-- Consumed by: S6 (automatic snapshot before every intervention)
+- Consumed by: S6 (automatic snapshot before a console write when in-game time has advanced)
 
 ## 1. Responsibility
 
