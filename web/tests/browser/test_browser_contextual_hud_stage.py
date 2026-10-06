@@ -47,6 +47,58 @@ def _selectable_target(identity: int, name: str) -> dict:
     }]
     return target
 
+
+# The typesetting fixture's own opening: a page of the appended response always
+# carries it on page 1, so a gate can tell that response's page from whatever
+# page was on screen before the append.
+_PROSE_MARK = "告示第"
+
+
+def _wait_appended_page_measured(page, scale, timeout=30000) -> None:
+    """Gate on the appended prose response's measured page and its marker.
+
+    Until the faces are measurable the window shows one unpaged provisional
+    page and no marker at all (webclient-message-typesetting D6), and that
+    latch waits on `document.fonts.ready` in a freshly loaded page. A fixed
+    sleep can therefore read the provisional presentation and a marker that is
+    not there yet, which is what failed the typesetting journey in CI.
+
+    The gate's own first poll can also win before the re-page for the append,
+    or for the new prose scale, commits, so the paging reads must then agree
+    across two consecutive polls before the walk below starts on a layout that
+    is settled rather than about to be re-cut.
+    """
+    wait_for_store_state(
+        page,
+        lambda s: bool(s.get("connected"))
+        and float(s.get("fontScale") or 1) == float(scale),
+        dom_readiness={
+            "selector": '[data-testid="message-page"]',
+            "predicate": (
+                "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                " const m = document.querySelector('[data-testid=\"message-page-marker\"]');"
+                f" return !!p && !!m && p.innerText.indexOf('{_PROSE_MARK}') !== -1; }}"
+            ),
+            "description": "the appended prose response's measured page with its marker",
+        },
+        timeout=timeout,
+    )
+    surface = page.locator('[data-testid="message-page"]')
+    previous = None
+    for _ in range(20):
+        page.wait_for_timeout(120)
+        signature = (
+            surface.get_attribute("data-page"),
+            surface.get_attribute("data-pages"),
+        )
+        if signature == previous and signature[0] is not None:
+            return
+        previous = signature
+    raise AssertionError(
+        f"the message window's pages never settled at prose scale {scale}"
+    )
+
+
 _GALLERY_PANEL = {
     "schema_version": 1,
     "available": True,
@@ -857,7 +909,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             )
             for scale in (1, 1.25):
                 page.evaluate("(s) => window.__elosernBridge.store.setFontScale(s)", scale)
-                page.wait_for_timeout(250)
+                _wait_appended_page_measured(page, scale)
                 # Read every page from the first: Enter on the focused page
                 # surface advances one page at a time.
                 page.evaluate(
@@ -947,7 +999,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     if geo["page"] >= geo["pages"]:
                         break
                     page.keyboard.press("Enter")
-                    page.wait_for_timeout(120)
+                    wait_for_store_state(
+                        page,
+                        lambda s: bool(s.get("connected")),
+                        dom_readiness={
+                            "selector": '[data-testid="message-page"]',
+                            "predicate": (
+                                "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                                f" return !!p && +p.getAttribute('data-page') === {geo['page'] + 1}; }}"
+                            ),
+                            "description": f"message-page advanced to page {geo['page'] + 1}",
+                        },
+                    )
                 self.assertTrue(seen_map, f"the map page was never shown at {viewport} @ {scale}")
                 # Re-page from the start for the next scale.
                 page.evaluate(
@@ -959,7 +1022,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     }""",
                     [prose, "<br>".join(map_rows)],
                 )
-                page.wait_for_timeout(250)
+                _wait_appended_page_measured(page, scale)
             page.evaluate("() => window.__elosernBridge.store.setFontScale(1)")
 
             # Dialogue: the marker ends at the left-aligned column's edge.
