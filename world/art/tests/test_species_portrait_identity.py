@@ -177,6 +177,9 @@ class SpeciesReferenceTests(unittest.TestCase):
             reference = official_content_reference_for_entity(entity)
         return reference, _unresolved_events(warned)
 
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_a_stored_species_key_is_the_whole_reference(self):
         entity = _ProvenanceEntity(**{SPECIES_PROVENANCE_ATTRIBUTE: _SYNTH_SPECIES})
         reference, events = self._resolve(entity)
@@ -205,6 +208,9 @@ class SpeciesReferenceTests(unittest.TestCase):
             ["preset"],
         )
 
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_every_variant_of_one_species_resolves_that_same_species_reference(self):
         self.assertGreaterEqual(len(_VARIANTS_OF_SPECIES), 2, _VARIANTS_OF_SPECIES)
         references = []
@@ -226,6 +232,9 @@ class SpeciesReferenceTests(unittest.TestCase):
             {OfficialContentReference(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES)},
         )
 
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_a_variant_key_is_never_a_species_key(self):
         variant_key = _VARIANTS_OF_SPECIES[0]
         self.assertFalse(registered_content_key(OFFICIAL_KIND_MONSTER, variant_key))
@@ -235,6 +244,9 @@ class SpeciesReferenceTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["reason"], "unregistered_key")
 
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_a_tier_only_individual_resolves_no_reference_silently(self):
         entity = _ProvenanceEntity(threat_tier=_SYNTH_TIER)
         entity.key = _SYNTH_TIER
@@ -245,6 +257,9 @@ class SpeciesReferenceTests(unittest.TestCase):
         # The tier is not an identity input here: it is never even read.
         self.assertNotIn("threat_tier", entity.read_keys)
 
+    @covers_requirement(
+        "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
+    )
     def test_a_tier_value_is_never_admitted_as_a_species_key(self):
         for tier in _SYNTH_TIERS:
             with self.subTest(tier=tier):
@@ -261,6 +276,9 @@ class SpeciesReferenceTests(unittest.TestCase):
             monster_subject_for(_SYNTH_TIER).full(), f"portrait:monster:{_SYNTH_TIER}"
         )
 
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_a_display_name_or_entity_key_never_produces_a_reference(self):
         entity = _ProvenanceEntity()
         entity.key = _SYNTH_SPECIES
@@ -408,6 +426,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
 
     # -- the official default presents -----------------------------------
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_a_catalog_backed_species_presents_its_official_image(self):
         identity = self._index(
             _SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
@@ -430,6 +451,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(GalleryRecord.objects.count(), 0)
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
+    @covers_requirement(
+        "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
+    )
     def test_a_species_the_snapshot_lacks_falls_through_byte_identically(self):
         # The snapshot holds a monster directory — but not this species'.
         foreign_identity = self._index(_UNREGISTERED_SPECIES, name="b.png")
@@ -454,6 +478,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(_unresolved_events(warned), [])
         self.assertNotIn(foreign_identity, json.dumps(backed_payload, sort_keys=True))
 
+    @covers_requirement(
+        "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
+    )
     def test_no_other_keys_official_bytes_are_reachable_for_an_unmatched_species(self):
         owned = self._index(_SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT))
         other = self._index(_OTHER_SPECIES, name="b.png")
@@ -485,6 +512,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, serialized)
 
+    @covers_requirement(
+        "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
+    )
     def test_a_tier_named_monster_directory_is_indexed_but_unreachable(self):
         # An operator error: a content directory named after a threat tier.
         # The catalog still indexes it — membership checking at ADMISSION for
@@ -577,6 +607,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertNotEqual(payload["url"], current_catalog().url_for(default_identity))
 
     # -- purity -----------------------------------------------------------
+    @covers_requirement(
+        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+    )
     def test_resolution_reads_only_stored_identity_and_the_loaded_snapshot(self):
         self._index(
             _SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
