@@ -183,12 +183,13 @@ jobs:
 
       # The Vue dist is built into each checkout so the portal serves the
       # bundle from the project origin in both two-process workspaces
-      # (webclient-vue-01-foundation, design D2).
+      # (webclient-vue-01-foundation, design D2); the GM bundle is built
+      # alongside it (gm-portal-s1-foundation).
       - name: Build Vue dist in browser workspaces
         run: |
           npm install --global pnpm@12.5.1
-          (cd w-a && pnpm install --frozen-lockfile && pnpm run build)
-          (cd w-b && pnpm install --frozen-lockfile && pnpm run build)
+          (cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
+          (cd w-b && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
 
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
@@ -284,6 +285,12 @@ jobs:
       - name: Build Vue application with Vite
         run: pnpm run build
 
+      - name: Build GM portal with Vite
+        run: pnpm run build:gm
+
+      - name: Check GM import boundary
+        run: pnpm run test:gm-boundary
+
       - name: Run Vue component tests with Vitest
         run: pnpm test
 
@@ -297,6 +304,8 @@ jobs:
         run: |
           test -s web/static/webclient/app/dist/index.js
           test -s web/static/webclient/app/dist/index.css
+          test -s web/static/gm/dist/index.js
+          test -s web/static/gm/dist/index.css
 
   top-level:
     needs: preflight

@@ -154,7 +154,9 @@ class TestOwnershipContractTests(unittest.TestCase):
         "evennia-test-optimization::supported-execution-profiles-preserve-suite-ownership"
     )
     def test_every_web_python_test_has_exactly_one_owner(self):
-        non_browser = set((REPO_ROOT / "web/webclient").rglob("test*.py"))
+        non_browser = set((REPO_ROOT / "web/webclient").rglob("test*.py")) | set(
+            (REPO_ROOT / "web/gm").rglob("test*.py")
+        )
         browser = set((REPO_ROOT / "web/tests/browser").glob("test*.py"))
         all_web_tests = set((REPO_ROOT / "web").rglob("test*.py"))
         self.assertTrue(non_browser)
@@ -340,7 +342,7 @@ class TestOwnershipContractTests(unittest.TestCase):
         self.assertEqual(indices, sorted(indices), "shard indices must be sorted")
         self.assertEqual(len(indices), len(set(indices)), "shard indices must be unique")
 
-        roots = ("commands", "server", "typeclasses", "world", "web/webclient")
+        roots = ("commands", "server", "typeclasses", "world", "web/webclient", "web/gm")
         discovered: set[str] = set()
         for root in roots:
             root_dir = REPO_ROOT / root

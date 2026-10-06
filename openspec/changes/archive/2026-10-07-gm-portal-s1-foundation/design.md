@@ -24,7 +24,7 @@ Define cursor/limit and POST-only write conventions in the contract; there is no
 
 ### 3. Request logging covers early denials and API fallback
 
-Use facade calls from the GM boundary: `gm_denied` on all access refusals and `gm_request` once per API request after the final response status is known. Wrap access handling within the request logging boundary so early 401/403 responses and API misses are included. Ensure middleware-originated responses relevant to GM APIs are covered by a narrowly scoped response-logging hook if needed; do not log cookie/token contents. Account context is the account name or `anonymous`; route is the request path. No freeze-file entry and no audit model are needed.
+Use facade calls from the GM boundary: `gm_denied` on all access refusals and `gm_request` once per API request after the final response status is known. Wrap access handling within the request logging boundary so early 401/403 responses and API misses are included. Ensure middleware-originated responses relevant to GM APIs are covered by a narrowly scoped response-logging hook if needed; do not log cookie/token contents. Account context is the account name or `anonymous`; route is the request path, truncated to a fixed length so probing long paths cannot inflate log lines. If resolving the session user itself fails on a database error, a GM API request still answers with the 503 `database_unreadable` envelope and its `gm_request` event. No freeze-file entry and no audit model are needed.
 
 ### 4. Independent Vite output and shared tooling, not a shared runtime
 
@@ -42,7 +42,7 @@ A dependency-free Node test recursively inspects JS/Vue/CSS import references in
 
 Add `vue-router` and create history with base `/gm/`; reuse Pinia only if state genuinely needs it. The home route consumes session/health through the sole fetch boundary. Future navigation labels follow the approved layout and render disabled with `尚未開放`; no routes or placeholder pages are created for them. A real permission-denied route is an error state, not a future feature. Provide account/logout through the existing project's logout flow without creating a GM write endpoint.
 
-`lib/api.js` owns same-origin credentials, CSRF header attachment on POST, envelope validation, and code-based failures. Router integration handles 403 without recursively fetching the session on the permission-denied route; 401 uses the server-supplied login destination and an encoded same-origin GM return path. Test 404, malformed JSON/envelope, and network failure separately. No retries, offline cache, or domain stores are added. S1 home is explicitly temporary: S2 will replace it and remove the skeleton health endpoint in its own change.
+`lib/api.js` owns same-origin credentials, CSRF header attachment on POST, envelope validation, and code-based failures. Router integration handles 403 `forbidden` without recursively fetching the session on the permission-denied route (a 403 `csrf_failed` is surfaced by code, not treated as a permission failure); 401 uses the server-supplied login destination and an encoded same-origin GM return path. Test 404, malformed JSON/envelope, and network failure separately. No retries, offline cache, or domain stores are added. S1 home is explicitly temporary: S2 will replace it and remove the skeleton health endpoint in its own change.
 
 ## Risks / Trade-offs
 

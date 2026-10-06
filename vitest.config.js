@@ -11,6 +11,8 @@ export default defineConfig({
     // Load SFC <style> blocks so computed-style assertions (e.g. the
     // command-line chip mode-gate `display:none`) see the real CSS.
     css: true,
-    include: ["web/webclient-app/**/*.test.js"],
+    // The GM portal (web/admin-app, gm-portal-s1-foundation) shares the
+    // tooling, never the component layer.
+    include: ["web/webclient-app/**/*.test.js", "web/admin-app/**/*.test.js"],
   },
 });

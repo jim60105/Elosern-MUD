@@ -16,9 +16,11 @@
 | --- | --- | --- |
 | `pnpm install --frozen-lockfile` | 安裝鎖定版本的工具鏈（僅開發用相依套件） | `frontend` 工作、瀏覽器工作區 |
 | `pnpm run build` | Vite 生產建置 → `web/static/webclient/app/dist/`（穩定的 `index.js` + `index.css`，加上雜湊化 `assets/`；**不納入版本控制**） | `frontend` 工作、瀏覽器工作區 |
-| `pnpm test` | Vitest 元件閘門（`web/webclient-app/**/*.test.js`、jsdom、離線） | `frontend` 工作 + 最上層契約測試 |
+| `pnpm test` | Vitest 元件閘門（`web/webclient-app/**/*.test.js` 與 `web/admin-app/**/*.test.js`、jsdom、離線） | `frontend` 工作 + 最上層契約測試 |
 | `pnpm run build-storybook` | Storybook 靜態建置 → `.storybook-out/`（已被 git 忽略） | `frontend` 工作 |
-| `pnpm run showcase-coverage` | 對照 `web/webclient-app/component-manifest.json` 檢查元件覆蓋率 | `frontend` 工作 + 最上層契約測試 |
+| `pnpm run showcase-coverage` | 對照 `web/webclient-app/component-manifest.json` 與 GM 的 `web/admin-app/component-manifest.json` 檢查元件覆蓋率 | `frontend` 工作 + 最上層契約測試 |
+| `pnpm run build:gm` | GM 控制台的獨立 Vite 建置（`vite.gm.config.js`）→ `web/static/gm/dist/`（穩定的 `index.js` + `index.css`；**不納入版本控制**，只清除 GM 自己的輸出目錄） | `frontend` 工作、瀏覽器工作區、容器 |
+| `pnpm run test:gm-boundary` | GM 相依邊界的無相依套件 Node 測試（`scripts/tests/gm-import-boundary.test.mjs`） | `frontend` 工作 + `web.gm.tests` 證據橋接 |
 | `pnpm run dev` | 本機工作用的 Vite 開發伺服器（HMR） | —（僅供本機） |
 | `node --test web/static/webclient/js/tests/*.test.js` | 針對保留的獨立於 DOM 邏輯執行無相依套件的 Node 閘門（約 1 秒） | preflight + 最上層契約測試 |
 
@@ -96,7 +98,19 @@ uv run --locked python tools/gen_mono_cells.py
 
 ## 容器
 
-`Containerfile` 的 `vue-dist` 階段（Node 24）會啟用 Corepack 並執行 `pnpm install --frozen-lockfile && pnpm run build`，應用程式佈局階段會將產生的 `dist` 複製至 `/app/web/static/webclient/app/dist/`；進入點在執行 `evennia migrate --noinput` 之後會執行 `evennia collectstatic --noinput` 以更新持久化的 `server/.static` 磁碟卷。本機工作流程為 `podman compose build && podman compose up`（請勿將 Ollama 或 sd-webui 加入此映像檔中）。
+`Containerfile` 的 `vue-dist` 階段（Node 24）會啟用 Corepack 並執行 `pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm`，應用程式佈局階段會將兩份產生的 `dist` 分別複製至 `/app/web/static/webclient/app/dist/` 與 `/app/web/static/gm/dist/`，並複製 `pyproject.toml`（GM session API 從中讀取遊戲版本）；進入點在執行 `evennia migrate --noinput` 之後會執行 `evennia collectstatic --noinput` 以更新持久化的 `server/.static` 磁碟卷。本機工作流程為 `podman compose build && podman compose up`（請勿將 Ollama 或 sd-webui 加入此映像檔中）。
+
+## GM 控制台（`web/admin-app/`，S1 基礎）
+
+GM 控制台是僅限 Developer 帳號使用的營運者介面，掛載於 `/gm/`，與遊戲 WebClient 分開建置、分開提供（設計：`docs/superpowers/specs/2026-10-06-gm-portal-design.md` §§3–5）。S1 只交付基礎骨架：
+
+- **存取：** `/gm/` 底下所有頁面與 API 都要求 `check_permstring("Developer")`（superuser 亦可）；staff 身分不能替代。未登入的頁面請求導向 `LOGIN_URL?next=…`，API 回傳 401 `unauthenticated`；權限不足時頁面回 403、API 回 403 `forbidden`。所有路由只能透過 `web/gm/urls.py` 的 `gm_path()` 註冊；`web/gm/tests/test_access.py` 會走訪 URL 解析器，未包裝的路由會讓測試失敗。
+- **API：** 只有 `GET /gm/api/session` 與 `GET /gm/api/health`（後者只做一次資料庫讀取，不探測 LLM 或 SD 服務）。回應格式為 `{"ok": true, "data": …}` 或 `{"ok": false, "error": {"code", "message"}}`，用戶端只依 `code` 分支。寫入一律走 POST 並附上 `X-CSRFToken`；S1 沒有正式的寫入端點。
+- **觀測性：** 每個 GM API 請求都會發出一次 `gm_request`（帶最終狀態碼），每次拒絕存取都會發出 `gm_denied`，皆透過 `world.observability` 門面。
+- **相依邊界：** `web/admin-app/` 只能從遊戲樹匯入 `styles/tokens.css` 與 `styles/fonts*.css`；`scripts/gm-import-boundary.mjs` 會先解析相對路徑、別名（`web/admin-app/gm-aliases.mjs`）與符號連結再套用允許清單。
+- **元件：** `GmShell`、`GmNav`、`GmPageHeader`、`GmPanel`、`GmTable`、`GmEmpty`、`GmError`、`GmStatusBadge` 都只以設計代符構成，Storybook 標題為 `GM/<元件>`，並列於 GM 的元件清單中。seal 紅與 `.ui-btn--danger` 只保留給破壞性操作。
+- **導覽：** 側欄的 維運、執行期狀態、世界資料、操作、GM 介入 皆顯示為「尚未開放」，沒有路由也沒有佔位頁面，要等各自的後續變更（S2–S6）落地。
+- **後端測試：** `web/gm/tests/`（`EvenniaTest`）已登錄於 `.github/evennia-shards.json`；新增的 GM 測試模組必須同時登錄。
 
 ## 前端相關需求的可追溯性
 

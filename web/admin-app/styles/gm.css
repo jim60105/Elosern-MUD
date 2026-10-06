@@ -1,0 +1,91 @@
+/*
+ * GM portal base (gm-portal-s1-foundation). Scoped to `.gm-root` so the
+ * Storybook preview can load it next to the game stylesheets without
+ * touching game stories. Every value is a design token from
+ * web/webclient-app/styles/tokens.css; the GM app never installs the game's
+ * --ui-scale owner, so the tokens resolve at their reference size.
+ *
+ * Visual direction: an "ink-night ledger" — still ink grounds, gold hairline
+ * rules, the Iansui display face only for the brand and page titles, serif
+ * for section titles, sans for UI copy, mono for verbatim data. Seal-red is
+ * reserved for destructive actions (none in S1).
+ */
+.gm-root {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  background: var(--ink-900);
+  color: var(--paper-200);
+  font-family: var(--f-sans);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.gm-root *,
+.gm-root *::before,
+.gm-root *::after {
+  box-sizing: inherit;
+}
+
+.gm-root h1,
+.gm-root h2,
+.gm-root h3,
+.gm-root p,
+.gm-root dl,
+.gm-root dd,
+.gm-root ul {
+  margin: 0;
+}
+
+.gm-root a:not(.ui-btn) {
+  color: var(--gold-400);
+  text-underline-offset: 3px;
+}
+
+.gm-root code,
+.gm-root .gm-mono {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.gm-visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Loading skeleton bar with a slow gold sweep; the motion tokens resolve to
+   0ms under the reduced/off motion levels, and the media query covers the
+   OS preference. */
+.gm-skeleton {
+  display: block;
+  height: 1em;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--gold-500) 9%, transparent), transparent)
+      0 0 / 200% 100% no-repeat,
+    var(--ink-780);
+  animation: gm-skeleton-sweep var(--motion-pending) linear infinite;
+}
+
+@keyframes gm-skeleton-sweep {
+  from {
+    background-position: 150% 0, 0 0;
+  }
+  to {
+    background-position: -50% 0, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-skeleton {
+    animation: none;
+  }
+}

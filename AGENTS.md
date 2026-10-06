@@ -104,7 +104,11 @@ is pinned to Python 3.13 by `.python-version`, and `uv.lock` is authoritative.
 The Vue 3 SPA webclient (view layer only) builds to `web/static/webclient/app/dist`
 from `web/webclient-app/` sources plus locked pnpm dependencies. The pnpm toolchain
 is a dev/CI-time dependency only (no runtime npm or pnpm dependency); the built page is
-served entirely from the project origin.
+served entirely from the project origin. The Developer-only GM portal SPA
+(`web/admin-app/`, mounted at `/gm/` by `web/gm/`) builds separately through
+`vite.gm.config.js` (`pnpm run build:gm`) to `web/static/gm/dist`; it may import
+only `styles/tokens.css` and `styles/fonts*.css` from the game tree (enforced by
+`pnpm run test:gm-boundary`).
 
 ## NPC and dialogue content
 

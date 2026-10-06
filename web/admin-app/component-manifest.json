@@ -1,0 +1,13 @@
+{
+  "required": [
+    "GM/GmShell",
+    "GM/GmNav",
+    "GM/GmPageHeader",
+    "GM/GmPanel",
+    "GM/GmTable",
+    "GM/GmEmpty",
+    "GM/GmError",
+    "GM/GmStatusBadge"
+  ],
+  "frozen": true
+}

@@ -15,10 +15,22 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(fileURLToPath(new URL("..", import.meta.url)));
 const appRoot = join(repoRoot, "web/webclient-app");
+// The GM portal (gm-portal-s1-foundation) keeps its own frozen manifest of
+// `GM/<Component>` story titles under web/admin-app; it is checked after the
+// game gate passes, with the same lockstep and documentation rules plus a
+// file-level check that every components/Gm*.vue is listed.
+const gmAppRoot = join(repoRoot, "web/admin-app");
 // Optional first argument: an alternate manifest path (the test suite probes
 // the gate with temporary manifests instead of mutating the tracked file).
-const manifestPath =
-  process.argv[2] ?? join(appRoot, "component-manifest.json");
+// `--gm-manifest <path>` likewise swaps the GM manifest for a probe.
+const cliArgs = process.argv.slice(2);
+const gmFlag = cliArgs.indexOf("--gm-manifest");
+const gmManifestPath =
+  gmFlag === -1 ? join(gmAppRoot, "component-manifest.json") : cliArgs[gmFlag + 1];
+const positional = cliArgs.filter(
+  (arg, index) => arg !== "--gm-manifest" && (gmFlag === -1 || index !== gmFlag + 1),
+);
+const manifestPath = positional[0] ?? join(appRoot, "component-manifest.json");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 const required = Array.isArray(manifest.required) ? manifest.required : [];
@@ -61,14 +73,14 @@ function statSafe(path) {
   }
 }
 
-function collectStoryFiles(dir) {
+function collectStoryFiles(dir, out = storyFiles) {
   for (const entry of readdirSafe(dir)) {
     const path = join(dir, entry);
     const stat = statSafe(path);
     if (stat === null) continue;
     if (stat.isDirectory()) {
       if (entry === "node_modules" || entry.startsWith(".")) continue;
-      collectStoryFiles(path);
+      collectStoryFiles(path, out);
       continue;
     }
     if (!entry.endsWith(".stories.js")) continue;
@@ -81,7 +93,7 @@ function collectStoryFiles(dir) {
     }
     const match = source.match(/title:\s*["'`]([^"'`]+)["'`]/);
     if (!match) continue;
-    storyFiles.push({ title: match[1], source });
+    out.push({ title: match[1], source });
   }
 }
 
@@ -134,9 +146,48 @@ if (undocumented.length > 0) {
   process.exit(1);
 }
 
+// GM portal gate: the same rules over web/admin-app's own manifest.
+const gmManifest = JSON.parse(readFileSync(gmManifestPath, "utf-8"));
+const gmRequired = Array.isArray(gmManifest.required) ? gmManifest.required : [];
+const gmStories = [];
+collectStoryFiles(gmAppRoot, gmStories);
+const gmCollected = new Set(gmStories.map(({ title }) => title));
+const gmFailures = [];
+if (gmManifest.frozen === true && gmRequired.length === 0) {
+  gmFailures.push("the frozen GM manifest is empty");
+}
+for (const title of gmRequired) {
+  if (!title.startsWith("GM/")) gmFailures.push(`GM title outside the GM/ namespace: ${title}`);
+  if (!gmCollected.has(title)) gmFailures.push(`required GM story missing a story file: ${title}`);
+}
+for (const title of gmCollected) {
+  if (!gmRequired.includes(title)) {
+    gmFailures.push(`registered GM story missing from the GM manifest: ${title}`);
+  }
+}
+for (const entry of readdirSafe(join(gmAppRoot, "components"))) {
+  const match = entry.match(/^(Gm\w+)\.vue$/);
+  if (match && !gmRequired.includes(`GM/${match[1]}`)) {
+    gmFailures.push(`GM component without a manifest entry: components/${entry}`);
+  }
+}
+for (const { title, source } of gmStories) {
+  if (gmRequired.includes(title) && (!hasStoryExport.test(source) || !hasBoundStory.test(source))) {
+    gmFailures.push(`required GM story registered but undocumented: ${title}`);
+  }
+}
+if (gmFailures.length > 0) {
+  console.error("GM component coverage:\n" + gmFailures.map((line) => `  - ${line}`).join("\n"));
+  process.exit(1);
+}
+
 console.log(
   `component coverage: all ${required.length} required component(s) have stories ` +
     `and every one of the ${collected.size} registered story title(s) is listed ` +
     `(${collected.size} story title(s) total)` +
     (frozen ? ` — enforcing the frozen manifest (complete required set)` : ""),
+);
+console.log(
+  `GM component coverage: all ${gmRequired.length} required GM component(s) have ` +
+    `documented stories and every GM story title is listed`,
 );

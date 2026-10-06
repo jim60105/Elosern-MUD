@@ -668,6 +668,16 @@ MAX_NR_CHARACTERS = _env_int_bounded(
 # credential nor an import-executing dotted path.
 HTTP_USER_AGENT = _env_str("HTTP_USER_AGENT", "elosern-mud/1.0")
 
+# GM portal boundary (gm-portal-s1-foundation): appended last so Evennia's
+# SharedLoginMiddleware has already mapped a webclient session onto the
+# website login. Its __call__ gates /gm/ before any process_view hook
+# (CsrfViewMiddleware included) and logs gm_request for GM API outcomes.
+MIDDLEWARE = list(MIDDLEWARE) + ["web.gm.middleware.GmBoundaryMiddleware"]
+
+# GM API CSRF rejections answer with the JSON error envelope; every other
+# path delegates to Django's stock failure page unchanged.
+CSRF_FAILURE_VIEW = "web.gm.csrf.csrf_failure"
+
 # Expose the flag to the webclient templates through the project context
 # processor (Evennia's general_context does not carry it).
 TEMPLATES = [

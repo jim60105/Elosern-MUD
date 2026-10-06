@@ -1,6 +1,8 @@
 /** @type {import('@storybook/vue3-vite').StorybookConfig} */
 const config = {
-  stories: ["../web/webclient-app/**/*.stories.js"],
+  // The GM portal stories (gm-portal-s1-foundation) share the tooling, not
+  // the game component layer; preview.js renders them under `.gm-root`.
+  stories: ["../web/webclient-app/**/*.stories.js", "../web/admin-app/**/*.stories.js"],
   // Serve the repo's static tree so story fixtures can use the production
   // `/art/...` media URL vocabulary (the committed built-in fallbacks live
   // at web/static/art/defaults/) instead of inventing asset-import URLs the

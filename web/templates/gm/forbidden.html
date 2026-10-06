@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+{% comment %}
+GM portal 403 page (gm-portal-s1-foundation): an authenticated account without
+the Developer permission. Self-contained: it must render even when the GM
+bundle is absent, so it carries its own small token-valued style block.
+{% endcomment %}
+<html lang="zh-Hant" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>權限不足 · Elosern GM</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: radial-gradient(ellipse at top, #15171b, #0b0d10 70%);
+        color: #e7e0d1;
+        font-family: "Noto Sans TC", system-ui, sans-serif;
+      }
+      main {
+        max-width: 28rem;
+        margin: 24px;
+        padding: 32px;
+        border: 1px solid #363638;
+        border-top: 2px solid #b99a60;
+        border-radius: 8px;
+        background: #121519;
+        box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
+      }
+      .eyebrow { margin: 0 0 8px; color: #b99a60; font-size: 13px; letter-spacing: 0.24em; }
+      h1 { margin: 0 0 12px; font-family: "Noto Serif TC", serif; font-size: 28px; font-weight: 600; color: #f2ecdf; }
+      p { margin: 0 0 20px; line-height: 1.7; color: #c9c4b9; }
+      code { font-family: "Jim Mono TC", ui-monospace, monospace; color: #e4c88e; }
+      a { color: #e4c88e; text-underline-offset: 3px; }
+      a:focus-visible { outline: 2px solid #e4c88e; outline-offset: 3px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">ELOSERN GM</p>
+      <h1>權限不足</h1>
+      <p>目前登入的帳號沒有 <code>Developer</code> 權限，無法開啟 GM 控制台。</p>
+      <a href="/">返回首頁</a>
+    </main>
+  </body>
+</html>
