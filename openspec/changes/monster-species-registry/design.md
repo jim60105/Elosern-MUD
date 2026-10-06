@@ -68,8 +68,13 @@ split is one test with distinctive private text rather than a denylist that has 
 field.
 
 **D-S7 Startup mirror reuses `world/lore/sync.py`.** Species/variant content mirrors into the existing
-Script mirror with a new named step and one `startup_step` boundary event, per the observability catalog;
-no new Script, no new sync entry point, so idempotency discipline is inherited.
+Script mirror through a new named synchronization step (`sync_monster_species`) that emits one boundary
+info event (`monster_species_sync`) carrying the registry identifiers and their counts; no new Script,
+no new sync entry point, so idempotency discipline is inherited. The event is deliberately not
+`startup_step`: that reserved name belongs to the composition-root catalog's `_startup_step` wrapper
+(exactly one per catalog step, in catalog order), and this mirror is not a catalog step — the
+`world/art/gallery_seed.py` boundary event is the precedent. `sync_all()` delegates the species/variant
+categories to that step, so every entry is still mirrored exactly once per startup.
 
 ## Risks / Trade-offs
 
@@ -90,3 +95,53 @@ no new Script, no new sync entry point, so idempotency discipline is inherited.
 None blocking. The balance-approval change and the ability-mechanics change are external prerequisites
 tracked in the proposal; the artwork wave's official-package content for `monster/<species-key>/`
 follows from this registry's keys.
+
+## Implementation Dispositions (2026-10-06)
+
+A pre-implementation rubber-duck review of this change's plan raised four blocking findings and several
+non-blocking ones. Every finding is folded into the implementation or explicitly dispositioned here.
+
+- **Boundary event name (blocking).** The single boundary info event is `monster_species_sync`, not
+  `startup_step`: `startup_step` is reserved to the composition-root catalog's `_startup_step` wrapper
+  (exactly one per catalog step, in catalog order, per `observability-logging`), and a second one for a
+  step outside `STARTUP_STEP_ORDER` would widen the event vocabulary silently.
+  `world/art/gallery_seed.py`'s boundary event is the precedent. D-S7 and tasks 4.1 are reworded to
+  match; the delta spec only requires "one boundary info event ... with registry-scoped context keys".
+- **Shard registration (blocking).** No `.github/evennia-shards.json` edit: the existing `world.lore`
+  package label already owns every `world/lore/**/test*.py` module after Tasks 1.1's tree walk, and an
+  explicit module label would overlap it and fail the shard-ownership contract. Confirmed by running
+  that contract through the contract gate; tasks 5.1 records the confirmation.
+- **Synthetic-kit parity (blocking).** Adding the two categories to `sync.py::_ALL_REGISTRIES` requires
+  the kit's category-for-category mirror: `world/tests/synthetic_data/targets.py` gains
+  `monster_species`/`monster_variants` backed by a new `data_monster_species.py` slice, and
+  `world/tests/test_synthetic_data.py`'s real-definition-object table gains both catalogs.
+  `world.tests.test_synthetic_data` passes.
+- **Profile completeness (blocking).** `MonsterCombatProfile` gives every field a private completeness
+  sentinel default, so an omitted field raises the named `MonsterSpeciesRegistryError` rather than the
+  constructor's `TypeError`, exactly as R3's scenario requires; `None`, non-integer, boolean, and
+  negative values are rejected by the same named error.
+- **Key grammar without a forbidden import (blocking).** `world/lore/` may not import `world.art`
+  (`world/art/fallback_keys.py` documents the boundary and `world/art/subjects.py` imports `world.lore`
+  back). The shared stable-key predicate is therefore applied through
+  `validate_monster_species_registry`'s injectable `key_violation_face`: shipped construction passes
+  none, and the registered data-contract test re-runs the same validation with
+  `subject_key_violation`, so every shipped key is checked by the one shared implementation and no rule
+  text is duplicated. A boundary test pins the module's import set to the standard library plus
+  `world.lore.*`.
+- **Validated vocabularies.** `habitat_tags` are `WILDERNESS_REGION_REGISTRY` keys — the only existing
+  habitat/region vocabulary, and the one `monster-site-placement` compares a site's habitat against —
+  while `threat_tier` is a `MONSTER_TIER_REGISTRY` key and `danger_grade` a `GUILD_RANK_REGISTRY` key.
+  All three are validated at construction through injectable faces, so an authored typo fails at import
+  while behavior tests stay on invented keys.
+- **`MonsterSpecies.ordinary_variant`.** Kept because R1 mandates the field: it is the species-level
+  twin of the variant flag (the baseline registered here is an ordinary version) with no construction
+  rule of its own, since R2 already forces every registered default variant to be ordinary. The
+  data-contract test pins the shipped pairs.
+- **R4's behaviour scenario.** "Narrative does not unlock a behaviour" has no subject in this change —
+  no variant is reachable from the behaviour-selection path, which is owned by the sibling
+  identity/mechanics changes. Rather than fake it, a guard test pins that
+  `world/rules/monster_behaviour.py` reads no species/variant identity, and the ability seam stays the
+  named external prerequisite recorded in the proposal.
+- **Traceability.** No `covers_requirement` annotation is added for this change's new capability ids:
+  `tools.spec_traceability` indexes only `openspec/specs/`, so the ids enter the index at archive sync
+  (the preceding lore-registry change's precedent).
