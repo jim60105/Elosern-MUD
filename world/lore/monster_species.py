@@ -17,10 +17,13 @@ Two boundaries are pinned here and must not be blurred:
 
 * **Balance honesty (design D-S4).** ``combat_profile`` is either ``None`` or a
   complete frozen :class:`MonsterCombatProfile`; ``danger_grade`` is either
-  ``None`` or an authored guild danger grade. The bestiary approves narrative
-  only, so every shipped row carries both as ``None``. ``None`` means "no
-  approved per-variant profile exists" — never a zero, never a number inferred
-  from flavoured names, and never tier-band truth.
+  ``None`` or an authored guild danger grade. The user granted the balance
+  approval on 2026-10-06 for the twelve first-batch variants, so every shipped
+  row carries the approved literal profile and grade recorded below
+  (``monster-balance-profiles``); a variant whose approval has not been granted
+  carries both as ``None``. ``None`` means "no approved per-variant profile
+  exists" — never a zero, never a number inferred from flavoured names, and
+  never tier-band truth.
 * **Abilities are narrative (design D-S5, requirement R4).** The six approved
   special abilities have no executable form: this module registers no skill
   key, behaviour profile, or combat trait for them, and adds no placeholder
@@ -200,6 +203,108 @@ def _check_key(
             )
 
 
+#: One threat tier's band row as the band face carries it: the HP band, the
+#: tier's physical band, its magic band, and its guild rank range. The tier
+#: model declares *one* physical band shared by ``atk_phys``, ``agility`` and
+#: ``defense`` (``world/lore/monsters.py::_static_band``), so this face cannot
+#: express a per-axis asymmetric tier; a future asymmetric tier is the change
+#: that widens the row.
+_TierBandRow = tuple[tuple[int, int], tuple[int, int], tuple[int, int], tuple[str, str]]
+
+
+def _default_tier_band_face() -> dict[str, _TierBandRow]:
+    """Project ``MONSTER_TIER_REGISTRY`` into the injectable band-face rows."""
+    return {
+        key: (
+            tier.hp_band,
+            tier.static_band.atk_phys,
+            tier.static_band.magic_power,
+            tier.guild_rank_range,
+        )
+        for key, tier in MONSTER_TIER_REGISTRY.items()
+    }
+
+
+def _grade_positions(grade_face: Iterable[str] | None) -> dict[str, int]:
+    """The rank order a danger grade is judged by inside a rank range.
+
+    The membership question ("is this a known grade?") is answered by
+    :func:`_faces` with a frozenset, which carries no order. The order lives in
+    the shipped guild rank registry's authored ``order`` field, or — for an
+    injected vocabulary, which is what behavior tests use — in the sequence the
+    face is given in, so invented ranks carry invented positions. A grade or a
+    rank-range endpoint the resolved vocabulary does not carry has no order,
+    and callers reject it rather than guessing one.
+    """
+    if grade_face is None:
+        return {
+            rank.key: rank.order
+            for rank in sorted(
+                GUILD_RANK_REGISTRY.values(), key=lambda rank: rank.order
+            )
+        }
+    return {key: position for position, key in enumerate(grade_face)}
+
+
+def _check_profile_bands(
+    mapping_key: str,
+    profile: MonsterCombatProfile,
+    tier_key: str,
+    bands: _TierBandRow,
+) -> None:
+    """Reject a profile value outside the band of the tier it declares.
+
+    Bounds are inclusive at both ends, so a value exactly on a band edge is
+    inside it. MP and SP are deliberately not checked: the tier model declares
+    no pool band, so there is no tier truth to compare a pool against, and
+    inventing one would be unapproved balance content. The shipped zeros are
+    pinned by the approved-literal contract instead.
+    """
+    hp_band, physical_band, magic_band, _rank_range = bands
+    for axis, value, band in (
+        ("hp", profile.hp, hp_band),
+        ("atk_phys", profile.atk_phys, physical_band),
+        ("agility", profile.agility, physical_band),
+        ("defense", profile.defense, physical_band),
+        ("magic_power", profile.magic_power, magic_band),
+    ):
+        if not band[0] <= value <= band[1]:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} declares {axis} {value} outside its "
+                f"threat tier {tier_key!r} band {band}; a combat profile must "
+                "lie inside the band of the tier it declares"
+            )
+
+
+def _check_grade_band(
+    mapping_key: str,
+    grade: str,
+    tier_key: str,
+    rank_range: tuple[str, str],
+    positions: Mapping[str, int],
+) -> None:
+    """Reject a danger grade outside the tier's guild rank range.
+
+    The grade is judged by its order inside the range, never by membership in
+    a set of keys, so a range wider than two ranks admits every rank between
+    its endpoints. The lookup is total: the caller has already rejected a grade
+    outside the grade vocabulary, and the positions are that same vocabulary's
+    order.
+    """
+    for endpoint in rank_range:
+        if endpoint not in positions:
+            raise MonsterSpeciesRegistryError(
+                f"threat tier {tier_key!r} declares guild rank range "
+                f"{rank_range!r} naming unknown rank {endpoint!r}"
+            )
+    bounds = [positions[endpoint] for endpoint in rank_range]
+    if not min(bounds) <= positions[grade] <= max(bounds):
+        raise MonsterSpeciesRegistryError(
+            f"variant {mapping_key!r} declares danger grade {grade!r} outside "
+            f"its threat tier {tier_key!r} guild rank range {rank_range!r}"
+        )
+
+
 def validate_monster_species_registry(
     species: Mapping[str, MonsterSpecies],
     variants: Mapping[str, MonsterVariant],
@@ -208,6 +313,7 @@ def validate_monster_species_registry(
     habitat_face: Iterable[str] | None = None,
     tier_face: Iterable[str] | None = None,
     grade_face: Iterable[str] | None = None,
+    tier_band_face: Mapping[str, _TierBandRow] | None = None,
 ) -> None:
     """Raise :class:`MonsterSpeciesRegistryError` unless every row is valid.
 
@@ -224,12 +330,35 @@ def validate_monster_species_registry(
     default to the static lore registries and are injectable so behavior tests
     can exercise this function with invented keys.
 
+    ``tier_band_face`` answers the band question: it maps a threat tier key to
+    that tier's ``(hp_band, physical_band, magic_band, guild_rank_range)`` and
+    defaults to ``MONSTER_TIER_REGISTRY``'s own bands. A variant that carries a
+    ``combat_profile`` or a ``danger_grade`` is judged against its declared
+    tier's row — every value inside its band with both bounds inclusive, and
+    the grade by its order inside the tier's guild rank range — and a declared
+    tier the face does not carry raises the named error instead of skipping the
+    check. A variant carrying neither slot is not band-checked: the spec's band
+    invariant is a property of an authored rating, and a tier key that only
+    validates against an injected vocabulary has no shipped band to be read
+    from. MP and SP have no band here, for the reason
+    :func:`_check_profile_bands` records.
+
     The cross-species variant-key collision rule is not enforced here: a keyed
     mapping cannot express two owners of one key, so it is enforced where the
     registry is merged (:func:`build_monster_variant_registry`). Validation
     only reads its inputs and raises before anything is published.
     """
-    habitat_keys, tier_keys, grade_keys = _faces(habitat_face, tier_face, grade_face)
+    # The grade face is materialized once: the membership vocabulary and the
+    # rank order are two readings of the same vocabulary, and a single-use
+    # iterable would leave the second reading empty.
+    grade_sequence = None if grade_face is None else tuple(grade_face)
+    habitat_keys, tier_keys, grade_keys = _faces(
+        habitat_face, tier_face, grade_sequence
+    )
+    grade_positions = _grade_positions(grade_sequence)
+    tier_bands = (
+        _default_tier_band_face() if tier_band_face is None else tier_band_face
+    )
 
     for mapping_key, row in species.items():
         _check_key(mapping_key, row.key, "species", key_violation_face)
@@ -292,6 +421,27 @@ def validate_monster_species_registry(
                 f"variant {mapping_key!r} declares unknown guild danger grade "
                 f"{row.danger_grade!r}"
             )
+        if row.combat_profile is None and row.danger_grade is None:
+            continue
+        bands = tier_bands.get(row.threat_tier)
+        if bands is None:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} declares threat tier "
+                f"{row.threat_tier!r}, which carries no band row to check its "
+                "combat profile and danger grade against"
+            )
+        if row.combat_profile is not None:
+            _check_profile_bands(
+                mapping_key, row.combat_profile, row.threat_tier, bands
+            )
+        if row.danger_grade is not None:
+            _check_grade_band(
+                mapping_key,
+                row.danger_grade,
+                row.threat_tier,
+                bands[3],
+                grade_positions,
+            )
 
     for mapping_key, row in species.items():
         default = variants.get(row.default_variant_key)
@@ -325,6 +475,13 @@ def validate_monster_species_registry(
 # The approved first bestiary batch (docs/lore/bestiary.md, approved
 # 2026-10-05). Display/description prose is the approved zh-TW narrative; the
 # published appearance excerpt is the same approved sentence's physical clause.
+# The combat profiles and danger grades are the user's balance approval of
+# 2026-10-06 (monster-balance-profiles) and are literals only: each value below
+# is the approved value transcribed verbatim, never re-derived, re-tuned,
+# re-rounded, or interpolated from a display name, a description, a threat
+# tier, another variant, or a tier band. MP and SP are authored zeros — the six
+# approved abilities have no executable mechanic, so no pool has a consumer —
+# and every tier's magic band is deliberately ``(0, 0)``.
 # Author-private notes are reasoned from the bestiary's own usage boundary
 # (in-world origins stay unknown): the hidden-truth field records that no
 # origin truth is authored, the explanation field carries the authoring
@@ -454,8 +611,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，分散覓食。",
         "low",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=55, mp=0, sp=0, atk_phys=4, agility=7, defense=3, magic_power=0
+        ),
+        "F",
     ),
     MonsterVariant(
         "flock_leader",
@@ -464,8 +623,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "以鳴聲協調同伴，從不同方向干擾驅趕者。",
         "low",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=80, mp=0, sp=0, atk_phys=6, agility=8, defense=4, magic_power=0
+        ),
+        "E",
     ),
     MonsterVariant(
         "shore_walker",
@@ -474,8 +635,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，遇人多半退避。",
         "low",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=70, mp=0, sp=0, atk_phys=5, agility=4, defense=8, magic_power=0
+        ),
+        "F",
     ),
     MonsterVariant(
         "reef_warden",
@@ -484,8 +647,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "占據狹窄洞口，利用地形保護族群。",
         "low",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=110, mp=0, sp=0, atk_phys=7, agility=3, defense=8, magic_power=0
+        ),
+        "E",
     ),
     MonsterVariant(
         "burrow_maker",
@@ -494,8 +659,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，依靠洞道逃避。",
         "low",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=60, mp=0, sp=0, atk_phys=4, agility=8, defense=3, magic_power=0
+        ),
+        "F",
     ),
     MonsterVariant(
         "nest_guard",
@@ -504,8 +671,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "加固入口，在窄處阻擋侵入者。",
         "low",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=95, mp=0, sp=0, atk_phys=6, agility=5, defense=7, magic_power=0
+        ),
+        "E",
     ),
     MonsterVariant(
         "cliff_stepper",
@@ -514,8 +683,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，偏向逃往高處。",
         "mid",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=240, mp=0, sp=0, atk_phys=14, agility=17, defense=13, magic_power=0
+        ),
+        "D",
     ),
     MonsterVariant(
         "pass_warden",
@@ -524,8 +695,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "守住岩坡入口，將衝撞與落石結合。",
         "mid",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=330, mp=0, sp=0, atk_phys=17, agility=13, defense=18, magic_power=0
+        ),
+        "C",
     ),
     MonsterVariant(
         "wood_stalker",
@@ -534,8 +707,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，守候林間獵徑。",
         "mid",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=220, mp=0, sp=0, atk_phys=16, agility=18, defense=12, magic_power=0
+        ),
+        "D",
     ),
     MonsterVariant(
         "trail_hunter",
@@ -544,8 +719,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "反覆試探隊伍邊緣，避免正面接近完整隊列。",
         "mid",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=280, mp=0, sp=0, atk_phys=18, agility=19, defense=14, magic_power=0
+        ),
+        "C",
     ),
     MonsterVariant(
         "bank_lurker",
@@ -554,8 +731,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "普通版本，守候野生動物渡水處。",
         "mid",
         True,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=340, mp=0, sp=0, atk_phys=18, agility=12, defense=17, magic_power=0
+        ),
+        "D",
     ),
     MonsterVariant(
         "bay_warden",
@@ -564,8 +743,10 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "占據有遮蔽的泊岸入口，阻礙小船靠岸。",
         "mid",
         False,
-        None,
-        None,
+        MonsterCombatProfile(
+            hp=400, mp=0, sp=0, atk_phys=20, agility=12, defense=20, magic_power=0
+        ),
+        "C",
     ),
 )
 
