@@ -163,6 +163,8 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     # -- population ---------------------------------------------------------
 
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::placement-decisions-are-boundary-observable-through-the-facade")
     def test_the_first_settlement_populates_each_site_to_its_capacity(self):
         with (
             patch("world.maps.monster_sites.log_info") as info,
@@ -201,6 +203,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             self.assertEqual(context["region"], self.region)
             self.assertEqual(context["coordinate"], PROBE)
 
+    @covers_requirement("monster-site-placement::placement-honors-capacity-and-determinism")
     def test_capacity_is_a_ceiling_and_never_reshuffles(self):
         self._settle()
         # A living individual beyond the authored capacity is neither deleted
@@ -220,6 +223,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     # -- one-shot -----------------------------------------------------------
 
+    @covers_requirement("monster-site-placement::one-shot-sites-stay-cleared-and-recoverable-sites-recover-only-on-approved-conditions")
     def test_a_one_shot_site_stays_cleared_across_advances_and_re_entry(self):
         self._settle()
         defeated = self._defeat(self.sites[NEST_KEY])
@@ -299,6 +303,8 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(state.state, SITE_STATE_CLEARED)
         self.assertEqual(state.cleared_at_tick, 120)
 
+    @covers_requirement("monster-site-placement::one-shot-sites-stay-cleared-and-recoverable-sites-recover-only-on-approved-conditions")
+    @covers_requirement("monster-site-placement::placement-decisions-are-boundary-observable-through-the-facade")
     def test_a_recoverable_site_recovers_at_its_condition_with_fresh_identities(self):
         self._settle()
         defeated = self._defeat(self.sites[CAMP_KEY])
@@ -409,6 +415,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     # -- ownership domains --------------------------------------------------
 
+    @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
     def test_the_two_owners_never_cross_domains(self):
         self._settle()
         marker = _population_key(*PROBE)

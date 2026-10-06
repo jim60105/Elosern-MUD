@@ -227,7 +227,7 @@ per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_po
 final `tick` increment inside a single durable transaction with snapshot/restore of the touched
 entity attributes **and of every durable surface any registered boundary-stage source may write
 (through its declared advance-surface contract, including quest logs and room pins, merchant
-components, NPC schedule state and location, instance-room state, pruned map knowledge, narrative letter rows, and durable delivery projection progress)**, so a
+components, NPC schedule state and location, instance-room state, pruned map knowledge, narrative letter rows, durable delivery projection progress, and the wilderness monster-site lifecycle state and site-owned individual placement/bookkeeping)**, so a
 process termination or a failure inside the call can never leave character state advanced without
 the matching tick (or the reverse), and no observer can see or persist an uncommitted settlement.
 
@@ -248,11 +248,17 @@ the matching tick (or the reverse), and no observer can see or persist an uncomm
 - **THEN** the failed quest record is durably visible in `quest_log` after restart and the tick
   increased by the full `seconds`, with no divergence between cache and storage
 
+#### Scenario: A successful advance with a due site recovery commits state and tick together
+- **WHEN** `advance()` completes normally while a recoverable authored site's in-game-clock condition
+  falls inside the window and `monster_site_lifecycle` ships its contract
+- **THEN** the site's fresh individuals and its `populated` per-site state are durably visible after
+  restart and the tick increased by the full `seconds`, with no divergence between cache and storage
+
 #### Scenario: The fixed stage order and one-day bound survive the snapshot extension
 - **WHEN** the stage sequence and `MAX_ADVANCE_SECONDS` are inspected after this change
 - **THEN** the stage sequence is still exactly `("gauge_regen", "buff_ticks", "sexual_decay",
   "practice_settlement", "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines",
-  "npc_schedules", "correspondence_delivery", "instance_reclamation")`, an oversized call still raises before any write, and
+  "npc_schedules", "correspondence_delivery", "instance_reclamation", "monster_site_lifecycle")`, an oversized call still raises before any write, and
   contracts run before any stage write
 
 ### Requirement: Every registered boundary-stage source declares the durable surfaces it may write
@@ -269,9 +275,15 @@ sources.
 
 #### Scenario: A writing source without a contract is a completeness violation
 - **WHEN** the registered boundary-stage sources are inspected (`caravan_arrivals`,
-  `quest_deadlines`, `npc_schedules`, `instance_reclamation`)
+  `quest_deadlines`, `npc_schedules`, `instance_reclamation`, `monster_site_lifecycle`)
 - **THEN** each one declares a contract that snapshots the durable surfaces its settlement writes,
-  and a test fails if any of these four registrations loses its contract
+  and a test fails if any of these registrations loses its contract
+
+#### Scenario: A site-lifecycle source declares the wilderness bookkeeping and site state it writes
+- **WHEN** `monster_site_lifecycle`'s declared contract is invoked without advancing the clock
+- **THEN** it snapshots the wilderness script's per-site state attribute and object bookkeeping, and
+  the `site_key` marker and location of every site-owned individual, reading only — no attribute,
+  marker, location, or tag value changes as a side effect
 
 #### Scenario: A read-only source declares no contract and still runs
 - **WHEN** `register_event_source("shop_hours", settle_shop_hours)` is registered with no contract
@@ -324,6 +336,14 @@ serves or repersists state that the rolled-back transaction never committed.
   re-fetched (rolled-back) reclaimed room rather than at a deleted object or `None`; and a room
   deleted during the failed advance is re-fetched fresh from the rolled-back database on the next
   access
+
+#### Scenario: A failed advance restores wilderness monster-site state and evicts the individuals it created
+- **WHEN** an advance populates or recovers an authored site inside the transaction and a later stage
+  or the final persist raises
+- **THEN** the wilderness script's per-site state equals its pre-advance value in cache and in its raw
+  Attribute row, no individual the failed advance created has a durable row, and no such individual
+  remains in Evennia's instance cache, so a later object row that reuses one of those primary keys is
+  served as the fresh object it is
 
 ### Requirement: advance() has a bounded settlement budget per call
 `WorldClock.advance()` SHALL reject or reject-and-degrade any call whose elapsed seconds would exceed

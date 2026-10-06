@@ -70,6 +70,7 @@ band members.
   Chebyshev distance 3 of `(60, 103)`
 - **THEN** every result is a `MonsterPopulation` with `tier == "low"`, never `None`, and the
   footprint cells of `capital_altoria` inside the band's square are skipped rather than populated
+
 ### Requirement: ensure_population idempotently places and respawns monsters at a coordinate
 `world/maps/wilderness_population.py` SHALL define `ensure_population(wilderness, coordinates) ->
 None` that reconciles a wilderness coordinate against `population_for_coordinates`. Every monster it
@@ -88,6 +89,14 @@ marker and SHALL never delete, move, or modify any other `Monster` at the coordi
   monster that has drifted from the model (wrong tier or name), a dead marker-matching monster, or any
   surplus marker-matching monsters SHALL be deleted and replaced by one fresh `Monster` matching the
   model.
+- When the regional ambient placement rules cover the coordinate's region, the reconciliation SHALL
+  additionally reconcile the species-bearing ambient individuals those rules author, within the
+  authored regional quantity and capacity, building each through the individual construction owner from
+  an authored variant key selected by the same pure coordinate-hash determinism (no RNG, no database
+  state, no wall clock), each additionally carrying its ambient ownership marker. Species-bearing
+  reconciliation SHALL stay inside this owner's marker domain and SHALL NOT act on site-, quest-,
+  story-, or session-owned individuals, and the tier-example branch above SHALL keep its current
+  behaviour for coordinates the ambient species rules do not cover.
 
 The created monster SHALL be engageable and defeatable through the existing player combat-session
 path without further setup.
@@ -128,6 +137,14 @@ path without further setup.
 - **WHEN** a `Monster` without a matching `population_key` is present at a coordinate and
   `ensure_population` runs for that coordinate
 - **THEN** the foreign monster is neither deleted, nor moved, nor modified by the reconciliation
+
+#### Scenario: Species-bearing ambient individuals reconcile inside their own domain
+- **WHEN** ambient species rules cover a coordinate's region and a site-owned or quest-bound monster also stands there
+- **THEN** the ambient pass creates/removes only its own marker-matching individuals up to authored quantity and capacity, and the foreign-owned monsters are untouched
+
+#### Scenario: Ambient species selection is pure across restarts
+- **WHEN** the ambient species selection for one coordinate is recomputed in a fresh process
+- **THEN** it selects the same authored variant with no RNG, database, or wall-clock input
 
 ### Requirement: A registered wilderness monster survives room recycling
 A monster registered through `ensure_population` SHALL be tracked by the wilderness script's

@@ -5,19 +5,24 @@ Define the deterministic order and execution rules for world-clock settlement st
 ## Requirements
 
 ### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, practice settlement,
-daily resets, then the six declared world-event seams
+daily resets, then the seven declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
-`npc_schedules`, `correspondence_delivery`, `instance_reclamation` — matching design doc §6.5's four built stages plus
+`npc_schedules`, `correspondence_delivery`, `instance_reclamation`, `monster_site_lifecycle` — matching
+design doc §6.5's four built stages plus
 `practice_settlement` (the declared-practice writer owned directly by
 `world/rules/clock.py`, inserted between `sexual_decay` and
-`daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement) and `instance_reclamation` (change 14's `reclaim_due_instances()`, after `correspondence_delivery` as the final stage), and SHALL execute every `advance()` call's stages in this order
+`daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement),
+`instance_reclamation` (change 14's `reclaim_due_instances()`), and `monster_site_lifecycle`
+(monster-site-placement's `settle_monster_sites()` in `world/maps/monster_sites.py`, appended after
+`instance_reclamation` as the final stage), and SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
 
 #### Scenario: The stage order is exactly the fixed sequence, including practice_settlement and instance_reclamation
 - **WHEN** the settlement stage sequence is inspected
 - **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "practice_settlement", "daily_resets",
-  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "correspondence_delivery", "instance_reclamation")`, in
+  "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "correspondence_delivery",
+  "instance_reclamation", "monster_site_lifecycle")`, in
   that order, with no duplicate or missing entry
 
 #### Scenario: Transposing any of the four ordered stages is mechanically detected
@@ -73,6 +78,13 @@ and this is a stated, not silent, limitation
   releasing story this design leans on) has no equivalent proof and is justified by "last, so nothing
   after it could still need the room" reasoning alone (design.md D-3), not by an arithmetic
   counter-example against any of the three
+
+#### Scenario: monster_site_lifecycle is the final declared seam and settles within the same advance
+- **WHEN** a recoverable site's in-game-clock condition matures inside an advance's `(start_tick, end_tick]`
+  window and `monster_site_lifecycle` is registered
+- **THEN** the site repopulates and its durable per-site state is written inside that same `advance()`
+  transaction, and no earlier stage's settlement can observe the site's post-advance state, because this
+  stage is the last entry of the fixed sequence
 
 ### Requirement: buff_ticks, sexual_decay, and practice settlement are skipped for combat-sourced advances
 `world/rules/clock.py`'s settlement stage runner SHALL skip the `buff_ticks`, `sexual_decay`, and

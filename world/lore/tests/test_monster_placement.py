@@ -161,6 +161,8 @@ class PlacementValidationTests(unittest.TestCase):
                 **_faces(**faces),
             )
 
+    @covers_requirement("lore-registries::placement-registries-follow-the-frozen-keyed-lore-data-contract")
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
     def test_an_unknown_region_is_rejected_for_rules_and_sites(self):
         self._reject(ambient={ABSENT_REGION: _rule(region_key=ABSENT_REGION)})
         self._reject(sites={SITE: _site(region_key=ABSENT_REGION)})
@@ -174,6 +176,7 @@ class PlacementValidationTests(unittest.TestCase):
         # only reference placement authors.
         self._reject(ambient={REGION: _rule(variant_keys=(SPECIES,))})
 
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
     def test_habitat_incompatible_authoring_fails_at_construction(self):
         mismatched = {SPECIES: _species_row(habitat_tags=(SPARE_REGION,))}
         self._reject(species_face=mismatched)
@@ -189,6 +192,7 @@ class PlacementValidationTests(unittest.TestCase):
         orphan = {ORDINARY: _variant_row(ORDINARY, species_key="t_fixture_absent_species")}
         self._reject(variant_face=orphan)
 
+    @covers_requirement("monster-site-placement::one-shot-sites-stay-cleared-and-recoverable-sites-recover-only-on-approved-conditions")
     def test_recovery_must_be_expressible(self):
         # A recoverable site with no condition, a zero or negative condition,
         # and a free-text (non-integer) condition are each refused: the closed
@@ -208,6 +212,7 @@ class PlacementValidationTests(unittest.TestCase):
     def test_a_site_kind_outside_the_closed_vocabulary_is_rejected(self):
         self._reject(sites={SITE: _site(kind="lair")})
 
+    @covers_requirement("monster-site-placement::placement-honors-capacity-and-determinism")
     def test_capacity_is_a_ceiling_never_below_the_quantity(self):
         self._reject(ambient={REGION: _rule(quantity=3, capacity=2)})
         self._reject(ambient={REGION: _rule(quantity=0)})
@@ -238,6 +243,7 @@ class PlacementValidationTests(unittest.TestCase):
         registry.validate_monster_placement_registry(ambient, sites, **_faces())
         self.assertEqual((ambient, sites), before)
 
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
     def test_validation_is_pure_and_publishes_nothing(self):
         ambient = {REGION: _rule()}
         sites = {SITE: _site(one_shot=False)}
