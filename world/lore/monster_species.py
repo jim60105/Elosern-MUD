@@ -48,7 +48,7 @@ from dataclasses import dataclass, fields
 from types import MappingProxyType
 
 from .guild import GUILD_RANK_REGISTRY
-from .monsters import MONSTER_TIER_REGISTRY
+from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
 from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
@@ -206,23 +206,46 @@ def _check_key(
 #: One threat tier's band row as the band face carries it: the HP band, the
 #: tier's physical band, its magic band, and its guild rank range. The tier
 #: model declares *one* physical band shared by ``atk_phys``, ``agility`` and
-#: ``defense`` (``world/lore/monsters.py::_static_band``), so this face cannot
-#: express a per-axis asymmetric tier; a future asymmetric tier is the change
-#: that widens the row.
+#: ``defense`` (``world/lore/monsters.py::_static_band``); a tier that declared
+#: asymmetric physical bands is rejected by the default projection rather than
+#: silently judged against the wrong axis, and supporting one is the change
+#: that widens this row.
 _TierBandRow = tuple[tuple[int, int], tuple[int, int], tuple[int, int], tuple[str, str]]
 
 
-def _default_tier_band_face() -> dict[str, _TierBandRow]:
-    """Project ``MONSTER_TIER_REGISTRY`` into the injectable band-face rows."""
-    return {
-        key: (
-            tier.hp_band,
+def _default_tier_band_face(
+    tiers: Mapping[str, MonsterTier] | None = None,
+) -> dict[str, _TierBandRow]:
+    """Project threat tiers into the injectable band-face rows.
+
+    A tier declares one physical band for ``atk_phys``, ``agility`` and
+    ``defense``; if one ever declared different bounds per axis, the single
+    physical band this face carries would silently judge two of the three
+    against the wrong bound, so the projection raises instead. The shipped
+    tiers are projected through the validation that runs at import;
+    ``tiers`` defaults to ``MONSTER_TIER_REGISTRY`` and is injectable so
+    behavior tests can prove both readings with invented tiers.
+    """
+    face: dict[str, _TierBandRow] = {}
+    for key, tier in (MONSTER_TIER_REGISTRY if tiers is None else tiers).items():
+        physical_bands = (
             tier.static_band.atk_phys,
+            tier.static_band.agility,
+            tier.static_band.defense,
+        )
+        if len(set(physical_bands)) != 1:
+            raise MonsterSpeciesRegistryError(
+                f"threat tier {key!r} declares asymmetric physical bands "
+                f"{physical_bands}, which the band face's single physical band "
+                "cannot express"
+            )
+        face[key] = (
+            tier.hp_band,
+            physical_bands[0],
             tier.static_band.magic_power,
             tier.guild_rank_range,
         )
-        for key, tier in MONSTER_TIER_REGISTRY.items()
-    }
+    return face
 
 
 def _grade_positions(grade_face: Iterable[str] | None) -> dict[str, int]:
@@ -332,16 +355,14 @@ def validate_monster_species_registry(
 
     ``tier_band_face`` answers the band question: it maps a threat tier key to
     that tier's ``(hp_band, physical_band, magic_band, guild_rank_range)`` and
-    defaults to ``MONSTER_TIER_REGISTRY``'s own bands. A variant that carries a
-    ``combat_profile`` or a ``danger_grade`` is judged against its declared
-    tier's row — every value inside its band with both bounds inclusive, and
-    the grade by its order inside the tier's guild rank range — and a declared
-    tier the face does not carry raises the named error instead of skipping the
-    check. A variant carrying neither slot is not band-checked: the spec's band
-    invariant is a property of an authored rating, and a tier key that only
-    validates against an injected vocabulary has no shipped band to be read
-    from. MP and SP have no band here, for the reason
-    :func:`_check_profile_bands` records.
+    defaults to ``MONSTER_TIER_REGISTRY``'s own bands. Every variant's declared
+    tier must be present in the face — a tier it does not carry raises the
+    named error instead of skipping the check, so no rating can ever arrive
+    with no band to be judged against — and a variant that carries a
+    ``combat_profile`` or a ``danger_grade`` is then judged against that row:
+    every value inside its band with both bounds inclusive, and the grade by
+    its order inside the tier's guild rank range. MP and SP have no band here,
+    for the reason :func:`_check_profile_bands` records.
 
     The cross-species variant-key collision rule is not enforced here: a keyed
     mapping cannot express two owners of one key, so it is enforced where the
@@ -421,14 +442,12 @@ def validate_monster_species_registry(
                 f"variant {mapping_key!r} declares unknown guild danger grade "
                 f"{row.danger_grade!r}"
             )
-        if row.combat_profile is None and row.danger_grade is None:
-            continue
         bands = tier_bands.get(row.threat_tier)
         if bands is None:
             raise MonsterSpeciesRegistryError(
                 f"variant {mapping_key!r} declares threat tier "
-                f"{row.threat_tier!r}, which carries no band row to check its "
-                "combat profile and danger grade against"
+                f"{row.threat_tier!r}, which the band face does not carry; a "
+                "rating would have no band to be judged against"
             )
         if row.combat_profile is not None:
             _check_profile_bands(

@@ -14,8 +14,11 @@ from world.lore.monster_species import (
     MonsterSpecies,
     MonsterSpeciesRegistryError,
     MonsterVariant,
+    _default_tier_band_face,
     validate_monster_species_registry,
 )
+from world.lore.monsters import MonsterTier
+from world.lore.races import StaticBand
 
 HABITAT = "t_fixture_hollow"
 SPECIES = "t_fixture_species"
@@ -96,6 +99,40 @@ def _faces(**overrides: object) -> dict[str, object]:
     }
     faces.update(overrides)
     return faces
+
+
+def _tier(agility_band: tuple[int, int] | None = None) -> MonsterTier:
+    """One invented tier whose physical axes share a band unless told not to."""
+    return MonsterTier(
+        TIER,
+        "試製層級",
+        RANK_RANGE,
+        StaticBand(
+            atk_phys=PHYSICAL_BAND,
+            agility=PHYSICAL_BAND if agility_band is None else agility_band,
+            defense=PHYSICAL_BAND,
+            magic_power=MAGIC_BAND,
+        ),
+        HP_BAND,
+        ("試製層級魔物",),
+        "試製層級敘述。",
+    )
+
+
+class TierBandFaceProjectionTests(unittest.TestCase):
+    """Requirement: the band face carries the tier's declared bands."""
+
+    def test_a_symmetric_tier_projects_its_bands(self):
+        face = _default_tier_band_face({TIER: _tier()})
+        self.assertEqual(
+            face[TIER], (HP_BAND, PHYSICAL_BAND, MAGIC_BAND, RANK_RANGE)
+        )
+
+    def test_a_tier_with_asymmetric_physical_bands_is_rejected(self):
+        skewed = (PHYSICAL_BAND[0] + 4, PHYSICAL_BAND[1] + 4)
+        with self.assertRaises(MonsterSpeciesRegistryError) as caught:
+            _default_tier_band_face({TIER: _tier(agility_band=skewed)})
+        self.assertIn(TIER, str(caught.exception))
 
 
 class TierBandInvariantTests(unittest.TestCase):
@@ -183,16 +220,17 @@ class TierBandInvariantTests(unittest.TestCase):
             _variant(combat_profile=_profile(mp=999, sp=999))
         )
 
-    def test_a_variant_without_a_profile_or_grade_is_not_band_checked(self):
-        # A tier key that only an injected vocabulary knows has no shipped band
-        # to read; a variant carrying neither slot is therefore not judged.
-        self._validate(
+    def test_an_unbanded_tier_is_rejected_even_without_a_rating(self):
+        # Face completeness is unconditional: the band face must carry every
+        # declared tier, so a rating can never arrive with nowhere to go.
+        message = self._rejection(
             _variant(
                 threat_tier=UNBANDED_TIER,
                 combat_profile=None,
                 danger_grade=None,
             )
         )
+        self.assertIn(UNBANDED_TIER, message)
 
 
 if __name__ == "__main__":
