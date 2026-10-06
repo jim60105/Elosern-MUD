@@ -181,6 +181,10 @@
       "reason": "quest definition catalog contract"
     },
     {
+      "path": "world/quests/tests/test_hunt_catalog_content.py",
+      "reason": "published regional species-hunt content contract"
+    },
+    {
       "path": "world/quests/tests/test_scenario_mapping.py",
       "reason": "scenario mapping data-contract surface"
     },
