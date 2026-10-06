@@ -96,10 +96,16 @@ None blocking. The balance-approval change and the ability-mechanics change are 
 tracked in the proposal; the artwork wave's official-package content for `monster/<species-key>/`
 follows from this registry's keys.
 
-## Implementation Dispositions (2026-10-06)
+## Review Dispositions (2026-10-06)
 
-A pre-implementation rubber-duck review of this change's plan raised four blocking findings and several
-non-blocking ones. Every finding is folded into the implementation or explicitly dispositioned here.
+Two rubber-duck reviews ran over this change: one over the plan before implementation, one over the
+finished diff. Every finding from either round is folded into the implementation or explicitly
+dispositioned here.
+
+### Pre-implementation review
+
+It raised blocking findings (four on the plan itself, plus the stable-key import-boundary
+adjudication) and several non-blocking ones.
 
 - **Boundary event name (blocking).** The single boundary info event is `monster_species_sync`, not
   `startup_step`: `startup_step` is reserved to the composition-root catalog's `_startup_step` wrapper
@@ -132,10 +138,12 @@ non-blocking ones. Every finding is folded into the implementation or explicitly
   habitat/region vocabulary, and the one `monster-site-placement` compares a site's habitat against —
   while `threat_tier` is a `MONSTER_TIER_REGISTRY` key and `danger_grade` a `GUILD_RANK_REGISTRY` key.
   All three are validated at construction through injectable faces, so an authored typo fails at import
-  while behavior tests stay on invented keys.
+  while behavior tests stay on invented keys. These are this change's chosen validated faces; a later
+  change that needs a wider vocabulary extends the face, not the rule.
 - **`MonsterSpecies.ordinary_variant`.** Kept because R1 mandates the field: it is the species-level
-  twin of the variant flag (the baseline registered here is an ordinary version) with no construction
-  rule of its own, since R2 already forces every registered default variant to be ordinary. The
+  twin of the variant flag (the baseline registered here is an ordinary version). R2 already forces
+  every registered default variant to be ordinary, so what construction rejects is drift: the field
+  must be a boolean and must agree with its default variant's authored classification. The
   data-contract test pins the shipped pairs.
 - **R4's behaviour scenario.** "Narrative does not unlock a behaviour" has no subject in this change —
   no variant is reachable from the behaviour-selection path, which is owned by the sibling
@@ -145,3 +153,38 @@ non-blocking ones. Every finding is folded into the implementation or explicitly
 - **Traceability.** No `covers_requirement` annotation is added for this change's new capability ids:
   `tools.spec_traceability` indexes only `openspec/specs/`, so the ids enter the index at archive sync
   (the preceding lore-registry change's precedent).
+
+### Post-implementation review
+
+It found no blocking issues and confirmed the shipped prose, the mirror trace, the artifact edits, and
+the import boundary against the worktree sources. Its non-blocking findings and suggestions were
+folded in:
+
+- **Identity stress-test made discriminating.** The rename/re-tier test now asserts through a
+  read-only registry view that the key set and every row's own key are unchanged and that neither the
+  renamed display name nor the changed tier resolves as a key, so a name-derived identity could not
+  pass it.
+- **Prose fidelity pinned to the approved text.** The registered data-contract test now requires every
+  published sentence of all six species (description, appearance, ecology) and all twelve variants to
+  appear, in order, in `docs/lore/bestiary.md`'s own text (compared with whitespace and markdown
+  emphasis removed), so the published strings cannot silently drift or be invented. The derived
+  appearance field is the approved prototype sentence's head clause, as the module comment records.
+  One cosmetic divergence was removed to keep the pin exact: the crocodile's `magic_power` clause no
+  longer appends 值 and matches the bestiary sentence.
+- **Conjecture test made discriminating.** It now also asserts the published view does not return a
+  marker-stripped rendering of its input, so a projecting/normalising view fails.
+- **Runtime-touch test strengthened.** The before/after comparison now digests every object, art, and
+  non-lore script row's persisted attribute payload (not just counts and keys) and covers the first
+  run as well as the repeat, so an in-place modification would be caught.
+- **Single declaration for the mirror categories.** `sync.py` declares the species registries once
+  (`MONSTER_SPECIES_REGISTRIES`); the mirror table composes from it and the step and the skip set both
+  derive from it, so the two can no longer drift.
+- **Species classification validated.** `MonsterSpecies.ordinary_variant` must be a boolean and must
+  agree with its default variant's authored classification, so the mandated field cannot drift from
+  the baseline it describes.
+- **Read-only and purity pinned.** Tests assert both published registries are `MappingProxyType`
+  instances that refuse mutation, and that a rejected candidate leaves its inputs and the published
+  registries untouched.
+- **Behaviour guard parsed, not textual.** The R4 guard now walks the behaviour-selection module's AST
+  for identity reads instead of scanning its source text, so a comment mentioning a species key can
+  never trip it while a real identity read would.
