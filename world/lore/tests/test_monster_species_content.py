@@ -8,8 +8,10 @@ slots, the shared stable-key contract, and the negative guarantee that the
 registries name no skill key, behaviour profile, or combat trait.
 """
 
+import ast
 import dataclasses
 import pathlib
+import re
 import unittest
 
 from world.art.subjects import is_valid_subject_key, subject_key_violation
@@ -26,7 +28,18 @@ from world.rules.monster_behaviour import BEHAVIOUR_PROFILES, MONSTER_BEHAVIOUR_
 from world.skills.registry import SKILL_REGISTRY
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+BESTIARY = REPO_ROOT / "docs" / "lore" / "bestiary.md"
 BEHAVIOUR_SELECTION_MODULE = REPO_ROOT / "world" / "rules" / "monster_behaviour.py"
+
+
+def _normalised(text: str) -> str:
+    """The text with whitespace and markdown emphasis removed."""
+    return re.sub(r"[\s`*]+", "", text)
+
+
+def _sentences(text: str) -> list[str]:
+    """The full-stop separated sentences of one shipped display string."""
+    return [piece for piece in text.split("。") if piece.strip()]
 
 # The approved bestiary batch: species key -> (display name, default variant key).
 APPROVED_SPECIES = {
@@ -182,6 +195,40 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                             getattr(species, private), getattr(species, published)
                         )
 
+    def test_every_published_string_is_verbatim_approved_prose_in_order(self):
+        """Each published sentence is the approved bestiary text, in its order."""
+        haystack = _normalised(BESTIARY.read_text(encoding="utf-8"))
+        self.assertTrue(haystack)
+
+        def assert_sentences_are_approved(source: str, field: str, value: str) -> None:
+            sentences = [_normalised(piece) for piece in _sentences(value)]
+            self.assertTrue(sentences, f"{source}.{field} carries no prose")
+            cursor = 0
+            for sentence in sentences:
+                index = haystack.find(sentence, cursor)
+                self.assertGreaterEqual(
+                    index,
+                    cursor,
+                    f"{source}.{field} sentence {sentence!r} is not approved "
+                    "bestiary prose in its published order",
+                )
+                cursor = index + len(sentence)
+
+        for key in APPROVED_SPECIES:
+            with self.subTest(species=key):
+                species = MONSTER_SPECIES_REGISTRY[key]
+                for field in (
+                    "published_description_zh",
+                    "published_appearance_zh",
+                    "published_ecology_zh",
+                ):
+                    assert_sentences_are_approved(key, field, getattr(species, field))
+        for key in APPROVED_VARIANTS:
+            with self.subTest(variant=key):
+                assert_sentences_are_approved(
+                    key, "description_zh", MONSTER_VARIANT_REGISTRY[key].description_zh
+                )
+
     def test_habitat_compatibility_tags_name_known_habitats(self):
         for key in APPROVED_SPECIES:
             with self.subTest(species=key):
@@ -266,7 +313,23 @@ class AbilitySeamNegativeTests(unittest.TestCase):
                 self.assertEqual(names & FORBIDDEN_SEAM_FIELDS, set())
 
     def test_the_behaviour_selection_path_reads_no_species_identity(self):
-        source = BEHAVIOUR_SELECTION_MODULE.read_text(encoding="utf-8")
+        # Nothing in the existing behaviour-selection path reads species or
+        # variant identity, so a variant's ability narrative cannot unlock an
+        # effect. The scan is parsed (not textual), so commentary alone never
+        # trips it, and a real identity read would.
+        tree = ast.parse(BEHAVIOUR_SELECTION_MODULE.read_text(encoding="utf-8"))
+        referenced: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                referenced.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                referenced.add(node.attr)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    referenced |= set(alias.name.split("."))
+            elif isinstance(node, ast.ImportFrom):
+                referenced |= set((node.module or "").split("."))
+                referenced |= {alias.name for alias in node.names}
         for forbidden in (
             "MONSTER_SPECIES_REGISTRY",
             "MONSTER_VARIANT_REGISTRY",
@@ -275,7 +338,7 @@ class AbilitySeamNegativeTests(unittest.TestCase):
             "variant_key",
         ):
             with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, source)
+                self.assertNotIn(forbidden, referenced)
 
 
 if __name__ == "__main__":

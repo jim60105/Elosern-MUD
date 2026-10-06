@@ -9,12 +9,14 @@ are injected, so no shipped habitat, tier, or grade key appears here either.
 
 import ast
 import dataclasses
+import hashlib
 import inspect
 import json
 import sys
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
@@ -137,6 +139,79 @@ def _script_keys() -> set[str]:
     return set(ScriptDB.objects.values_list("db_key", flat=True))
 
 
+def _stable_repr(value: object) -> str:
+    """A deterministic rendering of one persisted attribute value."""
+    if isinstance(value, (str, int, float, bool, bytes, type(None))):
+        return repr(value)
+    if isinstance(value, (tuple, list)):
+        return "[" + ",".join(_stable_repr(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{" + ",".join(
+            f"{_stable_repr(key)}:{_stable_repr(item)}"
+            for key, item in sorted(value.items(), key=lambda pair: repr(pair[0]))
+        ) + "}"
+    return type(value).__name__
+
+
+def _runtime_digest(model: type, *, exclude_prefix: str | None = None) -> str:
+    """One row's identity plus its whole persisted attribute payload."""
+    rows = model.objects.all().order_by("pk")
+    if exclude_prefix is not None:
+        rows = rows.exclude(db_key__startswith=exclude_prefix)
+    payload = "\n".join(
+        f"{row.pk}|{row.db_key}|"
+        + ",".join(
+            f"{key}={_stable_repr(value)}"
+            for key, value in sorted(
+                row.attributes.all().values_list("db_key", "db_value")
+            )
+        )
+        for row in rows
+    )
+    return hashlib.sha256(payload.encode("utf-8", "replace")).hexdigest()
+
+
+class PublishedRegistryReadOnlyTests(unittest.TestCase):
+    """Requirement: read-only registries; validation publishes nothing partial."""
+
+    REGISTRY_NAMES = ("MONSTER_SPECIES_REGISTRY", "MONSTER_VARIANT_REGISTRY")
+
+    @staticmethod
+    def _published(name: str):
+        return getattr(registry, name)
+
+    def test_the_published_registries_are_read_only_proxies(self):
+        for name in self.REGISTRY_NAMES:
+            with self.subTest(registry=name):
+                published = self._published(name)
+                self.assertIsInstance(published, MappingProxyType)
+                self.assertTrue(published)
+                with self.assertRaises(TypeError):
+                    published["t_fixture_intruder"] = None
+                with self.assertRaises(TypeError):
+                    del published[next(iter(published))]
+
+    def test_validation_is_pure_and_publishes_nothing(self):
+        species, variants = _valid_registry()
+        broken = dict(
+            species,
+            t_fixture_species=replace(
+                species["t_fixture_species"], default_variant_key="t_fixture_absent"
+            ),
+        )
+        inputs = (dict(species), dict(variants), dict(broken))
+        published_before = [dict(self._published(name)) for name in self.REGISTRY_NAMES]
+
+        with self.assertRaises(MonsterSpeciesRegistryError):
+            registry.validate_monster_species_registry(broken, variants, **_faces())
+
+        self.assertEqual((species, variants, broken), inputs)
+        self.assertEqual(
+            [dict(self._published(name)) for name in self.REGISTRY_NAMES],
+            published_before,
+        )
+
+
 class StableIdentityTests(unittest.TestCase):
     """Requirement: keys are the identity; names and tiers are not."""
 
@@ -153,10 +228,24 @@ class StableIdentityTests(unittest.TestCase):
         )
         registry.validate_monster_species_registry(renamed, retiered, **_faces())
 
-        self.assertEqual(sorted(renamed), sorted(species))
-        self.assertEqual(sorted(retiered), sorted(variants))
-        self.assertEqual(renamed["t_fixture_species"].key, "t_fixture_species")
-        self.assertEqual(retiered["t_fixture_ordinary"].key, "t_fixture_ordinary")
+        species_view = MappingProxyType(renamed)
+        variant_view = MappingProxyType(retiered)
+        # The lookup by key resolves the same record; every row's own key is
+        # unchanged; and the renamed display name is not an identity.
+        self.assertEqual(sorted(species_view), sorted(species))
+        self.assertEqual(sorted(variant_view), sorted(variants))
+        self.assertEqual(species_view["t_fixture_species"].key, "t_fixture_species")
+        self.assertEqual(variant_view["t_fixture_ordinary"].key, "t_fixture_ordinary")
+        self.assertEqual(
+            {row.key for row in species_view.values()}, set(species)
+        )
+        self.assertEqual(
+            {row.key for row in variant_view.values()}, set(variants)
+        )
+        with self.assertRaises(KeyError):
+            species_view["改名物種"]  # a display name is never an identity
+        with self.assertRaises(KeyError):
+            variant_view[STRONGER_TIER]  # nor is a threat tier
         view = registry.published_species_view(renamed["t_fixture_species"])
         self.assertEqual(view["key"], "t_fixture_species")
         self.assertEqual(view["display_name_zh"], "改名物種")
@@ -344,6 +433,20 @@ class MembershipValidationTests(unittest.TestCase):
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(good_species, bad_grade, **_faces())
 
+    def test_the_species_classification_must_be_a_boolean_agreeing_with_its_baseline(self):
+        species, variants = _valid_registry()
+        registry.validate_monster_species_registry(species, variants, **_faces())
+
+        disagreeing = {
+            "t_fixture_species": _species(ordinary_variant=False),
+        }
+        with self.assertRaises(MonsterSpeciesRegistryError):
+            registry.validate_monster_species_registry(disagreeing, variants, **_faces())
+
+        untyped = {"t_fixture_species": _species(ordinary_variant="yes")}
+        with self.assertRaises(MonsterSpeciesRegistryError):
+            registry.validate_monster_species_registry(untyped, variants, **_faces())
+
 
 class BalanceSlotTests(unittest.TestCase):
     """Requirement: the numeric and danger-grade slots never carry invented values."""
@@ -469,10 +572,14 @@ class PublishedProjectionTests(unittest.TestCase):
 
     def test_published_conjecture_keeps_its_uncertainty_marking(self):
         colophon = "（未經證實的說法）試製學者相信牠們來自北方。"
+        normalised = colophon.replace("未經證實", "已知")
         row = _species(published_ecology_zh=colophon)
         view = registry.published_species_view(row)
         self.assertEqual(view["published_ecology_zh"], colophon)
         self.assertIn("未經證實", view["published_ecology_zh"])
+        # A projection that rewrote the uncertainty away would return the
+        # normalised text instead; the published view never transforms prose.
+        self.assertNotEqual(view["published_ecology_zh"], normalised)
 
     def test_no_whole_record_serializer_is_exposed(self):
         for absent in ("to_dict", "asdict", "dump", "serialize", "species_to_dict"):
@@ -544,12 +651,13 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
 
     @staticmethod
     def _runtime_state() -> tuple:
+        # Identity AND payload: an in-place attribute change on a monster,
+        # room, quest, or art record moves one of these digests. The lore
+        # Scripts themselves are the mirror's own output and are excluded.
         return (
-            ObjectDB.objects.count(),
-            ArtAssetRecord.objects.count(),
-            tuple(sorted(ObjectDB.objects.values_list("db_key", flat=True))),
-            tuple(sorted(ArtAssetRecord.objects.values_list("db_key", flat=True))),
-            tuple(sorted(key for key in _script_keys() if not key.startswith("lore:"))),
+            _runtime_digest(ObjectDB),
+            _runtime_digest(ArtAssetRecord),
+            _runtime_digest(ScriptDB, exclude_prefix="lore:"),
         )
 
     def test_the_step_mirrors_exactly_the_species_and_variant_records(self):
@@ -587,11 +695,12 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         self.assertEqual(first_keys, second_keys)
 
     def test_the_mirror_touches_no_monster_room_quest_or_art_record(self):
-        sync_monster_species()
         before = self._runtime_state()
         sync_monster_species()
-        after = self._runtime_state()
-        self.assertEqual(before, after)
+        after_first_run = self._runtime_state()
+        self.assertEqual(before, after_first_run)
+        sync_monster_species()
+        self.assertEqual(after_first_run, self._runtime_state())
 
     def test_one_boundary_event_carries_the_registry_context(self):
         with patch("world.lore.sync.log_info") as info:
