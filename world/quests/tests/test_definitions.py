@@ -6,6 +6,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.monster_placement import MonsterSite
 from world.tests.synthetic_data import (
     SYNTH_ITEMS,
     SYNTH_MONSTER_SPECIES,
@@ -766,6 +767,274 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
             MAX_DEFINITION_PROSE_TOTAL,
         )
         self.assertLessEqual(MAX_DEFINITION_PROSE_LENGTH, MAX_DEFINITION_PROSE_TOTAL)
+
+
+# The bound site clear-out selector runs against file-local synthetic sites
+# injected through the kit's ``extra=`` seam: every accepted and rejected site
+# key below is an invented ``t_`` row, never a shipped one.
+_CLEAR_OUT_SITE = "t_clear_out_site"
+_SECOND_SITE = "t_clear_out_second_site"
+_ABSENT_SITE = "t_absent_site"
+_CLEAR_OUT_SITE_CAPACITY = 2
+_CLEAR_OUT_SITES = {
+    _CLEAR_OUT_SITE: MonsterSite(
+        _CLEAR_OUT_SITE,
+        "nest",
+        _HUNT_REGION,
+        (4, 4),
+        (_HUNT_ORDINARY, _HUNT_STRONGER),
+        _CLEAR_OUT_SITE_CAPACITY,
+        True,
+    ),
+    _SECOND_SITE: MonsterSite(
+        _SECOND_SITE,
+        "camp",
+        _HUNT_REGION,
+        (5, 5),
+        (_HUNT_ORDINARY,),
+        1,
+        False,
+        3600,
+    ),
+}
+_CLEAR_OUT_EXTRA = {"monster_sites": _CLEAR_OUT_SITES}
+
+
+def _clear_out(
+    site_key: str | object = _CLEAR_OUT_SITE,
+    *,
+    quantity: int = _CLEAR_OUT_SITE_CAPACITY,
+    bound: bool = True,
+    **extra: object,
+) -> QuestObjective:
+    """One synthetic bound site clear-out objective (keyword-assembled)."""
+    return QuestObjective(
+        kind=ObjectiveKind.DEFEAT,
+        quantity=quantity,
+        requires_bound_targets=bound,
+        site_key=site_key,  # type: ignore[arg-type]
+        **extra,  # type: ignore[arg-type]
+    )
+
+
+@synthetic_registries("monster_sites", extra=_CLEAR_OUT_EXTRA)
+class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
+    """Registration validation of the bound site clear-out selector."""
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_complete_clear_out_registers_immutably(self):
+        candidate = quest(
+            "clear-out-valid",
+            stages=(QuestStage(0, _clear_out()),),
+            rank="E",
+        )
+        register(candidate)
+        registered = QUEST_DEFINITION_REGISTRY["clear-out-valid"]
+        objective = registered.stages[0].objective
+        self.assertEqual(objective.site_key, _CLEAR_OUT_SITE)
+        self.assertTrue(objective.requires_bound_targets)
+        self.assertEqual(objective.quantity, _CLEAR_OUT_SITE_CAPACITY)
+        self.assertIsNone(objective.monster_tier)
+        with self.assertRaises(Exception):
+            objective.site_key = _SECOND_SITE  # type: ignore[misc]
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_an_unknown_or_empty_site_key_is_rejected(self):
+        invalid = (
+            ("clear-out-absent-site", _clear_out(_ABSENT_SITE)),
+            ("clear-out-empty-site", _clear_out("")),
+            ("clear-out-non-string-site", _clear_out(5)),
+        )
+        for key, objective in invalid:
+            with self.subTest(key=key):
+                with self.assertRaises(QuestDefinitionError):
+                    register(quest(key, stages=(QuestStage(0, objective),)))
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_site_key_without_the_bound_flag_is_rejected(self):
+        with self.assertRaises(QuestDefinitionError):
+            register(
+                quest(
+                    "clear-out-unbound",
+                    stages=(QuestStage(0, _clear_out(bound=False)),),
+                )
+            )
+        self.assertNotIn("clear-out-unbound", QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_site_key_beside_another_selector_family_is_rejected(self):
+        combined = (
+            (
+                "clear-out-and-tier",
+                _clear_out(monster_tier=SYNTH_MONSTER_TIERS["t_faint"].key),
+            ),
+            (
+                "clear-out-and-hunt",
+                QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=2,
+                    requires_bound_targets=True,
+                    site_key=_CLEAR_OUT_SITE,
+                    region_key=_HUNT_REGION,
+                    species_key=_HUNT_SPECIES,
+                    countable_variant_keys=(_HUNT_ORDINARY, _HUNT_STRONGER),
+                ),
+            ),
+        )
+        for key, objective in combined:
+            with self.subTest(key=key):
+                with self.assertRaises(QuestDefinitionError):
+                    register(quest(key, stages=(QuestStage(0, objective),)))
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_quantity_beyond_the_sites_capacity_is_rejected(self):
+        with self.assertRaises(QuestDefinitionError):
+            register(
+                quest(
+                    "clear-out-over-capacity",
+                    stages=(
+                        QuestStage(
+                            0, _clear_out(quantity=_CLEAR_OUT_SITE_CAPACITY + 1)
+                        ),
+                    ),
+                )
+            )
+        self.assertNotIn("clear-out-over-capacity", QUEST_DEFINITION_REGISTRY)
+        # The capacity itself is lawful.
+        register(
+            quest(
+                "clear-out-at-capacity",
+                stages=(
+                    QuestStage(0, _clear_out(quantity=_CLEAR_OUT_SITE_CAPACITY)),
+                ),
+            )
+        )
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_site_selector_is_rejected_on_other_objective_kinds(self):
+        invalid = (
+            (
+                "reach-with-site",
+                QuestObjective(
+                    kind=ObjectiveKind.REACH,
+                    requires_bound_targets=True,
+                    site_key=_CLEAR_OUT_SITE,
+                    destination=bound_instance_locator(),
+                ),
+            ),
+            (
+                "escort-with-site",
+                QuestObjective(
+                    kind=ObjectiveKind.ESCORT,
+                    requires_bound_targets=True,
+                    site_key=_CLEAR_OUT_SITE,
+                    destination=bound_instance_locator(),
+                ),
+            ),
+            (
+                "acquire-with-site",
+                QuestObjective(
+                    kind=ObjectiveKind.ACQUIRE,
+                    quantity=1,
+                    site_key=_CLEAR_OUT_SITE,
+                    item_key=next(iter(SYNTH_ITEMS)),
+                ),
+            ),
+            (
+                "deliver-with-site",
+                QuestObjective(
+                    kind=ObjectiveKind.DELIVER,
+                    quantity=1,
+                    requires_bound_targets=True,
+                    site_key=_CLEAR_OUT_SITE,
+                    item_key=next(iter(SYNTH_ITEMS)),
+                ),
+            ),
+        )
+        for key, objective in invalid:
+            with self.subTest(key=key):
+                with self.assertRaises(QuestDefinitionError):
+                    register(quest(key, stages=(QuestStage(0, objective),)))
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_second_definition_over_one_site_is_rejected_in_either_order(self):
+        first = quest("clear-out-first", stages=(QuestStage(0, _clear_out()),))
+        second = quest("clear-out-second", stages=(QuestStage(0, _clear_out()),))
+        register(first)
+        with self.assertRaises(QuestDefinitionError) as caught:
+            register(second)
+        message = str(caught.exception)
+        self.assertIn(_CLEAR_OUT_SITE, message)
+        self.assertIn("clear-out-first", message)
+        self.assertNotIn("clear-out-second", QUEST_DEFINITION_REGISTRY)
+        # The invariant is symmetric: the registry keeps whichever definition
+        # declared the site first, and the other one is the rejected party.
+        QUEST_DEFINITION_REGISTRY.pop("clear-out-first")
+        register(second)
+        with self.assertRaises(QuestDefinitionError):
+            register(first)
+        self.assertNotIn("clear-out-first", QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_later_stage_also_counts_as_declaring_a_site(self):
+        # The uniqueness rule compares every stage of both definitions, so a
+        # site named by a later stage collides exactly as a stage-zero one does.
+        register(
+            quest(
+                "clear-out-multi",
+                stages=(QuestStage(0, defeat()), QuestStage(1, _clear_out())),
+            )
+        )
+        with self.assertRaises(QuestDefinitionError):
+            register(quest("clear-out-later", stages=(QuestStage(0, _clear_out()),)))
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_two_stages_of_one_definition_may_name_one_site(self):
+        # The rule compares different definition keys only, so repeating a site
+        # inside one definition is deliberately not prohibited.
+        register(
+            quest(
+                "clear-out-repeated",
+                stages=(
+                    QuestStage(0, _clear_out(_SECOND_SITE, quantity=1)),
+                    QuestStage(1, _clear_out(_SECOND_SITE, quantity=1)),
+                ),
+            )
+        )
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_re_registering_the_same_clear_out_is_an_idempotent_no_op(self):
+        candidate = quest("clear-out-idempotent", stages=(QuestStage(0, _clear_out()),))
+        register(candidate)
+        stored = QUEST_DEFINITION_REGISTRY["clear-out-idempotent"]
+        register(candidate)
+        self.assertIs(QUEST_DEFINITION_REGISTRY["clear-out-idempotent"], stored)
+        # Equal content is still a no-op when it is a fresh but equal value.
+        register(quest("clear-out-idempotent", stages=(QuestStage(0, _clear_out()),)))
+        self.assertIs(QUEST_DEFINITION_REGISTRY["clear-out-idempotent"], stored)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.lore.monster_placement import MONSTER_SITE_REGISTRY
 from world.lore.monster_species import (
     MONSTER_SPECIES_REGISTRY,
     MONSTER_VARIANT_REGISTRY,
@@ -113,6 +114,15 @@ class QuestObjective:
     region_key: str | None = None
     species_key: str | None = None
     countable_variant_keys: tuple[str, ...] = ()
+    #: The bound site clear-out selector (design D-C1): the key of an authored
+    #: site in ``MONSTER_SITE_REGISTRY``. Legal only together with
+    #: ``requires_bound_targets=True`` and mutually exclusive with every other
+    #: selector family. The objective binds the site's own living individuals —
+    #: the site is a source, never a spawn — and ``quantity`` may not exceed the
+    #: site's authored capacity. It is a hand-written-only field: the
+    #: deterministic compile boundary never authors it, and the stored payload
+    #: round-trips it with an absent-key default.
+    site_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -222,6 +232,36 @@ def _validate_hunt_selector(
         )
 
 
+def _validate_site_clear_out(
+    definition: QuestDefinition,
+    objective: QuestObjective,
+) -> None:
+    """Validate the bound site clear-out selector (design D-C1/D-C2).
+
+    The selector names one authored site and the quantity may never exceed that
+    site's authored capacity: the bound set is the site's own living
+    individuals, so no acceptance could ever bind more than the site owns. An
+    empty or non-string key is rejected as such rather than reaching the
+    registry lookup, so every rejection is a named
+    :class:`QuestDefinitionError`.
+    """
+    site_key = objective.site_key
+    if not isinstance(site_key, str) or not site_key:
+        _reject(definition, "a site clear-out requires a non-empty site_key")
+    site = MONSTER_SITE_REGISTRY.get(site_key)
+    if site is None:
+        _reject(
+            definition,
+            f"site clear-out names unknown authored site {site_key!r}",
+        )
+    if objective.quantity > site.capacity:
+        _reject(
+            definition,
+            f"site clear-out quantity {objective.quantity} exceeds the authored "
+            f"capacity {site.capacity} of site {site_key!r}",
+        )
+
+
 def _validate_prose(
     definition: QuestDefinition,
     field: str,
@@ -322,21 +362,36 @@ def _validate_objective(
         has_tier = objective.monster_tier is not None
         has_bound = objective.requires_bound_targets is True
         has_hunt = bool(_declared_hunt_fields(objective))
+        has_site = objective.site_key is not None
         if has_hunt:
-            if has_tier or has_bound:
+            if has_tier or has_bound or has_site:
                 _reject(
                     definition,
                     "DEFEAT objective declares a regional species hunt beside "
-                    "monster_tier or requires_bound_targets; a hunt declares "
-                    "exactly one selector family",
+                    "monster_tier, requires_bound_targets, or a site key; a hunt "
+                    "declares exactly one selector family",
                 )
             _validate_hunt_selector(definition, objective)
+        elif has_site:
+            if not has_bound:
+                _reject(
+                    definition,
+                    "a site clear-out requires requires_bound_targets=True; a "
+                    "site key alone is not a selector family",
+                )
+            if has_tier:
+                _reject(
+                    definition,
+                    "DEFEAT objective declares a site key beside monster_tier; "
+                    "a site clear-out declares exactly one selector family",
+                )
+            _validate_site_clear_out(definition, objective)
         elif has_tier == has_bound:
             _reject(
                 definition,
                 "DEFEAT objective must declare exactly one of a known "
-                "monster_tier, requires_bound_targets=True, or the complete "
-                "regional species-hunt selector",
+                "monster_tier, requires_bound_targets=True (optionally naming a "
+                "known site_key), or the complete regional species-hunt selector",
             )
         elif has_tier and objective.monster_tier not in MONSTER_TIER_REGISTRY:
             _reject(
@@ -344,8 +399,16 @@ def _validate_objective(
                 f"unknown monster tier {objective.monster_tier!r}",
             )
     elif objective.kind is ObjectiveKind.REACH:
-        if objective.monster_tier is not None or objective.requires_bound_targets:
-            _reject(definition, "REACH objective cannot declare defeat selectors")
+        if (
+            objective.monster_tier is not None
+            or objective.requires_bound_targets
+            or objective.site_key is not None
+        ):
+            _reject(
+                definition,
+                "REACH objective cannot declare defeat selectors or a site "
+                "clear-out",
+            )
         if _declared_hunt_fields(objective):
             _reject(
                 definition,
@@ -359,8 +422,16 @@ def _validate_objective(
             )
         _validate_destination(definition, objective.destination, ObjectiveKind.REACH)
     elif objective.kind is ObjectiveKind.ESCORT:
-        if objective.monster_tier is not None or objective.requires_bound_targets:
-            _reject(definition, "ESCORT objective cannot declare defeat selectors")
+        if (
+            objective.monster_tier is not None
+            or objective.requires_bound_targets
+            or objective.site_key is not None
+        ):
+            _reject(
+                definition,
+                "ESCORT objective cannot declare defeat selectors or a site "
+                "clear-out",
+            )
         if _declared_hunt_fields(objective):
             _reject(
                 definition,
@@ -378,11 +449,12 @@ def _validate_objective(
             objective.monster_tier is not None
             or objective.destination is not None
             or objective.requires_bound_targets
+            or objective.site_key is not None
         ):
             _reject(
                 definition,
                 "ACQUIRE objective cannot declare defeat selectors, a destination, "
-                "or bound-target requirements",
+                "bound-target requirements, or a site clear-out",
             )
         if _declared_hunt_fields(objective):
             _reject(
@@ -399,6 +471,12 @@ def _validate_objective(
             _reject(definition, "DELIVER objective cannot declare a destination")
         if objective.monster_tier is not None:
             _reject(definition, "DELIVER objective cannot declare a monster_tier")
+        if objective.site_key is not None:
+            _reject(
+                definition,
+                "DELIVER objective cannot declare a site clear-out; its bound "
+                "targets are its delivery recipients",
+            )
         if _declared_hunt_fields(objective):
             _reject(
                 definition,
@@ -467,11 +545,47 @@ def validate_definition(definition: QuestDefinition) -> None:
 QUEST_DEFINITION_REGISTRY: dict[str, QuestDefinition] = {}
 
 
+def _declared_site_keys(definition: QuestDefinition) -> frozenset[str]:
+    """Every authored site key this definition's stages declare."""
+    return frozenset(
+        stage.objective.site_key
+        for stage in definition.stages
+        if stage.objective.site_key is not None
+    )
+
+
+def _reject_site_collisions(definition: QuestDefinition) -> None:
+    """Reject a second definition over one site (design D-C6).
+
+    Two clear-outs over one site would both bind the same living individuals, so
+    two records would credit the same defeats once. Registration rejects the
+    later definition and names the colliding key and definition rather than
+    leaving a silent double-count to the planner. Only definitions registered
+    under a *different* definition key are compared, so the equal-content
+    idempotent re-registration path never collides with itself; every stage of
+    both definitions is compared, not the stage-zero objective alone.
+    """
+    declared = _declared_site_keys(definition)
+    if not declared:
+        return
+    for other_key, other in QUEST_DEFINITION_REGISTRY.items():
+        if other_key == definition.key:
+            continue
+        collided = declared & _declared_site_keys(other)
+        if collided:
+            raise QuestDefinitionError(
+                f"{definition.key}: site {sorted(collided)[0]!r} is already "
+                f"declared by registered definition {other_key!r}"
+            )
+
+
 def register_quest_definition(definition: QuestDefinition) -> None:
     """Register one validated, immutable definition idempotently.
 
     Registering equal content under an existing key is a no-op; conflicting
-    content under an existing key raises before replacing anything.
+    content under an existing key raises before replacing anything. A definition
+    declaring a site another registered definition already declares is rejected
+    before it is stored.
     """
     validate_definition(definition)
     current = QUEST_DEFINITION_REGISTRY.get(definition.key)
@@ -481,4 +595,5 @@ def register_quest_definition(definition: QuestDefinition) -> None:
         raise QuestDefinitionError(
             f"{definition.key}: conflicting content already registered"
         )
+    _reject_site_collisions(definition)
     QUEST_DEFINITION_REGISTRY[definition.key] = definition

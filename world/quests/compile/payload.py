@@ -151,12 +151,15 @@ def _variant_keys_from_payload(value: Any) -> Any:
 
 
 def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
-    """Decode one stored objective, including the species-hunt selector.
+    """Decode one stored objective, including the hand-written selectors.
 
-    The three hunt fields are read with absent-key defaults so a payload
-    written before the selector existed decodes to exactly the objective it
-    recorded; a *partial* selector is rejected right below, by validating the
-    reconstructed definition, rather than being silently reinterpreted.
+    The hunt fields and the bound site clear-out's ``site_key`` are read with
+    absent-key defaults so a payload written before a selector existed decodes
+    to exactly the objective it recorded (and every generated quest's payload
+    decodes with the site key absent, because the compile boundary never authors
+    one); a *partial* or malformed selector is rejected right below, by
+    validating the reconstructed definition, rather than being silently
+    reinterpreted or coerced.
     """
     return QuestObjective(
         kind=ObjectiveKind(data["kind"]),
@@ -170,6 +173,7 @@ def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
         countable_variant_keys=_variant_keys_from_payload(
             data.get("countable_variant_keys")
         ),
+        site_key=data.get("site_key"),
     )
 
 
