@@ -8,7 +8,7 @@
 
 - [ ] 2.1 Add optional call_id/attempt descriptor metadata and generate uuid4 hex at guardrail entry; migrate every descriptor-copying wrapper including option proposals and epochs; verify fake-client/descriptor and wrapper regression tests.
 - [ ] 2.2 Record full settled real transport exchanges, request/response/raw text/error metadata and exactly one terminal guardrail outcome across ok/degraded/rejected, disabled and unexpected failures; verify recording-transport retry/degrade, accepted, fake-only and raising-fallback tests and unchanged propagated exceptions.
-- [ ] 2.3 Preserve credentials exclusion and _scrub_key for all recorded error paths, hostname-only endpoints and no request headers; verify contract fixtures containing API key, headers and URL userinfo do not leak into either sink.
+- [ ] 2.3 Preserve credentials exclusion and _scrub_key for all recorded error paths and echoed successful/raw response payloads, hostname-only endpoints and no request headers; verify API key, header and URL-userinfo fixtures do not leak into exchanges, outcomes or operational sinks.
 - [ ] 2.4 Add call_id to llm_call/retry/cached-token events and propagate actual correlation through correspondence/dream failures; verify all terminal and retry records/events share the identifier and no pre-call failure fabricates one.
 
 ## 3. Prose rule cutover and handoff

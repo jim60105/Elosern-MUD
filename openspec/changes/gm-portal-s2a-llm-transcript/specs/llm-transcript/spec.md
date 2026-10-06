@@ -19,6 +19,10 @@ Transcripts SHALL append one UTF-8 JSON line per record with non-ASCII text pres
 - **WHEN** transcripts are disabled, or storage is unwritable or a record is unserialisable
 - **THEN** disabled writes do nothing and lookup reports disabled; storage failures return without raising and issue a best-effort stderr diagnostic
 
+#### Scenario: Best-effort reading
+- **WHEN** a retained file is unreadable or a line is malformed during lookup
+- **THEN** lookup diagnoses the failure to stderr, skips unreadable content and returns readable matching records, possibly an empty list, without guaranteeing a complete scan
+
 ### Requirement: Correlated exchanges and terminal outcomes
 Every guarded call SHALL generate one uuid4 hexadecimal call_id at entry, reused across all attempts and its operational events. Each real transport attempt SHALL write one exchange when settled, successful or failed, containing kind, call_id, zero-based attempt, ISO-8601 ts, layer, profile model, hostname-only endpoint_host, elapsed ms, full request body, HTTP status or null when absent, full parsed response or raw non-JSON response text, and null error or scrubbed error type/message. Every guarded call SHALL write exactly one terminal outcome containing kind, call_id, ts, layer, profile, total ms, result (ok/degraded/rejected), nullable reason, attempt validation-errors list, and final_text (accepted text only, otherwise null). Disabled profiles and unexpected errors SHALL still produce outcomes without inventing exchanges. Fake clients SHALL write no exchange. Existing retry/degrade behavior and exception propagation SHALL remain unchanged.
 
@@ -40,3 +44,7 @@ Transcripts and operational events SHALL exclude API keys, request headers, auth
 #### Scenario: Credential-bearing request failure
 - **WHEN** a request uses a configured API key, headers, and URL userinfo and fails with error text containing those credentials
 - **THEN** no transcript or operational record contains those credentials or any request header, while non-secret request messages remain available
+
+#### Scenario: Credentials echoed by the endpoint
+- **WHEN** successful JSON or raw non-JSON response text echoes configured credentials
+- **THEN** exchange response, outcome final_text and operational diagnostics exclude those credentials while retaining ordinary prose
