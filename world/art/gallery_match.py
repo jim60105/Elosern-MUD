@@ -304,12 +304,14 @@ def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None
     player's own image. The entity's stored provenance supplies the typed
     content reference (``official_content_reference_for_entity``): no
     reference — every dynamically generated NPC, every imported NPC, every
-    monster before the separate species catalog lands, and every entity
-    without a named portrait subject — resolves ``None`` here. A reference
-    the snapshot does not hold (absent, refused at admission, or removed by
-    an artwork update) resolves ``None`` just the same, so a stale directory
-    falls through to the remaining chain with no exception, no preference
-    deletion, and no acquisition attempt.
+    tier-only monster (one carrying no stored species identity), and every
+    entity without a named portrait subject — resolves ``None`` here. A
+    species-backed monster resolves its species' reference, and a runtime card
+    whose stored image exists still outranks that official default exactly as
+    it outranks any other. A reference the snapshot does not hold (absent,
+    refused at admission, or removed by an artwork update) resolves ``None``
+    just the same, so a stale directory falls through to the remaining chain
+    with no exception, no preference deletion, and no acquisition attempt.
 
     The returned facts are the snapshot's own: the default image's admitted
     root-relative ``identity``, its same-origin

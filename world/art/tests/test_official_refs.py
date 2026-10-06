@@ -1,7 +1,7 @@
 """Tests for the typed official content reference and its provenance rules.
 
 Pure ``unittest.TestCase`` wherever it can be: the resolver performs no I/O,
-reads exactly two entity attributes, and consults the live lore registries, so
+reads exactly three entity attributes, and consults the live lore registries, so
 the grammar, boundary, inference-trap, diagnostic, and monster contracts here
 run without a database or a catalog snapshot. Synthetic registries are injected
 through the module's own registry bindings (string-named ``patch.object``,
@@ -35,6 +35,7 @@ from world.art.official_refs import (
     OFFICIAL_KIND_NPC,
     OFFICIAL_KIND_PRESET,
     PRESET_PROVENANCE_ATTRIBUTE,
+    SPECIES_PROVENANCE_ATTRIBUTE,
     UNRESOLVED_REFERENCE_EVENT,
     OfficialContentReference,
     OfficialContentReferenceError,
@@ -53,12 +54,14 @@ MODULE_PATH = REPO_ROOT / "world" / "art" / "official_refs.py"
 PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "world", "web/webclient")
 
 # The exact direct project-import boundary the leaf module is allowed: the
-# shared stable-key predicate, the two immutable lore registries, and the
+# shared stable-key predicate, the three immutable lore registries (the
+# species registry is the monster kind's membership authority), and the
 # observability facade. Nothing else — no catalog module, no rules layer, no
 # typeclass, no transport.
 EXPECTED_PROJECT_IMPORTS = frozenset(
     {
         "world.art.subjects",
+        "world.lore.monster_species",
         "world.lore.npc_profiles",
         "world.lore.player_presets",
         "world.observability",
@@ -66,12 +69,26 @@ EXPECTED_PROJECT_IMPORTS = frozenset(
 )
 
 # One-hop dependency sources the back-import check parses: everything the leaf
-# module's direct dependencies are made of.
+# module's direct dependencies are made of. ``world.lore.monster_species`` has
+# already been reachable transitively (``world.lore``'s package init imports
+# it, and the preset/profile registries import that package first), so this
+# entry binds a name that was loaded anyway and adds no new dependency.
 DEPENDENCY_SOURCES = (
     "world/art/subjects.py",
+    "world/lore/monster_species.py",
     "world/lore/npc_profiles",
     "world/lore/player_presets",
     "world/observability",
+)
+
+# The callees that can turn a ``(kind, key)`` pair into an official reference:
+# the typed constructor, the shared declared-key resolver, and the
+# authored-channel entry point. The producer-site audit below is pinned to
+# this vocabulary (a bare ``"monster"`` argument also appears in unrelated
+# calls — the gallery kind table, a quest lore key — which are not reference
+# sites).
+REFERENCE_CALLEES = frozenset(
+    {"OfficialContentReference", "_declared_reference", "official_content_reference"}
 )
 
 # Synthetic content keys. Never a shipped catalog key: the registries are
@@ -79,6 +96,7 @@ DEPENDENCY_SOURCES = (
 _SYNTH_PRESET = "t_synth_preset"
 _SYNTH_PROFILE = "t_synth_profile"
 _SYNTH_TIER = "t_synth_tier"
+_SYNTH_SPECIES = "t_synth_species"
 
 
 class _RecordingEntity:
@@ -163,6 +181,56 @@ def _monster_reference_constructions(tree: ast.Module) -> list[str]:
     return found
 
 
+def _monster_kind_reference_sites(tree: ast.Module) -> list[tuple[str, str]]:
+    """Every reference-path call site naming the monster kind, by function.
+
+    Returns ``(enclosing_function, callee)`` for each ``ast.Call`` whose callee
+    is one of ``REFERENCE_CALLEES`` and whose positional or keyword argument is
+    the vocabulary's monster-kind literal or the ``OFFICIAL_KIND_MONSTER``
+    name/attribute. Comparisons and container literals are not call sites, and
+    the call's innermost enclosing function is what a site is attributed to.
+
+    This is a static tripwire over the fixed reference-callee set, not a
+    runtime guarantee: a producer whose kind is computed before the call (a
+    local variable, a tuple index, a lookup) is invisible to it, and nothing
+    here prevents a second producer from being written. It exists so that any
+    NEW textual use of the monster kind on the reference path has to be
+    deliberate — the paired behavioral evidence is the species arm's own tests.
+    """
+    monster_kind = OFFICIAL_CONTENT_KINDS[0]
+    owners: dict[int, str] = {}
+
+    def walk(node: ast.AST, owner: str) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            owner = node.name
+        elif isinstance(node, ast.Call):
+            owners[id(node)] = owner
+        for child in ast.iter_child_nodes(node):
+            walk(child, owner)
+
+    walk(tree, "<module>")
+
+    def names_the_monster_kind(argument: ast.AST) -> bool:
+        if isinstance(argument, ast.Constant):
+            return argument.value == monster_kind
+        if isinstance(argument, (ast.Name, ast.Attribute)):
+            token = getattr(argument, "id", None) or getattr(argument, "attr", None)
+            return token == "OFFICIAL_KIND_MONSTER"
+        return False
+
+    sites: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        callee = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+        if callee not in REFERENCE_CALLEES:
+            continue
+        arguments = [*node.args, *(keyword.value for keyword in node.keywords)]
+        if any(names_the_monster_kind(argument) for argument in arguments):
+            sites.append((owners[id(node)], callee))
+    return sites
+
+
 class ReferenceTypeTests(unittest.TestCase):
     """The frozen type: closed kind vocabulary, shared key grammar."""
 
@@ -219,6 +287,20 @@ class ReferenceTypeTests(unittest.TestCase):
     def test_the_provenance_attribute_names_stay_separate(self):
         self.assertEqual(PRESET_PROVENANCE_ATTRIBUTE, FALLBACK_PRESET_ATTRIBUTE)
         self.assertNotEqual(NPC_PROFILE_PROVENANCE_ATTRIBUTE, FALLBACK_TIER_ATTRIBUTE)
+        # Three distinct read names: the species field is not an alias of a
+        # preset/profile provenance attribute, and none of them is the
+        # fallback layer's tier attribute.
+        self.assertEqual(
+            len(
+                {
+                    PRESET_PROVENANCE_ATTRIBUTE,
+                    NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+                    SPECIES_PROVENANCE_ATTRIBUTE,
+                }
+            ),
+            3,
+        )
+        self.assertNotEqual(SPECIES_PROVENANCE_ATTRIBUTE, FALLBACK_TIER_ATTRIBUTE)
 
 
 class LeafBoundaryTests(unittest.TestCase):
@@ -292,7 +374,7 @@ class ProvenanceResolutionTests(unittest.TestCase):
             reference, OfficialContentReference(OFFICIAL_KIND_NPC, _SYNTH_PROFILE)
         )
 
-    def test_the_resolver_reads_exactly_the_two_provenance_attribute_names(self):
+    def test_the_resolver_reads_only_the_provenance_attribute_names_it_needs(self):
         preset_only = _RecordingEntity(**{PRESET_PROVENANCE_ATTRIBUTE: _SYNTH_PRESET})
         profile_only = _RecordingEntity(
             **{
@@ -301,16 +383,29 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 "creation_preset_name": _SYNTH_PRESET,
             }
         )
+        nothing = _RecordingEntity()
         with (
             patch.object(official_refs, "PLAYER_PRESET_REGISTRY", {_SYNTH_PRESET: object()}),
             patch.object(official_refs, "NPC_PROFILE_REGISTRY", {_SYNTH_PROFILE: object()}),
         ):
             official_content_reference_for_entity(preset_only)
             official_content_reference_for_entity(profile_only)
+            official_content_reference_for_entity(nothing)
+        # A resolving earlier arm stops the chain: the species read happens
+        # only when nothing above answered, which is what keeps the three
+        # names from becoming a general attribute scan.
         self.assertEqual(preset_only.read_keys, [PRESET_PROVENANCE_ATTRIBUTE])
         self.assertEqual(
             profile_only.read_keys,
             [PRESET_PROVENANCE_ATTRIBUTE, NPC_PROFILE_PROVENANCE_ATTRIBUTE],
+        )
+        self.assertEqual(
+            nothing.read_keys,
+            [
+                PRESET_PROVENANCE_ATTRIBUTE,
+                NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+                SPECIES_PROVENANCE_ATTRIBUTE,
+            ],
         )
 
     @covers_requirement(
@@ -427,8 +522,14 @@ class ProvenanceResolutionTests(unittest.TestCase):
             self.assertIsNone(official_content_reference_for_entity(entity))
         self.assertEqual(
             entity.read_keys,
-            [PRESET_PROVENANCE_ATTRIBUTE, NPC_PROFILE_PROVENANCE_ATTRIBUTE],
+            [
+                PRESET_PROVENANCE_ATTRIBUTE,
+                NPC_PROFILE_PROVENANCE_ATTRIBUTE,
+                SPECIES_PROVENANCE_ATTRIBUTE,
+            ],
         )
+        # The species arm reads its name and also answers nothing: an identity
+        # text is never a species identity either.
         self.assertEqual(entity._values, {})
 
 
@@ -479,7 +580,7 @@ class AuthoredChannelTests(unittest.TestCase):
 
 
 class MonsterBoundaryTests(unittest.TestCase):
-    """Zero producers, no tier substitution, and the species-provider seam."""
+    """The monster kind: one species producer, no tier substitution."""
 
     def setUp(self):
         official_refs._reported_unresolved.clear()
@@ -488,9 +589,19 @@ class MonsterBoundaryTests(unittest.TestCase):
     @covers_requirement(
         "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
     )
-    def test_the_monster_kind_has_no_registry_membership(self):
+    def test_the_monster_kinds_membership_authority_is_the_species_registry(self):
+        # A value of the tier vocabulary is not a monster content key...
         self.assertFalse(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
         self.assertIsNone(official_content_reference(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
+        # ...and the species registry is the one authority that admits one.
+        with patch.object(
+            official_refs, "MONSTER_SPECIES_REGISTRY", {_SYNTH_SPECIES: object()}
+        ):
+            self.assertTrue(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES))
+            self.assertEqual(
+                official_content_reference(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES),
+                OfficialContentReference(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES),
+            )
 
     @covers_requirement(
         "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
@@ -505,14 +616,18 @@ class MonsterBoundaryTests(unittest.TestCase):
             patch.object(official_refs, "log_warn") as logged,
         ):
             self.assertIsNone(official_content_reference_for_entity(entity))
-        # No tier-to-species or name-to-species mapping ran, and no diagnostic
-        # was emitted for an entity that declared no provenance.
+        # No tier-to-species or name-to-species mapping ran: the entity declares
+        # no species identity, so the species arm answers nothing, and no
+        # diagnostic was emitted for an entity that declared no provenance.
         self.assertEqual(_unresolved_events(logged), [])
 
     @covers_requirement(
         "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
     )
     def test_an_injected_species_provider_answers_only_the_entities_own_reference(self):
+        # The seam's own contract: the provider is handed the ENTITY, so it can
+        # only ever answer with that entity's own reference (this is why the
+        # read lives behind the seam instead of in the ordered resolver).
         def provider(entity):
             species = getattr(entity, "species_key", None)
             if not isinstance(species, str) or not species:
@@ -535,14 +650,29 @@ class MonsterBoundaryTests(unittest.TestCase):
     @covers_requirement(
         "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
     )
-    def test_the_default_species_seam_has_no_producer(self):
-        entity = _RecordingEntity(species_key="t_synth_wolf")
-        self.assertIsNone(official_content_reference_for_entity(entity))
+    def test_a_monster_with_no_stored_species_identity_resolves_no_reference(self):
+        # Tier text and display text are the substitution candidates: neither
+        # produces a reference, and neither does a loose instance attribute —
+        # only a stored species identity (a registry attribute read) can.
+        entity = _RecordingEntity()
+        entity.species_key = _SYNTH_TIER
+        entity.key = _SYNTH_SPECIES
+        entity.display_name = _SYNTH_SPECIES
+        with (
+            patch.object(
+                official_refs, "MONSTER_SPECIES_REGISTRY", {_SYNTH_SPECIES: object()}
+            ),
+            patch.object(official_refs, "log_warn") as logged,
+        ):
+            self.assertIsNone(official_content_reference_for_entity(entity))
+        self.assertEqual(_unresolved_events(logged), [])
 
-    @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
-    )
-    def test_no_production_module_constructs_a_monster_reference(self):
+    def test_no_production_module_constructs_a_monster_reference_from_a_literal_kind(self):
+        # Structural guard for the producer's shape, not a zero-producer claim:
+        # the species arm reaches the constructor through ``_declared_reference``
+        # with a VARIABLE kind, so a direct monster-kind construction anywhere
+        # in production is what this scan refuses (it would bypass the shared
+        # registry-membership check and the bounded diagnostic).
         violations: list[str] = []
         scanned = 0
         for path in _production_module_paths():
@@ -555,7 +685,9 @@ class MonsterBoundaryTests(unittest.TestCase):
             )
         self.assertGreater(scanned, 50)
         self.assertEqual(
-            violations, [], f"production module constructs a monster reference: {violations}"
+            violations,
+            [],
+            f"production module constructs a monster reference directly: {violations}",
         )
 
     def test_the_scan_detects_a_planted_monster_reference(self):
@@ -574,6 +706,51 @@ class MonsterBoundaryTests(unittest.TestCase):
         # A preset-kind construction with a variable kind is not a monster one.
         clean = "x = OfficialContentReference(kind, key)\ny = len(another_call())\n"
         self.assertEqual(_monster_reference_constructions(ast.parse(clean)), [])
+
+    def test_the_species_arm_is_the_only_reference_path_naming_the_monster_kind(self):
+        # The superseding half of the zero-producer scan: the kind's name is
+        # passed to a reference-producing call at exactly ONE production site —
+        # the species arm — and through the shared declared-key resolver, so the
+        # producer cannot bypass registry membership or the bounded diagnostic
+        # by calling the constructor itself.
+        locations: set[tuple[str, str, str]] = set()
+        scanned = 0
+        for path in _production_module_paths():
+            scanned += 1
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            for function, callee in _monster_kind_reference_sites(tree):
+                locations.add((relative, function, callee))
+        self.assertGreater(scanned, 50)
+        self.assertEqual(
+            locations,
+            {
+                (
+                    "world/art/official_refs.py",
+                    "_species_content_reference",
+                    "_declared_reference",
+                )
+            },
+            f"unexpected monster-kind reference sites: {sorted(locations)}",
+        )
+
+    def test_the_site_scan_detects_a_planted_producer_and_ignores_unrelated_calls(self):
+        # The site scan's own control: a positive, the wrong kind, an unrelated
+        # callee that merely receives the word "monster", and a container
+        # literal (not a call site).
+        planted = (
+            "def _producer(entity):\n"
+            "    return _declared_reference(OFFICIAL_KIND_MONSTER, 't_synth', entity)\n"
+            "def _clean(entity):\n"
+            "    return _declared_reference(OFFICIAL_KIND_PRESET, 't_synth', entity)\n"
+            "unrelated = gallery_kind('monster')\n"
+            "table = (OFFICIAL_KIND_MONSTER, OFFICIAL_KIND_PRESET)\n"
+        )
+        self.assertEqual(
+            _monster_kind_reference_sites(ast.parse(planted)),
+            [("_producer", "_declared_reference")],
+        )
+        self.assertEqual(_monster_kind_reference_sites(ast.parse("x = 1\n")), [])
 
 
 if __name__ == "__main__":

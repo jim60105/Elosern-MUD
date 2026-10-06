@@ -611,8 +611,9 @@ class OfficialDefaultStepTests(EvenniaTestCase):
         self.assertIsNotNone(current_catalog().content("monster", "t_synth_species"))
         entity = _ProvenanceEntity(pk=5)
         entity.threat_tier = "t_synth_species"
-        # ...and the monster's species seam is still a zero producer, so no
-        # tier-to-content substitution can ever resolve it.
+        # ...and a tier named where a species identity is required still
+        # resolves nothing: the species arm reads stored species provenance
+        # alone, so no tier-to-content substitution can ever reach it.
         self.assertIsNone(
             official_default_for(
                 ArtSubject(ArtSubjectKind.MONSTER, "t_synth_species"), entity

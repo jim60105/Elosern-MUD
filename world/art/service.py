@@ -133,10 +133,12 @@ def _official_default_satisfies(subject, entity) -> bool:
     guard and the presentation agree by construction; it reads stored state
     plus the startup snapshot only — nothing is recorded, enqueued, acquired,
     or mutated, the subject's named portrait policy is untouched, and the
-    manual generation seams stay available. A subject with no reference (every
-    kind without an official producer, including monsters today) or one the
-    snapshot does not hold answers False, so its automatic request proceeds
-    exactly as before.
+    manual generation seams stay available. A subject whose reference the
+    caller cannot see answers False, so its automatic request proceeds exactly
+    as before: a character or NPC without authored provenance, a registry-keyed
+    monster subject (the automatic paths pass a bare ``ArtSubject``, which
+    carries no stored species identity), and any reference the snapshot does
+    not hold.
     """
     from world.art.gallery_match import official_default_for
 

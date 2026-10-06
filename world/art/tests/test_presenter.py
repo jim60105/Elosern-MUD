@@ -1218,7 +1218,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
         self.assertNotIn("portrait rejected", repr(payload))
 
-    def test_a_monster_never_presents_an_official_origin(self):
+    def test_a_tier_only_monster_never_presents_an_official_origin(self):
         folder = self.official_root / "monster" / "official-monster"
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "a.png").write_bytes(_png())
@@ -1226,8 +1226,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         # The snapshot really holds the matching content directory...
         self.assertIsNotNone(current_catalog().content("monster", "official-monster"))
         monster = create_object(Monster, key="official-monster-actor")
-        # ...and the monster still resolves no reference (no producer), so the
-        # official step resolves nothing for it.
+        # ...and a monster carrying no stored species identity still resolves no
+        # reference, so the official step resolves nothing for it — a directory
+        # named after the monster's key or display text is never selected.
         payload = resolve_subject(
             ArtSubject(ArtSubjectKind.MONSTER, "official-monster"), entity=monster
         )

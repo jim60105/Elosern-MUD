@@ -14,8 +14,9 @@ registries only —
   a named reference, and a dynamically generated NPC honoring an explicitly
   attached validated reference while inferring nothing from a lookalike display
   name;
-- monsters resolving no reference even while the mounted root really holds and
-  indexes a matching ``monster/<key>/`` content directory;
+- a monster whose tier and display text match an indexed ``monster/<key>/``
+  content directory resolving no reference, because a species reference comes
+  from stored species provenance alone;
 - an entity with no named portrait subject hashing its runtime identity for the
   built-in silhouette without acquiring a portrait policy, a gallery record, or
   a queue record, and never becoming an official reference.
@@ -259,7 +260,7 @@ class NpcProvenanceTests(EvenniaTest):
 
 
 class MonsterBoundaryTests(EvenniaTest):
-    """Requirement: monsters resolve no official image before the catalog."""
+    """A monster's reference never comes from its tier or display text."""
 
     def setUp(self):
         super().setUp()
@@ -285,8 +286,9 @@ class MonsterBoundaryTests(EvenniaTest):
                 monster = create_object(Monster, key=_SYNTH_SPECIES)
                 monster.threat_tier = _SYNTH_SPECIES
                 monster.db.display_name = _SYNTH_SPECIES
-                # ... and the resolver still yields nothing: no producer exists
-                # keyed by threat tier or display name.
+                # ... and the resolver still yields nothing: the mounted key is
+                # this monster's tier and display text, never a stored species
+                # identity, so the species arm has no provenance to answer from.
                 self.assertIsNone(official_content_reference_for_entity(monster))
 
 
