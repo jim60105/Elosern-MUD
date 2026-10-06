@@ -20,9 +20,16 @@ from world.rules.action import (
     register_event_effect_planner,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.quests.planner import quest_event_effect_planner
-from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
+)
 
 from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
 
@@ -39,11 +46,23 @@ _T_DOUBLE = make_skill(
     usable_out_of_combat=False,
 )
 _SCOPE = synthetic_registries("skills", extra={"skills": {_T_DOUBLE.key: _T_DOUBLE}})
+#: The species-backed shape needs the kit's monster catalogs open for the whole
+#: test body: an individual's derived tier is resolved from the variant registry
+#: on every read, including the one the defeat entry performs.
+_MONSTER_SCOPE = synthetic_registries(
+    "monster_tiers", "monster_species", "monster_variants"
+)
 
 
 def _enter_scope(test) -> None:
     stack = ExitStack()
     stack.enter_context(_SCOPE)
+    test.addCleanup(stack.close)
+
+
+def _enter_monster_scope(test) -> None:
+    stack = ExitStack()
+    stack.enter_context(_MONSTER_SCOPE)
     test.addCleanup(stack.close)
 
 
@@ -143,6 +162,30 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         defeated = [entry for entry in result.event_log.entries if entry.kind == "target_defeated"]
         self.assertEqual(len(defeated), 1)
         self.assertEqual(defeated[0].data["target_id"], monster_b.pk)
+
+    def test_a_species_backed_defeat_carries_its_registered_identity(self):
+        _enter_monster_scope(self)
+        species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+        variant = SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"]
+        monster = construct_species_individual(species.key, variant.key)
+        monster.traits.hp._data["current"] = 1
+        result = self._resolve([monster])
+        self.assertEqual(result.outcome, "success")
+        defeated = [entry for entry in result.event_log.entries if entry.kind == "target_defeated"]
+        self.assertEqual(len(defeated), 1)
+        self.assertEqual(defeated[0].data["target_id"], monster.pk)
+        self.assertEqual(defeated[0].data["monster_tier"], variant.threat_tier)
+        # Identity rides the registered keys, never the display key or the tier.
+        self.assertEqual(defeated[0].data["species_key"], species.key)
+        self.assertEqual(defeated[0].data["variant_key"], variant.key)
+        self.assertNotEqual(defeated[0].data["species_key"], species.display_name_zh)
+
+    def test_a_tier_only_defeat_carries_exactly_its_old_fields(self):
+        monster = self._monster("tier-only", hp=1)
+        result = self._resolve([monster])
+        defeated = [entry for entry in result.event_log.entries if entry.kind == "target_defeated"]
+        self.assertEqual(len(defeated), 1)
+        self.assertEqual(set(defeated[0].data), {"target_id", "monster_tier"})
 
 
 @_SCOPE
