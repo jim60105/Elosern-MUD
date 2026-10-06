@@ -18,7 +18,7 @@
 
 - [x] 4.1 Bump `DREAM_SCHEMA_VERSION` from 1 to 2 in `web/webclient/presentation/dream.py` (the registry registration references the constant by identifier and follows automatically), and verify the presenter emits `schema_version: 2`
 - [x] 4.2 Set `PANEL_ALLOWLIST.dream` to `2` in `web/static/webclient/js/elosern/protocol/constants.js`, and verify the UMD export mirrors the new version
-- [x] 4.3 Update the client validator `web/static/webclient/js/elosern/protocol/panels/dream.js` to require schema 2, add `scene_art` to the exact state field set, and bound it as a string of at most `MAX_SCENE_ART_URL = 256` characters mirroring `world.art.presenter.MAX_PORTRAIT_MEDIA_URL`, and verify a non-string or over-bound `scene_art` rejects
+- [x] 4.3 Update the client validator `web/static/webclient/js/elosern/protocol/panels/dream.js` to require schema 2, add `scene_art` to the exact state field set, and bound it as a string of at most `MAX_SCENE_ART_URL = 256` characters mirroring `world.art.presenter.MAX_PORTRAIT_MEDIA_URL`, and verify a non-string `scene_art` rejects (the vitest negative case; the 256-character bound itself is the shipped mirror and is not separately exercised)
 - [x] 4.4 Verify the four mirrored version sites agree (`DREAM_SCHEMA_VERSION`, the registry reference, `PANEL_ALLOWLIST.dream`, and the validator re-check) by running `tests/test_panel_schema_version_parity_contract.py` and the Node protocol gate
 
 ## 5. Panel art, labels, and removal of the bundled asset

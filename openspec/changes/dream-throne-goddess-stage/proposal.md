@@ -14,6 +14,13 @@ already reflects the contract restated below: the delta's two MODIFIED
 requirement bodies are byte-identical to the current main spec, so the archive
 sync is content-neutral.
 
+Because the delta restates two requirement blocks the implementation commit already
+applied in place, the archive sync rewrites those two blocks with identical text —
+archive before any further edit to them. The commit's third spec change, the
+`dream-explicit-presentation` Purpose sentence re-owning the arousal track to the
+goddess counterpart, is already in the main spec and cannot be expressed by a delta,
+so it is recorded here in prose only.
+
 ## What Changes
 
 - Record the shipped dream-stage retheme as a `dream-explicit-presentation` delta:

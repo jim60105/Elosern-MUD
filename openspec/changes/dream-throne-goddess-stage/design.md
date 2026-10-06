@@ -42,8 +42,10 @@ not an option still under consideration.
   from its startup snapshot).
 - **An absent official root is a valid no-art configuration.** With no catalog
   snapshot the URL is empty, the panel renders no `<img>`, and the rethemed prose
-  stands on its own. This is the same degradation every other missing-official-art
-  case uses, so the dream stage invents no second absence policy.
+  stands on its own. The dream stage reuses the catalog's own no-art rule — never
+  invent a URL — so it introduces no second absence policy; its observable outcome
+  is `""` and no `<img>`, whereas the art presenter keeps a URL and falls through to
+  a silhouette/placeholder payload.
 - **The bundled asset and its gallery pin are removed together.**
   `web/webclient-app/assets/redesign/dream-white-bed.avif` is deleted and its entry
   is dropped from `APPROVED_NON_RUNTIME_IMAGES` in
@@ -60,12 +62,13 @@ not an option still under consideration.
   available-form re-check `payload.schema_version !== 2` in
   `web/static/webclient/js/elosern/protocol/panels/dream.js`. The client validator
   adds `scene_art` to its exact-field list and bounds it as a string of at most 256
-  characters via `MAX_SCENE_ART_URL`, mirroring
-  `world.art.presenter.MAX_PORTRAIT_MEDIA_URL` — the one existing shared wire
-  ceiling for server-authored media URLs. Alternatives: bumping only the presenter
-  constant (rejected — the parity contract and the client would reject v2 payloads)
-  and selecting a fresh per-field cap (rejected — a second wire ceiling would drift
-  from the shared one).
+  characters through a module-local `MAX_SCENE_ART_URL = 256`, whose value mirrors
+  the shared server-authored media ceiling
+  `world.art.presenter.MAX_PORTRAIT_MEDIA_URL` (numerically equal to the protocol
+  bundle's exported `MAX_MEDIA_URL`); the dream validator declares its own copy
+  rather than importing that constant, so the mirror holds by value. Alternative:
+  bumping only the presenter constant (rejected — the parity contract and the client
+  available-form re-check would reject every v2 payload).
 - **The arousal counter is re-owned to the goddess counterpart, mechanically
   unchanged.** The `dream_track.py` module docstring now owns the deterministic,
   session-only pleasure/arousal/climax track to the dream's goddess counterpart and
@@ -100,6 +103,16 @@ not an option still under consideration.
   the track; the shipped guardrail and track tests are unchanged.
 - [Deleting a tracked image breaks the closed non-runtime-image contract] → the same
   commit removes its one allowlist entry, so the set stays exact.
+- [`scene_art` is bounded by UTF-16 code units and gets no same-origin prefix check,
+  unlike the sibling URL fields] → accepted as shipped: the identity is a module
+  constant, so the URL is ASCII and fixed-length
+  (`/art/official/<64 hex>/npc/dream_goddess/dream-throne.webp`, well inside every
+  ceiling) and always same-origin; a data-driven identity would need the sibling
+  `requireString`/`/art/` prefix discipline first.
+- [Two pre-existing docs still describe the pre-retheme staging] → recorded, not
+  fixed: `docs/development/narrative-memory-and-recall.md` and the narrative-memory
+  design doc still name the bundled white-bed AVIF and the pure-white-bed scene, and
+  this change writes nothing outside its own directory.
 
 ## Migration Plan
 
