@@ -19,10 +19,15 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.lore.monster_placement import AmbientPlacementRule
 from world.maps.monster_provisioning import PROVISION_NO_AMBIENT_RULE
-from world.maps.wilderness_population import _population_key, _stored_hp
+from world.maps.wilderness_population import (
+    _population_key,
+    _stored_hp,
+    ensure_population,
+)
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
+    is_footprint_cell,
     region_for_coordinates,
 )
 from world.quests.definitions import ObjectiveKind, QuestObjective, QuestStage
@@ -42,6 +47,7 @@ from world.rules.guild_offers import (
     register_guild_offer,
 )
 from world.rules.monster_individual import construct_species_individual
+from world.rules.npc_intents import apply_npc_intent
 from world.rules.tests._guild_service_probes import rank_reward_band
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.synthetic_data import (
@@ -329,6 +335,91 @@ class HuntAcceptanceTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaT
         self.assertEqual(self._monster_pks(), before_monsters)
         self.assertEqual(self._affinity_value(self.char1), affinity_before)
 
+
+    @covers_requirement(
+        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+    )
+    def test_a_failure_after_the_record_write_restores_the_cached_log(self):
+        # Acceptance owns an outer transaction, so it also owns the in-process
+        # quest-log cache: a failure after the writer already returned must leave
+        # the cached log equal to the rolled-back database, or the next
+        # acceptance would see a ghost active record.
+        from world.quests import transitions
+
+        real_write = transitions.apply_quest_log_replacement
+        before_records = self._storage()
+        before_occupancy = self._occupancy()
+
+        def _write_then_fail(*args, **kwargs):
+            real_write(*args, **kwargs)
+            raise RuntimeError("injected failure after the quest-log write")
+
+        with patch(
+            "world.quests.runtime.apply_quest_log_replacement",
+            side_effect=_write_then_fail,
+        ):
+            with self.assertRaises(RuntimeError):
+                accept(self.char1, self.full_hunt_key)
+        self.assertEqual(self._storage(), before_records)
+        self.assertEqual(self._occupancy(), before_occupancy)
+        # A follow-up acceptance sees the rolled-back log, not a ghost record.
+        later = accept(self.char1, self.hunt_key)
+        self.assertEqual(later.quest_id, f"{self.hunt_key}:1")
+
+    @covers_requirement(
+        "guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle"
+    )
+    def test_the_dialogue_path_restores_provisioned_targets_when_affinity_fails(self):
+        register_adventurer(self.char1, self.staff)
+        self._register_offer(self.full_hunt_key)
+        affinity_before = self._affinity_value(self.char1)
+        before_records = self._storage()
+        before_occupancy = self._occupancy()
+        before_monsters = self._monster_pks()
+        observed: dict[str, list[int]] = {}
+
+        def _fail(*args, **kwargs):
+            observed["monsters"] = self._monster_pks()
+            raise RuntimeError("injected affinity failure")
+
+        with patch("world.rules.npc_intents.apply_affinity_change", side_effect=_fail):
+            outcome = apply_npc_intent(
+                self.staff,
+                self.char1,
+                {"kind": "offer_quest", "quest_key": self.full_hunt_key},
+            )
+        self.assertFalse(outcome.applied)
+        self.assertGreater(len(observed.get("monsters", [])), len(before_monsters))
+        self.assertEqual(self._storage(), before_records)
+        self.assertEqual(self._occupancy(), before_occupancy)
+        self.assertEqual(self._monster_pks(), before_monsters)
+        self.assertEqual(self._affinity_value(self.char1), affinity_before)
+
+    @covers_requirement(
+        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+    )
+    def test_a_provisioned_target_waits_on_a_walkable_cell_of_the_region(self):
+        # Provisioning may place a guaranteed target on a cell the provider has
+        # not materialized yet. It must be a walkable cell of the declared region
+        # and survive the pass the provider runs when it activates that cell, so
+        # the contrib's own attach-on-activation (pinned by
+        # world.maps.tests.test_wilderness_population) then makes it reachable.
+        record = accept(self.char1, self.full_hunt_key)
+        self.assertEqual(record.state, QuestState.IN_PROGRESS)
+        targets = [
+            obj
+            for obj in self._living_ordinary()
+            if self.wilderness.db.itemcoordinates[obj] != PROBE
+        ]
+        self.assertTrue(targets, "provisioning placed no target outside the visited cell")
+        for target in targets:
+            cell = self.wilderness.db.itemcoordinates[target]
+            self.assertEqual(region_for_coordinates(*cell), self.region)
+            self.assertFalse(is_footprint_cell(cell))
+            # The pass the provider runs at activation keeps it alive on its cell.
+            ensure_population(self.wilderness, cell)
+            self.assertGreater(_stored_hp(target), 0)
+            self.assertEqual(self.wilderness.db.itemcoordinates[target], cell)
 
 if __name__ == "__main__":
     import unittest

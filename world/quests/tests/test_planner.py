@@ -959,6 +959,11 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         _enter_scope(self)
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.player = create_object(PlayerCharacter, key="hunt-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
+        self.player.traits.magic_power.base = 30
+        grant_lineage(self.player, [_T_SKILL])
         self.room = create_object(Room, key="hunt-field")
         self.room.db.region_key = _HUNT_REGION
         self.elsewhere = create_object(Room, key="hunt-elsewhere")
@@ -1003,6 +1008,20 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         monster.location = self.room if room is None else room
         monster.traits.hp._data["current"] = 1
         return monster
+
+    def _field(self, actor, targets):
+        return Battlefield(
+            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
+            {actor.key: actor, **{t.key: t for t in targets}},
+        )
+
+    def _resolve(self, actor, skill_key, targets):
+        field = self._field(actor, targets)
+        request = ActionRequest(
+            actor, skill_key, targets, BattlefieldActionContext(field)
+        )
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            return ActionResolver.resolve(request)
 
     def _defeat_entry(self, actor, individual, *, simulated: bool = False):
         from world.rules.event_log import EventEntry
@@ -1156,6 +1175,23 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         stored = self._records()[0]
         self.assertEqual(stored["state"], "completed")
         self.assertEqual(stored["stage_progress"], 2)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    def test_a_real_action_defeat_of_a_countable_target_completes_the_hunt(self):
+        # The whole producer path, not a fabricated log: a real ActionResolver
+        # kill emits the identity entry, the planner resolves the individual's
+        # region from the row, and the quest log commits in the same action.
+        self._hunt_quest(countable=(_HUNT_ORDINARY,), quantity=1)
+        stage_active_record(self.player, "species_hunt")
+        target = self._individual(_HUNT_ORDINARY)
+        result = self._resolve(self.player, _T_SKILL, [target])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(target.traits.hp.current, 0)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 1)
 
     @covers_requirement(
         "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"

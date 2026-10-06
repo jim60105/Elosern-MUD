@@ -8,6 +8,8 @@ shipped placement, species, variant, or region token is named as test content.
 
 from tools.spec_traceability import covers_requirement
 
+from unittest.mock import patch
+
 from django.db import transaction
 from evennia.utils.test_resources import EvenniaTest
 
@@ -16,6 +18,7 @@ from world.lore.monster_placement import AmbientPlacementRule, MonsterSite
 from world.maps.monster_provisioning import (
     PROVISION_NO_AMBIENT_RULE,
     PROVISION_NO_ELIGIBLE_VARIANT,
+    PROVISION_CAPACITY_EXHAUSTED,
     PROVISION_WORLD_UNAVAILABLE,
     _candidate_cells,
     ensure_hunt_targets,
@@ -329,6 +332,31 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
         self.assertFalse(result.satisfied)
         self.assertEqual(result.reason, PROVISION_NO_ELIGIBLE_VARIANT)
         self.assertEqual(result.created, ())
+        self.assertEqual(self._occupancy(), before)
+
+    def test_an_exhausted_authored_capacity_is_refused(self):
+        # A region whose whole authored footprint already sits at its ceiling
+        # cannot be topped up: the manager names the reason and creates nothing.
+        # The footprint is narrowed to the one cell under test so the assertion
+        # is about the ceiling, not about the size of the map.
+        for _ in range(self.rule.capacity):
+            self._spawn_ordinary(PROBE, marker=_population_key(*PROBE))
+        before = self._occupancy()
+        with patch(
+            "world.maps.monster_provisioning._candidate_cells",
+            return_value=(PROBE,),
+        ):
+            result = ensure_hunt_targets(
+                self.region,
+                SPECIES,
+                (ORDINARY,),
+                self.rule.capacity + 1,
+                wilderness=self.wilderness,
+            )
+        self.assertFalse(result.satisfied)
+        self.assertEqual(result.reason, PROVISION_CAPACITY_EXHAUSTED)
+        self.assertEqual(result.created, ())
+        self.assertEqual(result.available, self.rule.capacity)
         self.assertEqual(self._occupancy(), before)
 
     def test_a_cleared_site_is_never_recovered_by_provisioning(self):

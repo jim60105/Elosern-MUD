@@ -18,6 +18,8 @@ from world.tests.synthetic_data import (
 )
 from world.quests.definitions import (
     DestinationKind,
+    MAX_DEFINITION_PROSE_LENGTH,
+    MAX_DEFINITION_PROSE_TOTAL,
     ObjectiveKind,
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
@@ -702,6 +704,38 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
                                 **{field: value},
                             )
                         )
+
+    @covers_requirement(
+        "quest-blueprint::questdefinition-is-the-immutable-deterministic-input-to-quest-runtime"
+    )
+    def test_the_combined_prose_budget_is_enforced(self):
+        # Two individually legal fields can still overflow the rendered detail
+        # the frozen web panel carries, so the pair is bounded together.
+        over = MAX_DEFINITION_PROSE_TOTAL // 2 + 1
+        with self.assertRaises(QuestDefinitionError):
+            register(
+                quest(
+                    "prose-budget-over",
+                    stages=(QuestStage(0, _hunt()),),
+                    rating_rationale_zh="評" * over,
+                    background_flavor_zh="事" * over,
+                )
+            )
+        self.assertNotIn("prose-budget-over", QUEST_DEFINITION_REGISTRY)
+        register(
+            quest(
+                "prose-budget-ok",
+                stages=(QuestStage(0, _hunt()),),
+                rating_rationale_zh="評" * over,
+                background_flavor_zh="事" * (MAX_DEFINITION_PROSE_TOTAL - over),
+            )
+        )
+        stored = QUEST_DEFINITION_REGISTRY["prose-budget-ok"]
+        self.assertEqual(
+            len(stored.rating_rationale_zh) + len(stored.background_flavor_zh),
+            MAX_DEFINITION_PROSE_TOTAL,
+        )
+        self.assertLessEqual(MAX_DEFINITION_PROSE_LENGTH, MAX_DEFINITION_PROSE_TOTAL)
 
 
 if __name__ == "__main__":

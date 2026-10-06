@@ -53,9 +53,20 @@ class QuestDefinitionError(ValueError):
     """A definition violates the closed runtime input contract."""
 
 
-#: The authored-prose bound of ``rating_rationale_zh`` / ``background_flavor_zh``,
-#: matching the compile boundary's bounded player-facing string cap.
-MAX_DEFINITION_PROSE_LENGTH = 500
+#: The authored-prose bounds of ``rating_rationale_zh`` /
+#: ``background_flavor_zh``. Both fields render *verbatim* into ``guild show``
+#: and into the frozen web quest-detail field, whose shared bound is 512 code
+#: points (``MAX_DETAIL_CODE_POINTS`` in the webclient presentation contract,
+#: which this change deliberately leaves untouched). The fixed detail sections —
+#: name, state, stage, objective line, progress, grade, deadline, reward —
+#: reserve roughly 230 of that, so the authored prose may spend 240 per field
+#: and 280 together; anything larger could not be displayed by those panels at
+#: all, which is why the bound is enforced at registration instead of silently
+#: truncating the authored text at render time.
+MAX_DEFINITION_PROSE_LENGTH = 240
+
+#: The combined bound of the two prose fields, for the same reason.
+MAX_DEFINITION_PROSE_TOTAL = 280
 
 #: The CJK Unified Ideographs block: an authored player-facing prose field must
 #: contain at least one, so an ASCII placeholder cannot masquerade as zh-TW text.
@@ -420,6 +431,16 @@ def validate_definition(definition: QuestDefinition) -> None:
         _reject(definition, "rank must be a non-empty string")
     _validate_prose(definition, "rating_rationale_zh", definition.rating_rationale_zh)
     _validate_prose(definition, "background_flavor_zh", definition.background_flavor_zh)
+    prose_total = len(definition.rating_rationale_zh or "") + len(
+        definition.background_flavor_zh or ""
+    )
+    if prose_total > MAX_DEFINITION_PROSE_TOTAL:
+        _reject(
+            definition,
+            f"authored prose totals {prose_total} characters, above the "
+            f"{MAX_DEFINITION_PROSE_TOTAL}-character bound the rendered quest "
+            "detail (and the frozen web detail field) can carry",
+        )
     if not isinstance(definition.stages, tuple) or not definition.stages:
         _reject(definition, "stages must be a non-empty tuple of QuestStage values")
     deadline = definition.deadline_hours

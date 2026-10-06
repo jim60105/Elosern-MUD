@@ -17,7 +17,12 @@ from .definitions import (
     QuestObjective,
     ordinary_countable_variant_keys,
 )
-from .transitions import apply_quest_log_replacement, release_stage_binding
+from .transitions import (
+    apply_quest_log_replacement,
+    release_stage_binding,
+    restore_quest_log,
+    snapshot_quest_log,
+)
 
 
 class QuestDataError(ValueError):
@@ -544,11 +549,18 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
         failure_reason=None,
     )
     provisioning = provisioning_snapshot_for(definition)
+    # This operation now owns an outer transaction, so it also owns every
+    # in-process surface a failure *after* the quest-log writer returned would
+    # otherwise leave divergent: the writer restores the actor's quest log only
+    # for failures inside its own block, and a rollback of this outer block
+    # removes the row while the cached attribute keeps it.
+    quest_log_snapshot = snapshot_quest_log(actor)
     try:
         with transaction.atomic():
             _provision_hunt_targets(definition)
             apply_quest_log_replacement(actor, [*current, record])
     except Exception:
+        restore_quest_log(actor, quest_log_snapshot)
         restore_provisioning(provisioning)
         raise
     return record
