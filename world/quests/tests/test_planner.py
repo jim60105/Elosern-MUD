@@ -757,6 +757,133 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             [int(guard.pk)],
         )
 
+    def _commit(self, effects) -> None:
+        """Apply a planned transition, as the resolver's commit would."""
+        for effect in effects:
+            effect.apply()
+
+    @staticmethod
+    def _quest_log_writes(effects) -> list[str]:
+        """The quest-log writes a plan stages.
+
+        A defeat entry always also stages the lore-codex reveal, which is an
+        independent effect; only the quest-log write advances the record.
+        """
+        return [
+            effect.description
+            for effect in effects
+            if effect.description.startswith("quest_log|")
+        ]
+
+    def _counted_hunt(self) -> None:
+        """A DEFEAT objective that outlives the kills these tests present."""
+        definition = register(
+            quest("upkeep_counted_hunt", stages=(QuestStage(0, defeat(quantity=3)),))
+        )
+        accept(self.player, definition.key)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_a_redelivered_defeat_entry_advances_once(self):
+        self._counted_hunt()
+        monster = self._monster("dup")
+        entry = self._defeat_entry(self.player, monster)
+        self._commit(self._plan(self.player, [entry]))
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 1)
+        self.assertEqual(stored["counted_defeat_ids"], [int(monster.pk)])
+        # The very same defeat event presented again plans no quest-log write,
+        # so one individual can never advance one objective twice.
+        self.assertEqual(
+            self._quest_log_writes(self._plan(self.player, [entry])), []
+        )
+        self.assertEqual(self._records()[0], stored)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_a_fresh_kill_still_counts_beside_a_redelivered_one(self):
+        self._counted_hunt()
+        first = self._monster("first")
+        second = self._monster("second")
+        entry = self._defeat_entry(self.player, first)
+        self._commit(self._plan(self.player, [entry]))
+        self._commit(
+            self._plan(
+                self.player, [entry, self._defeat_entry(self.player, second)]
+            )
+        )
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 2)
+        self.assertEqual(
+            stored["counted_defeat_ids"], [int(first.pk), int(second.pk)]
+        )
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_two_individuals_with_one_display_key_count_separately(self):
+        self._counted_hunt()
+        first = self._monster("lookalike")
+        second = self._monster("lookalike")
+        self.assertNotEqual(first.pk, second.pk)
+        self._commit(self._plan(self.player, [self._defeat_entry(self.player, first)]))
+        self._commit(self._plan(self.player, [self._defeat_entry(self.player, second)]))
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 2)
+        self.assertEqual(
+            stored["counted_defeat_ids"], [int(first.pk), int(second.pk)]
+        )
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_a_newcomer_never_credits_an_old_bound_identity(self):
+        definition = register(
+            quest(
+                "upkeep_bound_three",
+                stages=(QuestStage(0, defeat(bound=True, quantity=3)),),
+            )
+        )
+        record = accept(self.player, definition.key)
+        old = self._monster("site-guardian")
+        bind_stage_runtime(self.player, record.quest_id, objective_targets=(old,))
+        self._commit(self._plan(self.player, [self._defeat_entry(self.player, old)]))
+        self.assertEqual(self._records()[0]["stage_progress"], 1)
+        # A recovered site's newcomer is a fresh identity: it is neither the
+        # bound dbref nor a member of the old individual's counted set.
+        newcomer = self._monster("site-guardian")
+        self.assertNotEqual(newcomer.pk, old.pk)
+        self.assertEqual(
+            self._quest_log_writes(
+                self._plan(self.player, [self._defeat_entry(self.player, newcomer)])
+            ),
+            [],
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 1)
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_a_new_objective_counts_its_own_identities_from_empty(self):
+        accept(self.player, self.two_stage.key)
+        monster = self._monster("stage-one-kill")
+        entry = self._defeat_entry(self.player, monster)
+        self._commit(self._plan(self.player, [entry]))
+        stored = self._records()[0]
+        self.assertEqual((stored["stage_index"], stored["stage_progress"]), (1, 0))
+        self.assertEqual(stored["counted_defeat_ids"], [])
+        # The cleared set is the point: residue from the satisfied objective can
+        # never cap the next one.
+        self._commit(self._plan(self.player, [entry]))
+        after = self._records()[0]
+        self.assertEqual((after["stage_index"], after["stage_progress"]), (1, 1))
+
+    @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    def test_surplus_kills_are_not_carried_into_the_next_stage(self):
+        accept(self.player, self.two_stage.key)
+        monsters = [self._monster(f"surplus-{index}") for index in range(3)]
+        self._commit(
+            self._plan(
+                self.player,
+                [self._defeat_entry(self.player, monster) for monster in monsters],
+            )
+        )
+        stored = self._records()[0]
+        self.assertEqual((stored["stage_index"], stored["stage_progress"]), (1, 0))
+        self.assertEqual(stored["counted_defeat_ids"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
