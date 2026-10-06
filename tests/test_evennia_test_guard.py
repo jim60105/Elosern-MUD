@@ -618,5 +618,47 @@ class DiscoveryFailureTests(_GuardHarnessTestCase):
         self.assertIn("Run Focus Test", nonzero["decision"]["reason"])
 
 
+class ClaudeHookAdapterTests(unittest.TestCase):
+    """The Claude Code PreToolUse adapter reuses the guard and fails closed."""
+
+    HOOK = REPO_ROOT / ".claude" / "hooks" / "evennia-test-guard.mjs"
+
+    def _run_hook(self, payload: str) -> subprocess.CompletedProcess:
+        node = _shutil_require_node()
+        return subprocess.run(
+            [node, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", str(self.HOOK)],
+            input=payload,
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+
+    @staticmethod
+    def _event(command: str, tool: str = "Bash") -> str:
+        return json.dumps(
+            {"tool_name": tool, "cwd": str(REPO_ROOT), "tool_input": {"command": command}}
+        )
+
+    def test_non_test_commands_and_other_tools_pass_silently(self):
+        for payload in (self._event("git status"), self._event("evennia test x", tool="Read")):
+            result = self._run_hook(payload)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+
+    def test_unsupported_wrapper_is_denied_with_json_reason(self):
+        result = self._run_hook(self._event("bash -lc 'evennia test'"))
+        self.assertEqual(result.returncode, 0)
+        decision = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("Run Focus Test", decision["permissionDecisionReason"])
+
+    def test_malformed_input_fails_closed_with_exit_2(self):
+        result = self._run_hook("not json")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("failed closed", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
