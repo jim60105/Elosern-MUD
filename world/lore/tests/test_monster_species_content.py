@@ -414,6 +414,9 @@ class BalanceSlotContentTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
     )
+    @covers_requirement(
+        "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals"
+    )
     def test_every_shipped_variant_carries_its_approved_literal_profile_and_grade(self):
         for key, approved in APPROVED_BALANCE.items():
             with self.subTest(variant=key):
@@ -432,6 +435,9 @@ class BalanceSlotContentTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
     )
+    @covers_requirement(
+        "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals"
+    )
     def test_no_variant_outside_the_approved_batch_carries_a_profile_or_grade(self):
         unapproved = set(MONSTER_VARIANT_REGISTRY) - set(APPROVED_BALANCE)
         for key in sorted(unapproved):
@@ -442,6 +448,9 @@ class BalanceSlotContentTests(unittest.TestCase):
 
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+    )
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
     )
     def test_every_shipped_profile_and_grade_lies_inside_its_declared_tier_band(self):
         # An independent reading of the shipped facts: this does not call the

@@ -9,6 +9,8 @@ this module can exercise every rejection without reading shipped lore data.
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.monster_species import (
     MonsterCombatProfile,
     MonsterSpecies,
@@ -122,12 +124,18 @@ def _tier(agility_band: tuple[int, int] | None = None) -> MonsterTier:
 class TierBandFaceProjectionTests(unittest.TestCase):
     """Requirement: the band face carries the tier's declared bands."""
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_symmetric_tier_projects_its_bands(self):
         face = _default_tier_band_face({TIER: _tier()})
         self.assertEqual(
             face[TIER], (HP_BAND, PHYSICAL_BAND, MAGIC_BAND, RANK_RANGE)
         )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_tier_with_asymmetric_physical_bands_is_rejected(self):
         skewed = (PHYSICAL_BAND[0] + 4, PHYSICAL_BAND[1] + 4)
         with self.assertRaises(MonsterSpeciesRegistryError) as caught:
@@ -150,9 +158,15 @@ class TierBandInvariantTests(unittest.TestCase):
             self._validate(variant, **face_overrides)
         return str(caught.exception)
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_an_in_band_profile_and_grade_are_accepted(self):
         self._validate(_variant())
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_value_exactly_on_a_band_edge_is_inside_the_band(self):
         self._validate(
             _variant(
@@ -167,12 +181,21 @@ class TierBandInvariantTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_hp_above_the_tier_band_is_rejected(self):
         self._rejection(_variant(combat_profile=_profile(hp=HP_BAND[1] + 1)))
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_hp_below_the_tier_band_is_rejected(self):
         self._rejection(_variant(combat_profile=_profile(hp=HP_BAND[0] - 1)))
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_each_physical_axis_outside_the_tier_band_is_rejected(self):
         for axis in ("atk_phys", "agility", "defense"):
             for value in (PHYSICAL_BAND[0] - 1, PHYSICAL_BAND[1] + 1):
@@ -181,6 +204,9 @@ class TierBandInvariantTests(unittest.TestCase):
                         _variant(combat_profile=_profile(**{axis: value}))
                     )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_nonzero_magic_power_is_rejected_against_a_zero_band(self):
         for value in (1, MAGIC_BAND[1] + 5):
             with self.subTest(value=value):
@@ -188,13 +214,22 @@ class TierBandInvariantTests(unittest.TestCase):
                     _variant(combat_profile=_profile(magic_power=value))
                 )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_grade_outside_the_tier_rank_range_is_rejected(self):
         self._rejection(_variant(danger_grade=RANK_ABOVE))
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_variant_whose_tier_carries_no_band_row_is_rejected(self):
         message = self._rejection(_variant(threat_tier=UNBANDED_TIER))
         self.assertIn(UNBANDED_TIER, message)
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_a_rank_range_naming_an_unknown_rank_is_rejected(self):
         self._rejection(
             _variant(),
@@ -203,6 +238,9 @@ class TierBandInvariantTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_the_rejection_names_the_variant_the_axis_the_value_and_the_band(self):
         value = HP_BAND[1] + 1
         message = self._rejection(
@@ -213,6 +251,9 @@ class TierBandInvariantTests(unittest.TestCase):
         self.assertIn(str(value), message)
         self.assertIn(str(HP_BAND), message)
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_the_pools_carry_no_band(self):
         # MP and SP have no tier band by design, so any authored pool validates
         # here; their approved zeros are pinned by the shipped-content contract.
@@ -220,6 +261,9 @@ class TierBandInvariantTests(unittest.TestCase):
             _variant(combat_profile=_profile(mp=999, sp=999))
         )
 
+    @covers_requirement(
+        "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
+    )
     def test_an_unbanded_tier_is_rejected_even_without_a_rating(self):
         # Face completeness is unconditional: the band face must carry every
         # declared tier, so a rating can never arrive with nowhere to go.
