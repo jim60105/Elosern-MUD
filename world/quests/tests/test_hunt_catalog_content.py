@@ -15,8 +15,11 @@ numbers for their own sake:
   (each inside the rendered-detail budget) and a reward inside its rank's copper
   band, registered as an ordinary commission of a registered guild branch;
 - prose asserts no effect of the six approved special abilities, none of which
-  has executable mechanics;
-- an individual danger grade never becomes a hunt's rank.
+  has executable mechanics (a blocklist of their approved names, plus the
+  byte-verbatim transcription from the change's approved content table);
+- a hunt's authored rank is never below the danger grade its strongest
+  countable variant carries, except for the approved divergences the table
+  pins: a grade never supplies a rank.
 
 This is content, not mechanism: the runtime already refuses an illegal hunt at
 acceptance with its named reason, and that guarantee keeps its single owner.
@@ -50,6 +53,12 @@ BESTIARY = REPO_ROOT / "docs" / "lore" / "bestiary.md"
 #: prerequisites — so no published hunt may assert one. A rationale describes the
 #: arrangement, numbers, and terrain instead; where a bestiary sentence describes
 #: an effect symptom, the published prose states the local conflict.
+#:
+#: The guard below is a blocklist of these six exact approved names, not a
+#: semantic no-ability-claim check: a paraphrase of an ability effect that names
+#: none of them passes it. The bestiary's own 能力邊界 sections are the
+#: prose-review anchor for a paraphrase, and the shipped prose is additionally
+#: transcribed verbatim from the change's approved content table.
 APPROVED_ABILITY_CLAIMS = (
     "氣流震穀",
     "追隨燈光的發光斑紋",
@@ -92,6 +101,13 @@ def _regional_hunts() -> dict[str, QuestDefinition]:
     objective declares the regional selector. The selector families are mutually
     exclusive, so a bound clear-out — which declares ``requires_bound_targets``
     instead — can never be read as a regional hunt.
+
+    No cardinality is pinned here by design: a later change appends bound
+    clear-outs to the same catalog, which this filter excludes, so the seven-key
+    offer expectation in
+    ``world/rules/tests/test_guild_config/test_catalog_loading.py`` is what keeps
+    this set from silently shrinking, and the per-region coverage assertions
+    below keep it from silently growing.
     """
     hunts: dict[str, QuestDefinition] = {}
     for definition in QUEST_CATALOG:
@@ -286,16 +302,27 @@ class HuntAuthoredContentTests(_ShippedCatalogTestCase):
             if next_rank_key is None:
                 continue
             with self.subTest(hunt=key):
-                band_span = thresholds[next_rank_key] - thresholds.get(
-                    definition.rank, 0
+                # F is the entry rank and legitimately carries no threshold row
+                # (the rulebook requires E-through-S); every other rank must
+                # have one, so a vanished row is a loud KeyError instead of a
+                # silently widened band.
+                own_floor = (
+                    0 if definition.rank == "F" else thresholds[definition.rank]
                 )
+                band_span = thresholds[next_rank_key] - own_floor
                 offer = catalog.offer_by_definition[key]
                 self.assertGreater(offer.reward.merit, 0)
                 self.assertLess(offer.reward.merit, band_span)
 
 
 class HuntRankIndependenceTests(_ShippedCatalogTestCase):
-    def test_a_danger_grade_never_becomes_a_hunts_rank(self):
+    def test_hunt_rank_is_never_below_its_strongest_countable_grade(self):
+        # The authored rank is not derived from a danger grade, so a hunt whose
+        # strongest countable variant is graded above it has to be one of the
+        # approved divergences instead of a newly copied rank. Equality with the
+        # strongest grade is lawful and shipped twice (both E hunts carry an
+        # E-graded stronger partner), so this pins the above-grade cases rather
+        # than forbidding every coincidence.
         divergences = {}
         for key, definition in _regional_hunts().items():
             strongest = _strongest_countable_grade(definition)
