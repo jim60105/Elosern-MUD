@@ -154,6 +154,66 @@ pnpm run showcase-coverage
 - `pnpm run showcase-coverage` → the component-coverage check against the frozen
   required-set manifest.
 
+### Webclient design direction
+
+The webclient is being redesigned as an AVG (visual-novel) + RPG hybrid in which
+artwork is a primary subject, not a MUD text column. Frame UI proposals and
+changes accordingly, and ship them as OpenSpec changes (no standalone HTML
+prototypes; the real app differs too much for a prototype to be useful).
+
+- Target desktop 16:9 only.
+- Layout: full-bleed stage on top; bottom band = message window (2/3 width) plus
+  command panel (1/3, bottom-right). Keep the image area large; do not put a
+  narrative column and minimap side by side eating ~60% of the width.
+- The player's own generated portrait stands on stage at all times; NPCs and
+  enemies stand opposite in dialogue and combat.
+- Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
+  condition; always shown in combat.
+- Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen
+  immediately (the server has `greeting_for()` in `world/rules/dialogue.py` for a
+  no-keyword opener).
+- The command line is hidden by default and expands via `/` or an icon.
+- The message window uses AVG click-to-advance paging with a typewriter effect,
+  paged per action response and never breaking mid-sentence; the player may act
+  while pages remain (leftover pages flush to the log).
+- A motion layer covers scene/mode transitions, typewriter, and beat-by-beat combat
+  choreography; structured combat beats in the server protocol are accepted.
+- Minimap has no legend and a thin frame, the full map fits the view, the full log
+  opens scrolled to the bottom, the dock has a fixed height, and redundant head
+  cards, 美術展示, and quick-word chips are removed.
+
+`web/webclient-app/styles/app-shell.css` contains `.elosern-root …` rules that
+duplicate or override component `<style>` blocks, and Storybook does not render
+under `.elosern-root`. When restyling a component, grep app-shell.css for its
+class names and remove or update the `.elosern-root` duplicates, and verify
+geometry with a live-client browser test, not only Storybook.
+
+## NPC and dialogue content
+
+- NPC authored dialogue, voice lines, and persona cards are strictly in-character
+  (no OOC). An NPC knows only its own world: it never names a command (`rest`,
+  `buy`, `shop stock`, `前往`, `guild list` ...), never explains game operations
+  (熟練度, 整點結算, 指令), and never mentions UI. It describes the world-side
+  equivalent instead (「樓上有床」「看看架上有什麼」「去公會大廳的看板找委託」).
+- Setting is JRPG 劍與魔法奇幻, never 中式武俠 vocabulary (avoid 過招, 劍招, 招式,
+  祕技, 拜師, 功夫). Elves have no fixed trades, schooling, or inherited posts.
+- Register: casual settings (shops, taverns, inns, baths, homes) use natural spoken
+  colloquial zh-TW (particles 喔/啦/吧/嘛, short clauses), never essay-like prose;
+  only formal settings (on-duty officials, ceremonies, nobility) use formal phrasing.
+- Apply the `chinese-content-writing-guideline` bans (banned phrases, contrastive
+  不是…而是, em-dash, physical verbs on abstract objects). Also: no sentence-final
+  的, no mid-sentence colon, no reduplication, no 您/不舒服; mechanic paraphrases
+  (歇下來, 越久越熟, 不適 for a negative status) count as OOC.
+- A merchant only buys back goods its own assortment offers.
+- Existing specs or tests that require dialogue to "name the commands" must be
+  MODIFIED in the change's delta spec, with the tests switched to a "no backticked
+  token / no OOC" assertion.
+- Content slices are authored directly by the lead agent, not delegated to
+  subagents, to keep one unified style.
+- When content slices branch from master independently, shared test edits must be
+  byte-identical hunks so they merge cleanly. Host-less test fixtures that
+  `replace()` a shipped row must also set `host_profile_key=None`.
+
 ## Python-vs-pnpm split
 
 - **Python gates (uv-managed):** the non-browser Evennia suite, top-level
@@ -203,6 +263,20 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   gates. The full managed browser suite, `tools.spec_traceability verify
   --evidence`, and the aggregate Python branch-coverage gate are CI-owned.
 - A browser test file that exceeds five minutes in CI must be split.
+- Browser tests: pick the specific affected `def test_` methods (or one class or
+  file) and run each batch as its own short command, e.g.
+  `uv run --locked python -m web.tests.browser.unittest_driver <mod>.<Class>.<test> ...`
+  with output captured to a scratch file. Never loop over many whole
+  `web/tests/browser/*` files in one command.
+- Every new browser test class or method under `web/tests/browser/` MUST be added
+  to `.github/browser-shards.json` in the same feature commit.
+  `tests.test_evennia_test_optimization_contract`
+  (`test_browser_method_labels_preserve_exact_ownership`) enforces exact
+  ownership; the workflow's inline validator checks structure only, so registration
+  is not optional. Before archive, run `tests.test_evennia_test_optimization_contract`
+  and `tests.test_webclient_frozen_contract` even when other tests are skipped. If a
+  blocker (such as foreign uncommitted edits to the manifest) forced a deferral,
+  re-check it right before merge.
 - Save CPU time: capture a long command's output to a temp file once, then inspect that file with whichever read or search tool is available — the `read` tool, `grep` (`rg`), or `bash` (`head`/`tail`/`sed`/`awk`). Do not re-run the test just to recapture its output.
 
 See `docs/development/evennia-test-performance.md` and
@@ -247,6 +321,10 @@ ad-hoc artifact workflow.
   mark a checkbox complete only after that task is actually verified.
 - Before handoff, compare the implementation with all change artifacts and run
   `openspec validate <change> --strict` plus the relevant uv-managed tests.
+- When spawning an apply worker, state the exact branch `feat/<change-slug>` and
+  worktree `.worktrees/<change-slug>` in its assignment; otherwise `os-phase`
+  cannot see the change (it shows it as `proposed` plus an orphan
+  `archived-unmerged` branch and blocks the pre-archive gate).
 - Archive only completed, verified changes. Always sync delta specs into
   `openspec/specs/` as part of the archive workflow, preserve the dated archive
   under `openspec/changes/archive/`, and finish with
