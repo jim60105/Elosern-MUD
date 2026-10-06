@@ -119,7 +119,10 @@ NPC_PROFILE_PROVENANCE_ATTRIBUTE = "npc_profile_key"
 # the sibling change that owns and writes it). This module reads it as a stored
 # attribute name only — it may not import ``typeclasses`` — so the reference
 # chain stays a leaf, and one named constant keeps the name in a single place
-# beside the other two read names.
+# beside the other two read names. The unset value must stay ``None``: this
+# arm treats ``None`` as "no stored identity" (silent) and any other value as a
+# declared key, so a falsy non-``None`` default (an empty string) would make
+# every tier-only monster emit one bounded diagnostic per process.
 SPECIES_PROVENANCE_ATTRIBUTE = "species_key"
 
 # The one bounded diagnostic id for a declared-but-unresolvable reference.

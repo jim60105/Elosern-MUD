@@ -438,10 +438,15 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         with patch.object(official_refs, "log_warn") as warned:
             backed_payload = resolve_subject(self._subject(), entity=backed)
             plain_payload = resolve_subject(self._subject(), entity=plain)
+        # Byte-identity of the presented row: the canonical serialization is
+        # equal, and the branch fields are equal explicitly rather than by
+        # implication.
         self.assertEqual(
             json.dumps(backed_payload, sort_keys=True),
             json.dumps(plain_payload, sort_keys=True),
         )
+        self.assertEqual(backed_payload["origin"], plain_payload["origin"])
+        self.assertEqual(backed_payload["fallback"], plain_payload["fallback"])
         self.assertNotEqual(backed_payload["origin"], ORIGIN_OFFICIAL)
         self.assertIsNone(backed_payload["url"])
         # The reference itself resolved; only the snapshot lacks its content,
@@ -495,7 +500,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertNotIn(tier_identity, json.dumps(payload, sort_keys=True))
 
     # -- shared reference, personal layer beside it -----------------------
-    def test_two_variants_of_one_species_share_the_image_and_keep_their_own_choices(self):
+    def test_two_variants_of_one_species_share_the_image_beside_one_personal_layer(self):
         identity = self._index(
             _SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
         )
@@ -519,14 +524,18 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
         self.assertEqual(first_payload["url"], current_catalog().url_for(identity))
 
-        # The personal layer sits beside the shared reference: this subject's
-        # own geometry override governs its payload while the mounted source
-        # is never written.
+        # The personal layer sits beside the shared reference, keyed by the
+        # runtime SUBJECT (for a monster, its tier — the layer this change does
+        # not touch), so the override written for this subject governs both
+        # same-species individuals' payloads while the mounted source is never
+        # written.
         override = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25}
         set_official_geometry(self._subject(), identity, face_rect=override)
         overridden = resolve_subject(self._subject(), entity=first)
+        sibling = resolve_subject(self._subject(), entity=second)
         self.assertEqual(overridden["face_rect"], override)
         self.assertEqual(overridden["url"], first_payload["url"])
+        self.assertEqual(sibling["face_rect"], override)
         self.assertEqual(self._tree(self.official_root), before)
 
     def test_a_stored_selection_outside_the_species_reference_is_ignored(self):
