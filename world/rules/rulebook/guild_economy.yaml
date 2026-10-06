@@ -17,6 +17,10 @@ merit_thresholds:
   S: 5000
 
 # Hand-written quest rewards, joined to quest definitions by definition_key.
+# The six regional species hunts below are the approved published commissions of
+# `monster-regional-species-hunts`; their copper sits inside the rank's own band
+# (F 10-100, E 100-500, D 500-5000) and their merit is authored per rank, inside
+# the span to the next rank's examination threshold.
 quest_rewards:
   - definition_key: introductory_hunt
     reward:
@@ -25,6 +29,36 @@ quest_rewards:
         - item_key: healing_potion
           quantity: 2
       merit: 25
+  - definition_key: eastern_plains_sway_whistle_sparrow
+    reward:
+      copper: 40
+      items: []
+      merit: 20
+  - definition_key: eastern_plains_ridge_burrow_hare
+    reward:
+      copper: 50
+      items: []
+      merit: 25
+  - definition_key: northwest_highland_forest_fog_mane_lynx
+    reward:
+      copper: 900
+      items: []
+      merit: 110
+  - definition_key: southwest_coast_tide_lamp_crab
+    reward:
+      copper: 150
+      items: []
+      merit: 45
+  - definition_key: western_hills_valleys_ridge_burrow_hare
+    reward:
+      copper: 180
+      items: []
+      merit: 50
+  - definition_key: western_hills_valleys_rock_echo_goat
+    reward:
+      copper: 1100
+      items: []
+      merit: 120
 
 # Guild examination opponent profiles, keyed by the target rank. Physical stats
 # must lie inside the required StaticTier band and every skill key must exist.
