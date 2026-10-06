@@ -423,11 +423,14 @@ class SiteClearOutAcceptanceTests(
         with patch(
             "world.quests.binding.apply_quest_log_replacement",
             side_effect=_fail_after_the_record_write,
-        ):
+        ), patch("world.quests.runtime.log_info") as info:
             with self.assertRaises(RuntimeError):
                 accept(self.char1, self.nest_key)
 
         self.assertEqual(observed["records"], [f"{self.nest_key}:1"])
+        # A rolled-back acceptance leaves no boundary line for a bound set that
+        # never committed.
+        info.assert_not_called()
         self.assertEqual(self._storage(), records_before)
         self.assertEqual(self._occupancy(), occupancy_before)
         self.assertEqual(self._monster_pks(), monsters_before)
@@ -470,6 +473,80 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(set(second.objective_target_ids), newcomers)
 
     # -- the shared predicate ----------------------------------------------
+
+    @covers_requirement(
+        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+    )
+    def test_the_binding_and_the_refusal_are_boundary_observable(self):
+        prose = r"[\u4e00-\u9fff]"
+        self._settle()
+
+        with (
+            patch("world.quests.runtime.log_info") as info,
+            patch("world.quests.runtime.log_warn") as warn,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            accept(self.char1, self.nest_key)
+
+        bound = [
+            call.args[0]
+            for call in info.call_args_list
+            if call.args and call.args[0] == "hunt_site_targets_bound"
+        ]
+        self.assertEqual(bound, ["hunt_site_targets_bound"])
+        context = [
+            call.kwargs["context"]
+            for call in info.call_args_list
+            if call.args and call.args[0] == "hunt_site_targets_bound"
+        ][0]
+        self.assertEqual(
+            set(context),
+            {"site", "region", "species", "variant", "required", "available"},
+        )
+        self.assertEqual(context["site"], NEST)
+        self.assertEqual(context["region"], self.region)
+        self.assertEqual(context["species"], (SPECIES,))
+        self.assertEqual(context["variant"], self.sites[NEST].variant_keys)
+        self.assertEqual(context["required"], 2)
+        self.assertEqual(context["available"], 2)
+        warn.assert_not_called()
+
+        # A second site, so the refusal is not masked by the active record the
+        # successful acceptance above just created.
+        self._clear(CAMP)
+        with (
+            patch("world.quests.runtime.log_info") as refuse_info,
+            patch("world.quests.runtime.log_warn") as refuse_warn,
+        ):
+            with self.assertRaises(QuestTargetsUnavailable):
+                accept(self.char1, self.camp_key)
+
+        # The refusal is recorded immediately: the acceptance's own rollback
+        # would discard an on-commit callback, and no state changed on it.
+        (call,) = refuse_warn.call_args_list
+        self.assertEqual(call.args[0], "hunt_site_targets_unavailable")
+        refused = call.kwargs["context"]
+        self.assertEqual(
+            set(refused),
+            {
+                "site",
+                "region",
+                "species",
+                "variant",
+                "required",
+                "available",
+                "reason",
+            },
+        )
+        self.assertEqual(refused["site"], CAMP)
+        self.assertEqual(refused["region"], self.region)
+        self.assertEqual(refused["required"], 2)
+        self.assertEqual(refused["available"], 0)
+        self.assertEqual(refused["reason"], SITE_READ_CLEARED)
+        refuse_info.assert_not_called()
+        for value in refused.values():
+            for text in value if isinstance(value, tuple) else (value,):
+                self.assertNotRegex(str(text), prose)
 
     @covers_requirement(
         "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
