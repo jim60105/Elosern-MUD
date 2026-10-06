@@ -21,6 +21,13 @@ content reference resolves nothing in the catalog SHALL present `official_entrie
 Python and JavaScript mirrored validators SHALL enforce the exact row shape, bounds, and URL
 vocabulary, rejecting payloads accepted on only one side.
 
+`official_entries` SHALL hold at most 32 rows. Each row's `identity` SHALL be at most 192 code
+points and its `url` SHALL stay inside a per-row budget of 256 code points — pinned equal to
+`world/art/presenter.py::MAX_PORTRAIT_MEDIA_URL` — because a fingerprinted official URL embeds an
+operator-chosen filename; a catalog image whose identity or URL exceeds that budget SHALL be
+omitted from the list with one bounded diagnostic instead of failing the whole panel, exactly as
+the portrait payload's official branch falls through over budget.
+
 #### Scenario: An empty gallery is available, not unavailable
 
 - **WHEN** a puppet whose character has no gallery record and no pending job receives a full snapshot

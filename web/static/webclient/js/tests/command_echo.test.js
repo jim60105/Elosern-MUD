@@ -708,6 +708,10 @@ const REGISTERED_MUTATION_ACTIONS = {
   "gallery.face_rect.update": null,
   "gallery.binding.save": null,
   "gallery.stage.update": null,
+  "gallery.official.select": null,
+  "gallery.official.clear_selection": null,
+  "gallery.official.geometry.set": null,
+  "gallery.official.geometry.clear": null,
   // Personal correspondence (use-letters.js): the folio dispatches the same
   // typed 信件 commands the text client types, with no descriptor fill.
   "letters.list": { payload: { after: 0 }, display: {} },

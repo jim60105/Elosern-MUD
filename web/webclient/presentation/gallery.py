@@ -12,7 +12,7 @@ from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_match import validated_card_identity
 from world.art.gallery_prompt import GALLERY_PROMPT_FIELDS
-from world.art.presenter import media_url_for
+from world.art.presenter import MAX_PORTRAIT_MEDIA_URL, media_url_for
 from world.art.queue import MAX_PENDING_GALLERY_JOBS, pending_gallery_jobs
 from world.art.subjects import (
     ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
@@ -38,6 +38,16 @@ GALLERY_MAX_CHIP = 16
 GALLERY_MAX_URL = 129
 GALLERY_MAX_WARNINGS = 5
 GALLERY_MAX_CONDITION = 512
+# The official-entry read model's bounds (change
+# ``official-art-personalization``): a bounded list of the selected subject's
+# catalog-admitted images, each row's identity inside the writers' own closed
+# identity grammar and each URL inside the shared portrait wire ceiling,
+# because a fingerprinted official URL embeds an operator-chosen filename.
+GALLERY_MAX_OFFICIAL_ENTRIES = 32
+GALLERY_MAX_OFFICIAL_IDENTITY = gallery_api.OFFICIAL_IDENTITY_MAX
+GALLERY_MAX_OFFICIAL_URL = MAX_PORTRAIT_MEDIA_URL
+OFFICIAL_URL_PREFIX = "/art/official/"
+OFFICIAL_ROW_FIELDS = ("identity", "url", "face_rect", "is_current", "is_catalog_default")
 SLOT_LABELS = {"weapon_main": "主手", "weapon_off": "副手", "armor": "防具", "accessories": "飾品"}
 SLOTS = gallery_api.SLOT_ORDER
 FIELDS = GALLERY_PROMPT_FIELDS
@@ -48,7 +58,8 @@ CARD_FIELDS = {
 }
 PANEL_FIELDS = {
     "schema_version", "available", "kind", "subjects", "selected", "filters", "cards",
-    "equipment_summary", "capabilities", "binding_warnings", "error_state",
+    "official_entries", "equipment_summary", "capabilities", "binding_warnings",
+    "error_state",
 }
 
 
@@ -125,6 +136,54 @@ def _validate_equipment(summary):
                 raise ProtocolValidationError("invalid accessory ordering/count")
 
 
+def _validate_official_url(url):
+    """The fingerprinted official media URL vocabulary, exactly."""
+    if not url.startswith(OFFICIAL_URL_PREFIX):
+        raise ProtocolValidationError("official url must name the official media route")
+    fingerprint, separator, tail = url[len(OFFICIAL_URL_PREFIX):].partition("/")
+    if (
+        not separator
+        or len(fingerprint) != 64
+        or any(character not in "0123456789abcdef" for character in fingerprint)
+    ):
+        raise ProtocolValidationError("official url must carry a sha256 fingerprint")
+    # Percent-encoded identities are ASCII printable with no space; anything
+    # else could not have been produced by the catalog's own URL builder.
+    if not tail or any(not 0x21 <= ord(character) <= 0x7E for character in tail):
+        raise ProtocolValidationError("official url must carry an identity path")
+
+
+def _validate_official_entries(entries):
+    """Exactly the official-row list: shape, bounds, vocabulary, uniqueness."""
+    if not isinstance(entries, list) or len(entries) > GALLERY_MAX_OFFICIAL_ENTRIES:
+        raise ProtocolValidationError("invalid official entries")
+    identities = set()
+    currents = 0
+    catalog_defaults = 0
+    for row in entries:
+        _exact(row, OFFICIAL_ROW_FIELDS, "official row")
+        identity = _text(row["identity"], GALLERY_MAX_OFFICIAL_IDENTITY, "official identity")
+        try:
+            gallery_api.validate_official_identity(identity)
+        except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire identity rejection is returned to the caller
+            raise ProtocolValidationError("invalid official identity") from exc
+        if identity in identities:
+            raise ProtocolValidationError("duplicate official identity")
+        identities.add(identity)
+        _validate_official_url(_text(row["url"], GALLERY_MAX_OFFICIAL_URL, "official url"))
+        try:
+            gallery_api.validate_face_rect(row["face_rect"])
+        except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire rectangle rejection is returned to the caller
+            raise ProtocolValidationError("invalid official face_rect") from exc
+        for flag in ("is_current", "is_catalog_default"):
+            if type(row[flag]) is not bool:
+                raise ProtocolValidationError("official row flags must be booleans")
+        currents += row["is_current"]
+        catalog_defaults += row["is_catalog_default"]
+    if currents > 1 or catalog_defaults > 1:
+        raise ProtocolValidationError("at most one current/catalog-default official row")
+
+
 def validate_gallery(payload):
     """Validate exactly the available form; unavailable forms belong to the registry."""
     _exact(payload, PANEL_FIELDS, "gallery")
@@ -157,6 +216,7 @@ def validate_gallery(payload):
         _validate_equipment(payload["equipment_summary"])
     elif payload["equipment_summary"] is not None:
         raise ProtocolValidationError("unsupported equipment summary")
+    _validate_official_entries(payload["official_entries"])
     cards = payload["cards"]
     if not isinstance(cards, list) or len(cards) > MAX_LIST_ITEMS:
         raise ProtocolValidationError("invalid cards")
@@ -323,6 +383,62 @@ def _synthetic(image_id, timestamp, status, label):
     }
 
 
+def _official_entries(subject, entity) -> list[dict]:
+    """The selected subject's catalog-admitted official images, as wire rows.
+
+    Read-only and bounded. The subject's OFFICIAL CONTENT REFERENCE — never a
+    display name or a threat tier — names one catalog content directory, and
+    its admitted images become rows in the catalog's deterministic filename
+    order. ``is_current`` marks the subject's retained personal selection and
+    ``is_catalog_default`` the content's default image; the rectangle is the
+    catalog's own validated metadata-or-fitted value. An identity or URL
+    outside the shared wire budget is omitted with one bounded diagnostic
+    instead of failing the panel, exactly as the portrait payload's official
+    branch falls through over budget. An entity declaring no reference, or a
+    reference the snapshot does not hold, yields an empty list.
+    """
+    from world.art.official import current_catalog
+    from world.art.official_refs import official_content_reference_for_entity
+
+    if entity is None:
+        return []
+    reference = official_content_reference_for_entity(entity)
+    if reference is None:
+        return []
+    catalog = current_catalog()
+    content = catalog.content(reference.kind, reference.key)
+    if content is None:
+        return []
+    selection = gallery_api.official_preferences_for(subject).selection
+    entries: list[dict] = []
+    for identity in content.images:
+        if len(entries) >= GALLERY_MAX_OFFICIAL_ENTRIES:
+            break
+        image = catalog.entry(identity)
+        url = catalog.url_for(identity)
+        if image is None or url is None:
+            continue
+        if (
+            len(identity) > GALLERY_MAX_OFFICIAL_IDENTITY
+            or len(url) > GALLERY_MAX_OFFICIAL_URL
+        ):
+            log_warn(
+                "gallery_official_entry_skipped",
+                context={"subject": subject.full(), "identity": identity},
+            )
+            continue
+        entries.append(
+            {
+                "identity": identity,
+                "url": url,
+                "face_rect": dict(image.face_rect),
+                "is_current": identity == selection,
+                "is_catalog_default": identity == content.default_identity,
+            }
+        )
+    return entries
+
+
 def gallery_presenter(context: PresentationContext):
     """Project one selected gallery. Reads never create or consolidate records."""
     from .coordinator import PresentationCoordinator
@@ -381,6 +497,7 @@ def gallery_presenter(context: PresentationContext):
         "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
         "subjects": [entry[0] for entry in rail], "selected": subject.full(),
         "filters": _filters(rows), "cards": rows,
+        "official_entries": _official_entries(subject, entity),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
         "capabilities": {field: getattr(capability, field) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,

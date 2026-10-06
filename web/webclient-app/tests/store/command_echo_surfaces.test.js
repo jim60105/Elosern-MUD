@@ -842,6 +842,13 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
     ["gallery.face_rect.update", { ...galleryCard, face_rect: { x: 0, y: 0, w: 1, h: 1 } }],
     ["gallery.binding.save", { ...galleryCard, slots: ["armor"] }],
     ["gallery.stage.update", { ...galleryCard, stage: { scale: 1, x: 0, y: 0 } }],
+    ["gallery.official.select", { subject_key: gallerySubject, identity: "preset/t_synth/a.png" }],
+    ["gallery.official.clear_selection", { subject_key: gallerySubject }],
+    [
+      "gallery.official.geometry.set",
+      { subject_key: gallerySubject, identity: "preset/t_synth/a.png", stage: { scale: 1, x: 0, y: 0 } },
+    ],
+    ["gallery.official.geometry.clear", { subject_key: gallerySubject, identity: "preset/t_synth/a.png" }],
   ]) {
     SURFACES.push({
       id: `EXPECTED SILENCE: ${actionId} webclient-only management`,

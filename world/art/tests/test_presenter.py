@@ -27,6 +27,10 @@ from world.art.gallery import (
     cards_for,
     default_face_rect,
     identity_stage,
+    official_preferences_for,
+    record_for,
+    set_official_geometry,
+    set_official_selection,
 )
 from world.art.official import (
     OfficialCatalog,
@@ -538,14 +542,16 @@ class StagePayloadTests(_CardPayloadCase):
         # A card stored without the key reads as identity.
         card = dict(cards_for(subject)[0])
         card.pop("stage")
-        with patch("world.art.presenter.resolve_card", return_value=card):
+        with patch("world.art.presenter.resolve_display", return_value=("card", card)):
             payload = resolve_character(self.player)
         self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
         # A malformed stored triple degrades to identity with one diagnostic,
         # and the asset itself still resolves.
         broken = dict(cards_for(subject)[0])
         broken["stage"] = {"scale": 3.5, "x": 0, "y": 0}
-        with patch("world.art.presenter.resolve_card", return_value=broken), patch(
+        with patch(
+            "world.art.presenter.resolve_display", return_value=("card", broken)
+        ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
             payload = resolve_character(self.player)
@@ -576,7 +582,9 @@ class FaceRectPayloadTests(_CardPayloadCase):
         subject, image_id, identity = self._append_card_with_file()
         card = dict(cards_for(subject)[0])
         card["face_rect"] = {"x": 0.5, "y": 0.0, "w": 0.9, "h": 0.9}
-        with patch("world.art.presenter.resolve_card", return_value=card), patch(
+        with patch(
+            "world.art.presenter.resolve_display", return_value=("card", card)
+        ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
             payload = resolve_character(self.player)
@@ -1260,6 +1268,413 @@ class OfficialPayloadTests(EvenniaTestCase):
             after = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
         self.assertTrue(all(payload == payloads[0] for payload in payloads))
         self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(before, after)
+
+
+class PersonalOfficialPayloadTests(EvenniaTestCase):
+    """The personal official-selection payload branch (tasks 2.1-2.3).
+
+    Every case resolves a preset-born character whose stored provenance names
+    a registered content reference, so the selection's own branch is the one
+    under test; the selection and its geometry overrides are written through
+    the public gallery preference API, and the catalog snapshot is loaded from
+    a synthetic tree — which is how acceptance criterion 4 (two characters
+    sharing official bytes, independent choices) becomes observable.
+    """
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.store = Path(self.tempdir.name) / "store"
+        self.store.mkdir()
+        self.official_root = Path(self.tempdir.name).resolve() / "official"
+        self.settings = override_settings(
+            ART_STORE_ROOT=str(self.store),
+            ART_OFFICIAL_ROOT=str(self.official_root),
+        )
+        self.settings.enable()
+        self.addCleanup(self.settings.disable)
+        reset_catalog()
+        self.addCleanup(reset_catalog)
+        for patcher in (
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            ),
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    # -- harness ----------------------------------------------------------
+    def _write_image(self, name, width=4, height=4, **manifest) -> None:
+        folder = self.official_root / "preset" / _PRESET_KEY
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(_png(width, height))
+        manifest_path = folder / "manifest.json"
+        if manifest:
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        elif manifest_path.exists():
+            manifest_path.unlink()
+
+    def _index(self, name="hero.png", width=4, height=4, **manifest) -> str:
+        self._write_image(name, width, height, **manifest)
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def _character(self, stable_key="official-hero", *, equipment=None):
+        entity = create_object(PlayerCharacter, key=f"official-{stable_key}")
+        entity.age = entity.apparent_age = 30
+        entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        entity.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, _PRESET_KEY)
+        if equipment is not None:
+            entity.db.equipment = equipment
+        return entity
+
+    def _subject(self, stable_key="official-hero") -> ArtSubject:
+        return ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
+
+    def _card(self, subject, **overrides):
+        fields = {
+            "image_id": str(uuid.uuid4()),
+            "stored_identity": None,
+            "prompt": None,
+            "seed": None,
+            "checkpoint": None,
+            "requested_fields": [],
+            "binding": None,
+            "source": "seed",
+            "created_at": 100.0,
+            "image_size": {"width": 768, "height": 1024},
+        }
+        directory = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+        fields["stored_identity"] = (
+            f"gallery/{directory}/{subject.key}/{fields['image_id']}.png"
+        )
+        fields.update(overrides)
+        target = self.store / fields["stored_identity"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"runtime-image")
+        return append_card(subject, **fields)
+
+    def _classic_done_asset(self, subject) -> str:
+        """A classic ``done`` asset record with its file, for step 5."""
+        ensure(subject, "desc")
+        identity = f"portrait/character/{subject.key}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"classic-asset")
+        claimed = claim(10)
+        settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
+        )
+        return identity
+
+    # -- payload shape ----------------------------------------------------
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
+    @covers_requirement(
+        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
+    )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_a_selected_official_image_presents_ahead_of_the_default_card(self):
+        identity = self._index(
+            face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
+        )
+        entity = self._character()
+        subject = self._subject()
+        set_official_selection(subject, identity)
+        card = self._card(subject)
+        payload = resolve_character(entity)
+        self.assertEqual(payload["kind"], PAYLOAD_OFFICIAL)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["url"], current_catalog().url_for(identity))
+        self.assertEqual(payload["face_rect"], _OFFICIAL_RECT)
+        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
+        # An official image is never a generated/done portrait...
+        self.assertIsNone(payload["status"])
+        self.assertNotIn("已生成", str(payload))
+        # ...and the runtime card, its default, and its file are untouched.
+        record = record_for(subject)
+        self.assertEqual(record.db.default_image_id, card["image_id"])
+        self.assertEqual(
+            [row["image_id"] for row in cards_for(subject)], [card["image_id"]]
+        )
+        self.assertTrue((self.store / card["stored_identity"]).exists())
+
+    @covers_requirement(
+        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
+    )
+    def test_an_equipment_bound_card_outranks_the_selection(self):
+        identity = self._index()
+        entity = self._character(equipment={"armor": "t_coat"})
+        subject = self._subject()
+        bound = self._card(
+            subject,
+            binding={"mask": ["armor"], "snapshot": {"armor": "t_coat"}},
+        )
+        set_official_selection(subject, identity)
+        payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(payload["url"], f"/art/{bound['stored_identity']}")
+        self.assertEqual(official_preferences_for(subject).selection, identity)
+
+    @covers_requirement(
+        "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
+    )
+    @covers_requirement(
+        "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
+    )
+    def test_a_selection_resolves_ahead_of_the_classic_asset_and_falls_back_when_stale(self):
+        identity = self._index()
+        entity = self._character()
+        subject = self._subject()
+        classic = self._classic_done_asset(subject)
+        set_official_selection(subject, identity)
+        # Step 4 outranks step 5 while the selection resolves...
+        self.assertEqual(resolve_character(entity)["origin"], ORIGIN_OFFICIAL)
+        # ...and a maintenance update that removes the directory (no restart
+        # gap) falls through to the classic asset with the preference retained.
+        shutil.rmtree(self.official_root / "preset")
+        load_catalog()
+        payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(payload["url"], f"/art/{classic}")
+        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+        self.assertEqual(official_preferences_for(subject).selection, identity)
+
+    # -- personal geometry ------------------------------------------------
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
+    )
+    def test_a_personal_override_beats_the_catalog_geometry_and_never_writes(self):
+        identity = self._index(
+            face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
+        )
+        entity = self._character()
+        subject = self._subject()
+        rect = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5}
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        set_official_selection(subject, identity)
+        set_official_geometry(subject, identity, face_rect=dict(rect), stage=dict(stage))
+        source = self.official_root / "preset" / _PRESET_KEY / "hero.png"
+        before = source.read_bytes()
+        payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["face_rect"], rect)
+        self.assertEqual(payload["stage"], stage)
+        # The mounted source and the catalog's own facts are unchanged: an
+        # override is entity-local presentation state.
+        self.assertEqual(source.read_bytes(), before)
+        entry = current_catalog().entry(identity)
+        self.assertEqual(entry.face_rect, _OFFICIAL_RECT)
+        self.assertEqual(entry.stage, _OFFICIAL_STAGE)
+
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
+    )
+    def test_an_update_invalidated_override_degrades_with_one_diagnostic(self):
+        identity = self._index("hero.png", width=4, height=4)
+        entity = self._character()
+        subject = self._subject()
+        stored_rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        set_official_selection(subject, identity)
+        set_official_geometry(subject, identity, face_rect=dict(stored_rect))
+        self.assertEqual(resolve_character(entity)["face_rect"], stored_rect)
+        # The artwork update replaces the bytes at the same identity with a
+        # taller image, so the stored square is no longer square on it.
+        self._write_image("hero.png", width=4, height=8)
+        load_catalog()
+        with patch("world.art.presenter.log_warn") as warn:
+            payload = resolve_character(entity)
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(
+            payload["face_rect"], default_face_rect({"width": 4, "height": 8})
+        )
+        events = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "art_official_override_invalid"
+        ]
+        self.assertEqual(len(events), 1, events)
+        self.assertEqual(events[0].kwargs["context"]["component"], "face_rect")
+        self.assertEqual(events[0].kwargs["context"]["identity"], identity)
+        # The preference is retained exactly as stored.
+        self.assertEqual(
+            official_preferences_for(subject).geometry, {identity: {"face_rect": stored_rect}}
+        )
+
+    def test_a_malformed_stored_stage_override_is_dropped_by_the_tolerant_read(self):
+        identity = self._index(
+            face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
+        )
+        entity = self._character()
+        subject = self._subject()
+        set_official_selection(subject, identity)
+        # Simulate storage a pre-validation version could have written: every
+        # tolerant read drops the malformed component with exactly one bounded
+        # event (the chain's step-4 read and the payload's override read), so
+        # the payload carries the catalog's own stage and no render-time
+        # override diagnostic fires.
+        record_for(subject).db.official_geometry = {identity: {"stage": {"scale": 3.5}}}
+        single_read = official_preferences_for(subject)
+        with patch("world.art.gallery.log_warn") as read_warn, patch(
+            "world.art.presenter.log_warn"
+        ) as warn:
+            payload = resolve_character(entity)
+        self.assertEqual(single_read.geometry, {})
+        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
+        invalid = [
+            call
+            for call in read_warn.call_args_list
+            if call.args and call.args[0] == "gallery_preference_invalid"
+        ]
+        # One bounded diagnostic per tolerant read, never a storm.
+        self.assertEqual(len(invalid), 2, invalid)
+        self.assertTrue(
+            all(call.kwargs["context"]["field"] == "official_geometry" for call in invalid),
+            invalid,
+        )
+        self.assertEqual(
+            [
+                call
+                for call in warn.call_args_list
+                if call.args and call.args[0] == "art_official_override_invalid"
+            ],
+            [],
+        )
+        # The malformed entry is dropped, not rewritten or deleted wholesale.
+        self.assertEqual(
+            official_preferences_for(subject).geometry, {}
+        )
+        self.assertEqual(record_for(subject).db.official_geometry.keys(), {identity})
+
+    # -- acceptance criterion 4 -------------------------------------------
+    @covers_requirement(
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
+    )
+    @covers_requirement(
+        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
+    )
+    def test_two_characters_sharing_official_bytes_choose_independently(self):
+        # One content directory (one manifest) holding two admitted images, so
+        # both characters share the reference and its bytes.
+        self._write_image("a.png", stage=dict(_OFFICIAL_STAGE))
+        self._write_image("b.png", stage=dict(_OFFICIAL_STAGE))
+        load_catalog()
+        first_identity = f"preset/{_PRESET_KEY}/a.png"
+        second_identity = f"preset/{_PRESET_KEY}/b.png"
+        fitted = default_face_rect({"width": 4, "height": 4})
+        one = self._character("twin-one")
+        two = self._character("twin-two")
+        one_subject = self._subject("twin-one")
+        two_subject = self._subject("twin-two")
+        one_rect = {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5}
+        two_stage = {"scale": 0.5, "x": 0.2, "y": 0.0}
+        set_official_selection(one_subject, first_identity)
+        set_official_geometry(one_subject, first_identity, face_rect=dict(one_rect))
+        set_official_selection(two_subject, second_identity)
+        set_official_geometry(two_subject, second_identity, stage=dict(two_stage))
+        sources = {
+            path: path.read_bytes()
+            for path in (self.official_root / "preset" / _PRESET_KEY).iterdir()
+        }
+        one_payload = resolve_character(one)
+        two_payload = resolve_character(two)
+        self.assertEqual(one_payload["url"], current_catalog().url_for(first_identity))
+        self.assertEqual(two_payload["url"], current_catalog().url_for(second_identity))
+        self.assertEqual(one_payload["face_rect"], one_rect)
+        self.assertEqual(two_payload["face_rect"], fitted)
+        self.assertEqual(two_payload["stage"], two_stage)
+        self.assertEqual(one_payload["stage"], _OFFICIAL_STAGE)
+        self.assertNotEqual(one_payload["url"], two_payload["url"])
+        self.assertNotEqual(one_payload["face_rect"], two_payload["face_rect"])
+        self.assertNotEqual(one_payload["stage"], two_payload["stage"])
+        # Neither character's state, nor the shared mounted source, moved.
+        self.assertEqual(official_preferences_for(one_subject).selection, first_identity)
+        self.assertEqual(official_preferences_for(two_subject).selection, second_identity)
+        self.assertEqual(
+            official_preferences_for(two_subject).geometry,
+            {second_identity: {"stage": two_stage}},
+        )
+        self.assertEqual(
+            {path: path.read_bytes() for path in sources}, sources
+        )
+        self.assertEqual(len(cards_for(one_subject)), 0)
+        self.assertEqual(len(cards_for(two_subject)), 0)
+
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    def test_a_hundred_selection_presentations_write_nothing(self):
+        identity = self._index(face_rect=dict(_OFFICIAL_RECT))
+        entity = self._character()
+        subject = self._subject()
+        set_official_selection(subject, identity)
+        set_official_geometry(
+            subject, identity, face_rect={"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5}
+        )
+        tripwires = (
+            patch.object(
+                socket, "create_connection", side_effect=AssertionError("network")
+            ),
+            patch.object(
+                socket.socket, "connect", side_effect=AssertionError("network")
+            ),
+            patch("world.art.gallery.append_card", side_effect=AssertionError("card write")),
+            patch("world.art.gallery.set_default", side_effect=AssertionError("default write")),
+            patch(
+                "world.art.gallery.set_official_selection",
+                side_effect=AssertionError("preference write"),
+            ),
+            patch(
+                "world.art.gallery.set_official_geometry",
+                side_effect=AssertionError("preference write"),
+            ),
+            patch(
+                "world.art.service.request_gallery_image",
+                side_effect=AssertionError("enqueue"),
+            ),
+            patch.object(official, "open_dir_fd", side_effect=AssertionError("re-walk")),
+            patch.object(official, "load_catalog", side_effect=AssertionError("re-load")),
+        )
+        with ExitStack() as stack:
+            for tripwire in tripwires:
+                stack.enter_context(tripwire)
+            before = (
+                GalleryRecord.objects.count(),
+                ArtAssetRecord.objects.count(),
+                repr(record_for(subject).attributes.all()),
+            )
+            payloads = [resolve_character(entity) for _ in range(100)]
+            after = (
+                GalleryRecord.objects.count(),
+                ArtAssetRecord.objects.count(),
+                repr(record_for(subject).attributes.all()),
+            )
+        self.assertTrue(all(payload == payloads[0] for payload in payloads))
+        self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(payloads[0]["url"], current_catalog().url_for(identity))
         self.assertEqual(before, after)
 
 

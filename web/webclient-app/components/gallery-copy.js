@@ -15,6 +15,37 @@ export const GALLERY_FILTERS = [
   { id: "failed", label: "失敗" },
 ];
 
+// The official-entry chrome (change official-art-personalization): client
+// vocabulary only. Every FACT — identity, URL, rectangle, and both markers —
+// arrives committed in the payload; official rows are selectable and
+// previewable, and no client composes a chip or a label for them.
+export const GALLERY_OFFICIAL_LABEL = "官方圖片";
+export const GALLERY_OFFICIAL_CHIPS = { current: "已選取", catalogDefault: "內容預設" };
+
+// The accessible name of an official row: the static chrome label plus the
+// committed identity, so two official rows never share one name.
+export function galleryOfficialName(entry) {
+  return `${GALLERY_OFFICIAL_LABEL}，${entry?.identity ?? ""}`;
+}
+
+// The shared face-rect and stage editors take a card-shaped object. An
+// official row carries exactly five committed facts by contract — no stage
+// and no timestamp — so the editors receive those facts plus static chrome:
+// the committed identity stands in for the card name, no date is claimed
+// (日期不詳), and the stage draft starts from the identity placement the row
+// cannot report. Saving one component never rewrites the other, because the
+// dispatched payload carries only the component the player edited.
+export function galleryOfficialEditorCard(entry) {
+  return {
+    url: entry.url,
+    face_rect: entry.face_rect,
+    stage: null,
+    label: GALLERY_OFFICIAL_LABEL,
+    image_id: entry.identity,
+    created_at: null,
+  };
+}
+
 // Card dates (webclient-zh-tw-copy-and-labels): a card's structured
 // `created_at` (epoch seconds) is shown as a local relative time with the
 // exact local instant beside it — never parsed from the label, which the

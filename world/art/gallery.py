@@ -22,6 +22,16 @@ also holds ``queue_lock`` (the future generation-settle path) must take
 ``queue_lock`` first — ``queue_lock -> gallery_lock`` is the only allowed
 order, and nothing here ever acquires ``queue_lock``.
 
+Each record also carries the subject's PERSONAL OFFICIAL-ART preferences
+(change ``official-art-personalization``): the explicitly selected official
+image identity and a bounded map of per-identity geometry overrides, written
+only through the four public writers below, under the same lock. A preference
+is never a card, never participates in card rules, and never touches a file:
+the mounted official directory stays read-only and the runtime store is
+untouched. Reads are tolerant like the card read — a malformed stored
+preference reads as absent with exactly one bounded ``gallery_preference_invalid``
+event naming the subject, never fatal.
+
 File deletion resolves the card identity through
 ``world/art/paths.py::resolved_under_store_root`` so no path outside
 ``ART_STORE_ROOT`` is ever unlinked. Reads are tolerant: a stored entry that
@@ -101,6 +111,25 @@ CARD_KEYS = frozenset(
     }
 )
 
+# The closed grammar of a personal official-image identity: the catalog's
+# root-relative ``<content-kind>/<content-key>/<filename>`` with one of the
+# closed store extensions, bounded so a preference field can never carry an
+# unbounded operator-supplied string. One predicate serves the writers, the
+# management adapters, and both wire validators, so an identity the panel
+# accepts is exactly one the writers accept.
+OFFICIAL_IDENTITY_MAX = 192
+
+# The bounded per-identity geometry-override map (design §8's "bounded map").
+# Beyond it a NEW identity is refused rather than silently evicting another
+# character's adjustment.
+MAX_OFFICIAL_GEOMETRY_OVERRIDES = 32
+
+# The two components one stored override may carry.
+OFFICIAL_GEOMETRY_KEYS = ("face_rect", "stage")
+
+# The one bounded diagnostic a malformed stored preference emits.
+PREFERENCE_INVALID_EVENT = "gallery_preference_invalid"
+
 
 def _empty_snapshot() -> dict:
     """A fresh fully empty four-slot snapshot (never a shared mutable)."""
@@ -133,6 +162,8 @@ class GalleryRecord(DefaultScript):
     subject_key: str = AttributeProperty(default="")
     cards: list = AttributeProperty(default=list)
     default_image_id: str | None = AttributeProperty(default=None)
+    official_selection: str | None = AttributeProperty(default=None)
+    official_geometry: dict = AttributeProperty(default=dict)
     last_error_code: str | None = AttributeProperty(default=None)
     last_error_at: float | None = AttributeProperty(default=None)
 
@@ -348,6 +379,64 @@ def validate_binding(binding: object) -> dict | None:
         "mask": [slot for slot in SLOT_ORDER if slot in set(mask)],
         "snapshot": normalized_snapshot,
     }
+
+
+def validate_official_identity(identity: object) -> str:
+    """Return the identity verbatim when it is a well-formed catalog identity.
+
+    Exactly the catalog layout's root-relative shape — three non-empty
+    ``/``-separated segments, none of them a dot segment — whose filename
+    carries one of the closed store extensions, at most
+    ``OFFICIAL_IDENTITY_MAX`` code points, and printable text (no control,
+    format, surrogate, or non-space separator character). The identity stays a
+    lookup key only: this validator never touches the filesystem, so whether
+    the catalog actually admits it remains the catalog's answer.
+    """
+    if not isinstance(identity, str) or not identity:
+        raise GalleryRecordError("official identity must be a non-empty string")
+    if len(identity) > OFFICIAL_IDENTITY_MAX:
+        raise GalleryRecordError(
+            f"official identity must be at most {OFFICIAL_IDENTITY_MAX} code points"
+        )
+    if not identity.isprintable():
+        raise GalleryRecordError("official identity must be printable text")
+    segments = identity.split("/")
+    if len(segments) != 3 or not all(segments):
+        raise GalleryRecordError(
+            "official identity must be <content-kind>/<content-key>/<filename>"
+        )
+    if any(segment in (".", "..") for segment in segments):
+        raise GalleryRecordError("official identity must not carry a dot segment")
+    filename = segments[2]
+    dot = filename.rfind(".")
+    if dot == -1 or filename[dot:] not in STORE_EXTENSIONS:
+        raise GalleryRecordError("official identity must carry a known store extension")
+    return identity
+
+
+def validate_official_geometry(entry: object) -> dict:
+    """Return a fresh stored-form geometry override.
+
+    A non-empty subset of the two components: a ``face_rect`` passing the
+    shared bounded rectangle rule and/or a ``stage`` passing the shared triple
+    rule, stored verbatim. The pixel-squareness check against the image's
+    decoded dimensions belongs to the caller that knows the catalog image's
+    size, exactly as a card's explicit rect is checked against its recorded
+    ``image_size`` — this validator knows no image.
+    """
+    if not isinstance(entry, Mapping):
+        raise GalleryRecordError("an official geometry override must be a mapping")
+    keys = set(entry)
+    if not keys or keys - set(OFFICIAL_GEOMETRY_KEYS):
+        raise GalleryRecordError(
+            "an official geometry override carries a face_rect, a stage, or both"
+        )
+    stored: dict = {}
+    if "face_rect" in keys:
+        stored["face_rect"] = validate_face_rect(entry["face_rect"])
+    if "stage" in keys:
+        stored["stage"] = validate_stage(entry["stage"])
+    return stored
 
 
 def snapshot_for(entity) -> dict:
@@ -715,6 +804,12 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
         else:
             record.db.cards = [*previous, stored]
             if not previous:
+                # The FIRST card of an empty record becomes its default
+                # automatically. That is not an explicit default SET, so it
+                # leaves a personal official selection alone (change
+                # ``official-art-personalization``): the chain still presents
+                # the selection, and a settled generation can never silently
+                # discard a choice the player made.
                 record.db.default_image_id = stored["image_id"]
             log_info(
                 "gallery_card_appended",
@@ -762,7 +857,12 @@ def set_default(subject: ArtSubject, image_id: str) -> None:
     """Point ``default_image_id`` at an existing card of the record.
 
     Validated against the tolerant read, so the default can never name a
-    malformed entry the reads themselves would hide.
+    malformed entry the reads themselves would hide. Setting an explicit
+    runtime default also CLEARS the personal official selection, so at most
+    one personal default governs (change ``official-art-personalization``).
+    The automatic first-card default ``append_card`` installs is not an
+    explicit default set: appending a card a player generated never discards
+    a selection the player made.
     """
     with gallery_lock:
         record = _consolidate(subject)
@@ -774,10 +874,135 @@ def set_default(subject: ArtSubject, image_id: str) -> None:
                 f"no valid card with image_id {image_id!r} exists to default to"
             )
         record.db.default_image_id = image_id
+        cleared_selection = record.db.official_selection
+        record.db.official_selection = None
         log_info(
             "gallery_default_set",
-            context={"subject": subject.full(), "image_id": image_id},
+            context={
+                "subject": subject.full(),
+                "image_id": image_id,
+                "cleared_official_selection": cleared_selection is not None,
+            },
         )
+
+
+def set_official_selection(subject: ArtSubject, identity: str) -> None:
+    """Select one official image as the subject's personal art preference.
+
+    The identity is a validated root-relative catalog identity; whether the
+    catalog admits it — and whether it belongs to the subject's own content
+    reference — is the caller's scope check, so a stale identity stays a legal
+    stored preference that resolution simply ignores. The write creates a
+    card-less record on demand, never touches a card, and CLEARS
+    ``default_image_id`` so exactly one personal default governs.
+    """
+    validated = validate_official_identity(identity)
+    with gallery_lock:
+        record = record_for(subject, create=True)
+        cleared_default = record.db.default_image_id
+        record.db.official_selection = validated
+        record.db.default_image_id = None
+        log_info(
+            "gallery_official_selection_set",
+            context={
+                "subject": subject.full(),
+                "identity": validated,
+                "cleared_default": cleared_default is not None,
+            },
+        )
+
+
+def clear_official_selection(subject: ArtSubject) -> None:
+    """Clear the personal official selection; a subject with no record no-ops.
+
+    Clearing never restores a runtime default — the invariant is "at most one
+    personal default governs", so a cleared selection simply leaves the
+    gallery-default slot unset until the player sets one.
+    """
+    with gallery_lock:
+        record = _consolidate(subject)
+        if record is None:
+            return
+        record.db.official_selection = None
+        log_info(
+            "gallery_official_selection_cleared",
+            context={"subject": subject.full()},
+        )
+
+
+def set_official_geometry(
+    subject: ArtSubject,
+    identity: str,
+    *,
+    face_rect: object = None,
+    stage: object = None,
+) -> dict:
+    """Replace one identity's personal geometry override; return the stored form.
+
+    The two components are independently nullable and stored verbatim after
+    validation: the caller that knows the catalog image's decoded size checks
+    the rectangle's squareness before calling (the management adapter does),
+    because this writer knows no image. Both ``None`` is a typed refusal — the
+    removal of an override is :func:`clear_official_geometry`. A NEW identity
+    beyond the bounded map's ceiling is refused rather than evicting another
+    identity's adjustment. Files are never touched.
+    """
+    validated_identity = validate_official_identity(identity)
+    stored: dict = {}
+    if face_rect is not None:
+        stored["face_rect"] = validate_face_rect(face_rect)
+    if stage is not None:
+        stored["stage"] = validate_stage(stage)
+    if not stored:
+        raise GalleryRecordError(
+            "an official geometry override needs a face_rect, a stage, or both"
+        )
+    with gallery_lock:
+        record = record_for(subject, create=True)
+        geometry = dict(record.db.official_geometry or {})
+        if (
+            validated_identity not in geometry
+            and len(geometry) >= MAX_OFFICIAL_GEOMETRY_OVERRIDES
+        ):
+            raise GalleryRecordError(
+                "at most "
+                f"{MAX_OFFICIAL_GEOMETRY_OVERRIDES} official geometry overrides "
+                "are stored per subject"
+            )
+        geometry[validated_identity] = stored
+        record.db.official_geometry = geometry
+        log_info(
+            "gallery_official_geometry_set",
+            context={
+                "subject": subject.full(),
+                "identity": validated_identity,
+                "components": sorted(stored),
+            },
+        )
+        return dict(stored)
+
+
+def clear_official_geometry(subject: ArtSubject, identity: str) -> bool:
+    """Remove one identity's geometry override; report whether one was stored.
+
+    A subject with no record, or an identity carrying no override, is a no-op
+    that creates nothing and writes nothing.
+    """
+    validated = validate_official_identity(identity)
+    with gallery_lock:
+        record = _consolidate(subject)
+        if record is None:
+            return False
+        geometry = dict(record.db.official_geometry or {})
+        if validated not in geometry:
+            return False
+        del geometry[validated]
+        record.db.official_geometry = geometry
+        log_info(
+            "gallery_official_geometry_cleared",
+            context={"subject": subject.full(), "identity": validated},
+        )
+        return True
 
 
 def _update_card_field(subject: ArtSubject, image_id: str, field: str, value) -> dict:
@@ -946,6 +1171,72 @@ def cards_for(subject: ArtSubject) -> list[dict]:
                 },
             )
     return cards
+
+
+@dataclass(frozen=True)
+class OfficialPreferences:
+    """One record's read-only official-art preference state.
+
+    ``selection`` is the retained personal official selection (``None`` when
+    unset or malformed); ``geometry`` maps a validated root-relative official
+    identity to its stored ``{face_rect?, stage?}`` override. A malformed
+    stored entry is absent from the map — never raised, never returned.
+    """
+
+    selection: str | None
+    geometry: dict[str, dict]
+
+
+def official_preferences_for(subject: ArtSubject) -> OfficialPreferences:
+    """The subject's personal official-art preferences, tolerantly read.
+
+    Creates nothing and writes nothing. A malformed stored preference — a
+    selection that is not a valid identity, a geometry field that is not a
+    bounded mapping, or an entry naming an invalid identity or carrying an
+    invalid component — reads as absent and emits exactly one bounded
+    ``gallery_preference_invalid`` event naming the subject, so one corrupt
+    field can never blind the read or fail a presentation.
+    """
+    record = record_for(subject)
+    if record is None:
+        return OfficialPreferences(None, {})
+    context = {"subject": subject.full()}
+    selection = None
+    raw_selection = record.db.official_selection
+    if raw_selection is not None:
+        try:
+            selection = validate_official_identity(raw_selection)
+        except GalleryRecordError:
+            log_warn(
+                PREFERENCE_INVALID_EVENT,
+                context={**context, "field": "official_selection"},
+            )
+    geometry: dict[str, dict] = {}
+    raw_geometry = record.db.official_geometry
+    if raw_geometry:
+        if (
+            not isinstance(raw_geometry, Mapping)
+            or len(raw_geometry) > MAX_OFFICIAL_GEOMETRY_OVERRIDES
+        ):
+            log_warn(
+                PREFERENCE_INVALID_EVENT,
+                context={**context, "field": "official_geometry"},
+            )
+        else:
+            for identity, entry in raw_geometry.items():
+                try:
+                    key = validate_official_identity(identity)
+                    geometry[key] = validate_official_geometry(entry)
+                except GalleryRecordError:
+                    log_warn(
+                        PREFERENCE_INVALID_EVENT,
+                        context={
+                            **context,
+                            "field": "official_geometry",
+                            "identity": identity if isinstance(identity, str) else None,
+                        },
+                    )
+    return OfficialPreferences(selection, geometry)
 
 
 def record_error(subject: ArtSubject, code: str) -> None:

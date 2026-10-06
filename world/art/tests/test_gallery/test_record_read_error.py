@@ -13,17 +13,21 @@ from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecord,
     GalleryRecordError,
+    PREFERENCE_INVALID_EVENT,
     SLOT_ORDER,
     append_card,
     cards_for,
+    clear_official_selection,
     clear_error,
     erroring_subjects,
     gallery_states,
+    official_preferences_for,
     record_error,
     record_for,
     record_key,
     remove_card,
     set_default,
+    set_official_selection,
     snapshot_for,
     validate_binding,
     validate_card,
@@ -362,3 +366,103 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         record.db.cards = stored
         self.assertEqual(len(cards_for(subject)), 3)
         self.assertEqual([state.card_count for state in gallery_states()], [3])
+
+
+_OFFICIAL = "preset/t_synth_preset/hero.png"
+_OTHER = "preset/t_synth_preset/other.png"
+_STAGE = {"scale": 1.4, "x": 0.1, "y": -0.2}
+
+
+class OfficialPreferenceReadTests(EvenniaTestCase):
+    """A malformed stored preference reads as absent, never fatally."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name).resolve()
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+
+    def _events(self, warned):
+        return [
+            call
+            for call in warned.call_args_list
+            if call.args and call.args[0] == PREFERENCE_INVALID_EVENT
+        ]
+
+    def test_a_subject_with_no_record_reads_unset_and_creates_nothing(self):
+        subject = _character("prefabsent")
+        with patch("world.art.gallery.log_warn") as warned:
+            preferences = official_preferences_for(subject)
+        self.assertIsNone(preferences.selection)
+        self.assertEqual(preferences.geometry, {})
+        self.assertEqual(self._events(warned), [])
+        self.assertIsNone(record_for(subject))
+
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    def test_a_malformed_stored_selection_reads_as_absent_with_one_event(self):
+        subject = _character("prefbadsel")
+        append_card(subject, **_card_fields(subject))
+        record = record_for(subject)
+        for malformed in (42, "", "preset/bare", "preset/../a.png", "x" * 200):
+            with self.subTest(value=repr(malformed)):
+                record.db.official_selection = malformed
+                with patch("world.art.gallery.log_warn") as warned:
+                    preferences = official_preferences_for(subject)
+                self.assertIsNone(preferences.selection)
+                events = self._events(warned)
+                self.assertEqual(len(events), 1, events)
+                self.assertEqual(events[0].kwargs["context"]["subject"], subject.full())
+                self.assertEqual(
+                    events[0].kwargs["context"]["field"], "official_selection"
+                )
+        # The valid fields of the record still read exactly as before.
+        self.assertEqual(len(cards_for(subject)), 1)
+
+    def test_a_malformed_geometry_field_reads_as_absent_with_one_event(self):
+        subject = _character("prefbadgeom")
+        set_official_selection(subject, _OFFICIAL)
+        record = record_for(subject)
+        for malformed in ("nope", ["face_rect"], {"identity": "not-a-mapping"}):
+            with self.subTest(value=repr(malformed)):
+                record.db.official_geometry = malformed
+                with patch("world.art.gallery.log_warn") as warned:
+                    preferences = official_preferences_for(subject)
+                self.assertEqual(preferences.geometry, {})
+                events = self._events(warned)
+                self.assertEqual(len(events), 1, events)
+                self.assertEqual(events[0].kwargs["context"]["field"], "official_geometry")
+        # The selection beside the corrupt map stays readable.
+        self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
+
+    def test_a_malformed_geometry_entry_never_hides_a_valid_sibling(self):
+        subject = _character("prefmixed")
+        record = record_for(subject, create=True)
+        record.db.official_geometry = {
+            _OFFICIAL: {"zoom": 1},
+            _OTHER: {"stage": dict(_STAGE)},
+        }
+        with patch("world.art.gallery.log_warn") as warned:
+            preferences = official_preferences_for(subject)
+        self.assertEqual(preferences.geometry, {_OTHER: {"stage": _STAGE}})
+        events = self._events(warned)
+        self.assertEqual(len(events), 1, events)
+        self.assertEqual(events[0].kwargs["context"]["identity"], _OFFICIAL)
+
+    def test_reading_preferences_writes_nothing(self):
+        subject = _character("prefreadonly")
+        set_official_selection(subject, _OFFICIAL)
+        record = record_for(subject)
+        before = repr(record.attributes.all())
+        with patch("world.art.gallery.log_warn") as warned:
+            first = official_preferences_for(subject)
+            second = official_preferences_for(subject)
+        self.assertEqual(first, second)
+        self.assertEqual(repr(record_for(subject).attributes.all()), before)
+        self.assertEqual(self._events(warned), [])
+        clear_official_selection(subject)
+        self.assertIsNone(official_preferences_for(subject).selection)

@@ -6,6 +6,7 @@ import GalleryDetailRail from "../../components/GalleryDetailRail.vue";
 import GalleryGenerateDrawer from "../../components/GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "../../components/GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
+import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
 import {
   clampFaceRect,
   defaultFaceRect,
@@ -336,5 +337,135 @@ describe("face geometry", () => {
     wrapper.unmount();
     await nextTick();
     expect(document.activeElement).toBe(opener);
+  });
+});
+
+const OFFICIAL_ROWS = GALLERY_SAMPLE.official_entries;
+const OFFICIAL_CURRENT = OFFICIAL_ROWS.find((row) => row.is_current);
+const OFFICIAL_DEFAULT = OFFICIAL_ROWS.find((row) => row.is_catalog_default);
+
+function rail(wrapper) {
+  return wrapper.get('[data-testid="gallery-detail"]');
+}
+
+describe("official read-only entries", () => {
+  it("renders the committed rows beside the cards and never counts them as cards", () => {
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
+    const rows = wrapper.findAll(".gallery-official__row");
+    expect(rows.map((row) => row.attributes("data-identity"))).toEqual(OFFICIAL_ROWS.map((row) => row.identity));
+    // Official rows are a separate list: the card grid and the filter tabs
+    // keep counting exactly the committed cards.
+    expect(wrapper.findAll(".gallery-card")).toHaveLength(GALLERY_SAMPLE.cards.length);
+    expect(button(wrapper, `全部（${GALLERY_SAMPLE.filters.all}）`)).toBeDefined();
+    const current = rows.find((row) => row.attributes("data-identity") === OFFICIAL_CURRENT.identity);
+    expect(current.text()).toContain("已選取");
+    const catalogDefault = rows.find((row) => row.attributes("data-identity") === OFFICIAL_DEFAULT.identity);
+    expect(catalogDefault.text()).toContain("內容預設");
+  });
+
+  it("selects an official row and renders only its read-only affordances", async () => {
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    const detail = rail(wrapper);
+    expect(detail.text()).toContain(OFFICIAL_CURRENT.identity);
+    expect(detail.text()).toContain("目前預設");
+    expect(button(detail, "刪除")).toBeUndefined();
+    expect(button(detail, "編輯設定")).toBeUndefined();
+    expect(button(detail, "設為預設影像").attributes("disabled")).toBeDefined();
+    expect(button(detail, "清除選取")).toBeDefined();
+  });
+
+  it("dispatches the selection with only the subject key and the committed identity", async () => {
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    const target = OFFICIAL_ROWS.find((row) => !row.is_current);
+    await wrapper.get(`[data-identity="${target.identity}"]`).trigger("click");
+    await button(rail(wrapper), "設為預設影像").trigger("click");
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.select", {
+      subject_key: GALLERY_SAMPLE.selected,
+      identity: target.identity,
+    });
+  });
+
+  it("clears the selection and the personal geometry through their own actions", async () => {
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    await button(rail(wrapper), "清除個人調整").trigger("click");
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.clear", {
+      subject_key: GALLERY_SAMPLE.selected,
+      identity: OFFICIAL_CURRENT.identity,
+    });
+  });
+
+  it("sends only the edited face rectangle for an official identity", async () => {
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    await button(rail(wrapper), "臉部框選").trigger("click");
+    const modal = wrapper.getComponent(GalleryFaceRectModal);
+    const image = modal.get(".gallery-face__original > img");
+    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
+    await image.trigger("load");
+    // A real edit: the modal seeds from the committed rectangle, so only a
+    // changed value may cross the wire (an untouched save would overwrite a
+    // stored personal override with the catalog seed).
+    await modal.findAll('input[type="number"]')[2].setValue("0.4");
+    await button(modal, "儲存框選").trigger("click");
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const [actionId, sent] = dispatch.mock.calls[0];
+    expect(actionId).toBe("gallery.official.geometry.set");
+    expect(Object.keys(sent).sort()).toEqual(["face_rect", "identity", "subject_key"]);
+    expect(sent.subject_key).toBe(GALLERY_SAMPLE.selected);
+    expect(sent.identity).toBe(OFFICIAL_CURRENT.identity);
+    expect(sent.face_rect.w).toBeCloseTo(0.4, 6);
+    // The editor re-squares the edited rectangle on the real image size.
+    expect(Math.abs(sent.face_rect.w * 768 - sent.face_rect.h * 1024)).toBeLessThanOrEqual(1);
+    expect(sent.face_rect).not.toEqual(OFFICIAL_CURRENT.face_rect);
+    // The untouched component is never smuggled along.
+    expect(sent).not.toHaveProperty("stage");
+  });
+
+  it("sends only the edited stage triple for an official identity", async () => {
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    await button(rail(wrapper), "比例調整").trigger("click");
+    const modal = wrapper.getComponent(GalleryStageTransformModal);
+    await modal.get(".stage-transform__figure").trigger("load");
+    await modal.get('input[type="range"]').setValue("0.6");
+    await button(modal, "儲存調整").trigger("click");
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.set", {
+      subject_key: GALLERY_SAMPLE.selected,
+      identity: OFFICIAL_CURRENT.identity,
+      stage: { scale: 0.6, x: 0, y: 0 },
+    });
+    expect(dispatch.mock.calls[0][1]).not.toHaveProperty("face_rect");
+  });
+
+  it("never dispatches an untouched official geometry save", async () => {
+    // The committed row carries no personal override, so an untouched save
+    // would silently overwrite one with the seed. It closes instead.
+    const dispatch = vi.fn(() => "request:1");
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
+    await button(rail(wrapper), "比例調整").trigger("click");
+    const modal = wrapper.getComponent(GalleryStageTransformModal);
+    await modal.get(".stage-transform__figure").trigger("load");
+    await button(modal, "儲存調整").trigger("click");
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(wrapper.findComponent(GalleryStageTransformModal).exists()).toBe(false);
+    // The face editor is seeded from the committed rectangle: saving it as-is
+    // dispatches nothing either.
+    await button(rail(wrapper), "臉部框選").trigger("click");
+    const face = wrapper.getComponent(GalleryFaceRectModal);
+    const image = face.get(".gallery-face__original > img");
+    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
+    await image.trigger("load");
+    await button(face, "儲存框選").trigger("click");
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
   });
 });

@@ -278,6 +278,15 @@ var GALLERY_SLOTS = ["weapon_main", "weapon_off", "armor", "accessories"];
 var GALLERY_SLOT_LABELS = ["主手", "副手", "防具", "飾品"];
 var GALLERY_FIELDS = ["appearance"].concat(GALLERY_SLOTS);
 var GALLERY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var GALLERY_STORE_EXTENSIONS = [".png", ".webp", ".jpg", ".avif"];
+// The official-entry read model's bounds, mirrored from
+// web/webclient/presentation/gallery.py: a bounded list of catalog-admitted
+// images, each identity inside the writers' closed grammar and each URL
+// inside the shared portrait wire ceiling (MAX_MEDIA_URL).
+var GALLERY_MAX_OFFICIAL_ENTRIES = 32;
+var GALLERY_MAX_OFFICIAL_IDENTITY = 192;
+var GALLERY_OFFICIAL_URL_PREFIX = "/art/official/";
+var GALLERY_OFFICIAL_ROW_FIELDS = ["identity", "url", "face_rect", "is_current", "is_catalog_default"];
 
 function galleryText(value, maximum, name) {
   requireString(value, name, maximum);
@@ -317,9 +326,119 @@ function validateGalleryFaceRect(value) {
   return rect;
 }
 
+
+// The official identity grammar, mirrored from
+// world/art/gallery.py::validate_official_identity: exactly three non-empty
+// slash-separated segments, none a dot segment, a known store extension,
+// printable text (no C/Z category character except the plain space), and at
+// most 192 code points.
+function validateGalleryOfficialIdentity(value) {
+  galleryText(value, GALLERY_MAX_OFFICIAL_IDENTITY, "official identity");
+  if (/[\p{C}\p{Z}]/u.test(value.replace(/ /g, ""))) {
+    throw new Error("invalid official identity");
+  }
+  var segments = value.split("/");
+  if (segments.length !== 3 || !segments.every(function (part) { return part.length > 0; })) {
+    throw new Error("invalid official identity");
+  }
+  if (segments.some(function (part) { return part === "." || part === ".."; })) {
+    throw new Error("invalid official identity");
+  }
+  var filename = segments[2];
+  var dot = filename.lastIndexOf(".");
+  if (dot === -1 || GALLERY_STORE_EXTENSIONS.indexOf(filename.slice(dot)) === -1) {
+    throw new Error("invalid official identity");
+  }
+  return value;
+}
+
+
+// The fingerprinted official media URL vocabulary: the closed route prefix, a
+// 64-character lowercase sha256 fingerprint segment, and a non-empty
+// percent-encoded identity path (ASCII printable, no space) — exactly what the
+// catalog's own URL builder produces.
+function validateGalleryOfficialUrl(url) {
+  if (url.indexOf(GALLERY_OFFICIAL_URL_PREFIX) !== 0) {
+    throw new Error("official url must name the official media route");
+  }
+  var rest = url.slice(GALLERY_OFFICIAL_URL_PREFIX.length);
+  var slash = rest.indexOf("/");
+  if (slash === -1) throw new Error("official url must carry a sha256 fingerprint");
+  var fingerprint = rest.slice(0, slash);
+  var tail = rest.slice(slash + 1);
+  if (fingerprint.length !== 64 || /[^0-9a-f]/.test(fingerprint)) {
+    throw new Error("official url must carry a sha256 fingerprint");
+  }
+  if (!tail || /[^\x21-\x7E]/.test(tail)) {
+    throw new Error("official url must carry an identity path");
+  }
+  return url;
+}
+
+
+// Exactly the official-row list: shape, bounds, vocabulary, uniqueness, and
+// the at-most-one current/catalog-default invariant.
+function validateGalleryOfficialEntries(value) {
+  if (!Array.isArray(value) || value.length > GALLERY_MAX_OFFICIAL_ENTRIES) {
+    throw new Error("invalid official entries");
+  }
+  var identities = new Set();
+  var currents = 0, catalogDefaults = 0;
+  value.forEach(function (row) {
+    requireExactFields(row, "official row", GALLERY_OFFICIAL_ROW_FIELDS, []);
+    var identity = validateGalleryOfficialIdentity(
+      galleryText(row.identity, GALLERY_MAX_OFFICIAL_IDENTITY, "official identity")
+    );
+    if (identities.has(identity)) throw new Error("duplicate official identity");
+    identities.add(identity);
+    validateGalleryOfficialUrl(galleryText(row.url, MAX_MEDIA_URL, "official url"));
+    validateGalleryFaceRect(row.face_rect);
+    requireBool(row.is_current, "is_current");
+    requireBool(row.is_catalog_default, "is_catalog_default");
+    currents += row.is_current ? 1 : 0;
+    catalogDefaults += row.is_catalog_default ? 1 : 0;
+  });
+  if (currents > 1 || catalogDefaults > 1) {
+    throw new Error("at most one current/catalog-default official row");
+  }
+  return value;
+}
+
+
 // Exact, kind-neutral mirror of actions/gallery_actions.py. Capability
 // refusals belong to the server, not this schema or the future gallery UI.
+// The card-reference union: a card uuid, or a validated official identity the
+// adapter refuses with the stable `official_read_only` code.
+function galleryCardReference(value) {
+  if (typeof value === "string" && value.length === 36 && GALLERY_UUID.test(value)) {
+    return value;
+  }
+  return validateGalleryOfficialIdentity(value);
+}
+
+
 function validateGalleryActionPayload(actionId, payload) {
+  // The one action whose exact key set is a union: {subject_key, identity} plus
+  // at least one geometry component, because the component the client omits
+  // keeps whatever the record already stores for that identity.
+  if (actionId === "gallery.official.geometry.set") {
+    if (!isPlainObject(payload)) throw new Error("gallery payload must be an object");
+    var allowed = ["subject_key", "identity", "face_rect", "stage"];
+    Object.keys(payload).forEach(function (key) {
+      if (allowed.indexOf(key) === -1) throw new Error("unexpected payload field");
+    });
+    if (!("subject_key" in payload) || !("identity" in payload)) {
+      throw new Error("missing payload field");
+    }
+    if (!("face_rect" in payload) && !("stage" in payload)) {
+      throw new Error("an official geometry payload carries a face_rect, a stage, or both");
+    }
+    gallerySubject(payload.subject_key);
+    validateGalleryOfficialIdentity(payload.identity);
+    if ("face_rect" in payload) validateGalleryFaceRect(payload.face_rect);
+    if ("stage" in payload) validateArtStage(payload.stage, true);
+    return Object.assign({}, payload);
+  }
   var keys = ["subject_key"];
   if (actionId === "gallery.generate") {
     keys = keys.concat(["fields", "custom_prompt"]);
@@ -331,12 +450,17 @@ function validateGalleryActionPayload(actionId, payload) {
     keys = keys.concat(["image_id", "stage"]);
   } else if (actionId === "gallery.binding.save") {
     keys = keys.concat(["image_id", "slots"]);
+  } else if (actionId === "gallery.official.select" || actionId === "gallery.official.geometry.clear") {
+    keys.push("identity");
+  } else if (actionId === "gallery.official.clear_selection") {
+    // The subject key alone: clearing names no identity.
   } else if (actionId !== "gallery.subject.select") {
     throw new Error("unknown gallery action");
   }
   requireExactFields(payload, actionId, keys, []);
   gallerySubject(payload.subject_key);
-  if (keys.indexOf("image_id") !== -1) galleryUuid(payload.image_id);
+  if (keys.indexOf("image_id") !== -1) galleryCardReference(payload.image_id);
+  if (keys.indexOf("identity") !== -1) validateGalleryOfficialIdentity(payload.identity);
   if (actionId === "gallery.generate" || actionId === "gallery.binding.save") {
     var generating = actionId === "gallery.generate";
     var values = generating ? payload.fields : payload.slots;
@@ -399,7 +523,8 @@ function compareCodePoints(a, b) {
 function validateGalleryPanel(payload) {
   requireExactFields(payload, "gallery", [
     "schema_version", "available", "kind", "subjects", "selected", "filters",
-    "cards", "equipment_summary", "capabilities", "binding_warnings", "error_state"
+    "cards", "official_entries", "equipment_summary", "capabilities",
+    "binding_warnings", "error_state"
   ], []);
   if (payload.schema_version !== GALLERY_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
     throw new Error("invalid gallery discriminator");
@@ -430,6 +555,7 @@ function validateGalleryPanel(payload) {
   if (capability.max_cards !== null && capability.max_cards !== 1) throw new Error("invalid card cap");
   if (capability.supports_bindings) validateGalleryEquipment(payload.equipment_summary);
   else if (payload.equipment_summary !== null) throw new Error("unsupported equipment summary");
+  validateGalleryOfficialEntries(payload.official_entries);
   if (!Array.isArray(payload.cards) || payload.cards.length > MAX_LIST_ITEMS) throw new Error("invalid cards");
   var byId = new Map(), previous = Infinity;
   var counts = { all: payload.cards.length, defaults: 0, bound: 0, pending: 0, failed: 0 };
@@ -590,4 +716,7 @@ module.exports = {
   GALLERY_MAX_URL: GALLERY_MAX_URL,
   GALLERY_MAX_WARNINGS: GALLERY_MAX_WARNINGS,
   GALLERY_MAX_CONDITION: GALLERY_MAX_CONDITION,
+  GALLERY_MAX_OFFICIAL_ENTRIES: GALLERY_MAX_OFFICIAL_ENTRIES,
+  GALLERY_MAX_OFFICIAL_IDENTITY: GALLERY_MAX_OFFICIAL_IDENTITY,
+  GALLERY_MAX_OFFICIAL_URL: MAX_MEDIA_URL,
 };

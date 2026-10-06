@@ -12,17 +12,23 @@ from world.art import gallery_kinds
 from world.art.gallery import (
     GalleryRecord,
     GalleryRecordError,
+    MAX_OFFICIAL_GEOMETRY_OVERRIDES,
     SLOT_ORDER,
     append_card,
     cards_for,
+    clear_official_geometry,
+    clear_official_selection,
     clear_error,
     erroring_subjects,
     gallery_states,
+    official_preferences_for,
     record_error,
     record_for,
     record_key,
     remove_card,
     set_default,
+    set_official_geometry,
+    set_official_selection,
     snapshot_for,
     validate_binding,
     validate_card,
@@ -351,3 +357,228 @@ class GalleryRecordWriteTests(EvenniaTestCase):
                     ),
                 )
         self.assertEqual([card["image_id"] for card in cards_for(subject)], [first])
+
+
+# A file-local synthetic identity: the writers validate the identity GRAMMAR
+# only; whether the catalog admits the image stays the catalog's answer.
+_OFFICIAL = "preset/t_synth_preset/hero.png"
+_OFFICIAL_OTHER = "preset/t_synth_preset/other.png"
+_RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375}
+_STAGE = {"scale": 1.4, "x": 0.1, "y": -0.2}
+
+
+class OfficialPreferenceWriteTests(EvenniaTestCase):
+    """The four preference writers: lazy records, clearing, bounds, no files."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name).resolve()
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+
+    def _make_file(self, identity):
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        return target
+
+    def _store_tree(self):
+        return {
+            path.relative_to(self.root).as_posix(): path.read_bytes()
+            for path in self.root.rglob("*")
+            if path.is_file()
+        }
+
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_a_selection_write_creates_a_card_less_record(self):
+        subject = _character("selects")
+        self.assertIsNone(record_for(subject))
+        set_official_selection(subject, _OFFICIAL)
+        record = record_for(subject)
+        self.assertIsNotNone(record)
+        self.assertEqual(record.db.cards, [])
+        self.assertIsNone(record.db.default_image_id)
+        preferences = official_preferences_for(subject)
+        self.assertEqual(preferences.selection, _OFFICIAL)
+        self.assertEqual(preferences.geometry, {})
+        # The card read is untouched by preference state.
+        self.assertEqual(cards_for(subject), [])
+
+    def test_the_first_card_becomes_the_default_without_clearing_the_selection(self):
+        # An automatic first-card default is not an explicit default SET, so a
+        # settled generation never discards the player's official choice.
+        subject = _character("autodefault")
+        set_official_selection(subject, _OFFICIAL)
+        image_id = _new_id()
+        self._make_file(_identity(subject, image_id))
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        self.assertEqual(record_for(subject).db.default_image_id, image_id)
+        self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
+
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_an_explicit_default_clears_the_selection(self):
+        subject = _character("mutuala")
+        image_id = _new_id()
+        self._make_file(_identity(subject, image_id))
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        set_official_selection(subject, _OFFICIAL)
+        self.assertIsNone(record_for(subject).db.default_image_id)
+        set_default(subject, image_id)
+        self.assertEqual(record_for(subject).db.default_image_id, image_id)
+        self.assertIsNone(official_preferences_for(subject).selection)
+        # The card list itself was never touched by either act.
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
+
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_a_selection_clears_an_explicit_default(self):
+        subject = _character("mutualb")
+        image_id = _new_id()
+        self._make_file(_identity(subject, image_id))
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        set_official_selection(subject, _OFFICIAL)
+        record = record_for(subject)
+        self.assertIsNone(record.db.default_image_id)
+        self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
+        # Deleting the card afterwards leaves the selection exactly as stored.
+        remove_card(subject, image_id)
+        self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
+
+    def test_a_geometry_write_creates_a_record_and_replaces_one_identity(self):
+        subject = _character("geometry")
+        self.assertIsNone(record_for(subject))
+        set_official_geometry(subject, _OFFICIAL, face_rect=dict(_RECT))
+        self.assertEqual(
+            official_preferences_for(subject).geometry, {_OFFICIAL: {"face_rect": _RECT}}
+        )
+        set_official_geometry(subject, _OFFICIAL, stage=dict(_STAGE))
+        self.assertEqual(
+            official_preferences_for(subject).geometry, {_OFFICIAL: {"stage": _STAGE}}
+        )
+        # A second identity is independent, and the selection is untouched.
+        set_official_geometry(
+            subject, _OFFICIAL_OTHER, face_rect=dict(_RECT), stage=dict(_STAGE)
+        )
+        set_official_selection(subject, _OFFICIAL)
+        preferences = official_preferences_for(subject)
+        self.assertEqual(preferences.selection, _OFFICIAL)
+        self.assertEqual(
+            preferences.geometry,
+            {
+                _OFFICIAL: {"stage": _STAGE},
+                _OFFICIAL_OTHER: {"face_rect": _RECT, "stage": _STAGE},
+            },
+        )
+        with self.assertRaises(GalleryRecordError):
+            set_official_geometry(subject, _OFFICIAL)
+
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    def test_clearing_absent_preferences_creates_nothing(self):
+        subject = _character("clearsnothing")
+        clear_official_selection(subject)
+        self.assertFalse(clear_official_geometry(subject, _OFFICIAL))
+        self.assertIsNone(record_for(subject))
+
+    def test_clearing_stored_preferences_reports_and_persists(self):
+        subject = _character("clearstored")
+        set_official_geometry(subject, _OFFICIAL, face_rect=dict(_RECT))
+        set_official_selection(subject, _OFFICIAL)
+        self.assertTrue(clear_official_geometry(subject, _OFFICIAL))
+        self.assertEqual(official_preferences_for(subject).geometry, {})
+        # Clearing the geometry never clears the selection.
+        self.assertEqual(official_preferences_for(subject).selection, _OFFICIAL)
+        self.assertFalse(clear_official_geometry(subject, _OFFICIAL))
+        clear_official_selection(subject)
+        self.assertIsNone(official_preferences_for(subject).selection)
+
+    def test_the_override_map_is_bounded_and_an_existing_identity_still_writes(self):
+        subject = _character("bounded")
+        for index in range(MAX_OFFICIAL_GEOMETRY_OVERRIDES):
+            set_official_geometry(
+                subject, f"preset/t_synth_{index}/a.png", face_rect=dict(_RECT)
+            )
+        self.assertEqual(
+            len(official_preferences_for(subject).geometry),
+            MAX_OFFICIAL_GEOMETRY_OVERRIDES,
+        )
+        set_official_geometry(subject, "preset/t_synth_0/a.png", stage=dict(_STAGE))
+        self.assertEqual(
+            official_preferences_for(subject).geometry["preset/t_synth_0/a.png"],
+            {"stage": _STAGE},
+        )
+        with self.assertRaises(GalleryRecordError):
+            set_official_geometry(
+                subject, "preset/t_synth_over/a.png", face_rect=dict(_RECT)
+            )
+        self.assertEqual(
+            len(official_preferences_for(subject).geometry),
+            MAX_OFFICIAL_GEOMETRY_OVERRIDES,
+        )
+
+    def test_malformed_identities_are_refused_by_every_writer(self):
+        subject = _character("refusers")
+        for identity in (
+            None,
+            7,
+            "",
+            "preset/bare",
+            "preset/t_synth_preset/a.bmp",
+            "preset/../a.png",
+            "preset/t_synth_preset/a\u200b.png",
+        ):
+            with self.subTest(identity=repr(identity)):
+                with self.assertRaises(GalleryRecordError):
+                    set_official_selection(subject, identity)
+                with self.assertRaises(GalleryRecordError):
+                    set_official_geometry(subject, identity, face_rect=dict(_RECT))
+                with self.assertRaises(GalleryRecordError):
+                    clear_official_geometry(subject, identity)
+        self.assertIsNone(record_for(subject))
+
+    @covers_requirement(
+        "art-gallery-model::gallery-records-carry-entity-local-official-art-preferences-as-first-class-fields"
+    )
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_preference_writes_touch_no_file_and_no_card(self):
+        subject = _character("nofiles")
+        image_id = _new_id()
+        self._make_file(_identity(subject, image_id))
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        before_files = self._store_tree()
+        before_cards = cards_for(subject)
+        set_official_selection(subject, _OFFICIAL)
+        set_official_geometry(
+            subject, _OFFICIAL, face_rect=dict(_RECT), stage=dict(_STAGE)
+        )
+        clear_official_geometry(subject, _OFFICIAL)
+        clear_official_selection(subject)
+        self.assertEqual(self._store_tree(), before_files)
+        self.assertEqual(cards_for(subject), before_cards)
+        # The preference fields never become cards, and the monster one-card
+        # cap is unaffected by them.
+        monster = _monster("prefmonster")
+        set_official_selection(monster, _OFFICIAL)
+        set_official_geometry(monster, _OFFICIAL, stage=dict(_STAGE))
+        self.assertEqual(cards_for(monster), [])
+        monster_id = _new_id()
+        self._make_file(_identity(monster, monster_id))
+        append_card(monster, **_card_fields(monster, image_id=monster_id))
+        self.assertEqual(
+            [card["image_id"] for card in cards_for(monster)], [monster_id]
+        )

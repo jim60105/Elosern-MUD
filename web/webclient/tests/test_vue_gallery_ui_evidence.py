@@ -150,6 +150,26 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         )
 
     @covers_requirement(
+        "webclient-gallery-ui::official-entries-render-as-selectable-read-only-rows-with-personal-geometry-affordances"
+    )
+    def test_official_rows_are_selectable_read_only(self):
+        # 'renders the committed rows beside the cards and never counts them
+        # as cards' pins the separate committed list with the card grid and
+        # filter counts untouched; 'selects an official row and renders only
+        # its read-only affordances' pins the preview plus 清除選取/清除個人調整
+        # with no 刪除/replace/regenerate affordance; 'dispatches the selection
+        # with only the subject key and the committed identity', 'clears the
+        # selection and the personal geometry through their own actions',
+        # 'sends only the edited face rectangle for an official identity' and
+        # 'sends only the edited stage triple for an official identity' pin
+        # every affordance dispatching its committed action with exactly the
+        # edited component; 'never dispatches an untouched official geometry
+        # save' pins that a save without an edit crosses no wire.
+        _assert_vitest_passes(
+            _run_vitest_once(GALLERY_COMPONENTS), "gallery official rows"
+        )
+
+    @covers_requirement(
         "webclient-gallery-ui::the-generate-drawer-maps-checkboxes-to-the-closed-catalog-and-dispatches-one-request"
     )
     def test_generate_drawer_catalog_dispatch(self):
