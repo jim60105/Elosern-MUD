@@ -5,8 +5,10 @@
 value set (HP, MP, SP, physical combat power, agility, defense, `magic_power`) as literal authored
 values, and `MonsterVariant.danger_grade` SHALL be either `None` or an authored guild danger grade.
 Registry construction SHALL reject a partially populated profile, a non-integer value, a negative
-value, and any nonzero MP/SP/`magic_power` that is not present as an explicit literal in the authored
-record. Only an explicit user balance approval may populate a slot: the authored values SHALL be the
+value, and a `magic_power` outside the variant's tier magic band. MP and SP carry no tier band, so
+their literals are gated by approval rather than by an inference rule: a nonzero pool is content no
+approval covers, which the approved-literal contract below rejects because the approved value is a
+written zero. Only an explicit user balance approval may populate a slot: the authored values SHALL be the
 approved values verbatim, and a registry edit SHALL NOT re-derive, re-tune, re-round, or interpolate
 them, nor infer any value from a display name, a description, a threat tier, or another variant. Once
 approval is granted for a variant, that variant SHALL ship the approved complete profile and the
@@ -23,7 +25,7 @@ source — and consumers SHALL NOT read the registry slot as if it carried that 
 
 #### Scenario: Flavour never becomes a number
 - **WHEN** a variant whose narrative mentions magical or elemental behaviour is inspected
-- **THEN** its `magic_power`, MP, and SP are exactly the authored literals — zero, because the tier magic band is `(0, 0)` and no ability mechanic consumes a pool — and are never read as a value derived from the name, the description, or an ability narrative
+- **THEN** its `magic_power`, MP, and SP are exactly the authored literals — zero, because the tier magic band is `(0, 0)` and no ability mechanic consumes a pool — and a nonzero `magic_power` is rejected by the tier magic band while a nonzero pool is rejected by the approved-literal contract, never accepted as a value derived from the name, the description, or an ability narrative
 
 #### Scenario: Balance approval populates the same slot
 - **WHEN** a balance-approved complete profile and grade are authored for one variant
@@ -61,9 +63,14 @@ Registry validation SHALL reject a variant whose `combat_profile` falls outside 
 tier's physical band for those axes, and `magic_power` inside the tier's magic band — and SHALL reject a
 variant whose `danger_grade` falls outside its tier's `guild_rank_range`. Bands and rank ranges SHALL be
 read from the existing threat-tier registry through the same injectable face discipline the rest of the
-validation uses, so an authored out-of-band rating fails at import while behavior tests can exercise the
-rule with invented bands. The tier model declares no band for the MP and SP resource pools, so those two
-axes are deliberately not band-checked: their value is an authored literal, not a band inference.
+validation uses: the face maps a tier key to that tier's HP band, physical band, magic band, and guild
+rank range, and every band bound is inclusive at both ends, so a value exactly on a band edge is inside
+it. A tier key the face does not carry SHALL raise the named species-registry error rather than skipping
+the check, and `danger_grade` SHALL be checked by its order inside the tier's `guild_rank_range`, not by
+membership in a set of keys. An authored out-of-band rating therefore fails at import, while behavior
+tests can exercise every rejection with invented bands. The tier model declares no band for the MP and SP
+resource pools, so those two axes are deliberately not band-checked: their value is an authored literal,
+not a band inference.
 
 #### Scenario: A profile above its tier band is rejected
 - **WHEN** a low-tier variant declares an `hp` above the tier's HP band, or a physical axis outside the tier's physical band
@@ -84,3 +91,11 @@ axes are deliberately not band-checked: their value is an authored literal, not 
 #### Scenario: The shipped batch is inside its declared bands
 - **WHEN** every shipped variant's profile and grade are checked against its own declared tier
 - **THEN** each one lies inside that tier's HP band, physical band, magic band, and `guild_rank_range`
+
+#### Scenario: A value exactly on a band edge is inside the band
+- **WHEN** a variant declares an `hp` equal to its tier's HP band maximum, or a physical axis equal to a band edge
+- **THEN** validation accepts it, because band bounds are inclusive
+
+#### Scenario: A tier with no band is rejected rather than skipped
+- **WHEN** validation runs against a tier face that does not carry a variant's declared tier
+- **THEN** the named species-registry error is raised instead of silently treating the rating as valid

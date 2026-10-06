@@ -63,15 +63,23 @@ authored zeros, not omissions: the record is all-or-nothing, so a zero must be w
 
 **D-B2 Band membership becomes a construction-time invariant with an injectable tier face.**
 `validate_monster_species_registry` grows the same shape as its existing habitat/tier/grade faces: a
-`tier_band_face` defaulting to `MONSTER_TIER_REGISTRY`. Shipped construction therefore fails at import on
-an out-of-band rating, and behavior tests can exercise every rejection with invented bands. Alternative
-rejected: a standalone new validator — it would let a future author call one and not the other, and the
-module's own discipline is that one function validates everything before publication.
+`tier_band_face` mapping a tier key to that tier's HP band, physical band, magic band, and guild rank
+range, defaulting to `MONSTER_TIER_REGISTRY`. (The existing faces are key sets; a band face carries rows,
+because a band is not a membership question.) Band bounds are inclusive at both ends — `bay_warden`'s
+`hp = 400` sits exactly on the mid band's maximum and must validate — `danger_grade` is checked by its
+order inside the tier's `guild_rank_range` rather than as set membership, and a tier key the face does not
+carry raises the named error instead of silently passing. Shipped construction therefore fails at import
+on an out-of-band rating, and behavior tests can exercise every rejection with invented bands.
+Alternative rejected: a standalone new validator — it would let a future author call one and not the
+other, and the module's own discipline is that one function validates everything before publication.
 
 **D-B3 MP and SP are deliberately not band-checked.** The tier model declares bands for HP, the three
 physical axes, and `magic_power`; it declares no pool band, so there is no tier truth to compare a pool
 against. Inventing a pool band to make the invariant look symmetrical would be new balance content
-nobody approved. The spec states this gap explicitly so it cannot be mistaken for an oversight.
+nobody approved. The gap is closed on the approval side instead: the shipped zeros are pinned as the
+approved literals, so a later edit that turns MP or SP nonzero fails the content contract rather than
+slipping past a rule that could not have enforced it (a record carries values, not their provenance).
+The spec states both halves explicitly so the exemption cannot be mistaken for an oversight.
 
 **D-B4 Already-persisted individuals are never rescaled.** The design forbids silently re-scaling the
 abilities of existing individuals when registry data changes. Individuals built before this change keep
