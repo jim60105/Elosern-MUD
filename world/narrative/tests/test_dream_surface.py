@@ -2,6 +2,7 @@
 
 import json
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -19,7 +20,7 @@ from web.webclient.actions.exploration_actions import _wait_adapter, validate_wa
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.dream import dream_presenter
 from world.ai import dream, guardrail
-from world.art import official as official_art
+from world.art import formats, official as official_art, subjects
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
@@ -80,7 +81,7 @@ class DreamSurfaceTests(EvenniaTest):
     def delivered(self, index=0):
         client = FakeLLMClient()
         client.add_response(lambda descriptor: True, json.dumps({
-            "scene": "合成場景：純白的床榻中，親密的身影隨著呼吸交流。",
+            "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
             "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
             "phase": prospective_state(index).level,
         }, ensure_ascii=False))
@@ -448,3 +449,22 @@ class DreamSurfaceTests(EvenniaTest):
             url = service.dream_state(self.actor)["scene_art"]
         self.assertEqual(url, f"/art/official/{'a' * 64}/{identity}")
         self.assertLessEqual(len(url), 256)
+
+    @covers_requirement(
+        "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
+    )
+    def test_dream_scene_identity_stays_catalog_admissible(self):
+        # The stage artwork is resolved out of the official catalog and served
+        # by the media route, so the identity must keep parsing as
+        # <kind>/<key>/<file> with an admitted kind, a stable subject key, and a
+        # stored extension. The tripwire matters because admission is silent:
+        # the day a kind gains a registry-membership check (the deferred
+        # authored npc/profile provenance), a non-registered key would stop
+        # being indexed and the stage would lose its artwork with no failing
+        # request anywhere.
+        parts = surface.DREAM_GODDESS_SCENE_IDENTITY.split("/")
+        self.assertEqual(len(parts), 3)
+        kind, key, filename = parts
+        self.assertIn(kind, official_art.OFFICIAL_CONTENT_KINDS)
+        self.assertTrue(subjects.is_valid_subject_key(key))
+        self.assertIn(Path(filename).suffix, formats.STORE_EXTENSIONS)

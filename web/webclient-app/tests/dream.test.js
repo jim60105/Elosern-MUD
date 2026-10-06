@@ -89,9 +89,18 @@ describe("server-authored dream surface", () => {
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
   });
-  it("renders the server-resolved scene artwork only when the panel carries one", () => {
+  it("renders the server-resolved scene artwork, degrading on a failed load", async () => {
     const { wrapper } = fixture();
     expect(wrapper.find("img.dream-scene__art").attributes("src")).toBe(state().scene_art);
+    // A replaced or withdrawn file 404s by design (the URL embeds the startup
+    // fingerprint): the stage falls back to the flat ink background instead of
+    // a broken-image glyph.
+    await wrapper.find("img.dream-scene__art").trigger("error");
+    expect(wrapper.find("img.dream-scene__art").exists()).toBe(false);
+    // A changed URL is a new attempt.
+    const republished = state().scene_art.replace("0000", "1111");
+    await wrapper.setProps({ state: state({ scene_art: republished }) });
+    expect(wrapper.find("img.dream-scene__art").attributes("src")).toBe(republished);
     wrapper.unmount();
     const blank = mount(DreamPanel, {
       props: { state: state({ scene_art: "" }), store: { view: reactive({ connected: true, dispatch: { inFlight: null } }), dispatchAction: vi.fn() } },

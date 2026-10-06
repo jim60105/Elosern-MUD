@@ -9,6 +9,11 @@ const refusal = ref("");
 const directionEditor = ref(null);
 const directionInput = ref(null);
 const stage = ref(null);
+// A staged artwork URL embeds the startup fingerprint of the file bytes, so a
+// replaced or withdrawn file 404s by design. A failed load falls back to the
+// flat ink stage instead of a broken-image glyph, and a changed URL is a fresh
+// attempt.
+const artFailed = ref(false);
 // The authoritative direction most recently copied into the editor. An unsent
 // edit that differs from it is the player's own draft and is never overwritten
 // by a later publication.
@@ -47,6 +52,7 @@ const selectedStory = computed(() => thread.value
   ? props.state.thread_choices.find((choice) => choice.id === thread.value)?.label || "已保存的故事線"
   : "新故事");
 watch(() => props.state.session_id, () => { message.value = ""; });
+watch(() => props.state.scene_art, () => { artFailed.value = false; });
 watch(() => JSON.stringify([props.state.session_id, props.state.draft_preferences, props.state.direction_parts]), () => {
   const authoritative = Array.from(savedDirection.value).length <= 2000 ? savedDirection.value : "";
   // `dream say` republishes the authored direction on every exchange, so adopt
@@ -92,7 +98,7 @@ async function send(action) {
 
 <template>
   <section ref="stage" class="dream-scene" role="dialog" aria-modal="true" aria-label="夢境協作" tabindex="-1" data-testid="dream-panel" @keydown="onKeydown">
-    <img v-if="state.scene_art" class="dream-scene__art" :src="state.scene_art" alt="雲海之上的純白王座與王座上的女神" decoding="async" />
+    <img v-if="state.scene_art && !artFailed" class="dream-scene__art" :src="state.scene_art" alt="雲海之上的純白王座與王座上的女神" decoding="async" @error="artFailed = true" />
     <div v-if="$slots.storyTools" class="dream-scene__story-tools"><slot name="storyTools" /></div>
     <div class="dream-folio">
     <header class="dream-folio__head">

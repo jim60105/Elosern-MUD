@@ -30,6 +30,12 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
 - `<kind>` is exactly `monster`, `preset`, or `npc`. Any other top-level
   directory is skipped (one bounded diagnostic), and the four image extensions
   `.png`, `.webp`, `.jpg`, and `.avif` are the closed accepted set.
+- The collaborative dream stage's illustration is an official `npc` asset
+  addressed by its **exact** identity
+  `<root>/npc/dream_goddess/dream-throne.webp`, so that exact filename is what
+  must be present (the game resolves that path, not the directory's default or
+  manifest choice). It is optional: without it the dream stage renders its
+  prose on the flat background instead of an illustration.
 - A content directory MAY carry a `manifest.json` with an optional `default`
   filename, a `face_rect`, and a `stage` placement. Without a valid explicit
   default, the first image in deterministic filename order is used; a missing
@@ -223,6 +229,12 @@ After preparing artwork, require the same event to report the indexed content
 directories and images with `reason=official_root_indexed` (for example
 `contents=1 images=7 refused=0`), and treat any refusal count as a to-do
 naming the offending root-relative paths the diagnostics carry.
+
+For the collaborative dream stage specifically, the indexed image count must
+include `npc/dream_goddess/dream-throne.webp`: run one `sleep dream` and check
+that the dream panel's `scene_art` state field is a non-empty
+`/art/official/...` URL (an empty value means the artwork was not indexed,
+which the stage survives by design).
 
 ### Troubleshooting
 

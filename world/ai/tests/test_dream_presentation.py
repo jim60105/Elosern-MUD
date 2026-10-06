@@ -48,7 +48,7 @@ from tools.spec_traceability import covers_requirement
 # Synthetic explicit fixture prose (kept in the test file, never shipped as
 # prompt text): the approved capability accepts explicit sexual content.
 _EXPLICIT_SCENE = (
-    "純白房間裡，兩具赤裸的身體在床榻上緊緊交纏，肌膚相貼、喘息交錯，"
+    "雲海王座之前，兩具赤裸的身影在漫過腳踝的積水中緊緊交纏，肌膚相貼、喘息交錯，"
     "手指沿著背脊一路撫下，濕熱的觸感讓彼此的呼吸越來越急。"
 )
 _COUNTERPART_LINE = "「別急，我們還有很多時間。」她貼著耳邊低語，掌心仍按在胸前。"
