@@ -223,6 +223,11 @@ def validate_monster_species_registry(
     validated by the one shared implementation. The three vocabulary faces
     default to the static lore registries and are injectable so behavior tests
     can exercise this function with invented keys.
+
+    The cross-species variant-key collision rule is not enforced here: a keyed
+    mapping cannot express two owners of one key, so it is enforced where the
+    registry is merged (:func:`build_monster_variant_registry`). Validation
+    only reads its inputs and raises before anything is published.
     """
     habitat_keys, tier_keys, grade_keys = _faces(habitat_face, tier_face, grade_face)
 
@@ -239,6 +244,11 @@ def validate_monster_species_registry(
         if not isinstance(row.default_variant_key, str) or not row.default_variant_key:
             raise MonsterSpeciesRegistryError(
                 f"species {mapping_key!r} declares no default variant"
+            )
+        if not isinstance(row.ordinary_variant, bool):
+            raise MonsterSpeciesRegistryError(
+                f"species {mapping_key!r} must author its ordinary/stronger "
+                "classification as a boolean"
             )
         if not row.habitat_tags:
             raise MonsterSpeciesRegistryError(
@@ -301,6 +311,13 @@ def validate_monster_species_registry(
                 f"species {mapping_key!r} default variant "
                 f"{row.default_variant_key!r} is a stronger variant; a species "
                 "baseline must be an ordinary variant"
+            )
+        if row.ordinary_variant is not default.ordinary_variant:
+            raise MonsterSpeciesRegistryError(
+                f"species {mapping_key!r} classifies itself as ordinary="
+                f"{row.ordinary_variant!r} while its default variant "
+                f"{row.default_variant_key!r} is ordinary="
+                f"{default.ordinary_variant!r}"
             )
 
 
@@ -417,7 +434,7 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "施法者與牠纏鬥時，可能先感到魔力消耗異常，再發現危險。"
         "牠仍依靠咬合與伏擊捕食，並非遠距離施法者。"
         "能力需要近身接觸，不能隔著整條河抽取魔力，也不會把吸取的魔力轉成傷口治療。"
-        "此處的吸取對應可消耗的魔力資源，不表示永久降低目標的固定 magic_power 值。"
+        "此處的吸取對應可消耗的魔力資源，不表示永久降低目標的固定 magic_power。"
         "具體消耗量與技能效果不在本次核准範圍內。",
         ("southeast_coast",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；吸取魔力的成因不在設定中交代。",
