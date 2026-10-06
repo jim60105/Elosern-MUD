@@ -282,12 +282,11 @@ read-only NPC recall preview.
 
 ### S4 Authored data browser
 
-- All class A registries, rulebooks, quest catalog, and prompts from §2.
-- Cross-references (for example monster species → placement sites → quests
-  that reference it).
-- Startup sync and validation outcomes.
-- Requires a generic registry adapter that turns frozen dataclasses into
-  serialisable rows.
+Designed in `docs/superpowers/specs/2026-10-06-gm-portal-s4-world-data-design.md`:
+a hand-maintained registry index, reference declarations on dataclass fields
+(`ref`/`ref_many` with named inverses) checked by a CI contract, entry pages
+with references and referrers, cross-registry search, and a read-only source
+viewer for rulebook and prompt YAML.
 
 ### S5 Operations through existing APIs
 
