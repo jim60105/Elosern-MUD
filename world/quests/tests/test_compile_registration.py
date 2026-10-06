@@ -633,6 +633,9 @@ def _stored_clear_out_objective(payload: dict) -> dict:
 class SiteClearOutPayloadTests(CompileRegistryIsolation, unittest.TestCase):
     """The stored payload codec carries the bound clear-out's site key."""
 
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_a_stored_clear_out_payload_round_trips_the_site_key(self):
         compiled = _compiled_clear_out()
         payload = _compiled_to_payload(compiled)
@@ -649,6 +652,9 @@ class SiteClearOutPayloadTests(CompileRegistryIsolation, unittest.TestCase):
         register_restored_quest(restored)
         self.assertIn(restored.definition.key, QUEST_DEFINITION_REGISTRY)
 
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_an_absent_stored_site_key_decodes_to_the_bound_family(self):
         # A payload written before the selector existed decodes to exactly the
         # objective it recorded: an absent key is the *bound-with-no-site*
@@ -692,6 +698,9 @@ class SiteClearOutPayloadTests(CompileRegistryIsolation, unittest.TestCase):
 class ClearOutCompileBoundaryTests(unittest.TestCase):
     """The generative boundary never authors a site key (design D-C1)."""
 
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_no_compiled_proposal_authors_a_site_key(self):
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
@@ -704,6 +713,9 @@ class ClearOutCompileBoundaryTests(unittest.TestCase):
                     self.assertIsNone(stage.objective.site_key)
         self.assertGreater(stages, 0)
 
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_a_proposal_declaring_a_site_key_is_rejected(self):
         # Presence is rejected, not just a value: a proposal can never smuggle a
         # hand-written site key in and have it silently ignored.

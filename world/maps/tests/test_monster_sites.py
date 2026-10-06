@@ -510,6 +510,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
     # -- the quest layer's binding source ----------------------------------
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_a_populated_site_whose_members_are_all_dead_answers_an_empty_set(self):
         # Until the world clock's own settlement declares the clearing, the
         # durable state still says populated: the read answers the truth about
@@ -531,6 +532,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(settled.reason, SITE_READ_CLEARED)
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_the_read_returns_the_sites_living_members_and_only_those(self):
         from evennia.utils.create import create_object
 
@@ -565,6 +567,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 self.assertNotIn(excluded.pk, {m.pk for m in read.members})
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_the_read_modifies_nothing_even_from_a_cold_trait_handler(self):
         from django.db import connection
         from django.test.utils import CaptureQueriesContext
@@ -620,6 +623,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(writes, [])
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_a_cleared_site_offers_no_members_and_stays_cleared(self):
         self._settle()
         nest = self.sites[NEST_KEY]
@@ -646,6 +650,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         )
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_a_never_populated_site_is_not_populated_by_the_read(self):
         # No settlement has run, so neither site holds a durable state yet.
         self.assertIsNone(site_state(NEST_KEY, wilderness=self.wilderness))
@@ -664,6 +669,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         )
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_the_read_answers_an_unknown_site_without_creating_anything(self):
         self._settle()
         monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
@@ -822,6 +828,7 @@ class MonsterSiteStageWithoutWorldTests(EvenniaTest):
         )
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
+    @covers_requirement("monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site")
     def test_the_read_refuses_when_no_world_is_provisioned(self):
         # Refusing is the read's answer, not an exception, and it provisions
         # nothing: no wilderness script may appear because a quest asked.

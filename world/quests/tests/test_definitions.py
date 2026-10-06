@@ -824,6 +824,9 @@ class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_a_complete_clear_out_registers_immutably(self):
         candidate = quest(
             "clear-out-valid",
@@ -842,6 +845,9 @@ class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
     )
     def test_an_unknown_or_empty_site_key_is_rejected(self):
         invalid = (
@@ -974,6 +980,9 @@ class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_a_second_definition_over_one_site_is_rejected_in_either_order(self):
         first = quest("clear-out-first", stages=(QuestStage(0, _clear_out()),))
         second = quest("clear-out-second", stages=(QuestStage(0, _clear_out()),))
@@ -1025,6 +1034,9 @@ class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
     )
     def test_re_registering_the_same_clear_out_is_an_idempotent_no_op(self):
         candidate = quest("clear-out-idempotent", stages=(QuestStage(0, _clear_out()),))

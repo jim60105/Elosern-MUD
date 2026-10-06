@@ -6,11 +6,10 @@ live terrain model at runtime, because the site owner resolves membership from t
 provider's own coordinate partition. No shipped placement, species, variant,
 region, item, or branch token is named here.
 
-The requirement ids this change *adds* are change-local until the archive syncs
-the delta specs into ``openspec/specs/``, so they are deliberately not annotated
-here; the archive worker attaches them once the ids exist in the index. Every
-``covers_requirement`` below names a requirement the delta *modifies*, which the
-index already carries.
+Every ``covers_requirement`` below names a requirement of this change or its
+predecessors, including the ids the archive synced into ``openspec/specs/``:
+the binding-source requirement (monster-site-placement) and the clear-out
+selector-and-binding requirement (quest-blueprint).
 """
 
 from types import MappingProxyType
@@ -275,6 +274,12 @@ class SiteClearOutAcceptanceTests(
     @covers_requirement(
         "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
     )
+    @covers_requirement(
+        "monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site"
+    )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
+    )
     def test_a_standing_site_binds_exactly_its_living_set_and_creates_nothing(self):
         self._settle()
         living = {member.pk for member in self._living(NEST)}
@@ -441,6 +446,9 @@ class SiteClearOutAcceptanceTests(
 
     @covers_requirement(
         "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+    )
+    @covers_requirement(
+        "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
     )
     def test_a_recovered_sites_newcomers_satisfy_only_a_later_clear_out(self):
         self._settle()
