@@ -68,10 +68,10 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`guild register`](/game/command-reference?id=guild-register) | 註冊為冒險者。 |
-| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板。 |
+| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板與每個委託的第一目標說明。 |
 | [`guild accept`](/game/command-reference?id=guild-accept) | 接取委託。 |
 | [`guild log`](/game/command-reference?id=guild-log) | 查看任務記錄。 |
-| [`guild show`](/game/command-reference?id=guild-show) | 查看任務詳情。 |
+| [`guild show`](/game/command-reference?id=guild-show) | 查看任務詳情（含階級、評價理由與背景）。 |
 | [`guild abandon`](/game/command-reference?id=guild-abandon) | 放棄任務。 |
 | [`guild turnin`](/game/command-reference?id=guild-turnin) | 回報任務並領取報酬。 |
 | [`guild merit`](/game/command-reference?id=guild-merit) | 查看階級與功績。 |

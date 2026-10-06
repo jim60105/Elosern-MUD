@@ -335,11 +335,20 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     else:
         return IntentOutcome(False, f"no commission {quest_key!r} at this issuer")
 
-    from world.quests.runtime import accept_quest
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+    from world.quests.runtime import (
+        accept_quest,
+        provisioning_snapshot_for,
+        restore_provisioning,
+    )
     from world.rules.affinity import AffinitySource
 
     quest_log_snapshot = attribute_snapshot(player, "quest_log")
     relations_snapshot = attribute_snapshot(npc, "relations_data")
+    definition = QUEST_DEFINITION_REGISTRY.get(quest_key)
+    provisioning_snapshot = (
+        None if definition is None else provisioning_snapshot_for(definition)
+    )
     affinity_capped = False
     try:
         with transaction.atomic():
@@ -354,6 +363,7 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     except Exception:
         restore_attribute_best_effort(player, "quest_log", quest_log_snapshot)
         restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
+        restore_provisioning(provisioning_snapshot)
         return IntentOutcome(False, "quest assignment failed and was rolled back")
     if affinity_capped:
         return IntentOutcome(True, "quest assigned; affinity credit capped")

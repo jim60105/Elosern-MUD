@@ -54,6 +54,9 @@ snapshot the actor's quest-log surface plus the host's affinity record (acceptan
 instance pins — stage binding happens only on stage advance), apply the quest
 record and the gain inside one transaction, and restore every surface on failure so a failed
 affinity write rolls back the acceptance; abandonment SHALL grant no affinity.
+When `accept_quest()` refuses a species-hunt offer because the hunt cannot be legally satisfied (the
+target-availability guarantee fails), the board path SHALL surface that named refusal as an ordinary
+rejection — no quest record, no affinity gain, no partial provisioning left behind.
 `abandon_guild_quest()` SHALL invoke `abandon_quest()` for the exact quest ID.
 The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts itself.
 
@@ -72,6 +75,10 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
   affinity gain commits
 - **THEN** the quest log and the host's affinity record — and their in-process caches — equal
   their pre-acceptance values
+
+#### Scenario: A legally unsatisfiable hunt offer is refused cleanly
+- **WHEN** a member accepts a species-hunt offer whose ordinary-eligible target guarantee cannot be met
+- **THEN** the refusal names the reason, and the quest log, affinity record, and every individual owned by the ambient/site managers equal their pre-acceptance values
 
 #### Scenario: Abandonment preserves quest-runtime semantics
 - **WHEN** a member abandons an active offered quest
@@ -148,7 +155,8 @@ caller's room, and the turn-in SHALL never accept a remote host or bypass `turn_
 ### Requirement: Board listing and quest log surface objective guidance
 `guild list` SHALL render each eligible offer with a one-line Traditional
 Chinese summary of the offered definition's first objective, in addition to the
-existing key, display name, and reward. `guild log` SHALL render a hint that
+existing key, display name, and reward; a regional species hunt SHALL render as one
+deterministic line naming the region, species, and count. `guild log` SHALL render a hint that
 `guild show <quest_id>` reveals full objective detail. Both SHALL be read-only
 presentation over existing registries and records, and SHALL NOT change board
 eligibility or quest state.
@@ -157,6 +165,10 @@ eligibility or quest state.
 - **WHEN** an F member lists a board containing the `introductory_hunt` offer
 - **THEN** the row shows the offered definition's first objective summary (for
   example a DEFEAT goal) alongside the name and reward
+
+#### Scenario: A species-hunt offer renders its one-liner
+- **WHEN** a board contains a species-hunt offer
+- **THEN** its row shows region, species, and required count in one deterministic Traditional Chinese line
 
 #### Scenario: Quest log hints at the detail command
 - **WHEN** a player with at least one quest record runs `guild log`

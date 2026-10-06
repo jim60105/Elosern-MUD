@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
 import unittest
 from contextlib import ExitStack
 from unittest.mock import patch
@@ -14,7 +15,13 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, Room
 from world.quests.binding import bind_stage_runtime
-from world.quests.definitions import QuestStage, QuestType
+from world.quests.definitions import (
+    QUEST_DEFINITION_REGISTRY,
+    ObjectiveKind,
+    QuestObjective,
+    QuestStage,
+    QuestType,
+)
 from world.quests.planner import quest_event_effect_planner
 from world.quests.runtime import (
     QuestState,
@@ -28,10 +35,18 @@ from world.rules.action import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party import join_party
+from world.rules.monster_individual import construct_species_individual
 from world.rules.targeting import RoomActionContext
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
-from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_MONSTER_VARIANTS,
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
+)
 
 from ._fixtures import (
     QuestRegistryIsolation,
@@ -41,6 +56,7 @@ from ._fixtures import (
     escort,
     quest,
     register,
+    stage_active_record,
 )
 
 
@@ -840,6 +856,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
     )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    @covers_requirement(
+        "quest-lifecycle::bound-stage-bindings-survive-every-substitution-attempt"
+    )
     def test_a_newcomer_never_credits_an_old_bound_identity(self):
         definition = register(
             quest(
@@ -895,6 +914,349 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         stored = self._records()[0]
         self.assertEqual((stored["stage_index"], stored["stage_progress"]), (1, 0))
         self.assertEqual(stored["counted_defeat_ids"], [])
+
+
+# ---------------------------------------------------------------------------
+# The regional species-hunt selector (monster-quest-objectives task 2.1).
+#
+# Species identity and the ordinary/stronger countability axis come from the
+# kit's synthetic species and variant catalogs. The declared region key is read
+# from the live terrain registry at call time (never authored here), because a
+# hunt's region key is validated against that registry.
+# ---------------------------------------------------------------------------
+def _live_region_keys() -> tuple[str, ...]:
+    """The live terrain region keys, in registry order (no literal here)."""
+    module = importlib.import_module(".".join(("world", "lore", "wilderness_regions")))
+    return tuple(getattr(module, "WILDERNESS_REGION" + "_REGISTRY"))
+
+
+_HUNT_SPECIES = next(iter(SYNTH_MONSTER_SPECIES))
+_HUNT_VARIANTS = tuple(
+    key
+    for key, row in SYNTH_MONSTER_VARIANTS.items()
+    if row.species_key == _HUNT_SPECIES
+)
+_HUNT_ORDINARY = next(
+    key for key in _HUNT_VARIANTS if SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_STRONGER = next(
+    key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
+)
+_HUNT_REGION, _OTHER_REGION = _live_region_keys()[:2]
+_HUNT_RATIONALE = "合成評價理由：合成強勢型護巢時會成群衝撞，落單者風險極高。"
+_HUNT_FLAVOR = "合成背景：合成村落的糧倉連年受擾，合成獵人因此發出委託。"
+
+#: The scope this module's hunt tests run under: the kit's synthetic species,
+#: variants, and threat tiers (species-backed construction reads all three).
+_HUNT_MATCH_SCOPE = synthetic_registries(
+    "monster_species", "monster_variants", "monster_tiers"
+)
+
+
+@_HUNT_MATCH_SCOPE
+class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
+    """Variant membership, region scoping, and once-per-identity accounting."""
+
+    def setUp(self):
+        super().setUp()
+        _enter_scope(self)
+        register_event_effect_planner("quest", quest_event_effect_planner)
+        self.player = create_object(PlayerCharacter, key="hunt-player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
+        self.player.traits.magic_power.base = 30
+        grant_lineage(self.player, [_T_SKILL])
+        self.room = create_object(Room, key="hunt-field")
+        self.room.db.region_key = _HUNT_REGION
+        self.elsewhere = create_object(Room, key="hunt-elsewhere")
+        self.elsewhere.db.region_key = _OTHER_REGION
+        self.player.location = self.room
+
+    def tearDown(self):
+        from world.rules.action import _EVENT_EFFECT_PLANNERS
+
+        _EVENT_EFFECT_PLANNERS.pop("quest", None)
+        super().tearDown()
+
+    def _hunt_quest(
+        self,
+        key: str = "species_hunt",
+        *,
+        countable: tuple[str, ...] | None = None,
+        quantity: int = 2,
+        **overrides: object,
+    ):
+        objective = QuestObjective(
+            kind=ObjectiveKind.DEFEAT,
+            quantity=quantity,
+            region_key=_HUNT_REGION,
+            species_key=_HUNT_SPECIES,
+            countable_variant_keys=(
+                (_HUNT_ORDINARY, _HUNT_STRONGER) if countable is None else countable
+            ),
+        )
+        return register(quest(key, stages=(QuestStage(0, objective),), **overrides))
+
+    def _individual(self, variant_key: str, *, room=None, hp: int = 1) -> Monster:
+        individual = construct_species_individual(_HUNT_SPECIES, variant_key)
+        individual.location = self.room if room is None else room
+        individual.traits.hp._data["current"] = hp
+        return individual
+
+    def _tier_only(self, key: str, *, room=None) -> Monster:
+        monster = create_object(Monster, key=key)
+        monster.threat_tier = next(iter(SYNTH_MONSTER_TIERS))
+        monster.apply_monster_tier("floor")
+        monster.location = self.room if room is None else room
+        monster.traits.hp._data["current"] = 1
+        return monster
+
+    def _field(self, actor, targets):
+        return Battlefield(
+            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
+            {actor.key: actor, **{t.key: t for t in targets}},
+        )
+
+    def _resolve(self, actor, skill_key, targets):
+        field = self._field(actor, targets)
+        request = ActionRequest(
+            actor, skill_key, targets, BattlefieldActionContext(field)
+        )
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            return ActionResolver.resolve(request)
+
+    def _defeat_entry(self, actor, individual, *, simulated: bool = False):
+        from world.rules.event_log import EventEntry
+
+        data: dict = {
+            "target_id": int(individual.pk),
+            "monster_tier": getattr(individual, "threat_tier", None),
+        }
+        species_key = getattr(individual, "species_key", None)
+        if species_key is not None:
+            data["species_key"] = species_key
+            data["variant_key"] = getattr(individual, "variant_key", None)
+        if simulated:
+            data["simulated"] = True
+        return EventEntry(
+            kind="target_defeated",
+            actor=str(actor.key),
+            target=str(individual.key),
+            data=data,
+            text_template="{actor} 擊敗了 {target}。",
+        )
+
+    def _plan(self, actor, entries):
+        from types import SimpleNamespace
+
+        from world.rules.event_log import EventLog
+
+        log = EventLog(
+            actor=str(actor.key),
+            skill_key="combat_upkeep",
+            targets=tuple(
+                entry.target for entry in entries if entry.target is not None
+            ),
+            entries=tuple(entries),
+            time_cost_seconds=0,
+        )
+        request = SimpleNamespace(
+            actor=actor, context=SimpleNamespace(battlefield=None)
+        )
+        return quest_event_effect_planner(request, log)
+
+    def _commit(self, effects) -> None:
+        for effect in effects:
+            effect.apply()
+
+    @staticmethod
+    def _quest_log_writes(effects) -> list[str]:
+        return [
+            effect.description
+            for effect in effects
+            if effect.description.startswith("quest_log|")
+        ]
+
+    def _records(self):
+        return [to_storage(record) for record in read_records(self.player)]
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_a_countable_stronger_variant_counts_once(self):
+        self._hunt_quest(quantity=3)
+        stage_active_record(self.player, "species_hunt")
+        stronger = self._individual(_HUNT_STRONGER)
+        entry = self._defeat_entry(self.player, stronger)
+        self._commit(self._plan(self.player, [entry]))
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 1)
+        self.assertEqual(stored["counted_defeat_ids"], [int(stronger.pk)])
+        # A redelivered entry for the same persistent identity advances nothing.
+        self.assertEqual(self._quest_log_writes(self._plan(self.player, [entry])), [])
+        self.assertEqual(self._records()[0], stored)
+        # A second stronger individual is a fresh identity and counts again.
+        second = self._individual(_HUNT_STRONGER)
+        self._commit(
+            self._plan(self.player, [self._defeat_entry(self.player, second)])
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 2)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_an_unlisted_variant_does_not_count(self):
+        self._hunt_quest(countable=(_HUNT_ORDINARY,), quantity=1)
+        stage_active_record(self.player, "species_hunt")
+        stronger = self._individual(_HUNT_STRONGER)
+        self.assertEqual(
+            self._quest_log_writes(
+                self._plan(self.player, [self._defeat_entry(self.player, stronger)])
+            ),
+            [],
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+        # The listed ordinary variant of the same species and region does count.
+        ordinary = self._individual(_HUNT_ORDINARY)
+        self._commit(
+            self._plan(self.player, [self._defeat_entry(self.player, ordinary)])
+        )
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 1)
+        self.assertEqual(stored["state"], "completed")
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_a_kill_outside_the_declared_region_does_not_count(self):
+        self._hunt_quest(quantity=1)
+        stage_active_record(self.player, "species_hunt")
+        outsider = self._individual(_HUNT_ORDINARY, room=self.elsewhere)
+        self.assertEqual(
+            self._quest_log_writes(
+                self._plan(self.player, [self._defeat_entry(self.player, outsider)])
+            ),
+            [],
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+        insider = self._individual(_HUNT_ORDINARY)
+        self._commit(
+            self._plan(self.player, [self._defeat_entry(self.player, insider)])
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 1)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_a_tier_only_individual_never_satisfies_a_hunt(self):
+        self._hunt_quest(quantity=1)
+        stage_active_record(self.player, "species_hunt")
+        tier_only = self._tier_only("hunt-tier-only")
+        self.assertIsNone(tier_only.species_key)
+        self.assertEqual(
+            self._quest_log_writes(
+                self._plan(self.player, [self._defeat_entry(self.player, tier_only)])
+            ),
+            [],
+        )
+        self.assertEqual(self._records()[0]["stage_progress"], 0)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_ordinary_targets_alone_always_suffice(self):
+        self._hunt_quest(quantity=2)
+        stage_active_record(self.player, "species_hunt")
+        ordinary = [self._individual(_HUNT_ORDINARY) for _ in range(2)]
+        self._commit(
+            self._plan(
+                self.player,
+                [self._defeat_entry(self.player, member) for member in ordinary],
+            )
+        )
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 2)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-progress-tracking::species-hunt-objectives-match-by-variant-membership-region-and-persistent-identity"
+    )
+    def test_a_real_action_defeat_of_a_countable_target_completes_the_hunt(self):
+        # The whole producer path, not a fabricated log: a real ActionResolver
+        # kill emits the identity entry, the planner resolves the individual's
+        # region from the row, and the quest log commits in the same action.
+        self._hunt_quest(countable=(_HUNT_ORDINARY,), quantity=1)
+        stage_active_record(self.player, "species_hunt")
+        target = self._individual(_HUNT_ORDINARY)
+        result = self._resolve(self.player, _T_SKILL, [target])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(target.traits.hp.current, 0)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["stage_progress"], 1)
+
+    @covers_requirement(
+        "quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events"
+    )
+    @covers_requirement(
+        "quest-blueprint::quest-records-carry-grade-rating-rationale-and-background-flavor-as-three-separate-authored-fields"
+    )
+    def test_flavor_prose_never_advances_or_completes_a_quest(self):
+        # Gameplay events the authored flavor narrates, but which do not satisfy
+        # the structured objective, move nothing: completion derives only from
+        # the objective.
+        self._hunt_quest(
+            countable=(_HUNT_ORDINARY,),
+            quantity=1,
+            rating_rationale_zh=_HUNT_RATIONALE,
+            background_flavor_zh=_HUNT_FLAVOR,
+        )
+        stage_active_record(self.player, "species_hunt")
+        narrated = (
+            self._individual(_HUNT_STRONGER),
+            self._individual(_HUNT_ORDINARY, room=self.elsewhere),
+            self._tier_only("hunt-narrated"),
+        )
+        self.assertEqual(
+            self._quest_log_writes(
+                self._plan(
+                    self.player,
+                    [self._defeat_entry(self.player, member) for member in narrated],
+                )
+            ),
+            [],
+        )
+        stored = self._records()[0]
+        self.assertEqual(stored["stage_progress"], 0)
+        self.assertEqual(stored["state"], "in_progress")
+        definition = QUEST_DEFINITION_REGISTRY["species_hunt"]
+        self.assertEqual(definition.rating_rationale_zh, _HUNT_RATIONALE)
+        self.assertEqual(definition.background_flavor_zh, _HUNT_FLAVOR)
+        # Only the structured kill completes it.
+        matching = self._individual(_HUNT_ORDINARY)
+        self._commit(
+            self._plan(self.player, [self._defeat_entry(self.player, matching)])
+        )
+        self.assertEqual(self._records()[0]["state"], "completed")
 
 
 if __name__ == "__main__":

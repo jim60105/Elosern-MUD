@@ -230,7 +230,10 @@ def accept_guild_offer(
     spelling. The quest-record creation and the +1 ``guild`` affinity gain
     with the issuing host commit in one all-or-nothing operation: the actor's
     quest-log surface and the host's affinity record are snapshotted before
-    the writes and restored on any failure.
+    the writes and restored on any failure, together with the wilderness
+    bookkeeping surfaces a species-hunt acceptance may have provisioned (the
+    affinity write happens after ``accept_quest`` returns, so the runtime's own
+    failure path cannot cover this boundary).
     """
     from typeclasses.components import GuildStaff
     from world.rules.affinity import AffinitySource, apply_affinity_change
@@ -248,10 +251,18 @@ def accept_guild_offer(
     branch_key = guild_staff.branch_key
     if not isinstance(branch_key, str) or not branch_key:
         raise BoardAccessError("GuildStaff host has no branch_key")
-    from world.quests.runtime import accept_quest
+    from world.quests.runtime import (
+        accept_quest,
+        provisioning_snapshot_for,
+        restore_provisioning,
+    )
 
     quest_log_snapshot = attribute_snapshot(actor, "quest_log")
     relations_snapshot = attribute_snapshot(staff, "relations_data")
+    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
+    provisioning_snapshot = (
+        None if definition is None else provisioning_snapshot_for(definition)
+    )
     try:
         with transaction.atomic():
             record = accept_quest(actor, definition_key, guild_issuer_key(branch_key))
@@ -259,6 +270,7 @@ def accept_guild_offer(
     except Exception:
         restore_attribute_best_effort(actor, "quest_log", quest_log_snapshot)
         restore_attribute_best_effort(staff, "relations_data", relations_snapshot)
+        restore_provisioning(provisioning_snapshot)
         raise
     return record
 

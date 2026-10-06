@@ -28,10 +28,12 @@ from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
     QuestDefinition,
+    QuestDefinitionError,
     QuestObjective,
     QuestStage,
     QuestType,
     RoomLocator,
+    validate_definition,
 )
 from world.rules.guild_offers import (
     ItemQuantity,
@@ -133,7 +135,29 @@ def _locator_from_payload(data: dict[str, Any] | None) -> RoomLocator | None:
     )
 
 
+def _variant_keys_from_payload(value: Any) -> Any:
+    """Decode a stored countable-variant list without coercing odd shapes.
+
+    A stored list or tuple becomes an immutable tuple and an absent key becomes
+    the empty default; anything else is passed through unchanged so the
+    definition validator rejects it loudly — ``tuple()`` on a bare string would
+    shred it into plausible single-character variant keys instead.
+    """
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return value
+
+
 def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
+    """Decode one stored objective, including the species-hunt selector.
+
+    The three hunt fields are read with absent-key defaults so a payload
+    written before the selector existed decodes to exactly the objective it
+    recorded; a *partial* selector is rejected right below, by validating the
+    reconstructed definition, rather than being silently reinterpreted.
+    """
     return QuestObjective(
         kind=ObjectiveKind(data["kind"]),
         quantity=data["quantity"],
@@ -141,6 +165,11 @@ def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
         destination=_locator_from_payload(data["destination"]),
         requires_bound_targets=data["requires_bound_targets"],
         item_key=data["item_key"],
+        region_key=data.get("region_key"),
+        species_key=data.get("species_key"),
+        countable_variant_keys=_variant_keys_from_payload(
+            data.get("countable_variant_keys")
+        ),
     )
 
 
@@ -243,6 +272,8 @@ def payload_to_registrations(
         rank=definition_data["rank"],
         stages=tuple(_stage_from_payload(stage) for stage in definition_data["stages"]),
         deadline_hours=definition_data["deadline_hours"],
+        rating_rationale_zh=definition_data.get("rating_rationale_zh"),
+        background_flavor_zh=definition_data.get("background_flavor_zh"),
     )
     issuance_data = payload["issuance"]
     reward_data = issuance_data["reward"]
@@ -292,7 +323,17 @@ def _validate_restored_payload(
     schema-drifted payloads fail loudly here (design D3) instead of silently
     registering a mismatched pair or leaving the SceneBuilder to fail
     mid-game.
+
+    The reconstructed definition is additionally re-validated against the
+    closed definition contract, so a stored species-hunt selector that is
+    partial, names an unknown region/species/variant, or carries a foreign
+    variant key is rejected at the payload boundary as a named compile error
+    rather than registering a hunt the runtime could never satisfy.
     """
+    try:
+        validate_definition(definition)
+    except QuestDefinitionError as error:
+        _reject(f"stored payload definition is invalid: {error}")
     try:
         parsed = parse_issuer_key(issuer_key)
     except IssuerKeyError as error:

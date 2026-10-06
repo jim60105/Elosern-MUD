@@ -12,7 +12,12 @@ from enum import StrEnum
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.lore.monster_species import (
+    MONSTER_SPECIES_REGISTRY,
+    MONSTER_VARIANT_REGISTRY,
+)
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.maps.map_data import XYMAP_DATA_LIST
 
 
@@ -48,6 +53,27 @@ class QuestDefinitionError(ValueError):
     """A definition violates the closed runtime input contract."""
 
 
+#: The authored-prose bounds of ``rating_rationale_zh`` /
+#: ``background_flavor_zh``. Both fields render *verbatim* into ``guild show``
+#: and into the frozen web quest-detail field, whose shared bound is 512 code
+#: points (``MAX_DETAIL_CODE_POINTS`` in the webclient presentation contract,
+#: which this change deliberately leaves untouched). The fixed detail sections —
+#: name, state, stage, objective line, progress, grade, deadline, reward —
+#: reserve roughly 230 of that, so the authored prose may spend 240 per field
+#: and 280 together; anything larger could not be displayed by those panels at
+#: all, which is why the bound is enforced at registration instead of silently
+#: truncating the authored text at render time.
+MAX_DEFINITION_PROSE_LENGTH = 240
+
+#: The combined bound of the two prose fields, for the same reason.
+MAX_DEFINITION_PROSE_TOTAL = 280
+
+#: The CJK Unified Ideographs block: an authored player-facing prose field must
+#: contain at least one, so an ASCII placeholder cannot masquerade as zh-TW text.
+_CJK_START = "\u4e00"
+_CJK_END = "\u9fff"
+
+
 KNOWN_GRID_MAP_KEYS: frozenset[str] = frozenset(
     map_data["zcoord"]
     for map_data in XYMAP_DATA_LIST
@@ -78,6 +104,15 @@ class QuestObjective:
     destination: RoomLocator | None = None
     requires_bound_targets: bool = False
     item_key: str | None = None
+    #: The regional species-hunt selector (design D-Q1/D-Q2): a region key, a
+    #: species key, and the countable variant keys owned by that species. The
+    #: three are legal only together, mutually exclusive with ``monster_tier``
+    #: and ``requires_bound_targets``, and at least one countable variant must be
+    #: an ordinary baseline variant, so the acceptance-time guarantee about
+    #: ordinary-eligible living targets is always expressible.
+    region_key: str | None = None
+    species_key: str | None = None
+    countable_variant_keys: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -98,10 +133,132 @@ class QuestDefinition:
     rank: str
     stages: tuple[QuestStage, ...]
     deadline_hours: int | None = None
+    #: The two separately authored prose fields beside the guild grade
+    #: (``rank``): why the authored arrangement, abilities, or terrain are
+    #: risky, and the issuer's motivation with the local events. Both are
+    #: readable offline and neither participates in completion, failure, or
+    #: progress (design D-Q5).
+    rating_rationale_zh: str | None = None
+    background_flavor_zh: str | None = None
 
 
 def _reject(definition: QuestDefinition, message: str) -> None:
     raise QuestDefinitionError(f"{definition.key}: {message}")
+
+
+def _declared_hunt_fields(objective: QuestObjective) -> tuple[str, ...]:
+    """The species-hunt selector fields the objective declares, by name."""
+    declared = []
+    if objective.region_key is not None:
+        declared.append("region_key")
+    if objective.species_key is not None:
+        declared.append("species_key")
+    if objective.countable_variant_keys:
+        declared.append("countable_variant_keys")
+    return tuple(declared)
+
+
+def _validate_hunt_selector(
+    definition: QuestDefinition,
+    objective: QuestObjective,
+) -> None:
+    """Validate the complete regional species-hunt selector.
+
+    Every reference is a stable registry key (a display name is never a
+    selector), every countable variant is owned by the declared species, and at
+    least one countable variant is an ordinary baseline variant: without that,
+    the acceptance-time guarantee about ordinary-eligible living targets could
+    not be expressed (design D-Q2).
+    """
+    region_key = objective.region_key
+    if not isinstance(region_key, str) or not region_key:
+        _reject(definition, "species hunt requires a non-empty region_key")
+    if region_key not in WILDERNESS_REGION_REGISTRY:
+        _reject(
+            definition,
+            f"species hunt names unknown wilderness region {region_key!r}",
+        )
+    species_key = objective.species_key
+    if not isinstance(species_key, str) or not species_key:
+        _reject(definition, "species hunt requires a non-empty species_key")
+    if species_key not in MONSTER_SPECIES_REGISTRY:
+        _reject(
+            definition,
+            f"species hunt names unknown monster species {species_key!r}",
+        )
+    variant_keys = objective.countable_variant_keys
+    if not isinstance(variant_keys, tuple) or not variant_keys:
+        _reject(
+            definition,
+            "species hunt requires a non-empty tuple of countable variant keys",
+        )
+    seen: set[str] = set()
+    has_ordinary = False
+    for variant_key in variant_keys:
+        if not isinstance(variant_key, str) or not variant_key:
+            _reject(definition, "countable variant keys must be non-empty strings")
+        if variant_key in seen:
+            _reject(definition, f"duplicate countable variant key {variant_key!r}")
+        seen.add(variant_key)
+        variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+        if variant is None:
+            _reject(
+                definition,
+                f"species hunt names unknown monster variant {variant_key!r}",
+            )
+        if variant.species_key != species_key:
+            _reject(
+                definition,
+                f"countable variant {variant_key!r} belongs to species "
+                f"{variant.species_key!r}, not {species_key!r}",
+            )
+        if variant.ordinary_variant:
+            has_ordinary = True
+    if not has_ordinary:
+        _reject(
+            definition,
+            "species hunt requires at least one ordinary baseline variant "
+            "among its countable variants",
+        )
+
+
+def _validate_prose(
+    definition: QuestDefinition,
+    field: str,
+    value: object,
+) -> None:
+    """Reject a prose field that is not bounded Traditional Chinese player text."""
+    if value is None:
+        return
+    if not isinstance(value, str) or not value.strip():
+        _reject(definition, f"{field} must be a non-empty string or None")
+    if len(value) > MAX_DEFINITION_PROSE_LENGTH:
+        _reject(
+            definition,
+            f"{field} exceeds the {MAX_DEFINITION_PROSE_LENGTH}-character bound",
+        )
+    if not any(_CJK_START <= character <= _CJK_END for character in value):
+        _reject(
+            definition,
+            f"{field} carries no CJK Unified Ideograph and is not Traditional Chinese",
+        )
+
+
+def ordinary_countable_variant_keys(objective: QuestObjective) -> tuple[str, ...]:
+    """The objective's countable variants that are ordinary baseline variants.
+
+    Ordinary-eligibility is derived, countability is authored (design D-Q2):
+    the acceptance-time guarantee covers only ordinary variants, and
+    registration guarantees at least one countable variant is ordinary, so a
+    registered hunt selector never yields an empty tuple here. An objective
+    that was never validated degrades to an empty tuple instead of raising.
+    """
+    ordinary: list[str] = []
+    for variant_key in objective.countable_variant_keys:
+        variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+        if variant is not None and variant.ordinary_variant:
+            ordinary.append(variant_key)
+    return tuple(ordinary)
 
 
 def _validate_destination(
@@ -164,13 +321,24 @@ def _validate_objective(
             _reject(definition, "DEFEAT objective cannot declare a destination")
         has_tier = objective.monster_tier is not None
         has_bound = objective.requires_bound_targets is True
-        if has_tier == has_bound:
+        has_hunt = bool(_declared_hunt_fields(objective))
+        if has_hunt:
+            if has_tier or has_bound:
+                _reject(
+                    definition,
+                    "DEFEAT objective declares a regional species hunt beside "
+                    "monster_tier or requires_bound_targets; a hunt declares "
+                    "exactly one selector family",
+                )
+            _validate_hunt_selector(definition, objective)
+        elif has_tier == has_bound:
             _reject(
                 definition,
                 "DEFEAT objective must declare exactly one of a known "
-                "monster_tier or requires_bound_targets=True",
+                "monster_tier, requires_bound_targets=True, or the complete "
+                "regional species-hunt selector",
             )
-        if has_tier and objective.monster_tier not in MONSTER_TIER_REGISTRY:
+        elif has_tier and objective.monster_tier not in MONSTER_TIER_REGISTRY:
             _reject(
                 definition,
                 f"unknown monster tier {objective.monster_tier!r}",
@@ -178,6 +346,11 @@ def _validate_objective(
     elif objective.kind is ObjectiveKind.REACH:
         if objective.monster_tier is not None or objective.requires_bound_targets:
             _reject(definition, "REACH objective cannot declare defeat selectors")
+        if _declared_hunt_fields(objective):
+            _reject(
+                definition,
+                "REACH objective cannot declare a regional species-hunt selector",
+            )
         if objective.quantity != 1:
             _reject(
                 definition,
@@ -188,6 +361,11 @@ def _validate_objective(
     elif objective.kind is ObjectiveKind.ESCORT:
         if objective.monster_tier is not None or objective.requires_bound_targets:
             _reject(definition, "ESCORT objective cannot declare defeat selectors")
+        if _declared_hunt_fields(objective):
+            _reject(
+                definition,
+                "ESCORT objective cannot declare a regional species-hunt selector",
+            )
         if objective.quantity != 1:
             _reject(
                 definition,
@@ -206,6 +384,11 @@ def _validate_objective(
                 "ACQUIRE objective cannot declare defeat selectors, a destination, "
                 "or bound-target requirements",
             )
+        if _declared_hunt_fields(objective):
+            _reject(
+                definition,
+                "ACQUIRE objective cannot declare a regional species-hunt selector",
+            )
         item_key = objective.item_key
         if not isinstance(item_key, str) or not item_key:
             _reject(definition, "ACQUIRE objective requires exactly one known item_key")
@@ -216,6 +399,11 @@ def _validate_objective(
             _reject(definition, "DELIVER objective cannot declare a destination")
         if objective.monster_tier is not None:
             _reject(definition, "DELIVER objective cannot declare a monster_tier")
+        if _declared_hunt_fields(objective):
+            _reject(
+                definition,
+                "DELIVER objective cannot declare a regional species-hunt selector",
+            )
         if objective.requires_bound_targets is not True:
             _reject(definition, "DELIVER objective requires requires_bound_targets to be True")
         item_key = objective.item_key
@@ -241,6 +429,18 @@ def validate_definition(definition: QuestDefinition) -> None:
         _reject(definition, "quest_type must be a QuestType value")
     if not isinstance(definition.rank, str) or not definition.rank:
         _reject(definition, "rank must be a non-empty string")
+    _validate_prose(definition, "rating_rationale_zh", definition.rating_rationale_zh)
+    _validate_prose(definition, "background_flavor_zh", definition.background_flavor_zh)
+    prose_total = len(definition.rating_rationale_zh or "") + len(
+        definition.background_flavor_zh or ""
+    )
+    if prose_total > MAX_DEFINITION_PROSE_TOTAL:
+        _reject(
+            definition,
+            f"authored prose totals {prose_total} characters, above the "
+            f"{MAX_DEFINITION_PROSE_TOTAL}-character bound the rendered quest "
+            "detail (and the frozen web detail field) can carry",
+        )
     if not isinstance(definition.stages, tuple) or not definition.stages:
         _reject(definition, "stages must be a non-empty tuple of QuestStage values")
     deadline = definition.deadline_hours

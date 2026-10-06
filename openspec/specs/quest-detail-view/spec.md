@@ -11,7 +11,11 @@ inside the game, rendered deterministically from immutable quest values.
 `guild show <quest_id>` SHALL render one of the caller's own quest records with
 its display name, state, stage index, the current stage's objective description,
 progress, deadline (when the definition sets one), and the registered reward for
-that definition at the caller's branch (when one exists). It SHALL resolve the
+that definition at the caller's branch (when one exists). When the definition
+carries them, it SHALL additionally render the authored guild grade, the rating
+rationale, and the background flavor as three distinctly labelled sections — the
+rationale and flavor verbatim from the definition's authored prose — and an
+absent optional field SHALL be omitted rather than fabricated. It SHALL resolve the
 record through the quest runtime read APIs and SHALL NOT require a local
 `GuildStaff` host. An unknown quest id SHALL produce a Traditional Chinese error
 and SHALL cause no state change.
@@ -51,15 +55,28 @@ and SHALL cause no state change.
 - **THEN** the detail renders an expired-deadline line rather than a negative
   remaining duration
 
+#### Scenario: Grade, rationale, and flavor render as three sections
+- **WHEN** a definition authored with grade, rating rationale, and background flavor is shown
+- **THEN** the output labels the three separately, renders both prose fields verbatim, and none of them replaces the objective description
+
+#### Scenario: Prose-only quest still shows unmet objectives
+- **WHEN** a flavor-rich quest's objectives are incomplete
+- **THEN** the detail shows flavor prose alongside incomplete progress, never a completion claim
+
 ### Requirement: Objective descriptions are deterministic and exhaustive
 The rendering layer SHALL produce a Traditional Chinese description for every
 `ObjectiveKind` and `DestinationKind` combination used by the closed definition
-vocabulary. It SHALL be read-only, SHALL NOT write quest or player state, and
+vocabulary, including the regional species-hunt selector (region display name, species
+display name, required count, and the countable variants' display names). It SHALL be read-only, SHALL NOT write quest or player state, and
 SHALL raise on an unknown `ObjectiveKind` so drift fails loudly in tests.
 
 #### Scenario: DEFEAT objective renders tier and quantity
 - **WHEN** a DEFEAT objective declares tier `low` and quantity `1`
 - **THEN** the description states the monster tier and the required count
+
+#### Scenario: Species hunt renders region, species, and countable variants
+- **WHEN** a species-hunt objective declares region, species, quantity, and countable variants
+- **THEN** the description names the region, the species, the count, and the eligible variants in deterministic order
 
 #### Scenario: REACH objective renders its destination
 - **WHEN** a REACH objective declares an anchor, grid, or bound-instance

@@ -32,6 +32,7 @@ from web.webclient.presentation.registry import (
     UNAVAILABLE_REASON,
     build_production_registry,
 )
+from web.webclient.presentation.services import MAX_DETAIL_CODE_POINTS
 from world.quests.catalog import register_catalog
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -461,6 +462,29 @@ class QuestLogPresenterTests(EvenniaTest):
 
         row = self._render()["rows"][0]
         self.assertEqual(row["state"], "completed")
+
+    @covers_requirement(
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_maximum_authored_prose_still_renders_within_the_detail_bound(self):
+        # The authored-prose bound is derived from this frozen field bound: a
+        # definition authored at the maximum must still render through the
+        # strict presenter validator instead of degrading the panel.
+        rationale = "評" * 140
+        flavor = "事" * 140
+        definition = register(
+            quest(
+                "t_prose_bound_quest",
+                stages=(QuestStage(0, defeat(quantity=1)),),
+                rating_rationale_zh=rationale,
+                background_flavor_zh=flavor,
+            )
+        )
+        accept_under_auto(self.player, definition)
+        row = self._render()["rows"][0]
+        self.assertLessEqual(len(row["detail"]), MAX_DETAIL_CODE_POINTS)
+        self.assertIn(f"評價理由：{rationale}", row["detail"])
+        self.assertIn(f"背景：{flavor}", row["detail"])
 
     @staticmethod
     def _json_default(obj):

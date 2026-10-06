@@ -21,6 +21,7 @@ from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
     QuestNotFound,
+    QuestTargetsUnavailable,
     QuestTransitionError,
     set_quest_tracked,
 )
@@ -342,6 +343,7 @@ def _quest_accept_adapter(actor: Any, payload: dict[str, Any], session: Any = No
         QuestDataError,
         QuestNotFound,
         QuestAlreadyActive,
+        QuestTargetsUnavailable,
     ) as error:
         return _rejected(error)
     message = f"你接取了任務 {record.quest_id}。"

@@ -14,7 +14,8 @@ advance the owner's matching stage when the acting entity is a bound companion o
 party binding) and is not knocked out; a companion's entries SHALL follow the same aggregation, cap,
 and one-transition rules as the owner's own. A
 bound-target objective SHALL match `data["target_id"]` against the record's `objective_target_ids`; an
-unbound objective SHALL match its declared `monster_tier`. Display
+unbound tier objective SHALL match its declared `monster_tier`; a regional species-hunt objective SHALL
+match by the species-hunt rules below. Display
 keys SHALL NOT be used as entity identity. Counting SHALL key on the defeated individual's persistent
 identity, and each record SHALL keep the set of individual identities already counted for its current
 objective: a duplicate or redelivered `target_defeated` entry for an identity this record has already
@@ -176,3 +177,35 @@ REACH/ESCORT arrival observation SHALL increment stage progress by at most one p
 
 - **WHEN** a matching arrival would advance progress beyond the objective quantity
 - **THEN** progress is capped at the quantity and the quest transitions at most once
+
+### Requirement: Species-hunt objectives match by variant membership, region, and persistent identity
+The quest planner SHALL evaluate a regional species-hunt DEFEAT objective against the `target_defeated`
+entry's species/variant identity fields: an entry counts only when its species key equals the
+objective's species key, its variant key is one of the objective's countable variant keys, and the
+defeated individual's location resolved inside the objective's declared region at defeat time. Each
+distinct persistent individual identity counts at most once per record (composing with the
+already-counted-identity dedupe), including stronger same-species variants in a general hunt — one
+stronger individual never counts twice and is never required when ordinary-eligible targets suffice. An
+entry with no species identity (tier-only individual) SHALL never satisfy a species hunt, and a hunt
+whose countable variants name specific variants SHALL count only those. Matching SHALL NOT consult
+display names, guild rank, or a single stat.
+
+#### Scenario: A countable stronger variant counts once
+- **WHEN** a general hunt counts eligible variants and a stronger same-species individual inside the region is defeated
+- **THEN** progress advances by one for that identity, and a duplicate event for it advances nothing
+
+#### Scenario: An unlisted variant does not count
+- **WHEN** a defeated individual's variant is a registered variant of the species but not among the objective's countable variants
+- **THEN** progress does not advance
+
+#### Scenario: Outside the region does not count
+- **WHEN** an individual of the right species and a countable variant is defeated outside the declared region
+- **THEN** progress does not advance
+
+#### Scenario: Ordinary targets alone always suffice
+- **WHEN** a hunt's ordinary-eligible targets were guaranteed at acceptance and all counted defeats are ordinary variants
+- **THEN** the objective completes without requiring any stronger variant
+
+#### Scenario: Tier-only kills never satisfy a species hunt
+- **WHEN** a tier-only monster without species identity is defeated inside the region
+- **THEN** the species-hunt objective's progress is unchanged

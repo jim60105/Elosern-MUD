@@ -25,7 +25,8 @@ from world.rules.quest_issuance import (
     npc_issuer_key,
     register_quest_issuance,
 )
-from world.quests.runtime import QuestRecord, accept_quest
+from world.quests.runtime import QuestRecord, QuestState, accept_quest, read_records
+from world.quests.transitions import apply_quest_log_replacement
 
 
 class QuestRegistryIsolation:
@@ -172,6 +173,8 @@ def quest(
     quest_type: QuestType = QuestType.DEFEAT,
     rank: str = "F",
     deadline_hours: int | None = None,
+    rating_rationale_zh: str | None = None,
+    background_flavor_zh: str | None = None,
 ) -> QuestDefinition:
     if stages is None:
         stages = (QuestStage(index=0, objective=defeat()),)
@@ -182,6 +185,8 @@ def quest(
         rank=rank,
         stages=stages,
         deadline_hours=deadline_hours,
+        rating_rationale_zh=rating_rationale_zh,
+        background_flavor_zh=background_flavor_zh,
     )
 
 
@@ -232,6 +237,38 @@ def accept(actor: Any, definition: QuestDefinition | str) -> QuestRecord:
     """
     key = definition.key if isinstance(definition, QuestDefinition) else str(definition)
     return accept_quest(actor, key, _ensure_test_issuance(key))
+
+
+def stage_active_record(
+    actor: Any,
+    definition: QuestDefinition | str,
+) -> QuestRecord:
+    """Write one active stage-zero record directly, bypassing acceptance gates.
+
+    Acceptance's own gates — issuer resolution and a hunt's target-availability
+    guarantee — are exercised by the lifecycle tests. This writer exists for the
+    tests whose subject *consumes* an already-active record (selector matching,
+    rendering): the record is staged through the same quest-log writer the
+    lifecycle uses, so the stored shape stays the production one.
+    """
+    key = definition if isinstance(definition, str) else definition.key
+    issuer_key = _ensure_test_issuance(key)
+    record = QuestRecord(
+        quest_id=f"{key}:1",
+        definition_key=key,
+        issuer_key=issuer_key,
+        state=QuestState.IN_PROGRESS,
+        stage_index=0,
+        stage_progress=0,
+        deadline_tick=None,
+        accepted_tick=0,
+        stage_room_id=None,
+        objective_target_ids=(),
+        protected_entity_ids=(),
+        failure_reason=None,
+    )
+    apply_quest_log_replacement(actor, [*read_records(actor), record])
+    return record
 
 
 # The shared automatic commission: same registry-backed resolution as the
