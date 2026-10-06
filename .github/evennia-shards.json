@@ -264,6 +264,7 @@
       "name": "webclient-actions",
       "labels": [
         "web.webclient.actions",
+        "web.gm.tests",
         "world.tests"
       ]
     },

@@ -28,6 +28,9 @@ urlpatterns = [
     path("webclient/", include("web.webclient.urls")),
     # web admin
     path("admin/", include("web.admin.urls")),
+    # GM portal: Developer-only operator SPA and its JSON API
+    # (gm-portal-s1-foundation); every route is wrapped by gm_required.
+    path("gm/", include("web.gm.urls")),
     # art assets: same-origin media route for validated stored identities.
     path("art/<path:identity>", art_media, name="art-media"),
     # add any extra urls here:

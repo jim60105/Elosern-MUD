@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+{% comment %}
+GM portal SPA shell (gm-portal-s1-foundation). Served for /gm/ and every
+non-API GM history path. It loads ONLY the separately built GM bundle
+(web/static/gm/dist, stable index.js / index.css) from the project origin,
+never the game webclient bundle. The login and logout destinations come from
+settings (LOGIN_URL / LOGOUT_URL) so the SPA hard-codes neither.
+{% endcomment %}
+{% load static %}
+<html lang="zh-Hant" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Elosern GM 控制台</title>
+    <link rel="stylesheet" href="{% static "gm/dist/index.css" %}">
+    <script type="module" src="{% static "gm/dist/index.js" %}"></script>
+  </head>
+  <body class="gm-page">
+    <div
+      id="gm-app"
+      data-login-url="{{ gm_login_url }}"
+      data-logout-url="{{ gm_logout_url }}"
+    ></div>
+    <noscript>GM 控制台需要啟用 JavaScript。</noscript>
+  </body>
+</html>
