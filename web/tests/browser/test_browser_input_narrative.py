@@ -44,6 +44,12 @@ from .harness import ManagedServer, ManagedServerTearDownMixin, wait_command_fie
 from . import fixtures
 
 
+# The paging journeys' own fixture: one tagged sentence per line. The tag lets
+# a gate name the response it appended instead of whichever response happens
+# to sit at page 1 of a multi-page layout.
+_PARAGRAPH_TAG = "【段落{}】"
+
+
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
     page.wait_for_timeout(wait_ms)
@@ -140,6 +146,10 @@ def _append_multipage_response(page):
     These journeys assert paging, not typing, so the helper pins the reader's
     text speed to `instant` first (webclient-typewriter-reading-prefs design
     D11): every page is fully shown, with its marker, as soon as it shows.
+    The gate names the appended response's own first sentence: a response
+    already on screen can sit at page 1 of its own multi-page layout, so a
+    gate on the paging attributes alone can pass before the window has
+    re-paged for this one, and the journey then measures that stale page.
     """
     # Ensure MessageWindow has completed its initial mount pass (`initialized = true`)
     # on an earlier response before the new multi-page response arrives; otherwise
@@ -166,7 +176,7 @@ def _append_multipage_response(page):
         timeout=30000,
     )
     sentences = "".join(
-        f"【段落{i}】霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+        f"{_PARAGRAPH_TAG.format(i)}霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
         for i in range(1, 16)
     )
     page.evaluate(
@@ -185,9 +195,10 @@ def _append_multipage_response(page):
             "predicate": (
                 "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
                 " return !!p && p.getAttribute('data-page') === '1'"
-                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }"
+                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2"
+                f" && p.innerText.indexOf('{_PARAGRAPH_TAG.format(1)}') !== -1; }}"
             ),
-            "description": "message-page opened at page 1 of a multi-page response",
+            "description": "message-page shows the appended response at page 1",
         },
         timeout=30000,
     )

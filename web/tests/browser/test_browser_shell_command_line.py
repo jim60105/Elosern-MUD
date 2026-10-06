@@ -53,12 +53,25 @@ def _wait_narrative_grew(page, before_len, timeout=30000):
     )
 
 
+# The paging journeys' own fixture: one sentence per line, tagged so a gate can
+# name the response it appended. Fifteen of them exceed one page, so appending
+# the same body again must add a page — the observation the tail gate needs.
+_SENTENCE_BODY = "霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
+_APPENDED_TAG = "第{}句："
+_APPENDED_MARK = _APPENDED_TAG.format(1)
+_TAIL_TAG = "尾聲第{}句："
+
+
 def _append_multipage_response(page):
-    """Append a multi-page response and gate on `[data-testid="message-page"]` opening at page 1 of >=2 pages.
+    """Append a multi-page response and gate on `[data-testid="message-page"]` showing it at page 1.
 
     These journeys assert paging, not typing, so the helper pins the reader's
     text speed to `instant` first (webclient-typewriter-reading-prefs design
     D11): every page is fully shown, with its marker, as soon as it shows.
+    The gate names the appended response's own first sentence: the retained
+    log already opens at page 1 of a two-page response, so a gate on the
+    paging attributes alone passes on the response that was on screen before
+    the append, and the journey then measures that stale page.
     """
     page.evaluate(
         """() => {
@@ -82,8 +95,7 @@ def _append_multipage_response(page):
         timeout=30000,
     )
     sentences = "".join(
-        f"第{i}句：霧氣沿著灰河的水面緩緩蔓延過青石長街與古老橋墩，遠處燈火在夜色中明滅不定。"
-        for i in range(1, 16)
+        _APPENDED_TAG.format(i) + _SENTENCE_BODY for i in range(1, 16)
     )
     page.evaluate(
         """(text) => {
@@ -101,9 +113,10 @@ def _append_multipage_response(page):
             "predicate": (
                 "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
                 " return !!p && p.getAttribute('data-page') === '1'"
-                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }"
+                " && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2"
+                f" && p.innerText.indexOf('{_APPENDED_MARK}') !== -1; }}"
             ),
-            "description": "message-page opened at page 1 of a multi-page response",
+            "description": "message-page shows the appended response at page 1",
         },
         timeout=30000,
     )
@@ -206,15 +219,33 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         total_before = int(surface.get_attribute("data-pages") or "0")
 
         # Appending another line to the same response never moves the reader
-        # off the page on screen.
-        page.evaluate(
-            "() => window.__elosernBridge.store.appendText('out', '尾聲：遠處傳來沉穩的鐘聲。')"
+        # off the page on screen. The appended text is a whole response's
+        # worth, so the window's re-page for it must add a page: gating on
+        # that growth is what distinguishes the re-paged layout from the
+        # layout the append has not reached yet.
+        tail = "".join(
+            _TAIL_TAG.format(i) + _SENTENCE_BODY for i in range(1, 16)
         )
-        page.wait_for_timeout(120)
+        page.evaluate(
+            "(text) => window.__elosernBridge.store.appendText('out', text)", tail
+        )
+        wait_for_store_state(
+            page,
+            lambda s: bool(s.get("connected")),
+            dom_readiness={
+                "selector": '[data-testid="message-page"]',
+                "predicate": (
+                    "() => { const p = document.querySelector('[data-testid=\"message-page\"]');"
+                    " return !!p && p.getAttribute('data-page') === '1'"
+                    f" && parseInt(p.getAttribute('data-pages') || '0', 10) > {total_before}; }}"
+                ),
+                "description": "the appended tail re-paged with the reader still on page 1",
+            },
+        )
         self.assertEqual(surface.get_attribute("data-page"), "1")
         self.assertEqual(surface.inner_text(), page_1_text)
         self.assertEqual(marker.inner_text(), "▼")
-        self.assertGreaterEqual(int(surface.get_attribute("data-pages") or "0"), total_before)
+        self.assertGreater(int(surface.get_attribute("data-pages") or "0"), total_before)
 
         # Clicking the window advances page by page to ■ on the last page.
         total = int(surface.get_attribute("data-pages") or "0")
