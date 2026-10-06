@@ -1,18 +1,38 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { faceObjectPosition } from "./face-rect.js";
-import { galleryCardName, galleryDate } from "./gallery-copy.js";
+import {
+  GALLERY_OFFICIAL_CHIPS,
+  GALLERY_OFFICIAL_LABEL,
+  galleryCardName,
+  galleryDate,
+  galleryOfficialName,
+} from "./gallery-copy.js";
 import "./gallery.css";
 
 const props = defineProps({
   card: { type: Object, default: null },
+  // The committed official row the player selected, or null.
+  entry: { type: Object, default: null },
   capabilities: { type: Object, default: () => ({}) },
   warnings: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
   // The host gallery's minute clock (epoch ms) for the relative date.
   now: { type: Number, default: () => Date.now() },
 });
-const emit = defineEmits(["default", "delete", "generate", "binding", "face", "stage"]);
+const emit = defineEmits([
+  "default",
+  "delete",
+  "generate",
+  "binding",
+  "face",
+  "stage",
+  "official-select",
+  "official-clear",
+  "official-face",
+  "official-stage",
+  "official-geometry-clear",
+]);
 const confirming = ref(false);
 const conditions = computed(() => props.warnings.find((row) => row.image_id === props.card?.image_id)?.conditions);
 const date = computed(() => galleryDate(props.card?.created_at, props.now));
@@ -28,7 +48,31 @@ function confirmDelete() {
 <template>
   <aside class="gallery-ui gallery-detail" data-testid="gallery-detail">
     <h3>肖像詳情</h3>
-    <template v-if="card">
+    <!-- An official entry is read-only shared artwork: it offers selection,
+         preview, and the player's own geometry overrides — never delete,
+         replace, or regenerate. The backend refuses those independently. -->
+    <template v-if="entry">
+      <img class="gallery-detail__image" :src="entry.url" :alt="galleryOfficialName(entry)" :style="{ objectPosition: faceObjectPosition(entry.face_rect) }">
+      <h4>{{ GALLERY_OFFICIAL_LABEL }}</h4>
+      <p class="gallery-detail__identity gallery-muted">{{ entry.identity }}</p>
+      <div class="gallery-chips">
+        <span v-if="entry.is_current" class="gallery-chip">{{ GALLERY_OFFICIAL_CHIPS.current }}</span>
+        <span v-if="entry.is_catalog_default" class="gallery-chip">{{ GALLERY_OFFICIAL_CHIPS.catalogDefault }}</span>
+      </div>
+      <section class="gallery-section">
+        <h4>目前狀態</h4>
+        <p>{{ entry.is_current ? '目前預設' : '未設為預設' }}</p>
+        <p class="gallery-muted">官方圖片為唯讀；你可以選擇它，或調整自己的顯示方式。</p>
+        <button class="gallery-primary gallery-detail__default" :disabled="disabled || entry.is_current" @click="emit('official-select')">設為預設影像</button>
+        <div class="gallery-actions">
+          <button :disabled="disabled" @click="emit('official-face')">臉部框選</button>
+          <button :disabled="disabled" @click="emit('official-stage')">比例調整</button>
+          <button :disabled="disabled || !entry.is_current" @click="emit('official-clear')">清除選取</button>
+          <button :disabled="disabled" @click="emit('official-geometry-clear')">清除個人調整</button>
+        </div>
+      </section>
+    </template>
+    <template v-else-if="card">
       <img v-if="card.status === 'card' && card.url" class="gallery-detail__image" :src="card.url" :alt="galleryCardName(card)" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
       <p v-else class="gallery-note">{{ card.label }}</p>
       <h4>{{ card.label }}</h4>
@@ -69,6 +113,7 @@ function confirmDelete() {
 .gallery-detail { min-width: 0; padding: calc(18px * var(--ui-scale)); border-left: 1px solid #bca57955; background: linear-gradient(150deg, #1d1e2520, #0a0e15); }
 .gallery-detail h3 { padding-right: calc(36px * var(--ui-scale)); }
 .gallery-detail__image { width: 100%; height: clamp(190px * var(--ui-scale), 32vh, 360px * var(--ui-scale)); object-fit: cover; border: 1px solid #bca57988; border-radius: var(--radius-sm); margin-bottom: calc(12px * var(--ui-scale)); }
+.gallery-detail__identity { overflow-wrap: anywhere; font-size: var(--text-xs); }
 .gallery-detail h4 { overflow-wrap: anywhere; margin-bottom: calc(6px * var(--ui-scale)); }
 .gallery-detail ul { padding-left: calc(18px * var(--ui-scale)); }
 .gallery-detail__default, .gallery-detail__generate { width: 100%; margin-bottom: calc(10px * var(--ui-scale)); }

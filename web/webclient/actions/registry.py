@@ -179,12 +179,20 @@ def build_production_action_registry() -> ActionRegistry:
         _gallery_face_rect_update_adapter,
         _gallery_stage_update_adapter,
         _gallery_binding_save_adapter,
+        _gallery_official_select_adapter,
+        _gallery_official_clear_selection_adapter,
+        _gallery_official_geometry_set_adapter,
+        _gallery_official_geometry_clear_adapter,
         validate_gallery_subject_select_payload,
         validate_gallery_generate_payload,
         validate_gallery_card_payload,
         validate_gallery_face_rect_update_payload,
         validate_gallery_stage_update_payload,
         validate_gallery_binding_save_payload,
+        validate_gallery_official_select_payload,
+        validate_gallery_official_clear_selection_payload,
+        validate_gallery_official_geometry_payload,
+        validate_gallery_official_geometry_clear_payload,
     )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
@@ -625,6 +633,24 @@ def build_production_action_registry() -> ActionRegistry:
     registry.register(ActionSpec(
         "gallery.stage.update", validate_gallery_stage_update_payload,
         _gallery_stage_update_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.official.select", validate_gallery_official_select_payload,
+        _gallery_official_select_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.official.clear_selection",
+        validate_gallery_official_clear_selection_payload,
+        _gallery_official_clear_selection_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.official.geometry.set", validate_gallery_official_geometry_payload,
+        _gallery_official_geometry_set_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.official.geometry.clear",
+        validate_gallery_official_geometry_clear_payload,
+        _gallery_official_geometry_clear_adapter, ("gallery",),
     ))
     registry.register(ActionSpec(
         "npc.persona.read", validate_read_payload,

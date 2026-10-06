@@ -101,6 +101,10 @@ class RegistryTests(unittest.TestCase):
                     # gallery stage-transform changes; the registry allowlist
                     # mirrors the production registry exactly.
                     "gallery.stage.update",
+                    "gallery.official.select",
+                    "gallery.official.clear_selection",
+                    "gallery.official.geometry.set",
+                    "gallery.official.geometry.clear",
                     "letters.collect",
                     "letters.list",
                     "letters.read",

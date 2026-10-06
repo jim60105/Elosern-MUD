@@ -1,6 +1,7 @@
 """Gallery actions through real records/dispatch, with deterministic offline settlement."""
 
 from copy import deepcopy
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -14,6 +15,7 @@ from django.test import override_settings
 from evennia.server.signals import SIGNAL_OBJECT_POST_UNPUPPET
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+from PIL import Image
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
@@ -27,7 +29,10 @@ from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import validate_ui_action_result
 from web.webclient.presentation.registry import build_production_registry
 from world.art import gallery as api
+from world.art import official, official_refs
 from world.art import queue
+from world.art.official import current_catalog, load_catalog, reset_catalog
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.clock import get_world_clock
@@ -35,6 +40,7 @@ from world.rules.clock import get_world_clock
 ROOT = Path(__file__).resolve().parents[4]
 SUBJECT = "portrait:character:t_gallery_actor"
 IMAGE = "12345678-1234-1234-1234-123456789abc"
+OFFICIAL_IDENTITY = "preset/t_gallery_preset/a.png"
 PAYLOADS = {
     "gallery.subject.select": {"subject_key": SUBJECT},
     "gallery.generate": {"subject_key": SUBJECT, "fields": ["appearance", "armor"], "custom_prompt": "  測試光影  "},
@@ -43,6 +49,17 @@ PAYLOADS = {
     "gallery.face_rect.update": {"subject_key": SUBJECT, "image_id": IMAGE, "face_rect": {"x": 0.125, "y": 0.25, "w": 0.5, "h": 0.5}},
     "gallery.stage.update": {"subject_key": SUBJECT, "image_id": IMAGE, "stage": {"scale": 0.6, "x": -0.2, "y": 0.1}},
     "gallery.binding.save": {"subject_key": SUBJECT, "image_id": IMAGE, "slots": ["accessories", "weapon_off"]},
+    "gallery.official.select": {"subject_key": SUBJECT, "identity": OFFICIAL_IDENTITY},
+    "gallery.official.clear_selection": {"subject_key": SUBJECT},
+    "gallery.official.geometry.set": {
+        "subject_key": SUBJECT,
+        "identity": OFFICIAL_IDENTITY,
+        "face_rect": {"x": 0.125, "y": 0.25, "w": 0.5, "h": 0.5},
+    },
+    "gallery.official.geometry.clear": {
+        "subject_key": SUBJECT,
+        "identity": OFFICIAL_IDENTITY,
+    },
 }
 
 
@@ -85,6 +102,58 @@ def wire_cases():
     for value in (None, {}, {"scale": 1, "x": 0, "y": 0, "z": 0}, {"scale": 1, "x": 0}, {"scale": True, "x": 0, "y": 0}, {"scale": "nan", "x": 0, "y": 0}, {"scale": 0.1, "x": 0, "y": 0}, {"scale": 2.5, "x": 0, "y": 0}, {"scale": 1, "x": -0.6, "y": 0}, {"scale": 1, "x": 0, "y": 0.51}):
         add(stage, "stage " + repr(value), lambda p, value=value: p.update(stage=value))
     add(stage, "stage bounds", lambda p: p.update(stage={"scale": 0.2, "x": -0.5, "y": 0.5}), True)
+    # The card-reference union: an admitted official identity reaches the
+    # adapter (which refuses it with `official_read_only`), while anything
+    # neither a uuid nor a valid identity stays an admission failure.
+    for action in (
+        "gallery.default.set",
+        "gallery.card.delete",
+        "gallery.face_rect.update",
+        "gallery.stage.update",
+        "gallery.binding.save",
+    ):
+        add(action, action + " official identity", lambda p: p.update(image_id=OFFICIAL_IDENTITY), True)
+        add(action, action + " bad reference", lambda p: p.update(image_id="preset/bare"))
+        add(action, action + " null reference", lambda p: p.update(image_id=None))
+    select = "gallery.official.select"
+    for identity in (
+        None,
+        7,
+        "",
+        "preset/bare",
+        "preset/t_gallery_preset",
+        "preset/t_gallery_preset/deep/a.png",
+        "preset/t_gallery_preset/a.bmp",
+        "preset/t_gallery_preset/a",
+        "preset/../a.png",
+        "preset/t_gallery_preset/a\u200b.png",
+        "preset/t_gallery_preset/a\u00a0.png",
+        "preset/t_gallery_preset/" + "k" * 200 + ".png",
+    ):
+        add(select, "identity " + repr(identity), lambda p, identity=identity: p.update(identity=identity))
+    add(
+        select,
+        "identity at cap",
+        lambda p: p.update(
+            identity="preset/" + "k" * (192 - len("preset/") - len("/a.png")) + "/a.png"
+        ),
+        True,
+    )
+    clear = "gallery.official.geometry.clear"
+    add(clear, "identity missing", lambda p: p.pop("identity"))
+    geometry = "gallery.official.geometry.set"
+    def stage_only(payload):
+        payload.pop("face_rect", None)
+        payload["stage"] = {"scale": 1, "x": 0, "y": 0}
+    def neither(payload):
+        payload.pop("face_rect", None)
+    add(geometry, "geometry stage only", stage_only, True)
+    add(geometry, "geometry both", lambda p: p.update(stage={"scale": 1, "x": 0, "y": 0}), True)
+    add(geometry, "geometry neither", neither)
+    for value in (None, {}, {"x": 0, "y": 0, "w": 0, "h": 1}, {"x": 0.75, "y": 0, "w": 0.5, "h": 1}, {"x": True, "y": 0, "w": 1, "h": 1}, {"x": -0.1, "y": 0, "w": 1, "h": 1}):
+        add(geometry, "geometry rect " + repr(value), lambda p, value=value: p.update(face_rect=value))
+    for value in (None, {}, {"scale": 3, "x": 0, "y": 0}, {"scale": 1, "x": 0}, {"scale": True, "x": 0, "y": 0}):
+        add(geometry, "geometry stage " + repr(value), lambda p, value=value: p.update(stage=value))
     return cases
 
 
@@ -560,3 +629,444 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 self.assertEqual(warn.call_args.args, ("gallery_action",))
                 self.assertEqual(warn.call_args.kwargs["context"]["action_id"], action)
                 info.assert_not_called()
+
+
+_PRESET_KEY = "t_gallery_preset"
+_OTHER_PRESET_KEY = "t_gallery_other"
+
+
+def _png(width=4, height=4) -> bytes:
+    """A real, decodable PNG of the given pixel size."""
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class OfficialPreferenceActionTests(EvenniaTest):
+    """The four personal official-art preference adapters (tasks 3.2, 3.3).
+
+    The actor is preset-born, so its content reference is the indexed
+    ``preset/t_gallery_preset/`` directory; every request goes through the real
+    dispatcher, so the refusal, publication, and idempotency contracts are
+    exercised end to end.
+    """
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.store = Path(self.tmp.name) / "store"
+        self.store.mkdir()
+        self.official_root = Path(self.tmp.name).resolve() / "official"
+        settings = override_settings(
+            ART_STORE_ROOT=str(self.store), ART_OFFICIAL_ROOT=str(self.official_root)
+        )
+        settings.enable()
+        self.addCleanup(settings.disable)
+        reset_catalog()
+        self.addCleanup(reset_catalog)
+        for patcher in (
+            patch.object(
+                official_refs,
+                "PLAYER_PRESET_REGISTRY",
+                {_PRESET_KEY: object(), _OTHER_PRESET_KEY: object()},
+            ),
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY, _OTHER_PRESET_KEY}),
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        get_world_clock()
+        self.actor = self._character("t_gallery_actor", _PRESET_KEY)
+        self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
+        self.registry = build_production_registry()
+        self.action_registry = build_production_action_registry()
+        self.sent = []
+        self.transport = SimpleNamespace(
+            ndb=SimpleNamespace(),
+            puppet=self.actor,
+            protocol_key="websocket",
+            msg=lambda **kwargs: self.sent.append(kwargs),
+        )
+        self.coordinator = attach_coordinator(self.transport, self.registry)
+        self.serial = 0
+
+    # -- harness ----------------------------------------------------------
+    def _character(self, stable_key, preset_key=None):
+        entity = create_object(PlayerCharacter, key="測試角色", location=self.room1)
+        entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        entity.db.age = entity.db.apparent_age = 25
+        if preset_key is not None:
+            entity.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, preset_key)
+        return entity
+
+    def _index(self, name="a.png", key=_PRESET_KEY, **manifest) -> str:
+        folder = self.official_root / "preset" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(_png())
+        manifest_path = folder / "manifest.json"
+        if manifest:
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        elif manifest_path.exists():
+            manifest_path.unlink()
+        load_catalog()
+        return f"preset/{key}/{name}"
+
+    def _card(self, number=1):
+        image_id = str(uuid.UUID(int=number))
+        identity = f"gallery/character/{self.subject.key}/{image_id}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"runtime-image")
+        return api.append_card(
+            self.subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+            created_at=100,
+            image_size={"width": 768, "height": 1024},
+        )
+
+    def _envelope(self, action, payload, request_id=None):
+        self.serial += 1
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": self.coordinator.epoch,
+            "request_id": request_id or f"o{self.serial}",
+            "base_revision": self.coordinator.revision,
+            "action_id": action,
+            "payload": payload,
+        }
+
+    def _dispatch(self, action, payload, *, envelope=None):
+        self.sent.clear()
+        handle_ui_action(
+            self.transport,
+            self.actor,
+            envelope or self._envelope(action, payload),
+            self.action_registry,
+            self.registry,
+        )
+        result = self.sent[-1]["ui_action_result"][0][0]
+        validate_ui_action_result(result)
+        return result
+
+    def _panel(self):
+        updates = [call["ui_update"][0][0] for call in self.sent if "ui_update" in call]
+        self.assertEqual(len(updates), 1)
+        self.assertNotIn("ui_snapshot", self.sent[0])
+        self.assertEqual(set(updates[0]["panels"]), {"gallery", "art", "roster"})
+        return updates[0]["panels"]["gallery"]
+
+    def _world(self):
+        """Every byte and every record the refusal must leave untouched."""
+        return (
+            {
+                path.relative_to(self.official_root).as_posix(): path.read_bytes()
+                for path in self.official_root.rglob("*")
+                if path.is_file()
+            },
+            {
+                path.relative_to(self.store).as_posix(): path.read_bytes()
+                for path in self.store.rglob("*")
+                if path.is_file()
+            },
+            [
+                (record.pk, repr(record.attributes.all()))
+                for record in api.GalleryRecord.objects.order_by("pk")
+            ],
+            [
+                (record.pk, record.db.status)
+                for record in ArtAssetRecord.objects.order_by("pk")
+            ],
+        )
+
+    # -- the four preference adapters -------------------------------------
+    @covers_requirement(
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_each_preference_adapter_writes_only_the_preference_and_publishes_once(self):
+        identity = self._index("a.png")
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        operations = (
+            (
+                "gallery.official.select",
+                {"subject_key": SUBJECT, "identity": identity},
+                "gallery_official_selected",
+            ),
+            (
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "stage": dict(stage)},
+                "gallery_official_geometry_set",
+            ),
+            (
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "face_rect": dict(rect)},
+                "gallery_official_geometry_set",
+            ),
+            (
+                "gallery.official.geometry.clear",
+                {"subject_key": SUBJECT, "identity": identity},
+                "gallery_official_geometry_cleared",
+            ),
+            (
+                "gallery.official.clear_selection",
+                {"subject_key": SUBJECT},
+                "gallery_official_selection_cleared",
+            ),
+        )
+        card = self._card()
+        official_before = {
+            path: path.read_bytes()
+            for path in (self.official_root / "preset" / _PRESET_KEY).iterdir()
+        }
+        for action, payload, code in operations:
+            with self.subTest(action=action), patch.object(
+                actions, "log_info"
+            ) as info, patch.object(actions, "log_warn") as warn:
+                result = self._dispatch(action, payload)
+                self.assertEqual(result["outcome"], "success")
+                self.assertEqual(result["code"], code)
+                # The adapter published its three declared panels before the
+                # result (the wire envelope carries no affected-panel list).
+                panel = self._panel()
+                self.assertEqual(panel["selected"], SUBJECT)
+                self.assertEqual(
+                    [row["image_id"] for row in panel["cards"]], [card["image_id"]]
+                )
+                self.assertEqual(len(panel["official_entries"]), 1)
+                self.assertEqual(
+                    panel["official_entries"][0]["identity"], identity
+                )
+                self.assertEqual(info.call_count, 1)
+                self.assertEqual(info.call_args.args, ("gallery_action",))
+                self.assertEqual(info.call_args.kwargs["context"]["action_id"], action)
+                # The event names the identity whenever the payload carries one.
+                if "identity" in payload:
+                    self.assertEqual(
+                        info.call_args.kwargs["context"]["identity"],
+                        payload["identity"],
+                    )
+                else:
+                    self.assertNotIn("identity", info.call_args.kwargs["context"])
+                warn.assert_not_called()
+        # The writes landed exactly as the payloads declared: the face edit kept
+        # the stored stage, and the stage edit kept the stored rectangle.
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry, {}
+        )
+        self.assertIsNone(api.official_preferences_for(self.subject).selection)
+        self.assertEqual(
+            {
+                path: path.read_bytes()
+                for path in (self.official_root / "preset" / _PRESET_KEY).iterdir()
+            },
+            official_before,
+        )
+        self.assertEqual(
+            [row["image_id"] for row in api.cards_for(self.subject)],
+            [card["image_id"]],
+        )
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_a_geometry_edit_keeps_the_component_it_did_not_send(self):
+        identity = self._index("a.png")
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        self.assertEqual(
+            self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "stage": dict(stage)},
+            )["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry,
+            {identity: {"stage": stage}},
+        )
+        self.assertEqual(
+            self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "face_rect": dict(rect)},
+            )["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry,
+            {identity: {"face_rect": rect, "stage": stage}},
+        )
+        self.assertEqual(
+            self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "stage": dict(stage)},
+            )["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry,
+            {identity: {"face_rect": rect, "stage": stage}},
+        )
+        # A rectangle that is not pixel-square on the image's current decoded
+        # size is refused before the write, with no partial write.
+        with patch.object(actions, "log_warn") as warn:
+            refused = self._dispatch(
+                "gallery.official.geometry.set",
+                {
+                    "subject_key": SUBJECT,
+                    "identity": identity,
+                    "face_rect": {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.1},
+                },
+            )
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "gallery_rejected")
+        self.assertEqual(warn.call_count, 1)
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry,
+            {identity: {"face_rect": rect, "stage": stage}},
+        )
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_an_out_of_reference_or_unindexed_identity_is_refused_with_no_write(self):
+        mine = self._index("a.png")
+        theirs = self._index("a.png", key=_OTHER_PRESET_KEY)
+        before = self._world()
+        api.set_official_selection(self.subject, mine)
+        api.set_official_geometry(self.subject, mine, stage={"scale": 0.6, "x": 0.0, "y": 0.0})
+        before = self._world()
+        for identity in (theirs, "preset/t_gallery_absent/a.png", "preset/t_gallery_preset/absent.png"):
+            for action in (
+                "gallery.official.select",
+                "gallery.official.geometry.set",
+                "gallery.official.geometry.clear",
+            ):
+                payload = {"subject_key": SUBJECT, "identity": identity}
+                if action == "gallery.official.geometry.set":
+                    payload["stage"] = {"scale": 0.6, "x": 0.0, "y": 0.0}
+                with self.subTest(identity=identity, action=action), patch.object(
+                    actions, "log_warn"
+                ) as warn:
+                    result = self._dispatch(action, payload)
+                    self.assertEqual(
+                        (result["outcome"], result["code"]),
+                        ("rejected", "unknown_official_image"),
+                    )
+                    self._panel()
+                    self.assertEqual(warn.call_count, 1)
+                    self.assertEqual(
+                        warn.call_args.kwargs["context"]["identity"], identity
+                    )
+        self.assertEqual(self._world(), before)
+        # A malformed geometry payload never reaches the adapter at all.
+        for payload in (
+            {"subject_key": SUBJECT, "identity": mine},
+            {"subject_key": SUBJECT, "identity": mine, "face_rect": None},
+            {"subject_key": SUBJECT, "identity": "preset/bare", "stage": {"scale": 1, "x": 0, "y": 0}},
+            {"subject_key": SUBJECT, "identity": mine, "stage": {"scale": 1, "x": 0, "y": 0}, "extra": 1},
+        ):
+            with self.subTest(payload=payload):
+                self.assertEqual(
+                    self._dispatch("gallery.official.geometry.set", payload)["code"],
+                    "malformed_payload",
+                )
+        self.assertEqual(self._world(), before)
+
+    @covers_requirement(
+        "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"
+    )
+    def test_a_replayed_preference_request_writes_once(self):
+        identity = self._index("a.png")
+        payload = {"subject_key": SUBJECT, "identity": identity}
+        envelope = self._envelope("gallery.official.select", payload)
+        with patch.object(
+            api, "set_official_selection", wraps=api.set_official_selection
+        ) as write:
+            first = self._dispatch("gallery.official.select", payload, envelope=envelope)
+            second = self._dispatch("gallery.official.select", payload, envelope=envelope)
+        self.assertEqual(first, second)
+        self.assertEqual(write.call_count, 1)
+        self.assertEqual(api.official_preferences_for(self.subject).selection, identity)
+
+    # -- the read-only guarantee ------------------------------------------
+    @covers_requirement(
+        "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
+    )
+    def test_existing_mutation_adapters_refuse_an_official_identity_with_no_side_effects(self):
+        identity = self._index("a.png")
+        card = self._card()
+        api.set_official_selection(self.subject, identity)
+        before = self._world()
+        operations = (
+            ("gallery.default.set", {}),
+            ("gallery.card.delete", {}),
+            ("gallery.face_rect.update", {"face_rect": {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}}),
+            ("gallery.stage.update", {"stage": {"scale": 0.6, "x": 0.0, "y": 0.0}}),
+            ("gallery.binding.save", {"slots": ["armor"]}),
+        )
+        for action, extra in operations:
+            with self.subTest(action=action), patch.object(
+                actions, "log_warn"
+            ) as warn:
+                result = self._dispatch(
+                    action, {"subject_key": SUBJECT, "image_id": identity, **extra}
+                )
+                self.assertEqual(
+                    (result["outcome"], result["code"]),
+                    ("rejected", "official_read_only"),
+                )
+                self.assertEqual(warn.call_count, 1)
+                self.assertEqual(warn.call_args.args, ("gallery_action",))
+                self.assertEqual(warn.call_args.kwargs["context"]["image_id"], identity)
+                # The three declared panels refresh before the rejected result.
+                self._panel()
+            self.assertEqual(self._world(), before)
+        # The runtime card and the stored selection are exactly as they were.
+        self.assertEqual(
+            [row["image_id"] for row in api.cards_for(self.subject)],
+            [card["image_id"]],
+        )
+        self.assertEqual(api.official_preferences_for(self.subject).selection, identity)
+
+    def test_manual_generation_writes_only_the_runtime_store(self):
+        self._index("a.png")
+        official_before = self._world()[0]
+        result = self._dispatch(
+            "gallery.generate",
+            {"subject_key": SUBJECT, "fields": [], "custom_prompt": ""},
+        )
+        self.assertEqual(result["outcome"], "success")
+        image_id = result["data"]["image_id"]
+        jobs = queue.claim(10)
+        job = next(job for job in jobs if job.db.gallery_image_id == image_id)
+        identity = f"gallery/character/{self.subject.key}/{image_id}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".tmp")
+        tmp.write_bytes(b"settled-runtime-image")
+        stored = queue.settle_gallery_generated(
+            job.key,
+            generation_token=job.db.generation_token,
+            output_identity=identity,
+            tmp_path=str(tmp),
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            image_size={"width": 768, "height": 1024},
+        )
+        self.assertEqual(stored["stored_identity"], identity)
+        self.assertEqual(self._world()[0], official_before)
+        self.assertTrue(target.exists())

@@ -68,6 +68,7 @@ _GALLERY_PANEL = {
         "max_cards": None,
     },
     "cards": [],
+    "official_entries": [],
     "equipment_summary": {
         "weapon_main": {"value": None, "display_name": "未裝備"},
         "weapon_off": {"value": None, "display_name": "未裝備"},

@@ -1,8 +1,10 @@
 """Gallery read-only projection, transport lifecycle, and executable wire parity."""
 
 from copy import deepcopy
+import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -17,14 +19,26 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from world.art import gallery as api
+from world.art import official, official_refs
+from world.art.official import current_catalog, load_catalog, reset_catalog
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
+from world.art.presenter import MAX_PORTRAIT_MEDIA_URL
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.gallery import SLOT_LABELS, gallery_presenter, gallery_subjects, validate_gallery
+from web.webclient.presentation.gallery import (
+    GALLERY_MAX_OFFICIAL_ENTRIES,
+    GALLERY_MAX_OFFICIAL_IDENTITY,
+    GALLERY_MAX_OFFICIAL_URL,
+    SLOT_LABELS,
+    gallery_presenter,
+    gallery_subjects,
+    validate_gallery,
+)
 from web.webclient.presentation.gallery_selection import gallery_selection_snapshot, select_gallery_subject
 from web.webclient.presentation.ingress import build_presentation_context, reset_client_sequence, _coordinator_for
 from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.registry import build_production_registry
-from world.art import gallery as api
 from world.art.queue import enqueue_gallery_job, pending_gallery_jobs, settle_gallery_failed
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -35,6 +49,22 @@ ROOT = Path(__file__).resolve().parents[4]
 
 def image_id(number):
     return str(uuid.UUID(int=number))
+
+
+_OFFICIAL_FINGERPRINT = "a" * 64
+
+
+def official_row(identity="preset/t_gallery_preset/a.png", **changes):
+    """A file-local synthetic official row; the fingerprint is fixed."""
+    row = {
+        "identity": identity,
+        "url": f"/art/official/{_OFFICIAL_FINGERPRINT}/{identity}",
+        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+        "is_current": False,
+        "is_catalog_default": True,
+    }
+    row.update(changes)
+    return row
 
 
 def payload():
@@ -59,7 +89,7 @@ def payload():
             "accessories": {"value": [], "display_names": [], "equipped_count": 0},
         },
         "capabilities": {"supports_bindings": True, "supports_field_selection": True, "supports_free_text": True, "max_cards": None},
-        "binding_warnings": [], "error_state": None,
+        "binding_warnings": [], "error_state": None, "official_entries": [],
     }
 
 
@@ -108,6 +138,201 @@ class GalleryWireTests(unittest.TestCase):
         # so a mismatch is two (or zero) face chips, not a rect disagreement.
         add("chip mismatch", lambda p: p["cards"][0].update(chips=["預設臉框", "自訂臉框", "目前預設"]))
         add("unsupported equipment", lambda p: p["capabilities"].update(supports_bindings=False))
+        def official(p, rows):
+            p["official_entries"] = rows
+        add("official row", lambda p: official(p, [official_row()]), True)
+        add(
+            "official row current",
+            lambda p: official(
+                p, [official_row(is_current=True, is_catalog_default=False)]
+            ),
+            True,
+        )
+        add(
+            "official rows at cap",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        identity=f"preset/t_g{index}/a.png",
+                        is_catalog_default=index == 0,
+                    )
+                    for index in range(GALLERY_MAX_OFFICIAL_ENTRIES)
+                ],
+            ),
+            True,
+        )
+        add(
+            "official rows over cap",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        identity=f"preset/t_g{index}/a.png",
+                        is_catalog_default=index == 0,
+                    )
+                    for index in range(GALLERY_MAX_OFFICIAL_ENTRIES + 1)
+                ],
+            ),
+        )
+        add("official entries null", lambda p: p.update(official_entries=None))
+        add("official entries missing", lambda p: p.pop("official_entries"))
+        add(
+            "official row extra key",
+            lambda p: official(p, [dict(official_row(), chips=[])]),
+        )
+        add(
+            "official row missing key",
+            lambda p: official(
+                p, [{key: value for key, value in official_row().items() if key != "url"}]
+            ),
+        )
+        add("official row duplicate", lambda p: official(p, [official_row(), official_row()]))
+        add(
+            "official rows two current",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        identity="preset/t_a/a.png", is_current=True, is_catalog_default=False
+                    ),
+                    official_row(
+                        identity="preset/t_b/a.png", is_current=True, is_catalog_default=False
+                    ),
+                ],
+            ),
+        )
+        add(
+            "official rows two catalog defaults",
+            lambda p: official(
+                p,
+                [
+                    official_row(identity="preset/t_a/a.png"),
+                    official_row(identity="preset/t_b/a.png"),
+                ],
+            ),
+        )
+        add("official flag not boolean", lambda p: official(p, [official_row(is_current=1)]))
+        add(
+            "official url foreign route",
+            lambda p: official(
+                p,
+                [official_row(url=f"/art/gallery/character/t_gallery/{image_id(1)}.png")],
+            ),
+        )
+        add(
+            "official url short fingerprint",
+            lambda p: official(
+                p, [official_row(url=f"/art/official/{'a' * 63}/preset/x/a.png")]
+            ),
+        )
+        add(
+            "official url upper fingerprint",
+            lambda p: official(
+                p, [official_row(url=f"/art/official/{'A' * 64}/preset/x/a.png")]
+            ),
+        )
+        add(
+            "official url empty tail",
+            lambda p: official(p, [official_row(url=f"/art/official/{_OFFICIAL_FINGERPRINT}/")]),
+        )
+        add(
+            "official url space",
+            lambda p: official(
+                p,
+                [official_row(url=f"/art/official/{_OFFICIAL_FINGERPRINT}/preset/x/a b.png")],
+            ),
+        )
+        add(
+            "official url over cap",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/"
+                        + "x" * GALLERY_MAX_OFFICIAL_URL
+                    )
+                ],
+            ),
+        )
+        add(
+            "official rect overflow",
+            lambda p: official(
+                p, [official_row(face_rect={"x": 0.9, "y": 0.0, "w": 0.5, "h": 0.5})]
+            ),
+        )
+        add(
+            "official rect zero",
+            lambda p: official(
+                p, [official_row(face_rect={"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.5})]
+            ),
+        )
+        add(
+            "official rect boolean",
+            lambda p: official(
+                p, [official_row(face_rect={"x": True, "y": 0.0, "w": 0.5, "h": 0.5})]
+            ),
+        )
+        add("official rect null", lambda p: official(p, [official_row(face_rect=None)]))
+        add(
+            "official identity two segments",
+            lambda p: official(p, [official_row(identity="preset/a.png")]),
+        )
+        add(
+            "official identity four segments",
+            lambda p: official(p, [official_row(identity="preset/key/deep/a.png")]),
+        )
+        add(
+            "official identity empty segment",
+            lambda p: official(p, [official_row(identity="preset//a.png")]),
+        )
+        add(
+            "official identity dot segment",
+            lambda p: official(p, [official_row(identity="preset/../a.png")]),
+        )
+        add(
+            "official identity unknown extension",
+            lambda p: official(p, [official_row(identity="preset/key/a.bmp")]),
+        )
+        add(
+            "official identity no extension",
+            lambda p: official(p, [official_row(identity="preset/key/a")]),
+        )
+        add(
+            "official identity format char",
+            lambda p: official(p, [official_row(identity="preset/key/a\u200b.png")]),
+        )
+        add(
+            "official identity nonbreaking space",
+            lambda p: official(p, [official_row(identity="preset/key/a\u00a0.png")]),
+        )
+        def official_identity_length(length):
+            return "preset/" + "k" * (length - len("preset/") - len("/a.png")) + "/a.png"
+        add(
+            "official identity at cap",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        identity=official_identity_length(GALLERY_MAX_OFFICIAL_IDENTITY),
+                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/x.png",
+                    )
+                ],
+            ),
+            True,
+        )
+        add(
+            "official identity over cap",
+            lambda p: official(
+                p,
+                [
+                    official_row(
+                        identity=official_identity_length(GALLERY_MAX_OFFICIAL_IDENTITY + 1),
+                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/x.png",
+                    )
+                ],
+            ),
+        )
         add("warning missing card", lambda p: p["binding_warnings"].append({"image_id": image_id(99), "label": "不存在", "conditions": ["防具：未裝備"]}))
         def subjects(p, count):
             p["subjects"].extend({"subject_key": f"portrait:character:t_{i}", "kind": "portrait:character", "display_name": "其他角色", "is_puppet": False} for i in range(count - 1))
@@ -424,3 +649,241 @@ class GalleryPresenterTests(EvenniaTest):
         other.delete()
         self.assertEqual(gallery_presenter(frozen)["selected"], self.subject.full())
         self.assertEqual(session.ndb.gallery_selection.subject_key, "portrait:character:t_deleted")
+
+
+_PRESET_KEY = "t_gallery_preset"
+
+
+def _png(width=4, height=4) -> bytes:
+    """A real, decodable PNG of the given pixel size."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class OfficialEntryProjectionTests(EvenniaTest):
+    """The official-entry read model of the gallery panel (task 3.1).
+
+    The puppet carries a synthetic preset provenance, so its content
+    reference is the indexed ``preset/t_gallery_preset/`` directory and the
+    read model is the one under test.
+    """
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.store = Path(self.tmp.name) / "store"
+        self.store.mkdir()
+        self.official_root = Path(self.tmp.name).resolve() / "official"
+        settings = override_settings(
+            ART_STORE_ROOT=str(self.store), ART_OFFICIAL_ROOT=str(self.official_root)
+        )
+        settings.enable()
+        self.addCleanup(settings.disable)
+        reset_catalog()
+        self.addCleanup(reset_catalog)
+        for patcher in (
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            ),
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            ),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        tiers = {"t_beast": SimpleNamespace(display_name_zh="測試魔物")}
+        for target in (
+            "web.webclient.presentation.gallery.MONSTER_TIER_REGISTRY",
+            "world.art.subjects.MONSTER_TIER_REGISTRY",
+        ):
+            patcher = patch(target, tiers)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.actor = create_object(PlayerCharacter, key="測試主角", location=self.room1)
+        self.actor.db.portrait_policy = {"mode": "named", "stable_key": "t_gallery_actor"}
+        self.actor.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, _PRESET_KEY)
+        self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
+        self.context = PresentationContext(self.actor, 1)
+
+    def _index(self, name, **manifest) -> str:
+        folder = self.official_root / "preset" / _PRESET_KEY
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(_png())
+        manifest_path = folder / "manifest.json"
+        if manifest:
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        elif manifest_path.exists():
+            manifest_path.unlink()
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def _card(self, number=1):
+        image_id = str(uuid.UUID(int=number))
+        identity = f"gallery/character/{self.subject.key}/{image_id}.png"
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"runtime-image")
+        return api.append_card(
+            self.subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+            created_at=100,
+            image_size={"width": 1000, "height": 1000},
+        )
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_three_admitted_images_mark_the_selection_without_touching_cards(self):
+        first = self._index("a.png")
+        self._index("b.png")
+        third = self._index("c.png", stage={"scale": 1.4, "x": 0.1, "y": -0.2})
+        card = self._card()
+        api.set_official_selection(self.subject, third)
+        value = gallery_presenter(self.context)
+        catalog = current_catalog()
+        self.assertEqual(
+            [row["identity"] for row in value["official_entries"]],
+            [first, f"preset/{_PRESET_KEY}/b.png", third],
+        )
+        self.assertEqual(
+            [row["url"] for row in value["official_entries"]],
+            [catalog.url_for(row["identity"]) for row in value["official_entries"]],
+        )
+        self.assertEqual(
+            [row["is_current"] for row in value["official_entries"]], [False, False, True]
+        )
+        self.assertEqual(
+            [row["is_catalog_default"] for row in value["official_entries"]],
+            [True, False, False],
+        )
+        for row in value["official_entries"]:
+            self.assertEqual(
+                row["face_rect"], catalog.entry(row["identity"]).face_rect
+            )
+            self.assertEqual(set(row), {
+                "identity",
+                "url",
+                "face_rect",
+                "is_current",
+                "is_catalog_default",
+            })
+        # Official rows are never cards, and the filter tabs keep counting only
+        # the card rows.
+        self.assertEqual([row["image_id"] for row in value["cards"]], [card["image_id"]])
+        self.assertEqual(
+            list(value["filters"]), ["all", "defaults", "bound", "pending", "failed"]
+        )
+        self.assertEqual(value["filters"]["all"], 1)
+        # Selecting the official image cleared the runtime default; the card
+        # itself is untouched.
+        self.assertIsNone(api.record_for(self.subject).db.default_image_id)
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_no_reference_or_absent_snapshot_presents_an_empty_list(self):
+        self.assertEqual(gallery_presenter(self.context)["official_entries"], [])
+        self._index("a.png")
+        self.assertEqual(len(gallery_presenter(self.context)["official_entries"]), 1)
+        # A reference the snapshot no longer holds is an empty list, present
+        # and not null.
+        shutil.rmtree(self.official_root / "preset")
+        load_catalog()
+        value = gallery_presenter(self.context)
+        self.assertEqual(value["official_entries"], [])
+        self.assertIsNotNone(value["official_entries"])
+        # An entity declaring no content reference (the provenance attribute
+        # is what declares one) presents an empty list too.
+        other = create_object(PlayerCharacter, key="無來源角色", location=self.room1)
+        other.db.portrait_policy = {"mode": "named", "stable_key": "t_no_reference"}
+        context = PresentationContext(other, 1)
+        self.assertEqual(gallery_presenter(context)["official_entries"], [])
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_an_over_budget_identity_is_skipped_with_one_diagnostic(self):
+        # 180 code points fit the identity bound but push the fingerprinted URL
+        # past the shared portrait ceiling, so the row is omitted, not fatal.
+        long_name = "x" * (180 - len(f"preset/{_PRESET_KEY}/") - len(".png")) + ".png"
+        skipped = self._index(long_name)
+        listed = self._index("a.png")
+        self.assertGreater(
+            len(current_catalog().url_for(skipped)), GALLERY_MAX_OFFICIAL_URL
+        )
+        with patch("web.webclient.presentation.gallery.log_warn") as warn:
+            value = gallery_presenter(self.context)
+        self.assertEqual(
+            [row["identity"] for row in value["official_entries"]], [listed]
+        )
+        events = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "gallery_official_entry_skipped"
+        ]
+        self.assertEqual(len(events), 1, events)
+        self.assertEqual(events[0].kwargs["context"]["identity"], skipped)
+        self.assertEqual(
+            events[0].kwargs["context"]["subject"], self.subject.full()
+        )
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_building_the_panel_with_official_entries_mutates_nothing(self):
+        identity = self._index("a.png")
+        api.set_official_selection(self.subject, identity)
+        api.set_official_geometry(
+            self.subject, identity, stage={"scale": 0.6, "x": 0.0, "y": -0.2}
+        )
+        before_records = [
+            (row.pk, repr(row.attributes.all()))
+            for row in api.GalleryRecord.objects.all()
+        ]
+        before_files = {
+            path.relative_to(self.store).as_posix(): path.read_bytes()
+            for path in self.store.rglob("*")
+            if path.is_file()
+        }
+        first = gallery_presenter(self.context)
+        self.assertEqual(gallery_presenter(self.context), first)
+        self.assertEqual(
+            [
+                (row.pk, repr(row.attributes.all()))
+                for row in api.GalleryRecord.objects.all()
+            ],
+            before_records,
+        )
+        self.assertEqual(
+            {
+                path.relative_to(self.store).as_posix(): path.read_bytes()
+                for path in self.store.rglob("*")
+                if path.is_file()
+            },
+            before_files,
+        )
+        self.assertTrue(first["official_entries"][0]["is_current"])
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-payload-is-exactly-version-mirrored-across-server-and-client"
+    )
+    def test_official_bounds_keep_their_single_origin(self):
+        self.assertEqual(GALLERY_MAX_OFFICIAL_IDENTITY, api.OFFICIAL_IDENTITY_MAX)
+        self.assertEqual(GALLERY_MAX_OFFICIAL_URL, MAX_PORTRAIT_MEDIA_URL)
+        self.assertEqual(GALLERY_MAX_OFFICIAL_URL, 256)
+        self.assertEqual(GALLERY_MAX_OFFICIAL_ENTRIES, 32)

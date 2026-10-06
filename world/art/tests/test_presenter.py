@@ -1478,7 +1478,7 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(entry.stage, _OFFICIAL_STAGE)
 
     @covers_requirement(
-        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
     )
     def test_an_update_invalidated_override_degrades_with_one_diagnostic(self):
         identity = self._index("hero.png", width=4, height=4)
@@ -1511,9 +1511,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
             official_preferences_for(subject).geometry, {identity: {"face_rect": stored_rect}}
         )
 
-    @covers_requirement(
-        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
-    )
     def test_a_malformed_stored_stage_override_is_dropped_by_the_tolerant_read(self):
         identity = self._index(
             face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
@@ -1562,10 +1559,7 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
 
     # -- acceptance criterion 4 -------------------------------------------
     @covers_requirement(
-        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
-    )
-    @covers_requirement(
-        "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
+        "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
     )
     def test_two_characters_sharing_official_bytes_choose_independently(self):
         # One content directory (one manifest) holding two admitted images, so

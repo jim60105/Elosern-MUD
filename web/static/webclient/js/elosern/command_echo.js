@@ -119,6 +119,13 @@
     "gallery.face_rect.update",
     "gallery.binding.save",
     "gallery.stage.update",
+    // The personal official-art preference controls are webclient-only too:
+    // selecting shared read-only artwork and adjusting one's own view of it
+    // have no typed-command equivalent.
+    "gallery.official.select",
+    "gallery.official.clear_selection",
+    "gallery.official.geometry.set",
+    "gallery.official.geometry.clear",
     // NPC persona author editor actions are silent webclient author controls.
     "npc.persona.read",
     "npc.persona.update",
