@@ -19,6 +19,7 @@ from web.webclient.actions.exploration_actions import _wait_adapter, validate_wa
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.dream import dream_presenter
 from world.ai import dream, guardrail
+from world.art import official as official_art
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
@@ -418,3 +419,32 @@ class DreamSurfaceTests(EvenniaTest):
         ending = service.dream_state(self.actor)["ending"]
         self.assertEqual([call.args[0] for call in self.actor.msg.call_args_list].count(ending), 1)
         self.assertFalse(surface.associated_session(self.actor).draft_id)
+
+    @covers_requirement(
+        "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
+    )
+    def test_scene_art_resolves_only_from_the_official_catalog(self):
+        # The dream stage's artwork is an external official asset: the panel
+        # carries the catalog URL only while the official snapshot admits the
+        # identity, and an empty snapshot (offline/absent folder) yields "".
+        self.enter()
+        identity = surface.DREAM_GODDESS_SCENE_IDENTITY
+        self.assertTrue(identity.startswith("npc/" + surface.DREAM_GODDESS_NPC_KEY + "/"))
+        self.assertEqual(service.dream_state(self.actor)["scene_art"], "")
+        image = official_art.OfficialImage(
+            identity=identity, kind="npc", key=surface.DREAM_GODDESS_NPC_KEY,
+            fingerprint="a" * 64, image_size={"width": 2880, "height": 1600},
+            face_rect={}, stage={},
+        )
+        with patch.object(
+            official_art, "_CATALOG",
+            official_art.OfficialCatalog(
+                {(image.kind, image.key): official_art.OfficialContent(
+                    kind=image.kind, key=image.key, default_identity=identity,
+                    images=(identity,))},
+                {identity: image},
+            ),
+        ):
+            url = service.dream_state(self.actor)["scene_art"]
+        self.assertEqual(url, f"/art/official/{'a' * 64}/{identity}")
+        self.assertLessEqual(len(url), 256)

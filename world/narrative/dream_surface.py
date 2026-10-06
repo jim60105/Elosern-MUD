@@ -9,6 +9,7 @@ from dataclasses import asdict
 from django.db import transaction
 from evennia.utils.dbserialize import deserialize
 
+from world.art import official
 from world.narrative import dream_session as lifecycle
 from world.narrative.authoring import draft_is_confirmed, get_draft
 from world.narrative.dream_track import render_ending, track_state
@@ -16,7 +17,24 @@ from world.narrative.models import StoryThread
 from world.narrative.threads import TERMINAL_THREAD_STATES, thread_accessible
 from world.observability import log_info
 
-OPENING = "純白的夢境裡只有一張床。床上的身影帶著女神般的氣質，面容始終無法辨明。你可以在這裡商談故事方向，也可以隨時醒來。"
+# The dream stage's official artwork identity: the cloud-throne goddess scene
+# lives in the operator-prepared official-artwork directory (never in git,
+# never bundled into the frontend). An absent official root degrades to the
+# empty URL, exactly like every other missing-official-art case.
+DREAM_GODDESS_NPC_KEY = "dream_goddess"
+DREAM_GODDESS_SCENE_IDENTITY = f"npc/{DREAM_GODDESS_NPC_KEY}/dream-throne.webp"
+
+OPENING = (
+    "雲海之上矗立著一座純白的王座。王座上的女神面容始終無法辨明，卻一邊撫慰著自己、"
+    "一邊從容地和你說話。她那誇張浮誇的性器一看便是長年使用的模樣，正不住地噴湧著淫水；"
+    "夢境的地面積水已漫過你的腳踝——看著那湧如泉水的液面，你明白那是女神的淫水。"
+    "你可以在這裡商談故事方向，也可以隨時醒來。"
+)
+
+
+def scene_art_url():
+    """The same-origin official-media URL for the dream stage's artwork."""
+    return official.current_catalog().url_for(DREAM_GODDESS_SCENE_IDENTITY) or ""
 
 
 def owner_id(actor):
@@ -133,10 +151,11 @@ def dream_state(actor):
         "draft_preferences": {key: item for key, item in (draft_direction or {}).items()
                               if key != "summary"} if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
+        "scene_art": scene_art_url(),
         "dialogue": value.get("dialogue", ""),
         "direction_parts": [displayed_direction[offset:offset + 2000]
                             for offset in range(0, len(displayed_direction), 2000)],
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
-        "ending": (f"{ending.phase}，餘韻漸漸平息，純白的夢境淡去，你醒了。" if ending and ending.climax_reached else "純白的夢境漸漸淡去，你醒了。") if ending else "",
+        "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",
         "ending_phase": ending.phase if ending else "",
     }

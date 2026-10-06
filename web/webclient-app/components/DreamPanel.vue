@@ -1,6 +1,5 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import dreamWhiteBed from "../assets/redesign/dream-white-bed.avif";
 import { createFocusTrap } from "./focus-trap.js";
 const props = defineProps({ state: { type: Object, required: true }, store: { type: Object, required: true } });
 const message = ref("");
@@ -93,33 +92,33 @@ async function send(action) {
 
 <template>
   <section ref="stage" class="dream-scene" role="dialog" aria-modal="true" aria-label="夢境協作" tabindex="-1" data-testid="dream-panel" @keydown="onKeydown">
-    <img class="dream-scene__art" :src="dreamWhiteBed" alt="" aria-hidden="true" decoding="async" />
+    <img v-if="state.scene_art" class="dream-scene__art" :src="state.scene_art" alt="雲海之上的純白王座與王座上的女神" decoding="async" />
     <div v-if="$slots.storyTools" class="dream-scene__story-tools"><slot name="storyTools" /></div>
     <div class="dream-folio">
     <header class="dream-folio__head">
-      <p class="dream-folio__eyebrow">純白夢境</p>
+      <p class="dream-folio__eyebrow">雲上王座之夢</p>
       <p class="dream-folio__count" role="status">剩餘交流次數：{{ state.remaining }}。</p>
     </header>
     <p class="dream-folio__opening">{{ state.opening }}</p>
     <div class="dream-folio__narrative">
       <p class="dream-folio__scene">{{ state.scene }}</p>
       <div v-if="state.dialogue" class="dream-folio__dialogue">
-        <p class="dream-folio__speaker">夢中的身影</p>
+        <p class="dream-folio__speaker">王座上的女神</p>
         <blockquote>{{ state.dialogue }}</blockquote>
       </div>
     </div>
-    <p class="dream-folio__phase">夢境階段：{{ state.track.level }}。</p>
-    <p v-if="state.pending" class="dream-folio__notice" role="status">身影正在回應。你仍可先儲存草稿，或直接醒來。</p>
+    <p class="dream-folio__phase">女神的興奮：{{ state.track.level }}。</p>
+    <p v-if="state.pending" class="dream-folio__notice" role="status">女神正在回應。你仍可先儲存草稿，或直接醒來。</p>
     <p v-if="state.failure" class="dream-folio__notice" role="status">暫時沒有收到回應，睡眠已經完成。你可以再試一次，也可以保存方向或醒來。</p>
     <p v-if="state.remaining === 0 && state.open" class="dream-folio__notice">這次夢境的交流已結束。你可以整理方向、儲存草稿，或醒來。</p>
     <p v-if="state.ending" class="dream-folio__ending">{{ state.ending }}</p>
     <form v-if="state.can_input" class="dream-folio__exchange" @submit.prevent="send('say')">
       <label>你輕聲說⋯
-        <textarea v-model="message" rows="3" maxlength="4000" :disabled="transportLocked" placeholder="說出你在夢裡想做的事，或回應眼前的身影。" />
+        <textarea v-model="message" rows="3" maxlength="4000" :disabled="transportLocked" placeholder="說出你在夢裡想做的事，或回應眼前的女神。" />
       </label>
       <div class="dream-folio__exchange-foot">
         <p>交流不會推進世界時間。</p>
-        <button class="ui-btn" type="submit" :disabled="transportLocked || !message.trim()">對身影說</button>
+        <button class="ui-btn" type="submit" :disabled="transportLocked || !message.trim()">對女神說</button>
       </div>
     </form>
     <section v-if="state.can_confirm || state.can_draft" class="dream-folio__direction" aria-label="將保存的故事方向">
@@ -128,7 +127,7 @@ async function send(action) {
         <p class="dream-folio__preview-label">{{ previewLabel }}</p>
         <p class="dream-folio__preview">{{ directionPreview }}</p>
       </template>
-      <p v-else class="dream-folio__empty">念頭還未成形。不妨先和眼前的身影聊聊，也可以直接醒來。</p>
+      <p v-else class="dream-folio__empty">念頭還未成形。不妨先和眼前的女神聊聊，也可以直接醒來。</p>
       <details ref="directionEditor" data-testid="dream-direction-editor" class="dream-folio__editor">
         <summary>整理想帶走的念頭（選填）</summary>
         <div class="dream-folio__editor-fields">

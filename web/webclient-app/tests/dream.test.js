@@ -12,6 +12,7 @@ function state(overrides = {}) {
     can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
+    scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
     direction_parts: [], thread_choices: [], draft_preferences: null,
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
     sleep: { tick_from: 17, tick_to: 17, requested_seconds: 0, seconds: 0, event_kinds: [] },
@@ -74,18 +75,29 @@ describe("server-authored dream surface", () => {
     expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 7, direction: { kind: "new_story", thread_id: null, summary: "合成新方向" } }, null);
   });
   it("mirrors the strict panel schema and truthful command echoes", () => {
-    const payload = { schema_version: 1, available: true, state: state() };
-    expect(Protocol.validatePanel("dream", 1, payload)).toEqual(payload);
-    expect(Protocol.validatePanel("dream", 1, { ...payload, state: null }).state).toBeNull();
-    expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ remaining: 0 }) })).toThrow();
-    expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ pending: true }) })).toThrow();
-    expect(Protocol.validatePanel("dream", 1, { ...payload, state: state({
+    const payload = { schema_version: 2, available: true, state: state() };
+    expect(Protocol.validatePanel("dream", 2, payload)).toEqual(payload);
+    expect(Protocol.validatePanel("dream", 2, { ...payload, state: null }).state).toBeNull();
+    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ remaining: 0 }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ pending: true }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ scene_art: null }) })).toThrow();
+    expect(Protocol.validatePanel("dream", 2, { ...payload, state: state({
       thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
     }) }).state.thread_choices[0].label).toBe("合成已知故事");
-    expect(() => Protocol.validatePanel("dream", 1, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
     expect(CommandEcho.commandLine("explore.wait", { sleep: true, dream: true })).toBe("sleep dream");
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
+  });
+  it("renders the server-resolved scene artwork only when the panel carries one", () => {
+    const { wrapper } = fixture();
+    expect(wrapper.find("img.dream-scene__art").attributes("src")).toBe(state().scene_art);
+    wrapper.unmount();
+    const blank = mount(DreamPanel, {
+      props: { state: state({ scene_art: "" }), store: { view: reactive({ connected: true, dispatch: { inFlight: null } }), dispatchAction: vi.fn() } },
+    });
+    expect(blank.find("img.dream-scene__art").exists()).toBe(false);
+    blank.unmount();
   });
   it("rehydrates a same-session external draft change without clearing unsent chat", async () => {
     const { wrapper, store } = fixture();

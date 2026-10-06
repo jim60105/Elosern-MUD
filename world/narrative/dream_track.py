@@ -1,9 +1,12 @@
-"""Server-owned dream arousal track and the generation-free dream ending.
+"""Server-owned dream-goddess arousal track and the generation-free dream ending.
 
 This module owns the W3 dream-explicit-presentation boundary that the durable
 six-exchange accounting deliberately leaves to the presentation capability: the
-deterministic, session-only pleasure/arousal/climax track of one collaborative
-dream conversation, and the deterministic ending that closes it.
+deterministic, session-only pleasure/arousal/climax track of the dream's
+goddess counterpart (one collaborative dream conversation), and the
+deterministic ending that closes it. The counter advances the *goddess's*
+excitement — her climax (reached at the six-exchange convergence) ends the
+dream; the player's own live sexual state is never involved.
 
 The track is a pure read model over the durable exchange count owned by
 :mod:`world.narrative.dream_session`. It is *not* a live ``SexualState``
