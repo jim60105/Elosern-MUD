@@ -4,7 +4,8 @@ Every row here is a file-local synthetic fixture with invented keys and prose:
 the shipped bestiary content is asserted exclusively by the tagged
 data-contract test in ``test_monster_species_content.py``, per the repository's
 test-data-independence rule. The vocabularies the registry validates against
-are injected, so no shipped habitat, tier, or grade key appears here either.
+are injected, and so are the band rows the tier-band invariant reads, so no
+shipped habitat, tier, grade, band, or rank range appears here either.
 """
 
 import ast
@@ -41,6 +42,15 @@ SPARE_HABITAT = "t_fixture_mere"
 TIER = "t_fixture_band"
 STRONGER_TIER = "t_fixture_band_above"
 GRADE = "t_fixture_grade"
+
+# The invented band rows of the two invented tiers: (HP band, physical band,
+# magic band, guild rank range). They are wide enough for the invented profile
+# the balance-slot tests build, and they are injected like every other face, so
+# the band invariant is exercised without reading a shipped tier's bands.
+TIER_HP_BAND = (10, 20)
+TIER_PHYSICAL_BAND = (3, 8)
+TIER_MAGIC_BAND = (0, 2)
+TIER_RANK_RANGE = (GRADE, GRADE)
 
 # The registry's public callables, in full: read, validate, and project. A
 # spawn/place/populate/reconcile entry point would have to appear here to exist.
@@ -83,6 +93,15 @@ def _faces(**overrides: object) -> dict[str, object]:
         "habitat_face": (HABITAT, SPARE_HABITAT),
         "tier_face": (TIER, STRONGER_TIER),
         "grade_face": (GRADE,),
+        "tier_band_face": {
+            TIER: (TIER_HP_BAND, TIER_PHYSICAL_BAND, TIER_MAGIC_BAND, TIER_RANK_RANGE),
+            STRONGER_TIER: (
+                TIER_HP_BAND,
+                TIER_PHYSICAL_BAND,
+                TIER_MAGIC_BAND,
+                TIER_RANK_RANGE,
+            ),
+        },
     }
     faces.update(overrides)
     return faces
