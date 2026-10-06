@@ -37,7 +37,7 @@ Design §6 approves bound clearing as the second hunt semantic and §5 approves 
 
 - `quest-blueprint`: registration gains the site clear-out selector family (site key, bound flag, quantity within the site's capacity) and a new requirement states that a site clear-out binds the site's own individuals, never spawns, and cannot be authored through the generative compile boundary.
 - `quest-lifecycle`: acceptance gains the site clear-out guarantee (site state as the sole supply, named refusals, no creation or recovery) and the stage-zero binding of exactly those individuals inside the same transaction, with no instance pin.
-- `guild-quest-board`: board listing gains the availability rule for site clear-outs (with rank eligibility, ordering, and summary rendering unchanged) and the acceptance path's refusal now covers a site clear-out's named refusal with no partial state.
+- `guild-quest-board`: board listing gains the availability rule for site clear-outs (with rank eligibility, ordering, and summary rendering unchanged, and with acceptance's own precheck kept at issuing branch plus actor rank so the named refusal stays reachable) and the acceptance path's refusal now covers a site clear-out's named refusal with no partial state.
 - `monster-site-placement`: a new requirement states that a site's living individuals are the quest layer's binding source and that neither acceptance nor the board may create, populate, or recover a site for a quest.
 
 ## Impact
