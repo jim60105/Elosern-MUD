@@ -29,6 +29,7 @@ import unittest
 from pathlib import Path
 from typing import Mapping
 
+from tools.spec_traceability import covers_requirement
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.monster_placement import AMBIENT_PLACEMENT_REGISTRY
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
@@ -170,6 +171,9 @@ class ShippedHuntRegistrationTests(_ShippedCatalogTestCase):
 
 
 class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_every_published_hunt_names_a_region_with_an_authored_ambient_rule(self):
         hunts = _regional_hunts()
         self.assertTrue(hunts)
@@ -179,6 +183,9 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
                     AMBIENT_PLACEMENT_REGISTRY.get(_region_key(definition))
                 )
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_every_published_hunt_declares_the_complete_selector(self):
         # A partial selector would not register, but the content contract states
         # the property rather than inferring it from the validator: a definition
@@ -189,6 +196,9 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
                 self.assertTrue(objective.species_key)
                 self.assertTrue(objective.countable_variant_keys)
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_at_least_one_ordinary_countable_variant_is_eligible_in_the_rule(self):
         # This is what makes the acceptance-time guarantee expressible: the
         # provisioning owner can only create a variant the rule places.
@@ -200,6 +210,9 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
                 self.assertTrue(ordinary)
                 self.assertTrue(set(ordinary) & set(rule.variant_keys))
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_the_quantity_is_at_or_below_the_regions_authored_supply(self):
         for key, definition in _regional_hunts().items():
             objective = definition.stages[0].objective
@@ -209,6 +222,9 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
                     objective.quantity, min(rule.quantity, rule.capacity)
                 )
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_the_uncovered_region_carries_no_hunt(self):
         # A region with no authored placement could never satisfy a hunt, so the
         # board must not offer one there.
@@ -216,6 +232,9 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
         self.assertIn(UNPLACED_REGION_KEY, WILDERNESS_REGION_REGISTRY)
         self.assertNotIn(UNPLACED_REGION_KEY, _hunt_regions())
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
+    )
     def test_one_hunt_per_placed_species_in_every_covered_region(self):
         hunts = _regional_hunts()
         for region_key, rule in AMBIENT_PLACEMENT_REGISTRY.items():
@@ -254,12 +273,18 @@ class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
 
 
 class HuntAuthoredContentTests(_ShippedCatalogTestCase):
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_the_introductory_reward_row_stays_the_first_offer(self):
         # The joins in world/rules/tests/test_guild_config/ read
         # ``catalog.quest_offers[0]``; the appended hunt rows must sit after it.
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertEqual(catalog.quest_offers[0].definition_key, "introductory_hunt")
 
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_every_hunt_carries_rank_rationale_flavor_and_a_banded_reward(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         for key, definition in _regional_hunts().items():
@@ -288,6 +313,9 @@ class HuntAuthoredContentTests(_ShippedCatalogTestCase):
                 # the monster side's business, not a commission's.
                 self.assertEqual(offer.reward.items, ())
 
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_reward_merit_fits_inside_its_rank_threshold_band(self):
         # The authored-merit bound of the approved content: a hunt's merit stays
         # inside the span from its own rank's examination threshold to the next
@@ -316,6 +344,9 @@ class HuntAuthoredContentTests(_ShippedCatalogTestCase):
 
 
 class HuntRankIndependenceTests(_ShippedCatalogTestCase):
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_hunt_rank_is_never_below_its_strongest_countable_grade(self):
         # The authored rank is not derived from a danger grade, so a hunt whose
         # strongest countable variant is graded above it has to be one of the
@@ -333,6 +364,9 @@ class HuntRankIndependenceTests(_ShippedCatalogTestCase):
                 divergences[key] = (definition.rank, strongest)
         self.assertEqual(divergences, AUTHORED_GRADE_DIVERGENCES)
 
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_the_two_mid_hunts_keep_their_authored_mid_rank(self):
         hunts = _regional_hunts()
         for key, rank in MID_HUNTS.items():
@@ -346,6 +380,9 @@ class HuntRankIndependenceTests(_ShippedCatalogTestCase):
 
 
 class HuntProseBoundaryTests(_ShippedCatalogTestCase):
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_the_ability_vocabulary_is_the_approved_bestiarys_own(self):
         # Non-vacuity: the guard below compares against real approved ability
         # names, so a reworded or dropped bestiary entry fails here rather than
@@ -355,6 +392,9 @@ class HuntProseBoundaryTests(_ShippedCatalogTestCase):
             with self.subTest(claim=claim):
                 self.assertIn(claim, bestiary)
 
+    @covers_requirement(
+        "quest-blueprint::every-shipped-hunt-carries-authored-rank-rating-rationale-background-flavor-and-a-rank-banded-reward"
+    )
     def test_no_published_hunt_prose_asserts_an_unimplemented_ability(self):
         for key, definition in _regional_hunts().items():
             published = (definition.display_name, definition.rating_rationale_zh,
