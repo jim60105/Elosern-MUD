@@ -8,9 +8,8 @@ function fixture(overrides = {}) {
     session_id: "synthetic-storyboard-dream", revision: 1, completed: 0, remaining: 6,
     can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
-    opening: "雲海之上矗立著一座純白的王座。王座上的女神面容模糊，卻像一直在等你。",
-    scene: "積水漫過你的腳踝，湧如泉水的液面映著王座。你看不清女神的臉，只聽見水聲與她從容的呼吸。這裡沒有催促你的鐘聲。",
-    dialogue: "「如果醒來後，能讓一個念頭慢慢成為故事……你想從哪裡開始？」",
+    opening: "雲海之上矗立著一座純白的王座。王座上的女神面容模糊，卻像一直在等你。積水漫過你的腳踝，湧如泉水的液面映著王座。你可以在這裡商談故事方向，也可以隨時醒來。",
+    scene: "", dialogue: "",
     scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
     direction_parts: [], draft_preferences: null,
     thread_choices: [{ id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" }],
@@ -22,11 +21,12 @@ function fixture(overrides = {}) {
 
 const render = (args) => ({
   setup() {
-    const state = reactive(fixture(args));
+    const { disconnected, ...overrides } = args;
+    const state = reactive(fixture(overrides));
     const intent = ref(null);
     const note = ref("操作只提交意圖。上方按鈕是合成伺服器發布器，不會呼叫模型或推進遊戲時間。");
     const store = {
-      view: reactive({ connected: true, dispatch: { inFlight: null } }),
+      view: reactive({ connected: !args.disconnected, motionLevel: "full", textSpeed: "normal", dispatch: { inFlight: null } }),
       dispatchAction(action, payload) {
         intent.value = { action, payload };
         note.value = "已收到操作意圖，請選擇成功或拒絕發布。";
@@ -44,8 +44,10 @@ const render = (args) => ({
       if (action === "dream.say") {
         state.completed += 1;
         state.remaining = 6 - state.completed;
-        state.track.completed = state.completed;
-        state.track.level = "合成已完成階段";
+        const levels = ["平靜", "微興奮", "中等", "高度", "極限"];
+        const ordinal = Math.min(4, Math.round(state.completed * 4 / 6));
+        Object.assign(state.track, { completed: state.completed, ordinal, level: levels[ordinal],
+          pleasure: Math.min(100, state.completed * 17), converging: state.completed + 1 >= 5 });
         state.scene = "身影微微側過身，替你的念頭留出一小片位置。霧沒有散去，遠處卻像有了可以走近的輪廓。";
         state.dialogue = "「那就先留下這個念頭。你還想替它添上什麼？」";
         state.direction_parts = payload.message_parts;
@@ -80,7 +82,7 @@ const render = (args) => ({
     }
     function publishCap() {
       Object.assign(state, { completed: 6, remaining: 0, can_input: false, pending: false });
-      Object.assign(state.track, { completed: 6, pleasure: 100, ordinal: 4, level: "合成第六次階段", converging: true });
+      Object.assign(state.track, { completed: 6, pleasure: 100, ordinal: 4, level: "極限", converging: true });
       state.revision += 1;
       intent.value = null;
       note.value = "已發布合成六次上限，自由文字關閉，離開操作仍可使用。";
@@ -105,8 +107,28 @@ const render = (args) => ({
   },
 });
 
+const thread = { id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" };
+const midTrack = { version: 1, completed: 2, pleasure: 32, ordinal: 1, level: "微興奮", climax_phase: "未達", converging: false };
+const said = "我想在北境的雪原上，與那位失散的騎士重逢……";
+const conversing = {
+  completed: 2, remaining: 4, track: midTrack, direction_parts: [said],
+  scene: "水面泛起細細的漣漪，她垂落的髮絲拂過王座扶手，白石被她的體溫映得微微發亮。湧如泉水的液面一圈圈蕩開，漫過你的腳踝。",
+  dialogue: "「重逢嗎……那就讓雪替你們記得彼此吧。你還想替這個念頭添上什麼？」",
+};
+
 export const Storyboard = { render };
-export const Pending = { render, args: { pending: true, can_input: false } };
-export const Failed = { render, args: { failure: true } };
-export const AtCap = { render, args: { completed: 6, remaining: 0, can_input: false,
-  track: { version: 1, completed: 6, pleasure: 100, ordinal: 4, level: "合成第六次階段", climax_phase: "合成階段", converging: true } } };
+export const Conversing = { render, args: conversing };
+export const Converging = { render, args: { ...conversing, completed: 5, remaining: 1,
+  track: { version: 1, completed: 5, pleasure: 86, ordinal: 3, level: "高度", climax_phase: "接近", converging: true } } };
+export const Pending = { render, args: { ...conversing, pending: true, can_input: false } };
+export const Failed = { render, args: { ...conversing, failure: true } };
+export const Drafted = { render, args: { ...conversing, direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
+  draft_preferences: { kind: "thread_direction", thread_id: thread.id, themes: ["重逢", "信任"], atmosphere: ["靜謐"], exclusions: ["暴力"] } } };
+export const AtCap = { render, args: { ...conversing, completed: 6, remaining: 0, can_input: false,
+  direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
+  dialogue: "「……帶著它醒來吧。」",
+  track: { version: 1, completed: 6, pleasure: 100, ordinal: 4, level: "極限", climax_phase: "餘韻", converging: true } } };
+export const ManyThreads = { render, args: { ...conversing, thread_choices: Array.from({ length: 32 }, (_, index) => ({
+  id: `synthetic-thread-${index}`, label: `合成故事線 ${index + 1}：${"在港灣與雪原之間往返的長篇委託紀錄".repeat(index % 3 + 1)}` })) } };
+export const Disconnected = { render, args: { ...conversing, disconnected: true } };
+export const NoArt = { render, args: { ...conversing, scene_art: "" } };
