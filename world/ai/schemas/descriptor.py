@@ -7,6 +7,10 @@ supply their own output schemas through this transmission contract without
 touching either module; the per-call validators let a layer bind a check to
 one specific call's data (e.g. the affinity no-leak check) without module
 global state.
+
+``call_id``/``attempt``/``layer`` are correlation metadata stamped by the
+guardrail on each attempt so the transport can write its transcript
+``exchange`` record; they never enter the wire body or headers.
 """
 
 from __future__ import annotations
@@ -24,6 +28,9 @@ class ChatRequestDescriptor:
     output_schema: Mapping[str, Any] | None = None
     schema_id: str | None = None
     semantic_validators: Mapping[str, Callable[[Any], list[str]]] | None = None
+    call_id: str | None = None
+    attempt: int = 0
+    layer: str | None = None
 
     def __post_init__(self) -> None:
         if not self.messages:
@@ -41,3 +48,9 @@ class ChatRequestDescriptor:
             self.semantic_validators, Mapping
         ):
             raise ValueError("semantic_validators must be a mapping when provided")
+        if self.call_id is not None and not isinstance(self.call_id, str):
+            raise ValueError("call_id must be a string when provided")
+        if isinstance(self.attempt, bool) or not isinstance(self.attempt, int) or self.attempt < 0:
+            raise ValueError("attempt must be a non-negative integer")
+        if self.layer is not None and not isinstance(self.layer, str):
+            raise ValueError("layer must be a string when provided")

@@ -25,6 +25,15 @@ class RenderContextTests(unittest.TestCase):
     def test_strings_with_spaces_are_quoted(self) -> None:
         self.assertEqual(render_context({"k": "two words"}), 'k="two words"')
 
+    @covers_requirement('observability-logging::facade-renders-one-structured-grep-friendly-line')
+    def test_long_multiline_prose_is_bounded_to_one_line(self) -> None:
+        prose = "旅人說：\n" + "雨" * 300
+        text = render_context({"input": prose})
+        self.assertNotIn("\n", text)
+        self.assertTrue(text.startswith('input="旅人說：\\n雨'))
+        self.assertTrue(text.endswith('"'))
+        self.assertEqual(len(text), len('input=""') + 200)
+
     def test_none_keys_and_values_omitted(self) -> None:
         self.assertEqual(render_context({"a": None, "b": 2}), "b=2")
 

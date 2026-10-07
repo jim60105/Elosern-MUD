@@ -260,6 +260,20 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(physical, self.physical())
         self.assertEqual(service.dream_state(self.actor)["sleep"]["seconds"], 10)
 
+    @covers_requirement('observability-logging::llm-and-narrative-diagnostic-correlation')
+    def test_generation_failure_event_names_the_actual_call_and_player_input(self):
+        self.enter(tick_from=90, tick_to=100, requested_seconds=10)
+        unscripted = FakeLLMClient()  # no fixture: an unexpected error escapes the guardrail
+        with patch("server.dream_service.log_warn") as warn, \
+                patch.object(guardrail, "log_info") as info:
+            result = self.request("say", message="合成的夢中提問", client=unscripted).result
+        self.assertEqual(result["outcome"], "rejected")
+        failed = [c.kwargs["context"] for c in warn.call_args_list
+                  if c.args[0] == "dream_surface_generation_failed"]
+        calls = [c.kwargs["context"] for c in info.call_args_list if c.args[0] == "llm_call"]
+        self.assertEqual(failed[0]["input"], "合成的夢中提問")
+        self.assertEqual(failed[0]["call_id"], calls[0]["call_id"])
+
     @covers_requirement("dream-sleep-surface::dream-departure-never-settles-sleep-again")
     def test_reconnect_progress_and_new_sleep_association_authority(self):
         first = self.enter()

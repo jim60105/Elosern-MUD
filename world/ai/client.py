@@ -11,6 +11,9 @@ rather than the global ``LLM_*`` settings.
 from __future__ import annotations
 
 import json
+import time
+from datetime import datetime
+from urllib.parse import urlsplit
 
 from twisted.internet import reactor as global_reactor
 from twisted.web.client import Agent, HTTPConnectionPool
@@ -24,13 +27,14 @@ from evennia.contrib.rpg.llm.llm_client import (
 )
 
 from world.ai.errors import LLMTransportError
-from world.ai.profiles import LLMProfile
+from world.ai.profiles import LLMProfile, profile_secrets
 from world.ai.schemas.descriptor import ChatRequestDescriptor
 from world.ai.schemas.registry import resolve_output_schema
 from world.ai.schemas.response import validate_chat_completion_envelope
 
 from world.http_identity import http_user_agent
 from world.observability import log_info, log_warn
+from world.observability import transcript as llm_transcript
 from world.observability.sanitize import safe_endpoint
 
 # Verbatim-passthrough sampling knobs (endpoint design §4.2 request order).
@@ -79,8 +83,18 @@ class _RedactedChainLink(Exception):
     """
 
 
-def _copy_chain_link(link: BaseException, api_key: str) -> BaseException:
-    """Copy one chain link, scrubbing the key from its observable text.
+def _scrub(text: str, secrets: tuple[str, ...]) -> str:
+    for secret in secrets:
+        text = text.replace(secret, "[redacted]")
+    return text
+
+
+def _carries(text: str, secrets: tuple[str, ...]) -> bool:
+    return any(secret in text for secret in secrets)
+
+
+def _copy_chain_link(link: BaseException, secrets: tuple[str, ...]) -> BaseException:
+    """Copy one chain link, scrubbing every credential from its observable text.
 
     A type-preserving copy keeps ``args``, ``__dict__`` (so ``kind``-style
     attributes survive) and the traceback (so the rendered raise site is the
@@ -92,15 +106,13 @@ def _copy_chain_link(link: BaseException, api_key: str) -> BaseException:
         copy = type(link).__new__(type(link))
         copy.__dict__.update(link.__dict__)
         copy.args = tuple(
-            value.replace(api_key, "[redacted]")
-            if isinstance(value, str) and api_key in value
-            else value
+            _scrub(value, secrets) if isinstance(value, str) else value
             for value in link.args
         )
     except Exception:  # observability: ignore R2: copy failure must not raise — an uncopyable link degrades to the scrubbing stand-in below, never a log that could carry the key
         copy = None
-    if copy is None or (copy is not None and api_key in str(copy)):
-        message = str(link).replace(api_key, "[redacted]")
+    if copy is None or (copy is not None and _carries(str(copy), secrets)):
+        message = _scrub(str(link), secrets)
         copy = type(
             type(link).__name__,
             (_RedactedChainLink,),
@@ -111,7 +123,7 @@ def _copy_chain_link(link: BaseException, api_key: str) -> BaseException:
     return copy
 
 
-def _redact_chain(error: BaseException, api_key: str) -> BaseException:
+def _redact_chain(error: BaseException, secrets: tuple[str, ...]) -> BaseException:
     """Return the exception chain with every link's text key-scrubbed.
 
     The observability facade renders the full ``__cause__``/``__context__``
@@ -124,14 +136,14 @@ def _redact_chain(error: BaseException, api_key: str) -> BaseException:
     from world.observability.render import _chain
 
     links = _chain(error)
-    if not api_key or not any(api_key in str(link) for link in links):
+    if not secrets or not any(_carries(str(link), secrets) for link in links):
         return error
     outer: BaseException | None = None
     # ``_chain`` is innermost-first; rebuild outermost-first so every inner
     # copy relinks to its outer neighbour's replacement.
     for index in range(len(links) - 1, -1, -1):
         link = links[index]
-        copy = _copy_chain_link(link, api_key)
+        copy = _copy_chain_link(link, secrets)
         if outer is not None:
             neighbour = links[index + 1]
             if link.__cause__ is neighbour:
@@ -157,6 +169,9 @@ class OpenAICompatClient(LLMClient):
         if not isinstance(profile, LLMProfile):
             raise TypeError("profile must be an LLMProfile")
         self.profile = profile
+        # Every credential-bearing string (api key, secret header values,
+        # URL userinfo forms) scrubbed from errors, logs, and transcripts.
+        self._secrets = profile_secrets(profile)
         self._reactor = reactor if reactor is not None else global_reactor
         self._conn_pool = HTTPConnectionPool(self._reactor)
         self._conn_pool._factory = QuietHTTP11ClientFactory
@@ -232,7 +247,7 @@ class OpenAICompatClient(LLMClient):
         if reasoning:
             body["reasoning"] = reasoning
 
-    def _parse_response(self, result):
+    def _parse_response(self, result, call_id=None):
         """Parse a ``(status_code, body)`` result into the generated text."""
         status_code, body = result
         if status_code != 200:
@@ -258,6 +273,7 @@ class OpenAICompatClient(LLMClient):
             if isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0:
                 log_info("llm_cached_tokens_reported", context={
                     "profile": self.profile.model, "cached_tokens": cached,
+                    "call_id": call_id,
                 })
         return payload["choices"][0]["message"]["content"]
 
@@ -268,9 +284,7 @@ class OpenAICompatClient(LLMClient):
         can reach a caller or the safe log path passes through here, so no
         endpoint- or transport-controlled text can carry the key out.
         """
-        if self.profile.api_key:
-            return message.replace(self.profile.api_key, "[redacted]")
-        return message
+        return _scrub(message, self._secrets)
 
     def _handle_llm_error(self, failure):
         """Map connection failures to a safe ``LLMTransportError`` errback."""
@@ -306,7 +320,7 @@ class OpenAICompatClient(LLMClient):
                     ),
                     "kind": error.kind,
                 },
-                exc=_redact_chain(error, self.profile.api_key),
+                exc=_redact_chain(error, self._secrets),
             )
         else:
             log_warn(
@@ -324,6 +338,21 @@ class OpenAICompatClient(LLMClient):
         """
         request_body = self._format_request_body(descriptor)
         url = self.profile.base_url.rstrip("/") + self.profile.path
+        started = time.monotonic()
+        settled: dict = {}
+
+        def remember_body(result):
+            settled["status"], settled["raw"] = result
+            return result
+
+        def settle_ok(text):
+            self._write_exchange(descriptor, request_body, started, settled, None)
+            return text
+
+        def settle_failed(failure):
+            self._write_exchange(descriptor, request_body, started, settled, failure.value)
+            return failure
+
         d = self.agent.request(
             b"POST",
             bytes(url, "utf-8"),
@@ -331,12 +360,62 @@ class OpenAICompatClient(LLMClient):
             bodyProducer=StringProducer(json.dumps(request_body)),
         )
         d = d.addCallback(self._handle_llm_response_body)
+        d = d.addCallback(remember_body)
         d = d.addErrback(self._handle_llm_error)
-        d = d.addCallback(self._parse_response)
+        d = d.addCallback(self._parse_response, call_id=descriptor.call_id)
         d = d.addTimeout(
             self.profile.timeout_seconds,
             self._reactor,
             onTimeoutCancel=self._on_timeout,
         )
+        # Exactly one transcript exchange per settled request: success,
+        # HTTP/malformed/connection failure, timeout, or cancellation.
+        d = d.addCallbacks(settle_ok, settle_failed)
         d = d.addErrback(self._safe_log_error)
         return d
+
+    def _write_exchange(self, descriptor, request_body, started, settled, error) -> None:
+        """Append the transcript ``exchange`` record; never raises.
+
+        Headers are never recorded. The response is the parsed JSON body or,
+        when unparseable, the raw text; credentials are scrubbed by the
+        transcript writer from every string, response echoes included.
+        """
+        try:
+            raw = settled.get("raw")
+            response = None
+            if isinstance(raw, (bytes, bytearray)):
+                text = bytes(raw).decode("utf-8", errors="replace")
+                try:
+                    response = json.loads(text)
+                except ValueError:  # observability: ignore R2: a non-JSON body is recorded verbatim as text
+                    response = text
+            elif isinstance(raw, str):
+                response = raw
+            if error is None:
+                error_record = None
+            elif isinstance(error, LLMTransportError):
+                error_record = {"type": error.kind, "message": self._scrub_key(str(error))}
+            else:
+                # Unexpected values never passed the scrub: type name only.
+                error_record = {"type": type(error).__name__, "message": None}
+            status = settled.get("status")
+            llm_transcript.write(
+                {
+                    "kind": "exchange",
+                    "call_id": descriptor.call_id,
+                    "attempt": descriptor.attempt,
+                    "ts": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+                    "layer": descriptor.layer,
+                    "profile": self.profile.model,
+                    "endpoint_host": urlsplit(self.profile.base_url).hostname,
+                    "ms": int((time.monotonic() - started) * 1000),
+                    "request": request_body,
+                    "status": status if isinstance(status, int) else None,
+                    "response": response,
+                    "error": error_record,
+                },
+                secrets=self._secrets,
+            )
+        except Exception:  # observability: ignore R2: a diagnostics failure must never replace the transport result; the transcript writer reports its own failures to stderr
+            return

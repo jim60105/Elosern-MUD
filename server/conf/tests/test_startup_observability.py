@@ -59,6 +59,7 @@ _BODY_TARGETS = (
     "server.title_nomination_service.register_nomination_triggers",
     "world.narrative.memory.process_pending_narrative_memory_projections",
     "world.narrative.correspondence_memory.recover_pending_correspondence_projections",
+    "world.observability.transcript.prune",
 )
 
 
@@ -112,6 +113,12 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertTrue(all(ms == 10 for _, ms in steps))
         warn.assert_not_called()
         error.assert_not_called()
+
+    def test_transcript_retention_prune_runs_once_per_start(self):
+        calls = []
+        self._run({"world.observability.transcript.prune": {"side_effect": lambda: calls.append(1)}})
+        self.assertEqual(calls, [1])
+        self.assertEqual(STARTUP_STEP_ORDER[-1], "llm_transcript_prune")
 
     def test_fail_loud_step_logs_and_reraises(self):
         info, warn, error = self._run(

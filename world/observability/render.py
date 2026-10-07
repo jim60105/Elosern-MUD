@@ -5,8 +5,8 @@ The line shape is::
     [level] event | mod.func:line | k=v | k2=v2 | tb: Type: msg @ file:line <- ...
 
 Rules (design §3.1): keys sorted; ``int``/``float``/``bool`` verbatim; strings
-verbatim, double-quoted when they contain whitespace; all other values
-``repr``-truncated to 200 characters; ``None`` keys/values omitted entirely;
+verbatim, double-quoted when they contain whitespace; every value (strings
+included) newline-escaped and truncated to 200 characters; ``None`` keys/values omitted entirely;
 the exception chain rendered outermost-first joined by `` <- ``. Rendering
 never raises: any per-value failure degrades that value in place.
 """
@@ -28,9 +28,12 @@ def render_value(value: object) -> str:
     """Render one context value; degrade in place instead of raising."""
     try:
         if isinstance(value, str):
+            # Prose may enter logs, bounded: escape newlines, then truncate
+            # before quoting so the closing quote always survives.
+            text = _single_line(value)[:VALUE_TRUNCATE_AT]
             if any(char.isspace() for char in value):
-                return f'"{_single_line(value)}"'
-            return value
+                return f'"{text}"'
+            return text
         if isinstance(value, (bool, int, float)):
             return repr(value)
         text = repr(value)

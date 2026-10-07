@@ -107,6 +107,9 @@ class InventoryTests(unittest.TestCase):
             )
             and match.group(1).startswith("LLM_")
         }
+        # Ordinary env-backed settings that merely share the LLM_ prefix (the
+        # transcript knobs) are inventoried in ENV_BACKED, not the knob table.
+        parsed -= set(ENV_BACKED.values())
         self.assertEqual(parsed, set(llm_global_env_names()))
         self.assertNotIn("OLLAMA_BASE_URL", parsed)
         # Per-layer names are documented through the grammar, not enumerated.

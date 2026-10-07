@@ -97,6 +97,8 @@ ENV_BACKED: dict[str, str] = {
     "MAX_NR_CHARACTERS": "ELOSERN_MAX_CHARACTERS",
     "DEFEAT_ADULT_SCENES": "DEFEAT_ADULT_SCENES",
     "HTTP_USER_AGENT": "HTTP_USER_AGENT",
+    "LLM_TRANSCRIPT_ENABLED": "LLM_TRANSCRIPT_ENABLED",
+    "LLM_TRANSCRIPT_RETENTION_DAYS": "LLM_TRANSCRIPT_RETENTION_DAYS",
 }
 
 
@@ -139,6 +141,8 @@ DEFAULT_REPR: dict[str, str] = {
     "ELOSERN_VUE_CLIENT": "True",
     "MAX_NR_CHARACTERS": "5",
     "HTTP_USER_AGENT": "'elosern-mud/1.0'",
+    "LLM_TRANSCRIPT_ENABLED": "True",
+    "LLM_TRANSCRIPT_RETENTION_DAYS": "14",
 }
 
 
@@ -211,6 +215,9 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", "10", "10"),
     ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", " 5 ", "5"),
     ("HTTP_USER_AGENT", "HTTP_USER_AGENT", " custom-agent/9 ", "'custom-agent/9'"),
+    ("LLM_TRANSCRIPT_ENABLED", "LLM_TRANSCRIPT_ENABLED", "off", "False"),
+    ("LLM_TRANSCRIPT_RETENTION_DAYS", "LLM_TRANSCRIPT_RETENTION_DAYS", "1", "1"),
+    ("LLM_TRANSCRIPT_RETENTION_DAYS", "LLM_TRANSCRIPT_RETENTION_DAYS", " 30 ", "30"),
 ]
 
 
@@ -248,6 +255,10 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ART_SD_PROBE_CACHE_SECONDS", "4", "expected an integer between 5 and 3600"),
     ("ART_SD_PROBE_CACHE_SECONDS", "3601", "expected an integer between 5 and 3600"),
     ("ART_SD_PROBE_CACHE_SECONDS", "0", "expected an integer between 5 and 3600"),
+    ("LLM_TRANSCRIPT_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
+    ("LLM_TRANSCRIPT_RETENTION_DAYS", "0", "expected an integer of at least 1"),
+    ("LLM_TRANSCRIPT_RETENTION_DAYS", "-2", "expected an integer of at least 1"),
+    ("LLM_TRANSCRIPT_RETENTION_DAYS", "two", "expected an integer of at least 1"),
     ("ELOSERN_MAX_CHARACTERS", "0", "expected an integer between 1 and 10"),
     ("ELOSERN_MAX_CHARACTERS", "11", "expected an integer between 1 and 10"),
     ("ELOSERN_MAX_CHARACTERS", "-1", "expected an integer between 1 and 10"),
@@ -333,6 +344,8 @@ class _SubprocessSettingsTests(unittest.TestCase):
                 "ELOSERN_VUE_CLIENT",
                 "ELOSERN_MAX_CHARACTERS",
                 "HTTP_USER_AGENT",
+                "LLM_TRANSCRIPT_ENABLED",
+                "LLM_TRANSCRIPT_RETENTION_DAYS",
             )
         }
 

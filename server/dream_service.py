@@ -108,14 +108,19 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
         return _result("rejected", "dream_refused", "目前無法接受這個操作，請確認故事方向與夢境狀態。")
 
     _refresh(actor, session)
+    tap = None
     try:
         from world.ai.dream import generate_dream_exchange
+        from world.ai.guardrail import CallIdTap
         if client is None:
             from world.ai.client import OpenAICompatClient
             from world.ai.profiles import get_profile
             client = OpenAICompatClient(get_profile("dream"))
+        # A fresh tap per turn names the actual guarded call in the failure
+        # event; it stays None when the failure precedes any guarded call.
+        tap = CallIdTap(client)
         response = yield generate_dream_exchange(
-            client, completed=completed, player_message=message,
+            tap, completed=completed, player_message=message,
             brief=collaborator_creative_brief(owner),
         )
         with transaction.atomic():
@@ -141,7 +146,10 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
             log_info("dream_surface_action", context={**boundary, "completed": completed + 1, "tick": tick})
         return _result("success", "dream_delivered", "夢境回應已送達。")
     except Exception as error:
-        log_warn("dream_surface_generation_failed", context=boundary, exc=error)
+        log_warn("dream_surface_generation_failed", context={
+            **boundary, "input": message,
+            "call_id": tap.latest if tap is not None else None,
+        }, exc=error)
         lifecycle.abandon_turn(session_id, owner, turn.submission_id, reason="generation_failed", tick=tick)
         latest = surface.associated_session(actor)
         if latest and latest.session_id == session_id and latest.state == lifecycle.STATE_OPEN:

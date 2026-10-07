@@ -16,15 +16,18 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from jsonschema import Draft7Validator
 from twisted.internet import defer
 
 from world.observability import log_debug, log_info
+from world.observability import transcript as llm_transcript
 
 from world.ai.errors import LLMTransportError
-from world.ai.profiles import LAYER_NAMES, UnknownLayerError, get_profile
+from world.ai.profiles import LAYER_NAMES, UnknownLayerError, get_profile, profile_secrets
 from world.ai.schemas.descriptor import ChatRequestDescriptor
 from world.ai.schemas.registry import resolve_output_schema
 
@@ -122,17 +125,104 @@ def _degrade(layer: str) -> Any:
     return fallback()
 
 
-def _emit_call(layer: str, profile: Any, started: float, result: str, reason: str | None) -> None:
-    """Write the single ``llm_call`` boundary event for one guarded call."""
-    context: dict[str, Any] = {
-        "layer": layer,
-        "profile": profile.model,
-        "ms": int((time.monotonic() - started) * 1000),
-        "result": result,
-    }
-    if reason is not None:
-        context["reason"] = reason
-    log_info("llm_call", context=context)
+def _timestamp() -> str:
+    """Local ISO-8601 timestamp with offset for transcript records."""
+    return datetime.now().astimezone().isoformat(timespec="milliseconds")
+
+
+class CallIdTap:
+    """Forwarding client wrapper that remembers the guarded ``call_id``.
+
+    ``guarded_call`` reports its identifier to the client it was handed
+    (``record_call_id``), so a caller that wraps its client in a fresh tap
+    per request can name the actual call in its own failure event — even
+    when the call degraded without reaching the transport. ``latest`` stays
+    ``None`` when no guarded call happened, so nothing is fabricated. Wrap
+    outermost: inner forwarding wrappers do not relay ``record_call_id``.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.call_ids: list[str] = []
+
+    def record_call_id(self, call_id: str) -> None:
+        self.call_ids.append(call_id)
+
+    @property
+    def latest(self) -> str | None:
+        return self.call_ids[-1] if self.call_ids else None
+
+    def get_response(self, descriptor: ChatRequestDescriptor):
+        return self._inner.get_response(descriptor)
+
+
+class _GuardedCall:
+    """Correlation state for one guarded call: id, timing, per-attempt errors."""
+
+    def __init__(self, layer: str, profile: Any) -> None:
+        self.call_id = uuid4().hex
+        self.layer = layer
+        self.profile = profile
+        self.started = time.monotonic()
+        self.attempts: list[dict[str, Any]] = []
+
+    def descriptor(
+        self,
+        attempt: int,
+        messages: tuple[dict[str, str], ...],
+        output_schema: Mapping[str, Any] | None,
+        base: ChatRequestDescriptor,
+    ) -> ChatRequestDescriptor:
+        return ChatRequestDescriptor(
+            messages,
+            output_schema,
+            base.schema_id,
+            base.semantic_validators,
+            call_id=self.call_id,
+            attempt=attempt,
+            layer=self.layer,
+        )
+
+    def note_attempt(self, attempt: int, errors: list[str]) -> None:
+        self.attempts.append({"attempt": attempt, "validation_errors": list(errors)})
+
+    def settle(self, result: str, reason: str | None, final_text: str | None = None) -> None:
+        """Write the single ``llm_call`` event and the transcript ``outcome``.
+
+        Neither sink raises (the facade and the transcript both contain their
+        own failures), so settling can never turn a degraded call into a
+        second, ``rejected`` settlement.
+        """
+        ms = int((time.monotonic() - self.started) * 1000)
+        context: dict[str, Any] = {
+            "call_id": self.call_id,
+            "layer": self.layer,
+            "profile": self.profile.model,
+            "ms": ms,
+            "result": result,
+        }
+        if reason is not None:
+            context["reason"] = reason
+        log_info("llm_call", context=context)
+        try:
+            secrets = profile_secrets(self.profile)
+        except Exception:  # observability: ignore R2: an unreadable profile skips the outcome record rather than risk an unscrubbed write
+            return
+        llm_transcript.write(
+            {
+                "kind": "outcome",
+                "call_id": self.call_id,
+                "ts": _timestamp(),
+                "layer": self.layer,
+                "profile": self.profile.model,
+                "ms": ms,
+                "result": result,
+                "reason": reason,
+                "attempts": self.attempts,
+                "final_text": final_text if result == "ok" else None,
+            },
+            secrets=secrets,
+        )
 
 
 def _jsonschema_errors(instance: Any, schema: Mapping[str, Any]) -> list[str]:
@@ -192,31 +282,38 @@ def guarded_call(layer: str, client: Any, descriptor: ChatRequestDescriptor):
         fallback result when the profile is disabled, a transport failure
         occurs, or the retry budget is exhausted.
 
-    Observability: exactly one ``llm_call`` boundary event per call —
+    Observability: exactly one ``llm_call`` boundary event and one
+    transcript ``outcome`` record per call, sharing a fresh ``call_id`` —
     ``ok``, ``degraded`` (with the degrade reason), or ``rejected`` when an
     unexpected error escapes the pipeline (including a failing degrade
-    fallback); escaping errors are re-raised unchanged. The degraded event
-    is written only after the fallback actually returned, so a raising
-    fallback yields one ``rejected`` event, never a prior ``degraded``.
+    fallback); escaping errors are re-raised unchanged. The degraded
+    settlement is written only after the fallback actually returned, so a
+    raising fallback yields one ``rejected`` settlement, never a prior
+    ``degraded``. An unknown layer raises before any call exists, so it
+    settles nothing. Each attempt descriptor carries the ``call_id``,
+    attempt index and layer so a real transport stamps its ``exchange``.
     """
     profile = get_profile(layer)
-    started = time.monotonic()
+    call = _GuardedCall(layer, profile)
+    record_call_id = getattr(client, "record_call_id", None)
+    if callable(record_call_id):
+        record_call_id(call.call_id)
     try:
-        result = yield _guarded_pipeline(layer, profile, client, descriptor, started)
+        result = yield _guarded_pipeline(layer, profile, client, descriptor, call)
     except Exception as error:
-        _emit_call(layer, profile, started, "rejected", f"unexpected_error:{type(error).__name__}")
+        call.settle("rejected", f"unexpected_error:{type(error).__name__}")
         raise
     return result
 
 
 @defer.inlineCallbacks
 def _guarded_pipeline(
-    layer: str, profile: Any, client: Any, descriptor: ChatRequestDescriptor, started: float
+    layer: str, profile: Any, client: Any, descriptor: ChatRequestDescriptor, call: _GuardedCall
 ):
-    """One validation-retry-degrade pass; emits its own terminal event."""
+    """One validation-retry-degrade pass; settles its own terminal outcome."""
     if not profile.enabled:
         fallback = _degrade(layer)
-        _emit_call(layer, profile, started, "degraded", "profile_disabled")
+        call.settle("degraded", "profile_disabled")
         return fallback
 
     output_schema = resolve_output_schema(
@@ -225,17 +322,13 @@ def _guarded_pipeline(
     budget = 1 + profile.max_retries
     messages = descriptor.messages
     for attempt in range(budget):
-        attempt_descriptor = ChatRequestDescriptor(
-            messages,
-            output_schema,
-            descriptor.schema_id,
-            descriptor.semantic_validators,
-        )
+        attempt_descriptor = call.descriptor(attempt, messages, output_schema, descriptor)
         try:
             text = yield client.get_response(attempt_descriptor)
         except LLMTransportError:  # observability: ignore R2: llm_call event below; the client layer owns the llm_transport_error chain
+            call.note_attempt(attempt, [])
             fallback = _degrade(layer)
-            _emit_call(layer, profile, started, "degraded", "transport_error")
+            call.settle("degraded", "transport_error")
             return fallback
         try:
             errors = _validate_output(
@@ -245,18 +338,25 @@ def _guarded_pipeline(
                 attempt_descriptor.semantic_validators,
             )
         except LLMTransportError:  # observability: ignore R2: llm_call event below; unparseable output is fully named by the degrade reason
+            call.note_attempt(attempt, [])
             fallback = _degrade(layer)
-            _emit_call(layer, profile, started, "degraded", "transport_error")
+            call.settle("degraded", "transport_error")
             return fallback
+        call.note_attempt(attempt, errors)
         if not errors:
-            _emit_call(layer, profile, started, "ok", None)
+            call.settle("ok", None, final_text=text)
             return text
         log_debug(
             "llm_call_retry",
-            context={"layer": layer, "attempt": attempt, "errors": len(errors)},
+            context={
+                "call_id": call.call_id,
+                "layer": layer,
+                "attempt": attempt,
+                "errors": len(errors),
+            },
         )
         if attempt < budget - 1:
             messages = messages + (_error_message(errors),)
     fallback = _degrade(layer)
-    _emit_call(layer, profile, started, "degraded", "invalid_output")
+    call.settle("degraded", "invalid_output")
     return fallback

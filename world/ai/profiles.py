@@ -391,3 +391,50 @@ def get_profile(layer: str) -> LLMProfile:
         raw = default_profiles()
     profiles = build_profiles(raw)
     return profiles[layer]
+
+
+# Header names whose values are public request metadata, never credentials;
+# every other configured header value is treated as a secret for redaction.
+_NON_SECRET_HEADER_NAMES = frozenset(
+    {"content-type", "accept", "user-agent", "x-title", "http-referer"}
+)
+# Header values shorter than this (e.g. a "v2" version pin) are treated as
+# metadata: redacting them would mangle ordinary prose throughout payloads.
+_MIN_HEADER_SECRET_LENGTH = 8
+
+
+def profile_secrets(profile: LLMProfile) -> tuple[str, ...]:
+    """Every credential-bearing string a profile can put on the wire.
+
+    The api key, configured header values outside the public-metadata names,
+    and the base URL's userinfo (the whole userinfo and the password, both
+    raw and percent-decoded, plus the Basic-auth base64 of ``user:pass``).
+    Blank values are dropped (replacing an empty string would mangle every
+    character), and the result is longest-first so a containing secret is
+    redacted before any secret it contains.
+    """
+    import base64
+    from urllib.parse import unquote, urlsplit
+
+    candidates: list[str] = [profile.api_key]
+    for name, values in profile.headers.items():
+        if name.lower() in _NON_SECRET_HEADER_NAMES:
+            continue
+        candidates.extend(value for value in values if len(value.strip()) >= _MIN_HEADER_SECRET_LENGTH)
+    try:
+        parts = urlsplit(profile.base_url)
+        netloc = parts.netloc
+    except ValueError:
+        netloc = ""
+    if "@" in netloc:
+        userinfo = netloc.rsplit("@", 1)[0]
+        user, _, password = userinfo.partition(":")
+        # A bare username is an identifier, not a secret, and redacting a
+        # short one would mangle ordinary prose; it is covered inside the
+        # whole userinfo and the pair forms.
+        for value in (userinfo, password):
+            candidates.extend((value, unquote(value)))
+        pair = f"{unquote(user)}:{unquote(password)}"
+        candidates.append(base64.b64encode(pair.encode("utf-8")).decode("ascii"))
+    unique = {value for value in candidates if isinstance(value, str) and value.strip()}
+    return tuple(sorted(unique, key=lambda value: (-len(value), value)))
