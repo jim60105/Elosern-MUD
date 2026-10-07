@@ -4,9 +4,11 @@ from server.console.tests._support import ConsoleOwnerTest
 from world.rules import gm, equipment
 from world.rules.clock import AdvanceSource, MAX_ADVANCE_SECONDS, read_world_clock
 from world.rules.surfaces import snapshot_traits
+from tools.spec_traceability import covers_requirement
 
 
 class RulesConsoleTests(ConsoleOwnerTest):
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_acquire_auto_reward_chain_pins_and_every_surface_survive_late_mirror_failure(self):
         from evennia.utils.create import create_object
         from world.tests.synthetic_data import make_quest
@@ -48,6 +50,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual([attribute_snapshot(room,'pin_reasons') for room in rooms],pins)
         self.assertEqual(list(self.player.contents),[])
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_grant_take_repeated_materialized_mixed_and_key_only(self):
         gm.give_item(self.target,'t_huskapple',3)
         self.assertEqual(list(self.player.db.inventory), ['t_huskapple']*3)
@@ -61,6 +64,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(self.player.db.inventory),['t_huskapple'])
         self.assertEqual(list(self.player.contents),[])
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_partial_mixed_holdings_remove_only_existing_matching_mirrors(self):
         gm.give_item(self.target,'t_huskapple',3)
         for mirror in list(self.player.contents)[:2]:
@@ -74,6 +78,10 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(self.player.db.inventory),['t_huskapple'])
         self.assertEqual(list(self.player.contents),[])
 
+    @covers_requirement(
+        'gm-developer-console::inventory-wallet-and-trait-operations',
+        'gm-developer-console::complete-validated-domain-verb-batch',
+    )
     def test_inventory_validation_before_any_change(self):
         for verb in (gm.give_item,gm.take_item):
             for quantity in (True,0,-1,1.5,'2'):
@@ -83,6 +91,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assert_refusal('invalid_argument',lambda:gm.take_item(self.target,'t_huskapple',1))
         self.assertEqual(list(self.player.db.inventory),[])
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_equipped_last_copy_is_unequipped_but_ordinary_removal_stays_rejected(self):
         gm.give_item(self.target,'t_thorn_knife',2)
         self.assertEqual(equipment.toggle_equipment(self.player,'t_thorn_knife').outcome,'success')
@@ -96,6 +105,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(self.player.db.inventory),[])
         self.assertEqual(list(self.player.contents),[])
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_give_late_materialization_failure_restores_mirrors_and_cache(self):
         original = equipment.materialize_registry_object
         def late(entity,key):
@@ -107,6 +117,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(self.player.db.inventory),[])
         self.assertEqual(list(self.player.contents),[])
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_take_multiple_mirror_delete_failure_restores_all(self):
         gm.give_item(self.target,'t_huskapple',3)
         mirrors = list(self.player.contents)
@@ -120,6 +131,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(len(self.player.contents),3)
         self.assertEqual(list(self.player.db.inventory),['t_huskapple']*3)
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_wallet_and_literal_trait_and_gauge_normal_invalid_and_rollback(self):
         gm.set_wallet(self.target,27)
         self.assertEqual(self.player.db.wallet,27)
@@ -162,6 +174,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
                 gm.set_gauge(self.target,'hp',1)
         self.assertEqual(snapshot_traits(self.player),traits)
 
+    @covers_requirement('gm-developer-console::inventory-wallet-and-trait-operations')
     def test_trait_and_gauge_type_scale_registry_kind_and_modifier_separation(self):
         lower,upper=gm._base_band(self.player,'magic_power')
         self.player.traits.magic_power.mod=3
@@ -195,6 +208,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assert_refusal('registry_key_not_found',lambda:gm.set_trait_base(self.target,'hp',0))
         self.player.race=old_race
 
+    @covers_requirement('gm-developer-console::full-gm-clock-settlement')
     def test_registered_world_stages_preserve_order_and_gm_clock_rollback(self):
         from world.rules import clock
         registrations=dict(clock._EVENT_SOURCES)
@@ -207,6 +221,7 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual([stage for stage,_,_ in seen],list(clock._STAGE_ORDER[5:]))
         self.assertTrue(all((start,end)==(before,before+3) for _,start,end in seen))
 
+    @covers_requirement('gm-developer-console::full-gm-clock-settlement')
     def test_clock_source_scope_bounds_and_real_settlement_rollback(self):
         from world.rules import clock
         before = read_world_clock().tick

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from web.gm.tests.test_read_only_contract import forbidden_assignments, forbidden_calls, forbidden_imports
 from server.console.registry import VERBS
+from tools.spec_traceability import covers_requirement
 
 ROOT=Path(__file__).resolve().parents[1]
 ALLOWED_SERVICES={
@@ -38,6 +39,10 @@ def violations(source,filename):
 
 
 class WriterContractTests(unittest.TestCase):
+    @covers_requirement(
+        'gm-developer-console::protected-deterministic-console-boundary',
+        'gm-developer-console::complete-s6-acceptance-and-repository-contracts',
+    )
     def test_transport_only_uses_owned_write_seams(self):
         for path in ROOT.glob('*.py'):
             if path.name=='dashboard.py':
@@ -45,6 +50,10 @@ class WriterContractTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertEqual(violations(path.read_text(),path.name),[])
 
+    @covers_requirement(
+        'gm-developer-console::protected-deterministic-console-boundary',
+        'gm-developer-console::complete-s6-acceptance-and-repository-contracts',
+    )
     def test_deliberately_forbidden_field_model_import_and_cross_transport_writes(self):
         for source in ('entity.db.wallet = 1','entity.wallet = 1','entity.attributes.add("x",1)','Model.objects.create(content={})','from world.narrative.memory import record_memory','from world.rules.gm import set_wallet','from world.rules import gm','from world.rules.equipment import apply_inventory_plan','import world.maps.gm','snapshot.delete_save("x")','snapshot.create_snapshot("manual","x")','apply_raw("#1",[])'):
             with self.subTest(source=source):
@@ -53,6 +62,10 @@ class WriterContractTests(unittest.TestCase):
             for service in services:
                 self.assertEqual(violations(f'{service}(request)',filename),[])
 
+    @covers_requirement(
+        'gm-developer-console::complete-validated-domain-verb-batch',
+        'gm-developer-console::complete-s6-acceptance-and-repository-contracts',
+    )
     def test_registry_maps_four_owners_and_exact_fourteen_callable_names(self):
         import importlib
         self.assertEqual(len(VERBS),14)

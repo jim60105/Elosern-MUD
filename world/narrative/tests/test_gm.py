@@ -3,12 +3,14 @@ from unittest import mock
 from server.console.tests._support import ConsoleOwnerTest
 from world.narrative import gm, memory
 from world.narrative.models import MemoryRecord, MemoryRevision
+from tools.spec_traceability import covers_requirement
 
 
 class MemoryConsoleTests(ConsoleOwnerTest):
     def record(self,owner=None):
         return memory.record_memory(owner_id=str((owner or self.npc).pk),content={'summary':'synthetic memory'},tick=0,category='observation',knowledge_scope='witnessed')[0]
 
+    @covers_requirement('gm-developer-console::append-only-memory-interventions')
     def test_retraction_supersession_preserve_original_and_update_generation(self):
         old,new=self.record(),self.record()
         owner=str(self.npc.pk)
@@ -27,6 +29,7 @@ class MemoryConsoleTests(ConsoleOwnerTest):
         self.assertEqual(old.knowledge_scope,'witnessed')
         self.assertEqual(memory.get_owner_generation(owner),generation+3)
 
+    @covers_requirement('gm-developer-console::append-only-memory-interventions')
     def test_rejected_owner_self_missing_and_malformed_ids(self):
         old,new=self.record(),self.record(self.player)
         target=f'#{self.npc.pk}'
@@ -41,6 +44,7 @@ class MemoryConsoleTests(ConsoleOwnerTest):
         old.refresh_from_db()
         self.assertEqual(old.effective_availability,'active')
 
+    @covers_requirement('gm-developer-console::append-only-memory-interventions')
     def test_second_revision_failure_and_late_retract_roll_back_all_rows(self):
         old,new=self.record(),self.record()
         target=f'#{self.npc.pk}'

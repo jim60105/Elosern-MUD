@@ -4,6 +4,7 @@ from evennia.utils.test_resources import EvenniaTest
 from evennia.utils.create import create_object
 from server.console.raw import apply_raw
 from server.console.errors import ConsoleError
+from tools.spec_traceability import covers_requirement
 
 
 class RawTests(EvenniaTest):
@@ -11,6 +12,7 @@ class RawTests(EvenniaTest):
         super().setUp()
         self.target = f'#{self.obj1.pk}'
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_ordered_categories_refs_tags_and_null_location(self):
         apply_raw(self.target, [
             {'op':'set_attr','key':'repair','category':'a','value': {'nested':[{'$ref':f'#{self.room1.pk}', 'key':'ignored', 'typeclass':'ignored'}, True, 3, None]}},
@@ -28,6 +30,7 @@ class RawTests(EvenniaTest):
         self.assertFalse(self.obj1.tags.has('marker', category='b'))
         self.assertIsNone(self.obj1.location)
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_late_failure_restores_same_instance_and_rows(self):
         self.obj1.db.repair = 1
         self.obj1.tags.add('original', category='a')
@@ -41,6 +44,7 @@ class RawTests(EvenniaTest):
         self.assertNotIn(self.obj1, self.room2.contents)
         self.assertTrue(self.obj1.tags.has('original', category='a'))
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_forbidden_display_fields_models_execution_and_shapes(self):
         invalid=[
             {'op':'set_components','value':[]},{'op':'set_created','value':0},
@@ -58,6 +62,7 @@ class RawTests(EvenniaTest):
             with self.subTest(operations=operations),self.assertRaises(ConsoleError):
                 apply_raw(self.target,operations)
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_invalid_complete_batch_never_writes(self):
         invalid = [ {'op':'set_typeclass','value':'anything'}, {'op':'set_attr','key':'x','value':{'$unserializable':'object'}}, {'op':'set_attr','key':'x','value':{'$ref':'#99999999'}}, {'op':'set_attr','key':'x','value':{'$ref':'bad'}}, {'op':'set_attr','key':'x','value':float('inf')}, {'op':'set_attr','key':'x','value':[float('nan')]}, {'op':'add_tag','key':'x'}, {'op':'set_location','value':3}, {'op':'set_attr','key':'x','category':4,'value':1} ]
         for operation in invalid:
@@ -66,12 +71,14 @@ class RawTests(EvenniaTest):
             self.assertEqual(caught.exception.code, 'raw_edit_invalid')
             self.assertFalse(self.obj1.attributes.has('before'))
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_raw_location_has_no_movement_settlement(self):
         with mock.patch.object(self.obj1, 'move_to') as move:
             apply_raw(self.target, [{'op':'set_location','value':{'$ref':f'#{self.room2.pk}'}}])
         move.assert_not_called()
         self.assertIs(self.obj1.location, self.room2)
 
+    @covers_requirement('gm-developer-console::transactional-universal-evennia-raw-editing')
     def test_mounted_gameplay_handlers_rebind_on_success_and_failure(self):
         entity = create_object('typeclasses.entities.LivingEntity', key='t_raw_living', location=self.room1)
         entity.traits.add('hp', trait_type='gauge', base=20, min=0)

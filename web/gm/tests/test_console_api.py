@@ -29,7 +29,12 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertEqual(response.status_code,status,response.content)
         return json.loads(response.content)
 
-    @covers_requirement('gm-portal-access-api::protected-gm-namespace', 'gm-portal-access-api::consistent-json-transport')
+    @covers_requirement(
+        'gm-portal-access-api::protected-gm-namespace',
+        'gm-portal-access-api::consistent-json-transport',
+        'gm-developer-console::protected-deterministic-console-boundary',
+        'gm-runtime-state::runtime-api-routes-and-bounded-lists',
+    )
     def test_access_and_csrf_apply_to_all_fixed_verbs_raw_and_status(self):
         routes=[f'/gm/api/console/{verb}' for verb in registry.VERBS]+[f'/gm/api/state/object/{self.player.pk}/raw']
         for kind,status,code in [('anonymous',401,'unauthenticated'),('player',403,'forbidden')]:
@@ -54,6 +59,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertTrue(body['ok'])
         self.assertEqual(self.player.db.wallet,5)
 
+    @covers_requirement('gm-developer-console::shared-console-transport-results-and-errors')
     def test_status_is_noncreating_and_read_only_and_registry_is_closed(self):
         data=self.assert_ok_envelope(self.client.get('/gm/api/console/status'))
         self.assertEqual(data['tick'],self.clock.tick)
@@ -69,6 +75,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
             self.assert_error_envelope(self.client.get(f'/gm/api/console/{verb}'),405,'method_not_allowed')
         self.assertEqual(self.saves,[])
 
+    @covers_requirement('gm-developer-console::shared-console-transport-results-and-errors')
     def test_missing_clock_status_and_write_are_noncreating(self):
         from evennia.scripts.models import ScriptDB
         from evennia.typeclasses.models import Attribute
@@ -84,6 +91,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertIsNone(self.policy.baseline_tick)
         self.assertEqual(self.player.db.wallet,0)
 
+    @covers_requirement('gm-developer-console::shared-console-transport-results-and-errors')
     def test_real_authoritative_wallet_raw_clock_deletion_and_domain_refusal(self):
         wallet=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':9}))['data']
         self.assertEqual(wallet['snapshot'],{'taken':True,'save_id':'synthetic-save'})
@@ -105,6 +113,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertIn('room',deleted['state'])
         self.assertEqual(len(self.saves),1)
 
+    @covers_requirement('gm-developer-console::shared-console-transport-results-and-errors')
     def test_spawn_quest_memory_and_instance_room_project_real_committed_readers(self):
         from evennia.utils.create import create_object
         from world.tests.synthetic_data import SYNTH_COMMISSIONER_KEY
@@ -126,6 +135,10 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertEqual(retracted['state']['generation'],memory.get_owner_generation(str(self.npc.pk)))
         self.assertEqual(retracted['state']['memory'],self.assert_ok_envelope(self.client.get(f'/gm/api/state/memories/{old.pk}?owner=%23{self.npc.pk}')))
 
+    @covers_requirement(
+        'gm-developer-console::shared-console-transport-results-and-errors',
+        'gm-runtime-state::runtime-api-routes-and-bounded-lists',
+    )
     def test_seven_domain_codes_internal_failure_and_allow_contract(self):
         cases=[
             ('no_such_verb',{},'unknown_verb',404),
@@ -152,6 +165,10 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
             self.assertEqual(self.client.put(path)['Allow'],allow)
         self.assert_error_envelope(self.client.get('/gm/api/state/object/99999999/raw'),404,'object_not_found')
 
+    @covers_requirement(
+        'gm-developer-console::shared-console-transport-results-and-errors',
+        'gm-developer-console::complete-validated-domain-verb-batch',
+    )
     def test_invalid_payloads_have_no_write_and_failed_save_blocks_owner(self):
         for body in ([1],{}, {'target':self.target,'copper':True}, {'target':self.target,'copper':1,'code':'danger'}):
             response=self.post('/gm/api/console/set_wallet',body)
@@ -167,6 +184,10 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertEqual(self.player.db.wallet,before)
         self.assertIsNone(self.policy.baseline_tick)
 
+    @covers_requirement(
+        'gm-developer-console::shared-console-transport-results-and-errors',
+        'gm-developer-console::tick-conditioned-recoverable-intervention',
+    )
     def test_manual_and_console_busy_statuses_leave_state_and_baseline_unchanged(self):
         self.policy.baseline_tick=7
         self.policy._lock.acquire()
@@ -182,6 +203,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         finally:
             self.policy._lock.release()
 
+    @covers_requirement('gm-developer-console::shared-console-transport-results-and-errors')
     def test_snapshot_retained_on_domain_failure_and_projection_failure_not_refusal(self):
         refused=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':-1}),400)
         self.assertTrue(refused['snapshot']['taken'])
@@ -193,6 +215,7 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertEqual(committed['data']['state']['error']['code'],'state_projection_failed')
         self.assertEqual(log.call_args.args[0],'gm_projection_failed')
 
+    @covers_requirement('gm-developer-console::console-operational-evidence-and-operator-guidance')
     def test_success_and_refusal_logs_redact_argument_contents_and_keep_save_identity(self):
         secret='password secret session-token'
         with mock.patch('server.console.snapshot_policy.log_info') as log:

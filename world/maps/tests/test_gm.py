@@ -5,6 +5,7 @@ from server.console.tests._support import ConsoleOwnerTest
 from world.maps import gm
 from world.rules.clock import read_world_clock
 from world.rules import skip_safety
+from tools.spec_traceability import covers_requirement
 
 
 class MapConsoleTests(ConsoleOwnerTest):
@@ -12,6 +13,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         super().setUp()
         self.registrations=dict(skip_safety._BATTLEFIELDS)
 
+    @covers_requirement('gm-developer-console::map-lifecycle-verbs-with-consequences')
     def test_teleport_party_instance_arrival_and_all_live_consequence_rollback(self):
         from evennia.utils.create import create_object
         from world.rules.party import join_party
@@ -43,6 +45,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         skip_safety._BATTLEFIELDS.update(self.registrations)
         super().tearDown()
 
+    @covers_requirement('gm-developer-console::map-lifecycle-verbs-with-consequences')
     def test_teleport_dialogue_and_no_cost_with_late_rollback(self):
         self.player.db.dialogue_session={'npc_id':self.npc.pk,'line':'Synthetic line','updated_tick':0}
         tick=read_world_clock().tick
@@ -58,6 +61,10 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertNotIn(self.player,self.room1.contents)
         self.assertEqual(read_world_clock().tick,tick)
 
+    @covers_requirement(
+        'gm-developer-console::map-lifecycle-verbs-with-consequences',
+        'gm-developer-console::complete-validated-domain-verb-batch',
+    )
     def test_teleport_validation(self):
         self.assert_refusal('target_kind_mismatch',lambda:gm.teleport(f'#{self.npc.pk}',f'#{self.room2.pk}'))
         self.assert_refusal('target_kind_mismatch',lambda:gm.teleport(self.target,self.target))
@@ -65,6 +72,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assert_refusal('invalid_argument',lambda:gm.teleport(self.target,True))
         self.assertIs(self.player.location,self.room1)
 
+    @covers_requirement('gm-developer-console::map-lifecycle-verbs-with-consequences')
     def test_spawn_authoritative_identity_and_placement_rollback(self):
         result=gm.spawn_monster('t_whisper_quail','t_whisper_quail_ordinary',f'#{self.room2.pk}')
         entity=ObjectDB.objects.get(pk=int(result['target'][1:]))
@@ -98,6 +106,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.enterContext(synthetic_registries('monster_variants',extra={'monster_variants':{**SYNTH_MONSTER_VARIANTS,'t_other_variant':make_monster_variant('t_other_variant',species_key='t_other_species')}}))
         self.assert_refusal('invalid_argument',lambda:gm.spawn_monster('t_whisper_quail','t_other_variant',f'#{self.room2.pk}'))
 
+    @covers_requirement('gm-developer-console::map-lifecycle-verbs-with-consequences')
     def test_delete_real_hooks_cleanup_and_late_failure_rebinds_live_roster(self):
         from world.rules.combat_session.lifecycle import engage
         engage(self.player,self.monster)
@@ -133,6 +142,7 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assert_refusal('target_kind_mismatch',lambda:gm.delete_entity(self.target))
         self.assert_refusal('target_not_found',lambda:gm.delete_entity(f'#{monster_pk}'))
 
+    @covers_requirement('gm-developer-console::map-lifecycle-verbs-with-consequences')
     def test_delete_compensation_survives_a_stale_registration(self):
         """An unrelated stale registration cannot abort the compensation."""
         from evennia.utils.create import create_object

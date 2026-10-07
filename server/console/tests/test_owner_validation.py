@@ -1,9 +1,11 @@
 """All object-bound verbs reject malformed, missing and incompatible identities."""
 from server.console.tests._support import ConsoleOwnerTest
 from server.console import registry
+from tools.spec_traceability import covers_requirement
 
 
 class OwnerIdentityTests(ConsoleOwnerTest):
+    @covers_requirement('gm-developer-console::complete-validated-domain-verb-batch')
     def test_every_object_bound_verb_has_existence_kind_and_shape_validation(self):
         npc=f'#{self.npc.pk}'
         room=f'#{self.room1.pk}'

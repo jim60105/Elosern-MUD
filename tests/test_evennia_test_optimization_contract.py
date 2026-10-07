@@ -328,7 +328,8 @@ class TestOwnershipContractTests(unittest.TestCase):
         self.assertNotIn("web.tests.browser", evennia_step["run"])
 
     @covers_requirement(
-        "evennia-test-optimization::machine-shards-preserve-exact-per-module-test-ownership"
+        "evennia-test-optimization::machine-shards-preserve-exact-per-module-test-ownership",
+        "gm-developer-console::complete-s6-acceptance-and-repository-contracts",
     )
     def test_evennia_shard_manifest_owns_every_non_browser_test_module_exactly_once(self):
         import json

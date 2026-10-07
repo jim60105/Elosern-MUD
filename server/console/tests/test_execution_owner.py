@@ -7,9 +7,11 @@ from server.console.snapshot_policy import SnapshotPolicy
 from server.console.tests._support import ConsoleOwnerTest
 from world.rules import equipment, gm
 from world.rules.clock import AdvanceSource, read_world_clock
+from tools.spec_traceability import covers_requirement
 
 
 class OwnerHandoffTests(ConsoleOwnerTest):
+    @covers_requirement('gm-developer-console::gameplay-thread-serialized-console-execution')
     def test_player_inventory_and_time_commit_only_before_or_after_owner_compensation(self):
         calls=[]
         def player_change(key):

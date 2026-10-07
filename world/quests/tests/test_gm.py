@@ -6,9 +6,11 @@ from world.quests import gm, runtime, transitions
 from world.quests.binding import bind_stage_runtime
 from world.tests.synthetic_data import SYNTH_COMMISSIONER_KEY
 from world.quests.tests._fixtures import RegistryIsolationMixin
+from tools.spec_traceability import covers_requirement
 
 
 class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
+    @covers_requirement('gm-developer-console::quest-lifecycle-repair-and-issuance')
     def test_generated_definition_restores_without_store_creation_and_rebinds_stage_pins(self):
         from world.tests.synthetic_data import make_quest, synthetic_registries, SYNTH_ARCHETYPES
         from world.quests.compile import CompiledQuest, IssuanceDescriptor, StageSpawnRequirement, register_generated_quest, SCENE_REQUIREMENT_REGISTRY
@@ -58,6 +60,7 @@ class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
     def issue(self):
         return gm.issue_quest(self.target,'t_ember_cull',SYNTH_COMMISSIONER_KEY)['quest_id']
 
+    @covers_requirement('gm-developer-console::quest-lifecycle-repair-and-issuance')
     def test_issue_initialized_repair_and_reward_idempotence(self):
         identity=self.issue()
         record=runtime.find_record(runtime.read_records(self.player),identity)
@@ -74,6 +77,10 @@ class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
         gm.set_quest_stage(self.target,identity,0)
         self.assertEqual(runtime.read_records(self.player)[0].state,runtime.QuestState.IN_PROGRESS)
 
+    @covers_requirement(
+        'gm-developer-console::quest-lifecycle-repair-and-issuance',
+        'gm-developer-console::complete-validated-domain-verb-batch',
+    )
     def test_invalid_state_stage_issuer_definition_kind_and_identity(self):
         identity=self.issue()
         before=list(self.player.db.quest_log)
@@ -94,6 +101,7 @@ class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
         self.assert_refusal('invalid_argument',lambda:gm.issue_quest(self.target,'t_ember_cull','npc:t_unregistered'))
         self.assertEqual(list(self.player.db.quest_log),before)
 
+    @covers_requirement('gm-developer-console::quest-lifecycle-repair-and-issuance')
     def test_obsolete_pin_release_and_replacement_failure_rollback(self):
         identity=self.issue()
         room=create_object('typeclasses.rooms.InstanceRoom',key='t_console_instance')
@@ -114,6 +122,7 @@ class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
         self.assertEqual(list(room.db.pin_reasons),[])
         self.assertIsNone(runtime.read_records(self.player)[0].stage_room_id)
 
+    @covers_requirement('gm-developer-console::quest-lifecycle-repair-and-issuance')
     def test_issuance_late_failure_leaves_no_record(self):
         original=runtime.apply_quest_log_replacement
         def late(*args,**kwargs):

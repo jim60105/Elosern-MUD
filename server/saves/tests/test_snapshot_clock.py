@@ -19,7 +19,10 @@ class SnapshotClockTests(TestCase):
         with sqlite3.connect(self.world.layout.db_file) as connection:
             connection.execute('UPDATE typeclasses_attribute SET db_value=? WHERE id=1', (base64.b64encode(pickle.dumps(value)).decode('ascii'),))
 
-    @covers_requirement('gm-save-management::complete-world-save-contents')
+    @covers_requirement(
+        'gm-save-management::complete-world-save-contents',
+        'gm-developer-console::tick-conditioned-recoverable-intervention',
+    )
     def test_manifest_uses_copy_despite_later_live_metadata_advance(self):
         def metadata():
             self.write_tick(999)
@@ -49,6 +52,10 @@ class SnapshotClockTests(TestCase):
             info = snapshot.create_snapshot('manual','injected',layout=self.world.layout, metadata=fixed_metadata, clock_reader=lambda path:None)
         self.assertIsNone(info.clock)
 
+    @covers_requirement(
+        'gm-developer-console::tick-conditioned-recoverable-intervention',
+        'gm-save-management::protected-save-api-and-streaming-download',
+    )
     def test_manual_baseline_and_calendar_follow_copy_after_live_metadata_advance(self):
         from server.console.snapshot_policy import SnapshotPolicy
         def metadata():
