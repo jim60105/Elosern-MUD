@@ -328,7 +328,7 @@ onMounted(() => {
           </label>
           <button
             type="submit"
-            class="ui-btn ui-btn--sm gm-recall__submit"
+            class="ui-btn ui-btn--primary ui-btn--sm gm-recall__submit"
             :aria-disabled="queryTooLong ? 'true' : null"
           >
             {{ recall.status === "loading" ? "召回中…" : "執行召回" }}

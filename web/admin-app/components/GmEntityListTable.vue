@@ -172,6 +172,9 @@ tbody tr:hover td {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--paper-300);
+  /* Identifiers and codes stay on one line; the region scrolls instead of
+     breaking a key mid-word. */
+  white-space: nowrap;
 }
 
 .gm-list__name .gm-entity-link {

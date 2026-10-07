@@ -127,6 +127,7 @@ defineExpose({ reset });
   flex-direction: column;
   gap: 2px;
   min-width: 7em;
+  align-self: flex-start;
 }
 
 .gm-filter-bar__title {
