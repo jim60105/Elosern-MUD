@@ -41,6 +41,7 @@ function navigate(item) {
     :sections="GM_SECTIONS"
     :active-key="activeKey"
     :active-route="String(route.name ?? '')"
+    :active-params="route.params"
     :title="title"
     eyebrow="ELOSERN · 營運者介面"
     :account="session.state.data?.account_name ?? ''"

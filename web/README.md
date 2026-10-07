@@ -31,6 +31,14 @@ more details):
 6. The finished HTML page is packed in a _HTTP response_ and is returned to the
    web browser, which can now display the page!
 
+## GM portal navigation
+
+The GM portal at `/gm/` uses a separate Vue application in `web/admin-app/`.
+Runtime sidebar children match both the current route name and their declared
+route parameters. Lists share `runtime-list`, so `params.kind` identifies the
+selected child; the active section remains highlighted independently.
+Entity detail and raw views do not mark a list child as the current page.
+
 ## A note on the webclient
 
 The web browser can also execute code directly without talking to the Server.

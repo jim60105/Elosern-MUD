@@ -14,6 +14,29 @@ function nav(props = {}) {
 const UNDELIVERED = { key: "future", label: "未來", route: null };
 
 describe("GmNav", () => {
+  it("selects only the matching runtime kind and clears it on other routes", async () => {
+    const wrapper = nav({
+      activeKey: "runtime",
+      activeRoute: "runtime-list",
+      activeParams: { kind: "characters" },
+    });
+    const selected = () => wrapper.findAll(".gm-nav__child.is-active").map((node) => node.attributes("data-child"));
+    const current = () => wrapper.findAll(".gm-nav__child[aria-current='page']").map((node) => node.attributes("data-child"));
+    expect(selected()).toEqual(["runtime-characters"]);
+    expect(current()).toEqual(["runtime-characters"]);
+    await wrapper.setProps({ activeParams: { kind: "npcs" } });
+    expect(selected()).toEqual(["runtime-npcs"]);
+    expect(current()).toEqual(["runtime-npcs"]);
+    await wrapper.setProps({ activeRoute: "runtime-search", activeParams: {} });
+    expect(selected()).toEqual(["runtime-search"]);
+    expect(current()).toEqual(["runtime-search"]);
+    for (const activeRoute of ["runtime-home", "runtime-entity", "runtime-object-raw"]) {
+      await wrapper.setProps({ activeRoute, activeParams: { kind: "characters" } });
+      expect(selected()).toEqual([]);
+      expect(current()).toEqual([]);
+    }
+  });
+
   it("lists every design section in order with the overview active", () => {
     const wrapper = nav();
     const labels = wrapper.findAll(".gm-nav__label").map((node) => node.text().replace("，", ""));

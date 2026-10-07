@@ -12,6 +12,7 @@ const props = defineProps({
   activeKey: { type: String, default: "" },
   // The current route name, so a child entry can mark itself current.
   activeRoute: { type: String, default: "" },
+  activeParams: { type: Object, default: () => ({}) },
   homeHref: { type: String, default: "/gm/" },
 });
 
@@ -31,6 +32,11 @@ function follow(event, item) {
 }
 
 const home = () => props.items.find((item) => item.href) ?? null;
+
+function isCurrent(child) {
+  return child.route === props.activeRoute
+    && Object.entries(child.params ?? {}).every(([key, value]) => props.activeParams[key] === value);
+}
 </script>
 
 <template>
@@ -78,9 +84,9 @@ const home = () => props.items.find((item) => item.href) ?? null;
             <li v-for="child in item.children" :key="child.key">
               <a
                 class="gm-nav__child"
-                :class="{ 'is-active': child.route === activeRoute }"
+                :class="{ 'is-active': isCurrent(child) }"
                 :href="child.href"
-                :aria-current="child.route === activeRoute ? 'page' : null"
+                :aria-current="isCurrent(child) ? 'page' : null"
                 :data-child="child.key"
                 @click="follow($event, child)"
               >

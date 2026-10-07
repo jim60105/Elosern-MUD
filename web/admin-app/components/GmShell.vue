@@ -10,6 +10,7 @@ defineProps({
   sections: { type: Array, required: true },
   activeKey: { type: String, default: "" },
   activeRoute: { type: String, default: "" },
+  activeParams: { type: Object, default: () => ({}) },
   title: { type: String, required: true },
   eyebrow: { type: String, default: "" },
   account: { type: String, default: "" },
@@ -30,6 +31,7 @@ const emit = defineEmits(["navigate"]);
         :items="sections"
         :active-key="activeKey"
         :active-route="activeRoute"
+        :active-params="activeParams"
         @navigate="emit('navigate', $event)"
       />
     </aside>
