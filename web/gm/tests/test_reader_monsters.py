@@ -53,7 +53,18 @@ EXPECTED_SECTIONS = [
 
 class MonsterReaderTests(EvenniaTest):
     def setUp(self):
-        open_synthetic_scope(self, "monster_species", "monster_variants", "monster_tiers")
+        # ``ambient_placements`` is part of the scope: an individual without a
+        # site key resolves its region through the ambient placement registry,
+        # so the absence of that catalog would make the placement section
+        # report a missing region instead of the kit's own rule.
+        open_synthetic_scope(
+            self,
+            "monster_species",
+            "monster_variants",
+            "monster_tiers",
+            "ambient_placements",
+            "monster_sites",
+        )
         super().setUp()
 
     def _individual(self, variant: str = ORDINARY):
@@ -69,7 +80,15 @@ class MonsterReaderTests(EvenniaTest):
 
     def test_species_identity_and_interim_numeric_source_are_reported(self):
         monster = self._individual()
-        detail = monsters.detail(monster)
+        # The kit's tier key is deliberately absent from the shipped behaviour
+        # rulebook's tier→archetype map, so the behaviour section would carry a
+        # contained source_unavailable slot. Register the tier for this case
+        # (the rulebook lookup is the authoritative read) so the assertion
+        # below is about the numeric-source projection, not that gap.
+        tier = SYNTH_MONSTER_VARIANTS[ORDINARY].threat_tier
+        archetype = next(iter(BEHAVIOUR_PROFILES))
+        with patch.dict(MONSTER_BEHAVIOUR_YAML["tier_default_archetype"], {tier: archetype}):
+            detail = monsters.detail(monster)
         self.assertEqual(section_keys(detail), EXPECTED_SECTIONS)
         self.assertEqual(failed_sections(detail), {})
         identity = section_of(detail, "identity")
