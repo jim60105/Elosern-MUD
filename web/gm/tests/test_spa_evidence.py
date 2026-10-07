@@ -7,7 +7,10 @@ GM Vitest files, and the extended showcase-coverage gate, asserting each
 passes. Following the precedent of earlier Vue evidence bridges, the
 ``@covers_requirement`` annotations for the ``gm-portal-spa`` requirements
 were applied at the change's archive, once the delta spec synced into the
-main spec put the requirement IDs into the traceability index.
+main spec put the requirement IDs into the traceability index. The S6
+console-controls case below was annotated the same way at its own archive,
+which also reconciled the Vitest-file and GM-component inventory assertions
+with the delivered S6 bundle.
 
 Every build runs under the shared showcase build lock: ``storybook build``
 copies ``web/static`` (which holds ``gm/dist``) and the GM build empties that
@@ -107,15 +110,16 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
             suites,
             [
                 "api.test.js", "call-drawer.test.js", "components.test.js",
-                "entity-link.test.js", "entity-view.test.js", "json-tree.test.js",
+                "console.test.js", "entity-link.test.js", "entity-view.test.js",
+                "json-tree.test.js",
                 "npc-tabs.test.js", "overview.test.js", "poller.test.js", "router.test.js",
-                "runtime-filters.test.js", "runtime-views.test.js", "section-view.test.js",
-                "session.test.js", "shell.test.js", "world.test.js",
+                "runtime-filters.test.js", "runtime-views.test.js", "saves.test.js",
+                "section-view.test.js", "session.test.js", "shell.test.js", "world.test.js",
             ],
         )
         result = _run_vitest(*suites)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+17 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+18 passed")
 
     @covers_requirement("gm-world-data::authored-browser-and-runtime-links", "gm-world-data::facade-observability-and-isolated-delivery")
     def test_world_data_vitest_cases_pass(self):
@@ -131,6 +135,22 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         # confirmation/cancellation, danger copy, code-based failures that never
         # become a permission denial, downloads, the S5 route with S6 disabled.
         result = _run_vitest("saves.test.js", "api.test.js", "router.test.js", "shell.test.js")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"Test Files\s+4 passed")
+
+    @covers_requirement(
+        "gm-developer-console::contextual-portal-controls-and-confirmation",
+        "gm-developer-console::complete-s6-acceptance-and-repository-contracts",
+        "gm-portal-spa::s1-navigation-and-history-routing",
+    )
+    def test_console_controls_and_confirmation_vitest_cases_pass(self):
+        # gm-portal-s6-console: the closed contextual verb vocabulary per entity
+        # kind, ordered category-sensitive raw batches under the persistent
+        # 繞過規則層 warning, the fetched save notice with cancellation and real
+        # returned metadata, NPC memory 撤銷/取代 with refreshed history and no
+        # polling, the dashboard 推進時鐘 control, and the removed disabled
+        # 介入 navigation entry without a placeholder route.
+        result = _run_vitest("console.test.js", "npc-tabs.test.js", "router.test.js", "shell.test.js")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r"Test Files\s+4 passed")
 
@@ -167,7 +187,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
     def test_showcase_coverage_includes_every_gm_component(self):
         result = _run(["node", "scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("GM component coverage: all 26 required GM component(s)", result.stdout)
+        self.assertIn("GM component coverage: all 33 required GM component(s)", result.stdout)
         self.assertIn("component coverage: all", result.stdout)
 
     @covers_requirement(

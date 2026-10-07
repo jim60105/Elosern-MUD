@@ -168,6 +168,8 @@ class StateApiMethodTests(StateApiTestCase):
         client = self.client_for("developer")
         for url in (LIST, f"{LIST}/{self.char1.pk}", RAW.format(dbref=self.char1.pk), SEARCH):
             for method in ("post", "put", "patch", "delete"):
+                if url == RAW.format(dbref=self.char1.pk) and method == "post":
+                    continue  # S6 explicitly owns this write; console tests cover it.
                 with self.subTest(url=url, method=method):
                     response = getattr(client, method)(url)
                     self.assert_error_envelope(response, 405, "method_not_allowed")

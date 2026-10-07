@@ -37,6 +37,16 @@ explicitly amends the design.
   `age`/`apparent_age` outside `0..10000`; never weaken or bypass this bound.
 - Import and action-resolution workflows are all-or-nothing. Validate before
   persistence and use transactions where partial state would be invalid.
+- GM console domain verbs belong to `world/rules/gm.py`, `world/maps/gm.py`,
+  `world/quests/gm.py`, and `world/narrative/gm.py`, each under its package's
+  existing ownership. `server/console/raw.py` is the explicit raw repair
+  exception for transactional Evennia Attributes, tags, and location; it
+  bypasses rule validation, never edits typeclasses or other models.
+- Manual patching of quest records, money, experience, inventory, and combat
+  results happens only through the GM console, never a Django shell. The
+  console takes an undo snapshot on the first write after process start and
+  whenever in-game time differs from its saved baseline. Authored data remains
+  source edited through git; this guidance does not add further domain verbs.
 - Store currency as integer copper. Convert units only for display; do not use
   floating-point money.
 - Keep forward-declared seams and guarded tests intact when their owning change

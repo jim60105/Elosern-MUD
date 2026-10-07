@@ -27,6 +27,10 @@
     "GM/GmSourceText",
     "GM/GmReferenceList",
     "GM/GmConfirmDialog",
+    "GM/GmConsoleDrawer",
+    "GM/GmConsolePrompt",
+    "GM/GmConsoleResult",
+    "GM/GmRawEditor",
     "GM/GmSaveSlot",
     "GM/Pages/SavesPage"
   ],

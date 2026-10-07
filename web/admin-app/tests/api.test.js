@@ -35,6 +35,17 @@ async function failure(promise) {
 }
 
 describe("GM fetch boundary", () => {
+  it("preserves actual completed snapshot metadata on console errors without changing older envelopes", async () => {
+    const snapshot={taken:true,save_id:"retained-save"};
+    const {api,onForbidden}=client(reply(400,{ok:false,error:{code:"invalid_argument",message:"參數不正確。"},snapshot}));
+    const error=await failure(api.post("/console/set_wallet",{target:"#7",copper:-1}));
+    expect(error).toBeInstanceOf(GmApiError);
+    expect(error.snapshot).toEqual(snapshot);
+    expect(error.code).toBe("invalid_argument");
+    expect(onForbidden).not.toHaveBeenCalled();
+    const older=client(reply(404,{ok:false,error:{code:"entry_not_found",message:"找不到條目。"}}));
+    expect((await failure(older.api.get("/registry/items/missing"))).snapshot).toBeNull();
+  });
   it("unwraps the success envelope and sends same-origin credentials", async () => {
     const { api, fetchImpl } = client(reply(200, { ok: true, data: { django: "ok" } }));
     await expect(api.get("/dashboard")).resolves.toEqual({ django: "ok" });

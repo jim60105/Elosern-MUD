@@ -56,6 +56,7 @@ hardlink 之所以安全，是因為每個美術寫入者都先寫暫存檔再�
 - `kind`：`manual`、`auto_restore`（讀檔前自動）、`auto_intervention`（S6 介入前自動）。
 - `created_at` 精確到微秒，用來排序同一秒內建立的存檔；id 只有到秒。
 - `migrations` 是存檔資料庫每個 app 最近套用的 migration（從存檔的 `django_migrations` 讀取）。
+- `clock` 的 tick 與遊戲內日期從該份存檔自己的資料庫副本讀取，不使用備份完成後的即時時鐘；主控台基準使用相同的存檔時間。
 - `files` 是驗證清單：每個檔案的相對路徑與大小。讀檔前逐一核對存在與大小，這是實作選擇，不是上游設計要求的格式；沒有 checksum。
 - `label` 會去頭尾空白、把換行與控制字元換成空白，最長 80 字；可以是空字串。
 

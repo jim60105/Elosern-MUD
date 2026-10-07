@@ -20,6 +20,7 @@ from typing import Any
 
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 
+from server.console import snapshot_policy
 from server.saves import snapshot
 from server.saves.layout import (
     InvalidSaveId,
@@ -93,7 +94,7 @@ def saves_collection(request: HttpRequest) -> HttpResponse:
         return _method_not_allowed("GET, POST")
     label = _label_from(request)
     try:
-        info = snapshot.create_snapshot("manual", label)
+        info = snapshot_policy.manual_save(label)
     except SaveError as error:  # observability: ignore R2: a domain refusal is answered by its code and recorded through gm_action
         _action(request, "save_create", "new", error.code)
         return _refusal(error)

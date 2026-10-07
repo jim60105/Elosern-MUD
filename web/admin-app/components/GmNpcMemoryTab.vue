@@ -1,14 +1,17 @@
 <script setup>
 // The NPC 記憶 tab (gm-portal-s3-runtime-state §5).
 //
-// Three read-only surfaces in one tab, all owner-scoped by the NPC's dbref:
+// Three inspection surfaces, all owner-scoped by the NPC's dbref:
 // the filtered effective memory list with each record's complete revision
 // history on demand, the newest ten context snapshots with their token
 // accounting and S2 evidence links, and the recall preview, which posts a
 // query — nothing else — to the authoritative ``fast_recall`` query under the
 // NPC's own owner/requester identity.
+// S6 revision interventions use the separate console gate and refresh these
+// immutable reads after commitment; they do not turn recall into a writer.
 import { computed, onMounted, reactive, ref } from "vue";
 import GmEntityListTable from "./GmEntityListTable.vue";
+import GmConsolePrompt from "./GmConsolePrompt.vue";
 import GmError from "./GmError.vue";
 import GmFilterBar from "./GmFilterBar.vue";
 import GmJsonTree from "./GmJsonTree.vue";
@@ -43,6 +46,27 @@ const snapshots = reactive({ status: "idle", items: [], error: null });
 const expanded = reactive({ memory: {}, snapshot: {} });
 const recall = reactive({ status: "idle", result: null, error: null });
 const form = reactive({ query: "", thread: "", include_superseded: false, include_inactive: false });
+const consoleRequest = ref(null);
+const replacements = reactive({});
+const generation = ref(null);
+
+function intervene(verb, row) {
+  const body = { target: `#${props.npcDbref}`, memory_id: Number(row.id) };
+  if (verb === "supersede_memory") body.replacement_id = Number(replacements[row.id]);
+  consoleRequest.value = { path: `/console/${verb}`, body, label: `${verb} · #${props.npcDbref} · ${row.id}` };
+}
+
+async function interventionDone(result) {
+  consoleRequest.value = null;
+  generation.value = result.state?.generation ?? null;
+  const ids = Object.keys(expanded.memory).filter(id => expanded.memory[id].status !== "idle");
+  await refreshAll();
+  for (const id of ids) {
+    expanded.memory[id].status = "idle";
+    await toggleMemory({ id });
+  }
+  if (recallActive.value) await runRecall();
+}
 
 const owner = computed(() => ({ owner: `#${props.npcDbref}` }));
 const refreshing = computed(() => memories.status === "loading" || snapshots.status === "loading");
@@ -174,6 +198,8 @@ defineExpose({ reload: refreshAll });
 
 <template>
   <div class="gm-memory">
+    <p v-if="generation !== null">記憶世代 {{ generation }}</p>
+    <GmConsolePrompt :request="consoleRequest" :api="api" @cancel="consoleRequest = null" @done="interventionDone" />
     <section class="gm-memory__block" data-block="memories" aria-labelledby="gm-memory-list">
       <div class="gm-memory__head">
         <h3 id="gm-memory-list" class="gm-memory__title">記憶紀錄</h3>
@@ -213,6 +239,9 @@ defineExpose({ reload: refreshAll });
           @open-call="emit('open-call', $event)"
         >
           <template #extra="{ row }">
+            <button type="button" class="ui-btn ui-btn--danger ui-btn--sm" data-action="retract" @click="intervene('retract_memory', row)">撤銷</button>
+            <label>取代記憶<select v-model="replacements[row.id]"><option value="">選擇同一 NPC 的記憶</option><option v-for="replacement in memories.items.filter(item => item.id !== row.id)" :key="replacement.id" :value="replacement.id">{{ replacement.id }}</option></select></label>
+            <button type="button" class="ui-btn ui-btn--danger ui-btn--sm" data-action="supersede" :disabled="!replacements[row.id]" @click="intervene('supersede_memory', row)">取代</button>
             <button
               type="button"
               class="ui-btn ui-btn--ghost ui-btn--sm"

@@ -155,9 +155,9 @@ def list_rows(kind: str, filters: dict[str, Any]) -> list[dict[str, Any]]:
 
         return _object_rows(kind, Monster, monsters.item_of, filters)
     if kind == "rooms":
-        from typeclasses.rooms import Room
+        from evennia import DefaultRoom
 
-        return _object_rows(kind, Room, rooms.item_of, filters)
+        return _object_rows(kind, DefaultRoom, rooms.item_of, filters)
     if kind == "quests":
         if str(filters.get("generated", "")).lower() in {"1", "true", "yes", "on"}:
             return [

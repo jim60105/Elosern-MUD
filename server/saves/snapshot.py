@@ -24,7 +24,9 @@ startup step :func:`startup_report` completes it after application.
 
 from __future__ import annotations
 
+import base64
 import os
+import pickle
 import shutil
 import sqlite3
 import tarfile
@@ -151,22 +153,8 @@ def autosave_keep() -> int:
 
 
 def world_metadata() -> dict[str, Any]:
-    """World clock and player character summary of the live world."""
+    """Informational player summary; clock provenance belongs to the copy."""
     from typeclasses.characters import PlayerCharacter
-    from world.rules.clock import read_world_clock
-
-    clock = read_world_clock()
-    clock_data = None
-    if clock is not None:
-        calendar = clock.calendar
-        clock_data = {
-            "tick": int(clock.tick),
-            "year": calendar.year,
-            "season": calendar.season_name,
-            "day": calendar.day_in_season,
-            "hour": calendar.hour,
-            "minute": calendar.minute,
-        }
     players = []
     for character in PlayerCharacter.objects.all().order_by("id"):
         location = character.location
@@ -174,7 +162,46 @@ def world_metadata() -> dict[str, Any]:
             "name": str(character.key),
             "location": str(location.key) if location is not None else None,
         })
-    return {"clock": clock_data, "players": players}
+    return {"players": players}
+
+
+def snapshot_clock(db_path: Path) -> dict[str, Any] | None:
+    """Read the saved Script Attribute, never a later live clock.
+
+    This is a trusted, server-created database copy, not uploaded pickle data.
+    Missing/corrupt clock storage cannot establish a console baseline.
+    """
+    from world.rules.clock import WorldDateTime
+
+    connection = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        row = connection.execute(
+            "SELECT a.db_value FROM scripts_scriptdb s "
+            "JOIN scripts_scriptdb_db_attributes sa ON sa.scriptdb_id = s.id "
+            "JOIN typeclasses_attribute a ON a.id = sa.attribute_id "
+            "WHERE s.db_key = ? AND a.db_key = ? AND a.db_category IS NULL "
+            "ORDER BY s.id LIMIT 1",
+            ("world_clock", "tick"),
+        ).fetchone()
+        if row is None:
+            return None
+        tick = pickle.loads(base64.b64decode(row[0], validate=True))
+        if type(tick) is not int or tick < 0:
+            return None
+        calendar = WorldDateTime.from_tick(tick)
+        return {
+            "tick": tick,
+            "year": calendar.year,
+            "season": calendar.season_name,
+            "day": calendar.day_in_season,
+            "hour": calendar.hour,
+            "minute": calendar.minute,
+        }
+    except Exception as error:
+        log_warn("save_clock_unreadable", context={"database": str(db_path)}, exc=error)
+        return None
+    finally:
+        connection.close()
 
 
 # --- snapshot -----------------------------------------------------------------
@@ -278,6 +305,7 @@ def create_snapshot(
     *,
     layout: SaveLayout | None = None,
     metadata: Callable[[], dict[str, Any]] | None = None,
+    clock_reader: Callable[[Path], dict[str, Any] | None] | None = None,
 ) -> SaveInfo:
     """Create one complete save of the live world and return its info."""
     if kind not in KINDS:
@@ -290,7 +318,10 @@ def create_snapshot(
             # A restore is staged and the server is shutting down: a new save
             # here would be lost to the restore.
             raise SaveInProgress("a restore is pending")
-        info = _create_locked(kind, normalize_label(label), layout, metadata or world_metadata)
+        info = _create_locked(
+            kind, normalize_label(label), layout, metadata or world_metadata,
+            clock_reader or snapshot_clock,
+        )
     finally:
         _snapshot_lock.release()
     if kind in AUTOMATIC_KINDS and kind not in _deferred_kinds(layout):
@@ -303,6 +334,7 @@ def _create_locked(
     label: str,
     layout: SaveLayout,
     metadata: Callable[[], dict[str, Any]],
+    clock_reader: Callable[[Path], dict[str, Any] | None] = snapshot_clock,
 ) -> SaveInfo:
     from world.art import publication
 
@@ -332,7 +364,7 @@ def _create_locked(
             "label": label,
             "kind": kind,
             "created_at": created_at,
-            "clock": world.get("clock"),
+            "clock": clock_reader(db_partial / DB_FILENAME),
             "players": world.get("players") or [],
             "migrations": inventory.latest_per_app(rows),
             "file_count": len(art_files) + 1,

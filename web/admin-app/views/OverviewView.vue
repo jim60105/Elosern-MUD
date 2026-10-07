@@ -132,7 +132,7 @@ const data = computed(() => dashboard.data);
 
     <div class="gm-dashboard__aside">
       <ArtPanel :art="data?.art ?? null" :now="now" />
-      <WorldPanel :world="data?.world ?? null" />
+      <WorldPanel :world="data?.world ?? null" @refresh="refresh" />
       <ProcessPanel :process="data?.process ?? null" />
       <SessionPanel />
     </div>

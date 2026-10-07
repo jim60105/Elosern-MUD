@@ -427,6 +427,14 @@ def definition_for(record: QuestRecord) -> QuestDefinition:
     """Return the referenced definition or raise for a missing active record."""
     definition = QUEST_DEFINITION_REGISTRY.get(record.definition_key)
     if definition is None:
+        from world.quests.generated_quest_store import read_payloads
+        from world.quests.compile.payload import payload_to_registrations
+
+        for payload in read_payloads():
+            if payload["definition"]["key"] == record.definition_key:
+                definition = payload_to_registrations(payload).definition
+                break
+    if definition is None:
         raise QuestDataError(
             f"quest {record.quest_id!r} references missing definition "
             f"{record.definition_key!r}"

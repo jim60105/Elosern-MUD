@@ -30,8 +30,8 @@ describe("GM router", () => {
     ]);
     const delivered = GM_SECTIONS.filter((section) => section.route).map((section) => section.key);
     expect(delivered).toEqual(["overview", "runtime", "world-data", "actions"]);
-    // S6 (GM 介入) stays undelivered.
-    expect(GM_SECTIONS.find((section) => section.key === "intervention").route).toBeNull();
+    // S6 is contextual, without a standalone navigation placeholder.
+    expect(GM_SECTIONS.find((section) => section.key === "intervention")).toBeUndefined();
     for (const section of GM_SECTIONS.filter((s) => !s.route)) {
       expect(names).not.toContain(section.key);
       expect(section.children).toBeUndefined();

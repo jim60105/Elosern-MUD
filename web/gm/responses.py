@@ -49,6 +49,16 @@ ERROR_MESSAGES: dict[str, str] = {
     "save_in_progress": "另一項存檔作業或待套用的讀檔正在進行，請稍後再試。",
     "save_delete_forbidden": "自動存檔由保留規則管理，不能手動刪除。",
     "save_failed": "存檔作業失敗，目前的世界狀態沒有變動。",
+    # S6 deterministic console.
+    "unknown_verb": "不支援的主控台操作。",
+    "invalid_argument": "操作參數的格式或範圍不正確。",
+    "registry_key_not_found": "找不到指定的登錄表條目。",
+    "target_not_found": "找不到操作目標，或世界時鐘尚未建立。",
+    "target_kind_mismatch": "此目標的種類不支援這項操作。",
+    "raw_edit_invalid": "原始資料編輯內容不正確，整批變更未套用。",
+    "snapshot_failed": "介入前存檔失敗，操作未執行。",
+    "internal_error": "操作執行失敗，請查看伺服器紀錄。",
+    "state_projection_failed": "操作已完成，但無法讀取更新後的狀態。請重新整理。",
 }
 
 
@@ -64,7 +74,13 @@ def ok(data: Any, status: int = 200) -> JsonResponse:
     return _json({"ok": True, "data": data}, status)
 
 
-def error(code: str, status: int, message: str | None = None) -> JsonResponse:
+def error(
+    code: str, status: int, message: str | None = None,
+    *, snapshot: dict[str, Any] | None = None,
+) -> JsonResponse:
     """Return the failure envelope for ``code`` with its zh-TW message."""
     text = message if message is not None else ERROR_MESSAGES[code]
-    return _json({"ok": False, "error": {"code": code, "message": text}}, status)
+    body = {"ok": False, "error": {"code": code, "message": text}}
+    if snapshot is not None:
+        body["snapshot"] = snapshot
+    return _json(body, status)

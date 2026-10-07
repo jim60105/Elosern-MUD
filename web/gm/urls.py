@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 from django.urls import URLPattern, path
 
-from web.gm import saves_api, state_api, views, world_api
+from web.gm import console_api, saves_api, state_api, views, world_api
 from web.gm.access import gm_required
 
 
@@ -25,6 +25,8 @@ urlpatterns = [
     gm_path("api/session", views.session, name="gm-api-session"),
     gm_path("api/dashboard", views.dashboard, name="gm-api-dashboard"),
     gm_path("api/llm/calls/<str:call_id>", views.llm_call, name="gm-api-llm-call"),
+    gm_path("api/console/status", console_api.console_status, name="gm-api-console-status"),
+    gm_path("api/console/<str:verb>", console_api.console_verb, name="gm-api-console-verb"),
     # S3 runtime state inspection: the reserved paths register before the
     # generic kind routes, so `search`, `object/.../raw` and NPC `recall` can
     # never be swallowed by `api/state/<kind>` (gm-portal-s3-runtime-state §6).

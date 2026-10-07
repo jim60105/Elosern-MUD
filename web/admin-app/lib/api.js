@@ -18,11 +18,12 @@ export const API_BASE = "/gm/api";
 export const GM_BASE = "/gm/";
 
 export class GmApiError extends Error {
-  constructor(code, { status = 0, message = "" } = {}) {
+  constructor(code, { status = 0, message = "", snapshot = null } = {}) {
     super(message || code);
     this.name = "GmApiError";
     this.code = code;
     this.status = status;
+    this.snapshot = snapshot;
   }
 }
 
@@ -133,7 +134,7 @@ export function createGmApi({
 
     const { code, message } = parsed.error;
     if (response.status === 403 && code === "forbidden") onForbidden();
-    throw new GmApiError(code, { status: response.status, message });
+    throw new GmApiError(code, { status: response.status, message, snapshot: parsed.snapshot ?? null });
   }
 
   // A binary GET: resolves to `{ blob, filename }` on success; a JSON body

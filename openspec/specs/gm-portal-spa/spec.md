@@ -38,19 +38,24 @@ The GM application SHALL supply `GmShell`, `GmNav`, `GmPageHeader`, `GmPanel`, `
 - **THEN** account/logout, navigation, and content remain usable, UI copy is Traditional Chinese, and any identifiers are unmodified and monospace
 
 ### Requirement: S1 navigation and history routing
-The SPA SHALL retain history routing at /gm/ and session identity/time/version. The home overview SHALL render the gm-operations-dashboard snapshot instead of calling the removed health endpoint, using the landed S1 fetch boundary and component layer and S2a transcript-detail contract. Navigation SHALL retain the approved future sections; undelivered sections SHALL remain disabled with 尚未開放 and no placeholder pages. Router guards SHALL handle authorization failures without redirect loops.
+
+The SPA SHALL retain history routing at /gm/ and session identity/time/version. The home overview SHALL render the gm-operations-dashboard snapshot instead of calling the removed health endpoint, using the landed S1 fetch boundary and component layer and S2a transcript-detail contract. Navigation SHALL retain the approved future sections; genuinely undelivered sections SHALL remain disabled with 尚未開放 and no placeholder pages. Delivered S6 SHALL use contextual entity drawers, raw/memory actions and the dashboard clock control under gm-developer-console, not a standalone intervention route. The navigation SHALL omit the obsolete disabled GM 介入 entry rather than imply that delivered S6 is unavailable or provide a placeholder link. Router guards SHALL handle authorization failures without redirect loops.
 
 #### Scenario: Foundation overview
 - **WHEN** a permitted operator loads /gm/
 - **THEN** session information and dashboard sections render and no request targets /gm/api/health
 
 #### Scenario: Future sections disabled
-- **WHEN** pointer or keyboard activation targets an undelivered section
+- **WHEN** pointer or keyboard activation targets a genuinely undelivered section
 - **THEN** it remains disabled and cannot navigate to a placeholder
 
 #### Scenario: History and authorization guard
 - **WHEN** a client route is entered directly, through history, or receives a forbidden API outcome
 - **THEN** routing stays under /gm/ and permission denial never exposes protected content or loops
+
+#### Scenario: Contextual S6 navigation
+- **WHEN** S6 is delivered and the operator navigates to an entity, raw tab, NPC memory tab or dashboard world section
+- **THEN** the appropriate console controls are available there, no obsolete disabled GM 介入 entry or standalone placeholder remains, and genuinely undelivered entries retain disabled behavior
 
 ### Requirement: Single GM fetch boundary
 All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 `forbidden` responses to the permission-denied view, and surface other errors by stable code; a 403 `csrf_failed` is a transport failure and SHALL surface by its code rather than selecting the permission-denied view. Network failure and malformed bodies SHALL produce explicit client errors, never fabricated success data. S1 SHALL test POST header wiring without introducing a production write endpoint.
