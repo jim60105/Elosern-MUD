@@ -1134,6 +1134,14 @@ attribute-swap 注入：kit 先解析所有 discovery pass 找到的 consumer �
 `world/lore/sync.py` 的 import-time capture 是具名目標：只有會呼叫 `sync_all()` 的
 scope 才需要 `include_sync_capture=True`。
 
+**Import-time 衍生狀態**：少數模組在 import 時就把 catalog 狀態記進 module 範圍，
+例如 `world/rules/equipment_effects.py` 會用當下的 registry 建出投影，並與 shipped
+rulebook 交叉驗證。discovery pass 會一併找出這類模組，並在**置換任何 catalog 之前**
+先 import 它們，讓 import-time 投影來自 shipped catalog，而 live 綁定照樣看到 scope
+的合成內容；兩種順序因此不再產生差異。若某個衍生模組此時還無法 import（需要
+runtime state），它維持原本的 late-import 語義，scope 結束時由 late-binder sweep
+還原。
+
 **行程層級安裝（browser harness）**：seed／server 是獨立行程、開機就鏡像 catalog 進
 私有 DB，in-process patch 到不了。設 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 後，
 `web/tests/browser/browser_settings.py` 走 `browser_startstop` wrapper 在

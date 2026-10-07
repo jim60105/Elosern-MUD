@@ -41,6 +41,35 @@ SELF_REL = "world/tests/test_synthetic_data.py"
 
 _CANON_RE = re.compile("export const SYNTH_" + "CANONICAL" + r"_JSON = `([^`]*)`;")
 
+# The kit's first import-time-derivation client: a module whose import builds a
+# projection from a catalog and cross-validates it against shipped rulebook
+# data, so a swap that lands before that import leaves production state built
+# from synthetic rows — or fails the validation outright. Path, projected
+# symbol, and catalog binding are assembled from fragments like every other
+# shipped reference in this file.
+DERIVED_MODULE = "world.rules.equipment" + "_effects"
+DERIVED_SYMBOL = "EQUIPMENT_EFFECT" + "_RULES"
+DERIVED_INPUT_BINDING = "ITEM_" + "REGISTRY"
+
+
+def _projection_content(rules: dict) -> dict:
+    """Comparable content of a loaded projection.
+
+    Each rule keeps its nested mappings as read-only views, and two views of
+    equal content are never equal objects, so equality has to be established
+    field by field rather than on the loaded mapping itself.
+    """
+    return {
+        key: (
+            dict(rule.adjustments),
+            dict(rule.gauge_caps),
+            rule.immune,
+            rule.attached_buffs,
+            rule.exposure_bias,
+        )
+        for key, rule in rules.items()
+    }
+
 
 def _catalog_maps() -> dict[str, dict]:
     """Every SYNTH_* catalog mapping (proxy views unwrapped) the kit exports."""
@@ -268,6 +297,49 @@ class PatchRestoreTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-patches-and-restores-registries-exactly"
     )
+    def test_import_time_derived_projection_stays_shipped_inside_a_scope(self):
+        """A module deriving catalog state at import must derive shipped state.
+
+        The projection is recorded in module scope, where the import runs once
+        per process: a swap landing first either freezes synthetic rows into
+        production state or fails a shipped-rulebook cross-validation, which
+        is how the whole test module used to error out on import order alone.
+        """
+        original = self._original("items")
+        baseline = getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SYMBOL)
+        self.assertTrue(baseline, "the production projection is empty")
+        saved = sys.modules.pop(DERIVED_MODULE, None)
+        self.assertIsNotNone(saved, "the derivation module was never imported")
+        try:
+            with kit.synthetic_registries("items"):
+                derived_module = importlib.import_module(DERIVED_MODULE)
+                # The scope is live: the module's own binding sees synthetic rows.
+                self.assertTrue(
+                    any(
+                        str(key).startswith(kit.SYNTH_PREFIX)
+                        for key in getattr(derived_module, DERIVED_INPUT_BINDING)
+                    ),
+                    "the scope did not reach the live catalog binding",
+                )
+                derived = getattr(derived_module, DERIVED_SYMBOL)
+                self.assertEqual(_projection_content(derived), _projection_content(baseline))
+                self.assertEqual(
+                    [
+                        str(key.value)
+                        for key in derived
+                        if str(key.value).startswith(kit.SYNTH_PREFIX)
+                    ],
+                    [],
+                    "the import-time projection was built from synthetic rows",
+                )
+        finally:
+            sys.modules.pop(DERIVED_MODULE, None)
+            sys.modules[DERIVED_MODULE] = saved
+        self.assertIs(self._original("items"), original)
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_frozen_target_swaps_owner_and_every_discovered_binding(self):
         logical = "npc_tiers"
         original = self._original(logical)
@@ -430,6 +502,86 @@ class PatchRestoreTests(unittest.TestCase):
             kit.synthetic_registries("not_a_registry")
         with self.assertRaises(KeyError):
             kit.synthetic_registries("items", extra={"not_a_registry": {}})
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
+    def test_derivation_inventory_matches_an_independent_ast_scan(self):
+        table = kit.discover_import_time_derivations(REPO_ROOT, refresh=True)
+        bindings = kit.discover_consumer_bindings(REPO_ROOT, refresh=True)
+        independent: dict[tuple[str, str], set[str]] = {
+            pair: set() for pair in kit.REGISTRY_TARGETS.values()
+        }
+
+        def import_time_loads(tree: ast.Module) -> set[str]:
+            """Names loaded by module-level statements (function bodies excluded)."""
+            loaded: set[str] = set()
+            stack = [
+                node
+                for node in tree.body
+                if not isinstance(node, (ast.Import, ast.ImportFrom))
+            ]
+            while stack:
+                node = stack.pop()
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+                ):
+                    continue
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                    loaded.add(node.id)
+                stack.extend(ast.iter_child_nodes(node))
+            return loaded
+
+        def module_level_bindings(tree: ast.Module) -> list[tuple[str, str, str]]:
+            """(module, imported-attr, local-name) of MODULE-SCOPE name-imports."""
+            found: list[tuple[str, str, str]] = []
+            stack = list(tree.body)
+            while stack:
+                node = stack.pop()
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    found.extend(
+                        (node.module, alias.name, alias.asname or alias.name)
+                        for alias in node.names
+                    )
+                elif isinstance(node, (ast.Try, ast.If)):
+                    stack.extend(node.body)
+                    stack.extend(node.orelse)
+                    for handler in node.handlers if isinstance(node, ast.Try) else ():
+                        stack.extend(handler.body)
+            return found
+
+        for package in kit._DISCOVERY_ROOTS:
+            base = REPO_ROOT / package
+            if not base.is_dir():
+                continue
+            for path in base.rglob("*.py"):
+                rel = "/" + "/".join(path.relative_to(REPO_ROOT).parts)
+                if any(x in rel for x in kit._DISCOVERY_EXCLUDES):
+                    continue
+                try:
+                    tree = ast.parse(path.read_text(encoding="utf-8"))
+                except (SyntaxError, UnicodeDecodeError):
+                    continue
+                parts = path.relative_to(REPO_ROOT).with_suffix("").parts
+                if parts[-1] == "__init__":
+                    parts = parts[:-1]
+                module_name = ".".join(parts)
+                loaded = import_time_loads(tree)
+                for origin, attr, local in module_level_bindings(tree):
+                    pair = (origin, attr)
+                    if pair in independent and local in loaded:
+                        independent[pair].add(module_name)
+        for pair, expected in independent.items():
+            self.assertEqual(
+                set(table.get(pair, ())),
+                expected,
+                f"derivation table mismatch for {pair}",
+            )
+            self.assertLessEqual(
+                set(table.get(pair, ())),
+                {module for module, _ in bindings.get(pair, ())},
+                f"{pair} derives from a binding it does not consume",
+            )
 
     @covers_requirement(
         "test-data-independence::the-kit-patches-and-restores-registries-exactly"
@@ -597,6 +749,34 @@ class ProcessInstallTests(unittest.TestCase):
         finally:
             if saved is not None:
                 sys.modules[consumer_name] = saved
+
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
+    def test_install_resolves_import_time_derived_projection_before_swapping(self):
+        """The process install pins module-scope derivations to shipped rows."""
+        baseline = getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SYMBOL)
+        self.assertTrue(baseline, "the production projection is empty")
+        saved = sys.modules.pop(DERIVED_MODULE, None)
+        self.assertIsNotNone(saved, "the derivation module was never imported")
+        try:
+            self.assertTrue(kit.install_synthetic_catalogs())
+            derived_module = importlib.import_module(DERIVED_MODULE)
+            self.assertTrue(
+                any(
+                    str(key).startswith(kit.SYNTH_PREFIX)
+                    for key in getattr(derived_module, DERIVED_INPUT_BINDING)
+                ),
+                "the install did not reach the live catalog binding",
+            )
+            self.assertEqual(
+                _projection_content(getattr(derived_module, DERIVED_SYMBOL)),
+                _projection_content(baseline),
+            )
+        finally:
+            kit.uninstall_synthetic_catalogs()
+            sys.modules.pop(DERIVED_MODULE, None)
+            sys.modules[DERIVED_MODULE] = saved
 
 
 class JsMirrorTests(unittest.TestCase):

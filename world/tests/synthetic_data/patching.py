@@ -11,7 +11,10 @@ from contextlib import ContextDecorator, ExitStack
 from types import MappingProxyType
 
 from world.tests.synthetic_data.targets import REGISTRY_TARGETS, _CONTENT, _TARGET_DEPENDENCIES
-from world.tests.synthetic_data.discovery import discover_consumer_bindings
+from world.tests.synthetic_data.discovery import (
+    discover_consumer_bindings,
+    discover_import_time_derivations,
+)
 
 # ---------------------------------------------------------------------------
 # Scoped patching (design D2).
@@ -78,6 +81,7 @@ class synthetic_registries(ContextDecorator):
         stack = ExitStack()
         self._open = True
         try:
+            _resolve_import_time_derivations(self._logicals)
             for logical in _dependency_order(self._logicals):
                 _apply_target(stack, logical, self._extra)
         except Exception:
@@ -157,9 +161,11 @@ def _apply_target(
     # patch.object captures the shipped object as its restore value. A
     # consumer imported after the owner swap would bind the replacement at
     # its own import and capture THAT as "original", leaving it stale after
-    # the scope. Consumers that cannot import (their rulebook validation
-    # needs runtime state) bind the synthetic replacement on the late
-    # import — the documented lazy-import limitation of design D2.
+    # the scope. Modules that DERIVE state from the target at import were
+    # already resolved by ``_resolve_import_time_derivations``; anything
+    # still unimportable (it needs runtime state) binds the synthetic
+    # replacement on the late import — the documented lazy-import limitation
+    # of design D2, swept back at teardown below.
     resolved_consumers: list[tuple[object, str]] = []
     for consumer_module, binding_name in _consumer_bindings(logical):
         try:
@@ -194,6 +200,32 @@ def _late_binder_sweep(logical: str, replacement: object, original: object) -> N
 def _consumer_bindings(logical: str) -> tuple[tuple[str, str], ...]:
     owner = REGISTRY_TARGETS[logical]
     return discover_consumer_bindings().get(owner, ())
+
+
+def _import_time_derivations(logical: str) -> tuple[str, ...]:
+    owner = REGISTRY_TARGETS[logical]
+    return discover_import_time_derivations().get(owner, ())
+
+
+def _resolve_import_time_derivations(logicals: tuple[str, ...]) -> None:
+    """Import modules that derive catalog state at import, before any patch.
+
+    A module that records catalog-derived state in module scope does it once,
+    at its first import. Importing it while a synthetic catalog is installed
+    would freeze a synthetic projection into production-derived state — and a
+    projection that cross-validates a shipped table against the live registry
+    fails loudly instead, because shipped rows can never describe synthetic
+    ones. Importing the module first makes that derivation shipped, while
+    every live binding still sees the scope's synthetic content.
+    """
+    for logical in logicals:
+        for module_name in _import_time_derivations(logical):
+            try:
+                importlib.import_module(module_name)
+            except Exception:
+                # A module that cannot import yet (runtime state, settings)
+                # keeps the documented late-import limitation of design D2.
+                continue  # observability: ignore R2: unimportable derivation left unpinned
 
 
 def _dependency_order(logicals: tuple[str, ...]) -> tuple[str, ...]:

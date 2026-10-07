@@ -14,8 +14,12 @@ catalogs for one test/class — ``patch.dict`` (clear+update, in place) for
 mutable registries, an attribute swap to a ``MappingProxyType`` for frozen
 ones, including every consumer-module binding that name-imported the target
 attribute. Consumer bindings are not hand-maintained: an AST discovery pass
-enumerates them from the source tree (cached). The lore-sync import-time
-capture dict is an explicit target for scopes that invoke ``sync_all()``.
+enumerates them from the source tree (cached). The same pass enumerates the
+modules that derive state from a catalog at import; those are resolved
+BEFORE the swap, so a projection computed in module scope (the equipment
+rulebook is one) stays shipped-derived while live bindings see synthetic
+content. The lore-sync import-time capture dict is an explicit target for
+scopes that invoke ``sync_all()``.
 
 Process scope (design D2b): ``install_synthetic_catalogs()`` applies the same
 swap process-wide and idempotently, for the separate managed-browser seed and
@@ -202,15 +206,18 @@ from world.tests.synthetic_data.discovery import (
     _DISCOVERY_ROOTS,
     _DISCOVERY_EXCLUDES,
     _BINDINGS_CACHE,
+    _DERIVATIONS_CACHE,
     _iter_discovery_sources,
     local_import_bindings,
     discover_consumer_bindings,
+    discover_import_time_derivations,
 )
 from world.tests.synthetic_data.patching import (
     synthetic_registries,
     _apply_target,
     _late_binder_sweep,
     _consumer_bindings,
+    _import_time_derivations,
     _dependency_order,
     _imported_modules,
 )
@@ -273,6 +280,7 @@ __all__ = [
     "REGISTRY_TARGETS",
     "SYNTH_PREFIX",
     "discover_consumer_bindings",
+    "discover_import_time_derivations",
     "install_synthetic_catalogs",
     "make_*",
     "synthetic_registries",

@@ -12,6 +12,7 @@ from world.tests.synthetic_data.patching import (
     _dependency_order,
     _imported_modules,
     _late_binder_sweep,
+    _resolve_import_time_derivations,
 )
 
 # ---------------------------------------------------------------------------
@@ -35,8 +36,10 @@ def install_synthetic_catalogs(
     are swapped (frozen targets) or their shipped content replaced in place
     (mutable targets); already-imported consumer bindings of frozen targets
     are swapped through the discovered binding table, and consumers imported
-    LATER pick the installed values up naturally. Returns ``True`` when this
-    call installed.
+    LATER pick the installed values up naturally. Modules that derive catalog
+    state at import are resolved BEFORE the swap, so their module-scope
+    projection comes from the shipped catalog rather than from content the
+    install is about to replace. Returns ``True`` when this call installed.
     """
     if _INSTALL_STATE["installed"]:
         return False
@@ -44,6 +47,7 @@ def install_synthetic_catalogs(
         name for name in REGISTRY_TARGETS if name != "lore_sync"
     ) + ("lore_sync",)
     _INSTALL_REPLACEMENTS.clear()
+    _resolve_import_time_derivations(names)
     for logical in _dependency_order(names):
         module_name, attribute = REGISTRY_TARGETS[logical]
         module = importlib.import_module(module_name)
