@@ -26,6 +26,7 @@ import unittest
 from pathlib import Path
 
 from tools.spec_traceability import covers_requirement
+from web.webclient.tests._captured_output import without_ansi
 from web.webclient.tests._showcase_build import showcase_build_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -35,8 +36,10 @@ GM_TESTS = REPO_ROOT / "web/admin-app/tests"
 
 
 def _run(command: list[str], timeout: int = 300) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=timeout
+    return without_ansi(
+        subprocess.run(
+            command, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=timeout
+        )
     )
 
 

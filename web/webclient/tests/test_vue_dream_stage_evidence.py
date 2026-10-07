@@ -18,6 +18,7 @@ import subprocess
 import unittest
 
 from tools.spec_traceability import covers_requirement
+from web.webclient.tests._captured_output import without_ansi
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
@@ -31,12 +32,14 @@ def _run_vitest(*test_files, names=()):
     if names:
         # Vitest matches against the full "<describe> > <test>" path.
         args += ["-t", "(" + "|".join(re.escape(name) for name in names) + ")$"]
-    return subprocess.run(
-        ["npx", "--no-install", "vitest", "run", *args],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=300,
+    return without_ansi(
+        subprocess.run(
+            ["npx", "--no-install", "vitest", "run", *args],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
     )
 
 
