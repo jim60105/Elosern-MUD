@@ -45,6 +45,8 @@ The deterministic combat-modifier module SHALL expose a read-only query of each 
 ### Requirement: Equipment condition provenance preserves independent sources
 Condition provenance SHALL be computed read-only from the same canonical snapshot used for the condition's actual values. An active attached buff SHALL have equipment provenance only when its instance identity, cached logical definition and cached source item agree with the currently worn item's declared attachment. An ordinary independent instance SHALL retain non-equipment provenance even when its definition matches an attached instance or its source string resembles an item key. An orphaned or inconsistent attachment whose origin cannot be proven SHALL have unknown provenance and SHALL NOT be treated as equipment-only. Missing or malformed required canonical status inputs SHALL continue to produce unavailable status rather than repaired state.
 
+An absent-item attachment SHALL be recognized by an exact canonical attachment identity whose registered equipment item declares the identified buff, independently of current worn membership. Such a declared identity with absent equipment or inconsistent cached ownership SHALL be unknown. An instance-key shape or source string alone, including an undeclared item/buff pair, SHALL NOT identify an attachment; an otherwise ordinary readable instance SHALL remain non-equipment.
+
 An actually matched derived condition SHALL be equipment-dependent when it does not match without the current read-time equipment contributions and those contributions have verified sources. A condition matching independently without those contributions SHALL retain independent provenance and attention. It SHALL be mixed when equipment also contributes to a matching input, and non-equipment when equipment does not change any input consumed by that condition. The equipment-free comparison SHALL preserve stored state, skills, grants, and independent buffs, remove only proven worn attachments and read-time equipment facts/overlays, and use the same deterministic condition semantics as actual combat. Buff predicates SHALL identify logical definitions rather than confusing source-specific instance identities with definitions. Unproven attribution SHALL use unknown provenance without suppressing attention. Canonical state changes previously caused by gameplay SHALL remain canonical in this comparison; historical causal reconstruction SHALL NOT be required.
 
 Building or comparing these values SHALL NOT materialize handlers, write or repair Attributes, advance time, tick buffs, alter equipment, or change combat evaluation. Under possession, provenance SHALL follow the same canonical subject that owns the status resources and conditions, without borrowing sources from the controlled host.
@@ -64,6 +66,10 @@ Building or comparing these values SHALL NOT materialize handlers, write or repa
 #### Scenario: Inconsistent attachment retains conservative attention
 - **WHEN** an otherwise readable active attached-looking instance is orphaned after its item is absent or has inconsistent cached source metadata
 - **THEN** its provenance is unknown with no invented equipment source and its adverse severity retains attention
+
+#### Scenario: Declared orphan differs from an item-looking independent instance
+- **WHEN** synthetic equipment declares one attached buff, that item's canonical attachment identity remains active while the item is not worn, and a second ordinary instance has a colon-shaped identity for an undeclared item/buff pair
+- **THEN** the declared orphan has unknown provenance, the ordinary instance has non-equipment provenance, and neither loses adverse-condition attention or invents an equipment source
 
 #### Scenario: Equipment induces an exposure threshold crossing
 - **WHEN** a synthetic actor stores exposure 中等, synthetic worn equipment adds +1 bias, and an adverse rule requires exposure at least 高
