@@ -27,3 +27,5 @@ Implementation touches `server/saves/`, settings/startup integration under `serv
 ## Sizing and Dependencies
 
 Keep one engineer-day-sized change: one local storage workflow with thin existing portal adapters, no import/upload or scheduler product. It depends only on the landed S1 foundation; S2–S4 are not new prerequisites. S6 may later call `create_snapshot("auto_intervention", ...)`, but its artifacts and write policy are explicitly out of scope. Implementation conflict surfaces are shared portal URL/router/navigation files, art writers, settings/startup hooks, both launchers, and shard manifests; queue changes editing these surfaces serially.
+
+The sizing assumes reuse of existing art worker serialization, Evennia shutdown, lease reclaim, GM components and temporary-file test fixtures, with no new persistence model or infrastructure. Art quiescence/writer safety and two-store rollback are explicit verification checkpoints before portal wiring; they must not be traded away to meet the sizing estimate.

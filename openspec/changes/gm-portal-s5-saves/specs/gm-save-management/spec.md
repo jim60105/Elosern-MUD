@@ -38,7 +38,7 @@ Only one snapshot SHALL run at a time; concurrent snapshot attempts SHALL fail w
 
 ### Requirement: Retention and manual deletion
 
-Each automatic kind SHALL retain at most `GM_AUTOSAVE_KEEP` saves after successful creation, defaulting to 10 with an environment override, deleting the oldest of that kind. Manual saves SHALL never be automatically deleted. Explicit operator deletion SHALL require confirmation and SHALL be limited to manual saves, refusing automatic saves with `save_delete_forbidden`.
+Each automatic kind SHALL retain at most `GM_AUTOSAVE_KEEP` saves after successful creation, defaulting to 10 with an environment override, deleting the oldest of that kind. A selected automatic restore target SHALL survive pre-restore snapshot retention until pending application finishes; pruning of its kind SHALL be deferred during that interval and completed at subsequent server startup. Manual saves SHALL never be automatically deleted. Explicit operator deletion SHALL require confirmation and SHALL be limited to manual saves, refusing automatic saves with `save_delete_forbidden`.
 
 #### Scenario: Independent automatic retention
 - **WHEN** new automatic saves exceed the configured limit with both automatic kinds and manual saves present
@@ -67,6 +67,10 @@ Restore requests SHALL reject saves containing migrations unknown to current cod
 #### Scenario: Pre-restore backup fails
 - **WHEN** the automatic snapshot fails
 - **THEN** no restore marker is written and the server remains running with current state intact
+
+#### Scenario: Oldest automatic restore target survives pre-save
+- **WHEN** the oldest `auto_restore` save is selected while that kind is at the retention limit
+- **THEN** the pre-restore snapshot does not delete the target, pending application can restore it, and deferred oldest-first retention runs only after application finishes at subsequent server startup
 
 ### Requirement: Pre-start restore with rollback and result
 
