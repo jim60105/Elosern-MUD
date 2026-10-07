@@ -65,10 +65,10 @@ def _repair(target, quest_id, *, state=None, stage=None):
         with transaction.atomic():
             transitions.apply_quest_log_replacement(actor, revised, pins)
             if desired is runtime.QuestState.IN_PROGRESS:
-                from world.quests.compile.contracts import SCENE_REQUIREMENT_REGISTRY
+                from world.quests.compile.compiler import scene_requirements_for
                 from world.quests.scene_builder import materialize_stage
 
-                if any(requirement.index == index for requirement in SCENE_REQUIREMENT_REGISTRY.get(record.definition_key, ())):
+                if any(requirement.index == index for requirement in scene_requirements_for(record.definition_key)):
                     materialize_stage(actor, quest_id, origin_room=actor.location)
     except Exception:
         restore_attributes(actor, attrs)
