@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 from django.urls import URLPattern, path
 
-from web.gm import state_api, views
+from web.gm import state_api, views, world_api
 from web.gm.access import gm_required
 
 
@@ -45,6 +45,26 @@ urlpatterns = [
         state_api.state_detail,
         name="gm-api-state-detail",
     ),
+    # S4 authored world data: the registry root answers with and without the
+    # trailing slash, and the reserved prompt-reload route registers before
+    # the source-name route so ``prompts/reload`` is never read as a file
+    # (gm-portal-s4-world-data §5).
+    gm_path("api/registry", world_api.registry_root, name="gm-api-registry-root"),
+    gm_path("api/registry/", world_api.registry_root),
+    gm_path("api/registry/<str:registry>", world_api.registry_list, name="gm-api-registry-list"),
+    gm_path(
+        "api/registry/<str:registry>/<path:key>",
+        world_api.registry_entry,
+        name="gm-api-registry-entry",
+    ),
+    gm_path("api/sources", world_api.sources_list, name="gm-api-sources"),
+    gm_path("api/sources/", world_api.sources_list),
+    gm_path(
+        "api/sources/prompts/reload",
+        world_api.prompts_reload,
+        name="gm-api-prompts-reload",
+    ),
+    gm_path("api/sources/<path:name>", world_api.source_text, name="gm-api-source"),
     gm_path("api", views.api_not_found),
     gm_path("api/", views.api_not_found),
     gm_path("api/<path:rest>", views.api_not_found),

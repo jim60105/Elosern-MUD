@@ -4,6 +4,7 @@
 // identifier-to-location mapping the runtime pages and GmEntityLink share.
 // Every request goes through the existing single fetch boundary (lib/api.js);
 // nothing here fetches, computes or caches server state.
+import { WORLD_ROUTE, registryLinkTarget, worldHref } from "./world.js";
 
 export const LIST_DEFAULT_LIMIT = 50;
 export const LIST_MAX_LIMIT = 200;
@@ -198,6 +199,8 @@ export function linkTarget(link) {
     const href = String(link.id);
     return href ? { href } : null;
   }
+  // A registry key names an authored world-data entry (gm-portal-s4).
+  if (kind === "registry") return registryLinkTarget(link);
   // Call identifiers open the existing S2 drawer instead of a route.
   if (kind === "call") {
     return link.id ? { callId: String(link.id) } : null;
@@ -249,6 +252,7 @@ export function targetHref(target, base = "/gm/") {
   if (!target) return null;
   if (target.href) return target.href;
   if (target.callId) return null;
+  if (Object.values(WORLD_ROUTE).includes(target.name)) return worldHref(target, base);
   const query = new URLSearchParams(target.query ?? {}).toString();
   if (target.name === RUNTIME_ROUTE.raw) {
     return `${base}runtime/object/${encodeURIComponent(target.params.dbref)}/raw`;

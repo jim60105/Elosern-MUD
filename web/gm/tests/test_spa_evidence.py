@@ -110,12 +110,20 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
                 "entity-link.test.js", "entity-view.test.js", "json-tree.test.js",
                 "npc-tabs.test.js", "overview.test.js", "poller.test.js", "router.test.js",
                 "runtime-filters.test.js", "runtime-views.test.js", "section-view.test.js",
-                "session.test.js", "shell.test.js",
+                "session.test.js", "shell.test.js", "world.test.js",
             ],
         )
         result = _run_vitest(*suites)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+15 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+16 passed")
+
+    @covers_requirement("gm-world-data::authored-browser-and-runtime-links", "gm-world-data::facade-observability-and-isolated-delivery")
+    def test_world_data_vitest_cases_pass(self):
+        # gm-portal-s4-world-data: link routing, field-path links, reference
+        # and referrer rendering, the four world pages and the prompt reload.
+        result = _run_vitest("world.test.js", "entity-link.test.js", "json-tree.test.js")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"Test Files\s+3 passed")
 
     @covers_requirement("gm-portal-spa::single-gm-fetch-boundary")
     def test_fetch_boundary_vitest_cases_pass(self):
@@ -150,7 +158,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
     def test_showcase_coverage_includes_every_gm_component(self):
         result = _run(["node", "scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("GM component coverage: all 23 required GM component(s)", result.stdout)
+        self.assertIn("GM component coverage: all 26 required GM component(s)", result.stdout)
         self.assertIn("component coverage: all", result.stdout)
 
     @covers_requirement(

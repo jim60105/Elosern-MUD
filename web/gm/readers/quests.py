@@ -31,6 +31,7 @@ from web.gm.readers._sections import (
     text,
     tree,
 )
+from web.gm.readers.world import authored_link
 
 KIND = "quests"
 
@@ -133,7 +134,12 @@ def detail_for_record(record: Any, owner: Any) -> dict[str, Any]:
     def identity() -> dict[str, Any]:
         rows = [
             row("任務編號", record.quest_id, mono=True),
-            row("定義鍵", record.definition_key, mono=True),
+            row(
+                "定義鍵",
+                record.definition_key,
+                mono=True,
+                link_to=authored_link("quest_definitions", record.definition_key),
+            ),
             row("發布識別", record.issuer_key, mono=True),
             row(
                 "擁有角色",
@@ -173,11 +179,32 @@ def detail_for_record(record: Any, owner: Any) -> dict[str, Any]:
             rows.append(row("目前目標", str(getattr(objective, "kind", "—")), mono=True))
             rows.append(row("目標數量", getattr(objective, "quantity", "—"), mono=True))
             if getattr(objective, "site_key", None):
-                rows.append(row("據點", str(objective.site_key), mono=True))
+                rows.append(
+                    row(
+                        "據點",
+                        str(objective.site_key),
+                        mono=True,
+                        link_to=authored_link("monster_sites", objective.site_key),
+                    )
+                )
             if getattr(objective, "species_key", None):
-                rows.append(row("物種", str(objective.species_key), mono=True))
+                rows.append(
+                    row(
+                        "物種",
+                        str(objective.species_key),
+                        mono=True,
+                        link_to=authored_link("monster_species", objective.species_key),
+                    )
+                )
             if getattr(objective, "region_key", None):
-                rows.append(row("區域", str(objective.region_key), mono=True))
+                rows.append(
+                    row(
+                        "區域",
+                        str(objective.region_key),
+                        mono=True,
+                        link_to=authored_link("wilderness_regions", objective.region_key),
+                    )
+                )
         return ledger(rows)
 
     def targets() -> dict[str, Any]:
@@ -244,7 +271,12 @@ def item_of(record: Any, owner: Any) -> dict[str, Any]:
         "dbref": None,
         "label": record.quest_id,
         "fields": [
-            row("定義鍵", record.definition_key, mono=True),
+            row(
+                "定義鍵",
+                record.definition_key,
+                mono=True,
+                link_to=authored_link("quest_definitions", record.definition_key),
+            ),
             row("狀態", STATE_LABELS.get(str(record.state.value), str(record.state))),
             row("階段", f"{record.stage_index} / {record.stage_progress}", mono=True),
             row("擁有角色", f"#{dbref_of(owner)}", mono=True),

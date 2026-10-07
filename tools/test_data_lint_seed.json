@@ -351,6 +351,10 @@
     {
       "path": "world/skills/tests/test_spell_catalogs.py",
       "reason": "spell catalog content contract"
+    },
+    {
+      "path": "world/lore/tests/test_registry_index_contract.py",
+      "reason": "authored registry index coverage and shipped reference integrity contract"
     }
   ],
   "seedDebtPaths": [

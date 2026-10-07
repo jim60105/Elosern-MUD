@@ -8,9 +8,10 @@ moved verbatim from the head of the single ``world/lore/items.py`` module.
 against it at construction.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
+from world.lore.registry_refs import ref
 from world.skills.equipment import EquipmentSlot
 
 # Player-facing item summaries are bounded; the bound mirrors the
@@ -221,7 +222,7 @@ class ItemDefinition:
 
     key: str
     display_name_zh: str
-    price_table_key: str
+    price_table_key: str = field(metadata=ref("prices", inverse="items"))
     sellable: bool
     presentation: ItemPresentation
     use_mechanics: ItemUseMechanics | None = None

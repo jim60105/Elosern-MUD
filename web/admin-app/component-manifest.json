@@ -22,7 +22,10 @@
     "GM/GmEntityListTable",
     "GM/GmEntityView",
     "GM/GmNpcMemoryTab",
-    "GM/GmNpcDialogueTab"
+    "GM/GmNpcDialogueTab",
+    "GM/GmProvenanceNote",
+    "GM/GmSourceText",
+    "GM/GmReferenceList"
   ],
   "frozen": true
 }

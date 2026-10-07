@@ -8,7 +8,7 @@ operator-facing Traditional Chinese.
 Pagination convention (first consumer arrives in S3, none in S1/S2): the request
 carries ``?cursor=<opaque>&limit=<n>`` and the response data is
 ``{"items": [...], "next_cursor": <opaque|null>}``. Writes are POST-only and
-CSRF-protected; S1 adds no production write endpoint.
+CSRF-protected; the first one is the S4 prompt-library reload.
 """
 
 from __future__ import annotations
@@ -37,6 +37,11 @@ ERROR_MESSAGES: dict[str, str] = {
     "invalid_cursor": "分頁游標不正確或與目前的查詢條件不符。",
     "invalid_query": "查詢文字不正確。",
     "query_too_long": "查詢文字超過 2000 字元上限。",
+    # S4 authored world data (gm-portal-s4-world-data).
+    "registry_not_found": "找不到指定的登錄表。",
+    "entry_not_found": "此登錄表中沒有這個條目。",
+    "source_not_found": "找不到指定的原始檔，或它不在可檢視的清單中。",
+    "prompt_reload_failed": "重新載入提示詞庫時發生錯誤。",
 }
 
 

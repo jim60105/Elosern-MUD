@@ -25,7 +25,6 @@ describe("GmNav", () => {
     const disabled = wrapper.findAll("[aria-disabled='true']");
     expect(disabled.map((node) => node.attributes("data-section"))).toEqual([
       "operations",
-      "world-data",
       "actions",
       "intervention",
     ]);
@@ -35,6 +34,10 @@ describe("GmNav", () => {
       expect(node.attributes("tabindex")).toBeUndefined();
       expect(node.text()).toContain("尚未開放");
     }
+    // The delivered world-data section (S4) is a real link to its home.
+    const world = wrapper.get("[data-section='world-data']");
+    expect(world.element.tagName).toBe("A");
+    expect(world.attributes("href")).toBe("/gm/world");
     // The delivered runtime section is a real link.
     const runtime = wrapper.get("[data-section='runtime']");
     expect(runtime.element.tagName).toBe("A");

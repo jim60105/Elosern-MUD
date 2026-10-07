@@ -34,6 +34,7 @@ from web.gm.readers._sections import (
     table,
     table_row,
 )
+from web.gm.readers.world import authored_link
 
 KIND = "monsters"
 
@@ -113,8 +114,16 @@ def identity_section(monster: Any) -> dict[str, Any]:
         row("名稱", label_of(monster)),
         row("識別碼", f"#{dbref_of(monster)}", mono=True),
         row("型別", typeclass_of(monster), mono=True),
-        row("物種", _species_label(species_key) or "（未設定）"),
-        row("變體", _variant(variant_key).display_name_zh if _variant(variant_key) else "（未設定）"),
+        row(
+            "物種",
+            _species_label(species_key) or "（未設定）",
+            link_to=authored_link("monster_species", species_key),
+        ),
+        row(
+            "變體",
+            _variant(variant_key).display_name_zh if _variant(variant_key) else "（未設定）",
+            link_to=authored_link("monster_variants", variant_key),
+        ),
         row("威脅階級", str(tier) if tier else "—", mono=True),
         row("危險等級", individual_danger_grade(monster) or "—", mono=True),
     ]
@@ -287,8 +296,17 @@ def item_of(monster: Any) -> dict[str, Any]:
         "dbref": dbref,
         "label": label_of(monster),
         "fields": [
-            row("物種", _species_label(species_key) or "（未設定）"),
-            row("變體", str(variant_key) if variant_key else "（未設定）", mono=True),
+            row(
+                "物種",
+                _species_label(species_key) or "（未設定）",
+                link_to=authored_link("monster_species", species_key),
+            ),
+            row(
+                "變體",
+                str(variant_key) if variant_key else "（未設定）",
+                mono=True,
+                link_to=authored_link("monster_variants", variant_key),
+            ),
             row("威脅階級", str(tier) if tier else "—", mono=True),
             row("數值來源", NUMERIC_SOURCE_LABELS.get(source, source)),
         ],

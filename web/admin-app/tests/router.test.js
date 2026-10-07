@@ -19,11 +19,16 @@ describe("GM router", () => {
       "runtime-object-raw",
       "runtime-list",
       "runtime-entity",
+      "world-home",
+      "world-source",
+      "world-sources",
+      "world-registry",
+      "world-entry",
       "forbidden",
       "not-found",
     ]);
     const delivered = GM_SECTIONS.filter((section) => section.route).map((section) => section.key);
-    expect(delivered).toEqual(["overview", "runtime"]);
+    expect(delivered).toEqual(["overview", "runtime", "world-data"]);
     for (const section of GM_SECTIONS.filter((s) => !s.route)) {
       expect(names).not.toContain(section.key);
       expect(section.children).toBeUndefined();

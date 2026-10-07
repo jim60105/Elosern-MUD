@@ -44,11 +44,12 @@ predicate, so every shipped key is validated by the one shared implementation.
 """
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from types import MappingProxyType
 
 from .guild import GUILD_RANK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
+from .registry_refs import ref
 from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
@@ -123,7 +124,9 @@ class MonsterSpecies:
     author_hidden_truth_zh: str
     author_explanation_zh: str
     author_conjecture_zh: str
-    default_variant_key: str
+    default_variant_key: str = field(
+        metadata=ref("monster_variants", inverse="default_of_species")
+    )
     ordinary_variant: bool
 
 
@@ -137,10 +140,10 @@ class MonsterVariant:
     """
 
     key: str
-    species_key: str
+    species_key: str = field(metadata=ref("monster_species", inverse="variants"))
     display_name_zh: str
     description_zh: str
-    threat_tier: str
+    threat_tier: str = field(metadata=ref("monster_tiers", inverse="variants"))
     ordinary_variant: bool
     combat_profile: MonsterCombatProfile | None
     danger_grade: str | None
