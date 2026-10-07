@@ -1,25 +1,30 @@
-"""GM views: the SPA shell and the two S1 read-only APIs.
+"""GM views: the SPA shell and the read-only operator APIs.
 
 Every view is registered through ``web.gm.urls.gm_path`` (``gm_required``).
-The session and health endpoints are GET-only and change no state; health
-performs one real database read and never probes LLM or SD services.
+Every API here is GET-only and changes no state. The dashboard folds the S1
+Django/database health into its process slot and never probes LLM services;
+the call-detail view reads the retained S2a transcript on demand.
 """
 
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
-from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, resolve_url
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_safe
-from evennia.accounts.models import AccountDB
 
+from web.gm import dashboard as dashboard_snapshot
 from web.gm import responses
 from web.gm.access import route_label
 from web.gm.version import game_version
-from world.observability import log_error, log_warn
+from world.observability import log_error
+from world.observability import transcript
+
+CALL_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 @require_safe
@@ -71,22 +76,35 @@ def session(request: HttpRequest) -> HttpResponse:
     )
 
 
-def health(request: HttpRequest) -> HttpResponse:
-    """Skeleton health: Django responding and the database readable."""
+def dashboard(request: HttpRequest) -> HttpResponse:
+    """One read-only operations snapshot with independently failing slots."""
     rejected = _get_only(request)
     if rejected is not None:
         return rejected
+    return responses.ok(dashboard_snapshot.build_snapshot())
+
+
+def llm_call(request: HttpRequest, call_id: str) -> HttpResponse:
+    """Retained transcript records for one guarded LLM call.
+
+    Lookup is best-effort (S2a): an empty result is ``transcript_not_found``
+    even if some file was unreadable, and available records are returned
+    without fabricating missing ones.
+    """
+    rejected = _get_only(request)
+    if rejected is not None:
+        return rejected
+    if not CALL_ID_PATTERN.match(call_id):
+        return responses.error("invalid_call_id", 400)
     try:
-        # One bounded primary-key read against a real table.
-        list(AccountDB.objects.order_by().values_list("id", flat=True)[:1])
-    except DatabaseError as exc:
-        log_warn(
-            "gm_health_database_unreadable",
-            exc=exc,
-            context={"route": route_label(request.path_info), "account": request.user.username},
-        )
-        return responses.error("database_unreadable", 503)
-    return responses.ok({"django": "ok", "database": "readable"})
+        records = transcript.find(call_id)
+    except transcript.TranscriptDisabled:  # observability: ignore R2: disabled transcripts are a reported state, answered by the 409 envelope
+        return responses.error("transcript_disabled", 409)
+    if not records:
+        return responses.error("transcript_not_found", 404)
+    outcomes = [record for record in records if record.get("kind") == "outcome"]
+    exchanges = [record for record in records if record.get("kind") == "exchange"]
+    return responses.ok({"outcome": outcomes[-1] if outcomes else None, "exchanges": exchanges})
 
 
 def api_not_found(request: HttpRequest, rest: str = "") -> HttpResponse:

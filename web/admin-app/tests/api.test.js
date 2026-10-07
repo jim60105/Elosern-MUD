@@ -37,9 +37,9 @@ async function failure(promise) {
 describe("GM fetch boundary", () => {
   it("unwraps the success envelope and sends same-origin credentials", async () => {
     const { api, fetchImpl } = client(reply(200, { ok: true, data: { django: "ok" } }));
-    await expect(api.get("/health")).resolves.toEqual({ django: "ok" });
+    await expect(api.get("/dashboard")).resolves.toEqual({ django: "ok" });
     const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("/gm/api/health");
+    expect(url).toBe("/gm/api/dashboard");
     expect(init.method).toBe("GET");
     expect(init.credentials).toBe("same-origin");
     expect(init.headers["X-CSRFToken"]).toBeUndefined();

@@ -21,8 +21,12 @@ Invariants:
   swallowed.
 - ``log_error`` double-writes: the single line (with ``tb:`` summary) plus the
   full ``traceback.format_exception`` text to the Evennia error log.
-- This module depends only on stdlib, the Evennia logger, and Django
-  settings — never on game modules (no import cycles).
+- After the line is written (to the Evennia logger, or the stderr fallback),
+  the event is offered to the observability-local recent sink
+  (``world.observability.recent``) feeding the GM dashboard; a failing sink
+  is contained and can never erase or prevent the written line.
+- This module depends only on stdlib, the Evennia logger, Django settings,
+  and observability-local modules — never on game modules (no import cycles).
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ import traceback as traceback_module
 from collections.abc import Mapping
 from typing import Any
 
+import world.observability.recent as recent
 from world.observability.render import format_exception_chain, render_line
 
 _evennia_logger: Any = None
@@ -126,13 +131,20 @@ def _emit(
         line = f"[{level}] {_safe_str(event)} | {caller} | <render-failed>"
     if line is None:
         line = f"[{level}] <unrenderable> | {caller}"
+    written = False
     try:
         _write(_get_evennia_logger(), level, line, exc)
-        return
+        written = True
     except Exception:
         pass
+    if not written:
+        try:
+            _fallback_stderr(line)
+        except Exception:
+            pass
+    # The line is already out; the recent sink only observes it.
     try:
-        _fallback_stderr(line)
+        recent.record(level, str(event), caller, context, tb_segment)
     except Exception:
         return
 

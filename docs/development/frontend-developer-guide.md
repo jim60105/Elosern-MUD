@@ -100,15 +100,16 @@ uv run --locked python tools/gen_mono_cells.py
 
 `Containerfile` 的 `vue-dist` 階段（Node 24）會啟用 Corepack 並執行 `pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm`，應用程式佈局階段會將兩份產生的 `dist` 分別複製至 `/app/web/static/webclient/app/dist/` 與 `/app/web/static/gm/dist/`，並複製 `pyproject.toml`（GM session API 從中讀取遊戲版本）；進入點在執行 `evennia migrate --noinput` 之後會執行 `evennia collectstatic --noinput` 以更新持久化的 `server/.static` 磁碟卷。本機工作流程為 `podman compose build && podman compose up`（請勿將 Ollama 或 sd-webui 加入此映像檔中）。
 
-## GM 控制台（`web/admin-app/`，S1 基礎）
+## GM 控制台（`web/admin-app/`，S1 基礎＋S2 營運總覽）
 
-GM 控制台是僅限 Developer 帳號使用的營運者介面，掛載於 `/gm/`，與遊戲 WebClient 分開建置、分開提供（設計：`docs/superpowers/specs/2026-10-06-gm-portal-design.md` §§3–5）。S1 只交付基礎骨架：
+GM 控制台是僅限 Developer 帳號使用的營運者介面，掛載於 `/gm/`，與遊戲 WebClient 分開建置、分開提供（設計：`docs/superpowers/specs/2026-10-06-gm-portal-design.md` §§3–5）。S1 交付基礎骨架，S2 把首頁「總覽」換成營運儀表板（設計：`docs/superpowers/specs/2026-10-06-gm-portal-s2-dashboard-design.md`）：
 
 - **存取：** `/gm/` 底下所有頁面與 API 都要求 `check_permstring("Developer")`（superuser 亦可）；staff 身分不能替代。未登入的頁面請求導向 `LOGIN_URL?next=…`，API 回傳 401 `unauthenticated`；權限不足時頁面回 403、API 回 403 `forbidden`。所有路由只能透過 `web/gm/urls.py` 的 `gm_path()` 註冊；`web/gm/tests/test_access.py` 會走訪 URL 解析器，未包裝的路由會讓測試失敗。
-- **API：** 只有 `GET /gm/api/session` 與 `GET /gm/api/health`（後者只做一次資料庫讀取，不探測 LLM 或 SD 服務）。回應格式為 `{"ok": true, "data": …}` 或 `{"ok": false, "error": {"code", "message"}}`，用戶端只依 `code` 分支。寫入一律走 POST 並附上 `X-CSRFToken`；S1 沒有正式的寫入端點。
+- **API：** `GET /gm/api/session`、`GET /gm/api/dashboard` 與 `GET /gm/api/llm/calls/<call_id>`。S1 的 `/gm/api/health` 已移除且沒有別名，Django／資料庫健康檢查併入 dashboard 的 `process` 區塊。dashboard 的每個區塊各自計算，失敗的區塊只在自己的位置放 `{"error": {"code", "message"}}`；它只讀取既有資料（不建立世界時鐘或任何紀錄），也不探測 LLM 端點（LLM 健康由近期 `llm_call` 事件被動推算，SD 使用既有的 TTL 快取探測）。LLM 統計只涵蓋行程內有界緩衝區（`GM_RECENT_LLM_CAPACITY`／`GM_RECENT_ISSUE_CAPACITY`）保留的事件，不是啟動以來的總數，reload 後清空。呼叫明細讀取 S2a transcript：格式錯誤回 400 `invalid_call_id`、查無紀錄回 404 `transcript_not_found`、transcript 停用回 409 `transcript_disabled`。回應格式為 `{"ok": true, "data": …}` 或 `{"ok": false, "error": {"code", "message"}}`，用戶端只依 `code` 分支。寫入一律走 POST 並附上 `X-CSRFToken`；S1 沒有正式的寫入端點。
 - **觀測性：** 每個 GM API 請求都會發出一次 `gm_request`（帶最終狀態碼），每次拒絕存取都會發出 `gm_denied`，皆透過 `world.observability` 門面。
 - **相依邊界：** `web/admin-app/` 只能從遊戲樹匯入 `styles/tokens.css` 與 `styles/fonts*.css`；`scripts/gm-import-boundary.mjs` 會先解析相對路徑、別名（`web/admin-app/gm-aliases.mjs`）與符號連結再套用允許清單。
-- **元件：** `GmShell`、`GmNav`、`GmPageHeader`、`GmPanel`、`GmTable`、`GmEmpty`、`GmError`、`GmStatusBadge` 都只以設計代符構成，Storybook 標題為 `GM/<元件>`，並列於 GM 的元件清單中。seal 紅與 `.ui-btn--danger` 只保留給破壞性操作。
+- **總覽儀表板：** `views/OverviewView.vue` 透過 `lib/poller.js` 每 5 秒輪詢一次（以 setTimeout 串接、不重疊請求、分頁隱藏時暫停、回到前景立即更新一次），輪詢失敗時保留上一份資料並標示「資料過期」；401／403 會停止輪詢交給路由守衛。各區塊位於 `views/overview/`，選取最近呼叫會開啟 `GmCallDrawer`（原生 `<dialog>` 模態側欄），只在選取時才查詢 transcript。
+- **元件：** `GmShell`、`GmNav`、`GmPageHeader`、`GmPanel`、`GmTable`、`GmEmpty`、`GmError`、`GmStatusBadge`，以及 S2 新增的 `GmMeter`、`GmServiceCard`、`GmRefreshBar`、`GmCodeBlock`、`GmCallDrawer`，都只以設計代符構成，Storybook 標題為 `GM/<元件>`，並列於 GM 的元件清單中。seal 紅與 `.ui-btn--danger` 只保留給破壞性操作。
 - **導覽：** 側欄的 維運、執行期狀態、世界資料、操作、GM 介入 皆顯示為「尚未開放」，沒有路由也沒有佔位頁面，要等各自的後續變更（S2–S6）落地。
 - **後端測試：** `web/gm/tests/`（`EvenniaTest`）已登錄於 `.github/evennia-shards.json`；新增的 GM 測試模組必須同時登錄。
 

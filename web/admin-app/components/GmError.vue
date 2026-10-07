@@ -2,15 +2,19 @@
 // An actual error state (gm-portal-s1-foundation): the operator sees the
 // server's zh-TW message and its stable code verbatim. Actions are neutral
 // (retry, go back) — seal-red is reserved for destructive actions.
+// `compact` tightens it for an in-panel slot error; `live="off"` keeps a
+// polled section's error from being re-announced on every refresh.
 defineProps({
   title: { type: String, default: "發生錯誤" },
   message: { type: String, default: "" },
   code: { type: String, default: "" },
+  compact: { type: Boolean, default: false },
+  live: { type: String, default: "alert", validator: (value) => ["alert", "off"].includes(value) },
 });
 </script>
 
 <template>
-  <div class="gm-error" role="alert">
+  <div class="gm-error" :class="{ 'gm-error--compact': compact }" :role="live === 'alert' ? 'alert' : null">
     <p class="gm-error__title">
       <span class="gm-error__glyph" aria-hidden="true">✕</span>{{ title }}
     </p>
@@ -32,6 +36,15 @@ defineProps({
   border: 1px solid var(--ink-700);
   border-left: 3px double var(--crit);
   border-radius: var(--radius);
+}
+
+.gm-error--compact {
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.gm-error--compact .gm-error__title {
+  font-size: var(--text-md);
 }
 
 .gm-error__title {

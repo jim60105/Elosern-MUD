@@ -18,8 +18,11 @@ from tools.spec_traceability import covers_requirement
 from web.gm.tests._support import GmTestCase
 
 PAGES = ("/gm/", "/gm/some/history/path")
-APIS = ("/gm/api/session", "/gm/api/health")
-UNKNOWN_APIS = ("/gm/api/missing", "/gm/api", "/gm/api/", "/gm/api/session/")
+READ_APIS = ("/gm/api/session", "/gm/api/dashboard")
+DETAIL_API = "/gm/api/llm/calls/" + "0" * 32
+APIS = READ_APIS + (DETAIL_API,)
+# /gm/api/health was removed with no alias (gm-portal-s2b-dashboard).
+UNKNOWN_APIS = ("/gm/api/missing", "/gm/api", "/gm/api/", "/gm/api/session/", "/gm/api/health")
 
 
 def gm_patterns(patterns, prefix=""):
@@ -122,12 +125,16 @@ class GmApiAccessTest(GmTestCase):
         "gm-portal-access-api::protected-gm-namespace",
         "gm-portal-access-api::registered-backend-acceptance-coverage",
     )
-    def test_privileged_accounts_reach_both_apis(self):
+    @covers_requirement('gm-operations-dashboard::landed-foundation-and-transcript-prerequisites')
+    def test_privileged_accounts_reach_every_api(self):
         for kind in ("developer", "superuser"):
             client = self.client_for(kind)
-            for url in APIS:
+            for url in READ_APIS:
                 with self.subTest(kind=kind, url=url):
                     self.assert_ok_envelope(client.get(url))
+            with self.subTest(kind=kind, url=DETAIL_API):
+                # Reaching the view: test settings disable transcripts (409).
+                self.assert_error_envelope(client.get(DETAIL_API), 409, "transcript_disabled")
 
     @covers_requirement(
         "gm-portal-access-api::s1-route-and-payload-scope",
@@ -158,7 +165,9 @@ class GmResolverCoverageTest(GmTestCase):
         routes = dict(gm_patterns(get_resolver().url_patterns))
         self.assertEqual(unprotected(get_resolver().url_patterns), [])
         # The fallbacks are present (and therefore covered) too.
-        for expected in ("gm/api/session", "gm/api/health", "gm/api", "gm/api/",
+        self.assertNotIn("gm/api/health", routes)
+        for expected in ("gm/api/session", "gm/api/dashboard", "gm/api/llm/calls/<str:call_id>",
+                         "gm/api", "gm/api/",
                          "gm/api/<path:rest>", "gm/", "gm/<path:rest>"):
             self.assertIn(expected, routes)
 

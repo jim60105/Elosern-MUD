@@ -7,7 +7,13 @@
     "GM/GmTable",
     "GM/GmEmpty",
     "GM/GmError",
-    "GM/GmStatusBadge"
+    "GM/GmStatusBadge",
+    "GM/GmMeter",
+    "GM/GmServiceCard",
+    "GM/GmRefreshBar",
+    "GM/GmCodeBlock",
+    "GM/GmCallDrawer",
+    "GM/Pages/OverviewDashboard"
   ],
   "frozen": true
 }

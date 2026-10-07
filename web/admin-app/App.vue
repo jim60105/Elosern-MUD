@@ -42,6 +42,7 @@ function navigate(item) {
     :account="session.state.data?.account_name ?? ''"
     :permission-level="session.state.data?.permission_level ?? ''"
     :logout-url="config.logoutUrl"
+    :wide="Boolean(route.meta.wide)"
     @navigate="navigate"
   >
     <RouterView />

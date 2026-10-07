@@ -41,9 +41,9 @@ class GmEventTest(GmTestCase):
     def test_api_outcomes_each_emit_one_gm_request_with_final_status(self):
         cases = (
             ("developer", "/gm/api/session", 200, self.account.username),
-            ("superuser", "/gm/api/health", 200, "GmSuperuser"),
+            ("superuser", "/gm/api/dashboard", 200, "GmSuperuser"),
             ("anonymous", "/gm/api/session", 401, "anonymous"),
-            ("player", "/gm/api/health", 403, self.account2.username),
+            ("player", "/gm/api/dashboard", 403, self.account2.username),
             ("developer", "/gm/api/missing", 404, self.account.username),
         )
         for kind, url, status, account in cases:
@@ -62,7 +62,7 @@ class GmEventTest(GmTestCase):
     def test_denials_emit_gm_denied_for_pages_and_apis(self):
         cases = (
             ("anonymous", "/gm/", "anonymous"),
-            ("anonymous", "/gm/api/health", "anonymous"),
+            ("anonymous", "/gm/api/dashboard", "anonymous"),
             ("player", "/gm/deep/link", self.account2.username),
             ("player", "/gm/api/session", self.account2.username),
         )
@@ -87,9 +87,8 @@ class GmEventTest(GmTestCase):
     def test_a_view_crash_still_logs_the_final_500(self):
         client = Client(raise_request_exception=False)
         client.force_login(self.account)
-        with mock.patch("web.gm.views.AccountDB") as account_db:
-            account_db.objects.order_by.side_effect = RuntimeError("boom")
-            response, requests, _ = self.request("developer", "/gm/api/health", client=client)
+        with mock.patch("web.gm.views.dashboard_snapshot.build_snapshot", side_effect=RuntimeError("boom")):
+            response, requests, _ = self.request("developer", "/gm/api/dashboard", client=client)
         self.assertEqual(response.status_code, 500)
         self.assertEqual([r["status"] for r in requests], [500])
 

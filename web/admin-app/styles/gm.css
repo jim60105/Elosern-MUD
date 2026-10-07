@@ -89,3 +89,121 @@
     animation: none;
   }
 }
+
+/* A modal GM drawer is open: the page behind it does not scroll. */
+html.gm-scroll-locked {
+  overflow: hidden;
+}
+
+/* Ledger rows (term / value) shared by the dashboard panels. */
+.gm-root .gm-ledger {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--sp-5);
+}
+
+.gm-root .gm-ledger__row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  padding-block: var(--sp-2);
+  border-bottom: 1px dashed var(--ink-700);
+}
+
+.gm-root .gm-ledger__row:first-child {
+  padding-top: 0;
+}
+
+.gm-root .gm-ledger__row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.gm-root .gm-ledger dt {
+  font-size: var(--text-sm);
+  color: var(--paper-500);
+}
+
+.gm-root .gm-ledger dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--paper-100);
+}
+
+/* Count tiles: a big tabular numeral over a small label. */
+.gm-root .gm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--sp-2);
+}
+
+.gm-root .gm-stat {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--ink-820);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-sm);
+}
+
+.gm-root .gm-stat__value {
+  font-family: var(--f-num, var(--f-sans));
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--paper-50);
+}
+
+.gm-root .gm-stat__label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  color: var(--paper-500);
+}
+
+.gm-root .gm-num {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.gm-root .gm-muted {
+  color: var(--paper-500);
+}
+
+.gm-root .gm-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 var(--sp-2);
+  overflow: hidden;
+  font-family: var(--f-mono);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--paper-300);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  background: var(--ink-820);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-sm);
+}
+
+/* A freshly arrived row glows gold once, then settles. */
+@keyframes gm-row-arrive {
+  from {
+    background-color: var(--gold-glow);
+  }
+}
+
+.gm-root .gm-arrived,
+.gm-root .gm-arrived > td {
+  animation: gm-row-arrive var(--motion-trail) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-root .gm-arrived,
+  .gm-root .gm-arrived > td {
+    animation: none;
+  }
+}

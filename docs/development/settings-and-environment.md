@@ -130,6 +130,13 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `LLM_TRANSCRIPT_ENABLED` | `LLM_TRANSCRIPT_ENABLED` | 布林 | `True` | 布林字；True 時每次 guarded LLM 呼叫把完整 request／response（`exchange`）與終局（`outcome`）以 JSONL 追加到 `server/logs/llm/YYYY-MM-DD.jsonl`（伺服器本地日期，由 `evennia-logs` volume 保存），以 `llm_call` 事件的 `call_id` 關聯。內容含玩家散文與提示詞，但永不含 API key、請求標頭或 URL userinfo。False 時寫入為 no-op，查詢回報 disabled。測試設定固定為 False |
 | `LLM_TRANSCRIPT_RETENTION_DAYS` | `LLM_TRANSCRIPT_RETENTION_DAYS` | 整數 | `14` | 至少 1；保留今天與前 N-1 個本地日期的檔案，更舊的檔案於每次伺服器啟動時（`llm_transcript_prune` 啟動步驟）刪除 |
 
+### GM 儀表板近期事件緩衝
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `GM_RECENT_LLM_CAPACITY` | `GM_RECENT_LLM_CAPACITY` | 整數 | `500` | 正整數；log facade 寫出每條 `llm_call` 事件後，存入行程內的有界緩衝（超過容量時淘汰最舊的一筆）。`/gm/` 儀表板的 LLM 各層呼叫數、降級率與延遲只涵蓋緩衝內保留的呼叫，不是整個行程的累計；reload 後清空 |
+| `GM_RECENT_ISSUE_CAPACITY` | `GM_RECENT_ISSUE_CAPACITY` | 整數 | `200` | 正整數；所有 `warn`／`error` 事件的有界緩衝，供儀表板「最近警告與錯誤」與翻譯、去背服務的最近失敗使用；reload 後清空 |
+
 驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族。`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
 **衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名，`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。

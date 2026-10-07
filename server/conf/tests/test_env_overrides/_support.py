@@ -99,6 +99,8 @@ ENV_BACKED: dict[str, str] = {
     "HTTP_USER_AGENT": "HTTP_USER_AGENT",
     "LLM_TRANSCRIPT_ENABLED": "LLM_TRANSCRIPT_ENABLED",
     "LLM_TRANSCRIPT_RETENTION_DAYS": "LLM_TRANSCRIPT_RETENTION_DAYS",
+    "GM_RECENT_LLM_CAPACITY": "GM_RECENT_LLM_CAPACITY",
+    "GM_RECENT_ISSUE_CAPACITY": "GM_RECENT_ISSUE_CAPACITY",
 }
 
 
@@ -143,6 +145,8 @@ DEFAULT_REPR: dict[str, str] = {
     "HTTP_USER_AGENT": "'elosern-mud/1.0'",
     "LLM_TRANSCRIPT_ENABLED": "True",
     "LLM_TRANSCRIPT_RETENTION_DAYS": "14",
+    "GM_RECENT_LLM_CAPACITY": "500",
+    "GM_RECENT_ISSUE_CAPACITY": "200",
 }
 
 
@@ -218,6 +222,8 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("LLM_TRANSCRIPT_ENABLED", "LLM_TRANSCRIPT_ENABLED", "off", "False"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "LLM_TRANSCRIPT_RETENTION_DAYS", "1", "1"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "LLM_TRANSCRIPT_RETENTION_DAYS", " 30 ", "30"),
+    ("GM_RECENT_LLM_CAPACITY", "GM_RECENT_LLM_CAPACITY", "50", "50"),
+    ("GM_RECENT_ISSUE_CAPACITY", "GM_RECENT_ISSUE_CAPACITY", " 20 ", "20"),
 ]
 
 
@@ -256,6 +262,8 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ART_SD_PROBE_CACHE_SECONDS", "3601", "expected an integer between 5 and 3600"),
     ("ART_SD_PROBE_CACHE_SECONDS", "0", "expected an integer between 5 and 3600"),
     ("LLM_TRANSCRIPT_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
+    ("GM_RECENT_LLM_CAPACITY", "0", "expected a positive integer"),
+    ("GM_RECENT_ISSUE_CAPACITY", "many", "expected a positive integer"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "0", "expected an integer of at least 1"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "-2", "expected an integer of at least 1"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "two", "expected an integer of at least 1"),
@@ -346,6 +354,8 @@ class _SubprocessSettingsTests(unittest.TestCase):
                 "HTTP_USER_AGENT",
                 "LLM_TRANSCRIPT_ENABLED",
                 "LLM_TRANSCRIPT_RETENTION_DAYS",
+                "GM_RECENT_LLM_CAPACITY",
+                "GM_RECENT_ISSUE_CAPACITY",
             )
         }
 

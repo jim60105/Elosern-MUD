@@ -684,6 +684,15 @@ LLM_TRANSCRIPT_RETENTION_DAYS = _env_typed(
     rule="expected an integer of at least 1",
 )
 
+######################################################################
+# GM dashboard recent-event buffers (gm-portal-s2b-dashboard)
+######################################################################
+# Process-local, bounded buffers fed by the observability facade: the newest
+# llm_call events and the newest warn/error events. Reset on reload; the
+# dashboard's counts and latencies describe only what these retain.
+GM_RECENT_LLM_CAPACITY = _env_int("GM_RECENT_LLM_CAPACITY", 500)
+GM_RECENT_ISSUE_CAPACITY = _env_int("GM_RECENT_ISSUE_CAPACITY", 200)
+
 # GM portal boundary (gm-portal-s1-foundation): appended last so Evennia's
 # SharedLoginMiddleware has already mapped a webclient session onto the
 # website login. Its __call__ gates /gm/ before any process_view hook

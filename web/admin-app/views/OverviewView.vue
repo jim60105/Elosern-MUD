@@ -1,264 +1,203 @@
 <script setup>
-// 總覽 (gm-portal-s1-foundation): the temporary S1 home. It renders the real
-// /gm/api/session and /gm/api/health responses through the single fetch
-// boundary; S2 replaces it with the operations dashboard.
-import { computed, inject, onMounted, reactive } from "vue";
-import GmPanel from "../components/GmPanel.vue";
-import GmTable from "../components/GmTable.vue";
-import GmError from "../components/GmError.vue";
-import GmStatusBadge from "../components/GmStatusBadge.vue";
-import { formatServerTime } from "../lib/format.js";
+// 總覽 (gm-portal-s2b-dashboard): the operations dashboard. One
+// /gm/api/dashboard snapshot every five seconds while the tab is visible,
+// through the single fetch boundary; each slot renders (or fails) on its
+// own. A failed poll keeps the last good snapshot and marks it stale.
+// Selecting a recent call opens the payload drawer, which fetches the
+// retained transcript on demand.
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import GmCallDrawer from "../components/GmCallDrawer.vue";
+import GmRefreshBar from "../components/GmRefreshBar.vue";
+import { createPoller, POLL_INTERVAL_MS } from "../lib/poller.js";
+import ArtPanel from "./overview/ArtPanel.vue";
+import IssuesPanel from "./overview/IssuesPanel.vue";
+import LlmLayersPanel from "./overview/LlmLayersPanel.vue";
+import ProcessPanel from "./overview/ProcessPanel.vue";
+import RecentCallsPanel from "./overview/RecentCallsPanel.vue";
+import ServicesPanel from "./overview/ServicesPanel.vue";
+import SessionPanel from "./overview/SessionPanel.vue";
+import WorldPanel from "./overview/WorldPanel.vue";
 
 const api = inject("gmApi");
 const session = inject("gmSession");
 
-const health = reactive({ status: "idle", data: null, error: null });
+const dashboard = reactive({ data: null, lastUpdatedAt: null, error: null });
+const selectedCall = ref(null);
+const hidden = ref(globalThis.document?.visibilityState === "hidden");
+const now = ref(Date.now() / 1000);
+let clock = null;
 
-async function loadHealth() {
-  health.status = "loading";
-  health.error = null;
+const poller = createPoller({
+  load: () => api.get("/dashboard"),
+  onData(data) {
+    dashboard.data = data;
+    dashboard.lastUpdatedAt = Date.now() / 1000;
+    dashboard.error = null;
+  },
+  onError(error) {
+    dashboard.error = error;
+  },
+});
+
+const refreshing = ref(false);
+async function refresh() {
+  refreshing.value = true;
   try {
-    health.data = await api.get("/health");
-    health.status = "ready";
-  } catch (error) {
-    health.error = error;
-    health.status = "error";
+    await poller.refresh();
+  } finally {
+    refreshing.value = false;
   }
 }
 
-function retrySession() {
-  session.load({ force: true });
+// The relative-age clock ticks only while the tab is visible.
+function startClock() {
+  if (clock === null) clock = setInterval(() => (now.value = Date.now() / 1000), 1000);
+}
+
+function stopClock() {
+  clearInterval(clock);
+  clock = null;
+}
+
+function onVisibility() {
+  hidden.value = document.visibilityState === "hidden";
+  if (hidden.value) {
+    stopClock();
+  } else {
+    now.value = Date.now() / 1000;
+    startClock();
+  }
 }
 
 onMounted(() => {
   session.load();
-  loadHealth();
+  document.addEventListener("visibilitychange", onVisibility);
+  if (!hidden.value) startClock();
+  poller.start();
 });
 
-const sessionState = session.state;
+onBeforeUnmount(() => {
+  poller.stop();
+  stopClock();
+  document.removeEventListener("visibilitychange", onVisibility);
+});
 
-const HEALTH_CHECKS = [
-  { key: "django", label: "Django 回應", expected: "ok", okLabel: "正常" },
-  { key: "database", label: "資料庫讀取", expected: "readable", okLabel: "可讀取" },
-];
+const barState = computed(() => {
+  if (dashboard.error) return "stale";
+  if (hidden.value) return "paused";
+  if (!dashboard.data) return "loading";
+  if (refreshing.value) return "refreshing";
+  return "live";
+});
 
-const healthColumns = [
-  { key: "label", label: "項目" },
-  { key: "key", label: "識別碼", mono: true },
-  { key: "value", label: "回報值", mono: true },
-  { key: "status", label: "狀態" },
-];
-
-const healthRows = computed(() =>
-  HEALTH_CHECKS.map((check) => {
-    const value = health.data?.[check.key];
-    const healthy = value === check.expected;
-    return {
-      key: check.key,
-      label: check.label,
-      value: value ?? "—",
-      badge: healthy ? { status: "ok", label: check.okLabel } : { status: "crit", label: "異常" },
-    };
-  }),
-);
+const data = computed(() => dashboard.data);
 </script>
 
 <template>
-  <div class="gm-overview">
-    <GmPanel
-      class="gm-overview__session"
-      title="操作者工作階段"
-      description="目前登入的帳號、權限與伺服器資訊"
-      :busy="sessionState.status === 'loading'"
-    >
-      <GmError
-        v-if="sessionState.status === 'error'"
-        title="無法載入工作階段"
-        :message="sessionState.error?.message"
-        :code="sessionState.error?.code"
-      >
-        <template #actions>
-          <button type="button" class="ui-btn ui-btn--sm" @click="retrySession">重試</button>
-        </template>
-      </GmError>
-      <template v-else-if="sessionState.data">
-        <dl class="gm-ledger" data-testid="gm-session">
-          <div class="gm-ledger__row">
-            <dt>帳號</dt>
-            <dd class="gm-mono" data-field="account_name">{{ sessionState.data.account_name }}</dd>
-          </div>
-          <div class="gm-ledger__row">
-            <dt>權限等級</dt>
-            <dd><span class="gm-level" data-field="permission_level">{{ sessionState.data.permission_level }}</span></dd>
-          </div>
-          <div class="gm-ledger__row">
-            <dt>伺服器時間</dt>
-            <dd>
-              <time :datetime="sessionState.data.server_time">{{ formatServerTime(sessionState.data.server_time) }}</time>
-              <span class="gm-ledger__raw gm-mono" data-field="server_time">{{ sessionState.data.server_time }}</span>
-            </dd>
-          </div>
-          <div class="gm-ledger__row">
-            <dt>遊戲版本</dt>
-            <dd class="gm-mono" data-field="game_version">{{ sessionState.data.game_version }}</dd>
-          </div>
-        </dl>
-      </template>
-      <div v-else class="gm-ledger" aria-hidden="true">
-        <div v-for="width in ['42%', '28%', '64%', '22%']" :key="width" class="gm-ledger__row">
-          <span class="gm-skeleton" style="width: 4.5em"></span>
-          <span class="gm-skeleton" :style="{ width }"></span>
-        </div>
-      </div>
-      <p v-if="sessionState.status === 'loading'" class="gm-visually-hidden" role="status">載入中…</p>
-    </GmPanel>
+  <div class="gm-dashboard">
+    <GmRefreshBar
+      class="gm-dashboard__bar"
+      :state="barState"
+      :last-updated-at="dashboard.lastUpdatedAt"
+      :interval-seconds="POLL_INTERVAL_MS / 1000"
+      :error-message="dashboard.error?.message ?? ''"
+      :now="now"
+      :paused="hidden"
+      :busy="refreshing"
+      data-testid="gm-refresh-bar"
+      @refresh="refresh"
+    />
 
-    <GmPanel
-      class="gm-overview__health"
-      title="系統健康"
-      description="Django 與資料庫的骨架檢查（不探測外部服務）"
-      :flush="health.status !== 'error'"
-      :busy="health.status === 'loading'"
-    >
-      <template #actions>
-        <button
-          type="button"
-          class="ui-btn ui-btn--ghost ui-btn--sm"
-          :aria-disabled="health.status === 'loading' ? 'true' : null"
-          @click="health.status !== 'loading' && loadHealth()"
-        >
-          {{ health.status === "loading" ? "檢查中…" : "重新檢查" }}
-        </button>
-      </template>
-      <GmError
-        v-if="health.status === 'error'"
-        title="無法取得健康狀態"
-        :message="health.error?.message"
-        :code="health.error?.code"
-      >
-        <template #actions>
-          <button type="button" class="ui-btn ui-btn--sm" @click="loadHealth">重試</button>
-        </template>
-      </GmError>
-      <GmTable
-        v-else-if="health.status === 'ready'"
-        :columns="healthColumns"
-        :rows="healthRows"
-        row-key="key"
-        caption="各項檢查的即時結果"
-        caption-hidden
-        flush
-        data-testid="gm-health"
-      >
-        <template #cell-status="{ row }">
-          <GmStatusBadge :status="row.badge.status" :label="row.badge.label" />
-        </template>
-      </GmTable>
-      <div v-else class="gm-health-skeleton" aria-hidden="true">
-        <div v-for="row in 2" :key="row" class="gm-health-skeleton__row">
-          <span class="gm-skeleton" style="width: 30%"></span>
-          <span class="gm-skeleton" style="width: 18%"></span>
-          <span class="gm-skeleton" style="width: 14%"></span>
-        </div>
-      </div>
-      <p v-if="health.status === 'loading'" class="gm-visually-hidden" role="status">檢查中…</p>
-    </GmPanel>
+    <ServicesPanel class="gm-dashboard__services" :services="data?.services ?? null" :now="now" />
+
+    <LlmLayersPanel
+      class="gm-dashboard__layers"
+      :layers="data?.llm?.layers ?? null"
+      :window="data?.llm?.window ?? null"
+      :now="now"
+    />
+
+    <div class="gm-dashboard__main">
+      <RecentCallsPanel
+        id="gm-recent-calls"
+        :calls="data?.llm?.recent ?? null"
+        :selected-id="selectedCall"
+        @select="selectedCall = $event"
+      />
+      <IssuesPanel
+        :issues="data?.errors?.recent ?? null"
+        :window="data?.errors?.window ?? null"
+      />
+    </div>
+
+    <div class="gm-dashboard__aside">
+      <ArtPanel :art="data?.art ?? null" :now="now" />
+      <WorldPanel :world="data?.world ?? null" />
+      <ProcessPanel :process="data?.process ?? null" />
+      <SessionPanel />
+    </div>
+
+    <GmCallDrawer
+      :call-id="selectedCall"
+      :api="api"
+      fallback-focus="#gm-recent-calls h2"
+      @close="selectedCall = null"
+    />
   </div>
 </template>
 
 <style scoped>
-.gm-overview {
+.gm-dashboard {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--sp-6);
   align-items: start;
+  container: gm-dashboard / inline-size;
 }
 
-.gm-overview__session,
-.gm-overview__health {
-  grid-column: span 6;
+.gm-dashboard > * {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
-@media (max-width: 1099px) {
-  .gm-overview__session,
-  .gm-overview__health {
-    grid-column: span 12;
+.gm-dashboard__bar {
+  position: sticky;
+  top: var(--sp-3);
+  z-index: 2;
+}
+
+.gm-dashboard__main {
+  display: grid;
+  grid-column: span 8;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+.gm-dashboard__aside {
+  display: grid;
+  grid-column: span 4;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+@container gm-dashboard (max-width: 1099px) {
+  .gm-dashboard__main,
+  .gm-dashboard__aside {
+    grid-column: 1 / -1;
+  }
+
+  .gm-dashboard__aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.gm-ledger {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: var(--sp-6);
-}
+@container gm-dashboard (max-width: 759px) {
+  .gm-dashboard__aside {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
-/* Each row spans both columns on the shared grid (subgrid), so the dashed
-   ledger rule runs unbroken under the term and its value. */
-.gm-ledger__row {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: baseline;
-  padding-block: var(--sp-3);
-  border-bottom: 1px dashed var(--ink-700);
-}
-
-.gm-ledger__row:first-child {
-  padding-top: 0;
-}
-
-.gm-ledger__row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.gm-ledger dt {
-  font-size: var(--text-sm);
-  color: var(--paper-500);
-}
-
-.gm-ledger dd {
-  min-width: 0;
-  font-size: var(--text-md);
-  color: var(--paper-100);
-  overflow-wrap: anywhere;
-}
-
-.gm-ledger dd.gm-mono {
-  font-size: var(--text-sm);
-}
-
-.gm-ledger time {
-  display: block;
-}
-
-.gm-ledger__raw {
-  display: block;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  font-size: var(--text-xs);
-  color: var(--paper-500);
-}
-
-.gm-level {
-  padding: 1px var(--sp-2);
-  font-family: var(--f-mono);
-  font-size: var(--text-xs);
-  color: var(--gold-400);
-  border: 1px solid var(--gold-600);
-  border-radius: var(--radius-sm);
-}
-
-.gm-health-skeleton__row {
-  display: flex;
-  gap: var(--sp-6);
-  align-items: center;
-  height: 48px;
-  padding: 0 var(--sp-5);
-  border-bottom: 1px solid var(--ink-700);
-}
-
-.gm-health-skeleton__row:last-child {
-  border-bottom: 0;
+  .gm-dashboard__bar {
+    position: static;
+  }
 }
 </style>

@@ -8,7 +8,7 @@ import { GM_BASE } from "./lib/api.js";
 // have routes: the overview, the permission-denied view, and a not-found view
 // for unknown client paths. Undelivered sections have no route.
 export const routes = [
-  { path: "/", name: "overview", component: OverviewView, meta: { title: "總覽", section: "overview" } },
+  { path: "/", name: "overview", component: OverviewView, meta: { title: "總覽", section: "overview", wide: true } },
   { path: "/forbidden", name: "forbidden", component: ForbiddenView, meta: { title: "權限不足" } },
   { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView, meta: { title: "找不到頁面" } },
 ];
