@@ -63,4 +63,5 @@
   - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)
   - [Vue 前端開發指南](/development/frontend-developer-guide)
+  - [GM 執行期狀態檢視](/development/gm-portal-runtime-inspection)
   - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)
