@@ -29,7 +29,10 @@ watch(
 );
 
 function navigate(item) {
-  if (item.route) router.push({ name: item.route });
+  if (!item?.route) return;
+  // A nav entry owns its whole location: a child of the runtime tree names a
+  // kind through params, and record-backed pages carry their owner in query.
+  router.push({ name: item.route, params: item.params ?? {}, query: item.query ?? {} });
 }
 </script>
 
@@ -37,6 +40,7 @@ function navigate(item) {
   <GmShell
     :sections="GM_SECTIONS"
     :active-key="activeKey"
+    :active-route="String(route.name ?? '')"
     :title="title"
     eyebrow="ELOSERN · 營運者介面"
     :account="session.state.data?.account_name ?? ''"

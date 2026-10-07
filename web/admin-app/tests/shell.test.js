@@ -25,7 +25,6 @@ describe("GmNav", () => {
     const disabled = wrapper.findAll("[aria-disabled='true']");
     expect(disabled.map((node) => node.attributes("data-section"))).toEqual([
       "operations",
-      "runtime",
       "world-data",
       "actions",
       "intervention",
@@ -36,11 +35,49 @@ describe("GmNav", () => {
       expect(node.attributes("tabindex")).toBeUndefined();
       expect(node.text()).toContain("尚未開放");
     }
+    // The delivered runtime section is a real link.
+    const runtime = wrapper.get("[data-section='runtime']");
+    expect(runtime.element.tagName).toBe("A");
+    expect(runtime.attributes("href")).toBe("/gm/runtime");
+  });
+
+  it("renders the runtime navigation tree only while that section is active", () => {
+    const collapsed = nav();
+    expect(collapsed.find(".gm-nav__tree").exists()).toBe(false);
+    const wrapper = nav({ activeKey: "runtime", activeRoute: "runtime-list" });
+    const children = wrapper.findAll(".gm-nav__child");
+    expect(children.map((node) => node.text())).toEqual([
+      "全域搜尋",
+      "帳號",
+      "玩家角色",
+      "NPC",
+      "魔物",
+      "房間",
+      "任務",
+      "敘事紀錄",
+      "美術資產",
+    ]);
+    expect(children[1].attributes("href")).toBe("/gm/runtime/accounts");
+    expect(children.find((node) => node.text() === "全域搜尋").attributes("href")).toBe(
+      "/gm/runtime/search",
+    );
+  });
+
+  it("marks the current child entry and navigates it with its full location", async () => {
+    const wrapper = nav({ activeKey: "runtime", activeRoute: "runtime-list" });
+    const child = wrapper.findAll(".gm-nav__child").find((node) => node.text() === "NPC");
+    const link = child.element;
+    link.addEventListener("click", (event) => event.preventDefault());
+    await child.trigger("click", { button: 0 });
+    const emitted = wrapper.emitted("navigate");
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0][0].route).toBe("runtime-list");
+    expect(emitted[0][0].params).toEqual({ kind: "npcs" });
   });
 
   it("ignores pointer and keyboard activation of a disabled section", async () => {
     const wrapper = nav();
-    const disabled = wrapper.get("[data-section='runtime']");
+    const disabled = wrapper.get("[data-section='actions']");
     await disabled.trigger("click");
     await disabled.trigger("keydown", { key: "Enter" });
     await disabled.trigger("keydown", { key: " " });
@@ -99,5 +136,12 @@ describe("GmShell", () => {
     expect(wrapper.emitted("navigate")[0][0].key).toBe("overview");
     await wrapper.get("[data-section='actions']").trigger("click");
     expect(wrapper.emitted("navigate")).toHaveLength(1);
+  });
+
+  it("renders the runtime tree when the runtime section is the active area", () => {
+    const wrapper = mount(GmShell, {
+      props: { sections: GM_SECTIONS, activeKey: "runtime", activeRoute: "runtime-list", title: "執行期清單" },
+    });
+    expect(wrapper.findAll(".gm-nav__child").length).toBe(9);
   });
 });

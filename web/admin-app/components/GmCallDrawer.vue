@@ -4,10 +4,14 @@
 // top layer). It fetches /gm/api/llm/calls/<id> only when a call is
 // selected; a later selection always wins over an earlier, slower response.
 // Payload text is untrusted and rendered through interpolation only.
+// Structured JSON (request parameters, a JSON response) goes through the
+// shared GmJsonTree (gm-portal-s3-runtime-state §6), which is also the raw
+// tab's renderer; prompt text keeps its verbatim GmCodeBlock presentation.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import GmCodeBlock from "./GmCodeBlock.vue";
 import GmEmpty from "./GmEmpty.vue";
 import GmError from "./GmError.vue";
+import GmJsonTree from "./GmJsonTree.vue";
 import GmStatusBadge from "./GmStatusBadge.vue";
 import { formatClock, formatMs } from "../lib/format.js";
 import { attemptErrors, attemptFailed, messageGroups, resultBadge } from "../lib/dashboard.js";
@@ -20,7 +24,7 @@ const props = defineProps({
   fallbackFocus: { type: String, default: "" },
 });
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "open-call"]);
 
 const dialog = ref(null);
 const heading = ref(null);
@@ -159,6 +163,12 @@ function withoutMessages(request) {
   if (!request || typeof request !== "object") return null;
   const { messages, ...rest } = request;
   return Object.keys(rest).length ? rest : null;
+}
+
+// Only an object/array response is structured data; a string response stays
+// verbatim text.
+function isStructured(value) {
+  return value !== null && typeof value === "object";
 }
 
 function selectTab(index, focus = false) {
@@ -318,7 +328,11 @@ function exchangeMeta(exchange) {
               <p v-if="!tab.groups.length" class="gm-call-drawer__muted">此次請求沒有訊息內容</p>
               <details v-if="tab.params" class="gm-call-drawer__group">
                 <summary>其他參數</summary>
-                <GmCodeBlock :text="tab.params" :max-lines="20" />
+                <GmJsonTree
+                  :value="tab.params"
+                  :open-depth="2"
+                  @open-call="emit('open-call', $event)"
+                />
               </details>
 
               <h4 class="gm-call-drawer__h4">回應</h4>
@@ -328,7 +342,17 @@ function exchangeMeta(exchange) {
                 title="請求失敗"
                 :message="`${tab.exchange.error.type}：${tab.exchange.error.message ?? '（訊息未記錄）'}`"
               />
-              <GmCodeBlock v-if="tab.exchange.response != null" :text="tab.exchange.response" :max-lines="20" />
+              <GmJsonTree
+                v-if="isStructured(tab.exchange.response)"
+                :value="tab.exchange.response"
+                :open-depth="2"
+                @open-call="emit('open-call', $event)"
+              />
+              <GmCodeBlock
+                v-else-if="tab.exchange.response != null"
+                :text="tab.exchange.response"
+                :max-lines="20"
+              />
               <p v-else class="gm-call-drawer__muted">沒有回應內容</p>
 
               <h4 class="gm-call-drawer__h4">驗證錯誤</h4>
