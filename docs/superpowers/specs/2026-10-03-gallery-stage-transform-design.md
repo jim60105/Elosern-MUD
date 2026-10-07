@@ -140,6 +140,11 @@ full-figure surface). The true framed-avatar semantics — the non-stage cover
 branch driven by `faceObjectPosition` — is untouched everywhere (gallery
 cards, roster, party strip).
 
+Drawer art CSS must restrict its `cover` override to non-stage artwork.
+Full-figure images retain `contain` and bottom-center positioning before the
+saved transform is applied; cropping with `cover` first loses image content
+even when the saved scale subsequently shrinks the figure.
+
 ### Placeholder
 
 The stage placeholder's inline SVG human silhouette stays exactly as it is.

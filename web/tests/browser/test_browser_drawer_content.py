@@ -96,6 +96,16 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
+                portrait_url = "/art/t_drawer_full_figure.svg"
+                page.route(
+                    "**" + portrait_url,
+                    lambda route: route.fulfill(
+                        content_type="image/svg+xml",
+                        body='<svg xmlns="http://www.w3.org/2000/svg" width="300" height="1200">'
+                        '<rect width="300" height="1200" fill="seagreen"/>'
+                        '<rect width="300" height="100" fill="goldenrod"/></svg>',
+                    ),
+                )
                 status = valid_status_panel("燼行者", "42")
                 status["actor"]["full_title"] = "見習冒險者　灰燼旅人"
                 _inject_snapshot(
@@ -105,12 +115,64 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                         "status": status,
                         "character": valid_character_panel(),
                         "lore_codex": valid_lore_codex_panel(),
+                        "roster": {
+                            "schema_version": 2,
+                            "available": True,
+                            "characters": [{
+                                "identity": 42, "name": "燼行者", "current": True, "pending": False,
+                                "portrait": {
+                                    "subject_key": None, "status": "done", "url": portrait_url,
+                                    "aspect_ratio": "3:4", "alt": "測試全身立繪",
+                                    "placeholder": None,
+                                    "face_rect": {"x": 0.25, "y": 0.0, "w": 0.5, "h": 0.1},
+                                    "stage": {"scale": 0.6, "x": 0.0, "y": 0.0},
+                                    "origin": "runtime",
+                                },
+                            }],
+                            "can_create": False, "max_characters": 3,
+                            "switch_locked": False, "lock_reason": None,
+                        },
                     },
                     mode="exploration",
                 )
                 _wait_mode(page, "exploration")
 
                 _open_drawer(page, "status")
+                page.wait_for_function(
+                    """() => {
+                      const image = document.querySelector('.hud-drawer__art .reference-artwork--stage img');
+                      return image && image.naturalWidth === 300 && image.naturalHeight === 1200;
+                    }"""
+                )
+                # Object fitting happens before the saved transform. Recover
+                # the painted bounds from the transformed box, not the box
+                # alone: a cover-cropped image can have an in-bounds box.
+                painted = page.evaluate(
+                    """() => {
+                      const art = document.querySelector('.hud-drawer__art').getBoundingClientRect();
+                      const image = document.querySelector('.hud-drawer__art .reference-artwork--stage img');
+                      const box = image.getBoundingClientRect();
+                      const style = getComputedStyle(image);
+                      const fit = (style.objectFit === 'contain' ? Math.min : Math.max)(
+                        image.clientWidth / image.naturalWidth,
+                        image.clientHeight / image.naturalHeight);
+                      const width = image.naturalWidth * fit * box.width / image.clientWidth;
+                      const height = image.naturalHeight * fit * box.height / image.clientHeight;
+                      return {
+                        top: box.bottom - height, bottom: box.bottom,
+                        left: (box.left + box.right - width) / 2,
+                        right: (box.left + box.right + width) / 2,
+                        artTop: art.top, artBottom: art.bottom,
+                        artLeft: art.left, artRight: art.right,
+                        position: style.objectPosition,
+                      };
+                    }"""
+                )
+                self.assertEqual(painted["position"], "50% 100%")
+                self.assertGreaterEqual(painted["top"], painted["artTop"] - 1, painted)
+                self.assertLessEqual(painted["bottom"], painted["artBottom"] + 1, painted)
+                self.assertGreaterEqual(painted["left"], painted["artLeft"] - 1, painted)
+                self.assertLessEqual(painted["right"], painted["artRight"] + 1, painted)
                 probe = page.evaluate(_ART_PROBE)
                 # `.hud-drawer__art` is `flex: 0 0 min(360px * var(--ui-scale), 28%)`,
                 # so the bound scales with the chrome factor at every size. The

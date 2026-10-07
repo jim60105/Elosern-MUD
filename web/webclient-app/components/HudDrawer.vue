@@ -228,7 +228,9 @@ defineExpose({ forceClose });
   border-right: 1px solid #bca57926;
 }
 .hud-drawer__art .reference-artwork { height: 100%; }
-.hud-drawer__art .reference-artwork img { object-fit: cover; object-position: center top; }
+/* Framed portraits crop; stage portraits keep ReferenceArtwork's full-figure
+   contain geometry before applying the saved scale and offsets. */
+.hud-drawer__art .reference-artwork:not(.reference-artwork--stage) img { object-fit: cover; object-position: center top; }
 
 /* The body is the drawer's only scrolling region; the head and foot are
    fixed, so a long reference surface scrolls inside the body only. */
