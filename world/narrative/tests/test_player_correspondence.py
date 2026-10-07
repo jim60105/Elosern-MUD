@@ -167,8 +167,12 @@ class PlayerCorrespondenceTests(EvenniaTest):
         with patch("commands.correspondence.log_info") as cmd_log:
             command.at_pre_cmd()
             command.func()
-            self.assertNotIn("合成機密", str(cmd_log.call_args_list))
-            self.assertNotIn(str(self.other.pk), str(cmd_log.call_args_list))
+            # The letter command logs its arguments like every other command;
+            # the facade bounds the value, so no args_count stand-in remains.
+            cmd_in = [call.kwargs["context"] for call in cmd_log.call_args_list
+                      if call.args[0] == "cmd_in"]
+            self.assertEqual(cmd_in[0]["args"], command.args)
+            self.assertNotIn("args_count", cmd_in[0])
         record = LetterSend.objects.get(sender_id=str(self.player.pk))
         self.assertEqual(record.body, "合成機密=原文")
         self.clock.advance(3600, AdvanceSource.COMMAND, [])

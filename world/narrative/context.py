@@ -23,7 +23,8 @@ Enforces:
    version, source IDs, read revisions, section hashes, budget accounting, truncation
    decisions, and the reconstructible rendered payload (design decision 3: payload or
    reconstructible sources, never hashes alone). The narrative database is the
-   controlled storage; prompt text never enters normal operational logs.
+   authoritative storage for prompts; operational logs carry IDs and counts here
+   by event choice, while full call payloads live in the LLM transcript.
 5. Invalidation and provenance:
    Owner memory-generation changes surface on every fresh assembly, so new
    generations see changed effective memory; historical snapshots are never rewritten.
@@ -650,9 +651,10 @@ def persist_context_snapshot(
     """Persist an assembled context as an immutable NarrativeContextSnapshot.
 
     The reconstructible rendered payload is ALWAYS retained (design decision 3):
-    retries and offline reconstruction must not depend on debug retention. Prompt
-    text stays inside the narrative database (controlled storage) and never enters
-    normal operational logs, which carry IDs and counts only.
+    retries and offline reconstruction must not depend on debug retention. The
+    narrative database is the authoritative prompt store; this function's own
+    events carry IDs and counts, and full call payloads live in the LLM
+    transcript keyed by ``call_id``.
     """
     snap_id = snapshot_id or f"snap_{uuid.uuid4().hex}"
 

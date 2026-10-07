@@ -82,7 +82,7 @@ def prepare_reply(source_id):
         work.save(update_fields=["snapshot_id"])
         log_info("correspondence_reply_captured", context={
             "source_id": source_id, "recipient": letter.recipient_id,
-            "snapshot_id": snapshot.snapshot_id,
+            "snapshot_id": snapshot.snapshot_id, "body": letter.body,
         })
         return snapshot
 

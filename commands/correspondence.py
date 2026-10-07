@@ -19,10 +19,10 @@ class CmdLetters(Command):
     help_category = "一般"
 
     def at_pre_cmd(self):
-        """Unlike the generic command hook, never log letter prose or names."""
+        """Log the bounded arguments like every other command."""
         self._observability_started = time.perf_counter()
         log_info("cmd_in", context={"char": self.caller.pk, "cmd": self.key,
-                                    "args_count": len(self.args or "")})
+                                    "args": self.args or ""})
 
     def func(self):
         args = (self.args or "").lstrip()

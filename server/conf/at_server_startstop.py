@@ -82,6 +82,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "connect_art_push",
     "narrative_projection_init",
     "narrative_correspondence_projection_init",
+    "llm_transcript_prune",
 )
 
 # Any-unexpected-error tolerance, used by steps that were broadly guarded
@@ -651,6 +652,17 @@ def at_server_start():
             "world.narrative.correspondence_memory",
             "recover_pending_correspondence_projections",
         ),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
+    # LLM transcript retention (gm-portal-s2a-llm-transcript): drop dated
+    # transcript files older than the configured window once per start. The
+    # seam never raises; the tolerant wrapper is the last-resort guard so a
+    # diagnostics directory can never abort the deterministic game's startup.
+    _startup_step(
+        "llm_transcript_prune",
+        lambda: _late("world.observability.transcript", "prune"),
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",

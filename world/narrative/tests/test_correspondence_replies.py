@@ -234,6 +234,29 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         self.assertTrue(work.snapshot_id)
         self.assertEqual(LetterSend.objects.count(), 1)
 
+    @covers_requirement('observability-logging::llm-and-narrative-diagnostic-correlation')
+    def test_reply_failure_event_names_the_actual_call_and_letter_body(self):
+        incoming = self.incoming()
+        unscripted = FakeLLMClient()  # no fixture: an unexpected error escapes the guardrail
+        with patch("server.correspondence_service.log_warn") as warn, \
+                patch("world.ai.guardrail.log_info") as info:
+            self.assertIsNone(request_letter_reply(incoming.source_id, client=unscripted).result)
+        failed = [c.kwargs["context"] for c in warn.call_args_list
+                  if c.args[0] == "correspondence_reply_failed"]
+        calls = [c.kwargs["context"] for c in info.call_args_list if c.args[0] == "llm_call"]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]["body"], incoming.body)
+        self.assertEqual(failed[0]["call_id"], calls[0]["call_id"])
+
+    @covers_requirement('observability-logging::llm-and-narrative-diagnostic-correlation')
+    def test_reply_failure_before_any_guarded_call_fabricates_no_call_id(self):
+        incoming = self.incoming(delivered=False)
+        with patch("server.correspondence_service.log_warn") as warn:
+            self.assertIsNone(request_letter_reply(incoming.source_id, client=FakeLLMClient()).result)
+        failed = [c.kwargs["context"] for c in warn.call_args_list
+                  if c.args[0] == "correspondence_reply_failed"]
+        self.assertIsNone(failed[0]["call_id"])
+
     @covers_requirement("correspondence-npc-replies::correspondence-cannot-execute-physical-or-quest-actions")
     def test_relationship_payload_bounds_reject_extra_authority(self):
         incoming = self.incoming()
@@ -296,16 +319,18 @@ class CorrespondenceReplyTests(EvenniaTestCase):
         snapshot = prepare_reply(incoming.source_id)
         self.assertIn("信" * 8000, snapshot.rendered_payload["user_prompt"])
 
-    def test_boundary_logs_contain_only_ids_and_context(self):
+    def test_capture_event_carries_the_incoming_body_for_diagnosis(self):
         incoming = self.incoming()
         with patch("world.narrative.replies.log_info") as logged:
             snapshot = prepare_reply(incoming.source_id)
             with self.captureOnCommitCallbacks(execute=True):
-                result = settle_reply(incoming.source_id, snapshot.snapshot_id, LetterReply("私人回信內容。"))
+                settle_reply(incoming.source_id, snapshot.snapshot_id, LetterReply("私人回信內容。"))
+        captured = [call.kwargs["context"] for call in logged.call_args_list
+                    if call.args[0] == "correspondence_reply_captured"]
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["body"], incoming.body)
+        self.assertEqual(captured[0]["snapshot_id"], snapshot.snapshot_id)
         events = {call.args[0] for call in logged.call_args_list}
-        self.assertIn("correspondence_reply_captured", events)
         self.assertIn("correspondence_reply_committed", events)
-        self.assertNotIn(result.body, str(logged.call_args_list))
-        self.assertNotIn(incoming.body, str(logged.call_args_list))
         for call in logged.call_args_list:
             self.assertIn("context", call.kwargs)

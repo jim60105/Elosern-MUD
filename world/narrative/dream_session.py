@@ -60,8 +60,8 @@ Accounting durability
   ``world.narrative.authoring`` documents for its own drafts.
 
 Boundary events carry session/submission/delivery identifiers, counts, ticks and
-stable reason codes only. Player prose, direction summaries and reason messages
-never enter logs.
+stable reason codes; that is a per-event choice, not a prose ban (prose may ride
+log context elsewhere, e.g. ``dream_surface_generation_failed``).
 """
 
 from __future__ import annotations
@@ -104,8 +104,7 @@ STATE_ENDED = "ended"
 OUTCOME_DRAFT = "draft"
 OUTCOME_CONFIRMED = "confirmed"
 
-# Stable rejection reason codes; player-facing prose never enters logs and the
-# codes are the identifiers callers and tests assert on.
+# Stable rejection reason codes: the identifiers callers and tests assert on.
 REASON_EMPTY_INPUT = "empty_input"
 REASON_OVERSIZED_INPUT = "oversized_input"
 REASON_OUTSTANDING_TURN = "outstanding_turn"

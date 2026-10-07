@@ -317,6 +317,9 @@ class TestSettingsSanitizationTests(_SubprocessSettingsTests):
         # make a test download-capable, even against the shipped backend's
         # unseeded directory.
         expected["ART_TRANSLATE_DOWNLOAD_ENABLED"] = "False"
+        # Same deliberate pin for LLM_TRANSCRIPT_ENABLED: a test run never
+        # appends to the real server/logs/llm transcript.
+        expected["LLM_TRANSCRIPT_ENABLED"] = "False"
         self.assertEqual(_printed_map(result.stdout, set(DEFAULT_REPR)), expected)
 
     @covers_requirement(

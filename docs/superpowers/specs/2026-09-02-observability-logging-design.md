@@ -68,11 +68,19 @@ def log_debug(event: str, *, exc: BaseException | None = None,
 
 渲染規則：
 
-- `event`：穩定 snake_case 事件識別碼，非自由句子；英文。玩家-facing 的
-  正體中文文案不進 log。
+- `event`：穩定 snake_case 事件識別碼，非自由句子；英文。
+- 散文可以進 log（GM Portal S2a 廢止舊有「玩家散文與提示詞不進 log」規則，
+  見 `2026-10-06-gm-portal-s2-dashboard-design.md` §2.1）：context 可攜帶玩家
+  輸入、信件內文、夢境文字、提示詞與模型輸出。憑證永遠不進任何 log：API key、
+  認證標頭與 URL userinfo 一律排除，錯誤文字仍經 `_scrub_key`。完整 LLM
+  payload 不重複寫入單行 log，而是存於 `server/logs/llm/YYYY-MM-DD.jsonl`
+  transcript，以 `call_id` 關聯。遊戲內知識邊界（`private` 可見性、
+  `PRIVATE_AUTHORING_CATEGORIES`、記憶／回想／thread 存取檢查）不是 logging
+  規則，維持不變。
 - caller 段 `mod.func:line` 由 facade 從 `sys._getframe` 取得，呼叫端不傳。
 - context 渲染為 `k=v`：str 原樣（含空白加引號）、int/float/bool 直譯、
-  Mapping／序列 `repr` 後截斷至 200 字元、值為 None 時整個鍵跳過；
+  Mapping／序列 `repr`；每個值（含字串）都轉義換行並截斷至 200 字元，
+  值為 None 時整個鍵跳過；
   鍵排序輸出，保證可 diff、單行、grep 友好。
 - `exc` 渲染為 `tb:` 段：例外鏈由外到內每一環 `Type: msg @ file:line`，
   以 ` <- ` 串接。單行摘要供 grep；同時 `log_error` 將
@@ -136,7 +144,9 @@ lint 驗證 reason 非空，並把豁免計數輸出到 JSON 報告，使豁免�
 
 1. 所有 game-code log 一律經 `world.observability` facade；禁止直接
    import Evennia logger（由 lint 執行）。
-2. event 碼為 snake_case 穩定識別碼、英文；玩家文案不進 log。
+2. event 碼為 snake_case 穩定識別碼、英文；散文可進 log（每個 context
+   值截斷至 200 字元、單行），憑證永不進 log，完整 LLM payload 走
+   transcript（§3.1）。
 3. `context` 必帶；能取得的業務標識（room／tick／layer／quest／job）
    一律放 context 鍵。
 4. `except` 區塊三選一：re-raise／facade log／豁免註解（附理由）。
@@ -160,7 +170,7 @@ repo 基底類別 `commands/command.py::Command`（Evennia default commands 不�
 | event | 級別 | context |
 |---|---|---|
 | `cmd_in` | info | `char`（pk）、`cmd`（命令 key）、`args`（截斷） |
-| `cmd_in` for `信件` | info | `char`, `cmd`, `args_count`; private arguments never enter logs |
+| `cmd_in` for `信件` | info | `char`, `cmd`, `args` (truncated like every other command) |
 | `cmd_done` | info | `char`、`cmd`、`ms`（耗時）、`outcome=ok` |
 
 Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func 拋例外
@@ -206,7 +216,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `narrative_dialogue_prefix_rendered` | `npc`, `char`, `epoch`, `snapshot_id`, `prefix_sha256`, `tokens` |
 | `narrative_dialogue_compaction_deferred` | `epoch`, `snapshot_id` |
 | `narrative_dialogue_compaction_stale` | `epoch`, `snapshot_id` |
-| `llm_cached_tokens_reported` | `profile`, `cached_tokens` (optional validated provider usage; no prompt content) |
+| `llm_cached_tokens_reported` | `profile`, `cached_tokens`, `call_id` (optional validated provider usage) |
 | `protection_demo_prepared` | `char`、`npc`、`enemy`、`room` |
 | `npc_voice_profile_missing` | `npc`、`profile`（error 級；dangling profile reference） |
 | `guild_service_host_created` | `char`、`service`、`shop`、`profession`、`profile` |
@@ -216,12 +226,12 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `correspondence_settled` | `source_id`, `recipient`, `tick`, `status` |
 | `correspondence_collected` | `char`, `room`, `tick`, `count`; durable commit only, no bodies or recipient names |
 | `correspondence_read` | `char`, `source_id`, `tick`; first durable opening only, no body |
-| `correspondence_reply_captured` | `source_id`, `recipient`, `snapshot_id`; no letter or memory text |
+| `correspondence_reply_captured` | `source_id`, `recipient`, `snapshot_id`, `body` (incoming letter body, truncated) |
 | `correspondence_reply_pending` | `source_id`, `recipient`, `snapshot_id`; no fabricated response |
 | `correspondence_reply_stale` | `source_id`, `recipient`, `snapshot_id` |
 | `correspondence_reply_effect_rejected` | `source_id`, `recipient`, `snapshot_id` |
 | `correspondence_reply_committed` | `source_id`, `outgoing_source_id`, `recipient`, `snapshot_id`, `tick` |
-| `correspondence_reply_failed` | `source_id`; exception chain via `exc`, no prompt or letter text |
+| `correspondence_reply_failed` | `source_id`, `body` (truncated), `call_id` when a guarded call was attempted; exception chain via `exc`; the full prompt is read from the transcript |
 | `correspondence_memory_projected` | `source_id`、`owner_id`、`projector_version`、`records_count`；letters settle told cognition, never letter text in logs |
 | `correspondence_memory_projection_skipped` | `source_id`、`projector_version`（warn 級；pending 來源缺對應 durable event，該列保持 pending） |
 | `correspondence_memory_projection_failed` | `source_id`、`projector_version`、`exc` |
@@ -273,7 +283,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `dream_surface_rejected` | `char`, `session_id`, `action`, `reason`, exception chain when available; owner/control/revision or direction refusal, never input values |
 | `dream_surface_response_stale` | `char`, `session_id`, `action`; a late response whose original outstanding turn or control no longer matches |
 | `dream_surface_generation_unavailable` | `char`, `session_id`, `action`; degraded model response, draft and awakening remain available |
-| `dream_surface_generation_failed` | `char`, `session_id`, `action`, exception chain; generation/delivery failure, no player text or full prompts |
+| `dream_surface_generation_failed` | `char`, `session_id`, `action`, `input` (player input, truncated), `call_id` when a guarded call was attempted, exception chain; full prompts live in the transcript |
 | `dream_session_resumed` | `session_id`, `owner`, `completed`, `tick`; explicit later entry resumes unconfirmed discussion with the original count, never replays sleep |
 
 | `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
@@ -283,7 +293,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 
 | event | context |
 |---|---|
-| `llm_call` | `layer`、`profile`、`ms`、`result`（`ok`／`degraded`／`rejected`）、`reason`（降級時的原因碼） |
+| `llm_call` | `call_id`、`layer`、`profile`、`ms`、`result`（`ok`／`degraded`／`rejected`）、`reason`（降級時的原因碼）；完整 payload 以 `call_id` 查 transcript |
+| `llm_call_retry` | `call_id`、`layer`、`attempt`、`errors`（debug 級） |
 | `llm_transport_error` | `layer`、`endpoint`、`exc` |
 | `sd_job_claim` | `job`、`subject` |
 | `sd_job_settled` | `job`、`subject`、`status`、`reason` |

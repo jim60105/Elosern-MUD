@@ -123,6 +123,13 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `HTTP_USER_AGENT` | `HTTP_USER_AGENT` | 自由文字 | `elosern-mud/1.0` | 去除前後空白後使用的字串，是伺服器外發 HTTP 請求（提示詞翻譯下載、sd-webui worker、LLM 客戶端）所攜帶的 User-Agent 標頭。未設定、空白或僅含空白字元時回退至預設值（不允許送出空標頭） |
 
+### LLM 呼叫 transcript
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `LLM_TRANSCRIPT_ENABLED` | `LLM_TRANSCRIPT_ENABLED` | 布林 | `True` | 布林字；True 時每次 guarded LLM 呼叫把完整 request／response（`exchange`）與終局（`outcome`）以 JSONL 追加到 `server/logs/llm/YYYY-MM-DD.jsonl`（伺服器本地日期，由 `evennia-logs` volume 保存），以 `llm_call` 事件的 `call_id` 關聯。內容含玩家散文與提示詞，但永不含 API key、請求標頭或 URL userinfo。False 時寫入為 no-op，查詢回報 disabled。測試設定固定為 False |
+| `LLM_TRANSCRIPT_RETENTION_DAYS` | `LLM_TRANSCRIPT_RETENTION_DAYS` | 整數 | `14` | 至少 1；保留今天與前 N-1 個本地日期的檔案，更舊的檔案於每次伺服器啟動時（`llm_transcript_prune` 啟動步驟）刪除 |
+
 驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族。`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
 **衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名，`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。

@@ -58,6 +58,8 @@ _ENV_OVERRIDES = (
     "ELOSERN_MAX_CHARACTERS",
     "DEFEAT_ADULT_SCENES",
     "HTTP_USER_AGENT",
+    "LLM_TRANSCRIPT_ENABLED",
+    "LLM_TRANSCRIPT_RETENTION_DAYS",
 )
 
 for _name in _ENV_OVERRIDES:
@@ -81,6 +83,10 @@ from server.conf.settings import *  # noqa: E402,F401,F403
 # can never make a test run download-capable even when the shipped backend
 # resolves against an unseeded directory.
 ART_TRANSLATE_DOWNLOAD_ENABLED = False
+
+# Test runs never append to the real server/logs/llm transcript; transcript
+# tests opt in with override_settings plus a temporary directory seam.
+LLM_TRANSCRIPT_ENABLED = False
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 DATABASES["default"].setdefault("TEST", {})["NAME"] = os.path.join(

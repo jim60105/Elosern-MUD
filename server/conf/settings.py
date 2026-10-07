@@ -668,6 +668,22 @@ MAX_NR_CHARACTERS = _env_int_bounded(
 # credential nor an import-executing dotted path.
 HTTP_USER_AGENT = _env_str("HTTP_USER_AGENT", "elosern-mud/1.0")
 
+######################################################################
+# LLM call transcript (gm-portal-s2a-llm-transcript)
+######################################################################
+# Every guarded LLM call appends full-payload exchange/outcome records to
+# server/logs/llm/YYYY-MM-DD.jsonl (world/observability/transcript.py).
+# Disabled: writes are no-ops and lookups report disabled. Retention counts
+# today plus RETENTION_DAYS-1 earlier local dates; startup prunes the rest.
+LLM_TRANSCRIPT_ENABLED = _env_bool("LLM_TRANSCRIPT_ENABLED", True)
+LLM_TRANSCRIPT_RETENTION_DAYS = _env_typed(
+    "LLM_TRANSCRIPT_RETENTION_DAYS",
+    int,
+    14,
+    at_least=1,
+    rule="expected an integer of at least 1",
+)
+
 # GM portal boundary (gm-portal-s1-foundation): appended last so Evennia's
 # SharedLoginMiddleware has already mapped a webclient session onto the
 # website login. Its __call__ gates /gm/ before any process_view hook

@@ -53,9 +53,16 @@ explicitly amends the design.
   uses named imports (`from world.observability import log_warn`); event
   assertions in tests patch the caller module's binding, never
   `world.observability.*`.
-- `event` is a stable snake_case identifier in English; player-facing prose
-  never enters logs. Exception chains ride `exc=` (any level renders a one-line
-  `tb:` summary; `log_error` also double-writes the full traceback).
+- `event` is a stable snake_case identifier in English. Prose (player input,
+  letter bodies, dream text, prompts, model output) may ride `context`; every
+  context value renders single-line and truncated at 200 characters. Full LLM
+  payloads live in the transcript (`world/observability/transcript.py`,
+  `server/logs/llm/`) keyed by `call_id`. Credentials (API keys, auth headers,
+  URL userinfo) never enter any log or transcript. In-world knowledge
+  boundaries (`private` visibility, memory/recall/thread access) are not
+  logging rules and stay enforced. Exception chains ride `exc=` (any level
+  renders a one-line `tb:` summary; `log_error` also double-writes the full
+  traceback).
 - Every call carries a `context` dict; put every business identifier available
   at the site (`room`, `tick`, `layer`, `quest`, `job`, `char`, `step`, ...) in
   context keys instead of the message text.
