@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from numbers import Real
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -140,14 +140,30 @@ def _load_behaviour_profiles(
 BEHAVIOUR_PROFILES = _load_behaviour_profiles(MONSTER_BEHAVIOUR_YAML)
 
 
+def _profile_for(archetype_key: Any, tier: Callable[[], Any]) -> BehaviourProfile:
+    """Resolve one archetype key, falling back to the tier default."""
+    if not archetype_key:
+        archetype_key = MONSTER_BEHAVIOUR_YAML["tier_default_archetype"][tier()]
+    return BEHAVIOUR_PROFILES[archetype_key]
+
+
 def resolve_behaviour_profile(monster: Any) -> BehaviourProfile:
     """Resolve an instance override or its threat tier's default profile."""
-    archetype_key = getattr(monster, "behaviour_tree", None)
-    if not archetype_key:
-        archetype_key = MONSTER_BEHAVIOUR_YAML["tier_default_archetype"][
-            monster.threat_tier
-        ]
-    return BEHAVIOUR_PROFILES[archetype_key]
+    return _profile_for(
+        getattr(monster, "behaviour_tree", None), lambda: monster.threat_tier
+    )
+
+
+def read_behaviour_profile(monster: Any) -> BehaviourProfile:
+    """Resolve the same profile without provisioning anything.
+
+    ``resolve_behaviour_profile`` reads the autocreating ``behaviour_tree``
+    descriptor; this read-only twin reads the stored Attribute instead, so a
+    GM inspection (gm-portal-s3-runtime-state §2) never materializes it. The
+    resolution itself is shared, so the two can never drift.
+    """
+    stored = monster.attributes.get("behaviour_tree", default=None)
+    return _profile_for(stored, lambda: monster.threat_tier)
 
 
 def _owned_damage_skills(entity: Any) -> list[SkillDef]:

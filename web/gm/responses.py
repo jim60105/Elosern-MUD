@@ -28,6 +28,15 @@ ERROR_MESSAGES: dict[str, str] = {
     "invalid_call_id": "呼叫識別碼格式不正確（需為 32 位小寫十六進位）。",
     "transcript_not_found": "找不到此呼叫的 transcript 紀錄（可能已超過保留期限）。",
     "transcript_disabled": "LLM transcript 已停用，無法查詢呼叫內容。",
+    # S3 runtime state inspection (gm-portal-s3-runtime-state §7).
+    "object_not_found": "找不到指定的物件。",
+    "kind_mismatch": "此物件的種類與請求的路徑不符。",
+    "unsupported_kind": "不支援的狀態種類。",
+    "invalid_filter": "查詢條件不正確。",
+    "invalid_limit": "每頁筆數必須介於 1 與 200 之間。",
+    "invalid_cursor": "分頁游標不正確或與目前的查詢條件不符。",
+    "invalid_query": "查詢文字不正確。",
+    "query_too_long": "查詢文字超過 2000 字元上限。",
 }
 
 
