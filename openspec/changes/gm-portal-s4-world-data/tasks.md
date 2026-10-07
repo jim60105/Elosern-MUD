@@ -6,7 +6,7 @@
 
 ## 2. Read-only API, sources and reload (2 hours)
 
-- [ ] 2.1 Add `web/gm/readers/world.py` inventory/list/search/detail reads with authored serialization and nested string search; verify shapes, loaded-versus-disk distinction, stable query-preserving cursor pages/default 50/max 200 and missing-registry/key errors in focused tests and existing reader AST contract.
+- [ ] 2.1 Add `web/gm/readers/world.py` inventory/list/search/detail reads with authored serialization and nested string search; verify cross-registry all-match items shape, registry/key ordering and empty results, loaded-versus-disk distinction, stable query-preserving entry cursor pages/default 50/max 200 and missing-registry/key errors in focused tests and existing reader AST contract.
 - [ ] 2.2 Add request-time qualified YAML allowlist/source reads and all GET routes through gm_path before API fallbacks; verify rulebook/commerce/prompts text/provenance, fresh allowlist, same-basename files, traversal/encoded traversal/absolute path/escaping symlink rejection and source_not_found envelope.
 - [ ] 2.3 Add CSRF-protected prompt reload handler outside readers, reset then authoritative load and diagnostics, gm_prompts_reloaded/gm_action context; verify successful/failed loader behavior, no GET/no invalid-CSRF loader call, request/denial events and no source/persistent changes. Run focused event tests with observability lint.
 - [ ] 2.4 Test every S4 page/API with anonymous/ordinary/Developer/superuser access, inherited envelope/method/cursor/limit errors, resolver protection, offline operation and unchanged rows/Attributes/source bytes; verify with focused GM tests and read-only contracts.

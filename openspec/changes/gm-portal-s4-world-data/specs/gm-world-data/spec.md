@@ -24,7 +24,7 @@ S4 SHALL expose GET /gm/api/registry/ for inventory and, with q, cross-registry 
 
 #### Scenario: Cross-registry nested search and details
 - **WHEN** a query matches a key or nested string field and an entry is opened
-- **THEN** matching registry/key identities are returned and detail exposes all converted fields plus correct forward and inverse relationships
+- **THEN** cross-registry search returns all matches as data.items containing registry/key identities sorted by registry name then key without pagination (an empty array for no matches), and detail exposes all converted fields plus correct forward and inverse relationships
 
 #### Scenario: Registry lookup errors
 - **WHEN** a Developer requests an unknown registry or absent key in a known registry
