@@ -6,6 +6,13 @@ import GmEmpty from "../../components/GmEmpty.vue";
 import GmPanel from "../../components/GmPanel.vue";
 import SlotState from "./SlotState.vue";
 import { formatCount } from "../../lib/dashboard.js";
+import { inject, ref } from "vue";
+import GmConsolePrompt from "../../components/GmConsolePrompt.vue";
+
+const api = inject("gmApi", null);
+const seconds = ref("");
+const request = ref(null);
+const emit = defineEmits(["refresh"]);
 
 defineProps({
   world: { type: Object, default: null },
@@ -16,6 +23,11 @@ const pad = (value) => String(value ?? 0).padStart(2, "0");
 
 <template>
   <GmPanel title="世界" description="遊戲內時間與即時狀態">
+    <form v-if="api" @submit.prevent="request = {path: '/console/advance_clock', body: {seconds: Number(seconds)}, label: 'advance_clock · world'}">
+      <label>秒數<input v-model="seconds" type="number" min="0" step="1" required /></label>
+      <button type="submit" class="ui-btn ui-btn--danger" :disabled="!world?.clock">推進時鐘</button>
+    </form>
+    <GmConsolePrompt v-if="api" :request="request" :api="api" @cancel="request = null" @done="request = null; emit('refresh')" />
     <SlotState :value="world" :rows="3">
       <div class="gm-world" data-testid="gm-world">
         <div v-if="world.clock" class="gm-world__clock">

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import GmEntityView from "../components/GmEntityView.vue";
 import GmNpcDialogueTab from "../components/GmNpcDialogueTab.vue";
@@ -44,6 +44,33 @@ function memoryApi(overrides = {}) {
 }
 
 describe("GmNpcMemoryTab", () => {
+  it("retracts and supersedes with same-owner choices, refreshed history/generation and no polling", async () => {
+    const timer=vi.spyOn(globalThis,"setInterval");
+    const boundary=memoryApi({
+      "/state/memories":listPage([MEMORY_ITEM,{...MEMORY_ITEM,id:"32"}]),
+      "/console/status":{tick:42,baseline_tick:42,will_snapshot:false},
+      "/console/retract_memory":{target:"#12",state:{generation:9},snapshot:{taken:false,save_id:null}},
+      "/console/supersede_memory":{target:"#12",state:{generation:11},snapshot:{taken:false,save_id:null}},
+    });
+    const wrapper=mountWith(GmNpcMemoryTab,{props:{npcDbref:"12",api:boundary}});
+    await flushPromises();
+    await wrapper.get("[data-block='memories'] button[aria-expanded]").trigger("click"); await flushPromises();
+    await wrapper.get("[data-action='retract']").trigger("click"); await flushPromises();
+    await wrapper.get("[data-confirm]").trigger("click"); await flushPromises();
+    expect(boundary.calls.find(call=>call.path==="/console/retract_memory").body).toEqual({target:"#12",memory_id:31});
+    expect(wrapper.text()).toContain("記憶世代 9");
+    expect(boundary.calls.filter(call=>call.path==="/state/memories/31?owner=%2312")).toHaveLength(2);
+    const selector=wrapper.get("[data-block='memories'] .gm-list__extra select");
+    expect(selector.findAll("option").map(node=>node.element.value)).toEqual(["","32"]);
+    await selector.setValue("32");
+    await wrapper.get("[data-action='supersede']").trigger("click"); await flushPromises();
+    await wrapper.get("[data-confirm]").trigger("click"); await flushPromises();
+    expect(boundary.calls.find(call=>call.path==="/console/supersede_memory").body).toEqual({target:"#12",memory_id:31,replacement_id:32});
+    expect(wrapper.text()).toContain("記憶世代 11");
+    expect(timer).not.toHaveBeenCalled();
+    timer.mockRestore();
+  });
+
   it("loads the owner-scoped memory list and the newest-ten snapshot page", async () => {
     const boundary = memoryApi();
     const wrapper = mountWith(GmNpcMemoryTab, { props: { npcDbref: "12", api: boundary } });
@@ -85,13 +112,13 @@ describe("GmNpcMemoryTab", () => {
     const boundary = memoryApi();
     const wrapper = mountWith(GmNpcMemoryTab, { props: { npcDbref: "12", api: boundary } });
     await flushPromises();
-    await wrapper.findAll(".gm-list__extra button")[0].trigger("click");
+    await wrapper.get("[data-block='memories'] button[aria-expanded]").trigger("click");
     await flushPromises();
     expect(boundary.calls.at(-1).path).toBe("/state/memories/31?owner=%2312");
     const revisions = wrapper.get("[data-section='revisions']");
     expect(revisions.text()).toContain("修訂");
     expect(revisions.text()).toContain("active");
-    await wrapper.findAll(".gm-list__extra button")[1].trigger("click");
+    await wrapper.get("[data-block='snapshots'] button[aria-expanded]").trigger("click");
     await flushPromises();
     expect(boundary.calls.at(-1).path).toBe("/state/snapshots/t_snapshot_1?owner=%2312");
     // Both detail panes render an ``identity`` section; scope to the snapshot's.

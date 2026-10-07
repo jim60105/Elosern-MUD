@@ -40,7 +40,7 @@ export const GM_SECTIONS = Object.freeze([
   }),
   Object.freeze({ key: "world-data", label: "世界資料", route: WORLD_ROUTE.home, href: "/gm/world" }),
   Object.freeze({ key: "actions", label: "存檔", route: SAVES_ROUTE.home, href: "/gm/saves" }),
-  Object.freeze({ key: "intervention", label: "GM 介入", route: null }),
+
 ]);
 
 export const DISABLED_SECTION_TAG = "尚未開放";

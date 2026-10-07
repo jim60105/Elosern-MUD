@@ -9,6 +9,8 @@
 // dashboard's visibility-aware polling).
 import { computed, ref, watch } from "vue";
 import GmCallDrawer from "./GmCallDrawer.vue";
+import GmConsoleDrawer from "./GmConsoleDrawer.vue";
+import GmRawEditor from "./GmRawEditor.vue";
 import GmEntityLink from "./GmEntityLink.vue";
 import GmError from "./GmError.vue";
 import GmJsonTree from "./GmJsonTree.vue";
@@ -182,6 +184,7 @@ function onDrawerClose() {
     </nav>
 
     <header class="gm-entity__header">
+      <GmConsoleDrawer :kind="kind" :target="`#${dbref ?? id}`" :api="api" @done="refresh" />
       <div class="gm-entity__identity">
         <p class="gm-entity__eyebrow">
           {{ kindLabel(kind) }}
@@ -295,8 +298,9 @@ function onDrawerClose() {
           <button type="button" class="ui-btn ui-btn--sm" @click="loadRaw">重試</button>
         </template>
       </GmError>
+      <GmRawEditor v-if="rawState.data && isDbrefKind(kind)" :target="`#${dbref ?? id}`" :raw="rawState.data.raw ?? rawState.data" :api="api" @done="refresh" />
       <GmJsonTree
-        v-else-if="rawState.data"
+        v-if="rawState.data"
         :value="rawState.data.raw ?? rawState.data"
         @open-call="selectedCall = $event"
       />

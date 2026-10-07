@@ -17,6 +17,7 @@ const props = defineProps({
   cancelLabel: { type: String, default: "取消" },
   danger: { type: Boolean, default: false },
   busy: { type: Boolean, default: false },
+  confirmDisabled: { type: Boolean, default: false },
   // Where focus goes on close when the opener left the DOM (a CSS selector).
   fallbackFocus: { type: String, default: "" },
 });
@@ -108,7 +109,7 @@ onBeforeUnmount(() => {
           type="button"
           class="ui-btn"
           :class="danger ? 'ui-btn--danger gm-confirm__go' : 'ui-btn--primary'"
-          :disabled="busy"
+          :disabled="busy || confirmDisabled"
           data-confirm
           @click="emit('confirm')"
         >
