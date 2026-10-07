@@ -254,6 +254,20 @@ class StateApiErrorMatrixTests(StateApiTestCase):
                 self.assertEqual(data["dbref"], entity.pk)
                 self.assertTrue(data["sections"])
 
+    @covers_requirement("gm-portal-access-api::consistent-json-transport")
+    def test_an_account_detail_carries_its_own_raw_inventory(self):
+        """An account is not an ObjectDB: its raw data rides its own detail."""
+        data = self.assert_ok_envelope(
+            self.client_for("developer").get(f"/gm/api/state/accounts/{self.account.pk}")
+        )
+        self.assertEqual(data["kind"], "accounts")
+        self.assertEqual(data["dbref"], self.account.pk)
+        # The account's own inventory, never an unrelated ObjectDB row.
+        self.assertIsNone(data["raw"]["location"])
+        self.assertIsInstance(data["raw"]["attributes"], list)
+        self.assertEqual(data["raw"]["key"], self.account.username)
+        self.assertIn("tags", data["raw"])
+
     @covers_requirement(
         "gm-portal-access-api::consistent-json-transport",
         "gm-portal-access-api::registered-backend-acceptance-coverage",

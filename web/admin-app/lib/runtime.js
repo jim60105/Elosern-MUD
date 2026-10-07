@@ -141,13 +141,31 @@ export const NARRATIVE_SUBTYPE_LABELS = Object.freeze(
 );
 
 //: Which kinds answer through the object raw route (dbref-backed).
-const DBREF_KINDS = Object.freeze(["accounts", "characters", "npcs", "monsters", "rooms", "object"]);
+//: An account is not an ObjectDB, so its raw inventory rides its own detail
+//: payload (design §3) and never the dbref-based object route.
+const DBREF_KINDS = Object.freeze(["characters", "npcs", "monsters", "rooms", "object"]);
 
 export function isDbrefKind(kind) {
   return DBREF_KINDS.includes(kind);
 }
 
 export const SUBTYPE_PARAM = "subtype";
+
+//: A collection descriptor names its owning entity, not a record id: the
+//: curated summaries link an NPC's memory, snapshot and dialogue collections
+//: through the ``owner:<dbref>`` sentinel (or, for dialogue, the NPC's own
+//: dbref). Those links open the owner's own tab, which is where the collection
+//: is actually served.
+const COLLECTION_TABS = Object.freeze({
+  memories: "memory",
+  snapshots: "memory",
+  dialogue: "dialogue",
+});
+const OWNER_SENTINEL = /^owner:(.+)$/;
+
+//: A memory's id is its numeric primary key. Snapshot and dialogue details use
+//: their own string identities, so only memories are constrained here.
+const RECORD_KINDS = Object.freeze(["memories"]);
 
 export function subtypeOf(kind, id) {
   if (kind !== "narrative") return null;
@@ -191,10 +209,37 @@ export function linkTarget(link) {
       query: {},
     };
   }
+  const identity = String(link.id);
+  const sentinel = identity.match(OWNER_SENTINEL);
+  if (sentinel) {
+    const ownerId = dbrefParam(sentinel[1]);
+    if (!ownerId) return null;
+    const tab = COLLECTION_TABS[kind];
+    if (tab) {
+      return { name: RUNTIME_ROUTE.entity, params: { kind: "npcs", id: ownerId }, query: { tab } };
+    }
+    if (kind === "quests") {
+      return {
+        name: RUNTIME_ROUTE.list,
+        params: { kind: "quests" },
+        query: { owner: `#${ownerId}` },
+      };
+    }
+  }
+  // A dialogue collection is identified by its NPC's dbref; a player's detail
+  // is reached from the dialogue list, never from a link descriptor.
+  if (kind === "dialogue" && /^\d+$/.test(identity)) {
+    return {
+      name: RUNTIME_ROUTE.entity,
+      params: { kind: "npcs", id: identity },
+      query: { tab: "dialogue" },
+    };
+  }
+  if (RECORD_KINDS.includes(kind) && !/^\d+$/.test(identity)) return null;
   if (!KIND_LABELS[kind]) return null;
   return {
     name: RUNTIME_ROUTE.entity,
-    params: { kind, id: String(link.id) },
+    params: { kind, id: identity },
     query: ownerQuery(link.owner),
   };
 }
@@ -207,6 +252,10 @@ export function targetHref(target, base = "/gm/") {
   const query = new URLSearchParams(target.query ?? {}).toString();
   if (target.name === RUNTIME_ROUTE.raw) {
     return `${base}runtime/object/${encodeURIComponent(target.params.dbref)}/raw`;
+  }
+  if (target.name === RUNTIME_ROUTE.list) {
+    const kind = encodeURIComponent(target.params.kind);
+    return `${base}runtime/${kind}${query ? `?${query}` : ""}`;
   }
   const kind = encodeURIComponent(target.params.kind);
   return `${base}runtime/${kind}/${encodeURIComponent(target.params.id)}${query ? `?${query}` : ""}`;

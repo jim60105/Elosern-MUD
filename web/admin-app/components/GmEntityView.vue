@@ -23,6 +23,8 @@ const props = defineProps({
   id: { type: String, required: true },
   // The owner identity a record-backed kind resolves its id under.
   owner: { type: String, default: "" },
+  // A requested tab (the cross-link vocabulary points at a collection's tab).
+  tab: { type: String, default: "" },
   api: { type: Object, required: true },
 });
 
@@ -124,7 +126,7 @@ function onTabKeydown(event, key) {
 }
 
 watch(
-  () => [props.kind, props.id, props.owner],
+  () => [props.kind, props.id, props.owner, props.tab],
   () => {
     rawState.value = { status: "idle", data: null, error: null };
     selectedCall.value = null;
@@ -133,7 +135,7 @@ watch(
       detail.value = { status: "idle", data: null, error: null, loadedAt: null };
       loadRaw();
     } else {
-      activeTab.value = "overview";
+      activeTab.value = tabs.value.some((tab) => tab.key === props.tab) ? props.tab : "overview";
       loadDetail();
     }
   },

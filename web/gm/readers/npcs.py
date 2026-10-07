@@ -382,11 +382,17 @@ def memory_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
     from world.narrative.models import MemoryRecord
     from web.gm.readers.errors import ObjectNotFound
 
+    # The owner is part of the identity: a record projected through this view
+    # must belong to the owner the caller named, so a numeric primary key can
+    # never reach another owner's cognition.
+    owner_id, _entity = owner_identity(filters)
     text = str(identity).strip()
     if not text.isdigit():
         raise ObjectNotFound()
     record = MemoryRecord.objects.filter(pk=int(text)).first()
     if record is None:
+        raise ObjectNotFound()
+    if str(record.owner_id) != owner_id:
         raise ObjectNotFound()
 
     def identity_section() -> dict[str, Any]:
@@ -533,8 +539,11 @@ def snapshot_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
     from world.narrative.models import NarrativeContextSnapshot
     from web.gm.readers.errors import ObjectNotFound
 
+    owner_id, _entity = owner_identity(filters)
     snapshot = NarrativeContextSnapshot.objects.filter(snapshot_id=str(identity)).first()
     if snapshot is None:
+        raise ObjectNotFound()
+    if str(snapshot.owner_id) != owner_id:
         raise ObjectNotFound()
     payload = snapshot.rendered_payload or {}
 

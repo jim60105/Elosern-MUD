@@ -45,6 +45,7 @@ const recall = reactive({ status: "idle", result: null, error: null });
 const form = reactive({ query: "", thread: "", include_superseded: false, include_inactive: false });
 
 const owner = computed(() => ({ owner: `#${props.npcDbref}` }));
+const refreshing = computed(() => memories.status === "loading" || snapshots.status === "loading");
 const queryTooLong = computed(() => form.query.length > RECALL_QUERY_LIMIT);
 const recallActive = computed(() => recall.status !== "idle");
 
@@ -160,12 +161,26 @@ onMounted(() => {
   loadMemories();
   loadSnapshots();
 });
+
+async function refreshAll() {
+  await Promise.all([loadMemories(), loadSnapshots()]);
+}
 </script>
 
 <template>
   <div class="gm-memory">
     <section class="gm-memory__block" data-block="memories" aria-labelledby="gm-memory-list">
-      <h3 id="gm-memory-list" class="gm-memory__title">記憶紀錄</h3>
+      <div class="gm-memory__head">
+        <h3 id="gm-memory-list" class="gm-memory__title">記憶紀錄</h3>
+        <button
+          type="button"
+          class="ui-btn ui-btn--ghost ui-btn--sm gm-memory__refresh"
+          :aria-disabled="refreshing ? 'true' : null"
+          @click="!refreshing && refreshAll()"
+        >
+          重新載入
+        </button>
+      </div>
       <GmFilterBar
         :fields="MEMORY_FILTERS"
         :model-value="filters"
@@ -404,6 +419,17 @@ onMounted(() => {
   display: grid;
   gap: var(--sp-3);
   min-width: 0;
+}
+
+.gm-memory__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.gm-memory__refresh {
+  margin-left: auto;
 }
 
 .gm-memory__title {

@@ -222,6 +222,25 @@ class NpcNarrativeReaderTests(EvenniaTest):
         self.assertEqual(revisions["rows"], [])
         self.assertIn("沒有修訂", revisions["empty_note"])
 
+    def test_memory_and_snapshot_detail_enforce_the_owner_identity(self):
+        """A primary key alone must never reach another owner's cognition."""
+        record = self._memory(tick=1)
+        snapshot = self._snapshot(1)
+        other = create.create_object(NPC, key="t_reader_other_npc", location=self.room1)
+        for call in (
+            lambda: npcs.memory_detail(str(record.pk), {"owner": f"#{other.pk}"}),
+            lambda: npcs.snapshot_detail(snapshot.snapshot_id, {"owner": f"#{other.pk}"}),
+        ):
+            with self.subTest(call=call), self.assertRaises(Exception) as raised:
+                call()
+            self.assertEqual(raised.exception.code, "object_not_found")
+        with self.assertRaises(Exception) as missing:
+            npcs.memory_detail(str(record.pk), {})
+        self.assertEqual(missing.exception.code, "invalid_filter")
+        with self.assertRaises(Exception) as missing:
+            npcs.snapshot_detail(snapshot.snapshot_id, {})
+        self.assertEqual(missing.exception.code, "invalid_filter")
+
     # --- snapshots (3.1) --------------------------------------------------
 
     def test_snapshot_list_is_capped_at_the_newest_ten(self):

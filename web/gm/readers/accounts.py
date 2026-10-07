@@ -17,6 +17,7 @@ from web.gm.readers._entities import (
     sequence_values,
     typeclass_of,
 )
+from web.gm.readers.raw import raw_object
 from web.gm.readers._sections import (
     SectionError,
     chip,
@@ -187,6 +188,10 @@ def detail(account: Any) -> dict[str, Any]:
         "label": label_of(account),
         "dbref": dbref_of(account),
         "typeclass": typeclass_of(account),
+        # An account is not an ObjectDB: its raw inventory belongs in its own
+        # detail representation rather than in the object raw route, whose
+        # dbref namespace belongs to a different table (design §3).
+        "raw": raw_object(account),
         "sections": compute_sections(
             [
                 ("identity", "身分", identity),

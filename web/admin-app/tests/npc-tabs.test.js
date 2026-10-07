@@ -54,6 +54,16 @@ describe("GmNpcMemoryTab", () => {
     ]);
     expect(wrapper.get("table").text()).toContain("observation");
     expect(wrapper.text()).toContain("最新十筆");
+    // The tab carries its own manual refresh (the entity header reloads the
+    // summary/raw tabs, not this collection pair).
+    await wrapper.get(".gm-memory__refresh").trigger("click");
+    await flushPromises();
+    expect(boundary.calls.map((call) => call.path)).toEqual([
+      "/state/memories?owner=%2312&limit=50",
+      "/state/snapshots?owner=%2312&limit=10",
+      "/state/memories?owner=%2312&limit=50",
+      "/state/snapshots?owner=%2312&limit=10",
+    ]);
   });
 
   it("restarts pagination when a filter changes and follows the cursor otherwise", async () => {

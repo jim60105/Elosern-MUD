@@ -17,12 +17,12 @@ describe("GmEntityLink", () => {
   });
 
   it("carries the owner identity a record-backed id needs", () => {
-    const link = { kind: "memories", id: "owner:12", owner: "12", label: "記憶" };
+    const link = { kind: "memories", id: "31", owner: "12", label: "記憶" };
     const wrapper = mountWith(GmEntityLink, { props: { link } });
-    expect(wrapper.get("a").attributes("href")).toBe("/gm/runtime/memories/owner%3A12?owner=%2312");
+    expect(wrapper.get("a").attributes("href")).toBe("/gm/runtime/memories/31?owner=%2312");
     expect(linkTarget(link)).toEqual({
       name: "runtime-entity",
-      params: { kind: "memories", id: "owner:12" },
+      params: { kind: "memories", id: "31" },
       query: { owner: "#12" },
     });
   });
@@ -59,6 +59,28 @@ describe("GmEntityLink", () => {
     expect(unknown.get("span").classes()).toContain("gm-entity-link--plain");
     const empty = mountWith(GmEntityLink, { props: { link: null, label: "—" } });
     expect(empty.text()).toBe("—");
+  });
+
+  it("opens the owner's own tab for a collection descriptor", () => {
+    // The curated summaries link a collection through the owning entity: the
+    // sentinel id is not a record id, so it must never become one.
+    expect(linkTarget({ kind: "memories", id: "owner:12", label: "記憶" })).toEqual({
+      name: "runtime-entity",
+      params: { kind: "npcs", id: "12" },
+      query: { tab: "memory" },
+    });
+    expect(targetHref(linkTarget({ kind: "snapshots", id: "owner:#12" }))).toBe(
+      "/gm/runtime/npcs/12?tab=memory",
+    );
+    expect(linkTarget({ kind: "dialogue", id: "12" })).toEqual({
+      name: "runtime-entity",
+      params: { kind: "npcs", id: "12" },
+      query: { tab: "dialogue" },
+    });
+    expect(targetHref(linkTarget({ kind: "quests", id: "owner:12" }))).toBe(
+      "/gm/runtime/quests?owner=%2312",
+    );
+    expect(linkTarget({ kind: "memories", id: "owner:" })).toBeNull();
   });
 
   it("pushes the SPA route on a plain click and leaves modified clicks alone", async () => {

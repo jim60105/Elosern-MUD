@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import RuntimeHomeView from "../views/RuntimeHomeView.vue";
+import RuntimeEntityView from "../views/RuntimeEntityView.vue";
 import RuntimeListView from "../views/RuntimeListView.vue";
 import RuntimeSearchView from "../views/RuntimeSearchView.vue";
 import { errorWith, fakeApi, listPage, mountWith, stubRouter } from "./runtime-helpers.js";
@@ -149,5 +150,43 @@ describe("RuntimeSearchView", () => {
     const refused = await searchView({ "/state/search": errorWith("invalid_query", "請輸入查詢文字。") });
     expect(refused.wrapper.get(".gm-error code").text()).toBe("invalid_query");
     expect(refused.wrapper.get(".gm-error").text()).toContain("請輸入查詢文字");
+  });
+});
+
+describe("RuntimeEntityView routes", () => {
+  it("maps the reserved raw route to the object raw request", async () => {
+    const router = stubRouter();
+    await router.push("/runtime/object/7/raw");
+    await router.isReady();
+    const boundary = fakeApi({
+      "/state/object/7/raw": {
+        id: "7",
+        kind: "object",
+        label: "t_plain",
+        dbref: 7,
+        typeclass: "",
+        raw: { dbref: 7, key: "t_plain", attributes: [{ key: "t_count", category: "", value: 7 }] },
+      },
+    });
+    const wrapper = mountWith(RuntimeEntityView, { router, api: boundary });
+    await flushPromises();
+    expect(boundary.calls).toEqual([{ method: "get", path: "/state/object/7/raw" }]);
+    expect(wrapper.get("h2").text()).toBe("t_plain");
+    expect(wrapper.get(".gm-json-tree").text()).toContain("t_count");
+  });
+
+  it("opens the tab and owner a cross-link named", async () => {
+    const router = stubRouter();
+    await router.push("/runtime/npcs/12?owner=%2312&tab=memory");
+    await router.isReady();
+    const boundary = fakeApi({
+      "/state/npcs/12": { id: "12", kind: "npcs", label: "合成守衛", dbref: 12, sections: [] },
+      "/state/memories": { items: [], next_cursor: null },
+      "/state/snapshots": { items: [], next_cursor: null },
+    });
+    const wrapper = mountWith(RuntimeEntityView, { router, api: boundary });
+    await flushPromises();
+    expect(boundary.calls[0].path).toBe("/state/npcs/12?owner=%2312");
+    expect(wrapper.get("[role='tab'][aria-selected='true']").text()).toBe("記憶");
   });
 });
