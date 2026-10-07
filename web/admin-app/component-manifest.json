@@ -13,7 +13,16 @@
     "GM/GmRefreshBar",
     "GM/GmCodeBlock",
     "GM/GmCallDrawer",
-    "GM/Pages/OverviewDashboard"
+    "GM/Pages/OverviewDashboard",
+    "GM/GmEntityLink",
+    "GM/GmJsonTree",
+    "GM/GmFilterBar",
+    "GM/GmPager",
+    "GM/GmSectionView",
+    "GM/GmEntityListTable",
+    "GM/GmEntityView",
+    "GM/GmNpcMemoryTab",
+    "GM/GmNpcDialogueTab"
   ],
   "frozen": true
 }

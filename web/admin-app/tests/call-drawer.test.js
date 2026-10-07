@@ -36,7 +36,11 @@ describe("LLM call payload drawer", () => {
     expect(summaries[0]).toContain("系統");
     expect(summaries[1]).toContain("使用者");
     expect(first.text()).toContain("旅人：請問北方的森林最近安全嗎？");
-    expect(first.text()).toContain("\"prompt_tokens\": 812");
+    // The structured response rides the shared JSON tree: keys and values are
+    // separate nodes, no longer one verbatim JSON string.
+    expect(first.text()).toContain("prompt_tokens");
+    expect(first.text()).toContain("812");
+    expect(first.findAll(".gm-json-tree__key").map((node) => node.text())).toContain("prompt_tokens");
     expect(first.text()).toContain("'reply' is a required property");
     expect(first.text()).toContain("HTTP 200");
 

@@ -64,6 +64,21 @@ def list_payloads() -> list[dict]:
     return list(get_store().db.payloads or [])
 
 
+def read_payloads() -> list[dict]:
+    """Return the stored payloads without ever creating the store Script.
+
+    ``list_payloads`` resolves the store through ``get_store()``, which
+    creates the Script when it is absent. Read-only inspection
+    (gm-portal-s3-runtime-state §2/§6) must write nothing, so this twin finds
+    the existing Script and answers ``[]`` when there is none.
+    """
+    found = search_script(STORE_KEY)
+    if not found:
+        return []
+    stored = found[0].db.payloads
+    return list(stored or [])
+
+
 def append_payload(payload: dict) -> bool:
     """Append one payload unless its issuance identity is already stored.
 

@@ -1,14 +1,17 @@
 <script setup>
 // The GM side navigation (gm-portal-s1-foundation): brand, ornament rule,
 // and one entry per sub-project. Delivered sections are links that emit
-// `navigate`; undelivered ones are inert, unfocusable spans marked
-// aria-disabled with the 「尚未開放」 tag — no href, no handler, no
-// placeholder page behind them.
+// `navigate` (with their full router location); undelivered ones are inert,
+// unfocusable spans marked aria-disabled with the 「尚未開放」 tag — no href,
+// no handler, no placeholder page behind them. A delivered section may carry
+// `children`, which render as an indented tree while that section is active.
 import { DISABLED_SECTION_TAG } from "../lib/sections.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
   activeKey: { type: String, default: "" },
+  // The current route name, so a child entry can mark itself current.
+  activeRoute: { type: String, default: "" },
   homeHref: { type: String, default: "/gm/" },
 });
 
@@ -67,6 +70,24 @@ const home = () => props.items.find((item) => item.href) ?? null;
             <span class="gm-nav__label">{{ item.label }}<span class="gm-visually-hidden">，</span></span>
             <span class="gm-nav__tag">{{ DISABLED_SECTION_TAG }}</span>
           </span>
+          <ul
+            v-if="item.children && item.key === activeKey"
+            class="gm-nav__tree"
+            :aria-label="`${item.label}子項目`"
+          >
+            <li v-for="child in item.children" :key="child.key">
+              <a
+                class="gm-nav__child"
+                :class="{ 'is-active': child.route === activeRoute }"
+                :href="child.href"
+                :aria-current="child.route === activeRoute ? 'page' : null"
+                :data-child="child.key"
+                @click="follow($event, child)"
+              >
+                <span class="gm-nav__child-label">{{ child.label }}</span>
+              </a>
+            </li>
+          </ul>
         </li>
       </ul>
     </nav>
@@ -201,6 +222,45 @@ a.gm-nav__item:active {
   border-radius: var(--radius-pill);
 }
 
+/* The delivered section's navigation tree: an indented hairline list. */
+.gm-nav__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: var(--sp-1) 0 var(--sp-2) var(--sp-4);
+  padding: 0 0 0 var(--sp-3);
+  list-style: none;
+  border-left: 1px solid var(--ink-700);
+}
+
+.gm-nav__child {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--paper-400);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.gm-nav__child:hover {
+  color: var(--paper-50);
+  background: var(--ink-820);
+}
+
+.gm-nav__child.is-active {
+  color: var(--gold-300);
+  background: linear-gradient(90deg, var(--gold-glow), transparent 90%);
+}
+
+.gm-nav__child-label {
+  white-space: nowrap;
+}
+
 @media (max-width: 859px) {
   .gm-nav__brand {
     height: 56px;
@@ -234,6 +294,12 @@ a.gm-nav__item:active {
     left: 8px;
     width: auto;
     height: 3px;
+  }
+
+  /* The horizontal strip keeps the sections only; the runtime home page
+     carries the same tree for narrow viewports. */
+  .gm-nav__tree {
+    display: none;
   }
 }
 </style>

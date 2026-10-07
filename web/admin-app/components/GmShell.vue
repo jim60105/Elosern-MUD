@@ -9,6 +9,7 @@ import GmPageHeader from "./GmPageHeader.vue";
 defineProps({
   sections: { type: Array, required: true },
   activeKey: { type: String, default: "" },
+  activeRoute: { type: String, default: "" },
   title: { type: String, required: true },
   eyebrow: { type: String, default: "" },
   account: { type: String, default: "" },
@@ -25,7 +26,12 @@ const emit = defineEmits(["navigate"]);
   <div class="gm-shell gm-root">
     <a class="gm-shell__skip ui-btn" href="#gm-main">跳至主要內容</a>
     <aside class="gm-shell__aside">
-      <GmNav :items="sections" :active-key="activeKey" @navigate="emit('navigate', $event)" />
+      <GmNav
+        :items="sections"
+        :active-key="activeKey"
+        :active-route="activeRoute"
+        @navigate="emit('navigate', $event)"
+      />
     </aside>
     <GmPageHeader
       class="gm-shell__header"
