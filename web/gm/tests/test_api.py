@@ -1,21 +1,19 @@
 """S1 API payloads, the JSON envelope, and the shell response.
 
 Session reports the real account, permission level, aware server time, and
-the project version; health performs a real database read and never reaches
-an external service; failures use matching statuses and envelopes; S1 has no
-production write endpoint.
+the project version; failures use matching statuses and envelopes; the GM
+API has no production write endpoint. Dashboard and call-detail payloads are
+covered by test_dashboard and test_llm_calls.
 """
 
 from __future__ import annotations
 
-import socket
 import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
-from django.db import DatabaseError
 from django.shortcuts import resolve_url
 from django.test import Client
 from django.utils import timezone
@@ -84,43 +82,6 @@ class GmSessionApiTest(GmTestCase):
         self.assert_error_envelope(response, 500, "version_unavailable")
 
 
-class GmHealthApiTest(GmTestCase):
-    @covers_requirement(
-        "gm-portal-access-api::s1-route-and-payload-scope",
-        "gm-portal-spa::independent-same-origin-gm-build",
-    )
-    def test_health_reports_django_and_database_without_network(self):
-        with mock.patch.object(
-            socket, "create_connection", side_effect=AssertionError("network probe")
-        ) as connect:
-            data = self.assert_ok_envelope(self.client_for("developer").get("/gm/api/health"))
-        self.assertEqual(data, {"django": "ok", "database": "readable"})
-        connect.assert_not_called()
-
-    @covers_requirement(
-        "gm-portal-access-api::s1-route-and-payload-scope",
-    )
-    def test_health_reads_the_database(self):
-        with mock.patch("web.gm.views.AccountDB") as account_db:
-            account_db.objects.order_by.return_value.values_list.return_value = [1]
-            self.assert_ok_envelope(self.client_for("developer").get("/gm/api/health"))
-        account_db.objects.order_by.assert_called_once_with()
-
-    @covers_requirement(
-        "gm-portal-access-api::s1-route-and-payload-scope",
-        "gm-portal-access-api::consistent-json-transport",
-    )
-    def test_unreadable_database_returns_503_without_claiming_readable(self):
-        client = self.client_for("developer")
-        with mock.patch("web.gm.views.AccountDB") as account_db, \
-                mock.patch("web.gm.views.log_warn") as log_warn:
-            account_db.objects.order_by.side_effect = DatabaseError("disk I/O error")
-            response = client.get("/gm/api/health")
-        self.assert_error_envelope(response, 503, "database_unreadable")
-        self.assertNotIn(b"readable\"", response.content.replace(b"unreadable", b""))
-        self.assertEqual(log_warn.call_args.args[0], "gm_health_database_unreadable")
-
-
 class GmMethodAndWriteSurfaceTest(GmTestCase):
     @covers_requirement(
         "gm-portal-access-api::s1-route-and-payload-scope",
@@ -128,7 +89,7 @@ class GmMethodAndWriteSurfaceTest(GmTestCase):
     )
     def test_read_only_apis_reject_other_methods_with_envelope(self):
         client = self.client_for("developer")  # CSRF checks are off by default
-        for url in ("/gm/api/session", "/gm/api/health"):
+        for url in ("/gm/api/session", "/gm/api/dashboard", "/gm/api/llm/calls/" + "0" * 32):
             for method in ("post", "put", "patch", "delete"):
                 with self.subTest(url=url, method=method):
                     response = getattr(client, method)(url)
@@ -141,8 +102,8 @@ class GmMethodAndWriteSurfaceTest(GmTestCase):
     )
     def test_no_production_gm_route_accepts_a_write(self):
         client = self.client_for("developer")
-        for url in ("/gm/", "/gm/x", "/gm/api", "/gm/api/session", "/gm/api/health",
-                    "/gm/api/write"):
+        for url in ("/gm/", "/gm/x", "/gm/api", "/gm/api/session", "/gm/api/dashboard",
+                    "/gm/api/llm/calls/" + "0" * 32, "/gm/api/write"):
             with self.subTest(url=url):
                 self.assertGreaterEqual(client.post(url, {"x": "1"}).status_code, 400)
 

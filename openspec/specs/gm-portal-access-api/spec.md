@@ -5,46 +5,46 @@ Provide a Developer-only GM portal entry and a minimal read-only API with consis
 ## Requirements
 
 ### Requirement: Protected GM namespace
-Every page and API request under `/gm/` MUST require an authenticated account whose `check_permstring("Developer")` passes; superusers MUST pass. Anonymous pages SHALL redirect to `LOGIN_URL` with the requested path in `next`; unauthorized authenticated pages SHALL return HTTP 403. Anonymous APIs SHALL return HTTP 401 with `unauthenticated`; unauthorized authenticated APIs SHALL return HTTP 403 with `forbidden`, both in the error envelope. All resolved GM views, including fallback routes, MUST be covered by the access wrapper.
+Every page and API request under /gm/ MUST require an authenticated account whose check_permstring("Developer") passes; superusers MUST pass. Anonymous pages SHALL redirect to LOGIN_URL with next; unauthorized authenticated pages SHALL return 403. Anonymous APIs SHALL return 401 unauthenticated; unauthorized authenticated APIs SHALL return 403 forbidden in error envelopes. All resolved views, including new dashboard/detail and fallback routes, MUST be covered by the access wrapper.
 
 #### Scenario: Anonymous page access
-- **WHEN** an anonymous visitor requests `/gm/` or a GM history-route page
-- **THEN** the response redirects to the configured login URL with the requested path encoded as `next`
+- **WHEN** an anonymous visitor requests a GM page
+- **THEN** login redirects preserve the requested path
 
 #### Scenario: Ordinary account denied
-- **WHEN** an authenticated non-Developer requests a GM page or either S1 API
-- **THEN** the page returns 403 and the API returns the 403 `forbidden` envelope
+- **WHEN** an authenticated ordinary account requests GM pages or session, dashboard or detail APIs
+- **THEN** pages return 403 and APIs return the 403 forbidden envelope
 
 #### Scenario: Anonymous API denied
-- **WHEN** an anonymous visitor requests either S1 API or an unknown GM API path
-- **THEN** the response is the 401 `unauthenticated` envelope rather than a redirect or SPA shell
+- **WHEN** an anonymous visitor requests session, dashboard, detail or an unknown GM API
+- **THEN** it receives the 401 unauthenticated envelope rather than a redirect or shell
 
 #### Scenario: Privileged access
-- **WHEN** a Developer or superuser requests GM pages and the session and health APIs
-- **THEN** access succeeds independently of ordinary staff status
+- **WHEN** anonymous, ordinary, Developer and superuser accounts request session, dashboard or detail
+- **THEN** anonymous requests return 401, ordinary requests return 403, and privileged requests reach the endpoint independently of staff status
 
 #### Scenario: URL coverage regression
-- **WHEN** a GM URL is added without the required access wrapper
-- **THEN** the URL-resolver contract test fails, including for API and page fallback patterns
+- **WHEN** a GM URL is registered without the access wrapper
+- **THEN** the resolver coverage test fails, including fallback routes
 
 ### Requirement: S1 route and payload scope
-S1 SHALL expose only `GET /gm/api/session` and `GET /gm/api/health` as concrete API endpoints. Session data SHALL contain the current account name, permission level, server time, and game version. Health SHALL report Django responding and database readability using a real read, without external-service probes or state changes. `/gm/` and non-API history paths SHALL serve the SPA shell. Unknown API paths SHALL return a JSON 404 error envelope, never the shell.
+The GM API SHALL expose GET /gm/api/session, GET /gm/api/dashboard and GET /gm/api/llm/calls/<call_id>. Session SHALL retain account name, permission level, server time and game version. Dashboard SHALL fold Django responsiveness and real read-only database health into its process section and provide the operations snapshot specified by gm-operations-dashboard. The former /gm/api/health SHALL be removed, without alias or compatibility handler. /gm/ and non-API history paths SHALL serve the shell; unknown APIs SHALL return JSON 404, never the shell. These routes SHALL require the landed S1 access/envelope foundation and S2a transcript contract.
 
 #### Scenario: Operator session
-- **WHEN** a permitted account requests the session API
-- **THEN** HTTP 200 contains the success envelope with that account's name and permission level, current server time, and actual game version
+- **WHEN** a permitted account requests session
+- **THEN** its success envelope retains actual identity, permission, time and version
 
 #### Scenario: Minimal health
-- **WHEN** a permitted account requests health with a readable database
-- **THEN** HTTP 200 reports Django responding and database readable without calling LLM or SD services
+- **WHEN** a permitted account requests dashboard with a readable database
+- **THEN** process reports Django responding and database readable without LLM probes or state changes
 
 #### Scenario: Unreadable database
-- **WHEN** the health database read fails
-- **THEN** the response indicates failure with a matching non-success HTTP status and error envelope, without claiming the database is readable
+- **WHEN** a permitted account requests dashboard with readable or unreadable database
+- **THEN** process health reports the real result, with a section error on failure and other sections preserved
 
 #### Scenario: History routing and API miss
-- **WHEN** a permitted account requests a non-API GM history path and `/gm/api/missing`
-- **THEN** the history path serves the SPA shell and the API miss returns HTTP 404 with an error envelope
+- **WHEN** a permitted account requests /gm/api/health or a non-API history path
+- **THEN** health returns the protected JSON 404 envelope and the history path serves the SPA shell
 
 ### Requirement: Consistent JSON transport
 Success responses SHALL use `{"ok":true,"data":<payload>}`; failures SHALL use `{"ok":false,"error":{"code":"<snake_case>","message":"<zh-TW>"}}` with the matching HTTP status. Clients SHALL branch on codes rather than messages. The pagination convention SHALL be `cursor=<opaque>&limit=<n>` and data `{"items":[...],"next_cursor":<opaque|null>}`; S1 SHALL add no paginated endpoint. State-changing requests SHALL use POST with Django CSRF protection; S1 SHALL add no production write endpoint and SHALL establish a readable CSRF cookie when serving the shell. Django REST API enablement SHALL remain false.

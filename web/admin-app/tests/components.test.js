@@ -5,6 +5,10 @@ import GmTable from "../components/GmTable.vue";
 import GmEmpty from "../components/GmEmpty.vue";
 import GmError from "../components/GmError.vue";
 import GmStatusBadge from "../components/GmStatusBadge.vue";
+import GmMeter from "../components/GmMeter.vue";
+import GmServiceCard from "../components/GmServiceCard.vue";
+import GmRefreshBar from "../components/GmRefreshBar.vue";
+import GmCodeBlock from "../components/GmCodeBlock.vue";
 
 describe("GmStatusBadge", () => {
   it.each([
@@ -79,5 +83,80 @@ describe("GmPanel, GmEmpty, GmError", () => {
     expect(error.attributes("role")).toBe("alert");
     expect(error.get("code").text()).toBe("malformed_response");
     expect(error.find(".ui-btn--danger").exists()).toBe(false);
+  });
+});
+
+
+describe("GmMeter", () => {
+  it("is decorative with a hidden text label and patterned segments", () => {
+    const wrapper = mount(GmMeter, {
+      props: {
+        label: "成功 3，降級 1",
+        segments: [
+          { key: "ok", value: 3, tone: "ok", pattern: "solid" },
+          { key: "degraded", value: 1, tone: "warn", pattern: "hatch" },
+          { key: "rejected", value: 0, tone: "crit", pattern: "cross" },
+        ],
+      },
+    });
+    expect(wrapper.get(".gm-meter__track").attributes("aria-hidden")).toBe("true");
+    expect(wrapper.get(".gm-visually-hidden").text()).toBe("成功 3，降級 1");
+    const fills = wrapper.findAll(".gm-meter__fill");
+    expect(fills.map((fill) => fill.attributes("style"))).toEqual(["width: 75%;", "width: 25%;"]);
+    expect(fills[1].classes()).toContain("gm-meter__fill--hatch");
+  });
+
+  it("clamps a single value and marks zero with a tick", () => {
+    const over = mount(GmMeter, { props: { label: "x", value: 900, max: 500 } });
+    expect(over.get(".gm-meter__fill").attributes("style")).toBe("width: 100%;");
+    const zero = mount(GmMeter, { props: { label: "x", value: 0, max: 500 } });
+    expect(zero.get(".gm-meter__track").classes()).toContain("gm-meter__track--empty");
+  });
+});
+
+describe("GmServiceCard", () => {
+  it("states status in text and rule style, and a slot error as critical", () => {
+    const warn = mount(GmServiceCard, { props: { name: "翻譯", status: "warn", statusLabel: "假後端" } });
+    expect(warn.classes()).toContain("gm-service-card--warn");
+    expect(warn.get(".status-marker").text()).toBe("假後端");
+    const failed = mount(GmServiceCard, {
+      props: { name: "SD 繪圖", status: "ok", statusLabel: "正常", error: { code: "sd_unavailable", message: "無法取得" } },
+    });
+    expect(failed.attributes("data-status")).toBe("crit");
+    expect(failed.get(".status-marker").text()).toBe("無法取得狀態");
+    expect(failed.get("code").text()).toBe("sd_unavailable");
+  });
+});
+
+describe("GmRefreshBar", () => {
+  it("describes each freshness state and blocks refresh while busy", async () => {
+    const wrapper = mount(GmRefreshBar, { props: { state: "live", lastUpdatedAt: 100, now: 108 } });
+    expect(wrapper.text()).toContain("8 秒前");
+    expect(wrapper.text()).toContain("每 5 秒自動更新");
+    await wrapper.get("button").trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    await wrapper.setProps({ state: "refreshing" });
+    await wrapper.get("button").trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    await wrapper.setProps({ state: "stale", errorMessage: "斷線" });
+    expect(wrapper.get(".status-marker").text()).toBe("資料過期");
+    expect(wrapper.text()).toContain("更新失敗：斷線");
+    expect(wrapper.get("[role='status']").text()).toBe("資料已過期");
+    await wrapper.setProps({ state: "live" });
+    expect(wrapper.get("[role='status']").text()).toBe("已恢復即時更新");
+  });
+});
+
+describe("GmCodeBlock", () => {
+  it("renders JSON verbatim, collapses long content, and never injects HTML", async () => {
+    const text = Array.from({ length: 30 }, (_, index) => `<b>line ${index}</b>`).join("\n");
+    const wrapper = mount(GmCodeBlock, { props: { text, maxLines: 5 } });
+    expect(wrapper.find("pre b").exists()).toBe(false);
+    expect(wrapper.classes()).toContain("is-collapsed");
+    const toggle = wrapper.findAll("button").find((button) => button.text().startsWith("顯示全部"));
+    await toggle.trigger("click");
+    expect(wrapper.classes()).not.toContain("is-collapsed");
+    const json = mount(GmCodeBlock, { props: { text: { a: [1] } } });
+    expect(json.get("pre").text()).toBe('{\n  "a": [\n    1\n  ]\n}');
   });
 });

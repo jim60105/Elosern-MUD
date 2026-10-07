@@ -14,6 +14,8 @@ defineProps({
   account: { type: String, default: "" },
   permissionLevel: { type: String, default: "" },
   logoutUrl: { type: String, default: "" },
+  // Dense data pages (the operations dashboard) may use a wider measure.
+  wide: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["navigate"]);
@@ -34,7 +36,7 @@ const emit = defineEmits(["navigate"]);
       :logout-url="logoutUrl"
     />
     <main id="gm-main" class="gm-shell__main" tabindex="-1">
-      <div class="gm-shell__content"><slot /></div>
+      <div class="gm-shell__content" :class="{ 'gm-shell__content--wide': wide }"><slot /></div>
     </main>
   </div>
 </template>
@@ -90,6 +92,10 @@ const emit = defineEmits(["navigate"]);
 
 .gm-shell__content {
   max-width: 1200px;
+}
+
+.gm-shell__content--wide {
+  max-width: 1600px;
 }
 
 @media (max-width: 1099px) {

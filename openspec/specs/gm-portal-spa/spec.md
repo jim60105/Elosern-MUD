@@ -5,15 +5,15 @@ Provide a separately built operator SPA that shares only approved visual tokens 
 ## Requirements
 
 ### Requirement: Independent same-origin GM build
-The GM SPA SHALL be a separate Vue 3 application in `web/admin-app/`, built through `vite.gm.config.js` by `pnpm run build:gm` into `web/static/gm/dist/` with stable `index.js` and `index.css`. The GM shell template SHALL reference those assets. CI and container builds SHALL run the GM build alongside the game build; generated output SHALL come from sources, never hand-authored. The existing game Vite entry, frozen contracts, `.elosern-root` styles, OOB protocol, and `/admin/` SHALL remain untouched.
+The GM SPA SHALL remain separately built from web/admin-app/ through vite.gm.config.js and pnpm run build:gm into web/static/gm/dist/ with stable index.js/index.css referenced by its shell. CI/container builds SHALL build both GM and game bundles from sources. Game Vite entry, frozen contracts, .elosern-root styles, OOB and /admin/ SHALL remain untouched. LLM/SD offline conditions SHALL not prevent the GM shell or dashboard from loading; services SHALL show offline/critical states without requiring active LLM probes.
 
 #### Scenario: Production assets
-- **WHEN** CI or the container image builds the frontend
-- **THEN** both bundles are built and the GM shell can load its stable GM asset names from the project origin without depending on the game bundle
+- **WHEN** CI or container builds run
+- **THEN** both bundles are built and GM assets load independently from the project origin
 
 #### Scenario: External services offline
-- **WHEN** LLM and SD services are offline
-- **THEN** the GM shell and S1 session/health overview still load without contacting those services; S1 adds no service-status dashboard
+- **WHEN** LLM and SD are unavailable
+- **THEN** the dashboard remains usable with truthful service states and sends no LLM probes
 
 ### Requirement: Enforced token-only game dependency boundary
 The GM application SHALL import from `web/webclient-app/` only `styles/tokens.css` and `styles/fonts*.css`. All other game-tree imports, including `app-shell.css`, components, stores, transport, and utilities, SHALL be forbidden. A dependency-free Node test SHALL scan imports throughout `web/admin-app/` and enforce the resolved-path allowlist, including JavaScript/Vue imports and CSS imports.
@@ -38,19 +38,19 @@ The GM application SHALL supply `GmShell`, `GmNav`, `GmPageHeader`, `GmPanel`, `
 - **THEN** account/logout, navigation, and content remain usable, UI copy is Traditional Chinese, and any identifiers are unmodified and monospace
 
 ### Requirement: S1 navigation and history routing
-The SPA SHALL use history routing with base `/gm/`. The home section SHALL be the overview and SHALL render actual session and health responses. Navigation SHALL expose the overview and the future operations, runtime-state, world-data, operations/action, and GM-intervention sections defined by the design; sections not delivered SHALL be disabled with `尚未開放` and SHALL NOT have placeholder pages. Router guards SHALL handle authorization failures without redirect loops.
+The SPA SHALL retain history routing at /gm/ and session identity/time/version. The home overview SHALL render the gm-operations-dashboard snapshot instead of calling the removed health endpoint, using the landed S1 fetch boundary and component layer and S2a transcript-detail contract. Navigation SHALL retain the approved future sections; undelivered sections SHALL remain disabled with 尚未開放 and no placeholder pages. Router guards SHALL handle authorization failures without redirect loops.
 
 #### Scenario: Foundation overview
-- **WHEN** a permitted operator loads `/gm/`
-- **THEN** the overview renders session identity/time/version and skeleton Django/database health from the two S1 APIs
+- **WHEN** a permitted operator loads /gm/
+- **THEN** session information and dashboard sections render and no request targets /gm/api/health
 
 #### Scenario: Future sections disabled
-- **WHEN** an operator attempts keyboard or pointer activation of an undelivered section
-- **THEN** it is visibly disabled with `尚未開放` and does not navigate to a placeholder page
+- **WHEN** pointer or keyboard activation targets an undelivered section
+- **THEN** it remains disabled and cannot navigate to a placeholder
 
 #### Scenario: History and authorization guard
-- **WHEN** a GM client route is entered directly, navigated through history, or receives a 403 API outcome
-- **THEN** routing stays under `/gm/` and authorization failure reaches the permission-denied view without repeated redirects or protected content display
+- **WHEN** a client route is entered directly, through history, or receives a forbidden API outcome
+- **THEN** routing stays under /gm/ and permission denial never exposes protected content or loops
 
 ### Requirement: Single GM fetch boundary
 All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 `forbidden` responses to the permission-denied view, and surface other errors by stable code; a 403 `csrf_failed` is a transport failure and SHALL surface by its code rather than selecting the permission-denied view. Network failure and malformed bodies SHALL produce explicit client errors, never fabricated success data. S1 SHALL test POST header wiring without introducing a production write endpoint.

@@ -105,11 +105,14 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         suites = sorted(path.name for path in GM_TESTS.glob("*.test.js"))
         self.assertEqual(
             suites,
-            ["api.test.js", "components.test.js", "overview.test.js", "router.test.js", "session.test.js", "shell.test.js"],
+            [
+                "api.test.js", "call-drawer.test.js", "components.test.js", "overview.test.js",
+                "poller.test.js", "router.test.js", "session.test.js", "shell.test.js",
+            ],
         )
         result = _run_vitest(*suites)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+6 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+8 passed")
 
     @covers_requirement("gm-portal-spa::single-gm-fetch-boundary")
     def test_fetch_boundary_vitest_cases_pass(self):
@@ -122,6 +125,13 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         result = _run_vitest("router.test.js", "shell.test.js", "overview.test.js")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r"Test Files\s+3 passed")
+
+    @covers_requirement('gm-operations-dashboard::visibility-aware-overview-and-payload-drawer')
+    @covers_requirement('gm-portal-spa::s1-navigation-and-history-routing')
+    def test_dashboard_polling_and_payload_drawer_vitest_cases_pass(self):
+        result = _run_vitest("poller.test.js", "overview.test.js", "call-drawer.test.js", "components.test.js")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"Test Files\s+4 passed")
 
     @covers_requirement("gm-portal-spa::operator-component-layer")
     def test_component_layer_vitest_cases_pass(self):
@@ -136,7 +146,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
     def test_showcase_coverage_includes_every_gm_component(self):
         result = _run(["node", "scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("GM component coverage: all 8 required GM component(s)", result.stdout)
+        self.assertIn("GM component coverage: all 14 required GM component(s)", result.stdout)
         self.assertIn("component coverage: all", result.stdout)
 
     @covers_requirement("gm-portal-spa::operator-component-layer")

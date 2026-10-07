@@ -5,7 +5,7 @@ Success: ``{"ok": true, "data": <payload>}``. Failure:
 with the matching HTTP status. Clients branch on ``code`` only; the message is
 operator-facing Traditional Chinese.
 
-Pagination convention (first consumer arrives in S3, none in S1): the request
+Pagination convention (first consumer arrives in S3, none in S1/S2): the request
 carries ``?cursor=<opaque>&limit=<n>`` and the response data is
 ``{"items": [...], "next_cursor": <opaque|null>}``. Writes are POST-only and
 CSRF-protected; S1 adds no production write endpoint.
@@ -25,6 +25,9 @@ ERROR_MESSAGES: dict[str, str] = {
     "csrf_failed": "安全驗證失敗，請重新整理頁面後再試一次。",
     "database_unreadable": "資料庫目前無法讀取。",
     "version_unavailable": "無法讀取遊戲版本。",
+    "invalid_call_id": "呼叫識別碼格式不正確（需為 32 位小寫十六進位）。",
+    "transcript_not_found": "找不到此呼叫的 transcript 紀錄（可能已超過保留期限）。",
+    "transcript_disabled": "LLM transcript 已停用，無法查詢呼叫內容。",
 }
 
 

@@ -23,7 +23,8 @@ def gm_path(route: str, view: Callable[..., Any], name: str | None = None) -> UR
 
 urlpatterns = [
     gm_path("api/session", views.session, name="gm-api-session"),
-    gm_path("api/health", views.health, name="gm-api-health"),
+    gm_path("api/dashboard", views.dashboard, name="gm-api-dashboard"),
+    gm_path("api/llm/calls/<str:call_id>", views.llm_call, name="gm-api-llm-call"),
     gm_path("api", views.api_not_found),
     gm_path("api/", views.api_not_found),
     gm_path("api/<path:rest>", views.api_not_found),
