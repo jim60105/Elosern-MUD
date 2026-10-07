@@ -18,7 +18,7 @@
 // combat-modifier condition carrying its exact applied modifiers, an active
 // disguise, and no combat session.
 export const STATUS_PANEL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   actor: {
     name: "艾倫‧灰誓",
@@ -34,19 +34,19 @@ export const STATUS_PANEL_SAMPLE = {
     {
       code: "fastwind",
       label: "疾風",
-      severity: "beneficial",
+      provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "beneficial",
       remaining_seconds: 60,
     },
     {
       code: "shame_exposure",
       label: "高露出",
-      severity: "harmful",
+      provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful",
       modifiers: { defense: -15, agility: -10 },
     },
     {
       code: "fog_veil",
       label: "霧隱",
-      severity: "informational",
+      provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational",
     },
   ],
   disguise_active: true,
@@ -70,7 +70,7 @@ export const STATUS_PANEL_COMBAT_SAMPLE = {
     {
       code: "combat_focus",
       label: "專注",
-      severity: "warning",
+      provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "warning",
       remaining_seconds: 10,
       modifiers: { atk_phys: 5 },
     },

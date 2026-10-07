@@ -368,32 +368,32 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 # the global JSON-safety bound now spans the full
                 # JavaScript-safe range, so the roster reaches the drawer.
                 status["conditions"] = [
-                    {"code": "regen", "label": "再生", "severity": "beneficial", "remaining_seconds": 30},
-                    {"code": "fog_veil", "label": "霧隱", "severity": "informational"},
+                    {"code": "regen", "label": "再生", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "beneficial", "remaining_seconds": 30},
+                    {"code": "fog_veil", "label": "霧隱", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "informational"},
                     {
                         "code": "focus",
                         "label": "專注",
-                        "severity": "warning",
+                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "warning",
                         "remaining_seconds": 10,
                         "modifiers": {"atk_phys": 5},
                     },
                     {
                         "code": "exposure",
                         "label": "高露出",
-                        "severity": "harmful",
+                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful",
                         "modifiers": {"defense": -15, "agility": -10},
                     },
                     {
                         "code": "bleed",
                         "label": "出血",
-                        "severity": "harmful",
+                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful",
                         "remaining_seconds": 20,
                         "modifiers": {"hp": -3},
                     },
-                    {"code": "paralyze", "label": "癱瘓", "severity": "critical"},
-                    {"code": "shield", "label": "護盾", "severity": "beneficial", "remaining_seconds": 15},
-                    {"code": "chill", "label": "失溫", "severity": "harmful", "remaining_seconds": 8},
-                    {"code": "lucky", "label": "幸運", "severity": "informational", "remaining_seconds": 60},
+                    {"code": "paralyze", "label": "癱瘓", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "critical"},
+                    {"code": "shield", "label": "護盾", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "beneficial", "remaining_seconds": 15},
+                    {"code": "chill", "label": "失溫", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful", "remaining_seconds": 8},
+                    {"code": "lucky", "label": "幸運", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "informational", "remaining_seconds": 60},
                 ]
                 character = valid_character_panel()
                 _inject_snapshot(page, {"status": status, "character": character}, mode="exploration")

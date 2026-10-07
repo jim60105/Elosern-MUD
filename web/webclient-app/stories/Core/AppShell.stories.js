@@ -207,8 +207,8 @@ const renderPlayer = (args) => ({
         panels: {
           status: protocolFixtures.statusPanel(args.populated || args.combat ? {
             conditions: [
-              { code: "poisoned", label: "中毒", severity: "harmful", remaining_seconds: 40 },
-              { code: "blessed", label: "祝福", severity: "beneficial" },
+              { code: "poisoned", label: "中毒", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful", remaining_seconds: 40 },
+              { code: "blessed", label: "祝福", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "beneficial" },
             ],
           } : undefined),
           // The populated island stacks (webclient-avg-stage-hud-anchors):

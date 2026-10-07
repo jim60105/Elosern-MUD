@@ -13,6 +13,45 @@ const assert = require("node:assert/strict");
 const Protocol = require("../elosern/protocol.js");
 const { EPOCH_A, VALID_EPOCH, actionResult, connectedStore, nested, protocolError, serverTime, snapshot, unavailableStatusPanel, validStatusPanel } = require("./protocol_support.js");
 
+test("status v3 provenance rejects malformed initial and replacement messages atomically", () => {
+  const source = { item_key: "t_a", label: "合成護符" };
+  const valid = { kind: "equipment", equipment_sources: [source] };
+  const invalid = [
+    undefined, null, {}, { ...valid, extra: true }, { kind: "legacy", equipment_sources: [] },
+    { kind: "equipment", equipment_sources: [] }, { kind: "mixed", equipment_sources: [] },
+    { kind: "non_equipment", equipment_sources: [source] }, { kind: "unknown", equipment_sources: [source] },
+    { ...valid, equipment_sources: [source, source] },
+    { ...valid, equipment_sources: [{ item_key: "t_b", label: "乙" }, source] },
+    { ...valid, equipment_sources: [{ ...source, extra: 1 }] },
+    { ...valid, equipment_sources: [{ ...source, item_key: "BAD" }] },
+    { ...valid, equipment_sources: [{ ...source, item_key: "a".repeat(65) }] },
+    { ...valid, equipment_sources: [{ ...source, label: "" }] },
+    { ...valid, equipment_sources: [{ ...source, label: "字".repeat(129) }] },
+    { ...valid, equipment_sources: Array.from({ length: 9 }, (_, i) => ({ item_key: `t_${i}`, label: "合成" })) },
+  ];
+  for (const provenance of invalid) {
+    const condition = { code: "t_warning", label: "合成警告", severity: "warning" };
+    if (provenance !== undefined) condition.provenance = provenance;
+    const panel = validStatusPanel({ conditions: [condition] });
+    const initial = Protocol.createStore();
+    initial.beginTransport(1);
+    assert.equal(initial.receive(1, "ui_snapshot", [snapshot({ panels: { status: panel } })], {}).reason, "invalid");
+    assert.equal(initial.getState().phase, "awaiting_initial_snapshot");
+    const committed = Protocol.createStore();
+    committed.beginTransport(1);
+    assert.equal(committed.receive(1, "ui_snapshot", [snapshot()], {}).accepted, true);
+    const before = committed.getState();
+    assert.equal(committed.receive(1, "ui_update", [snapshot({ revision: 2, panels: { status: panel } })], {}).reason, "invalid");
+    assert.deepEqual(committed.getState(), before);
+  }
+  for (const kind of ["equipment", "mixed", "non_equipment", "unknown"]) {
+    const provenance = { kind, equipment_sources: ["equipment", "mixed"].includes(kind) ? [source] : [] };
+    assert.doesNotThrow(() => Protocol.validateStatusPanel(validStatusPanel({
+      conditions: [{ code: "t_warning", label: "合成警告", severity: "warning", provenance }],
+    })));
+  }
+});
+
 
 test("accepts a valid full snapshot and adopts its state", () => {
   const store = Protocol.createStore();
@@ -93,9 +132,9 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 2 })
+      unavailableStatusPanel({ schema_version: 3 })
     ),
-    unavailableStatusPanel({ schema_version: 2 })
+    unavailableStatusPanel({ schema_version: 3 })
   );
   const badReason = unavailableStatusPanel();
   badReason.reason = { code: "x" };
@@ -106,7 +145,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
     Protocol.validatePanel(
       "status",
       Protocol.PANEL_ALLOWLIST.status,
-      unavailableStatusPanel({ schema_version: 3 })
+      unavailableStatusPanel({ schema_version: 2 })
     )
   );
   // An internal reason carries a bounded correlation ID.
@@ -115,7 +154,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
       "status",
       Protocol.PANEL_ALLOWLIST.status,
       unavailableStatusPanel({
-        schema_version: 2,
+        schema_version: 3,
         reason: {
           code: "internal_presenter_error",
           message: "此介面暫時無法使用",
@@ -129,7 +168,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
   assert.doesNotThrow(() => Protocol.validateStatusPanel(validStatusPanel()));
   assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 1 })));
-  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 3 })));
+  assert.throws(() => Protocol.validateStatusPanel(validStatusPanel({ schema_version: 2 })));
   const partialResources = validStatusPanel();
   partialResources.resources = { hp: { current: 1, maximum: 2 } };
   assert.throws(() => Protocol.validateStatusPanel(partialResources));
@@ -141,7 +180,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
   );
   assert.throws(() =>
     Protocol.validateStatusPanel(
-      validStatusPanel({ conditions: [{ code: "x", label: "y", severity: "mystery" }] })
+      validStatusPanel({ conditions: [{ code: "x", label: "y", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "mystery" }] })
     )
   );
   const partialActor = validStatusPanel();
@@ -239,18 +278,18 @@ test("enforces status field-specific bounds", () => {
   const manyConditions = validStatusPanel();
   manyConditions.conditions = [];
   for (let i = 0; i < 33; i++) {
-    manyConditions.conditions.push({ code: "c" + i, label: "L", severity: "informational" });
+    manyConditions.conditions.push({ code: "c" + i, label: "L", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational" });
   }
   assert.throws(() => Protocol.validateStatusPanel(manyConditions));
   // Condition code must be an identifier; label capped at 128; modifiers capped at 16 keys.
   assert.throws(() =>
     Protocol.validateStatusPanel(
-      validStatusPanel({ conditions: [{ code: "BAD", label: "L", severity: "informational" }] })
+      validStatusPanel({ conditions: [{ code: "BAD", label: "L", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational" }] })
     )
   );
   assert.throws(() =>
     Protocol.validateStatusPanel(
-      validStatusPanel({ conditions: [{ code: "ok", label: "L".repeat(129), severity: "informational" }] })
+      validStatusPanel({ conditions: [{ code: "ok", label: "L".repeat(129), provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational" }] })
     )
   );
   const tooManyModifiers = {};
@@ -260,7 +299,7 @@ test("enforces status field-specific bounds", () => {
   assert.throws(() =>
     Protocol.validateStatusPanel(
       validStatusPanel({
-        conditions: [{ code: "ok", label: "L", severity: "informational", modifiers: tooManyModifiers }],
+        conditions: [{ code: "ok", label: "L", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "informational", modifiers: tooManyModifiers }],
       })
     )
   );
@@ -281,7 +320,7 @@ test("enforces status field-specific bounds", () => {
             {
               code: "high_exposure_defense_penalty",
               label: "高露出",
-              severity: "harmful",
+              provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful",
               modifiers: { defense: -15, agility: -10 },
             },
           ],

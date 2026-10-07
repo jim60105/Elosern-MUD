@@ -315,6 +315,8 @@ def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
         trait_values=trait_values,
         buff_entries=(),
         matches=tuple(matches),
+        buff_provenance={},
+        rule_provenance={},
         equipment=tuple(equipment),
         combat=None,
     )

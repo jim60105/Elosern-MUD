@@ -416,7 +416,7 @@ var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
 var PANEL_ALLOWLIST = {
   gallery: 1,
   art: 2,
-  status: 2,
+  status: 3,
   context_actions: 5,
   local_map: 1,
   party: 2,

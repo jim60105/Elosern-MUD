@@ -51,6 +51,27 @@ describe("CharacterStatusDrawer", () => {
     return wrapper;
   }
 
+  it("discloses equipment-only adversity with full vitals and unavailable character data", () => {
+    const conditions = [{
+      code: "t_shared", label: "合成警告", severity: "warning", remaining_seconds: 17,
+      modifiers: { defense: -15 },
+      provenance: { kind: "equipment", equipment_sources: [{ item_key: "t_a", label: "合成護符" }] },
+    }];
+    conditions.push({ ...conditions[0], remaining_seconds: 120,
+      provenance: { kind: "unknown", equipment_sources: [] } });
+    const status = {
+      ...STATUS_PANEL_SAMPLE, conditions,
+      resources: { hp: { current: 100, maximum: 100 }, mp: { current: 50, maximum: 50 }, sp: { current: 40, maximum: 40 } },
+    };
+    const w = mountDrawer({ status, character: CHARACTER_UNAVAILABLE });
+    const rows = w.findAll('[data-testid="character-status-drawer__condition--t_shared"]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain("裝備來源：合成護符");
+    expect(rows[0].attributes("aria-label")).toContain("防禦 -15");
+    expect(rows[1].text()).toContain("來源暫無資料");
+    expect(rows[1].text()).toContain("剩 120 秒");
+  });
+
   it("renders the party drawer opener only when partyAvailable, emitting open-party without dispatching", async () => {
     const wWithout = mountDrawer({ partyAvailable: false });
     expect(wWithout.find('[data-testid="character-status-drawer__open-party"]').exists()).toBe(false);

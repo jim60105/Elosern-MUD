@@ -8,10 +8,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, EXPOSURE_LEVELS
-from world.rules.equipment_effects import effective_exposure, worn_item_keys
+from world.rules.equipment_effects import exposure_with_bias
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
 from world.rules.stored_sexual_reads import StoredLevel
-from world.skills.equipment import dual_wielding_from_storage
 from world.skills.handler import INNATE_SKILL_ORDER
 from world.skills.sexual_acts import unlocked_act_keys_for
 
@@ -21,7 +20,7 @@ from .models import (
     StatusQueryError,
     _LevelRef,
 )
-from .readers import _active_buff_entries, _is_list_like, _read_attribute
+from .readers import _is_list_like, _read_attribute
 from .sexual import _ordinal_of, _sexual_level
 
 
@@ -38,10 +37,17 @@ class _StoredSkillsFacade:
     handler) and never writes.
     """
 
-    __slots__ = ("entity",)
+    __slots__ = ("entity", "_skills_data", "_owned", "_grants")
 
     def __init__(self, entity: Any):
         self.entity = entity
+        raw = entity.db.skills
+        self._skills_data = dict(raw) if isinstance(raw, Mapping) else {}
+        self._owned = (
+            *self.base_owned_keys(),
+            *sorted(unlocked_act_keys_for(self.base_owned_keys(), self._counter_values())),
+        )
+        self._grants = tuple(entity.db.skill_grants or [])
 
     @property
     def db(self) -> Any:
@@ -52,7 +58,7 @@ class _StoredSkillsFacade:
         return self
 
     def _stored_list(self, field: str) -> tuple[str, ...]:
-        raw = self.entity.db.skills
+        raw = self._skills_data
         if not isinstance(raw, Mapping):
             return ()
         value = raw.get(field)
@@ -99,15 +105,16 @@ class _StoredSkillsFacade:
         materialized record, so reading every counter from storage reproduces
         both branches without mounting one.
         """
-        base = self.base_owned_keys()
-        return [*base, *sorted(unlocked_act_keys_for(base, self._counter_values()))]
+        return list(self._owned)
 
     def conferred_grants(self) -> list[Any]:
         """Stored grants verbatim (``list(entity.db.skill_grants or [])``)."""
-        return list(self.entity.db.skill_grants or [])
+        return list(self._grants)
 
 
-def _sexual_condition_context(entity: Any) -> dict[str, Any]:
+def _sexual_condition_context(
+    entity: Any, buff_entries, equipment, biases, dual_wielding: bool
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the combat-modifier condition context from read-only state.
 
     The exposure slot carries the EFFECTIVE level (stored plus worn equipment
@@ -115,7 +122,9 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
     panel's condition chips can never disagree with what combat resolution
     actually matches (add-equipment-sexual-effects D4).
     """
-    context: dict[str, Any] = {"active_buffs": {key for key, _ in _active_buff_entries(entity)}}
+    context: dict[str, Any] = {
+        "active_buffs": {cache["definition_key"] for _, cache in buff_entries}
+    }
     for field, levels in (
         ("arousal", AROUSAL_LEVELS),
         ("climax_phase", CLIMAX_PHASE_LEVELS),
@@ -125,7 +134,10 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
             context[field] = _LevelRef(_ordinal_of(levels, value), levels)
         elif isinstance(value, _LevelRef):
             context[field] = value
-    exposure = effective_exposure(entity)
+    from world.rules.stored_sexual_reads import stored_sexual_level
+
+    stored = stored_sexual_level(entity, "exposure")
+    exposure = exposure_with_bias(stored, sum(biases.values()))
     if isinstance(exposure, StoredLevel) and exposure.levels == EXPOSURE_LEVELS:
         context["exposure"] = _LevelRef(exposure.value, EXPOSURE_LEVELS)
     # Neither read model may materialize ``entity.skills``: every
@@ -136,6 +148,19 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
     # away from the real entity as well.
     facade = _StoredSkillsFacade(entity)
     context["entity"] = facade
-    context["dual_wielding"] = dual_wielding_from_storage(facade)
-    context["worn_item_keys"] = worn_item_keys(facade)
-    return context
+    context["dual_wielding"] = dual_wielding
+    context["worn_item_keys"] = frozenset(
+        value for value in (
+            equipment["weapon_main"], equipment["weapon_off"], equipment["armor"],
+            *equipment["accessories"],
+        ) if value is not None
+    )
+    comparison = dict(context)
+    comparison["worn_item_keys"] = frozenset()
+    comparison["dual_wielding"] = False
+    stored = exposure_with_bias(stored, 0)
+    if isinstance(stored, StoredLevel) and stored.levels == EXPOSURE_LEVELS:
+        comparison["exposure"] = _LevelRef(stored.value, EXPOSURE_LEVELS)
+    else:
+        comparison.pop("exposure", None)
+    return context, comparison

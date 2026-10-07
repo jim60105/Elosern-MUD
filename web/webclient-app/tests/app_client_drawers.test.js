@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
+import StatusPanel from "../components/StatusPanel.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
   QUEST_LOG_PANEL_SAMPLE,
@@ -821,7 +822,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    }
  });
 
-  it("focuses a harmful condition chip, then commits full vitals with only a beneficial condition; the island hides and focus lands on #action-dock", async () => {
+  it("rescues focus when a same-code adverse condition becomes equipment-only", async () => {
     const w = mountAppClient();
     store.beginTransport(1);
     store.setConnected(true);
@@ -833,7 +834,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         mp: { current: 50, maximum: 50 },
         sp: { current: 40, maximum: 40 },
       },
-      conditions: [{ code: "poison", label: "中毒", severity: "harmful" }],
+      conditions: [{ code: "poison", label: "中毒", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful" }],
 });
     store.receive(1, "ui_snapshot", [fx.snapshot({
       revision: 1,
@@ -846,23 +847,44 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     chip.element.focus();
     expect(document.activeElement).toBe(chip.element);
 
-    const beneficialStatus = fx.statusPanel({
+    const equipmentStatus = fx.statusPanel({
       resources: {
         hp: { current: 100, maximum: 100 },
         mp: { current: 50, maximum: 50 },
         sp: { current: 40, maximum: 40 },
       },
-      conditions: [{ code: "defense_instinct_defense_bonus", label: "防禦本能", severity: "beneficial" }],
+      conditions: [{
+        code: "poison", label: "中毒", severity: "harmful",
+        provenance: { kind: "equipment", equipment_sources: [{ item_key: "t_a", label: "合成護符" }] },
+      }],
     });
     store.receive(1, "ui_snapshot", [fx.snapshot({
       revision: 2,
       mode: "exploration",
-      panels: { status: beneficialStatus },
+      panels: { status: equipmentStatus },
     })], {});
     await w.vm.$nextTick();
 
     expect(w.get('[data-testid="status-panel"]').isVisible()).toBe(false);
     expect(document.activeElement?.id).toBe("action-dock");
+  });
+
+  it("keeps dialogue and creation gates above independent critical attention", async () => {
+    const w = mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    const status = fx.statusPanel({
+      conditions: [{ code: "t_critical", label: "合成警告", severity: "critical",
+        provenance: { kind: "non_equipment", equipment_sources: [] } }],
+    });
+    for (const [revision, mode] of [[1, "dialogue"], [2, "creation"], [3, "exploration"]]) {
+      expect(store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels: { status } })], {}).accepted).toBe(true);
+      await w.vm.$nextTick();
+      if (mode === "dialogue") expect(w.findComponent(StatusPanel).props("visible")).toBe(false);
+      if (mode === "creation") expect(w.get('[data-testid="elosern-stage"]').attributes("data-elosern-mode")).toBe("creation");
+      if (mode === "exploration") expect(w.findComponent(StatusPanel).props("visible")).toBe(true);
+    }
   });
 
   it("joins the committed string status identity for possession and clears dialogue companion focus", async () => {

@@ -52,5 +52,15 @@ export function conditionLabel(condition) {
   for (const modifier of conditionModifiers(condition)) {
     parts.push(modifier.text);
   }
+  const source = conditionSource(condition);
+  if (source) parts.push(source);
   return parts.join("，");
+}
+
+export function conditionSource(condition) {
+  const provenance = condition.provenance;
+  if (provenance.kind === "unknown") return "來源暫無資料";
+  if (provenance.kind === "non_equipment") return "";
+  const labels = provenance.equipment_sources.map((source) => source.label).join("、");
+  return `裝備來源：${labels}${provenance.kind === "mixed" ? "，另有獨立來源" : ""}`;
 }

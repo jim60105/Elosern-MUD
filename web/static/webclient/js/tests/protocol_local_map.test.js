@@ -77,8 +77,8 @@ function validLocalMapPanel(overrides) {
 
 test("validates the local_map panel available/unavailable discriminator", () => {
   assert.deepEqual(
-    Protocol.validatePanel("local_map", Protocol.PANEL_ALLOWLIST.local_map, unavailableStatusPanel()),
-    unavailableStatusPanel()
+    Protocol.validatePanel("local_map", Protocol.PANEL_ALLOWLIST.local_map, unavailableStatusPanel({ schema_version: 1 })),
+    unavailableStatusPanel({ schema_version: 1 })
   );
   assert.doesNotThrow(() => Protocol.validateLocalMapPanel(validLocalMapPanel()));
   assert.throws(() => Protocol.validateLocalMapPanel(validLocalMapPanel({ extra: 1 })));

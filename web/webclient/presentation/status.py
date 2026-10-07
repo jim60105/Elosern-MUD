@@ -1,10 +1,9 @@
-"""Version-2 read-only ``status`` panel presenter.
+"""Version-3 read-only ``status`` panel presenter.
 
 The presenter serializes the frozen status read model built by
 ``world.rules.status_query``. It never reads raw persistent records itself, never
-calls ``get_display_value``, and never mutates canonical state. Version 2 adds the
-optional ``actor.full_title`` row: the composed 稱號　異名 the client addresses
-the player by, omitted entirely while both title slots are empty.
+calls ``get_display_value``, and never mutates canonical state. Version 3 requires
+condition provenance and preserves the optional composed ``actor.full_title``.
 """
 
 from typing import Any
@@ -13,7 +12,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.status_query import StatusQueryError, build_status_read_model
 
-STATUS_SCHEMA_VERSION = 2
+STATUS_SCHEMA_VERSION = 3
 
 
 def status_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -36,10 +35,21 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         resources[key] = {"current": gauge.current, "maximum": gauge.maximum}
     conditions = []
     for condition in model.conditions:
+        try:
+            condition.provenance.validate()
+        except (StatusQueryError, AttributeError, TypeError):
+            raise PanelUnavailableError
         entry: dict[str, Any] = {
             "code": condition.code,
             "label": condition.label,
             "severity": condition.severity,
+            "provenance": {
+                "kind": condition.provenance.kind,
+                "equipment_sources": [
+                    {"item_key": source.item_key, "label": source.label}
+                    for source in condition.provenance.equipment_sources
+                ],
+            },
         }
         if condition.remaining_seconds is not None:
             entry["remaining_seconds"] = condition.remaining_seconds
@@ -53,8 +63,7 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         "identity": str(actor.pk),
     }
     # The composed full title (fixed　epithet); the wire field is optional and
-    # omitted when empty, so a pre-creation character keeps the v1 shape
-    # minus the version bump.
+    # omitted when empty.
     if model.full_title:
         actor_field["full_title"] = model.full_title
     if model.location_label is not None:

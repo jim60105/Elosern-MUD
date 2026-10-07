@@ -9,7 +9,7 @@ import ConditionChips from "../../components/ConditionChips.vue";
 // remainder in a bounded, scrollable column (FocusedTooltip opens one).
 
 function condition(code, severity, label, remainingSeconds, modifiers) {
-  const c = { code, severity, label };
+  const c = { code, severity, label, provenance: { kind: "non_equipment", equipment_sources: [] } };
   if (typeof remainingSeconds === "number") {
     c.remaining_seconds = remainingSeconds;
   }

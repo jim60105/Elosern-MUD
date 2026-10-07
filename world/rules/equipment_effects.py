@@ -707,10 +707,18 @@ def effective_exposure(entity: Any) -> Any:
     The returned view is the shared immutable ``StoredLevel``, the
     same comparison-parity type both context builders use.
     """
-    from world.lore.sexual_vocab import EXPOSURE_LEVELS
-    from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
+    from world.rules.stored_sexual_reads import stored_sexual_level
 
-    stored = stored_sexual_level(entity, "exposure")
+    return exposure_with_bias(
+        stored_sexual_level(entity, "exposure"), equipment_exposure_bias(entity)
+    )
+
+
+def exposure_with_bias(stored: Any, bias: int) -> Any:
+    """Apply the canonical exposure overlay to an already captured level."""
+    from world.lore.sexual_vocab import EXPOSURE_LEVELS
+    from world.rules.stored_sexual_reads import StoredLevel
+
     if isinstance(stored, str):
         if stored not in EXPOSURE_LEVELS:
             return stored
@@ -723,7 +731,7 @@ def effective_exposure(entity: Any) -> Any:
         return stored
     ordinal = min(
         len(EXPOSURE_LEVELS) - 1,
-        max(0, stored.value + equipment_exposure_bias(entity)),
+        max(0, stored.value + bias),
     )
     return StoredLevel(ordinal, EXPOSURE_LEVELS)
 
@@ -759,6 +767,35 @@ def attached_buff_instances(
         if isinstance(value, str) and value:
             collect(value)
     return instances
+
+
+def declared_attachment(instance_key: str) -> tuple[str, str] | None:
+    """Recognize only exact identities declared by registered equipment."""
+    if not isinstance(instance_key, str) or instance_key.count(":") != 1:
+        return None
+    buff_key, item_key = instance_key.split(":")
+    definition = ITEM_REGISTRY.get(item_key)
+    if definition is None or definition.equipment_slot is None:
+        return None
+    rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+    if rule is None or buff_key not in rule.attached_buffs:
+        return None
+    return buff_key, item_key
+
+
+def condition_equipment_inputs(
+    equipment: Mapping[str, Any],
+) -> tuple[dict[str, str], dict[str, int]]:
+    """Capture registry labels and exposure contributions for normalized gear."""
+    labels: dict[str, str] = {}
+    biases: dict[str, int] = {}
+    for item_key in _worn_item_keys(equipment):
+        definition = ITEM_REGISTRY[item_key]
+        labels[item_key] = definition.display_name_zh
+        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        if rule is not None and rule.exposure_bias:
+            biases[item_key] = rule.exposure_bias
+    return labels, biases
 
 
 # Adjustment-prose vocabulary in one fixed order (P3 design D4): combat

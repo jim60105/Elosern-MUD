@@ -19,7 +19,7 @@ function manyConditions(count) {
   return Array.from({ length: count }, (_, i) => ({
     code: `cond_${i}`,
     label: `狀態${i + 1}`,
-    severity: ["beneficial", "informational", "warning", "harmful", "critical"][i % 5],
+    provenance: { kind: "non_equipment", equipment_sources: [] }, severity: ["beneficial", "informational", "warning", "harmful", "critical"][i % 5],
     ...(i % 4 === 0 ? { remaining_seconds: i * 10 } : {}),
     ...(i % 3 === 0 ? { modifiers: { agility: "-10%" } } : {}),
   }));
@@ -44,6 +44,32 @@ describe("ConditionChips (chromeless condition icon row)", () => {
     });
     return wrapper;
   }
+
+  it("keeps duplicate-code tooltip and overflow detail local to each instance", async () => {
+    const attached = {
+      code: "t_shared", label: "合成警告", severity: "harmful", remaining_seconds: 17,
+      modifiers: { defense: -15 },
+      provenance: { kind: "equipment", equipment_sources: [{ item_key: "t_a", label: "合成護符" }] },
+    };
+    const independent = { ...attached, remaining_seconds: 120, provenance: { kind: "non_equipment", equipment_sources: [] } };
+    const w = mountChips({ conditions: [attached, independent, ...manyConditions(4), attached, independent] }, true);
+    const icons = w.findAll('[data-testid="status-panel__condition--t_shared"]');
+    await icons[0].trigger("focus");
+    expect(tooltip().textContent).toContain("合成護符");
+    expect(tooltip().textContent).toContain("剩 17 秒");
+    expect(icons[0].attributes("aria-label")).toContain("裝備來源：合成護符");
+    expect(icons[1].attributes("aria-describedby")).toBeUndefined();
+    await icons[1].trigger("focus");
+    expect(tooltip().textContent).toContain("剩 120 秒");
+    expect(tooltip().textContent).not.toContain("合成護符");
+    await w.get('[data-testid="status-panel__condition-overflow"]').trigger("click");
+    const overflow = w.get('[data-testid="status-panel__condition-disclosure"]').findAll(".detail-row");
+    expect(overflow[0].attributes("aria-label")).toBe(icons[0].attributes("aria-label"));
+    expect(overflow[0].text()).toContain("裝備來源：合成護符");
+    expect(overflow[1].text()).toContain("剩 120 秒");
+    await w.setProps({ conditions: [independent, attached] });
+    expect(tooltip()).toBeNull();
+  });
 
   it("renders one icon per committed condition with its severity glyph", () => {
     const w = mountChips();
@@ -217,7 +243,7 @@ describe("ConditionChips (chromeless condition icon row)", () => {
     ].map((label, i) => ({
       code: `long_${i}`,
       label,
-      severity: "harmful",
+      provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful",
       ...(i === 1 ? { modifiers: { mp_cost: "-10%" } } : {}),
       ...(i === 6 ? { modifiers: { actions_per_turn: 0, chance: 30 } } : {}),
     }));

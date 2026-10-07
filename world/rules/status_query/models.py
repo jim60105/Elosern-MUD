@@ -6,6 +6,7 @@ breakdown vocabularies the readers and builders share; it reads nothing.
 """
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from world.skills.registry import SkillCategory
@@ -150,12 +151,48 @@ class _LevelRef:
 
 
 @dataclass(frozen=True)
+class EquipmentSource:
+    item_key: str
+    label: str
+
+
+@dataclass(frozen=True)
+class ConditionProvenance:
+    kind: str
+    equipment_sources: tuple[EquipmentSource, ...]
+
+    def validate(self) -> None:
+        if type(self) is not ConditionProvenance or not isinstance(self.kind, str) or self.kind not in {
+            "equipment", "non_equipment", "mixed", "unknown"
+        }:
+            raise StatusQueryError("condition provenance kind is invalid")
+        sources = self.equipment_sources
+        if not isinstance(sources, tuple) or len(sources) > 8:
+            raise StatusQueryError("condition equipment sources exceed their bound")
+        if bool(sources) != (self.kind in {"equipment", "mixed"}):
+            raise StatusQueryError("condition provenance sources disagree with kind")
+        previous = ""
+        for source in sources:
+            if (
+                type(source) is not EquipmentSource
+                or not isinstance(source.item_key, str)
+                or re.fullmatch(r"[a-z0-9_.]{1,64}", source.item_key) is None
+                or source.item_key <= previous
+                or not isinstance(source.label, str)
+                or not 1 <= len(source.label) <= 128
+            ):
+                raise StatusQueryError("condition equipment source is invalid")
+            previous = source.item_key
+
+
+@dataclass(frozen=True)
 class ConditionValue:
     code: str
     label: str
     severity: str
     remaining_seconds: int | None
     modifiers: dict[str, Any]
+    provenance: ConditionProvenance
 
 
 @dataclass(frozen=True)

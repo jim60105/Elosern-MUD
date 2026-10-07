@@ -8,6 +8,7 @@ Covers capabilities:
 """
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -298,6 +299,38 @@ class PossessionPresentationTests(EvenniaTest):
         # 4. objectives_presenter: available without error
         obj_panel = objectives_presenter(ctx_npc)
         self.assertTrue(obj_panel["available"])
+
+    @covers_requirement(
+        "webclient-status-presentation::equipment-condition-provenance-preserves-independent-sources"
+    )
+    def test_possession_provenance_uses_resource_owner_equipment(self):
+        from contextlib import ExitStack
+        from world.rules.rulebook.schema import Rule
+        from world.skills.equipment import EquipmentSlot
+
+        enter_possession(self.player, self.npc)
+        self.player.db.equipment = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": ["t_owner"]}
+        self.npc.db.equipment = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": ["t_host"]}
+        self.player.sexual.exposure.value = "中等"
+        self.npc.sexual.exposure.value = "極高"
+        items = {
+            key: SimpleNamespace(key=key, modifier_key=key, equipment_slot=EquipmentSlot.ACCESSORY, display_name_zh=label)
+            for key, label in (("t_owner", "合成主人護符"), ("t_host", "合成宿主護符"))
+        }
+        effects = {key: SimpleNamespace(exposure_bias=1, attached_buffs=()) for key in items}
+        with ExitStack() as stack:
+            stack.enter_context(patch.dict("world.rules.equipment.ITEM_REGISTRY", items))
+            stack.enter_context(patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", items))
+            stack.enter_context(patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", effects))
+            stack.enter_context(patch("world.rules.combat_modifiers._RULES", [
+                Rule("t_exposure", {"field": "exposure", "gte": "高"}, {"defense": -15}),
+            ]))
+            stack.enter_context(patch("world.rules.status_query.status.display_for", return_value=SimpleNamespace(label="合成警告", severity="warning")))
+            panel = status_presenter(PresentationContext(self.npc, 1))
+        self.assertEqual(panel["actor"]["identity"], str(self.npc.pk))
+        self.assertEqual(panel["conditions"][0]["provenance"], {
+            "kind": "equipment", "equipment_sources": [{"item_key": "t_owner", "label": "合成主人護符"}],
+        })
 
     @covers_requirement(
         "webclient-possession-presentation::the-dispatcher-refuses-possession-incompatible-actions-with-fixed-zero-write-results"

@@ -66,6 +66,10 @@ describe("StatusPanel (H2 island-stack root)", () => {
   it("the trailing-bar memory survives a hidden-then-shown revision", async () => {
     const initialStatus = {
       ...STATUS_PANEL_SAMPLE,
+      conditions: [{
+        code: "t_equipment", label: "合成警告", severity: "warning",
+        provenance: { kind: "equipment", equipment_sources: [{ item_key: "t_a", label: "合成護符" }] },
+      }],
       resources: {
         hp: { current: 100, maximum: 100 },
         mp: { current: 50, maximum: 50 },
@@ -76,7 +80,7 @@ describe("StatusPanel (H2 island-stack root)", () => {
     expect(w.get('[data-testid="status-panel"]').isVisible()).toBe(false);
 
     const damagedStatus = {
-      ...STATUS_PANEL_SAMPLE,
+      ...initialStatus,
       resources: {
         hp: { current: 80, maximum: 100 },
         mp: { current: 50, maximum: 50 },
@@ -115,8 +119,8 @@ describe("StatusPanel (H2 island-stack root)", () => {
     const status = {
       ...STATUS_PANEL_SAMPLE,
       conditions: [
-        { code: "defense_instinct_defense_bonus", label: "防禦本能", severity: "beneficial" },
-        { code: "poison", label: "中毒", severity: "harmful" },
+        { code: "defense_instinct_defense_bonus", label: "防禦本能", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "beneficial" },
+        { code: "poison", label: "中毒", provenance: { kind: "non_equipment", equipment_sources: [] }, severity: "harmful" },
       ],
     };
     const w = mountPanel({ status, visible: true });

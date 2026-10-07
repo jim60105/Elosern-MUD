@@ -9,10 +9,21 @@ import { describe, expect, it } from "vitest";
 import { conditionLabel } from "../../lib/condition_label.js";
 
 function condition(overrides = {}) {
-  return { label: "烈風", code: "gale", ...overrides };
+  return { label: "烈風", code: "gale", provenance: { kind: "non_equipment", equipment_sources: [] }, ...overrides };
 }
 
 describe("conditionLabel", () => {
+  it("discloses supplied equipment labels, independent mixed sources and neutral unknown detail", () => {
+    const equipment_sources = [{ item_key: "t_a", label: "合成護符甲" }, { item_key: "t_b", label: "合成護符乙" }];
+    expect(conditionLabel(condition({
+      remaining_seconds: 17, modifiers: { defense: -15 },
+      provenance: { kind: "equipment", equipment_sources },
+    }))).toBe("烈風，剩 17 秒，防禦 -15，裝備來源：合成護符甲、合成護符乙");
+    expect(conditionLabel(condition({ provenance: { kind: "mixed", equipment_sources } })))
+      .toBe("烈風，裝備來源：合成護符甲、合成護符乙，另有獨立來源");
+    expect(conditionLabel(condition({ provenance: { kind: "unknown", equipment_sources: [] } })))
+      .toBe("烈風，來源暫無資料");
+  });
   it("falls back to the condition code when no label is supplied", () => {
     expect(conditionLabel(condition({ label: null }))).toBe("gale");
     expect(conditionLabel(condition({ label: undefined }))).toBe("gale");
