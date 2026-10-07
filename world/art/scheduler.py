@@ -24,6 +24,11 @@ class ArtDrainScript(DefaultScript):
     def at_repeat(self) -> None:
         if not settings.ART_SCHEDULER_ENABLED:
             return
+        from world.art.publication import is_paused
+
+        if is_paused():
+            # A world snapshot pauses the drain (server.saves.snapshot).
+            return
         from world.art.worker import drain
 
         drain(settings.ART_SCHEDULER_LIMIT)

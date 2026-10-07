@@ -13,7 +13,7 @@ describe("GmNav", () => {
   it("lists every design section in order with the overview active", () => {
     const wrapper = nav();
     const labels = wrapper.findAll(".gm-nav__label").map((node) => node.text().replace("，", ""));
-    expect(labels).toEqual(["總覽", "維運", "執行期狀態", "世界資料", "操作", "GM 介入"]);
+    expect(labels).toEqual(["總覽", "維運", "執行期狀態", "世界資料", "存檔", "GM 介入"]);
     const active = wrapper.get("[aria-current='page']");
     expect(active.attributes("data-section")).toBe("overview");
     expect(active.attributes("href")).toBe("/gm/");
@@ -25,7 +25,6 @@ describe("GmNav", () => {
     const disabled = wrapper.findAll("[aria-disabled='true']");
     expect(disabled.map((node) => node.attributes("data-section"))).toEqual([
       "operations",
-      "actions",
       "intervention",
     ]);
     for (const node of disabled) {
@@ -34,6 +33,10 @@ describe("GmNav", () => {
       expect(node.attributes("tabindex")).toBeUndefined();
       expect(node.text()).toContain("尚未開放");
     }
+    // The delivered saves section (S5) is a real link to its page.
+    const saves = wrapper.get("[data-section='actions']");
+    expect(saves.element.tagName).toBe("A");
+    expect(saves.attributes("href")).toBe("/gm/saves");
     // The delivered world-data section (S4) is a real link to its home.
     const world = wrapper.get("[data-section='world-data']");
     expect(world.element.tagName).toBe("A");
@@ -80,7 +83,7 @@ describe("GmNav", () => {
 
   it("ignores pointer and keyboard activation of a disabled section", async () => {
     const wrapper = nav();
-    const disabled = wrapper.get("[data-section='actions']");
+    const disabled = wrapper.get("[data-section='intervention']");
     await disabled.trigger("click");
     await disabled.trigger("keydown", { key: "Enter" });
     await disabled.trigger("keydown", { key: " " });
@@ -137,7 +140,7 @@ describe("GmShell", () => {
     expect(wrapper.get("a.gm-shell__skip").attributes("href")).toBe("#gm-main");
     await wrapper.get("[data-section='overview']").trigger("click", { button: 0 });
     expect(wrapper.emitted("navigate")[0][0].key).toBe("overview");
-    await wrapper.get("[data-section='actions']").trigger("click");
+    await wrapper.get("[data-section='intervention']").trigger("click");
     expect(wrapper.emitted("navigate")).toHaveLength(1);
   });
 

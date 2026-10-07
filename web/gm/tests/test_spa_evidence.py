@@ -115,7 +115,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         )
         result = _run_vitest(*suites)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+16 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+17 passed")
 
     @covers_requirement("gm-world-data::authored-browser-and-runtime-links", "gm-world-data::facade-observability-and-isolated-delivery")
     def test_world_data_vitest_cases_pass(self):
@@ -124,6 +124,15 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         result = _run_vitest("world.test.js", "entity-link.test.js", "json-tree.test.js")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r"Test Files\s+3 passed")
+
+    @covers_requirement("gm-save-management::operator-saves-page", "gm-save-management::protected-save-api-and-streaming-download")
+    def test_saves_page_vitest_cases_pass(self):
+        # gm-portal-s5-saves: metadata and restore result, labelled creation,
+        # confirmation/cancellation, danger copy, code-based failures that never
+        # become a permission denial, downloads, the S5 route with S6 disabled.
+        result = _run_vitest("saves.test.js", "api.test.js", "router.test.js", "shell.test.js")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"Test Files\s+4 passed")
 
     @covers_requirement("gm-portal-spa::single-gm-fetch-boundary")
     def test_fetch_boundary_vitest_cases_pass(self):

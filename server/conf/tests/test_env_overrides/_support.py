@@ -101,6 +101,7 @@ ENV_BACKED: dict[str, str] = {
     "LLM_TRANSCRIPT_RETENTION_DAYS": "LLM_TRANSCRIPT_RETENTION_DAYS",
     "GM_RECENT_LLM_CAPACITY": "GM_RECENT_LLM_CAPACITY",
     "GM_RECENT_ISSUE_CAPACITY": "GM_RECENT_ISSUE_CAPACITY",
+    "GM_AUTOSAVE_KEEP": "GM_AUTOSAVE_KEEP",
 }
 
 
@@ -147,6 +148,7 @@ DEFAULT_REPR: dict[str, str] = {
     "LLM_TRANSCRIPT_RETENTION_DAYS": "14",
     "GM_RECENT_LLM_CAPACITY": "500",
     "GM_RECENT_ISSUE_CAPACITY": "200",
+    "GM_AUTOSAVE_KEEP": "10",
 }
 
 
@@ -224,6 +226,7 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "LLM_TRANSCRIPT_RETENTION_DAYS", " 30 ", "30"),
     ("GM_RECENT_LLM_CAPACITY", "GM_RECENT_LLM_CAPACITY", "50", "50"),
     ("GM_RECENT_ISSUE_CAPACITY", "GM_RECENT_ISSUE_CAPACITY", " 20 ", "20"),
+    ("GM_AUTOSAVE_KEEP", "GM_AUTOSAVE_KEEP", "3", "3"),
 ]
 
 
@@ -264,6 +267,7 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("LLM_TRANSCRIPT_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
     ("GM_RECENT_LLM_CAPACITY", "0", "expected a positive integer"),
     ("GM_RECENT_ISSUE_CAPACITY", "many", "expected a positive integer"),
+    ("GM_AUTOSAVE_KEEP", "0", "expected a positive integer"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "0", "expected an integer of at least 1"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "-2", "expected an integer of at least 1"),
     ("LLM_TRANSCRIPT_RETENTION_DAYS", "two", "expected an integer of at least 1"),
@@ -356,6 +360,7 @@ class _SubprocessSettingsTests(unittest.TestCase):
                 "LLM_TRANSCRIPT_RETENTION_DAYS",
                 "GM_RECENT_LLM_CAPACITY",
                 "GM_RECENT_ISSUE_CAPACITY",
+                "GM_AUTOSAVE_KEEP",
             )
         }
 

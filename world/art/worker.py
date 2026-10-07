@@ -43,6 +43,7 @@ from world.art.queue import (
     settle,
     settle_generated,
 )
+from world.art import publication
 from world.art.sd_worker import SDError, resolve_sd_client
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
@@ -129,20 +130,22 @@ def _write_temp(identity: str, png_bytes: bytes) -> str:
             f"output identity {identity!r} resolves outside the store root"
         )
     target = _store_root() / identity
-    target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
-    )
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(png_bytes)
-            handle.flush()
-    except BaseException:
+    # Held so a world snapshot never sees a half-written temporary file.
+    with publication.publishing():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
+        )
         try:
-            os.unlink(tmp_path)
-        except OSError:  # observability: ignore R2: best-effort temp cleanup; the original error propagates below
-            pass
-        raise
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(png_bytes)
+                handle.flush()
+        except BaseException:
+            try:
+                os.unlink(tmp_path)
+            except OSError:  # observability: ignore R2: best-effort temp cleanup; the original error propagates below
+                pass
+            raise
     return tmp_path
 
 
@@ -298,19 +301,51 @@ def _settle_one(
         if is_gallery:
             return _gallery_failure("sd_internal_error")
         return ArtAssetStatus.FAILED, None, "sd_internal_error", False
-    if is_gallery:
+
+    def _publish() -> tuple[str, str | None, str | None, bool] | None:
+        """The publication step a world snapshot never splits."""
+        if is_gallery:
+            try:
+                stored = settle_gallery_generated(
+                    job_key,
+                    generation_token=generation_token,
+                    output_identity=identity,
+                    tmp_path=tmp_path,
+                    prompt={"positive": image.prompt, "negative": image.negative_prompt},
+                    seed=image.seed,
+                    checkpoint=image.checkpoint,
+                    image_size={"width": image.decoded_width, "height": image.decoded_height},
+                )
+            except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
+                log_warn(
+                    "sd_generation_error",
+                    context={
+                        "endpoint": _sd_endpoint(),
+                        "code": "sd_internal_error",
+                        "stage": "publication",
+                    },
+                    exc=error,
+                )
+                # A card-append failure leaves at worst an orphan FILE (written
+                # before the append) for the startup prune; the job settles failed.
+                return _gallery_failure("sd_internal_error")
+            if stored is None:
+                return None
+            _log_gallery_settle(subject, image_id, ArtAssetStatus.DONE, "generated")
+            return ArtAssetStatus.DONE, identity, None, True
         try:
-            stored = settle_gallery_generated(
-                job_key,
+            committed = settle_generated(
+                subject,
                 generation_token=generation_token,
                 output_identity=identity,
                 tmp_path=tmp_path,
-                prompt={"positive": image.prompt, "negative": image.negative_prompt},
                 seed=image.seed,
-                checkpoint=image.checkpoint,
-                image_size={"width": image.decoded_width, "height": image.decoded_height},
             )
         except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
+            # A non-stale claim whose atomic publication failed must still reach
+            # a terminal settle (the batch settles FAILED with the prior output
+            # retained); letting this escape would strand the record
+            # ``in_progress`` and skip every later record in the batch.
             log_warn(
                 "sd_generation_error",
                 context={
@@ -320,42 +355,19 @@ def _settle_one(
                 },
                 exc=error,
             )
-            # A card-append failure leaves at worst an orphan FILE (written
-            # before the append) for the startup prune; the job settles failed.
-            return _gallery_failure("sd_internal_error")
-        if stored is None:
+            return ArtAssetStatus.FAILED, None, "sd_internal_error", False
+        if committed is None:
             return None
-        _log_gallery_settle(subject, image_id, ArtAssetStatus.DONE, "generated")
+        _record, prior_identity = committed
+        if prior_identity:
+            _cleanup_prior_output(prior_identity)
         return ArtAssetStatus.DONE, identity, None, True
-    try:
-        committed = settle_generated(
-            subject,
-            generation_token=generation_token,
-            output_identity=identity,
-            tmp_path=tmp_path,
-            seed=image.seed,
-        )
-    except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
-        # A non-stale claim whose atomic publication failed must still reach
-        # a terminal settle (the batch settles FAILED with the prior output
-        # retained); letting this escape would strand the record
-        # ``in_progress`` and skip every later record in the batch.
-        log_warn(
-            "sd_generation_error",
-            context={
-                "endpoint": _sd_endpoint(),
-                "code": "sd_internal_error",
-                "stage": "publication",
-            },
-            exc=error,
-        )
-        return ArtAssetStatus.FAILED, None, "sd_internal_error", False
-    if committed is None:
-        return None
-    _record, prior_identity = committed
-    if prior_identity:
-        _cleanup_prior_output(prior_identity)
-    return ArtAssetStatus.DONE, identity, None, True
+
+    # The record transition, the atomic replace, and the superseded file's
+    # deletion run under the publication gate (``world.art.publication``),
+    # taken before ``queue_lock``, so a snapshot sees either none or all of it.
+    with publication.publishing():
+        return _publish()
 
 
 def _translate_prompt(
@@ -636,6 +648,9 @@ def drain(limit: int) -> int:
     Returns the number of jobs dispatched; the caller (a command or the
     scheduler Script) never blocks on the generation wait.
     """
+    if publication.is_paused():
+        # A world snapshot holds the art store still (world.art.publication).
+        return 0
     if not _try_acquire_worker_slot():
         return 0
     try:
@@ -682,6 +697,9 @@ def _run_and_release_slot(
 
 def drain_synchronous(limit: int) -> int:
     """Drain on the calling thread for deterministic tests and recovery paths."""
+    if publication.is_paused():
+        # A world snapshot holds the art store still (world.art.publication).
+        return 0
     if not _try_acquire_worker_slot():
         return 0
     try:

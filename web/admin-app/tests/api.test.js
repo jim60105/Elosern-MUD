@@ -141,3 +141,66 @@ describe("GM fetch helpers", () => {
     expect(gmReturnPath(undefined)).toBe("/gm/");
   });
 });
+
+describe("GM binary downloads (S5 save archives)", () => {
+  function fileReply(status, body, headers) {
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      headers: new Headers(headers),
+      blob: async () => ({ body }),
+      text: async () => body,
+    };
+  }
+
+  it("resolves a binary success to its blob and attachment filename", async () => {
+    const { api, fetchImpl } = client(
+      fileReply(200, "tar-bytes", {
+        "Content-Type": "application/x-tar",
+        "Content-Disposition": 'attachment; filename="elosern-save-x.tar"',
+      }),
+    );
+    const result = await api.download("/saves/x/download");
+    expect(result.filename).toBe("elosern-save-x.tar");
+    expect(result.blob).toEqual({ body: "tar-bytes" });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("/gm/api/saves/x/download");
+    expect(init.credentials).toBe("same-origin");
+  });
+
+  it("surfaces JSON failures by code and keeps auth handling", async () => {
+    const notFound = client(
+      fileReply(404, JSON.stringify({ ok: false, error: { code: "save_not_found", message: "找不到" } }), {
+        "Content-Type": "application/json",
+      }),
+    );
+    const error = await failure(notFound.api.download("/saves/x/download"));
+    expect(error.code).toBe("save_not_found");
+    expect(notFound.onForbidden).not.toHaveBeenCalled();
+
+    const anonymous = client(fileReply(401, "{}", { "Content-Type": "application/json" }));
+    expect((await failure(anonymous.api.download("/saves/x/download"))).code).toBe("unauthenticated");
+    expect(anonymous.navigate).toHaveBeenCalledTimes(1);
+
+    const denied = client(
+      fileReply(403, JSON.stringify({ ok: false, error: { code: "forbidden", message: "權限不足" } }), {
+        "Content-Type": "application/json",
+      }),
+    );
+    expect((await failure(denied.api.download("/saves/x/download"))).code).toBe("forbidden");
+    expect(denied.onForbidden).toHaveBeenCalledTimes(1);
+  });
+
+  it("never treats a JSON success body as a file", async () => {
+    const { api } = client(fileReply(200, JSON.stringify({ ok: true, data: {} }), { "Content-Type": "application/json" }));
+    expect((await failure(api.download("/saves/x/download"))).code).toBe("malformed_response");
+  });
+
+  it("keeps a domain refusal away from the permission-denied view", async () => {
+    const { api, onForbidden } = client(
+      reply(409, { ok: false, error: { code: "save_delete_forbidden", message: "自動存檔不能刪除" } }),
+    );
+    expect((await failure(api.post("/saves/x/delete"))).code).toBe("save_delete_forbidden");
+    expect(onForbidden).not.toHaveBeenCalled();
+  });
+});

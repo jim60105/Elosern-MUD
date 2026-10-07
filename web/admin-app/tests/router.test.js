@@ -24,11 +24,14 @@ describe("GM router", () => {
       "world-sources",
       "world-registry",
       "world-entry",
+      "saves",
       "forbidden",
       "not-found",
     ]);
     const delivered = GM_SECTIONS.filter((section) => section.route).map((section) => section.key);
-    expect(delivered).toEqual(["overview", "runtime", "world-data"]);
+    expect(delivered).toEqual(["overview", "runtime", "world-data", "actions"]);
+    // S6 (GM 介入) stays undelivered.
+    expect(GM_SECTIONS.find((section) => section.key === "intervention").route).toBeNull();
     for (const section of GM_SECTIONS.filter((s) => !s.route)) {
       expect(names).not.toContain(section.key);
       expect(section.children).toBeUndefined();
@@ -121,5 +124,12 @@ describe("GM router", () => {
     await router.push("/forbidden");
     expect(router.currentRoute.value.name).toBe("forbidden");
     expect(router.currentRoute.value.fullPath).toBe("/forbidden");
+  });
+
+  it("resolves the saves page directly through history routing", async () => {
+    const { router } = makeRouter();
+    await router.push("/saves");
+    expect(router.currentRoute.value.name).toBe("saves");
+    expect(router.currentRoute.value.meta.section).toBe("actions");
   });
 });

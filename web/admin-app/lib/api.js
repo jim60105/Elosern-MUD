@@ -3,10 +3,16 @@
 // Every GM API call goes through a client made here: same-origin requests
 // with the Django session cookie, `X-CSRFToken` from the `csrftoken` cookie on
 // POST writes, strict envelope validation, and code-based failures. 401 hands
-// off to the configured login page with a GM return path; 403 `forbidden`
-// selects the permission-denied view (a 403 `csrf_failed` is a transport
-// failure, surfaced by its code). Network failures and malformed bodies are
-// explicit client errors — never fabricated data. No retries, no cache.
+// off to the configured login page with a GM return path; only the access
+// refusal code `forbidden` selects the permission-denied view (a 403
+// `csrf_failed` is a transport failure, and a domain refusal such as S5's
+// `save_delete_forbidden` is an operation result — both surface by code).
+// Network failures and malformed bodies are explicit client errors — never
+// fabricated data. No retries, no cache.
+//
+// `download()` is the one binary exception (S5 save archives): success is the
+// file body, every failure is still the JSON envelope and takes the same
+// login/forbidden/code paths as `request()`.
 
 export const API_BASE = "/gm/api";
 export const GM_BASE = "/gm/";
@@ -47,6 +53,12 @@ export function loginRedirectUrl(loginUrl, location) {
   return `${loginUrl}${separator}next=${encodeURIComponent(gmReturnPath(location))}`;
 }
 
+// The filename of an `attachment; filename="..."` header, or "" when absent.
+export function attachmentName(header) {
+  const match = /filename="([^"]+)"/.exec(header ?? "");
+  return match ? match[1] : "";
+}
+
 function isEnvelope(body) {
   if (body === null || typeof body !== "object" || Array.isArray(body)) return false;
   if (body.ok === true) return Object.hasOwn(body, "data");
@@ -83,13 +95,16 @@ export function createGmApi({
       init.body = JSON.stringify(body ?? {});
     }
 
+    return unwrap(await send(path, init));
+  }
+
+  async function send(path, init) {
     let response;
     try {
       response = await fetchImpl(`${API_BASE}${path}`, init);
     } catch {
       throw new GmApiError("network_error", { message: CLIENT_MESSAGES.network_error });
     }
-
     if (response.status === 401) {
       if (!loginStarted) {
         loginStarted = true;
@@ -97,7 +112,10 @@ export function createGmApi({
       }
       throw new GmApiError("unauthenticated", { status: 401, message: "請先登入。" });
     }
+    return response;
+  }
 
+  async function unwrap(response) {
     let parsed;
     try {
       parsed = JSON.parse(await response.text());
@@ -114,12 +132,33 @@ export function createGmApi({
     if (parsed.ok) return parsed.data;
 
     const { code, message } = parsed.error;
-    if (response.status === 403 && code !== "csrf_failed") onForbidden();
+    if (response.status === 403 && code === "forbidden") onForbidden();
     throw new GmApiError(code, { status: response.status, message });
+  }
+
+  // A binary GET: resolves to `{ blob, filename }` on success; a JSON body
+  // (every failure, or an unexpected success envelope) goes through unwrap.
+  async function download(path) {
+    const response = await send(path, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { Accept: "application/x-tar, application/json" },
+    });
+    const type = response.headers?.get?.("Content-Type") ?? "";
+    if (!response.ok || type.includes("application/json")) {
+      await unwrap(response);
+      // A 2xx JSON body is not a file: never fabricate a download from it.
+      throw new GmApiError("malformed_response", {
+        status: response.status,
+        message: CLIENT_MESSAGES.malformed_response,
+      });
+    }
+    return { blob: await response.blob(), filename: attachmentName(response.headers?.get?.("Content-Disposition")) };
   }
 
   return {
     get: (path) => request(path),
     post: (path, body) => request(path, { method: "POST", body }),
+    download,
   };
 }

@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 from django.urls import URLPattern, path
 
-from web.gm import state_api, views, world_api
+from web.gm import saves_api, state_api, views, world_api
 from web.gm.access import gm_required
 
 
@@ -65,6 +65,26 @@ urlpatterns = [
         name="gm-api-prompts-reload",
     ),
     gm_path("api/sources/<path:name>", world_api.source_text, name="gm-api-source"),
+    # S5 world saves: the collection answers with and without the trailing
+    # slash; per-save actions take the id verbatim and validate it in the
+    # view before any filesystem access (gm-portal-s5-saves).
+    gm_path("api/saves", saves_api.saves_collection, name="gm-api-saves"),
+    gm_path("api/saves/", saves_api.saves_collection),
+    gm_path(
+        "api/saves/<str:save_id>/restore",
+        saves_api.save_restore,
+        name="gm-api-save-restore",
+    ),
+    gm_path(
+        "api/saves/<str:save_id>/delete",
+        saves_api.save_delete,
+        name="gm-api-save-delete",
+    ),
+    gm_path(
+        "api/saves/<str:save_id>/download",
+        saves_api.save_download,
+        name="gm-api-save-download",
+    ),
     gm_path("api", views.api_not_found),
     gm_path("api/", views.api_not_found),
     gm_path("api/<path:rest>", views.api_not_found),

@@ -136,6 +136,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `GM_RECENT_LLM_CAPACITY` | `GM_RECENT_LLM_CAPACITY` | 整數 | `500` | 正整數；log facade 寫出每條 `llm_call` 事件後，存入行程內的有界緩衝（超過容量時淘汰最舊的一筆）。`/gm/` 儀表板的 LLM 各層呼叫數、降級率與延遲只涵蓋緩衝內保留的呼叫，不是整個行程的累計；reload 後清空 |
 | `GM_RECENT_ISSUE_CAPACITY` | `GM_RECENT_ISSUE_CAPACITY` | 整數 | `200` | 正整數；所有 `warn`／`error` 事件的有界緩衝，供儀表板「最近警告與錯誤」與翻譯、去背服務的最近失敗使用；reload 後清空 |
+| `GM_AUTOSAVE_KEEP` | `GM_AUTOSAVE_KEEP` | 整數 | `10` | 正整數；世界存檔（S5）每種自動存檔（讀檔前、介入前）各自最多保留的份數，新建後刪除該種類最舊的一份；手動存檔永不自動刪除 |
 
 驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族。`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
