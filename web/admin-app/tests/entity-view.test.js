@@ -6,11 +6,12 @@ import { NPC_DETAIL, NPC_RAW, errorWith, fakeApi, mountWith } from "./runtime-he
 const CALL = "ab".repeat(16);
 
 function api(overrides = {}) {
+  const callPath = `/llm/calls/${CALL}`;
   return fakeApi({
     "/state/npcs/12": NPC_DETAIL,
     "/state/object/12/raw": NPC_RAW,
     "/state/npcs/12?owner=%2312": NPC_DETAIL,
-    "/llm/calls/" + CALL: { outcome: null, exchanges: [] },
+    [callPath]: { outcome: null, exchanges: [] },
     ...overrides,
   });
 }
