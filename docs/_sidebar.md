@@ -64,4 +64,5 @@
   - [Vue 前端架構](/development/frontend-vue-architecture)
   - [Vue 前端開發指南](/development/frontend-developer-guide)
   - [GM 執行期狀態檢視](/development/gm-portal-runtime-inspection)
+  - [GM 世界資料瀏覽](/development/gm-portal-world-data)
   - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)

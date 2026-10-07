@@ -6,16 +6,24 @@ import RuntimeEntityView from "./views/RuntimeEntityView.vue";
 import RuntimeHomeView from "./views/RuntimeHomeView.vue";
 import RuntimeListView from "./views/RuntimeListView.vue";
 import RuntimeSearchView from "./views/RuntimeSearchView.vue";
+import WorldEntryView from "./views/WorldEntryView.vue";
+import WorldHomeView from "./views/WorldHomeView.vue";
+import WorldRegistryView from "./views/WorldRegistryView.vue";
+import WorldSourceView from "./views/WorldSourceView.vue";
 import { GM_BASE } from "./lib/api.js";
 
 // History routing under /gm/. Delivered sections own routes: the overview, the
 // runtime state section (its nav tree, search, per-kind lists, entity pages and
 // the universal raw view), the permission-denied view, and a not-found view for
-// unknown client paths. Undelivered sections (S4/S5/S6) have no route.
+// unknown client paths. The world-data section (S4) owns its home, the source
+// viewer, registry lists and entry pages. Undelivered sections (S5/S6) have no
+// route.
 //
 // Order matters: the reserved runtime paths (search, the object raw route) are
-// registered before the parameterized kind routes so they can never be
-// swallowed — the same precedence the server's URL map keeps.
+// registered before the parameterized kind routes, and the reserved world
+// source path before the registry routes, so they can never be swallowed — the
+// same precedence the server's URL map keeps (no registry is named
+// ``sources``; a contract test pins that).
 export const routes = [
   { path: "/", name: "overview", component: OverviewView, meta: { title: "總覽", section: "overview", wide: true } },
   {
@@ -48,6 +56,37 @@ export const routes = [
     name: "runtime-entity",
     component: RuntimeEntityView,
     meta: { title: "執行期實體", section: "runtime" },
+  },
+  {
+    path: "/world",
+    name: "world-home",
+    component: WorldHomeView,
+    meta: { title: "世界資料", section: "world-data", wide: true },
+  },
+  {
+    path: "/world/sources/:name+",
+    name: "world-source",
+    component: WorldSourceView,
+    meta: { title: "原始檔", section: "world-data", wide: true },
+  },
+  {
+    path: "/world/sources",
+    name: "world-sources",
+    redirect: { name: "world-home" },
+  },
+  {
+    path: "/world/:registry",
+    name: "world-registry",
+    component: WorldRegistryView,
+    props: (route) => ({ registry: String(route.params.registry), query: { ...route.query } }),
+    meta: { title: "登錄表", section: "world-data" },
+  },
+  {
+    path: "/world/:registry/:key",
+    name: "world-entry",
+    component: WorldEntryView,
+    props: (route) => ({ registry: String(route.params.registry), entryKey: String(route.params.key) }),
+    meta: { title: "登錄表條目", section: "world-data", wide: true },
   },
   { path: "/forbidden", name: "forbidden", component: ForbiddenView, meta: { title: "權限不足" } },
   { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView, meta: { title: "找不到頁面" } },

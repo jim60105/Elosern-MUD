@@ -38,6 +38,7 @@ from web.gm.readers._sections import (
     tile,
     tiles,
 )
+from web.gm.readers.world import authored_link
 
 #: The affinity projection's row ceiling (the title-codex precedent: the
 #: counters still describe the full set, only the rendered rows are bounded).
@@ -101,11 +102,21 @@ def identity_section(entity: Any) -> dict[str, Any]:
     ]
     race_key = read_attr(entity, "race", default=None)
     if race_key:
-        rows.append(row("種族", _registry_label(RACE_REGISTRY, race_key) or str(race_key)))
+        rows.append(
+            row(
+                "種族",
+                _registry_label(RACE_REGISTRY, race_key) or str(race_key),
+                link_to=authored_link("races", race_key),
+            )
+        )
     subrace_key = read_attr(entity, "subrace", default=None)
     if subrace_key:
         rows.append(
-            row("亞種", _registry_label(SUBRACE_REGISTRY, subrace_key) or str(subrace_key))
+            row(
+                "亞種",
+                _registry_label(SUBRACE_REGISTRY, subrace_key) or str(subrace_key),
+                link_to=authored_link("subraces", subrace_key),
+            )
         )
     sex = read_attr(entity, "sex", default=None)
     if sex:
@@ -589,7 +600,11 @@ def character_list_item(entity: Any) -> dict[str, Any]:
         "label": label_of(entity),
         "fields": [
             row("待完成建立", "是" if pending else "否"),
-            row("種族", _registry_label(RACE_REGISTRY, read_attr(entity, "race", default=None)) or "—"),
+            row(
+                "種族",
+                _registry_label(RACE_REGISTRY, read_attr(entity, "race", default=None)) or "—",
+                link_to=authored_link("races", read_attr(entity, "race", default=None)),
+            ),
             row("所在位置", label_of(entity.location) if entity.location else "—"),
         ],
     }

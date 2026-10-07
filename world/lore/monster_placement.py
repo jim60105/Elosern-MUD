@@ -21,10 +21,11 @@ decision anywhere reads a habitat tag.
 """
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+from .registry_refs import ref, ref_many
 from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 # Read the variant registry as a MODULE attribute at call time (never a
 # from-import binding captured once): the synthetic test-data kit patches the
@@ -62,8 +63,10 @@ class AmbientPlacementRule:
     cell selects, with no RNG, database read, or wall-clock input.
     """
 
-    region_key: str
-    variant_keys: tuple[str, ...]
+    region_key: str = field(metadata=ref("wilderness_regions", inverse="ambient_placements"))
+    variant_keys: tuple[str, ...] = field(
+        metadata=ref_many("monster_variants", inverse="ambient_placements")
+    )
     quantity: int
     capacity: int
     selection_salt: int = 0
@@ -84,9 +87,11 @@ class MonsterSite:
 
     key: str
     kind: str
-    region_key: str
+    region_key: str = field(metadata=ref("wilderness_regions", inverse="monster_sites"))
     coordinates: tuple[int, int]
-    variant_keys: tuple[str, ...]
+    variant_keys: tuple[str, ...] = field(
+        metadata=ref_many("monster_variants", inverse="monster_sites")
+    )
     capacity: int
     one_shot: bool
     recover_after_ticks: int | None = None

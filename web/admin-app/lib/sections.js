@@ -1,9 +1,12 @@
 // GM navigation model (design §5 layout): one section per sub-project. The
 // runtime state section (gm-portal-s3-runtime-state) is delivered and carries
 // its navigation tree as children — global search first, then the curated
-// kinds. Every other section is still disabled with 「尚未開放」 and owns no
+// kinds. The world-data section (gm-portal-s4-world-data) is one entry: its
+// home page carries the grouped registry index, so ~40 registries never flood
+// the tree. Every other section is still disabled with 「尚未開放」 and owns no
 // route or placeholder page until its own change lands.
 import { RUNTIME_KINDS, RUNTIME_ROUTE } from "./runtime.js";
+import { WORLD_ROUTE } from "./world.js";
 
 export const GM_SECTIONS = Object.freeze([
   Object.freeze({ key: "overview", label: "總覽", route: "overview", href: "/gm/" }),
@@ -31,7 +34,7 @@ export const GM_SECTIONS = Object.freeze([
       ),
     ]),
   }),
-  Object.freeze({ key: "world-data", label: "世界資料", route: null }),
+  Object.freeze({ key: "world-data", label: "世界資料", route: WORLD_ROUTE.home, href: "/gm/world" }),
   Object.freeze({ key: "actions", label: "操作", route: null }),
   Object.freeze({ key: "intervention", label: "GM 介入", route: null }),
 ]);

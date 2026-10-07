@@ -112,6 +112,24 @@ class MonsterReaderTests(EvenniaTest):
             monsters.NUMERIC_SOURCE_LABELS[NUMERIC_SOURCE_INTERIM_TIER_BAND],
         )
 
+    def test_species_and_variant_rows_link_to_their_authored_entries(self):
+        # gm-portal-s4-world-data §4.4: registry-key runtime fields open the
+        # authored entry page through the shared link component.
+        monster = self._individual()
+        identity = section_of(monsters.detail(monster), "identity")
+        links = {entry["label"]: entry.get("link") for entry in identity["rows"]}
+        self.assertEqual(
+            links["物種"], {"kind": "registry", "registry": "monster_species", "id": SPECIES}
+        )
+        self.assertEqual(
+            links["變體"], {"kind": "registry", "registry": "monster_variants", "id": ORDINARY}
+        )
+        listed = {entry["label"]: entry.get("link") for entry in monsters.item_of(monster)["fields"]}
+        self.assertEqual(listed["物種"]["id"], SPECIES)
+        self.assertEqual(listed["變體"]["registry"], "monster_variants")
+        # The individual's stored identity is untouched by the link lookup.
+        self.assertEqual(read_attr(monster, "species_key", default=None), SPECIES)
+
     def test_approved_profile_variant_reports_its_own_numeric_source(self):
         monster = self._individual(STRONGER)
         detail = monsters.detail(monster)

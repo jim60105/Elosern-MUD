@@ -7,7 +7,9 @@ for each item live in the ``world/rules/rulebook/commerce/`` slices and are join
 to these identities by the catalog loader in ``world/rules/guild_config.py``.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from world.lore.registry_refs import ref_many
 
 #: The ``PRICE_TABLE`` band whose rows are one-of-a-kind keepsakes, never
 #: traded (masterwork-gear-price-band states the rule; this package owns the
@@ -21,7 +23,7 @@ class AssortmentDefinition:
 
     key: str
     display_name_zh: str
-    item_keys: tuple[str, ...]
+    item_keys: tuple[str, ...] = field(metadata=ref_many("items", inverse="assortments"))
 
 
 # The four capital assortments split the former 58-item general-store

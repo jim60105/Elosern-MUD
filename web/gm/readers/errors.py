@@ -3,7 +3,8 @@
 The transport maps these onto the S3 error matrix (design §7): an absent object
 is ``object_not_found``, an object that exists but is not the kind the route
 names is ``kind_mismatch``, and a filter the projection cannot use is
-``invalid_filter``.
+``invalid_filter``. The S4 world-data readers add ``registry_not_found``,
+``entry_not_found`` and ``source_not_found`` (all 404).
 """
 
 from __future__ import annotations
@@ -72,12 +73,39 @@ class InvalidQuery(ReaderError):
         super().__init__(message, code="invalid_query", status=400)
 
 
+class RegistryNotFound(ReaderError):
+    code = "registry_not_found"
+    status = 404
+
+    def __init__(self) -> None:
+        super().__init__("找不到指定的登錄表。", code="registry_not_found", status=404)
+
+
+class EntryNotFound(ReaderError):
+    code = "entry_not_found"
+    status = 404
+
+    def __init__(self) -> None:
+        super().__init__("此登錄表中沒有這個條目。", code="entry_not_found", status=404)
+
+
+class SourceNotFound(ReaderError):
+    code = "source_not_found"
+    status = 404
+
+    def __init__(self) -> None:
+        super().__init__("找不到指定的原始檔，或它不在可檢視的清單中。", code="source_not_found", status=404)
+
+
 __all__ = [
+    "EntryNotFound",
     "InvalidFilter",
     "InvalidQuery",
     "KindMismatch",
     "ObjectNotFound",
     "QueryTooLong",
     "ReaderError",
+    "RegistryNotFound",
+    "SourceNotFound",
     "UnsupportedKind",
 ]

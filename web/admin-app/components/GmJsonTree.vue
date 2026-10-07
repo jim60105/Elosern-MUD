@@ -6,10 +6,15 @@
 // to the object's raw inspection; values JSON cannot carry arrive as
 // ``{"$unserializable": "<type>", "repr": "…"}`` and are shown as a distinct,
 // bounded marker so one bad leaf never hides the rest of the inventory.
+// Authored world-data entries (gm-portal-s4) pass ``links``: a map from a
+// leaf's field path (``stages[0].objective.species_key``, the backend
+// reference-walk shape) to a link descriptor, so a declared reference renders
+// as a link at exactly that leaf while the raw value stays visible.
 // Collapsing uses native <details>, so it is keyboard-operable and stays
 // motion-neutral.
 import { computed } from "vue";
 import GmEntityLink from "./GmEntityLink.vue";
+import { childPath } from "../lib/world.js";
 
 const props = defineProps({
   value: { type: null, default: null },
@@ -18,6 +23,9 @@ const props = defineProps({
   depth: { type: Number, default: 0 },
   // Levels rendered expanded; deeper levels start collapsed.
   openDepth: { type: Number, default: 2 },
+  // This node's field path, and the field-path → link map of declared references.
+  path: { type: String, default: "" },
+  links: { type: Object, default: null },
 });
 
 const emit = defineEmits(["open-call"]);
@@ -54,6 +62,10 @@ const refLink = computed(() => ({
 // typeclass instead of a link that could resolve an unrelated ObjectDB row.
 const isObjectRef = computed(() => !props.value.model || props.value.model === "object");
 const addressableRef = computed(() => (isObjectRef.value ? refLink.value : null));
+const leafLink = computed(() => {
+  if (!props.links || container.value !== null || isRef.value || isMarker.value) return null;
+  return props.links[props.path] ?? null;
+});
 const scalar = computed(() => {
   if (typeof props.value === "string") return JSON.stringify(props.value);
   if (props.value === undefined) return "undefined";
@@ -83,6 +95,11 @@ const scalar = computed(() => {
       <code class="gm-json-tree__repr">{{ value.repr }}</code>
     </p>
 
+    <p v-else-if="leafLink" class="gm-json-tree__row gm-json-tree__row--linked" :data-path="path">
+      <span v-if="name !== ''" class="gm-json-tree__key">{{ name }}</span>
+      <GmEntityLink :link="leafLink" :label="value === null ? 'null' : String(value)" />
+    </p>
+
     <p v-else-if="container === null" class="gm-json-tree__row">
       <span v-if="name !== ''" class="gm-json-tree__key">{{ name }}</span>
       <code class="gm-json-tree__scalar" :data-type="typeof value">{{ scalar }}</code>
@@ -100,6 +117,8 @@ const scalar = computed(() => {
             :name="key"
             :depth="depth + 1"
             :open-depth="openDepth"
+            :path="childPath(path, key)"
+            :links="links"
             @open-call="emit('open-call', $event)"
           />
         </li>

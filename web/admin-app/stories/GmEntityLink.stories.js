@@ -50,3 +50,13 @@ export const Unaddressable = {
 };
 
 export const NoTarget = { args: { link: null, label: "—" } };
+
+// Authored world-data targets (gm-portal-s4): ◇ opens the entry page; a
+// declared reference whose target key is absent is broken text, not a link.
+export const AuthoredEntry = {
+  args: { link: { kind: "registry", registry: "t_hollows", id: "t_hollow_east" } },
+};
+
+export const MissingAuthoredTarget = {
+  args: { link: { kind: "registry", registry: "t_hollows", id: "t_hollow_gone", missing: true } },
+};

@@ -7,7 +7,7 @@ same structural vocabulary (type / objectives / destination layers) is the
 narrow conversion target that change 20's guardrail will compile to.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
@@ -18,6 +18,7 @@ from world.lore.monster_species import (
     MONSTER_VARIANT_REGISTRY,
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.registry_refs import ref, ref_many
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.maps.map_data import XYMAP_DATA_LIST
 
@@ -91,7 +92,9 @@ class RoomLocator:
     """
 
     kind: DestinationKind
-    anchor_key: str | None = None
+    anchor_key: str | None = field(
+        default=None, metadata=ref("anchors", inverse="quest_destinations", nullable=True)
+    )
     xyz: tuple[int, int, str] | None = None
 
 
@@ -101,19 +104,30 @@ class QuestObjective:
 
     kind: ObjectiveKind
     quantity: int = 1
-    monster_tier: str | None = None
+    monster_tier: str | None = field(
+        default=None, metadata=ref("monster_tiers", inverse="quest_objectives", nullable=True)
+    )
     destination: RoomLocator | None = None
     requires_bound_targets: bool = False
-    item_key: str | None = None
+    item_key: str | None = field(
+        default=None, metadata=ref("items", inverse="quest_objectives", nullable=True)
+    )
     #: The regional species-hunt selector (design D-Q1/D-Q2): a region key, a
     #: species key, and the countable variant keys owned by that species. The
     #: three are legal only together, mutually exclusive with ``monster_tier``
     #: and ``requires_bound_targets``, and at least one countable variant must be
     #: an ordinary baseline variant, so the acceptance-time guarantee about
     #: ordinary-eligible living targets is always expressible.
-    region_key: str | None = None
-    species_key: str | None = None
-    countable_variant_keys: tuple[str, ...] = ()
+    region_key: str | None = field(
+        default=None,
+        metadata=ref("wilderness_regions", inverse="quest_objectives", nullable=True),
+    )
+    species_key: str | None = field(
+        default=None, metadata=ref("monster_species", inverse="quest_objectives", nullable=True)
+    )
+    countable_variant_keys: tuple[str, ...] = field(
+        default=(), metadata=ref_many("monster_variants", inverse="quest_objectives")
+    )
     #: The bound site clear-out selector (design D-C1): the key of an authored
     #: site in ``MONSTER_SITE_REGISTRY``. Legal only together with
     #: ``requires_bound_targets=True`` and mutually exclusive with every other
@@ -122,7 +136,9 @@ class QuestObjective:
     #: site's authored capacity. It is a hand-written-only field: the
     #: deterministic compile boundary never authors it, and the stored payload
     #: round-trips it with an absent-key default.
-    site_key: str | None = None
+    site_key: str | None = field(
+        default=None, metadata=ref("monster_sites", inverse="quest_objectives", nullable=True)
+    )
 
 
 @dataclass(frozen=True)
@@ -140,7 +156,7 @@ class QuestDefinition:
     key: str
     display_name: str
     quest_type: QuestType
-    rank: str
+    rank: str = field(metadata=ref("guild_ranks", inverse="quest_definitions"))
     stages: tuple[QuestStage, ...]
     deadline_hours: int | None = None
     #: The two separately authored prose fields beside the guild grade

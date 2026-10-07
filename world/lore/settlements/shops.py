@@ -11,8 +11,9 @@ its two authored-identity validators move here unchanged (their guild
 registry imports stay function-local, now absolute for the subpackage move).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from world.lore.registry_refs import ref_many
 from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
 
@@ -25,7 +26,9 @@ class ShopDefinition:
     # Authored NPC identity of the shop's service host (design D5).
     host_name: str
     host_title: str
-    assortment_keys: tuple[str, ...]
+    assortment_keys: tuple[str, ...] = field(
+        metadata=ref_many("assortments", inverse="shops")
+    )
 
     @property
     def offered_item_keys(self) -> tuple[str, ...]:

@@ -19,11 +19,12 @@ describing a place that simply exists: a plaza, a forecourt, a quay. A
 partially authored host is a load error, not a half-built NPC.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Mapping
 
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.lore.registry_refs import ref, ref_many
 from world.lore.sex import SEX_VALUES
 
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
@@ -75,7 +76,7 @@ class PlaceDefinition:
     """Immutable identity of one service location."""
 
     key: str  # also the interior room tag
-    settlement_key: str
+    settlement_key: str = field(metadata=ref("settlements", inverse="places"))
     kind: PlaceKind
     room_name_zh: str
     room_desc_zh: str
@@ -88,16 +89,24 @@ class PlaceDefinition:
     # a legitimate authored value even for a place with a host).
     host_name: str | None = None
     host_title: str | None = None
-    host_race: str | None = None  # RACE_REGISTRY key
-    host_subrace: str | None = None  # SUBRACE_REGISTRY key under host_race
+    host_race: str | None = field(  # RACE_REGISTRY key
+        default=None, metadata=ref("races", inverse="host_places", nullable=True)
+    )
+    host_subrace: str | None = field(  # SUBRACE_REGISTRY key under host_race
+        default=None, metadata=ref("subraces", inverse="host_places", nullable=True)
+    )
     host_sex: str | None = None  # SEX_VALUES member
-    profession: str | None = None
+    profession: str | None = field(
+        default=None, metadata=ref("professions", inverse="places", nullable=True)
+    )
     service_id: str | None = None
     # The dataclass has no kw_only: every field after the first default needs
     # one. () reads as "declares no goods" / "authors no component kwargs",
     # and keeps ``dict(place.authored_kwargs)`` working against a host-less
     # row (the shop-identity scan) without a guard.
-    assortment_keys: tuple[str, ...] = ()
+    assortment_keys: tuple[str, ...] = field(
+        default=(), metadata=ref_many("assortments", inverse="places")
+    )
     # The profession blueprint's authored component identity kwargs (shop_key /
     # branch_key / dialogue_key), frozen as a mapping. Projected onto the
     # blueprint exactly as validate_service_hosts projects roster kwargs today.
@@ -108,14 +117,20 @@ class PlaceDefinition:
     # no assortment base rule. Removals decline items the referenced
     # assortments contain. Both are shop-only concepts: a place without a
     # shop identity may declare neither.
-    extra_item_keys: tuple[str, ...] = ()
-    excluded_item_keys: tuple[str, ...] = ()
+    extra_item_keys: tuple[str, ...] = field(
+        default=(), metadata=ref_many("items", inverse="extra_at_places")
+    )
+    excluded_item_keys: tuple[str, ...] = field(
+        default=(), metadata=ref_many("items", inverse="excluded_at_places")
+    )
     # The optional authored reference to this place's host's NPC persona
     # profile, by profile key (npc-persona-profile-registry D2). Resolving it
     # is mandatory only once every owning slice has filled its rows
     # (npc-persona-host-examiner-producers adds that rule); this field counts
     # as host material, so a hostless place carrying one is never hostless.
-    host_profile_key: str | None = None
+    host_profile_key: str | None = field(
+        default=None, metadata=ref("npc_profiles", inverse="host_places", nullable=True)
+    )
     # A place capability, independent of descriptive kind or host profession.
     letter_service: bool = False
 

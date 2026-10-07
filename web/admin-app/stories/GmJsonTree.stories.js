@@ -1,4 +1,6 @@
 import { h } from "vue";
+import { referenceLinks } from "../lib/world.js";
+import { MARKED_ENTRY } from "./world-fixtures.js";
 import GmJsonTree from "../components/GmJsonTree.vue";
 import { NPC_RAW } from "./runtime-fixtures.js";
 
@@ -31,3 +33,9 @@ export const Collapsed = { args: { value: NPC_RAW.raw, openDepth: 1 } };
 export const EmptyContainers = { args: { value: { attributes: [], tags: {}, components: [] } } };
 
 export const ScalarOnly = { args: { value: { dbref: 12, key: "合成守衛", active: true, note: null } } };
+
+// An authored world-data entry (gm-portal-s4): declared references link at
+// their exact field path; a dangling target stays visible as broken text.
+export const AuthoredEntryWithReferences = {
+  args: { value: MARKED_ENTRY.fields, links: referenceLinks(MARKED_ENTRY.references), openDepth: 4 },
+};
