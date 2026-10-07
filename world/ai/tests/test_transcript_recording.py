@@ -15,12 +15,12 @@ from twisted.python.failure import Failure
 
 from tools.spec_traceability import covers_requirement
 from world.ai import guardrail as guardrail_module
-from world.ai.client import OpenAICompatClient
 from world.ai.errors import LLMTransportError
 from world.ai.fake_client import FakeLLMClient
 from world.ai.guardrail import CallIdTap, guarded_call
 from world.ai.profiles import default_profiles, get_profile, profile_secrets
 from world.ai.schemas import ChatRequestDescriptor
+from world.ai.tests.test_client import make_client
 from world.observability import transcript
 
 API_KEY = "sk-synthetic-key-0001"
@@ -121,7 +121,7 @@ class _RecordingCase(unittest.TestCase):
                 patch.object(guardrail_module, "log_debug") as debug, \
                 patch("world.ai.client.log_info") as client_info, \
                 patch("world.ai.client.log_warn"):
-            client = OpenAICompatClient(get_profile("narrator"), reactor=Clock())
+            client = make_client(reactor=Clock())
             client.agent = agent
             result = _settle(guarded_call("narrator", wrap(client), descriptor))
         return result, info, debug, client_info
@@ -195,7 +195,7 @@ class CorrelationTests(_RecordingCase):
         pending = defer.Deferred()
         with override_settings(LLM_PROFILES=_raw()), \
                 patch("world.ai.client.log_warn"), patch.object(guardrail_module, "log_info"):
-            client = OpenAICompatClient(get_profile("narrator"), reactor=clock)
+            client = make_client(reactor=clock)
             client.agent = _SequenceAgent(pending)
             d = guarded_call("narrator", client, ChatRequestDescriptor(
                 messages=({"role": "user", "content": "x"},)))
@@ -302,7 +302,7 @@ class CredentialExclusionTests(_RecordingCase):
         with patch("world.ai.client.log_warn") as warn, \
                 override_settings(LLM_PROFILES=self.credentialed()), \
                 patch.object(guardrail_module, "log_info") as info:
-            client = OpenAICompatClient(get_profile("narrator"), reactor=Clock())
+            client = make_client(reactor=Clock())
             client.agent = _SequenceAgent(error)
             self.assertEqual(_settle(guarded_call("narrator", client, ChatRequestDescriptor(
                 messages=({"role": "user", "content": "旅人的祕密心事"},)))), "FALLBACK")

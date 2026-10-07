@@ -158,7 +158,11 @@ class AiTransportBoundaryTests(unittest.TestCase):
     def test_tests_never_construct_openai_compat_client(self):
         for module_path in _module_paths(AI_TESTS_ROOT):
             if module_path.name == "test_client.py":
-                continue  # the client's own unit tests must construct it
+                # The client's own unit tests must construct it, and they own
+                # the sanctioned `make_client` seam another test module may
+                # import when it has to drive the real client with a scripted
+                # agent (llm-transcript's recording-transport scenarios).
+                continue
             source = module_path.read_text(encoding="utf-8")
             with self.subTest(module=module_path.as_posix()):
                 self.assertNotIn("OpenAICompatClient(", source)

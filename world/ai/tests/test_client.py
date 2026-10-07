@@ -30,6 +30,13 @@ def narrator_profile():
 
 
 def make_client(profile=None, reactor=None):
+    """Build a real client — the sanctioned construction path for ai tests.
+
+    The transport contract (tests/test_ai_transport_contract.py) forbids every
+    module under world/ai/tests except this one from naming the constructor,
+    so a test module that must drive the real client with a scripted agent
+    imports this helper instead of building the client itself.
+    """
     return OpenAICompatClient(profile or narrator_profile(), reactor=reactor)
 
 
