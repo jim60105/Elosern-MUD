@@ -110,7 +110,7 @@ GM 控制台是僅限 Developer 帳號使用的營運者介面，掛載於 `/gm/
 - **相依邊界：** `web/admin-app/` 只能從遊戲樹匯入 `styles/tokens.css` 與 `styles/fonts*.css`；`scripts/gm-import-boundary.mjs` 會先解析相對路徑、別名（`web/admin-app/gm-aliases.mjs`）與符號連結再套用允許清單。
 - **總覽儀表板：** `views/OverviewView.vue` 透過 `lib/poller.js` 每 5 秒輪詢一次（以 setTimeout 串接、不重疊請求、分頁隱藏時暫停、回到前景立即更新一次），輪詢失敗時保留上一份資料並標示「資料過期」；401／403 會停止輪詢交給路由守衛。各區塊位於 `views/overview/`，選取最近呼叫會開啟 `GmCallDrawer`（原生 `<dialog>` 模態側欄），只在選取時才查詢 transcript。
 - **元件：** `GmShell`、`GmNav`、`GmPageHeader`、`GmPanel`、`GmTable`、`GmEmpty`、`GmError`、`GmStatusBadge`，以及 S2 新增的 `GmMeter`、`GmServiceCard`、`GmRefreshBar`、`GmCodeBlock`、`GmCallDrawer`，都只以設計代符構成，Storybook 標題為 `GM/<元件>`，並列於 GM 的元件清單中。seal 紅與 `.ui-btn--danger` 只保留給破壞性操作。
-- **導覽：** 側欄的 維運、執行期狀態、世界資料、操作、GM 介入 皆顯示為「尚未開放」，沒有路由也沒有佔位頁面，要等各自的後續變更（S2–S6）落地。
+- **導覽：** S2–S6 已全部落地，側欄四個區塊（總覽、執行期狀態、世界資料、存檔）皆為有效連結：S2b 的營運儀表板就是「總覽」首頁，沒有獨立的「維運」條目；S6 以脈絡化主控台控制落在實體、raw、記憶與儀表板畫面，刻意沒有獨立條目。route 為 null 的未來未交付區塊仍會渲染為停用並標示「尚未開放」，沒有路由也沒有佔位頁面。
 - **後端測試：** `web/gm/tests/`（`EvenniaTest`）已登錄於 `.github/evennia-shards.json`；新增的 GM 測試模組必須同時登錄。
 
 ## 前端相關需求的可追溯性

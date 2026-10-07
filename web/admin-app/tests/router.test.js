@@ -29,9 +29,10 @@ describe("GM router", () => {
       "not-found",
     ]);
     const delivered = GM_SECTIONS.filter((section) => section.route).map((section) => section.key);
+    // Every sub-project has landed: S2b's operations dashboard is the overview
+    // home (no separate 維運 entry) and S6 is contextual (no standalone entry).
     expect(delivered).toEqual(["overview", "runtime", "world-data", "actions"]);
-    // S6 is contextual, without a standalone navigation placeholder.
-    expect(GM_SECTIONS.find((section) => section.key === "intervention")).toBeUndefined();
+    expect(GM_SECTIONS.map((section) => section.key)).toEqual(delivered);
     for (const section of GM_SECTIONS.filter((s) => !s.route)) {
       expect(names).not.toContain(section.key);
       expect(section.children).toBeUndefined();

@@ -9,29 +9,24 @@ function nav(props = {}) {
   return mount(GmNav, { props: { items: GM_SECTIONS, activeKey: "overview", ...props } });
 }
 
+// S2–S6 are all delivered, so no real section is undelivered anymore. The
+// disabled-rendering behavior stays pinned with a synthetic future entry.
+const UNDELIVERED = { key: "future", label: "未來", route: null };
+
 describe("GmNav", () => {
   it("lists every design section in order with the overview active", () => {
     const wrapper = nav();
     const labels = wrapper.findAll(".gm-nav__label").map((node) => node.text().replace("，", ""));
-    expect(labels).toEqual(["總覽", "維運", "執行期狀態", "世界資料", "存檔"]);
+    expect(labels).toEqual(["總覽", "執行期狀態", "世界資料", "存檔"]);
     const active = wrapper.get("[aria-current='page']");
     expect(active.attributes("data-section")).toBe("overview");
     expect(active.attributes("href")).toBe("/gm/");
     expect(active.classes()).toContain("is-active");
   });
 
-  it("renders undelivered sections disabled with 尚未開放 and no link", () => {
+  it("renders every delivered section as a live link with no disabled entry", () => {
     const wrapper = nav();
-    const disabled = wrapper.findAll("[aria-disabled='true']");
-    expect(disabled.map((node) => node.attributes("data-section"))).toEqual([
-      "operations",
-    ]);
-    for (const node of disabled) {
-      expect(node.element.tagName).toBe("SPAN");
-      expect(node.attributes("href")).toBeUndefined();
-      expect(node.attributes("tabindex")).toBeUndefined();
-      expect(node.text()).toContain("尚未開放");
-    }
+    expect(wrapper.findAll("[aria-disabled='true']")).toHaveLength(0);
     // The delivered saves section (S5) is a real link to its page.
     const saves = wrapper.get("[data-section='actions']");
     expect(saves.element.tagName).toBe("A");
@@ -44,6 +39,18 @@ describe("GmNav", () => {
     const runtime = wrapper.get("[data-section='runtime']");
     expect(runtime.element.tagName).toBe("A");
     expect(runtime.attributes("href")).toBe("/gm/runtime");
+  });
+
+  it("renders an undelivered section disabled with 尚未開放 and no link", () => {
+    const wrapper = nav({ items: [...GM_SECTIONS, UNDELIVERED] });
+    const disabled = wrapper.findAll("[aria-disabled='true']");
+    expect(disabled.map((node) => node.attributes("data-section"))).toEqual(["future"]);
+    for (const node of disabled) {
+      expect(node.element.tagName).toBe("SPAN");
+      expect(node.attributes("href")).toBeUndefined();
+      expect(node.attributes("tabindex")).toBeUndefined();
+      expect(node.text()).toContain("尚未開放");
+    }
   });
 
   it("renders the runtime navigation tree only while that section is active", () => {
@@ -81,8 +88,8 @@ describe("GmNav", () => {
   });
 
   it("ignores pointer and keyboard activation of a disabled section", async () => {
-    const wrapper = nav();
-    const disabled = wrapper.get("[data-section='operations']");
+    const wrapper = nav({ items: [...GM_SECTIONS, UNDELIVERED] });
+    const disabled = wrapper.get("[data-section='future']");
     await disabled.trigger("click");
     await disabled.trigger("keydown", { key: "Enter" });
     await disabled.trigger("keydown", { key: " " });
@@ -130,7 +137,12 @@ describe("GmPageHeader", () => {
 describe("GmShell", () => {
   it("composes navigation, header, and content landmarks", async () => {
     const wrapper = mount(GmShell, {
-      props: { sections: GM_SECTIONS, activeKey: "overview", title: "總覽", account: "op" },
+      props: {
+        sections: [...GM_SECTIONS, UNDELIVERED],
+        activeKey: "overview",
+        title: "總覽",
+        account: "op",
+      },
       slots: { default: "<p class='content'>內容</p>" },
     });
     expect(wrapper.get("nav").attributes("aria-label")).toBe("GM 主選單");
@@ -139,7 +151,7 @@ describe("GmShell", () => {
     expect(wrapper.get("a.gm-shell__skip").attributes("href")).toBe("#gm-main");
     await wrapper.get("[data-section='overview']").trigger("click", { button: 0 });
     expect(wrapper.emitted("navigate")[0][0].key).toBe("overview");
-    await wrapper.get("[data-section='operations']").trigger("click");
+    await wrapper.get("[data-section='future']").trigger("click");
     expect(wrapper.emitted("navigate")).toHaveLength(1);
   });
 
