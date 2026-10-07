@@ -63,7 +63,7 @@ close paths SHALL retain their existing opener restoration.
 - **WHEN** a reference drawer's close control renders
 - **THEN** it carries no visible text node, renders a decorative close glyph, and exposes the same accessible name (e.g. `aria-label="關閉"`) an assistive technology would have read from the previous visible text
 
-#### Scenario: The skill-book drawer states its skill counts and graphical use
+#### Scenario: The skill-book drawer states its skill counts and cast syntax
 - **WHEN** the skill-book drawer opens with the `character` panel available
 - **THEN** its head carries a leading skill glyph and a `主動 {n} ‧ 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once, and graphical use/practice are discoverable without the old cast-syntax footer
 
