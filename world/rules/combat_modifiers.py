@@ -358,6 +358,11 @@ def matched_combat_modifiers(
     return tuple(matches)
 
 
+def combat_modifier_predicates() -> dict[str, dict[str, Any]]:
+    """Return current rule predicates for read-only source attribution."""
+    return {rule.id: dict(rule.when) for rule in _RULES}
+
+
 def evaluate_combat_modifiers(entity) -> dict[str, Any]:
     """Return the merged matching bundle without mutating entity state."""
     result: dict[str, Any] = {}

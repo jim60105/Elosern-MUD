@@ -42,6 +42,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
                 severity=display.severity,
                 remaining_seconds=cache.get("remaining_seconds"),
                 modifiers={},
+                provenance=assembly.buff_provenance[buff_key],
             )
         )
 
@@ -56,6 +57,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
                 severity=display.severity,
                 remaining_seconds=None,
                 modifiers=dict(adjustments),
+                provenance=assembly.rule_provenance[rule_id],
             )
         )
 

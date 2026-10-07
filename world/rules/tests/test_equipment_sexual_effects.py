@@ -712,6 +712,9 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             # the condition-context builder overlays it for rule matching.
             Path("world/rules/status_query/sexual.py"),
             Path("world/rules/status_query/context.py"),
+            # Attribution compares captured effective/stored contexts; it
+            # never reads or writes canonical exposure itself.
+            Path("world/rules/status_query/provenance.py"),
             Path("web/webclient/presentation/character.py"),
             # The GM character reader renders the same intimate read model as
             # the webclient presentation (``build_character_read_model``), so

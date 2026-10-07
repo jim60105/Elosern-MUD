@@ -7,6 +7,8 @@ from web.webclient.presentation.character import MAX_FULL_TITLE_CODE_POINTS
 from web.webclient.presentation.registry import build_production_registry
 from ._support import _T_COMPOSED_TITLE, _T_RANK, _T_TITLE, _context, _open_title_scope
 import unittest
+from dataclasses import replace
+from unittest.mock import patch
 
 
 class CharacterFullTitlePresenterTests(EvenniaTest):
@@ -31,6 +33,43 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
 
     def _status(self):
         return build_production_registry().render("status", _context(self.player))
+
+    @covers_requirement("webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers")
+    def test_status_v3_serializes_and_rejects_invalid_frozen_provenance(self):
+        from world.rules.status_query import build_status_read_model
+        from world.rules.status_query.models import ConditionValue, ConditionProvenance, EquipmentSource
+
+        model = build_status_read_model(self.player)
+        source = EquipmentSource("t_a", "合成護符")
+        valid = ConditionProvenance("equipment", (source,))
+        row = ConditionValue("t_warning", "合成警告", "warning", 17, {"defense": -15}, valid)
+        with patch("web.webclient.presentation.status.build_status_read_model", return_value=replace(model, conditions=(row,))):
+            panel = self._status()
+        self.assertEqual(panel["schema_version"], 3)
+        self.assertEqual(panel["conditions"], [{
+            "code": "t_warning", "label": "合成警告", "severity": "warning",
+            "remaining_seconds": 17, "modifiers": {"defense": -15},
+            "provenance": {"kind": "equipment", "equipment_sources": [{"item_key": "t_a", "label": "合成護符"}]},
+        }])
+        invalid = [
+            None, ConditionProvenance("legacy", ()), ConditionProvenance("equipment", ()),
+            ConditionProvenance("mixed", ()), ConditionProvenance("unknown", (source,)),
+            ConditionProvenance("non_equipment", (source,)),
+            ConditionProvenance("equipment", (source, source)),
+            ConditionProvenance("equipment", (EquipmentSource("t_b", "乙"), source)),
+            ConditionProvenance("equipment", tuple(EquipmentSource(f"t_{i}", "合成") for i in range(9))),
+            ConditionProvenance("equipment", (EquipmentSource("BAD", "甲"),)),
+            ConditionProvenance("equipment", (EquipmentSource("t_a", ""),)),
+            ConditionProvenance("equipment", (EquipmentSource("t_a", "字" * 129),)),
+        ]
+        for value in invalid:
+            with self.subTest(value=value), patch(
+                "web.webclient.presentation.status.build_status_read_model",
+                return_value=replace(model, conditions=(replace(row, provenance=value),)),
+            ):
+                panel = self._status()
+                self.assertFalse(panel["available"])
+                self.assertEqual(panel["schema_version"], 3)
 
 
     def test_an_untitled_actor_omits_the_row_on_both_panels(self):

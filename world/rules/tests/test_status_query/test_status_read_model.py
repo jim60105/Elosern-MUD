@@ -2,6 +2,8 @@
 """
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from contextlib import ExitStack
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
@@ -54,6 +56,139 @@ class StatusReadModelTests(EvenniaTest):
         super().setUp()
         self.actor = _actor(self)
         self.actor.location = self.room1
+
+    def _provenance_scope(self):
+        """Synthetic ownership declarations and matching rules, no live content."""
+        from world.rules.rulebook.schema import Rule
+        from world.skills.equipment import EquipmentSlot
+
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+        items = {
+            key: SimpleNamespace(
+                key=key, display_name_zh=label, modifier_key=key,
+                equipment_slot=EquipmentSlot.ACCESSORY,
+            )
+            for key, label in (("t_a", "合成護符甲"), ("t_b", "合成護符乙"))
+        }
+        effects = {
+            key: SimpleNamespace(attached_buffs=("t_adverse",), exposure_bias=bias)
+            for key, bias in (("t_a", 1), ("t_b", -1))
+        }
+        stack.enter_context(patch.dict("world.rules.equipment.ITEM_REGISTRY", items))
+        stack.enter_context(patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", items))
+        stack.enter_context(patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", effects))
+        stack.enter_context(patch.dict("world.rules.buffs.BUFF_DEFINITIONS", {
+            "t_adverse": SimpleNamespace(), "t_other": SimpleNamespace(),
+        }))
+        stack.enter_context(patch("world.rules.status_query.status.display_for",
+                                  return_value=SimpleNamespace(label="合成警告", severity="warning")))
+        rules = [
+            Rule("t_exposure", {"field": "exposure", "gte": "高"}, {"defense": -15}),
+            Rule("t_buff", {"buff_active": "t_adverse"}, {"agility": "-10%"}),
+            Rule("t_combined", {"field": "exposure", "gte": "高", "equipment_worn": "t_a"}, {"accuracy": -2}),
+            Rule("t_unrelated", {"field": "arousal", "gte": "高度"}, {"accuracy": -3}),
+        ]
+        stack.enter_context(patch("world.rules.combat_modifiers._RULES", rules))
+        self.actor.db.equipment = {
+            "weapon_main": None, "weapon_off": None, "armor": None, "accessories": ["t_a"],
+        }
+        return effects
+
+    @covers_requirement("webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers")
+    def test_equipment_threshold_provenance_and_actual_match_parity(self):
+        from world.rules.status_query.assembly import _assemble
+        from world.rules.combat_modifiers import matched_combat_modifiers
+        self._provenance_scope()
+        for stored, expected in (("中等", "equipment"), ("高", "mixed"), ("極高", "non_equipment")):
+            with self.subTest(stored=stored):
+                self.actor.sexual.exposure.value = stored
+                model = build_status_read_model(self.actor)
+                row = next(c for c in model.conditions if c.code == "t_exposure")
+                self.assertEqual(row.provenance.kind, expected)
+                self.assertEqual(row.modifiers, {"defense": -15})
+                self.assertEqual([s.item_key for s in row.provenance.equipment_sources],
+                                 [] if expected == "non_equipment" else ["t_a"])
+                combined = next(c for c in model.conditions if c.code == "t_combined")
+                self.assertEqual(combined.provenance.kind, "equipment")
+                self.assertEqual(_assemble(self.actor).matches, matched_combat_modifiers(self.actor))
+                self.assertEqual(self.actor.sexual.exposure.value, EXPOSURE_LEVELS.index(stored))
+        self.actor.sexual.pleasure.base = 85
+        row = next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_unrelated")
+        self.assertEqual(row.provenance.kind, "non_equipment")
+        self.actor.db.equipment["accessories"] = ["t_b", "t_a"]
+        self.actor.sexual.exposure.value = "高"
+        row = next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_exposure")
+        self.assertEqual(row.provenance.kind, "non_equipment", "net-zero overlay contributes no source")
+        self.actor.sexual.exposure.value = "極低"
+        self.actor.db.equipment["accessories"] = ["t_b"]
+        self.assertFalse(any(c.code == "t_exposure" for c in build_status_read_model(self.actor).conditions))
+
+    @covers_requirement("webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers")
+    def test_attached_ownership_preserves_independent_instances_and_orphans(self):
+        self._provenance_scope()
+        caches = {
+            "t_adverse:t_a": {"definition_key": "t_adverse", "source_key": "t_a", "stacks": 1, "remaining_seconds": 30},
+            "ordinary": {"definition_key": "t_adverse", "source_key": "t_a", "stacks": 1, "remaining_seconds": 120},
+            "t_other:t_a": {"definition_key": "t_other", "source_key": "t_a", "stacks": 1, "remaining_seconds": 60},
+        }
+        self.actor.attributes.add("buffs", caches)
+        model = build_status_read_model(self.actor)
+        buffs = [c for c in model.conditions if c.code == "t_adverse"]
+        self.assertEqual([c.remaining_seconds for c in buffs], [30, 120])
+        self.assertEqual([c.provenance.kind for c in buffs], ["equipment", "non_equipment"])
+        derived = next(c for c in model.conditions if c.code == "t_buff")
+        self.assertEqual(derived.provenance.kind, "mixed")
+        self.assertEqual(derived.provenance.equipment_sources[0].label, "合成護符甲")
+        self.assertEqual(next(c for c in model.conditions if c.code == "t_other").provenance.kind, "non_equipment")
+        del caches["ordinary"]
+        self.actor.attributes.add("buffs", caches)
+        self.assertEqual(next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_buff").provenance.kind, "equipment")
+        for source in (None, "t_b"):
+            with self.subTest(source=source):
+                caches["t_adverse:t_a"]["source_key"] = source
+                self.actor.attributes.add("buffs", caches)
+                rows = build_status_read_model(self.actor).conditions
+                self.assertEqual(next(c for c in rows if c.code == "t_adverse").provenance.kind, "unknown")
+                self.assertEqual(next(c for c in rows if c.code == "t_buff").provenance.kind, "non_equipment")
+        caches["t_adverse:t_a"]["source_key"] = "t_a"
+        self.actor.db.equipment["accessories"] = []
+        self.actor.attributes.add("buffs", caches)
+        self.assertEqual(next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_adverse").provenance.kind, "unknown")
+        self.actor.db.equipment["accessories"] = ["t_b", "t_a"]
+        caches["t_adverse:t_b"] = {"definition_key": "t_adverse", "source_key": "t_b", "stacks": 1}
+        self.actor.attributes.add("buffs", caches)
+        row = next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_buff")
+        self.assertEqual([s.item_key for s in row.provenance.equipment_sources], ["t_a", "t_b"])
+        caches["t_adverse:t_a"]["definition_key"] = "t_other"
+        self.actor.attributes.add("buffs", caches)
+        self.assertEqual(next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_other").provenance.kind, "unknown")
+
+    @covers_requirement("webclient-status-presentation::status-presentation-has-no-mutation-side-effects")
+    def test_provenance_reads_preserve_materialized_and_unmaterialized_storage(self):
+        import copy
+        self._provenance_scope()
+        for materialized in (False, True):
+            with self.subTest(materialized=materialized):
+                if not materialized:
+                    self.actor.attributes.remove("sexual_traits", category="traits")
+                    self.actor.__dict__.pop("sexual", None)
+                else:
+                    self.actor.sexual.exposure.value = "中等"
+                before = copy.deepcopy([
+                    self.actor.attributes.get("traits", category="traits"),
+                    self.actor.attributes.get("sexual_traits", category="traits"),
+                    self.actor.db.equipment, self.actor.attributes.get("buffs"),
+                ])
+                handlers = set(self.actor.__dict__)
+                first = build_status_read_model(self.actor)
+                self.assertEqual(build_status_read_model(self.actor), first)
+                self.assertEqual(before, [
+                    self.actor.attributes.get("traits", category="traits"),
+                    self.actor.attributes.get("sexual_traits", category="traits"),
+                    self.actor.db.equipment, self.actor.attributes.get("buffs"),
+                ])
+                self.assertEqual(set(self.actor.__dict__), handlers)
 
     @covers_requirement(
         "webclient-status-presentation::compact-status-reports-canonical-true-resources"
