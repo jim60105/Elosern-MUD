@@ -122,9 +122,10 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     graft_synth_combat_modifier()
     # state_reactions validates the shipped climax rulebook at import against
     # the live buff registry and MP cost tiers; the t_-only install removes
-    # both vocabularies it names, so the seed's first apply_buff dispatch
-    # would die importing it. Graft the marker buff + restore the shipped
-    # tier vocabulary BEFORE any lazy import reaches the module.
+    # both vocabularies it names. The kit's derivation pre-resolution already
+    # pulls the module in before the swap, so its import-time validation sees
+    # shipped data; the graft widens the vocabulary again for every later
+    # dispatch.
     from web.browser_support.browser_fixtures_data import (
         graft_synth_state_reaction_rulebook,
     )

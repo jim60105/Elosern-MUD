@@ -368,19 +368,19 @@ def graft_synth_state_reaction_rulebook() -> None:
     marker, earth carapace, water suffocation, fire ignite, lightning
     wards each needed a follow-up graft); this closes the seam class.
 
-    Ordering invariant: nothing may import ``world.rules.state_reactions``
-    between the install and this graft (the seed reaches it lazily via the
-    first ``apply_buff``; the server boot imports it as a startup step
-    after ``at_server_init``). The assertion below fails loudly if a future
-    resequencing breaks that.
+    Ordering invariant: ``world.rules.state_reactions`` validates the shipped
+    rulebook against the LIVE catalogs at its first import, so that import
+    must never happen between the registry swap and this graft. The kit
+    resolves import-time catalog derivations BEFORE it swaps anything
+    (``_resolve_import_time_derivations``), and that pass already pulls this
+    module in through the import chain of a derivation it resolves, so its
+    validation always sees shipped data; the import at the end of this body
+    proves the other order as well, and fails loudly there instead of inside
+    the first ``apply_buff`` dispatch.
     """
-    import sys
+    import importlib
     from pathlib import Path
 
-    assert "world.rules.state_reactions" not in sys.modules, (
-        "state_reactions was imported before the synth graft; the "
-        "install-time validation already fail-closed against t_-only data"
-    )
     import yaml
 
     from world.rules.buffs import BUFF_DEFINITIONS, load_buff_definitions
@@ -418,6 +418,10 @@ def graft_synth_state_reaction_rulebook() -> None:
     # for tier-label reads.
     for tier_key, tier in MP_SHIPPED_COST_TIERS.items():
         MP_COST_TIERS.setdefault(tier_key, tier)
+    # A no-op when the kit already resolved the module before the swap;
+    # otherwise this is the import the widened vocabulary above has to make
+    # possible.
+    importlib.import_module("world.rules.state_reactions")
 
 
 def synth_next_entry_rank_key() -> str:
