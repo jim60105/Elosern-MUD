@@ -82,12 +82,14 @@ def tag_rows(entity: Any) -> list[dict[str, Any]]:
     tags = getattr(entity, "tags", None)
     if tags is None or not hasattr(tags, "all"):
         return []
+    # ``TagHandler.all()`` returns bare key strings by default; the raw tab
+    # needs each tag's category too, so ask for the Tag objects themselves.
     rows = [
         {
             "key": str(getattr(tag, "db_key", "")),
             "category": str(getattr(tag, "db_category", "") or ""),
         }
-        for tag in tags.all()
+        for tag in tags.all(return_objs=True)
     ]
     rows.sort(key=lambda row: (row["category"], row["key"]))
     return rows

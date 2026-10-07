@@ -435,7 +435,7 @@ def affinity_section(entity: Any) -> dict[str, Any]:
                     "npc": cell(
                         f"#{npc.pk}",
                         mono=True,
-                        link=link("npcs", npc.pk, npc.key),
+                        link_to=link("npcs", npc.pk, npc.key),
                     ),
                     "name": cell(label_of(npc)),
                     "value": cell(handler.affinity_for(entity), mono=True),
@@ -471,7 +471,11 @@ def party_section(entity: Any) -> dict[str, Any]:
         rows.append(
             table_row(
                 {
-                    "npc": cell(f"#{dbref}", mono=True, link=link("npcs", dbref, label_of(companion))),
+                    "npc": cell(
+                        f"#{dbref}",
+                        mono=True,
+                        link_to=link("npcs", dbref, label_of(companion)),
+                    ),
                     "name": cell(label_of(companion)),
                     "location": cell(label_of(companion.location) if companion.location else "—"),
                 },

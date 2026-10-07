@@ -527,7 +527,10 @@ def _thread_raw(record: Any) -> dict[str, Any]:
 def _letter_detail(identity: str) -> dict[str, Any] | None:
     from world.narrative.models import LetterReplyWork, LetterSend, LetterState
 
-    record = LetterSend.objects.filter(source_id=identity).select_related("state").first()
+    # The reverse accessors of the one-to-one rows are ``letterstate`` and
+    # ``letterreplywork``; a wrong ``select_related`` name raises before the
+    # record can be projected, so the lookup stays a plain filtered read.
+    record = LetterSend.objects.filter(source_id=identity).first()
     if record is None:
         return None
     state = LetterState.objects.filter(letter=record).first()
@@ -842,7 +845,7 @@ def _draft_detail(identity: str) -> dict[str, Any] | None:
                     "submission": cell(
                         entry.submission_key,
                         mono=True,
-                        link=source_link("request", entry.submission_key),
+                        link_to=source_link("request", entry.submission_key),
                     ),
                     "version": cell(entry.version, mono=True),
                     "validation": cell(entry.validation_status),
