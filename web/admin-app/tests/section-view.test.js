@@ -83,7 +83,7 @@ describe("GmSectionView", () => {
     });
     expect(wrapper.findAll(".gm-section__group-title").map((n) => n.text())).toEqual([
       "身分",
-      "外貌合成備註",
+      "外貌 合成備註",
     ]);
     expect(wrapper.findAll(".gm-ledger__row")).toHaveLength(2);
     expect(wrapper.get(".gm-section__note").text()).toBe("版本 1（世代 1）");
@@ -100,8 +100,8 @@ describe("GmSectionView", () => {
       ],
     });
     expect(tiles.findAll(".gm-stat").map((n) => n.text())).toEqual([
-      "30生命 / 30",
-      "10魔力 / 10",
+      "30生命/ 30",
+      "10魔力/ 10",
     ]);
     expect(tiles.findAll(".gm-stat__value")[1].classes()).toContain("is-gold");
 
@@ -141,7 +141,8 @@ describe("GmSectionView", () => {
     const error = wrapper.get(".gm-error");
     expect(error.text()).toContain("「錢包」無法讀取");
     expect(error.get("code").text()).toBe("source_unavailable");
-    expect(error.attributes("role")).toBeNull();
+    // ``live="off"`` renders no alert role: a section slot must not re-announce.
+    expect(error.attributes("role")).toBeUndefined();
     expect(wrapper.get("h3").text()).toContain("錢包");
     expect(wrapper.attributes("data-type")).toBe("error");
   });

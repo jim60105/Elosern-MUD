@@ -164,7 +164,7 @@ onMounted(() => {
 
 <template>
   <div class="gm-memory">
-    <section class="gm-memory__block" aria-labelledby="gm-memory-list">
+    <section class="gm-memory__block" data-block="memories" aria-labelledby="gm-memory-list">
       <h3 id="gm-memory-list" class="gm-memory__title">記憶紀錄</h3>
       <GmFilterBar
         :fields="MEMORY_FILTERS"
@@ -237,7 +237,7 @@ onMounted(() => {
       </template>
     </section>
 
-    <section class="gm-memory__block" aria-labelledby="gm-memory-snapshots">
+    <section class="gm-memory__block" data-block="snapshots" aria-labelledby="gm-memory-snapshots">
       <h3 id="gm-memory-snapshots" class="gm-memory__title">
         情境快照
         <span class="gm-memory__hint">最新十筆</span>
@@ -294,7 +294,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="gm-memory__block" aria-labelledby="gm-memory-recall">
+    <section class="gm-memory__block" data-block="recall" aria-labelledby="gm-memory-recall">
       <h3 id="gm-memory-recall" class="gm-memory__title">
         召回預覽
         <span class="gm-memory__hint">以 NPC 自身為擁有者與請求者，等同正式召回查詢</span>
@@ -339,9 +339,9 @@ onMounted(() => {
         </p>
       </form>
 
-      <p v-if="recall.error" class="gm-recall__failed" role="alert">
-        <GmError compact :title="'召回失敗'" :message="recall.error.message" :code="recall.error.code" />
-      </p>
+      <div v-if="recall.error" class="gm-recall__failed" role="alert">
+        <GmError compact title="召回失敗" :message="recall.error.message" :code="recall.error.code" />
+      </div>
 
       <div v-else-if="recallActive && recall.result" class="gm-recall__result" data-testid="gm-recall-result">
         <dl class="gm-ledger gm-ledger__row">

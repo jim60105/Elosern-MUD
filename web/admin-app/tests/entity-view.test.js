@@ -71,7 +71,12 @@ describe("GmEntityView", () => {
     const tree = wrapper.get(".gm-json-tree");
     expect(tree.text()).toContain("t_count");
     expect(tree.text()).toContain("⟨set⟩");
-    expect(tree.get("a").attributes("href")).toBe("/gm/runtime/object/3/raw");
+    // The root reference links the inspected object itself; the location's
+    // reference links the room it stands in.
+    expect(tree.findAll("a").map((node) => node.attributes("href"))).toEqual([
+      "/gm/runtime/object/12/raw",
+      "/gm/runtime/object/3/raw",
+    ]);
   });
 
   it("renders a record-backed raw tab from the detail payload instead", async () => {

@@ -22,11 +22,13 @@ const valueOf = (field) => {
   return field.type === "checkbox" ? false : (field.default ?? "");
 };
 
+// Only explicitly set, non-empty values count: a field's displayed default is
+// what the server already assumes, not a filter the operator applied.
 const activeCount = computed(
-  () => props.fields.filter((field) => {
-    const value = valueOf(field);
-    return value !== "" && value !== false && value !== null;
-  }).length,
+  () =>
+    Object.values(props.modelValue).filter(
+      (value) => value !== "" && value !== false && value !== null && value !== undefined,
+    ).length,
 );
 
 function commit(key, value) {

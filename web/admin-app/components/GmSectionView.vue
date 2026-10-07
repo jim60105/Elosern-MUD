@@ -94,7 +94,7 @@ const columns = computed(() => props.section.columns ?? []);
       <dl v-if="payload === 'ledger'" class="gm-ledger gm-section__ledger">
         <div v-for="(row, index) in rows" :key="row.key ?? index" class="gm-ledger__row">
           <dt>{{ row.label }}</dt>
-          <dd><GmValue :entry="row" /></dd>
+          <dd><GmValue :entry="row" @open-call="emit('open-call', $event)" /></dd>
         </div>
       </dl>
 
@@ -108,7 +108,7 @@ const columns = computed(() => props.section.columns ?? []);
         :empty-message="section.empty_note ?? ''"
       >
         <template v-for="column in columns" #[`cell-${column.key}`]="{ value }">
-          <GmValue :entry="value ?? { value: null }" />
+          <GmValue :entry="value ?? { value: null }" @open-call="emit('open-call', $event)" />
         </template>
       </GmTable>
 
@@ -121,7 +121,7 @@ const columns = computed(() => props.section.columns ?? []);
           <dl class="gm-ledger">
             <div v-for="(row, rowIndex) in item.rows ?? []" :key="row.key ?? rowIndex" class="gm-ledger__row">
               <dt>{{ row.label }}</dt>
-              <dd><GmValue :entry="row" /></dd>
+              <dd><GmValue :entry="row" @open-call="emit('open-call', $event)" /></dd>
             </div>
           </dl>
         </div>

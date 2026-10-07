@@ -18,7 +18,8 @@ describe("GmJsonTree", () => {
     const wrapper = mountWith(GmJsonTree, { props: { value: NPC_RAW.raw.location } });
     const anchor = wrapper.get("a");
     expect(anchor.attributes("href")).toBe("/gm/runtime/object/3/raw");
-    expect(anchor.text()).toBe("合成廣場");
+    // The glyph is decoration inside the link; the label is the key.
+    expect(anchor.get("span:last-child").text()).toBe("合成廣場");
     expect(wrapper.get(".gm-json-tree__type").text()).toBe("typeclasses.rooms.Room");
   });
 

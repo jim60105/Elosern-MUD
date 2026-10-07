@@ -106,13 +106,16 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         self.assertEqual(
             suites,
             [
-                "api.test.js", "call-drawer.test.js", "components.test.js", "overview.test.js",
-                "poller.test.js", "router.test.js", "session.test.js", "shell.test.js",
+                "api.test.js", "call-drawer.test.js", "components.test.js",
+                "entity-link.test.js", "entity-view.test.js", "json-tree.test.js",
+                "npc-tabs.test.js", "overview.test.js", "poller.test.js", "router.test.js",
+                "runtime-filters.test.js", "runtime-views.test.js", "section-view.test.js",
+                "session.test.js", "shell.test.js",
             ],
         )
         result = _run_vitest(*suites)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertRegex(result.stdout, r"Test Files\s+8 passed")
+        self.assertRegex(result.stdout, r"Test Files\s+15 passed")
 
     @covers_requirement("gm-portal-spa::single-gm-fetch-boundary")
     def test_fetch_boundary_vitest_cases_pass(self):
@@ -146,8 +149,26 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
     def test_showcase_coverage_includes_every_gm_component(self):
         result = _run(["node", "scripts/component-coverage.mjs"], timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("GM component coverage: all 14 required GM component(s)", result.stdout)
+        self.assertIn("GM component coverage: all 23 required GM component(s)", result.stdout)
         self.assertIn("component coverage: all", result.stdout)
+
+    @covers_requirement(
+        "gm-portal-spa::operator-component-layer",
+        "gm-portal-spa::s1-navigation-and-history-routing",
+    )
+    def test_runtime_inspection_vitest_cases_pass(self):
+        """The runtime components and pages are the S3 additions to the layer."""
+        result = _run_vitest(
+            "entity-link.test.js",
+            "json-tree.test.js",
+            "runtime-filters.test.js",
+            "section-view.test.js",
+            "entity-view.test.js",
+            "npc-tabs.test.js",
+            "runtime-views.test.js",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r"Test Files\s+7 passed")
 
     @covers_requirement("gm-portal-spa::operator-component-layer")
     def test_showcase_coverage_fails_for_an_unlisted_gm_component(self):

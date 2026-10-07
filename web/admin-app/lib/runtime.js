@@ -74,8 +74,8 @@ export const RUNTIME_KINDS = Object.freeze([
         key: "subtype",
         label: "子類型",
         type: "select",
-        default: "event",
         options: Object.freeze([
+          Object.freeze({ value: "", label: "依後端預設" }),
           Object.freeze({ value: "event", label: "事件" }),
           Object.freeze({ value: "thread", label: "故事線" }),
           Object.freeze({ value: "letter", label: "書信" }),
@@ -134,9 +134,9 @@ export function kindLabel(kind) {
 //: The narrative subtype labels (also used by the list captions).
 export const NARRATIVE_SUBTYPE_LABELS = Object.freeze(
   Object.fromEntries(
-    (RUNTIME_KIND_BY_KEY.narrative.filters.find((filter) => filter.key === "subtype").options ?? []).map(
-      (option) => [option.value, option.label],
-    ),
+    (RUNTIME_KIND_BY_KEY.narrative.filters.find((filter) => filter.key === "subtype").options ?? [])
+      .filter((option) => option.value)
+      .map((option) => [option.value, option.label]),
   ),
 );
 

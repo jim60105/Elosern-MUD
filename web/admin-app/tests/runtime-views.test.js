@@ -74,7 +74,6 @@ describe("RuntimeListView", () => {
     await flushPromises();
     expect(boundary.calls[0].path).toBe("/state/monsters?species=t_whale&limit=50");
     await wrapper.get("input[name='region']").setValue("t_bramble_wold");
-    await wrapper.get("input[name='region']").trigger("change");
     await flushPromises();
     expect(boundary.calls.at(-1).path).toBe(
       "/state/monsters?species=t_whale&region=t_bramble_wold&limit=50",
@@ -88,7 +87,6 @@ describe("RuntimeListView", () => {
     expect(boundary.calls).toHaveLength(0);
     expect(wrapper.get(".gm-list-view__hint").text()).toContain("擁有角色");
     await wrapper.get("input[name='owner']").setValue("#5");
-    await wrapper.get("input[name='owner']").trigger("change");
     await flushPromises();
     expect(boundary.calls[0].path).toBe("/state/quests?owner=%235&limit=50");
   });

@@ -41,11 +41,9 @@ describe("GmFilterBar", () => {
       props: { fields: FIELDS, modelValue: { owner: "#5" } },
     });
     await wrapper.get("input[name='owner']").setValue("#9");
-    await wrapper.get("input[name='owner']").trigger("change");
     expect(wrapper.emitted("update:modelValue").at(-1)[0]).toEqual({ owner: "#9" });
     expect(wrapper.emitted("change")).toHaveLength(1);
     await wrapper.get("input[name='owner']").setValue("");
-    await wrapper.get("input[name='owner']").trigger("change");
     expect(wrapper.emitted("update:modelValue").at(-1)[0]).toEqual({});
     await wrapper.get("input[name='generated']").setValue(true);
     expect(wrapper.emitted("update:modelValue").at(-1)[0]).toEqual({ owner: "#5", generated: true });
@@ -87,7 +85,8 @@ describe("GmPager", () => {
     await wrapper.get(".gm-pager__select").setValue("50");
     expect(wrapper.emitted("limit")).toHaveLength(1);
     // The first page is already the start: nothing to reset.
-    expect(wrapper.findAll("button")[0].attributes("aria-disabled")).toBeNull();
+    // ``:aria-disabled="null"`` removes the attribute entirely.
+    expect(wrapper.findAll("button")[0].attributes("aria-disabled")).toBeUndefined();
     await wrapper.findAll("button")[0].trigger("click");
     expect(wrapper.emitted("first")).toHaveLength(1);
     const first = mountWith(GmPager, { props: { nextCursor: null, limit: 50, shown: 3, page: 1 } });

@@ -8,7 +8,6 @@
 // selected tab, and nothing here schedules a timer (unlike the overview
 // dashboard's visibility-aware polling).
 import { computed, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
 import GmCallDrawer from "./GmCallDrawer.vue";
 import GmEntityLink from "./GmEntityLink.vue";
 import GmError from "./GmError.vue";
@@ -153,7 +152,7 @@ function onDrawerClose() {
 <template>
   <div class="gm-entity">
     <nav class="gm-entity__crumbs" aria-label="位置">
-      <RouterLink class="gm-entity__crumb" :to="{ name: 'runtime-home' }">執行期狀態</RouterLink>
+      <a class="gm-entity__crumb" href="/gm/runtime">執行期狀態</a>
       <template v-if="listTarget">
         <span class="gm-entity__crumb-sep" aria-hidden="true">／</span>
         <a class="gm-entity__crumb" :href="listTarget">{{ kindLabel(kind) }}清單</a>

@@ -61,7 +61,6 @@ describe("GmNpcMemoryTab", () => {
     const wrapper = mountWith(GmNpcMemoryTab, { props: { npcDbref: "12", api: boundary } });
     await flushPromises();
     await wrapper.get("input[name='tier']").setValue("core");
-    await wrapper.get("input[name='tier']").trigger("change");
     await flushPromises();
     const filtered = boundary.calls.at(-1).path;
     expect(filtered).toContain("tier=core");
@@ -85,7 +84,10 @@ describe("GmNpcMemoryTab", () => {
     await wrapper.findAll(".gm-list__extra button")[1].trigger("click");
     await flushPromises();
     expect(boundary.calls.at(-1).path).toBe("/state/snapshots/t_snapshot_1?owner=%2312");
-    expect(wrapper.get("[data-section='identity']").text()).toContain("t_capability");
+    // Both detail panes render an ``identity`` section; scope to the snapshot's.
+    expect(
+      wrapper.get("[data-block='snapshots'] [data-section='identity']").text(),
+    ).toContain("t_capability");
   });
 
   it("posts the recall query and renders the authoritative selections", async () => {
@@ -93,7 +95,8 @@ describe("GmNpcMemoryTab", () => {
     const wrapper = mountWith(GmNpcMemoryTab, { props: { npcDbref: "12", api: boundary } });
     await flushPromises();
     await wrapper.get("textarea").setValue("合成記憶");
-    await wrapper.get("form").trigger("submit");
+    // The filter bar is the component's first form; the recall form is its own.
+    await wrapper.get(".gm-recall").trigger("submit");
     await flushPromises();
     const posted = boundary.calls.at(-1);
     expect(posted.method).toBe("post");
@@ -119,7 +122,7 @@ describe("GmNpcMemoryTab", () => {
     const before = boundary.calls.length;
     await wrapper.get("textarea").setValue("x".repeat(2001));
     expect(wrapper.get(".gm-recall__warning").text()).toContain("超過 2000 字元");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".gm-recall").trigger("submit");
     await flushPromises();
     expect(boundary.calls).toHaveLength(before);
   });
@@ -131,7 +134,7 @@ describe("GmNpcMemoryTab", () => {
     const wrapper = mountWith(GmNpcMemoryTab, { props: { npcDbref: "12", api: boundary } });
     await flushPromises();
     await wrapper.get("textarea").setValue("合成");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".gm-recall").trigger("submit");
     await flushPromises();
     expect(wrapper.get(".gm-error code").text()).toBe("query_too_long");
   });
