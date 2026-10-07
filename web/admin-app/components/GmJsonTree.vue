@@ -49,6 +49,11 @@ const refLink = computed(() => ({
   id: props.value.$ref,
   label: props.value.key || props.value.$ref,
 }));
+// Only an ObjectDB reference has a raw-inspection route. An account or script
+// reference carries a ``model`` discriminator and stays verbatim text with its
+// typeclass instead of a link that could resolve an unrelated ObjectDB row.
+const isObjectRef = computed(() => !props.value.model || props.value.model === "object");
+const addressableRef = computed(() => (isObjectRef.value ? refLink.value : null));
 const scalar = computed(() => {
   if (typeof props.value === "string") return JSON.stringify(props.value);
   if (props.value === undefined) return "undefined";
@@ -60,7 +65,13 @@ const scalar = computed(() => {
   <div class="gm-json-tree" :data-depth="depth">
     <p v-if="isRef" class="gm-json-tree__row">
       <span v-if="name !== ''" class="gm-json-tree__key">{{ name }}</span>
-      <GmEntityLink :link="refLink" glyph="▸" @open-call="emit('open-call', $event)" />
+      <GmEntityLink
+        v-if="addressableRef"
+        :link="refLink"
+        glyph="▸"
+        @open-call="emit('open-call', $event)"
+      />
+      <span v-else class="gm-json-tree__scalar">{{ value.key || value.$ref }}</span>
       <span v-if="value.typeclass" class="gm-json-tree__type">{{ value.typeclass }}</span>
     </p>
 

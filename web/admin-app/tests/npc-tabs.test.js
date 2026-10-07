@@ -158,7 +158,7 @@ describe("GmNpcDialogueTab", () => {
     });
     const wrapper = mountWith(GmNpcDialogueTab, { props: { npcDbref: "12", api: boundary } });
     await flushPromises();
-    expect(boundary.calls[0].path).toBe("/state/dialogue?owner=%2312");
+    expect(boundary.calls[0].path).toBe("/state/dialogue?owner=%2312&limit=50");
     expect(wrapper.get("table").text()).toContain("t_player_a");
     await wrapper.get(".gm-list__extra button").trigger("click");
     await flushPromises();
@@ -192,7 +192,7 @@ describe("NPC tab integration", () => {
     expect(wrapper.text()).toContain("召回預覽");
     await tabs[3].trigger("click");
     await flushPromises();
-    expect(boundary.calls.at(-1).path).toBe("/state/dialogue?owner=%2312");
+    expect(boundary.calls.at(-1).path).toBe("/state/dialogue?owner=%2312&limit=50");
     expect(wrapper.text()).toContain("對話紀元");
   });
 });

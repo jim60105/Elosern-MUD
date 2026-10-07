@@ -34,6 +34,10 @@ const activeTab = ref("overview");
 const selectedCall = ref(null);
 const refreshing = ref(false);
 const tabRefs = ref([]);
+// The narrative tabs own their own collections and expose a reload, so the
+// header's refresh reloads whatever tab is actually selected.
+const memoryTab = ref(null);
+const dialogueTab = ref(null);
 
 const ownerFilters = computed(() => (props.owner ? { owner: props.owner } : {}));
 const dbref = computed(() => detail.value.data?.dbref ?? null);
@@ -87,6 +91,9 @@ async function loadRaw() {
         error: null,
         loadedAt: Date.now() / 1000,
       };
+    } else if (detail.value.status === "ready") {
+      // A raw inventory read is a read of this entity: the stamp is current.
+      detail.value = { ...detail.value, loadedAt: Date.now() / 1000 };
     }
   } catch (error) {
     rawState.value = { status: "error", data: null, error };
@@ -96,8 +103,21 @@ async function loadRaw() {
 async function refresh() {
   refreshing.value = true;
   try {
-    if (activeTab.value === "raw") await loadRaw();
-    else await loadDetail();
+    if (activeTab.value === "memory") {
+      await memoryTab.value?.reload?.();
+    } else if (activeTab.value === "dialogue") {
+      await dialogueTab.value?.reload?.();
+    } else if (activeTab.value === "raw" && isDbrefKind(props.kind)) {
+      await loadRaw();
+    } else if (activeTab.value === "raw") {
+      // A record-backed raw tab reads its detail payload: refresh the detail
+      // first so the raw view is not a reread of the previous response.
+      await loadDetail();
+      rawState.value = { status: "idle", data: null, error: null };
+      await loadRaw();
+    } else {
+      await loadDetail();
+    }
   } finally {
     refreshing.value = false;
   }
@@ -290,7 +310,12 @@ function onDrawerClose() {
       class="gm-entity__panel"
       tabindex="0"
     >
-      <GmNpcMemoryTab :npc-dbref="id" :api="api" @open-call="selectedCall = $event" />
+      <GmNpcMemoryTab
+        ref="memoryTab"
+        :npc-dbref="id"
+        :api="api"
+        @open-call="selectedCall = $event"
+      />
     </div>
 
     <div
@@ -301,7 +326,12 @@ function onDrawerClose() {
       class="gm-entity__panel"
       tabindex="0"
     >
-      <GmNpcDialogueTab :npc-dbref="id" :api="api" @open-call="selectedCall = $event" />
+      <GmNpcDialogueTab
+        ref="dialogueTab"
+        :npc-dbref="id"
+        :api="api"
+        @open-call="selectedCall = $event"
+      />
     </div>
 
     <GmCallDrawer :call-id="selectedCall" :api="api" @close="onDrawerClose" />

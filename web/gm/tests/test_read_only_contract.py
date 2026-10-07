@@ -55,8 +55,52 @@ FORBIDDEN_IMPORTS = frozenset(
     }
 )
 
-#: Assignment-target attribute prefixes that are stored state.
-FORBIDDEN_TARGET_ATTRS = frozenset({"db", "attributes", "tags", "nattributes", "ndb"})
+#: Assignment-target attributes that are stored state: the Evennia storage
+#: prefixes plus the persistent ``AttributeProperty`` descriptors the inspected
+#: typeclasses declare (assigning one of those is a write even though the
+#: attribute name carries no prefix).
+FORBIDDEN_TARGET_ATTRS = frozenset(
+    {
+        "db",
+        "attributes",
+        "tags",
+        "nattributes",
+        "ndb",
+        # typeclasses/entities.py, characters.py, npcs.py, monsters.py, rooms.py
+        "age",
+        "apparent_age",
+        "combat_traits",
+        "creation_draft",
+        "creation_pending",
+        "dialogue_memory",
+        "guild_rank",
+        "loot_table",
+        "behaviour_tree",
+        "npc_title",
+        "quest_log",
+        "race",
+        "schedule",
+        "sex",
+        "species_key",
+        "subrace",
+        "threat_tier",
+        "variant_key",
+        "wallet",
+        # rooms.py instance/anchor descriptors
+        "anchor_key",
+        "expire_tick",
+        "interacted",
+        "named",
+        "origin_room",
+        "owned_entities",
+        "pin_reasons",
+        "scene_archetype",
+        # LLMNPC
+        "max_chat_memory_size",
+        "thinking_messages",
+        "thinking_timeout",
+    }
+)
 
 #: The internal modules whose exported helpers a reader must import to use.
 HELPER_MODULES = ("_sections", "_entities", "_json")
@@ -71,15 +115,25 @@ def _tree(path: Path) -> ast.Module:
 
 
 def forbidden_calls(tree: ast.Module) -> list[str]:
-    """Every ``<expr>.save()``/``.create()``/… call, as ``name:line``."""
+    """Every writer call, and every extracted writer method, as ``name:line``.
+
+    Covers both the direct ``<expr>.save()`` shape and the alias shape
+    (``writer = obj.save`` then ``writer()``), which a call-only check misses.
+    """
     found: list[str] = []
     for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.ctx, ast.Load)
+            and node.attr in FORBIDDEN_METHODS
+        ):
+            found.append(f"{node.attr}:{node.lineno}")
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        name = func.attr if isinstance(func, ast.Attribute) else None
-        if name in FORBIDDEN_METHODS:
-            found.append(f"{name}:{node.lineno}")
+        # A method call on an attribute is already reported by the sweep above.
+        if isinstance(func, ast.Attribute):
+            continue
         if isinstance(func, ast.Name) and func.id in {
             "create_object",
             "create_script",
@@ -210,8 +264,13 @@ class ReaderStaticContractTest(unittest.TestCase):
             "obj.save()": forbidden_calls,
             "handler.attributes.add('x', value=1)": forbidden_calls,
             "Scratch.objects.get_or_create(key='x')": forbidden_calls,
+            "writer = obj.save": forbidden_calls,
             "obj.db.wallet = 5": forbidden_assignments,
             "obj.db_typeclass_path = 'x'": forbidden_assignments,
+            "entity.wallet = 5": forbidden_assignments,
+            "character.quest_log = []": forbidden_assignments,
+            "npc.schedule = {}": forbidden_assignments,
+            "room.expire_tick = 900": forbidden_assignments,
         }
         for source, checker in cases.items():
             with self.subTest(source=source):

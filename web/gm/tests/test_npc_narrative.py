@@ -13,6 +13,8 @@ synced at archive.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.npcs import NPC
@@ -27,7 +29,7 @@ from world.narrative.models import (
 from world.narrative.recall import fast_recall
 from world.rules.traits import restore_gauges_to_full
 
-from web.gm.readers import npcs
+from web.gm.readers import npcs, registry
 from web.gm.readers._entities import read_attr, stored_attribute_keys
 from web.gm.tests._state_support import (
     column_values,
@@ -269,6 +271,21 @@ class NpcNarrativeReaderTests(EvenniaTest):
         evidence = section_of(detail, "evidence")
         self.assertEqual(row_value(evidence, "call_id"), CALL_ID)
         self.assertEqual(link_ids(evidence, "call"), [CALL_ID])
+        # The complete stored payload is preserved in raw, not only the
+        # curated reading of it.
+        record = detail["raw"]["record"]
+        for field_name in (
+            "sources",
+            "budget_accounting",
+            "truncation_decisions",
+            "rendered_payload",
+            "created_at",
+            "thread_revisions",
+            "section_hashes",
+        ):
+            with self.subTest(field=field_name):
+                self.assertIn(field_name, record)
+        self.assertEqual(record["rendered_payload"]["call_id"], CALL_ID)
 
     def test_snapshot_without_evidence_or_truncation_reports_honest_empties(self):
         snapshot = self._snapshot(2)
@@ -294,7 +311,25 @@ class NpcNarrativeReaderTests(EvenniaTest):
         values = {field["label"]: field["value"] for field in items[0]["fields"]}
         self.assertEqual(values["紀元數"], 2)
         self.assertEqual(values["對話框數"], 2)
-        self.assertEqual([epoch["sequence"] for epoch in items[0]["epochs"]], [1, 2])
+        # Summary only: the epochs and their frames live in the detail.
+        self.assertNotIn("epochs", items[0])
+        self.assertNotIn("sections", items[0])
+
+    def test_dialogue_lists_are_summary_only_and_paginate_every_player(self):
+        for index in range(51):
+            self._dialogue(f"t_player_{index:02d}", 1)
+        first = registry.build_list("dialogue", {"owner": f"#{self.owner}"})
+        self.assertEqual(len(first["items"]), 50)
+        self.assertIsNotNone(first["next_cursor"])
+        for item in first["items"]:
+            self.assertNotIn("epochs", item)
+            self.assertEqual(set(item["fields"][0]), {"key", "label", "value", "mono"})
+        last = registry.build_list(
+            "dialogue", {"owner": f"#{self.owner}", "cursor": first["next_cursor"]}
+        )
+        self.assertEqual(len(last["items"]), 1)
+        self.assertIsNone(last["next_cursor"])
+        self.assertEqual(len(first["items"]) + len(last["items"]), 51)
 
     def test_dialogue_detail_marks_epochs_and_links_retained_calls(self):
         self._dialogue("t_player_a", 1)
@@ -309,6 +344,12 @@ class NpcNarrativeReaderTests(EvenniaTest):
         self.assertEqual(
             row_value(section_of(detail, "identity"), "玩家"), "t_player_a"
         )
+        # The raw tab carries the stored records the groups above read.
+        record = detail["raw"]["record"]
+        self.assertEqual(record["npc_id"], self.owner)
+        self.assertEqual(record["player_id"], "t_player_a")
+        self.assertEqual([epoch["sequence"] for epoch in record["epochs"]], [1, 2])
+        self.assertEqual(record["epochs"][0]["frames"][0]["identity"], "t_frame_1")
 
     def test_dialogue_detail_needs_a_matching_owner(self):
         self._dialogue("t_player_a", 1)
@@ -398,8 +439,11 @@ class NpcNarrativeReaderTests(EvenniaTest):
         self._memory(tick=1)
         boundary = npcs.recall(f"#{self.owner}", {"query": "x" * 2000})
         self.assertIsInstance(boundary, dict)
-        with self.assertRaises(Exception) as too_long:
-            npcs.recall(f"#{self.owner}", {"query": "x" * 2001})
+        with patch("world.narrative.recall.fast_recall") as fast_recall:
+            with self.assertRaises(Exception) as too_long:
+                npcs.recall(f"#{self.owner}", {"query": "x" * 2001})
+        # Refused before execution, never executed and discarded.
+        fast_recall.assert_not_called()
         self.assertEqual(too_long.exception.code, "query_too_long")
 
     def test_recall_refuses_a_missing_or_non_npc_target(self):
@@ -409,9 +453,19 @@ class NpcNarrativeReaderTests(EvenniaTest):
         with self.assertRaises(Exception) as missing:
             npcs.recall("#999999", {"query": ""})
         self.assertEqual(missing.exception.code, "object_not_found")
+        # An existing object of the wrong kind is a kind mismatch.
         with self.assertRaises(Exception) as wrong_kind:
             npcs.recall(f"#{self.char1.pk}", {"query": ""})
-        self.assertEqual(wrong_kind.exception.code, "object_not_found")
+        self.assertEqual(wrong_kind.exception.code, "kind_mismatch")
+
+    def test_memory_detail_excludes_private_authoring_records(self):
+        from world.narrative.memory import PRIVATE_AUTHORING_CATEGORIES
+
+        category = sorted(PRIVATE_AUTHORING_CATEGORIES)[0]
+        record = self._memory(tick=1, category=category)
+        with self.assertRaises(Exception) as hidden:
+            npcs.memory_detail(str(record.pk), {"owner": f"#{self.owner}"})
+        self.assertEqual(hidden.exception.code, "object_not_found")
 
     def test_viewing_the_narrative_tabs_creates_no_attributes(self):
         self._memory(tick=1)

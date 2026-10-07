@@ -380,6 +380,7 @@ def _flag(value: Any) -> bool:
 def memory_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
     """One memory record with its complete revision history."""
     from world.narrative.models import MemoryRecord
+    from world.narrative.memory import PRIVATE_AUTHORING_CATEGORIES
     from web.gm.readers.errors import ObjectNotFound
 
     # The owner is part of the identity: a record projected through this view
@@ -393,6 +394,10 @@ def memory_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
     if record is None:
         raise ObjectNotFound()
     if str(record.owner_id) != owner_id:
+        raise ObjectNotFound()
+    # The same cognition boundary the list applies: a private authoring record
+    # is not in-world knowledge, so it is never projected through this view.
+    if record.category in PRIVATE_AUTHORING_CATEGORIES:
         raise ObjectNotFound()
 
     def identity_section() -> dict[str, Any]:
@@ -431,6 +436,22 @@ def memory_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
 
     def revision_section() -> dict[str, Any]:
         revisions = record.revisions.order_by("-revision_number", "-id")
+
+        def supersedes_cell(entry: Any) -> dict[str, Any]:
+            if not entry.supersedes_record_id:
+                return {"value": "—", "mono": True}
+            # The superseded record belongs to the same owner, so the identity
+            # the frontend needs is carried with the link.
+            return {
+                "value": entry.supersedes_record_id,
+                "mono": True,
+                "link": {
+                    "kind": "memories",
+                    "id": str(entry.supersedes_record_id),
+                    "owner": owner_id,
+                },
+            }
+
         return table(
             [
                 column("revision", "修訂", mono=True),
@@ -447,7 +468,7 @@ def memory_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
                         "revision": {"value": entry.revision_number, "mono": True},
                         "availability": {"value": entry.availability, "mono": True},
                         "tier": {"value": entry.tier, "mono": True},
-                        "supersedes": {"value": entry.supersedes_record_id or "—", "mono": True},
+                        "supersedes": supersedes_cell(entry),
                         "decay": {"value": json_value(entry.decay_metadata), "mono": True},
                         "relations": {"value": json_value(entry.relations), "mono": True},
                         "created": {"value": json_value(entry.created_at), "mono": True},
@@ -651,6 +672,13 @@ def snapshot_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
                     "owner_generation": snapshot.owner_generation,
                     "thread_revisions": snapshot.thread_revisions,
                     "section_hashes": snapshot.section_hashes,
+                    # The complete stored payload: the curated sections above
+                    # are a reading of it, never a replacement for it.
+                    "sources": snapshot.sources,
+                    "budget_accounting": snapshot.budget_accounting,
+                    "truncation_decisions": snapshot.truncation_decisions,
+                    "rendered_payload": snapshot.rendered_payload,
+                    "created_at": snapshot.created_at,
                 }
             )
         },
@@ -682,40 +710,31 @@ def _snapshot_evidence(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def dialogue_list_items(filters: dict[str, Any]) -> list[dict[str, Any]]:
-    """Dialogue epochs and frames grouped by player, for one NPC owner."""
-    from world.narrative.epochs import epoch_frames
+    """One summary row per player, for one NPC owner (design §4 lists).
+
+    Lists carry summary fields only: the epochs and their frames stay in the
+    dialogue detail, so a page of player groups never ships frame content.
+    """
+    from django.db.models import Count
+
     from world.narrative.models import DialogueEpoch
+    from world.narrative.models import DialogueFrame
 
     owner_id, _entity = owner_identity(filters)
     epochs = DialogueEpoch.objects.filter(npc_id=owner_id).order_by(
         "player_id", "sequence", "id"
     )
-    grouped: dict[str, list[dict[str, Any]]] = {}
+    grouped: dict[str, list[Any]] = {}
     for epoch in epochs:
-        grouped.setdefault(epoch.player_id, []).append(
-            {
-                "epoch_id": epoch.pk,
-                "sequence": epoch.sequence,
-                "version": epoch.version,
-                "reason": epoch.reason,
-                "start_turn_id": epoch.start_turn_id,
-                "summary": epoch.summary,
-                "generation_id": epoch.generation_id,
-                "snapshot_id": epoch.snapshot_id,
-                "source_refs": json_value(epoch.source_refs),
-                "frames": [
-                    {
-                        "identity": frame.identity,
-                        "tick": frame.tick,
-                        "content": frame.content,
-                        "sources": json_value(frame.sources),
-                    }
-                    for frame in epoch_frames(epoch)
-                ],
-            }
-        )
+        grouped.setdefault(epoch.player_id, []).append(epoch.pk)
+    frame_counts = {
+        entry["epoch_id"]: entry["n"]
+        for entry in DialogueFrame.objects.filter(epoch__in=epochs)
+        .values("epoch_id")
+        .annotate(n=Count("id"))
+    }
     items = []
-    for player_id, entries in grouped.items():
+    for player_id, epoch_ids in grouped.items():
         items.append(
             {
                 "id": player_id,
@@ -723,13 +742,12 @@ def dialogue_list_items(filters: dict[str, Any]) -> list[dict[str, Any]]:
                 "dbref": None,
                 "label": player_id,
                 "owner": owner_id,
-                "epochs": entries,
                 "fields": [
                     row("玩家", player_id, mono=True),
-                    row("紀元數", len(entries), mono=True),
+                    row("紀元數", len(epoch_ids), mono=True),
                     row(
                         "對話框數",
-                        sum(len(entry["frames"]) for entry in entries),
+                        sum(frame_counts.get(epoch_id, 0) for epoch_id in epoch_ids),
                         mono=True,
                     ),
                 ],
@@ -826,6 +844,39 @@ def dialogue_detail(identity: Any, filters: dict[str, Any]) -> dict[str, Any]:
         "dbref": None,
         "typeclass": "",
         "sections": sections,
+        # The stored epoch and frame records, so the raw tab shows what the
+        # curated groups above read rather than an empty object.
+        "raw": {
+            "record": json_value(
+                {
+                    "npc_id": owner_id,
+                    "player_id": player_id,
+                    "epochs": [
+                        {
+                            "epoch_id": epoch.pk,
+                            "sequence": epoch.sequence,
+                            "version": epoch.version,
+                            "reason": epoch.reason,
+                            "start_turn_id": epoch.start_turn_id,
+                            "summary": epoch.summary,
+                            "generation_id": epoch.generation_id,
+                            "snapshot_id": epoch.snapshot_id,
+                            "source_refs": epoch.source_refs,
+                            "frames": [
+                                {
+                                    "identity": frame.identity,
+                                    "tick": frame.tick,
+                                    "content": frame.content,
+                                    "sources": frame.sources,
+                                }
+                                for frame in epoch_frames(epoch)
+                            ],
+                        }
+                        for epoch in epochs
+                    ],
+                }
+            )
+        },
     }
 
 
@@ -846,9 +897,15 @@ def recall(owner_identity_value: Any, body: dict[str, Any]) -> dict[str, Any]:
     text = str(owner_identity_value or "").strip().lstrip("#")
     if not text.isdigit():
         raise InvalidFilter("recall 必須指定 NPC 的 dbref。")
+    from evennia.objects.models import ObjectDB
+
+    # Existence and kind are separate facts: an existing object that is not an
+    # NPC is a kind_mismatch, an absent identity is object_not_found.
+    if ObjectDB.objects.filter(pk=int(text)).first() is None:
+        raise ObjectNotFound()
     npc = NPC.objects.filter(pk=int(text)).first()
     if npc is None:
-        raise ObjectNotFound()
+        raise KindMismatch()
     thread = (body or {}).get("thread")
     result = fast_recall(
         owner_id=str(npc.pk),

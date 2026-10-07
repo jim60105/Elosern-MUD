@@ -48,14 +48,40 @@ def bounded_repr(value: Any) -> str:
 
 
 def entity_ref(value: Any) -> dict[str, Any] | None:
-    """The ``$ref`` projection of an Evennia entity, else ``None``."""
+    """The ``$ref`` projection of an Evennia entity, else ``None``.
+
+    An ObjectDB reference keeps exactly the specified ``$ref``/``typeclass``/
+    ``key`` shape, because that is the one the raw-object route can resolve. An
+    AccountDB or ScriptDB reference carries an extra ``model`` discriminator:
+    their primary keys live in different tables, so a console must not send
+    them to the ObjectDB route where an unrelated row could share the number.
+    """
     if isinstance(value, entity_types()):
-        return {
+        reference = {
             "$ref": f"#{value.pk}",
             "typeclass": str(getattr(value, "db_typeclass_path", "") or ""),
             "key": str(getattr(value, "db_key", "") or ""),
         }
+        model = _model_name(value)
+        if model != "object":
+            reference["model"] = model
+        return reference
     return None
+
+
+def _model_name(value: Any) -> str:
+    """The stored-table family of an entity reference."""
+    from evennia.accounts.models import AccountDB
+    from evennia.objects.models import ObjectDB
+    from evennia.scripts.models import ScriptDB
+
+    if isinstance(value, ObjectDB):
+        return "object"
+    if isinstance(value, AccountDB):
+        return "account"
+    if isinstance(value, ScriptDB):
+        return "script"
+    return "object"
 
 
 def unserializable(value: Any) -> dict[str, str]:

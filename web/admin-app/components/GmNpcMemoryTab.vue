@@ -46,7 +46,10 @@ const form = reactive({ query: "", thread: "", include_superseded: false, includ
 
 const owner = computed(() => ({ owner: `#${props.npcDbref}` }));
 const refreshing = computed(() => memories.status === "loading" || snapshots.status === "loading");
-const queryTooLong = computed(() => form.query.length > RECALL_QUERY_LIMIT);
+// The server bound counts Unicode code points (Python ``len``), so the client
+// counter must too: a supplementary character is more than one UTF-16 unit.
+const queryPoints = computed(() => [...form.query].length);
+const queryTooLong = computed(() => queryPoints.value > RECALL_QUERY_LIMIT);
 const recallActive = computed(() => recall.status !== "idle");
 
 function detailOf(id) {
@@ -165,6 +168,8 @@ onMounted(() => {
 async function refreshAll() {
   await Promise.all([loadMemories(), loadSnapshots()]);
 }
+
+defineExpose({ reload: refreshAll });
 </script>
 
 <template>
@@ -325,7 +330,7 @@ async function refreshAll() {
             placeholder="輸入要召回的線索"
           ></textarea>
           <span class="gm-recall__count" :class="{ 'is-over': queryTooLong }">
-            {{ form.query.length }} / {{ RECALL_QUERY_LIMIT }}
+            {{ queryPoints }} / {{ RECALL_QUERY_LIMIT }}
           </span>
         </label>
         <div class="gm-recall__controls">

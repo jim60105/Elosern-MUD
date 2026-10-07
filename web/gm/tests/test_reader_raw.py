@@ -115,3 +115,16 @@ class RawInventoryTests(EvenniaTest):
         # ``component_names`` is the only registry read; no handler is built.
         inventory = raw.raw_object(self.plain)
         self.assertEqual([entry["name"] for entry in inventory["components"]], ["t_slot"])
+
+    def test_an_object_reference_keeps_its_shape_and_others_carry_their_model(self):
+        self.plain.attributes.add("t_account", value=self.account)
+        values = {
+            row["key"]: row["value"] for row in raw.raw_object(self.plain)["attributes"]
+        }
+        # An ObjectDB reference is exactly the specified marker: the raw-object
+        # route is the one that can resolve it.
+        self.assertEqual(set(values["t_link"]), {"$ref", "typeclass", "key"})
+        # An account reference lives in another table, so it says so and is
+        # never routed to the ObjectDB namespace.
+        self.assertEqual(values["t_account"]["model"], "account")
+        self.assertEqual(values["t_account"]["$ref"], f"#{self.account.pk}")

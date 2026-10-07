@@ -61,4 +61,15 @@ describe("GmJsonTree", () => {
     expect(nested.map((node) => node.attributes("href"))).toEqual(["/gm/runtime/object/9/raw"]);
     expect(nested[0].attributes("data-kind")).toBe("object");
   });
+
+  it("never sends an account or script reference to the object route", () => {
+    const value = {
+      account: { $ref: "#4", typeclass: "typeclasses.accounts.Account", key: "op", model: "account" },
+      script: { $ref: "#9", typeclass: "world.art.store.ArtAssetRecord", key: "art:x", model: "script" },
+    };
+    const wrapper = mountWith(GmJsonTree, { props: { value, openDepth: 3 } });
+    expect(wrapper.findAll("a")).toHaveLength(0);
+    expect(wrapper.text()).toContain("typeclasses.accounts.Account");
+    expect(wrapper.text()).toContain("op");
+  });
 });

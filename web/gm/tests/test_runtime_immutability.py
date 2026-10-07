@@ -203,6 +203,9 @@ class RuntimeImmutabilityTest(EvenniaTest):
             registry.build_list(kind, dict(filters, generated="true"))
         registry.detail("characters", str(self.player.pk), {})
         registry.detail("characters", str(self.owner.pk), {})
+        # An account is not an ObjectDB: its detail carries its own raw
+        # inventory, so it is exercised through the same immutable surface.
+        registry.detail("accounts", str(self.account.pk), {})
         registry.detail("npcs", str(self.npc.pk), {})
         registry.detail("monsters", str(self.monster.pk), {})
         registry.detail("rooms", str(self.room.pk), {})

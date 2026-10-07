@@ -6,11 +6,12 @@
 // rows link back to the retained S2 call drawer when a frame recorded a
 // call id — no dialogue context is assembled and no correspondence is
 // settled to render this tab.
-import { computed, onMounted, reactive } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import GmEntityListTable from "./GmEntityListTable.vue";
 import GmError from "./GmError.vue";
+import GmPager from "./GmPager.vue";
 import GmSectionView from "./GmSectionView.vue";
-import { listPath, ownerQuery } from "../lib/runtime.js";
+import { LIST_DEFAULT_LIMIT, listPath, ownerQuery } from "../lib/runtime.js";
 
 const props = defineProps({
   npcDbref: { type: String, required: true },
@@ -19,8 +20,17 @@ const props = defineProps({
 
 const emit = defineEmits(["open-call"]);
 
-const list = reactive({ status: "idle", items: [], error: null, loadedAt: null });
+const list = reactive({
+  status: "idle",
+  items: [],
+  nextCursor: null,
+  page: 1,
+  limit: LIST_DEFAULT_LIMIT,
+  error: null,
+  loadedAt: null,
+});
 const expanded = reactive({});
+const refreshing = ref(false);
 
 const owner = computed(() => ({ owner: `#${props.npcDbref}` }));
 
@@ -28,11 +38,15 @@ function detailOf(player) {
   return (expanded[player] ??= { status: "idle", data: null, error: null });
 }
 
-async function load() {
+async function load({ cursor = null, append = false } = {}) {
   list.status = "loading";
   try {
-    const data = await props.api.get(listPath("dialogue", { filters: owner.value }));
-    list.items = data.items;
+    const data = await props.api.get(
+      listPath("dialogue", { cursor, limit: list.limit, filters: owner.value }),
+    );
+    list.items = append ? [...list.items, ...data.items] : data.items;
+    list.nextCursor = data.next_cursor;
+    list.page = append ? list.page + 1 : 1;
     list.status = "ready";
     list.error = null;
     list.loadedAt = Date.now() / 1000;
@@ -41,6 +55,22 @@ async function load() {
     list.error = error;
   }
 }
+
+async function reload() {
+  refreshing.value = true;
+  try {
+    await load();
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+function onLimit(limit) {
+  list.limit = limit;
+  load();
+}
+
+defineExpose({ reload });
 
 async function toggle(player) {
   const state = detailOf(player);
@@ -71,8 +101,8 @@ onMounted(load);
       <button
         type="button"
         class="ui-btn ui-btn--ghost ui-btn--sm gm-dialogue__refresh"
-        :aria-disabled="list.status === 'loading' ? 'true' : null"
-        @click="list.status !== 'loading' && load()"
+        :aria-disabled="refreshing ? 'true' : null"
+        @click="!refreshing && reload()"
       >
         重新載入
       </button>
@@ -132,6 +162,16 @@ onMounted(load);
           </div>
         </template>
       </div>
+      <GmPager
+        :next-cursor="list.nextCursor"
+        :limit="list.limit"
+        :shown="list.items.length"
+        :page="list.page"
+        :busy="list.status === 'loading'"
+        @more="load({ cursor: list.nextCursor, append: true })"
+        @limit="onLimit"
+        @first="load()"
+      />
     </template>
   </div>
 </template>

@@ -103,6 +103,7 @@ describe("GmEntityView", () => {
 
   it("refreshes only when asked and never schedules a timer", async () => {
     const interval = vi.spyOn(globalThis, "setInterval");
+    const timeout = vi.spyOn(globalThis, "setTimeout");
     const boundary = api();
     const wrapper = mountWith(GmEntityView, { props: { kind: "npcs", id: "12", api: boundary } });
     await flushPromises();
@@ -111,6 +112,8 @@ describe("GmEntityView", () => {
     await flushPromises();
     expect(boundary.calls).toHaveLength(2);
     expect(interval).not.toHaveBeenCalled();
+    // No delayed reload is armed either: the surface is manually refreshed.
+    expect(timeout.mock.calls.every(([, delay]) => !delay)).toBe(true);
     expect(wrapper.get(".gm-entity__stamp").text()).toContain("最後載入");
   });
 

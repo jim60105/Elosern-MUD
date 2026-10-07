@@ -228,6 +228,15 @@ class StateApiErrorMatrixTests(StateApiTestCase):
             ("get", f"/gm/api/state/monsters/{self.char1.pk}", 404, "kind_mismatch"),
             ("get", "/gm/api/state/object/999999/raw", 404, "object_not_found"),
             ("get", "/gm/api/state/not_a_kind", 404, "unsupported_kind"),
+            # An existing object that is not an NPC is a kind mismatch, and the
+            # recall POST is the route that has to say so.
+            (
+                "post",
+                f"/gm/api/state/npc/{self.char1.pk}/recall",
+                404,
+                "kind_mismatch",
+            ),
+            ("post", "/gm/api/state/npc/999999/recall", 404, "object_not_found"),
             ("get", "/gm/api/state/quests", 400, "invalid_filter"),
             ("get", "/gm/api/state/memories", 400, "invalid_filter"),
             ("get", "/gm/api/state/snapshots", 400, "invalid_filter"),
@@ -241,7 +250,13 @@ class StateApiErrorMatrixTests(StateApiTestCase):
         )
         for method, url, status, code in cases:
             with self.subTest(url=url):
-                self.assert_error_envelope(getattr(client, method)(url), status, code)
+                if method == "post":
+                    # The recall route reads a JSON body; an empty form body is
+                    # a transport error of its own.
+                    response = client.post(url, data="{}", content_type="application/json")
+                else:
+                    response = getattr(client, method)(url)
+                self.assert_error_envelope(response, status, code)
 
     @covers_requirement("gm-portal-access-api::consistent-json-transport")
     def test_a_curated_detail_route_serves_only_curated_kinds(self):
