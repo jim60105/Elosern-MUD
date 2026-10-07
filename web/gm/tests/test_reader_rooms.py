@@ -10,11 +10,12 @@ archive.
 
 from __future__ import annotations
 
+from django.test import Client
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
-from typeclasses.rooms import InstanceRoom, Room
+from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom, Room
 
 from tools.spec_traceability import covers_requirement
 from web.gm.readers import rooms
@@ -61,6 +62,62 @@ class RoomReaderTests(EvenniaTest):
         # A plain room has no xyz; the row must be absent, not fabricated.
         self.assertNotIn("座標", [row["label"] for row in identity["rows"]])
         self.assertIsNone(rooms.coordinates(self.here))
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_room_api_preserves_named_and_numeric_grid_layers_without_writes(self):
+        client = Client()
+        client.force_login(self.account)
+        for room_type, xyz in (
+            (GridRoom, (-3, 0, "t_named_grid_map")),
+            (AnchorRoom, (0, -4, "t_named_anchor_map")),
+            (GridRoom, (2, -5, -1)),
+            (AnchorRoom, (-2, 3, 0)),
+        ):
+            with self.subTest(room_type=room_type.__name__, xyz=xyz):
+                room, errors = room_type.create(key="t_reader_grid_layer", xyz=xyz)
+                self.assertEqual(errors, [])
+                before_attrs = stored_attribute_keys(room)
+                before_tags = room.tags.all(return_key_and_category=True)
+                expected = ", ".join(str(part) for part in xyz)
+
+                response = client.get("/gm/api/state/rooms")
+                self.assertEqual(response.status_code, 200)
+                payload = response.json()
+                self.assertIs(payload["ok"], True)
+                item = next(
+                    item
+                    for item in payload["data"]["items"]
+                    if item["id"] == str(room.pk)
+                )
+                self.assertEqual(row_value({"rows": item["fields"]}, "座標"), expected)
+
+                response = client.get(f"/gm/api/state/rooms/{room.pk}")
+                self.assertEqual(response.status_code, 200)
+                payload = response.json()
+                self.assertIs(payload["ok"], True)
+                detail = payload["data"]
+                self.assertEqual(failed_sections(detail), {})
+                self.assertEqual(row_value(section_of(detail, "identity"), "座標"), expected)
+                self.assertEqual(stored_attribute_keys(room), before_attrs)
+                self.assertEqual(room.tags.all(return_key_and_category=True), before_tags)
+
+    def test_incomplete_grid_coordinates_are_absent_in_list_and_detail_api(self):
+        room = create.create_object(GridRoom, key="t_reader_unplaced_grid")
+        client = Client()
+        client.force_login(self.account)
+        response = client.get("/gm/api/state/rooms")
+        self.assertEqual(response.status_code, 200)
+        item = next(
+            item for item in response.json()["data"]["items"] if item["id"] == str(room.pk)
+        )
+        self.assertEqual(row_value({"rows": item["fields"]}, "座標"), "—")
+
+        response = client.get(f"/gm/api/state/rooms/{room.pk}")
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()["data"]
+        self.assertEqual(failed_sections(detail), {})
+        identity = section_of(detail, "identity")
+        self.assertNotIn("座標", [entry["label"] for entry in identity["rows"]])
 
     def test_exits_table_links_direction_and_destination(self):
         detail = rooms.detail(self.here)

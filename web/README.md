@@ -44,6 +44,11 @@ Character summaries display affinity stages using the authored
 before JSON serialization; affinity values and caps remain numeric and
 inspection does not modify the stored relationship records.
 
+Room lists and summaries preserve the XYZ grid's coordinate values. The Z
+coordinate identifies the map and may be a name or a number. Rooms with
+incomplete coordinate tags are displayed without coordinates; inspection
+does not provision or modify those tags.
+
 ## A note on the webclient
 
 The web browser can also execute code directly without talking to the Server.

@@ -50,11 +50,15 @@ def place_kind(room: Any) -> str:
     return type(room).__name__
 
 
-def coordinates(room: Any) -> list[int] | None:
-    """The room's ``(x, y, z)`` grid coordinates, when it has any."""
+def coordinates(room: Any) -> list[int | str] | None:
+    """The complete grid position, with a numeric or named map layer."""
     value = getattr(room, "xyz", None)
-    if isinstance(value, (list, tuple)) and len(value) == 3:
-        return [int(part) for part in value]
+    if (
+        isinstance(value, (list, tuple))
+        and len(value) == 3
+        and all(part is not None for part in value)
+    ):
+        return list(value)
     return None
 
 
