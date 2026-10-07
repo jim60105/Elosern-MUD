@@ -7,6 +7,8 @@ package, so the stdlib migration inventory knows ``fake.0001_initial``.
 
 from __future__ import annotations
 
+import base64
+import pickle
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -19,7 +21,6 @@ FUTURE_MIGRATION = ("fake", "0002_future")
 
 def fixed_metadata() -> dict:
     return {
-        "clock": {"tick": 42, "year": 1, "season": "春", "day": 3, "hour": 9, "minute": 30},
         "players": [{"name": "Tester", "location": "room-a"}],
     }
 
@@ -51,6 +52,20 @@ class TempWorld:
             )
             connection.execute("CREATE TABLE world (key TEXT PRIMARY KEY, value TEXT)")
             connection.execute("INSERT INTO world VALUES ('state', 'original')")
+            connection.execute("CREATE TABLE scripts_scriptdb (id INTEGER PRIMARY KEY, db_key TEXT)")
+            connection.execute(
+                "CREATE TABLE typeclasses_attribute "
+                "(id INTEGER PRIMARY KEY, db_key TEXT, db_category TEXT, db_value TEXT)"
+            )
+            connection.execute(
+                "CREATE TABLE scripts_scriptdb_db_attributes (scriptdb_id INTEGER, attribute_id INTEGER)"
+            )
+            connection.execute("INSERT INTO scripts_scriptdb VALUES (1, 'world_clock')")
+            connection.execute(
+                "INSERT INTO typeclasses_attribute VALUES (1, 'tick', NULL, ?)",
+                (base64.b64encode(pickle.dumps(42)).decode("ascii"),),
+            )
+            connection.execute("INSERT INTO scripts_scriptdb_db_attributes VALUES (1, 1)")
             connection.commit()
         finally:
             connection.close()

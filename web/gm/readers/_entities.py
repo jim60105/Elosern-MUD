@@ -163,7 +163,7 @@ def object_kind(entity: Any) -> str | None:
     from typeclasses.characters import PlayerCharacter
     from typeclasses.monsters import Monster
     from typeclasses.npcs import NPC
-    from typeclasses.rooms import Room
+    from evennia import DefaultRoom
 
     if isinstance(entity, Monster):
         return "monsters"
@@ -171,7 +171,7 @@ def object_kind(entity: Any) -> str | None:
         return "npcs"
     if isinstance(entity, PlayerCharacter):
         return "characters"
-    if isinstance(entity, Room):
+    if isinstance(entity, DefaultRoom):
         return "rooms"
     from evennia.accounts.models import AccountDB
 

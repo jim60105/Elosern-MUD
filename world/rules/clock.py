@@ -118,6 +118,7 @@ class AdvanceSource(StrEnum):
     """The action category that supplied elapsed game seconds."""
 
     COMMAND = "command"
+    GM = "gm"
     COMBAT = "combat"
     SKIP = "skip"
     DEFEAT_AFTERMATH = "defeat_aftermath"
