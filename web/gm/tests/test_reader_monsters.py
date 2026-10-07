@@ -112,6 +112,7 @@ class MonsterReaderTests(EvenniaTest):
             monsters.NUMERIC_SOURCE_LABELS[NUMERIC_SOURCE_INTERIM_TIER_BAND],
         )
 
+    @covers_requirement("gm-world-data::authored-browser-and-runtime-links")
     def test_species_and_variant_rows_link_to_their_authored_entries(self):
         # gm-portal-s4-world-data §4.4: registry-key runtime fields open the
         # authored entry page through the shared link component.

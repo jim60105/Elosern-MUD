@@ -117,6 +117,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r"Test Files\s+16 passed")
 
+    @covers_requirement("gm-world-data::authored-browser-and-runtime-links", "gm-world-data::facade-observability-and-isolated-delivery")
     def test_world_data_vitest_cases_pass(self):
         # gm-portal-s4-world-data: link routing, field-path links, reference
         # and referrer rendering, the four world pages and the prompt reload.

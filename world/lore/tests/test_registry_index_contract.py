@@ -21,6 +21,7 @@ import unittest
 from collections.abc import Mapping
 from pathlib import Path
 
+from tools.spec_traceability import covers_requirement
 from world.lore import registry_index
 from world.lore.registry_index import (
     GROUPS,
@@ -116,6 +117,7 @@ class RegistryInventoryContractTest(unittest.TestCase):
         super().setUpClass()
         cls.loaded = _loaded()
 
+    @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_names_are_unique_snake_case_and_never_reserved(self):
         names = [spec.name for spec in REGISTRY_INDEX]
         self.assertEqual(len(names), len(set(names)))
@@ -124,6 +126,7 @@ class RegistryInventoryContractTest(unittest.TestCase):
         # ``/gm/world/sources/...`` is the source viewer route.
         self.assertNotIn("sources", names)
 
+    @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_display_metadata_and_source_paths(self):
         for spec in REGISTRY_INDEX:
             with self.subTest(registry=spec.name):
@@ -134,6 +137,7 @@ class RegistryInventoryContractTest(unittest.TestCase):
         self.assertEqual(len(GROUPS), 8)
         self.assertEqual({spec.group for spec in REGISTRY_INDEX}, set(GROUPS))
 
+    @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_every_startup_sync_registry_and_named_category_is_indexed(self):
         from world.lore.sync import _ALL_REGISTRIES
 
@@ -145,6 +149,7 @@ class RegistryInventoryContractTest(unittest.TestCase):
             with self.subTest(registry=category):
                 self.assertEqual(dict(self.loaded[category]), dict(registry))
 
+    @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_loaders_return_mappings_of_frozen_dataclass_entries(self):
         for name, entries in self.loaded.items():
             with self.subTest(registry=name):
@@ -186,12 +191,15 @@ class RegistryInventoryContractTest(unittest.TestCase):
 
 
 class ReferenceIntegrityContractTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_shipped_references_resolve(self):
         self.assertEqual(check_references(), [])
 
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_declarations_name_indexed_registries_with_unique_inverses(self):
         self.assertEqual(declaration_errors(), [])
 
+    @covers_requirement("authored-registry-references::declarative-reference-traversal")
     def test_first_batch_declarations_are_present_and_preserve_defaults(self):
         import importlib
 
@@ -213,6 +221,7 @@ class ReferenceIntegrityContractTest(unittest.TestCase):
     def test_reference_index_is_cached_for_the_process(self):
         self.assertIs(build_reference_index(), build_reference_index())
 
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model", "authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_startup_sync_adds_no_reference_enforcement(self):
         source = (REPO_ROOT / "world" / "lore" / "sync.py").read_text(encoding="utf-8")
         self.assertNotIn("registry_index", source)
@@ -220,6 +229,7 @@ class ReferenceIntegrityContractTest(unittest.TestCase):
 
 
 class LazyImportContractTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::explicit-complete-lazy-registry-inventory")
     def test_index_import_adds_no_rules_skills_or_quest_module(self):
         script = (
             "import json, sys\n"

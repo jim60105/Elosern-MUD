@@ -30,6 +30,7 @@ from evennia.scripts.models import ScriptDB
 from evennia.typeclasses.attributes import Attribute
 from evennia.typeclasses.tags import Tag
 
+from tools.spec_traceability import covers_requirement
 from web.gm import pagination, world_api
 from web.gm.readers import world as world_reader
 from web.gm.tests._support import GmTestCase
@@ -116,6 +117,7 @@ class WorldApiTestCase(GmTestCase):
 
 
 class RegistryApiTest(WorldApiTestCase):
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_inventory_lists_every_registry_grouped_with_metadata(self):
         for path in (REGISTRY, f"{REGISTRY}/"):
             with self.subTest(path=path):
@@ -133,6 +135,7 @@ class RegistryApiTest(WorldApiTestCase):
                 self.assertEqual(data["items"][0]["summary_fields"], ["display_name_zh"])
                 self.assertEqual(data["items"][2]["summary_fields"], ["label_text"])
 
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_entry_list_pages_in_key_order_with_default_and_maximum_limits(self):
         first = self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/t_critters"))
         self.assertEqual(len(first["items"]), pagination.DEFAULT_LIMIT)
@@ -160,6 +163,7 @@ class RegistryApiTest(WorldApiTestCase):
             self.developer.get(f"{REGISTRY}/t_critters", {"cursor": "%%%"}), 400, "invalid_cursor"
         )
 
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_entry_list_query_filters_nested_strings_and_binds_the_cursor(self):
         nested = self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/t_critters", {"q": "銀色月光"}))
         self.assertEqual([item["key"] for item in nested["items"]], ["t_marked"])
@@ -183,6 +187,7 @@ class RegistryApiTest(WorldApiTestCase):
             self.developer.get(f"{REGISTRY}/t_critters", {"q": "x" * 201}), 400, "invalid_query"
         )
 
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_cross_registry_search_returns_every_match_sorted_without_paging(self):
         data = self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/", {"q": "月光"}))
         self.assertEqual(
@@ -199,6 +204,7 @@ class RegistryApiTest(WorldApiTestCase):
         empty = self.assert_ok_envelope(self.developer.get(REGISTRY, {"q": "沒有這個字"}))
         self.assertEqual(empty, {"items": []})
 
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_entry_detail_carries_fields_references_and_grouped_referrers(self):
         marked = self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/t_critters/t_marked"))
         self.assertEqual(marked["label"], "斑紋獸")
@@ -255,6 +261,7 @@ class RegistryApiTest(WorldApiTestCase):
         trinket = self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/t_trinkets/t_trinket_moon"))
         self.assertEqual(trinket["fields"], {"label_text": "月光小飾", "weight": 0.5})
 
+    @covers_requirement("gm-world-data::registry-api-envelope-search-and-pagination")
     def test_unknown_registry_and_key_use_their_codes(self):
         self.assert_error_envelope(self.developer.get(f"{REGISTRY}/t_absent"), 404, "registry_not_found")
         self.assert_error_envelope(self.developer.get(f"{REGISTRY}/t_absent/t_x"), 404, "registry_not_found")
@@ -263,11 +270,13 @@ class RegistryApiTest(WorldApiTestCase):
         )
         self.assert_error_envelope(self.developer.get(f"{REGISTRY}/t_critters/"), 404, "not_found")
 
+    @covers_requirement("gm-world-data::protected-immutable-offline-boundary")
     def test_registry_routes_refuse_writes(self):
         for path in (REGISTRY, f"{REGISTRY}/t_critters", f"{REGISTRY}/t_critters/t_marked", f"{SOURCES}/"):
             with self.subTest(path=path):
                 self.assert_error_envelope(self.developer.post(path), 405, "method_not_allowed")
 
+    @covers_requirement("gm-world-data::authored-browser-and-runtime-links")
     def test_authored_link_only_names_present_entries(self):
         self.assertEqual(
             world_reader.authored_link("t_hollows", "t_hollow_east", "東窪"),
@@ -299,6 +308,7 @@ class SourceViewerTest(WorldApiTestCase):
         override.enable()
         self.addCleanup(override.disable)
 
+    @covers_requirement("gm-world-data::allowlisted-source-text")
     def test_allowlist_qualifies_names_and_is_rebuilt_per_request(self):
         data = self.assert_ok_envelope(self.developer.get(f"{SOURCES}/"))
         self.assertEqual(
@@ -313,6 +323,7 @@ class SourceViewerTest(WorldApiTestCase):
         names = [item["name"] for item in self.assert_ok_envelope(self.developer.get(SOURCES))["items"]]
         self.assertIn("rulebook/beta.yaml", names)
 
+    @covers_requirement("gm-world-data::allowlisted-source-text")
     def test_source_text_is_disk_content_with_provenance(self):
         data = self.assert_ok_envelope(self.developer.get(f"{SOURCES}/rulebook/alpha.yaml"))
         self.assertEqual(data["text"], "schema: 1\n# 註解\nvalue: 2\n")
@@ -324,6 +335,7 @@ class SourceViewerTest(WorldApiTestCase):
         prompts = self.assert_ok_envelope(self.developer.get(f"{SOURCES}/prompts/alpha.yaml"))
         self.assertTrue(prompts["reloadable"])
 
+    @covers_requirement("gm-world-data::allowlisted-source-text")
     def test_escape_attempts_are_source_not_found(self):
         attempts = (
             "rulebook/escape.yaml",
@@ -345,6 +357,7 @@ class SourceViewerTest(WorldApiTestCase):
         listed = [item["name"] for item in self.assert_ok_envelope(self.developer.get(SOURCES))["items"]]
         self.assertNotIn("rulebook/escape.yaml", listed)
 
+    @covers_requirement("gm-world-data::allowlisted-source-text")
     def test_undecodable_file_is_source_not_found(self):
         (self.rulebook / "binary.yaml").write_bytes(b"\xff\xfe\x00bad")
         self.assert_error_envelope(self.developer.get(f"{SOURCES}/rulebook/binary.yaml"), 404, "source_not_found")
@@ -357,6 +370,7 @@ class PromptReloadTest(WorldApiTestCase):
         client.get("/gm/")
         return client, client.cookies["csrftoken"].value
 
+    @covers_requirement("gm-world-data::csrf-protected-prompt-reload-and-diagnostics", "gm-world-data::facade-observability-and-isolated-delivery")
     def test_reload_resets_then_loads_and_returns_diagnostics(self):
         broken = PromptLibraryError("npc.yaml", "t_prompt_key", "prompt text is empty")
         library = PromptLibrary(root=str(Path(settings.GAME_DIR) / "prompts"), texts={"t_ok": "x"}, errors={"t_prompt_key": broken})
@@ -382,6 +396,7 @@ class PromptReloadTest(WorldApiTestCase):
         self.assertEqual(events["gm_prompts_reloaded"]["unavailable"], ["t_prompt_key"])
         self.assertNotIn("x", json.dumps(events["gm_prompts_reloaded"]["unavailable"]))
 
+    @covers_requirement("gm-world-data::csrf-protected-prompt-reload-and-diagnostics")
     def test_real_loader_success_then_failure_follows_loader_semantics(self):
         self.addCleanup(reset_prompt_library)
         client, token = self._csrf_client()
@@ -394,6 +409,7 @@ class PromptReloadTest(WorldApiTestCase):
         self.assertEqual(failed["available"], 0)
         self.assertEqual(len(failed["unavailable"]), failed["total"])
 
+    @covers_requirement("gm-world-data::csrf-protected-prompt-reload-and-diagnostics")
     def test_reload_requires_csrf_and_post_before_touching_the_loader(self):
         client, _token = self._csrf_client()
         with (
@@ -406,6 +422,7 @@ class PromptReloadTest(WorldApiTestCase):
         reset.assert_not_called()
         load.assert_not_called()
 
+    @covers_requirement("gm-world-data::facade-observability-and-isolated-delivery")
     def test_raised_loader_failure_is_an_envelope_and_an_event(self):
         client, token = self._csrf_client()
         with (
@@ -431,6 +448,7 @@ class AccessAndBoundaryTest(WorldApiTestCase):
     )
     PAGES = ("/gm/world", "/gm/world/t_critters", "/gm/world/t_critters/t_marked", "/gm/world/sources/prompts/art.yaml")
 
+    @covers_requirement("gm-world-data::protected-immutable-offline-boundary")
     def test_access_matrix_covers_every_page_and_api(self):
         for path in self.API_GETS:
             with self.subTest(path=path):
@@ -451,6 +469,7 @@ class AccessAndBoundaryTest(WorldApiTestCase):
                     self.assertEqual(page.status_code, 200)
                     self.assertIn(b"gm/dist/index.js", page.content)
 
+    @covers_requirement("gm-world-data::facade-observability-and-isolated-delivery")
     def test_requests_and_denials_emit_their_facade_events(self):
         with mock.patch("web.gm.middleware.log_info") as log_info, mock.patch("web.gm.access.log_warn") as log_warn:
             self.developer.get(f"{REGISTRY}/t_critters")
@@ -472,6 +491,7 @@ class AccessAndBoundaryTest(WorldApiTestCase):
     def _row_counts(self) -> tuple[int, ...]:
         return (ObjectDB.objects.count(), Attribute.objects.count(), ScriptDB.objects.count(), Tag.objects.count())
 
+    @covers_requirement("gm-world-data::protected-immutable-offline-boundary")
     def test_reads_and_reload_change_no_rows_attributes_or_source_bytes_offline(self):
         before = (self._source_digest(), self._row_counts())
         snapshot = {name: dict(spec.loader()) for name, spec in ((spec.name, spec) for spec in INDEX)}

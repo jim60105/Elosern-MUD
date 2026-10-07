@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from unittest import mock
 
+from tools.spec_traceability import covers_requirement
 from world.lore import registry_index
 from world.lore.registry_index import (
     DanglingReference,
@@ -96,6 +97,7 @@ def _index(*extra: RegistrySpec) -> tuple[RegistrySpec, ...]:
 
 
 class RefMetadataTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::declarative-reference-traversal")
     def test_ref_and_ref_many_produce_read_only_field_metadata(self):
         single = ref("t_dens", inverse="residents")
         many = ref_many("t_dens", inverse="haunters")
@@ -107,6 +109,7 @@ class RefMetadataTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             single["registry_ref"] = None  # type: ignore[index]
 
+    @covers_requirement("authored-registry-references::declarative-reference-traversal")
     def test_declarations_change_no_type_default_or_value(self):
         fields = {item.name: item for item in dataclasses.fields(Beast)}
         self.assertIs(fields["home_key"].default, dataclasses.MISSING)
@@ -123,6 +126,7 @@ class RefMetadataTest(unittest.TestCase):
 
 
 class ReferenceTraversalTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::declarative-reference-traversal")
     def test_single_many_nullable_nested_and_frozenset_paths(self):
         found, declared = entry_references(BEASTS["t_wolf"])
         paths = [(path, spec.inverse, key) for path, spec, key in found]
@@ -145,11 +149,13 @@ class ReferenceTraversalTest(unittest.TestCase):
             {("Beast", "home_key"), ("Beast", "haunt_keys"), ("Beast", "lair_keys"), ("Step", "den_key")},
         )
 
+    @covers_requirement("authored-registry-references::declarative-reference-traversal")
     def test_traversal_preserves_every_input_value(self):
         before = dataclasses.asdict(BEASTS["t_wolf"])
         entry_references(BEASTS["t_wolf"])
         self.assertEqual(dataclasses.asdict(BEASTS["t_wolf"]), before)
 
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_forward_and_inverse_maps_agree(self):
         index = build_reference_index(_index())
         forward = index.forward[("t_beasts", "t_wolf")]
@@ -168,6 +174,7 @@ class ReferenceTraversalTest(unittest.TestCase):
 
 
 class IntegrityTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_missing_target_keys_are_reported_with_five_fields(self):
         beasts = {"t_ghost": Beast("t_ghost", home_key="t_nowhere", steps=(Step(0, den_key="t_void"),))}
         dangling = check_references((_spec("t_dens", DENS), _spec("t_beasts", beasts)))
@@ -188,6 +195,7 @@ class IntegrityTest(unittest.TestCase):
         # Two beasts reuse each declaration; repeated instances never collide.
         self.assertEqual(declaration_errors(_index()), [])
 
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_declarations_without_instances_are_found_through_type_hints(self):
         index = build_reference_index((_spec("t_dens", DENS), _spec("t_burrows", {"t_hole": Burrow("t_hole")})))
         self.assertEqual(index.forward, {})
@@ -196,6 +204,7 @@ class IntegrityTest(unittest.TestCase):
             {("Step", "den_key", "steps")},
         )
 
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_absent_target_registry_and_inverse_collision_are_rejected(self):
         index = _index(
             _spec("t_rivals", {"t_lynx": Rival("t_lynx", den_key="t_cave")}),
@@ -213,6 +222,7 @@ class IntegrityTest(unittest.TestCase):
 
 
 class CacheTest(unittest.TestCase):
+    @covers_requirement("authored-registry-references::cached-bidirectional-integrity-model")
     def test_index_is_built_once_per_index_tuple(self):
         index = _index()
         registry_index._cached.cache_clear()
