@@ -55,7 +55,7 @@ from evennia import DefaultScript
 from evennia.typeclasses.attributes import AttributeProperty
 from evennia.utils.create import create_script
 
-from world.art import gallery_kinds
+from world.art import gallery_kinds, publication
 from world.art.formats import STORE_EXTENSIONS
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import (
@@ -64,6 +64,9 @@ from world.art.subjects import (
     parse_subject,
 )
 from world.observability import log_debug, log_info, log_warn
+
+#: Longest a card-file unlink waits for a running world snapshot.
+_SNAPSHOT_WAIT_SECONDS = 2.0
 
 # The one shared card face rectangle (design §3.1). Applied to every card
 # written without an explicit rect; the client composes crops at render time
@@ -742,12 +745,19 @@ def _delete_stored_file(subject: ArtSubject, identity: object) -> None:
     if resolved is None:
         log_warn("gallery_card_file_unresolvable", context=context)
         return
-    try:
-        resolved.unlink()
-    except FileNotFoundError:
-        log_debug("gallery_card_file_missing", context=context)
-    except OSError as exc:
-        log_warn("gallery_card_file_delete_failed", context=context, exc=exc)
+    # A world snapshot holds the art store still; waiting is bounded so a
+    # long snapshot never freezes the game, and a skipped unlink leaves an
+    # unreferenced file that the startup orphan prune reclaims.
+    with publication.publishing_within(_SNAPSHOT_WAIT_SECONDS) as acquired:
+        if not acquired:
+            log_warn("gallery_card_file_delete_deferred", context=context)
+            return
+        try:
+            resolved.unlink()
+        except FileNotFoundError:
+            log_debug("gallery_card_file_missing", context=context)
+        except OSError as exc:
+            log_warn("gallery_card_file_delete_failed", context=context, exc=exc)
 
 
 def append_card(subject: ArtSubject, **card_fields) -> dict:
@@ -760,7 +770,11 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
     the default, exactly as today's monster branch did unconditionally; a kind
     declaring a null maximum never replaces anything. Every violation raises a
     typed ``GalleryRecordError`` before any record or file is touched.
+    Replaced files are unlinked after ``gallery_lock`` is released: the
+    unlink takes the art publication gate, which is never acquired while
+    holding ``gallery_lock`` (``world.art.publication`` lock order).
     """
+    stale: list = []
     with gallery_lock:
         record = _consolidate(subject)
         existing_ids = _raw_image_ids(record) if record is not None else frozenset()
@@ -798,9 +812,10 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
                 "gallery_card_replaced",
                 context={"subject": subject.full(), "image_id": stored["image_id"]},
             )
-            for entry in previous:
-                identity = entry.get("stored_identity") if isinstance(entry, Mapping) else None
-                _delete_stored_file(subject, identity)
+            stale = [
+                entry.get("stored_identity") if isinstance(entry, Mapping) else None
+                for entry in previous
+            ]
         else:
             record.db.cards = [*previous, stored]
             if not previous:
@@ -815,7 +830,9 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
                 "gallery_card_appended",
                 context={"subject": subject.full(), "image_id": stored["image_id"]},
             )
-        return dict(stored)
+    for identity in stale:
+        _delete_stored_file(subject, identity)
+    return dict(stored)
 
 
 def remove_card(subject: ArtSubject, image_id: str) -> None:
@@ -850,7 +867,8 @@ def remove_card(subject: ArtSubject, image_id: str) -> None:
             "gallery_card_removed",
             context={"subject": subject.full(), "image_id": image_id},
         )
-        _delete_stored_file(subject, removed.get("stored_identity"))
+    # Unlinked after gallery_lock is released (publication gate lock order).
+    _delete_stored_file(subject, removed.get("stored_identity"))
 
 
 def set_default(subject: ArtSubject, image_id: str) -> None:

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Start the Elosern MUD (Evennia) server locally for development.
 #
-# Applies any pending database migrations, then launches Evennia in the
-# foreground. Ports are fixed by server/conf/settings.py (telnet 4000,
+# Applies a staged world-save restore (server/saves/restore.py) if the GM
+# portal requested one, then any pending database migrations, then launches
+# Evennia in the foreground. Ports are fixed by server/conf/settings.py (telnet 4000,
 # web client 4001) and are not configurable at runtime.
 #
 # Usage:
@@ -35,5 +36,6 @@ echo "   Press Ctrl+C to stop"
 echo ""
 
 cd "$PROJECT_DIR"
+uv run --locked python -m server.saves.restore --apply-pending
 uv run --locked evennia migrate --noinput
 exec uv run --locked evennia start --log

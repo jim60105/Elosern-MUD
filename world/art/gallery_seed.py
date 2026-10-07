@@ -33,13 +33,14 @@ content file is opened RELATIVE to its verified parent fd with ``O_NOFOLLOW``
 and re-verified by ``fstat`` AFTER the open: sources and manifests must be
 regular single-link files within a hard size cap (seed images are
 kilobyte-to-megabyte media; the cap bounds hostile memory use and rejects
-special files), and the destination must also be a single-link regular file —
-a planted symlink is refused at open (``ELOOP``) and a hard-linked inode is
-never silently clobbered (identity paths are uuid5-derived, so a multi-link
-destination is never a legitimate sync artifact). Content-identical
-destinations are left byte-untouched; a differing unreferenced destination is
-overwritten in place on the same inode BEFORE its card is appended, so a stale
-orphan can never be served under a fresh card.
+special files), and an existing destination must be a regular file — a
+planted symlink is refused at open (``ELOOP``). Content-identical destinations
+are left byte-untouched; a differing unreferenced destination is replaced
+BEFORE its card is appended, so a stale orphan can never be served under a
+fresh card. The replacement is written to a temporary file beside it and
+atomically renamed over the name, never written in place: another link to the
+old inode (a world save mirrors the store with hardlinks, gm-portal-s5-saves)
+keeps its bytes, so a multi-link destination is replaced, not refused.
 
 Per subject an optional ``manifest.json`` object may declare ``default`` (an
 eligible image filename of this subject folder) and ``face_rect``. An invalid,
@@ -72,6 +73,7 @@ worker, the sd-webui client, or any connectivity surface.
 
 from collections.abc import Mapping
 import errno
+import secrets
 import json
 import os
 from pathlib import Path
@@ -158,19 +160,22 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
 
     The identity has already passed the confinement helper; this primitive is
     race-safe anyway: every directory component is opened no-follow RELATIVE
-    to the verified parent fd (creating it when absent), and the final file is
-    opened ``O_RDWR | O_CREAT | O_NOFOLLOW`` and ``fstat``-verified AFTER the
-    open — a swapped-in symlink answers ``ELOOP``, a non-regular file or a
-    hard-linked inode is refused, and an existing file past the size cap is
-    refused rather than compared byte-for-byte from hostile memory. Identical
-    content leaves the file byte-untouched; different content is written in
-    place on the same inode (readers never see an unlinked gap).
+    to the verified parent fd (creating it when absent). An existing
+    destination is opened ``O_RDONLY | O_NOFOLLOW`` and ``fstat``-verified
+    AFTER the open — a swapped-in symlink answers ``ELOOP``, a non-regular
+    file is refused, and an existing file past the size cap is refused rather
+    than compared byte-for-byte from hostile memory. Identical content leaves
+    the file byte-untouched. Different content is written to an exclusive
+    no-follow temporary file in the same directory and atomically renamed
+    over the name relative to the parent fd, so readers never see a partial
+    file and other links to the old inode (world saves) keep their bytes.
 
     Raises ``RejectedFile`` for any refusal and ``OSError`` for I/O
     failure; callers map both to bounded diagnostics.
     """
     store_root = Path(str(settings.ART_STORE_ROOT)).resolve()
     parts = identity.split("/")
+    name = parts[-1]
     opened: list[int] = []
     try:
         parent_fd = open_dir_fd(str(store_root))
@@ -186,18 +191,31 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
                 child_fd = open_dir_fd(part, dir_fd=parent_fd)
             opened.append(child_fd)
             parent_fd = child_fd
-        try:
-            fd = open_nofollow(
-                parts[-1], dir_fd=parent_fd, flags=os.O_RDWR | os.O_CREAT
-            )
-        except OSError as error:
-            # A planted symlink at the destination answers ELOOP at open.
-            if error.errno == errno.ELOOP:
-                raise RejectedFile(identity) from error
-            raise
-        opened.append(fd)
-        stat_result = os.fstat(fd)
-        if not S_ISREG(stat_result.st_mode) or stat_result.st_nlink != 1:
+        if _existing_matches(identity, name, parent_fd, payload):
+            return False
+        _replace_atomically(name, parent_fd, payload)
+        return True
+    finally:
+        for fd in reversed(opened):
+            try:
+                os.close(fd)
+            except OSError:  # observability: ignore R2: close failure cannot undo a completed write
+                pass
+
+
+def _existing_matches(identity: str, name: str, parent_fd: int, payload: bytes) -> bool:
+    """True when the destination already holds ``payload``; refuse unsafe files."""
+    try:
+        fd = open_nofollow(name, dir_fd=parent_fd, flags=os.O_RDONLY)
+    except FileNotFoundError:  # observability: ignore R2: an absent destination is the ordinary first copy
+        return False
+    except OSError as error:
+        # A planted symlink at the destination answers ELOOP at open.
+        if error.errno == errno.ELOOP:
+            raise RejectedFile(identity) from error
+        raise
+    try:
+        if not S_ISREG(os.fstat(fd).st_mode):
             raise RejectedFile(identity)
         existing = b""
         remaining = _MAX_FILE_BYTES + 1
@@ -207,22 +225,37 @@ def _publish_under_store(identity: str, payload: bytes) -> bool:
                 break
             existing += chunk
             remaining -= len(chunk)
-        if len(existing) > _MAX_FILE_BYTES:
-            raise RejectedFile(identity)
-        if existing == payload:
-            return False
-        os.lseek(fd, 0, os.SEEK_SET)
-        written = 0
-        while written < len(payload):
-            written += os.write(fd, payload[written:])
-        os.ftruncate(fd, len(payload))
-        return True
     finally:
-        for fd in reversed(opened):
-            try:
-                os.close(fd)
-            except OSError:  # observability: ignore R2: close failure cannot undo a completed write
-                pass
+        os.close(fd)
+    if len(existing) > _MAX_FILE_BYTES:
+        raise RejectedFile(identity)
+    return existing == payload
+
+
+def _replace_atomically(name: str, parent_fd: int, payload: bytes) -> None:
+    """Write ``payload`` to a temporary sibling and rename it over ``name``."""
+    tmp_name = f".{name}.{secrets.token_hex(6)}.tmp"
+    fd = os.open(
+        tmp_name,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o666,
+        dir_fd=parent_fd,
+    )
+    try:
+        try:
+            written = 0
+            while written < len(payload):
+                written += os.write(fd, payload[written:])
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(tmp_name, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+    except BaseException:
+        try:
+            os.unlink(tmp_name, dir_fd=parent_fd)
+        except OSError:  # observability: ignore R2: best-effort temp cleanup; the original error propagates
+            pass
+        raise
 
 
 def _parse_manifest(

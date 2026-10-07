@@ -25,7 +25,10 @@
     "GM/GmNpcDialogueTab",
     "GM/GmProvenanceNote",
     "GM/GmSourceText",
-    "GM/GmReferenceList"
+    "GM/GmReferenceList",
+    "GM/GmConfirmDialog",
+    "GM/GmSaveSlot",
+    "GM/Pages/SavesPage"
   ],
   "frozen": true
 }

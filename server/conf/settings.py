@@ -693,6 +693,18 @@ LLM_TRANSCRIPT_RETENTION_DAYS = _env_typed(
 GM_RECENT_LLM_CAPACITY = _env_int("GM_RECENT_LLM_CAPACITY", 500)
 GM_RECENT_ISSUE_CAPACITY = _env_int("GM_RECENT_ISSUE_CAPACITY", 200)
 
+######################################################################
+# World saves (gm-portal-s5-saves)
+######################################################################
+# The database half of every save lives beside the live database, on the
+# same persistent volume; the art half lives under ART_STORE_ROOT/.saves.
+# Like ART_STORE_ROOT this path is not environment-overridable: the
+# pre-start restore tool (server/saves/restore.py) derives the same default
+# layout without Django. Each automatic save kind keeps at most
+# GM_AUTOSAVE_KEEP saves; manual saves are never pruned automatically.
+GM_SAVES_ROOT = os.path.join(GAME_DIR, "server", "db", "saves")
+GM_AUTOSAVE_KEEP = _env_int("GM_AUTOSAVE_KEEP", 10)
+
 # GM portal boundary (gm-portal-s1-foundation): appended last so Evennia's
 # SharedLoginMiddleware has already mapped a webclient session onto the
 # website login. Its __call__ gates /gm/ before any process_view hook

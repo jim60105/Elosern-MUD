@@ -401,12 +401,13 @@ class SyncIdempotencyTests(_TempRoots):
         self.assertNotIn("source_unreadable", reasons)
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
-    def test_a_hardlinked_destination_is_never_clobbered(self):
+    def test_a_hardlinked_destination_is_replaced_without_touching_the_other_link(self):
         hero = _unique("character")
-        self.tree.image("character", hero, "a.png")
+        source = self.tree.image("character", hero, "a.png")
         subject = _character(hero)
         image_id, identity = self._identity_for(subject, "a.png")
-        # Pre-plant the derived destination as a 2-link inode OUTSIDE the store.
+        # Pre-plant the derived destination as a 2-link inode, the shape a
+        # world save's hardlinked art mirror leaves behind.
         twin = self.store_root / "twin.bin"
         twin.write_bytes(b"priceless")
         destination = self.store_root / identity
@@ -414,8 +415,14 @@ class SyncIdempotencyTests(_TempRoots):
         os.link(twin, destination)
         sync_all()
         self.assertEqual(twin.read_bytes(), b"priceless")
-        self.assertIn("destination_refused", self._reasons())
-        self.assertEqual(cards_for(subject), [])
+        self.assertEqual(destination.read_bytes(), Path(source).read_bytes())
+        self.assertEqual(os.stat(destination).st_nlink, 1)
+        self.assertNotIn("destination_refused", self._reasons())
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
+        # No temporary sibling is left behind.
+        self.assertEqual(
+            [p.name for p in destination.parent.iterdir() if p.name.endswith(".tmp")], []
+        )
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_a_malformed_entry_referencing_the_identity_never_has_its_file_swapped(self):

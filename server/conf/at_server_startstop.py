@@ -82,6 +82,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "connect_art_push",
     "narrative_projection_init",
     "narrative_correspondence_projection_init",
+    "saves_restore_report",
     "llm_transcript_prune",
 )
 
@@ -652,6 +653,17 @@ def at_server_start():
             "world.narrative.correspondence_memory",
             "recover_pending_correspondence_projections",
         ),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
+    # World saves (gm-portal-s5-saves): translate the pre-start restore tool's
+    # RESTORE_RESULT.json into save_restored / save_restore_failed once, then
+    # finish automatic-save retention deferred while a restore was pending.
+    # Tolerant: a saves directory can never abort the deterministic startup.
+    _startup_step(
+        "saves_restore_report",
+        lambda: _late("server.saves.snapshot", "startup_report"),
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",

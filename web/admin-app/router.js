@@ -10,14 +10,15 @@ import WorldEntryView from "./views/WorldEntryView.vue";
 import WorldHomeView from "./views/WorldHomeView.vue";
 import WorldRegistryView from "./views/WorldRegistryView.vue";
 import WorldSourceView from "./views/WorldSourceView.vue";
+import SavesView from "./views/SavesView.vue";
 import { GM_BASE } from "./lib/api.js";
 
 // History routing under /gm/. Delivered sections own routes: the overview, the
 // runtime state section (its nav tree, search, per-kind lists, entity pages and
 // the universal raw view), the permission-denied view, and a not-found view for
 // unknown client paths. The world-data section (S4) owns its home, the source
-// viewer, registry lists and entry pages. Undelivered sections (S5/S6) have no
-// route.
+// viewer, registry lists and entry pages. The saves section (S5) owns one page.
+// The undelivered section (S6) has no route.
 //
 // Order matters: the reserved runtime paths (search, the object raw route) are
 // registered before the parameterized kind routes, and the reserved world
@@ -87,6 +88,12 @@ export const routes = [
     component: WorldEntryView,
     props: (route) => ({ registry: String(route.params.registry), entryKey: String(route.params.key) }),
     meta: { title: "登錄表條目", section: "world-data", wide: true },
+  },
+  {
+    path: "/saves",
+    name: "saves",
+    component: SavesView,
+    meta: { title: "存檔", section: "actions", wide: true },
   },
   { path: "/forbidden", name: "forbidden", component: ForbiddenView, meta: { title: "權限不足" } },
   { path: "/:pathMatch(.*)*", name: "not-found", component: NotFoundView, meta: { title: "找不到頁面" } },
