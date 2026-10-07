@@ -18,7 +18,7 @@ World-state experiments need a recoverable save slot that includes both SQLite s
 
 ### Modified Capabilities
 
-None. The current `gm-portal-access-api` and `gm-portal-spa` contracts are reused, not re-specified or amended. S1–S4 are already landed.
+- `art-gallery-seed-sync`: seed publication replaces a differing destination through a temporary sibling and an atomic rename instead of writing in place, and no longer refuses a multi-link destination, so hardlinked save mirrors keep their bytes. The current `gm-portal-access-api` and `gm-portal-spa` contracts are reused, not re-specified or amended. S1–S4 are already landed.
 
 ## Impact
 

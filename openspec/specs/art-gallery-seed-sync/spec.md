@@ -54,9 +54,11 @@ particular kind.
 Reading files out of the (potentially hostile) seed tree SHALL verify each opened file AFTER the
 open — regular, hard-link count one, within a size cap, never reached through a symlink — so a
 planted link or aliased inode is refused rather than copied. Writing into the store SHALL likewise
-open each destination no-follow and refuse anything that is not a single-link regular file, and a
-raw record entry (valid or malformed) SHALL reserve its `stored_identity`: the file it points at is
-never overwritten even when the card itself no longer validates.
+open an existing destination no-follow and refuse anything that is not a regular file, and SHALL
+replace a differing destination only by writing a temporary sibling and atomically renaming it over
+the name, never by writing in place, so another hard link to the old inode (a world save) keeps its
+bytes. A raw record entry (valid or malformed) SHALL reserve its `stored_identity`: the file it points
+at is never overwritten even when the card itself no longer validates.
 
 #### Scenario: A second run copies and appends nothing
 - **WHEN** `sync_all()` runs twice against an unchanged seed root
@@ -77,6 +79,10 @@ never overwritten even when the card itself no longer validates.
 #### Scenario: Surplus seed files for a capped kind are skipped
 - **WHEN** a subject folder for a kind whose declared maximum is one holds several eligible image files
 - **THEN** at most one card is appended, the surplus files are skipped with a bounded diagnostic, and no existing card is replaced
+
+#### Scenario: A hard-linked destination is replaced without touching the other link
+- **WHEN** an unreferenced derived destination shares its inode with another name (as a world save's hardlinked mirror does) and its bytes differ from the seed file
+- **THEN** the destination name receives the seed bytes through an atomic rename, the other name keeps its original bytes, and the card is appended
 
 ### Requirement: Seed cards carry seed provenance and no reproduction set
 A card appended by seed synchronization SHALL carry `source` `seed`, `prompt` `None`, `seed` `None`,
