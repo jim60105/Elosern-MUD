@@ -13,14 +13,17 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from evennia.utils.test_resources import EvenniaTest
-from world.lore.monster_placement import MONSTER_SITE_REGISTRY
 from world.rules.monster_behaviour import BEHAVIOUR_PROFILES, MONSTER_BEHAVIOUR_YAML
 from world.rules.monster_individual import construct_species_individual
 from world.rules.traits import (
     NUMERIC_SOURCE_APPROVED_PROFILE,
     NUMERIC_SOURCE_INTERIM_TIER_BAND,
 )
-from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, SYNTH_MONSTER_VARIANTS
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_SITES,
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+)
 
 from web.gm.readers import monsters
 from web.gm.readers._entities import read_attr, stored_attribute_keys
@@ -130,7 +133,7 @@ class MonsterReaderTests(EvenniaTest):
         site = section_of(monsters.detail(monster), "placement")
         self.assertEqual(row_value(site, "歸屬"), "據點")
         self.assertEqual(row_value(site, "據點"), SITE)
-        self.assertEqual(row_value(site, "區域"), MONSTER_SITE_REGISTRY[SITE].region_key)
+        self.assertEqual(row_value(site, "區域"), SYNTH_MONSTER_SITES[SITE].region_key)
         self.assertIn(",", row_value(site, "座標"))
 
     def test_loot_table_rows_cover_item_keys_and_quantity_rows(self):
