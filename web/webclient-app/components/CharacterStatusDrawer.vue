@@ -21,7 +21,7 @@
 // use-map-lattice / use-creation facade precedent); this SFC is the thin
 // passive renderer that destructures their flat binding set below.
 import { computed } from "vue";
-import { conditionLabel } from "../lib/condition_label.js";
+import { conditionLabel, conditionSource } from "../lib/condition_label.js";
 import { useStatusDrawerCharacter } from "../composables/use-status-drawer-character.js";
 import { useStatusDrawerStatus } from "../composables/use-status-drawer-status.js";
 import { useStatusDrawerPersona } from "../composables/use-status-drawer-persona.js";
@@ -304,12 +304,13 @@ const {
       </p>
       <div v-if="conditions.length > 0" class="character-status-drawer__pillrow">
         <span
-          v-for="condition in conditions"
-          :key="condition.code"
+          v-for="(condition, index) in conditions"
+          :key="index"
           class="character-status-drawer__pill"
           :class="`character-status-drawer__pill--${condition.severity}`"
           :data-testid="`character-status-drawer__condition--${condition.code}`"
           :data-severity="condition.severity"
+          :aria-label="conditionName(condition)"
         >
           <span class="character-status-drawer__condition-label">{{ condition.label ?? condition.code }}</span>
           <span class="character-status-drawer__condition-stat">
@@ -333,6 +334,7 @@ const {
               {{ key }} {{ value }}
             </span>
           </span>
+          <span v-if="conditionSource(condition)" class="character-status-drawer__condition-source">{{ conditionSource(condition) }}</span>
         </span>
       </div>
     </section>

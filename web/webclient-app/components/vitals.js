@@ -33,11 +33,9 @@ export function isLowHp(resources) {
 const ATTENTION_SEVERITIES = new Set(["warning", "harmful", "critical"]);
 
 // Vitals island visibility (webclient-retire-redundant-hud, design D2):
-// The vitals island is shown only in combat or while a vital or a condition
-// needs attention. An injured state, combat mode, or a condition whose
-// severity is warning, harmful, or critical makes the island visible.
-// Beneficial/informational conditions alone at full vitals in exploration
-// or dialogue leave the island hidden.
+// Mode and availability gates remain view-owned. Only independently adverse
+// or unattributable conditions request attention; equipment-only rows remain
+// truthful status data and render whenever another trigger reveals the dock.
 export function isVitalsVisible({ mode, resources, conditions, lowHp } = {}) {
   if (mode === "combat") {
     return true;
@@ -61,7 +59,8 @@ export function isVitalsVisible({ mode, resources, conditions, lowHp } = {}) {
     }
   }
   if (Array.isArray(conditions)) {
-    return conditions.some((c) => c && typeof c.severity === "string" && ATTENTION_SEVERITIES.has(c.severity));
+    return conditions.some((c) => c && ATTENTION_SEVERITIES.has(c.severity)
+      && ["non_equipment", "mixed", "unknown"].includes(c.provenance.kind));
   }
   return false;
 }

@@ -134,7 +134,7 @@ away in a drawer, never permanently on screen.
 |---|---|---|---|---|
 | Slim top bar (nav, tool group, switcher, connection) | ✓ | ✓ | ✓ | ✓ |
 | Place card (location + game time) | ✓ | ✓ | ✓ | — |
-| Vitals + condition chips | only when a vital is below max or a `warning`+ condition is active | same as exploration | always | — |
+| Vitals + condition chips | depleted vital, low HP, or independently adverse condition | — | available status always | — |
 | Minimap (top-right `map` anchor) | ✓ | ✓ | — | — |
 | Objective tracker (one line under the minimap) | ✓ | — | — | — |
 | Combat participant frame (numbers) | — | — | ✓ (in the `map` anchor) | — |
@@ -155,6 +155,32 @@ markers), and the top-bar `探索` home tab (it names the screen the player is
 already on). Every field the head card showed stays reachable: title, guild
 rank and merit in the character-status drawer, the wallet in the bag drawer,
 the name in the switcher.
+
+### Equipment condition attention (equipment-condition-hud-attention)
+
+Status schema v3 requires each condition's exact `provenance` object with
+`kind` and `equipment_sources`. Kinds are `equipment`, `non_equipment`, `mixed`,
+and `unknown`. Equipment and mixed rows carry one to eight registry-backed
+`{item_key, label}` sources, sorted by unique item key. Other kinds carry no
+equipment sources. This is a clean server/browser cutover from status v2;
+the envelope stays v1 and unrelated panel versions remain unchanged.
+
+Only warning, harmful, or critical rows with non-equipment, mixed, or unknown
+provenance independently reveal the dock. Combat and resource triggers remain
+unchanged; dialogue and creation still hide it, and unavailable status never
+fabricates a dock. Every condition remains in the full character-status roster
+and in the dock whenever another trigger reveals it. Shared accessible detail,
+tooltips and overflow disclose supplied source labels without joining another
+panel. Duplicate-code buff instances retain their own durations and detail.
+
+Provenance compares actual matched rule IDs against one equipment-free context
+over the same captured read. It removes proven worn attachments only, preserving
+independent instances and stored state. Exposure sources contribute only when
+the clamped input changes. Stored 極高 plus a +1 overlay remains non-equipment;
+this includes the investigated Yuna baseline and does not promise to hide her
+current dock. Historical equipment-related consequences already persisted as
+canonical state retain independent attention. No preset or gameplay severity
+changes as part of this presentation contract.
 
 ## 5. Layout
 

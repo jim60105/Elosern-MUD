@@ -17,7 +17,7 @@
 // hung above the dock would be clipped. A scroll or resize while it is open
 // closes it rather than leaving it adrift.
 import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
-import { conditionLabel, conditionModifiers } from "../lib/condition_label.js";
+import { conditionLabel, conditionModifiers, conditionSource } from "../lib/condition_label.js";
 
 const props = defineProps({
   // The committed `status.conditions[]` array.
@@ -69,7 +69,7 @@ const hoverCode = ref(null);
 const focusCode = ref(null);
 const tipCode = computed(() => hoverCode.value ?? focusCode.value);
 const tipCondition = computed(() =>
-  tipCode.value === null ? null : props.conditions.find((c) => c.code === tipCode.value) ?? null,
+  tipCode.value === null ? null : props.conditions[tipCode.value] ?? null,
 );
 const tipPlace = ref({ left: 0, bottom: 0, tick: 0 });
 
@@ -106,6 +106,9 @@ function closeTip() {
 watch(tipCondition, (condition) => {
   if (tipCode.value !== null && condition === null) closeTip();
 });
+// Local indices distinguish duplicate definition codes. A replaced roster
+// closes the tooltip so reordering cannot silently retarget its detail.
+watch(() => props.conditions, closeTip);
 watch(
   () => props.revealed,
   (revealed) => {
@@ -153,19 +156,19 @@ function onRowKeydown(event) {
   >
     <div class="icons">
       <button
-        v-for="condition in visible"
-        :key="condition.code"
+        v-for="(condition, index) in visible"
+        :key="index"
         type="button"
         class="chip"
-        :class="[`chip--${condition.severity}`, { active: tipCode === condition.code }]"
+        :class="[`chip--${condition.severity}`, { active: tipCode === index }]"
         :data-testid="`status-panel__condition--${condition.code}`"
         :data-severity="condition.severity"
         :data-code="condition.code"
         :aria-label="chipName(condition)"
-        :aria-describedby="tipCode === condition.code && tipOpen ? tipId : null"
-        @focus="onFocus($event, condition.code)"
+        :aria-describedby="tipCode === index && tipOpen ? tipId : null"
+        @focus="onFocus($event, index)"
         @blur="onBlur"
-        @mouseenter="onEnter($event, condition.code)"
+        @mouseenter="onEnter($event, index)"
         @mouseleave="onLeave"
       >
         <span class="glyph" aria-hidden="true">{{ glyph(condition) }}</span>
@@ -191,12 +194,13 @@ function onRowKeydown(event) {
       data-testid="status-panel__condition-disclosure"
     >
       <div
-        v-for="condition in overflowItems"
-        :key="condition.code"
+        v-for="(condition, index) in overflowItems"
+        :key="index + VISIBLE_CAP"
         class="detail-row"
         :class="`detail--${condition.severity}`"
         :data-testid="`status-panel__condition--${condition.code}`"
         :data-severity="condition.severity"
+        :aria-label="chipName(condition)"
       >
         <span class="detail-glyph" aria-hidden="true">{{ glyph(condition) }}</span>
         <span class="detail-label">{{ condition.label ?? condition.code }}</span>
@@ -207,6 +211,7 @@ function onRowKeydown(event) {
           class="detail-mod"
           :data-testid="`status-panel__condition-mod--${modifier.key}`"
         >{{ modifier.text }}</span>
+        <span v-if="conditionSource(condition)" class="detail-source">{{ conditionSource(condition) }}</span>
       </div>
     </div>
     <Teleport to="body">
@@ -239,6 +244,7 @@ function onRowKeydown(event) {
           class="detail-mod"
           :data-testid="`status-panel__condition-mod--${modifier.key}`"
         >{{ modifier.text }}</p>
+        <p v-if="conditionSource(tipCondition)" class="detail-source">{{ conditionSource(tipCondition) }}</p>
       </div>
     </Teleport>
   </div>

@@ -323,13 +323,25 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
         """The island reveals over 250ms; hiding it with focus on a chip moves
         focus home first, and the island is inert until it is display:none."""
         page = self._page(None)
-        harmful = [{"code": "poison", "label": "中毒", "severity": "harmful"}]
-        inject_update(page, {"status": _status(100)})
+        equipment = [{
+            "code": "t_equipment_warning", "label": "合成警告", "severity": "warning",
+            "modifiers": {"defense": -15},
+            "provenance": {"kind": "equipment", "equipment_sources": [{"item_key": "t_a", "label": "合成護符"}]},
+        }]
+        inject_update(page, {"status": _status(100, equipment)})
         page.wait_for_function(
             "() => getComputedStyle(document.querySelector('[data-testid=\"status-panel\"]')).display === 'none'",
             timeout=15000,
         )
-        inject_update(page, {"status": _status(60, harmful)})
+        page.evaluate("window.__elosernBridge.store.openHudDrawer('status')")
+        row = page.locator('[data-testid="character-status-drawer__condition--t_equipment_warning"]')
+        row.wait_for(state="visible", timeout=15000)
+        self.assertIn("裝備來源：合成護符", row.inner_text())
+        self.assertIn("defense -15", row.inner_text())
+        self.assertEqual(page.locator('[data-testid="status-panel"]').is_visible(), False)
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[data-testid="hud-drawer"]', state="hidden", timeout=15000)
+        inject_update(page, {"status": _status(60, equipment)})
         entering = page.wait_for_function(
             """() => {
               const el = document.querySelector('[data-testid="status-panel"]');
@@ -344,8 +356,9 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertIn("transform", entering["property"])
         self._settled(page, '[data-testid="status-panel"]')
 
-        page.focus('[data-testid="status-panel__condition--poison"]')
-        inject_update(page, {"status": _status(100)})
+        self.assertIn("合成護符", page.locator('[data-testid="status-panel__condition--t_equipment_warning"]').get_attribute("aria-label"))
+        page.focus('[data-testid="status-panel__condition--t_equipment_warning"]')
+        inject_update(page, {"status": _status(100, equipment)})
         leaving = page.wait_for_function(
             """() => {
               const el = document.querySelector('[data-testid="status-panel"]');

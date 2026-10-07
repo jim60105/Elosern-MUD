@@ -1,4 +1,4 @@
-// status panel validator (mirror of web.webclient.presentation.status_panel).
+// Status v3 presenter wire contract, including read-model provenance.
 // Split from the combat panel module.
 
 "use strict";
@@ -26,6 +26,33 @@ var COMBAT_MODES = C.COMBAT_MODES;
 var SEVERITIES = C.SEVERITIES;
 
 
+function validateProvenance(value) {
+  requireExactFields(value, "condition.provenance", ["kind", "equipment_sources"], []);
+  if (["equipment", "non_equipment", "mixed", "unknown"].indexOf(value.kind) === -1) {
+    throw new Error("condition.provenance.kind is invalid");
+  }
+  var sources = value.equipment_sources;
+  if (!Array.isArray(sources) || sources.length > 8) {
+    throw new Error("condition.provenance.equipment_sources exceeds its bound");
+  }
+  if ((sources.length > 0) !== (value.kind === "equipment" || value.kind === "mixed")) {
+    throw new Error("condition.provenance sources disagree with kind");
+  }
+  var previous = "";
+  sources.forEach(function (source) {
+    requireExactFields(source, "equipment source", ["item_key", "label"], []);
+    validateIdentifier(source.item_key, "equipment source.item_key");
+    requireString(source.label, "equipment source.label", 128);
+    if (source.label.length === 0) {
+      throw new Error("equipment source.label must be nonempty");
+    }
+    if (source.item_key <= previous) {
+      throw new Error("equipment sources must be unique and item-key sorted");
+    }
+    previous = source.item_key;
+  });
+}
+
 function validateStatusCondition(value) {
   if (!isPlainObject(value)) {
     throw new Error("conditions entries must be JSON objects");
@@ -39,12 +66,13 @@ function validateStatusCondition(value) {
   if (hasModifiers) {
     conditional.push("modifiers");
   }
-  requireExactFields(value, "condition", ["code", "label", "severity"], conditional);
+  requireExactFields(value, "condition", ["code", "label", "severity", "provenance"], conditional);
   validateIdentifier(value.code, "condition.code");
   requireString(value.label, "condition.label", MAX_CONDITION_LABEL);
   if (SEVERITIES.indexOf(value.severity) === -1) {
     throw new Error("condition.severity is not a stable severity");
   }
+  validateProvenance(value.provenance);
   if (hasRemaining) {
     requireInt(value.remaining_seconds, "condition.remaining_seconds", 0, MAX_SAFE_INTEGER);
   }
@@ -60,7 +88,7 @@ function validateStatusCondition(value) {
   return value;
 }
 
-// Exact available status panel v2 schema (composed full title optional).
+// Exact available status panel v3 schema (composed full title optional).
 function validateStatusPanel(payload) {
   requireExactFields(
     payload,
@@ -69,7 +97,7 @@ function validateStatusPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 2) {
+  if (payload.schema_version !== 3) {
     throw new Error("unsupported status panel schema_version");
   }
 

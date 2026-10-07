@@ -89,6 +89,14 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(combat.find(".local-map").exists()).toBe(true);
   });
 
+  it("keeps the creation vitals gate at display:none", () => {
+    const creation = mountShell("creation", false);
+    expect(creation.get('[data-testid="elosern-stage"]').attributes("data-elosern-mode")).toBe("creation");
+    const css = styleBlock("components/HudFrame.vue");
+    expect(css).toContain('.elosern-stage[data-elosern-mode="creation"] [data-anchor="vitals"]');
+    expect(extractRule(css, '.elosern-stage[data-elosern-mode="creation"] [data-anchor="command-line"]')).toContain("display: none");
+  });
+
   it("rescues focus to the action dock when a mode change hides the focused surface", async () => {
     const explore = mountShell("exploration", true);
     await explore.vm.$nextTick();

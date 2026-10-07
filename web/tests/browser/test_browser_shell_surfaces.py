@@ -349,7 +349,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     {
                         "code": f"cond_{i}",
                         "label": f"狀態{i + 1}",
-                        "severity": ["beneficial", "informational", "warning", "harmful", "critical"][i % 5],
+                        "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": ["beneficial", "informational", "warning", "harmful", "critical"][i % 5],
                         **({"remaining_seconds": i * 10} if i % 4 == 0 else {}),
                     }
                     for i in range(8)
@@ -464,7 +464,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # 2. Full vitals with only a beneficial condition: still not visible
         beneficial_status = dict(full_status)
         beneficial_status["conditions"] = [
-            {"code": "defense_instinct_defense_bonus", "label": "防禦本能", "severity": "beneficial"}
+            {"code": "defense_instinct_defense_bonus", "label": "防禦本能", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "beneficial"}
         ]
         inject_snapshot(page, {"status": beneficial_status}, mode="exploration")
         page.wait_for_timeout(200)
@@ -473,7 +473,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         # 3. Full vitals with one harmful condition: visible with that chip
         harmful_status = dict(full_status)
         harmful_status["conditions"] = [
-            {"code": "poison", "label": "中毒", "severity": "harmful"}
+            {"code": "poison", "label": "中毒", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful"}
         ]
         inject_snapshot(page, {"status": harmful_status}, mode="exploration")
         page.wait_for_timeout(200)
@@ -508,7 +508,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 status = valid_status_panel("艾倫‧灰誓", "char-42")
                 status["resources"]["hp"]["current"] = 80
                 status["conditions"] = [
-                    {"code": "poison", "label": "中毒", "severity": "harmful", "remaining_seconds": 40},
+                    {"code": "poison", "label": "中毒", "provenance": {"kind": "non_equipment", "equipment_sources": []}, "severity": "harmful", "remaining_seconds": 40},
                 ]
                 inject_snapshot(page, {"status": status, "art": valid_art_panel()}, mode="exploration")
                 page.wait_for_selector('[data-testid="status-panel"]', state="visible", timeout=15000)
