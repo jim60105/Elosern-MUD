@@ -171,6 +171,57 @@ def settle_movement(
     return result
 
 
+def settle_relocation(entity: Any, destination: Any) -> None:
+    """Relocate one operator-selected entity with its arrival bookkeeping.
+
+    The operator console's map-lifecycle ``teleport`` verb
+    (gm-developer-console::map-lifecycle-verbs-with-consequences): the entity
+    moves without a movement charge, records its arrival node, brings its
+    party along, observes the destination's arrival lore, re-homes a gate
+    arrival, and drops the dialogue it held in the room it left. Every write
+    lives in this deterministic settlement, so the operator adapter delegates
+    instead of importing a map-knowledge write helper (map-knowledge D4).
+
+    A refused move compensates and raises the console's ``movement_refused``
+    error; any later failure compensates after the outer rollback and
+    re-raises, exactly as the adapter did when it owned this body. Its
+    evidence is ``world/maps/tests/test_gm.py``, which drives the verb and
+    asserts the arrival, party, dialogue and rollback consequences.
+    """
+    from server.console.errors import ConsoleError
+    from typeclasses.characters import PlayerCharacter
+    from world.quests.room_observation import observe_arrival_lore
+    from world.rules.city_gates import reanchor_home_on_gate_arrival
+    from world.rules.dialogue import clear_dialogue_session
+    from world.rules.map_knowledge import record_arrival
+    from world.rules.party import follow_companions
+    from world.rules.surfaces import restore_attributes, snapshot_attributes
+
+    source = entity.location
+    snapshot = _snapshot_movement_state(
+        entity,
+        source,
+        destination=destination,
+        wilderness_coordinates=None,
+        wilderness_source_coordinates=None,
+    )
+    attrs = snapshot_attributes(entity, ("dialogue_session",))
+    try:
+        with transaction.atomic():
+            if not entity.move_to(destination, quiet=True, move_type="teleport"):
+                raise ConsoleError("invalid_argument", "movement_refused")
+            record_arrival(entity)
+            follow_companions(entity, source, destination=destination)
+            observe_arrival_lore(entity, destination)
+            reanchor_home_on_gate_arrival(entity, destination)
+            if isinstance(entity, PlayerCharacter) and source is not destination:
+                clear_dialogue_session(entity)
+    except Exception:
+        _compensate(snapshot)
+        restore_attributes(entity, attrs)
+        raise
+
+
 def _snapshot_movement_state(
     traversing_object: Any,
     source_location: Any,

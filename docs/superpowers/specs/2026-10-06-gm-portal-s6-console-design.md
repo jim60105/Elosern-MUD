@@ -67,7 +67,7 @@ unchanged on failure.
 | `set_wallet` (integer copper ≥ 0) | `world/rules/gm.py` | Enforces the integer-copper invariant; no wallet writer exists today |
 | `set_trait_base` / `set_gauge` | `world/rules/gm.py` | The traits handler shape is complex; base values must stay literal (no multipliers) and within the trait scale |
 | `advance_clock` (seconds) | `world/rules/gm.py`, new `AdvanceSource.GM` | Must run the full clock settlement; not bound to a character, unlike `time_skip.advance_skip` |
-| `teleport` (entity, room) | `world/maps/gm.py` | Must run departure and arrival consequences (dialogue session, party, instance pins) without movement cost |
+| `teleport` (entity, room) | `world/maps/gm.py`, settling in `world/rules/movement_settlement.settle_relocation` | Must run departure and arrival consequences (dialogue session, party, instance pins) without movement cost; the settlement owns every write, so the adapter never imports a map-knowledge write helper |
 | `spawn_monster` (species, variant, room) / `delete_entity` | `world/maps/gm.py` | Spawning goes through `monster_individual.construct_species_individual`; deletion must run Evennia delete hooks and release skip-safety and combat registrations |
 | `set_quest_state` / `set_quest_stage` / `issue_quest` | `world/quests/gm.py` | Quest records are frozen structures with bindings and pins to release or create |
 | `retract_memory` / `supersede_memory` | `world/narrative/gm.py`, via `memory.revise_memory` and `supersede_memory` | Narrative models are append-only; raw editing cannot reach them |

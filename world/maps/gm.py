@@ -12,31 +12,13 @@ from world.rules.surfaces import snapshot_attributes, restore_attributes
 def teleport(target, room):
     entity = resolve_target(target, {"characters", "monsters"})
     destination = resolve_target(room, {"rooms"})
-    from world.rules.movement_settlement import _snapshot_movement_state, _compensate
-    from world.rules.map_knowledge import record_arrival
-    from world.rules.party import follow_companions
-    from world.quests.room_observation import observe_arrival_lore
-    from world.rules.city_gates import reanchor_home_on_gate_arrival
-    from world.rules.dialogue import clear_dialogue_session
-    from typeclasses.characters import PlayerCharacter
+    from world.rules.movement_settlement import settle_relocation
 
-    source = entity.location
-    before = _snapshot_movement_state(entity, source, destination=destination, wilderness_coordinates=None, wilderness_source_coordinates=None)
-    attrs = snapshot_attributes(entity, ("dialogue_session",))
-    try:
-        with transaction.atomic():
-            if not entity.move_to(destination, quiet=True, move_type="teleport"):
-                raise ConsoleError("invalid_argument", "movement_refused")
-            record_arrival(entity)
-            follow_companions(entity, source, destination=destination)
-            observe_arrival_lore(entity, destination)
-            reanchor_home_on_gate_arrival(entity, destination)
-            if isinstance(entity, PlayerCharacter) and source is not destination:
-                clear_dialogue_session(entity)
-    except Exception:
-        _compensate(before)
-        restore_attributes(entity, attrs)
-        raise
+    # The verb only resolves and validates its arguments: the arrival
+    # knowledge, party, lore, home and dialogue consequences of the move are
+    # written by the deterministic settlement (map-knowledge D4 keeps the
+    # map-knowledge write helpers out of this adapter).
+    settle_relocation(entity, destination)
     return {"target": target, "room": room}
 
 
