@@ -451,7 +451,7 @@ def affinity_section(entity: Any) -> dict[str, Any]:
                     "name": cell(label_of(npc)),
                     "value": cell(handler.affinity_for(entity), mono=True),
                     "cap": cell(handler.cap_for(entity), mono=True),
-                    "stage": cell(handler.stage_for(entity), mono=True),
+                    "stage": cell(handler.stage_for(entity).name),
                 },
                 key=str(npc.pk),
             )
@@ -465,7 +465,7 @@ def affinity_section(entity: Any) -> dict[str, Any]:
             column("name", "名稱"),
             column("value", "好感度", mono=True),
             column("cap", "上限", mono=True),
-            column("stage", "階段", mono=True),
+            column("stage", "階段"),
         ],
         rows,
         note=note,

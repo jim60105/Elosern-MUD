@@ -39,6 +39,11 @@ route parameters. Lists share `runtime-list`, so `params.kind` identifies the
 selected child; the active section remains highlighted independently.
 Entity detail and raw views do not mark a list child as the current page.
 
+Character summaries display affinity stages using the authored
+`AffinityStage.name` string. The runtime reader projects this display label
+before JSON serialization; affinity values and caps remain numeric and
+inspection does not modify the stored relationship records.
+
 ## A note on the webclient
 
 The web browser can also execute code directly without talking to the Server.

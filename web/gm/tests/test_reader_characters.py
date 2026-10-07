@@ -10,9 +10,15 @@ when the delta spec synced into the main spec at archive.
 
 from __future__ import annotations
 
+from copy import deepcopy
+from unittest.mock import patch
+
+from django.test import Client
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC
+from world.rules.affinity_config import AffinityConfig, AffinityStage
 from world.rules.traits import restore_gauges_to_full
 from world.tests.synthetic_data import SYNTH_RACES
 
@@ -141,6 +147,54 @@ class CharacterReaderTests(EvenniaTest):
         links = section_of(detail, "links")
         kinds = link_kinds(links)
         self.assertLessEqual({"rooms", "quests", "memories", "dialogue"}, kinds)
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_affinity_stages_render_as_names_in_the_detail_api_without_writes(self):
+        npc = create.create_object(NPC, key="t_reader_affinity_npc")
+        config = AffinityConfig(
+            invite_threshold=10,
+            daily_interaction_cap=5,
+            quest_completion_gain=2,
+            friendly_fire_penalty_per_hit=1,
+            sexual_forced_penalty=3,
+            cap_breaks=(),
+            stages=(
+                AffinityStage("t_distant", 0, "合成疏遠階段", "合成描述"),
+                AffinityStage("t_close", 10, "合成親近階段", "合成描述"),
+            ),
+        )
+        client = Client()
+        client.force_login(self.account)
+        with patch("world.rules.affinity.get_config", return_value=config):
+            for value, expected_name in (
+                (9, "合成疏遠階段"),
+                (10, "合成親近階段"),
+                (25, "合成親近階段"),
+            ):
+                with self.subTest(value=value):
+                    npc.db.relations_data = {
+                        str(self.player.pk): {
+                            "value": value,
+                            "cap": 120,
+                            "daily_gain": 2,
+                            "daily_tick": 1,
+                        }
+                    }
+                    before = deepcopy(dict(npc.db.relations_data))
+                    response = client.get(f"/gm/api/state/characters/{self.player.pk}")
+                    self.assertEqual(response.status_code, 200)
+                    body = response.json()
+                    self.assertIs(body["ok"], True)
+                    affinity = section_of(body["data"], "affinity")
+                    cells = next(
+                        entry["cells"]
+                        for entry in affinity["rows"]
+                        if entry["key"] == str(npc.pk)
+                    )
+                    self.assertEqual(cells["stage"]["value"], expected_name)
+                    self.assertEqual(cells["value"]["value"], value)
+                    self.assertEqual(cells["cap"]["value"], 120)
+                    self.assertEqual(dict(npc.db.relations_data), before)
 
     def test_links_expose_the_current_room_and_quests(self):
         detail = characters.character_detail(self.player)
