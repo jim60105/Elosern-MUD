@@ -7,9 +7,9 @@ Attributes, the typeclass path, the location and the creation date. Object
 references serialize as ``$ref`` and values JSON cannot carry serialize as a
 bounded ``$unserializable`` marker without preventing the rest of the
 inventory from rendering. Non-Evennia records expose their stored fields as
-raw data instead of pretending to have Attributes. The
-``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+raw data instead of pretending to have Attributes. The ``gm-runtime-state``
+requirement annotations were attached when the delta spec synced into the main
+spec at archive.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from evennia.objects.objects import DefaultObject
 from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import raw
 from web.gm.readers._json import MAX_REPR_CHARS, json_value
 
@@ -27,6 +28,7 @@ from web.gm.readers._json import MAX_REPR_CHARS, json_value
 class JsonConversionTests(EvenniaTest):
     """``json_value`` is total: no value can break the whole inventory."""
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_object_references_become_ref_markers(self):
         self.assertEqual(
             json_value(self.obj1),
@@ -37,6 +39,7 @@ class JsonConversionTests(EvenniaTest):
             },
         )
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_unsupported_values_carry_a_bounded_repr(self):
         marker = json_value(complex(1, 2))
         self.assertEqual(set(marker), {"$unserializable", "repr"})
@@ -72,6 +75,7 @@ class RawInventoryTests(EvenniaTest):
         self.plain.attributes.add("component_names", value=["t_slot"])
         self.plain.tags.add("t_tagged", category="t_category")
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_raw_object_lists_every_attribute_with_its_category(self):
         inventory = raw.raw_object(self.plain)
         keys = {(row["key"], row["category"]) for row in inventory["attributes"]}
@@ -90,6 +94,7 @@ class RawInventoryTests(EvenniaTest):
         values = {row["key"]: row["value"] for row in inventory["attributes"]}
         self.assertEqual(values["t_link"]["$ref"], f"#{self.room1.pk}")
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_categorized_tags_and_existing_components_are_reported(self):
         inventory = raw.raw_object(self.plain)
         self.assertIn({"key": "t_tagged", "category": "t_category"}, inventory["tags"])
@@ -106,6 +111,7 @@ class RawInventoryTests(EvenniaTest):
         self.assertEqual(identity["kind"], "object")
         self.assertEqual(identity["id"], str(self.plain.pk))
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_an_account_reports_no_object_only_location(self):
         inventory = raw.raw_object(self.account)
         self.assertIsNone(inventory["location"])

@@ -5,8 +5,8 @@ narrative kind: every approved subtype — events, story threads, letters with
 their delivery state, dream sessions/exchanges, director decisions, scheduled
 beats, authoring drafts and creative requests — projects a list row and a
 detail payload, while a bare identity is refused and an unknown record is a
-404. The ``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+404. Its ``gm-runtime-state`` requirement annotation was attached when the
+delta spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from world.narrative.models import (
     StoryThread,
 )
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import narrative
 from web.gm.tests._state_support import (
     failed_sections,
@@ -120,6 +121,7 @@ class NarrativeReaderTests(EvenniaTest):
             for subtype in narrative.SUBTYPES
         }
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_every_approved_subtype_yields_exactly_its_own_records(self):
         lists = self._lists()
         self.assertEqual(
@@ -161,6 +163,7 @@ class NarrativeReaderTests(EvenniaTest):
         letter = lists["letter"][0]
         self.assertEqual(field_value(letter, "狀態"), "delivered")
 
+    @covers_requirement("gm-runtime-state::universal-evennia-raw-inspection")
     def test_every_subtype_detail_projects_its_stored_record_as_raw_data(self):
         identities = {
             "event": "event:t_reader_event",
@@ -215,6 +218,7 @@ class NarrativeReaderTests(EvenniaTest):
             narrative.detail("event", "t_reader_absent")
         self.assertEqual(missing.exception.code, "object_not_found")
 
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
     def test_list_filters_are_applied_to_the_indexed_fields(self):
         self.assertEqual(len(narrative.list_items("event", {"event_type": "t_reader_kind"})), 1)
         self.assertEqual(narrative.list_items("event", {"event_type": "t_other"}), [])

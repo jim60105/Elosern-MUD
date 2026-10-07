@@ -3,9 +3,9 @@
 Establishes the delta requirement "Complete curated entity summaries" for the
 art-asset kind: subject key, status, prompt summary, source hash, generated
 time and failure reason, plus the existing ``/art/`` thumbnail offered only
-when the stored identity resolves to a real file. The
-``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+when the stored identity resolves to a real file. Its ``gm-runtime-state``
+requirement annotation was attached when the delta spec synced into the main
+spec at archive.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import art
 from web.gm.readers._entities import stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -45,6 +46,7 @@ class ArtReaderTests(EvenniaTest):
         self.record.db.enqueued_at = 1700000000.0
         self.record.db.completed_at = 1700000042.0
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_exposes_every_curated_art_section(self):
         detail = art.detail(self.record)
         self.assertEqual(detail["kind"], "art")
@@ -62,6 +64,31 @@ class ArtReaderTests(EvenniaTest):
         thumbnail_row = next(row for row in identity["rows"] if row["label"] == "縮圖")
         self.assertNotIn("link", thumbnail_row)
         self.assertIsNone(art.thumbnail_url(self.record))
+
+    def test_identity_offers_the_thumbnail_once_the_output_file_exists(self):
+        # The positive half of the contract: the stored identity is offered
+        # only because a real file resolves under ``ART_STORE_ROOT``.
+        import tempfile
+        from pathlib import Path
+
+        from django.test import override_settings
+
+        identity = "gallery/monster/t_reader_subject/t_reader_image.png"
+        with tempfile.TemporaryDirectory() as store:
+            target = Path(store) / identity
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"t_syntheticimage")
+            with override_settings(ART_STORE_ROOT=store):
+                self.record.db.output_identity = identity
+                self.assertEqual(art.thumbnail_url(self.record), f"/art/{identity}")
+                thumbnail = next(
+                    row
+                    for row in section_of(art.detail(self.record), "identity")["rows"]
+                    if row["label"] == "縮圖"
+                )
+                self.assertEqual(
+                    thumbnail["link"], {"kind": "media", "id": f"/art/{identity}"}
+                )
 
     def test_generation_and_output_report_stored_provenance(self):
         detail = art.detail(self.record)

@@ -6,9 +6,8 @@ memory filter and the complete revision history, the newest-ten snapshot cap
 with its token accounting/truncation/evidence links, multi-player dialogue
 grouping with the existing S2 call links, and recall equality against a direct
 authoritative ``fast_recall`` under the same canonical owner/requester without
-a single persistent change. The ``gm-runtime-state::*`` requirement IDs this
-module covers enter the traceability index when the change's delta spec is
-synced at archive.
+a single persistent change. Its ``gm-runtime-state`` requirement annotations
+were attached when the delta spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ from world.narrative.models import (
 from world.narrative.recall import fast_recall
 from world.rules.traits import restore_gauges_to_full
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import npcs, registry
 from web.gm.readers._entities import read_attr, stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -166,6 +166,10 @@ class NpcNarrativeReaderTests(EvenniaTest):
         source = next(field for field in item["fields"] if field["label"] == "來源")
         self.assertEqual(source["link"]["kind"], "narrative")
 
+    @covers_requirement(
+        "gm-runtime-state::npc-memory-and-dialogue-inspection",
+        "gm-runtime-state::runtime-api-routes-and-bounded-lists",
+    )
     def test_memory_filters_are_applied(self):
         active = self._memory(tick=1, tier="core")
         inactive = self._memory(tick=2, availability="inactive", tier="core")
@@ -200,7 +204,18 @@ class NpcNarrativeReaderTests(EvenniaTest):
             ],
             [str(superseded.pk)],
         )
+        told = self._memory(tick=4, scope="told")
+        self.assertEqual(
+            [
+                item["id"]
+                for item in npcs.memory_list_items(
+                    {"owner": f"#{self.owner}", "scope": "told"}
+                )
+            ],
+            [str(told.pk)],
+        )
 
+    @covers_requirement("gm-runtime-state::npc-memory-and-dialogue-inspection")
     def test_memory_detail_exposes_the_complete_revision_history(self):
         record = self._memory(tick=7, revision_number=3, revisions=3)
         detail = npcs.memory_detail(str(record.pk), {"owner": f"#{self.owner}"})
@@ -245,6 +260,7 @@ class NpcNarrativeReaderTests(EvenniaTest):
 
     # --- snapshots (3.1) --------------------------------------------------
 
+    @covers_requirement("gm-runtime-state::npc-memory-and-dialogue-inspection")
     def test_snapshot_list_is_capped_at_the_newest_ten(self):
         snapshots = [self._snapshot(index) for index in range(12)]
         items = npcs.snapshot_list_items({"owner": f"#{self.owner}"})
@@ -302,6 +318,7 @@ class NpcNarrativeReaderTests(EvenniaTest):
 
     # --- dialogue (3.2) ---------------------------------------------------
 
+    @covers_requirement("gm-runtime-state::npc-memory-and-dialogue-inspection")
     def test_dialogue_list_groups_epochs_by_player(self):
         self._dialogue("t_player_a", 1)
         self._dialogue("t_player_a", 2)
@@ -369,6 +386,10 @@ class NpcNarrativeReaderTests(EvenniaTest):
 
     # --- recall (3.3) -----------------------------------------------------
 
+    @covers_requirement(
+        "gm-runtime-state::npc-memory-and-dialogue-inspection",
+        "gm-runtime-state::two-layer-immutable-inspection-acceptance",
+    )
     def test_recall_equals_a_direct_authoritative_call_and_writes_nothing(self):
         for index in range(3):
             self._memory(tick=index + 1, tier="core" if index == 0 else "working")
@@ -416,6 +437,7 @@ class NpcNarrativeReaderTests(EvenniaTest):
         )
         self.assertIn(superseded.pk, [entry["id"] for entry in preview["working"]])
 
+    @covers_requirement("gm-runtime-state::protected-read-only-inspection-boundary")
     def test_recall_preserves_the_thread_permission_gate(self):
         # An unknown/inaccessible thread contributes no content: the preview
         # reports exactly what the authoritative recall reports, never more.

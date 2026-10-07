@@ -4,9 +4,8 @@ Establishes the delta requirement "Runtime navigation search and cross-links":
 an exact ``#dbref`` resolves straight to that object whatever its kind, other
 text matches object keys, then quest ids, then narrative source ids in that
 precedence, and a non-curated object's result still carries the link descriptor
-the navigation needs. The ``gm-runtime-state::*`` requirement IDs this module
-covers enter the traceability index when the change's delta spec is synced at
-archive.
+the navigation needs. Its ``gm-runtime-state`` requirement annotation was
+attached when the delta spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from typeclasses.characters import PlayerCharacter
 from world.narrative.models import MemoryRecord, NarrativeEvent
 from world.quests.tests._fixtures import stage_active_record
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import search
 from web.gm.tests._state_support import open_synthetic_scope
 
@@ -79,6 +79,7 @@ class SearchReaderTests(EvenniaTest):
         kinds = {result["kind"] for result in by_source}
         self.assertEqual(kinds, {"narrative", "memories"})
 
+    @covers_requirement("gm-runtime-state::runtime-navigation-search-and-cross-links")
     def test_results_keep_the_documented_tier_precedence(self):
         # One object key and two source ids share the marker text, so both
         # contributing tiers appear and their order is the contract.
@@ -95,6 +96,7 @@ class SearchReaderTests(EvenniaTest):
                 search.search(value)
             self.assertEqual(raised.exception.code, "invalid_query")
 
+    @covers_requirement("gm-runtime-state::runtime-navigation-search-and-cross-links")
     def test_a_result_carries_a_link_descriptor_the_navigation_can_follow(self):
         for result in search.search(SOURCE)["results"]:
             with self.subTest(result=result):

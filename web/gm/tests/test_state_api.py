@@ -6,10 +6,9 @@ enforcement on the recall preview, reserved-route precedence against the
 generic kind routes, the lookup/length error matrix (404
 ``object_not_found``/``kind_mismatch``, 400 ``query_too_long`` before recall
 execution), summary-only cursor lists with filter binding, and the facade
-request events. The genuinely matching main-spec requirement IDs are the
-``gm-portal-access-api`` ones below; the ``gm-runtime-state`` requirements this
-module establishes exist only as this change's delta and enter the
-traceability index when the delta spec is synced at archive.
+request events. The annotations name the requirement each test establishes:
+the ``gm-portal-access-api`` transport IDs and the ``gm-runtime-state``
+runtime-state IDs the delta spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -24,9 +23,13 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.art.store import ArtAssetRecord
 from world.narrative.models import NarrativeEvent
+from world.rules.monster_individual import construct_species_individual
+from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, SYNTH_MONSTER_VARIANTS
 
 from tools.spec_traceability import covers_requirement
 from web.gm import pagination
+from web.gm.readers import monsters
+from web.gm.tests._state_support import open_synthetic_scope
 from web.gm.tests._support import GmTestCase
 
 LIST = "/gm/api/state/characters"
@@ -60,6 +63,7 @@ class StateApiAccessTests(StateApiTestCase):
     @covers_requirement(
         "gm-portal-access-api::protected-gm-namespace",
         "gm-portal-access-api::registered-backend-acceptance-coverage",
+        "gm-runtime-state::protected-read-only-inspection-boundary",
     )
     def test_anonymous_and_player_requests_are_denied_with_the_existing_envelopes(self):
         api_requests = [
@@ -112,6 +116,7 @@ class StateApiAccessTests(StateApiTestCase):
     @covers_requirement(
         "gm-portal-access-api::facade-request-and-denial-events",
         "gm-portal-access-api::protected-gm-namespace",
+        "gm-runtime-state::protected-read-only-inspection-boundary",
     )
     def test_a_denied_state_request_emits_the_denial_event(self):
         with mock.patch("web.gm.access.log_warn") as log_warn:
@@ -120,6 +125,7 @@ class StateApiAccessTests(StateApiTestCase):
 
     @covers_requirement(
         "gm-portal-access-api::protected-gm-namespace",
+        "gm-runtime-state::runtime-api-routes-and-bounded-lists",
     )
     def test_every_runtime_route_family_resolves_to_its_registered_pattern(self):
         concrete = {
@@ -139,6 +145,7 @@ class StateApiAccessTests(StateApiTestCase):
 
     @covers_requirement(
         "gm-portal-access-api::protected-gm-namespace",
+        "gm-runtime-state::runtime-api-routes-and-bounded-lists",
     )
     def test_reserved_paths_are_not_swallowed_by_the_generic_kind_route(self):
         cases = {
@@ -183,6 +190,7 @@ class StateApiCsrfTests(StateApiTestCase):
     @covers_requirement(
         "gm-portal-access-api::consistent-json-transport",
         "gm-portal-access-api::facade-request-and-denial-events",
+        "gm-runtime-state::runtime-api-routes-and-bounded-lists",
     )
     def test_recall_post_without_or_with_an_invalid_token_is_csrf_failed(self):
         client = self.client_for("developer", enforce_csrf_checks=True)
@@ -215,6 +223,7 @@ class StateApiErrorMatrixTests(StateApiTestCase):
     @covers_requirement(
         "gm-portal-access-api::consistent-json-transport",
         "gm-portal-access-api::registered-backend-acceptance-coverage",
+        "gm-runtime-state::independent-failures-and-precise-lookup-errors",
     )
     def test_the_lookup_error_matrix(self):
         client = self.client_for("developer")
@@ -286,6 +295,7 @@ class StateApiErrorMatrixTests(StateApiTestCase):
     @covers_requirement(
         "gm-portal-access-api::consistent-json-transport",
         "gm-portal-access-api::registered-backend-acceptance-coverage",
+        "gm-runtime-state::independent-failures-and-precise-lookup-errors",
     )
     def test_recall_query_length_boundary(self):
         client = self.client_for("developer")
@@ -322,6 +332,7 @@ class StateApiPaginationTests(StateApiTestCase):
         ]
 
     @covers_requirement("gm-portal-access-api::consistent-json-transport")
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
     def test_the_default_limit_is_fifty_and_the_maximum_two_hundred(self):
         self.assertEqual(pagination.DEFAULT_LIMIT, 50)
         self.assertEqual(pagination.MAX_LIMIT, 200)
@@ -335,6 +346,7 @@ class StateApiPaginationTests(StateApiTestCase):
         self.assertIsNone(maximum["next_cursor"])
 
     @covers_requirement("gm-portal-access-api::consistent-json-transport")
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
     def test_cursor_pages_terminate_and_never_repeat_a_row(self):
         client = self.client_for("developer")
         seen: list[str] = []
@@ -355,6 +367,7 @@ class StateApiPaginationTests(StateApiTestCase):
         self.assertEqual(len(seen), total)
 
     @covers_requirement("gm-portal-access-api::consistent-json-transport")
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
     def test_a_cursor_is_bound_to_the_filters_it_was_issued_for(self):
         client = self.client_for("developer")
         cursor = self.assert_ok_envelope(client.get(LIST + "?limit=1"))["next_cursor"]
@@ -367,6 +380,7 @@ class StateApiPaginationTests(StateApiTestCase):
         self.assert_error_envelope(response, 400, "invalid_cursor")
 
     @covers_requirement("gm-portal-access-api::consistent-json-transport")
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
     def test_list_items_are_summaries_without_raw_or_section_payloads(self):
         client = self.client_for("developer")
         for url in (LIST, "/gm/api/state/rooms", "/gm/api/state/narrative?subtype=event"):
@@ -378,3 +392,57 @@ class StateApiPaginationTests(StateApiTestCase):
                     self.assertNotIn("raw", item)
                     self.assertNotIn("sections", item)
                     self.assertIsInstance(item["fields"], list)
+
+
+class StateApiListFilterTests(StateApiTestCase):
+    """The approved object filters select through the list transport."""
+
+    SPECIES = "t_whisper_quail"
+    VARIANT = "t_whisper_quail_ordinary"
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "monster_species",
+            "monster_variants",
+            "monster_tiers",
+            "ambient_placements",
+            "monster_sites",
+        )
+        super().setUp()
+        self.monster = construct_species_individual(self.SPECIES, self.VARIANT)
+
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
+    def test_npc_location_filter_requires_a_room_dbref(self):
+        client = self.client_for("developer")
+        # The filter value is a ``#dbref``, so the hash must be percent-encoded
+        # (a raw ``#`` starts a URL fragment and would drop the value).
+        here = self.assert_ok_envelope(
+            client.get(f"/gm/api/state/npcs?location=%23{self.room1.pk}")
+        )
+        self.assertIn(str(self.npc.pk), [item["id"] for item in here["items"]])
+        elsewhere = self.assert_ok_envelope(
+            client.get(f"/gm/api/state/npcs?location=%23{self.room2.pk}")
+        )
+        self.assertNotIn(str(self.npc.pk), [item["id"] for item in elsewhere["items"]])
+        # A location that is not a room dbref is refused, never ignored.
+        invalid = client.get("/gm/api/state/npcs?location=t_not_a_room")
+        self.assert_error_envelope(invalid, 400, "invalid_filter")
+
+    @covers_requirement("gm-runtime-state::runtime-api-routes-and-bounded-lists")
+    def test_monster_species_and_region_filters_select_the_individual(self):
+        client = self.client_for("developer")
+        by_species = self.assert_ok_envelope(
+            client.get(f"/gm/api/state/monsters?species={self.SPECIES}")
+        )
+        self.assertIn(str(self.monster.pk), [item["id"] for item in by_species["items"]])
+        region = monsters.region_of(self.monster)
+        self.assertTrue(region)
+        by_region = self.assert_ok_envelope(
+            client.get(f"/gm/api/state/monsters?region={region}")
+        )
+        self.assertIn(str(self.monster.pk), [item["id"] for item in by_region["items"]])
+        absent = self.assert_ok_envelope(
+            client.get("/gm/api/state/monsters?region=t_absent_region")
+        )
+        self.assertEqual(absent["items"], [])

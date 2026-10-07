@@ -7,9 +7,9 @@ Attribute/Tag handler) or import a known writer — including the dialogue
 context assembly that settles correspondence and appends frames. The contract
 also proves it rejects deliberately forbidden syntax, and that every reader
 imports the helpers it uses (a missing section-helper import would otherwise
-surface only as a contained runtime section error). The
-``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+surface only as a contained runtime section error). Its ``gm-runtime-state``
+requirement annotations were attached when the delta spec synced into the main
+spec at archive.
 """
 
 from __future__ import annotations
@@ -17,6 +17,8 @@ from __future__ import annotations
 import ast
 import unittest
 from pathlib import Path
+
+from tools.spec_traceability import covers_requirement
 
 READERS = Path(__file__).resolve().parents[1] / "readers"
 
@@ -237,6 +239,7 @@ def _exported_helpers() -> set[str]:
 
 
 class ReaderStaticContractTest(unittest.TestCase):
+    @covers_requirement("gm-runtime-state::two-layer-immutable-inspection-acceptance")
     def test_readers_never_call_a_writer(self):
         for path in _modules():
             with self.subTest(module=path.name):
@@ -259,6 +262,7 @@ class ReaderStaticContractTest(unittest.TestCase):
             with self.subTest(module=path.name):
                 self.assertEqual(missing_helper_imports(_tree(path), exported), [])
 
+    @covers_requirement("gm-runtime-state::two-layer-immutable-inspection-acceptance")
     def test_the_contract_rejects_deliberately_forbidden_syntax(self):
         cases = {
             "obj.save()": forbidden_calls,

@@ -3,9 +3,9 @@
 Establishes the delta requirement "Complete curated entity summaries" for the
 quest-record kind: definition key, issuer, status/stage, progress counters,
 bound/ protected targets, deadline, rewards and the owning character — plus the
-generated-quest payload — with the owner-scoped record identity preserved. The
-``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+generated-quest payload — with the owner-scoped record identity preserved. Its
+``gm-runtime-state`` requirement annotation was attached when the delta spec
+synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from world.tests.synthetic_data import (
     SYNTH_QUESTS,
 )
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import quests
 from web.gm.readers._entities import stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -78,6 +79,7 @@ class QuestReaderTests(EvenniaTest):
         apply_quest_log_replacement(self.owner, [*read_records(self.owner), record])
         return record
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_exposes_every_curated_quest_section(self):
         detail = quests.detail_for_record(self.record, self.owner)
         self.assertEqual(detail["kind"], "quests")
@@ -153,6 +155,7 @@ class QuestReaderTests(EvenniaTest):
             quests.resolve_owner("#999999")
         self.assertEqual(missing.exception.code, "object_not_found")
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_generated_quest_projection_reports_the_stored_payload(self):
         payload = {
             "definition": {"key": "t_gen", "name": "合成生成任務"},

@@ -3,9 +3,9 @@
 Establishes the delta requirement "Complete curated entity summaries" for the
 NPC kind: every player-character field plus title/profession, service
 components, the seven-section persona card with its version, today's schedule
-with the current slot, and the dialogue key. The ``gm-runtime-state::*``
-requirement IDs this module covers enter the traceability index when the
-change's delta spec is synced at archive.
+with the current slot, and the dialogue key. Its ``gm-runtime-state``
+requirement annotation was attached when the delta spec synced into the main
+spec at archive.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from world.rules.npc_persona import initialize_npc_persona
 from world.rules.traits import restore_gauges_to_full
 from world.tests.synthetic_data import SYNTH_RACES
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import npcs
 from web.gm.readers._entities import stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -66,6 +67,7 @@ class NpcReaderTests(EvenniaTest):
         )
         initialize_npc_persona(self.npc, CARD, {"kind": "import", "record": "t-reader-npc"})
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_carries_character_sections_plus_the_npc_only_ones(self):
         detail = npcs.detail(self.npc)
         keys = section_keys(detail)

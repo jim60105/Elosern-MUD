@@ -131,6 +131,7 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
 
     @covers_requirement('gm-operations-dashboard::visibility-aware-overview-and-payload-drawer')
     @covers_requirement('gm-portal-spa::s1-navigation-and-history-routing')
+    @covers_requirement('gm-runtime-state::shared-runtime-presentation-without-polling')
     def test_dashboard_polling_and_payload_drawer_vitest_cases_pass(self):
         result = _run_vitest("poller.test.js", "overview.test.js", "call-drawer.test.js", "components.test.js")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -155,6 +156,8 @@ class GmFrontendGateEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "gm-portal-spa::operator-component-layer",
         "gm-portal-spa::s1-navigation-and-history-routing",
+        "gm-runtime-state::shared-runtime-presentation-without-polling",
+        "gm-runtime-state::runtime-navigation-search-and-cross-links",
     )
     def test_runtime_inspection_vitest_cases_pass(self):
         """The runtime components and pages are the S3 additions to the layer."""

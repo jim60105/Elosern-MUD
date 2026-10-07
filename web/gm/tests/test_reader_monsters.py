@@ -4,8 +4,8 @@ Establishes the delta requirement "Complete curated entity summaries" for the
 monster kind: identity and provenance (species, variant, derived threat tier,
 danger grade, and the numeric source that actually built the individual), the
 owning site or ambient placement, the loot table, and the behaviour profile.
-The ``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive.
+Its ``gm-runtime-state`` requirement annotations were attached when the delta
+spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from world.tests.synthetic_data import (
     SYNTH_MONSTER_VARIANTS,
 )
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import monsters
 from web.gm.readers._entities import read_attr, stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -81,6 +82,7 @@ class MonsterReaderTests(EvenniaTest):
         monster.traits.sp.current = 10
         return monster
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_species_identity_and_interim_numeric_source_are_reported(self):
         monster = self._individual()
         # The kit's tier key is deliberately absent from the shipped behaviour
@@ -159,6 +161,7 @@ class MonsterReaderTests(EvenniaTest):
                 BEHAVIOUR_PROFILES[archetype].target_strategy,
             )
 
+    @covers_requirement("gm-runtime-state::independent-failures-and-precise-lookup-errors")
     def test_a_failing_section_leaves_the_others_readable(self):
         # An unregistered tier key cannot resolve a behaviour profile; the
         # refusal stays in that slot while the rest of the page renders.

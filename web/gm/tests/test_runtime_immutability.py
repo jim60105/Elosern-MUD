@@ -8,9 +8,9 @@ row counts *and* stored values, not just counts — with missing-Attribute
 fixtures exercising the indirect autocreation risk. The baseline is taken after
 the fixtures are built and asserted before any teardown, so no transaction
 rollback can mask a write. Facade events and in-process recall caches are
-permitted; domain writes are not. The ``gm-runtime-state::*`` requirement IDs
-this module covers enter the traceability index when the change's delta spec is
-synced at archive.
+permitted; domain writes are not. Its ``gm-runtime-state`` requirement
+annotations were attached when the delta spec synced into the main spec at
+archive.
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ from world.rules.monster_individual import construct_species_individual
 from world.rules.traits import restore_gauges_to_full
 from world.tests.synthetic_data import SYNTH_GUILD_ISSUER_KEY
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import registry
 from web.gm.tests._state_support import open_synthetic_scope
 
@@ -225,6 +226,10 @@ class RuntimeImmutabilityTest(EvenniaTest):
 
     # --- the assertions ---------------------------------------------------
 
+    @covers_requirement(
+        "gm-runtime-state::two-layer-immutable-inspection-acceptance",
+        "gm-runtime-state::protected-read-only-inspection-boundary",
+    )
     def test_the_whole_inspection_surface_is_immutable(self):
         before = {
             "player": _through_rows(self.player),
@@ -248,6 +253,7 @@ class RuntimeImmutabilityTest(EvenniaTest):
             with self.subTest(model=model_name):
                 self.assertEqual(after[model_name], rows)
 
+    @covers_requirement("gm-runtime-state::protected-read-only-inspection-boundary")
     def test_missing_stored_defaults_stay_missing(self):
         self._inspect_everything()
         for entity in (self.player, self.owner, self.npc):

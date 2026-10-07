@@ -4,8 +4,8 @@ Establishes the delta requirement "Complete curated entity summaries" for the
 player-character kind, including the two hard invariants: stored truth and
 ``disguised_stats`` are emitted side by side (the disguise labelled 僅顯示用 and
 never merged into a true trait), and currency stays integer copper with a
-derived display. The ``gm-runtime-state::*`` requirement IDs this module covers
-enter the traceability index when the change's delta spec is synced at archive.
+derived display. Its ``gm-runtime-state`` requirement annotation was attached
+when the delta spec synced into the main spec at archive.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typeclasses.characters import PlayerCharacter
 from world.rules.traits import restore_gauges_to_full
 from world.tests.synthetic_data import SYNTH_RACES
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import characters
 from web.gm.readers._entities import (
     read_attr,
@@ -83,6 +84,7 @@ class CharacterReaderTests(EvenniaTest):
         }
         self.player.guild_rank = "t_bronze"
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_exposes_every_curated_character_section(self):
         detail = characters.character_detail(self.player)
         self.assertEqual(detail["kind"], "characters")
@@ -99,6 +101,7 @@ class CharacterReaderTests(EvenniaTest):
         self.assertEqual(row_value(identity, "種族"), SYNTH_RACES[SYNTH_RACE].display_name_zh)
         self.assertEqual(row_value(identity, "當前房間"), f"#{self.room1.pk}")
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_disguise_is_emitted_separately_and_never_replaces_true_traits(self):
         true_attack = int(self.player.traits.atk_phys.value)
         self.player.db.disguised_stats = {"atk_phys": true_attack - 5}
@@ -116,6 +119,7 @@ class CharacterReaderTests(EvenniaTest):
         self.assertEqual(hp["rows"][0]["label"], "基礎")
         self.assertTrue(hp["note"].startswith("有效值 "))
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_wallet_stays_integer_copper_with_a_derived_display(self):
         detail = characters.character_detail(self.player)
         wallet = section_of(detail, "wallet")
@@ -174,6 +178,7 @@ class MissingStoredDefaultTests(EvenniaTest):
         # shell; a product read must not fill it in.
         self.player.attributes.remove("wallet")
 
+    @covers_requirement("gm-runtime-state::protected-read-only-inspection-boundary")
     def test_missing_wallet_reports_a_section_error_without_creating_it(self):
         before = stored_attribute_keys(self.player)
         self.assertIsNone(read_attr(self.player, "wallet", default=None))

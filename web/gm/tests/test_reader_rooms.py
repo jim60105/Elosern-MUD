@@ -3,9 +3,9 @@
 Establishes the delta requirement "Complete curated entity summaries" for the
 room kind: coordinates and place kind, exits with their destinations, the
 occupants grouped by kind, and instance ownership/lifetime read back without
-provisioning a single Attribute. The ``gm-runtime-state::*`` requirement IDs
-this module covers enter the traceability index when the change's delta spec is
-synced at archive.
+provisioning a single Attribute. Its ``gm-runtime-state`` requirement
+annotations were attached when the delta spec synced into the main spec at
+archive.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, Room
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import rooms
 from web.gm.readers._entities import read_attr, stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -44,6 +45,7 @@ class RoomReaderTests(EvenniaTest):
         )
         self.npc = create.create_object(NPC, key="t_reader_room_npc", location=self.here)
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_carries_the_four_room_sections(self):
         detail = rooms.detail(self.here)
         self.assertEqual(detail["kind"], "rooms")
@@ -108,6 +110,7 @@ class RoomReaderTests(EvenniaTest):
         self.assertEqual(owned[0]["link"]["kind"], "object")
         self.assertEqual(link_ids(section, "object"), [str(self.npc.pk)])
 
+    @covers_requirement("gm-runtime-state::protected-read-only-inspection-boundary")
     def test_a_missing_expire_tick_reads_as_promoted_without_creating_it(self):
         instance_room = create.create_object(InstanceRoom, key="t_reader_instance_open")
         before = stored_attribute_keys(instance_room)

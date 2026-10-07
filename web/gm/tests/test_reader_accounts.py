@@ -2,16 +2,16 @@
 
 Establishes the delta requirement "Complete curated entity summaries" for the
 account kind: name, permissions, created/last-login dates, live sessions and
-the owned character list, read without creating or repairing anything. The
-``gm-runtime-state::*`` requirement IDs this module covers enter the
-traceability index when the change's delta spec is synced at archive (the
-documented ``web/gm/tests/test_spa_evidence.py`` precedent).
+the owned character list, read without creating or repairing anything. Its
+``gm-runtime-state`` requirement annotation was attached when the delta spec
+synced into the main spec at archive.
 """
 
 from __future__ import annotations
 
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from web.gm.readers import accounts
 from web.gm.readers._entities import stored_attribute_keys
 from web.gm.tests._state_support import (
@@ -33,6 +33,7 @@ class AccountReaderTests(EvenniaTest):
         # list is what an account page shows, so register it like any login.
         self.account.characters.add(self.char1)
 
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
     def test_detail_exposes_every_named_account_field(self):
         detail = accounts.detail(self.account)
         self.assertEqual(detail["kind"], "accounts")
