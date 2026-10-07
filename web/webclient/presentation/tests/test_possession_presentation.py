@@ -300,6 +300,9 @@ class PossessionPresentationTests(EvenniaTest):
         obj_panel = objectives_presenter(ctx_npc)
         self.assertTrue(obj_panel["available"])
 
+    @covers_requirement(
+        "webclient-status-presentation::equipment-condition-provenance-preserves-independent-sources"
+    )
     def test_possession_provenance_uses_resource_owner_equipment(self):
         from contextlib import ExitStack
         from world.rules.rulebook.schema import Rule

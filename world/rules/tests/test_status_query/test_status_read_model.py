@@ -96,6 +96,9 @@ class StatusReadModelTests(EvenniaTest):
         return effects
 
     @covers_requirement("webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers")
+    @covers_requirement(
+        "webclient-status-presentation::equipment-condition-provenance-preserves-independent-sources"
+    )
     def test_equipment_threshold_provenance_and_actual_match_parity(self):
         from world.rules.status_query.assembly import _assemble
         from world.rules.combat_modifiers import matched_combat_modifiers
@@ -125,6 +128,9 @@ class StatusReadModelTests(EvenniaTest):
         self.assertFalse(any(c.code == "t_exposure" for c in build_status_read_model(self.actor).conditions))
 
     @covers_requirement("webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers")
+    @covers_requirement(
+        "webclient-status-presentation::equipment-condition-provenance-preserves-independent-sources"
+    )
     def test_attached_ownership_preserves_independent_instances_and_orphans(self):
         self._provenance_scope()
         caches = {
@@ -165,6 +171,9 @@ class StatusReadModelTests(EvenniaTest):
         self.assertEqual(next(c for c in build_status_read_model(self.actor).conditions if c.code == "t_other").provenance.kind, "unknown")
 
     @covers_requirement("webclient-status-presentation::status-presentation-has-no-mutation-side-effects")
+    @covers_requirement(
+        "webclient-status-presentation::equipment-condition-provenance-preserves-independent-sources"
+    )
     def test_provenance_reads_preserve_materialized_and_unmaterialized_storage(self):
         import copy
         self._provenance_scope()

@@ -318,6 +318,7 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::location-appearance-and-vitals-changes-transition-at-the-motion-level",
         "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
         "webclient-contextual-hud::the-vitals-island-is-shown-only-in-combat-or-while-a-vital-or-a-condition-needs-attention",
+        "webclient-contextual-hud::condition-detail-preserves-equipment-provenance-without-hiding-gameplay-conditions",
     )
     def test_vitals_reveal_and_inert(self):
         """The island reveals over 250ms; hiding it with focus on a chip moves
