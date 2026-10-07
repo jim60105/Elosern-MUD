@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 from unittest import TestCase, mock
+import threading
 from server.console import execution, registry
 from server.console.errors import ConsoleError
 from server.console.snapshot_policy import SnapshotPolicy
@@ -97,6 +98,11 @@ class PolicyTests(TestCase):
         self.policy.manual_save('copy')
         self.assertEqual(self.policy.baseline_tick, 10)
         self.assertTrue(self.policy.status()['will_snapshot'])
+        self.policy.saver=lambda *args:SimpleNamespace(id='no-clock',clock=None)
+        self.policy.manual_save('no-clock')
+        self.assertIsNone(self.policy.baseline_tick)
+        self.assertTrue(self.execute()['snapshot']['taken'])
+        self.assertIsNone(self.policy.baseline_tick)
 
     def test_manual_manual_and_console_contention_refuse_without_queue(self):
         self.policy.baseline_tick = 7
@@ -111,6 +117,39 @@ class PolicyTests(TestCase):
             self.assertEqual(self.policy.baseline_tick, 7)
         finally:
             self.policy._lock.release()
+
+    def test_actual_overlapping_manual_and_console_requests_refuse_before_save_release(self):
+        entered=threading.Event()
+        release=threading.Event()
+        results=[]
+        self.policy.baseline_tick=7
+        def saver(kind,label):
+            entered.set()
+            self.assertTrue(release.wait(5))
+            return SimpleNamespace(id='t_manual',clock={'tick':12})
+        self.policy.saver=saver
+        def first():
+            try:
+                results.append(self.policy.manual_save('first'))
+            except Exception as failure:
+                results.append(failure)
+        worker=threading.Thread(target=first)
+        worker.start()
+        try:
+            self.assertTrue(entered.wait(5))
+            with self.assertRaises(SaveInProgress):
+                self.policy.manual_save('second')
+            with self.assertRaises(ConsoleError) as caught:
+                self.execute()
+            self.assertEqual(caught.exception.reason,'console_in_progress')
+            self.assertEqual(self.policy.baseline_tick,7)
+            self.assertEqual(results,[])
+        finally:
+            release.set()
+            worker.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(results[0].id,'t_manual')
+        self.assertEqual(self.policy.baseline_tick,12)
 
     def test_reentry_refuses_and_outcome_event_follows_operation(self):
         def operation():

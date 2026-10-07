@@ -1,7 +1,6 @@
 <script setup>
-// 世界: the in-game date and daypart from the existing clock (read only —
-// the overview never creates the clock), plus live session/combat/instance
-// counts.
+// Inspect the existing clock and live world counts without creating a clock.
+// S6 advances the existing clock through the separate console save gate.
 import GmEmpty from "../../components/GmEmpty.vue";
 import GmPanel from "../../components/GmPanel.vue";
 import SlotState from "./SlotState.vue";

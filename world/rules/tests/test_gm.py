@@ -61,6 +61,19 @@ class RulesConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(self.player.db.inventory),['t_huskapple'])
         self.assertEqual(list(self.player.contents),[])
 
+    def test_partial_mixed_holdings_remove_only_existing_matching_mirrors(self):
+        gm.give_item(self.target,'t_huskapple',3)
+        for mirror in list(self.player.contents)[:2]:
+            mirror.delete()
+        gm.take_item(self.target,'t_huskapple',1)
+        self.assertEqual(list(self.player.db.inventory),['t_huskapple']*2)
+        self.assertEqual(list(self.player.contents),[])
+        gm.give_item(self.target,'t_huskapple',1)
+        self.assertEqual(len(self.player.contents),1)
+        gm.take_item(self.target,'t_huskapple',2)
+        self.assertEqual(list(self.player.db.inventory),['t_huskapple'])
+        self.assertEqual(list(self.player.contents),[])
+
     def test_inventory_validation_before_any_change(self):
         for verb in (gm.give_item,gm.take_item):
             for quantity in (True,0,-1,1.5,'2'):
@@ -148,6 +161,51 @@ class RulesConsoleTests(ConsoleOwnerTest):
             with self.assertRaises(RuntimeError):
                 gm.set_gauge(self.target,'hp',1)
         self.assertEqual(snapshot_traits(self.player),traits)
+
+    def test_trait_and_gauge_type_scale_registry_kind_and_modifier_separation(self):
+        lower,upper=gm._base_band(self.player,'magic_power')
+        self.player.traits.magic_power.mod=3
+        self.player.db.disguised_stats={'magic_power':999}
+        gm.set_trait_base(self.target,'magic_power',lower)
+        self.assertEqual(self.player.traits.magic_power.base,lower)
+        self.assertEqual(self.player.traits.magic_power.mod,3)
+        self.assertEqual(self.player.db.disguised_stats['magic_power'],999)
+        before=snapshot_traits(self.player)
+        for value in (True,-1,0.5,'4',None,upper+1):
+            self.assert_refusal('invalid_argument',lambda:gm.set_trait_base(self.target,'magic_power',value))
+        self.assert_refusal('invalid_argument',lambda:gm.set_gauge(self.target,'hp',self.player.traits.hp.max+1))
+        for function in (gm.set_trait_base,gm.set_gauge):
+            self.assert_refusal('registry_key_not_found',lambda:function(self.target,'magic_power' if function is gm.set_gauge else 't_missing',0))
+            self.assert_refusal('target_not_found',lambda:function('#99999999','hp',0))
+            self.assert_refusal('target_kind_mismatch',lambda:function(f'#{self.npc.pk}','hp',0))
+            self.assert_refusal('invalid_argument',lambda:function(self.target,True,0))
+        self.assertEqual(snapshot_traits(self.player),before)
+        monster_target=f'#{self.monster.pk}'
+        gm.set_gauge(monster_target,'hp',0)
+        self.assertEqual(self.monster.traits.hp.current,0)
+        monster_lower,_=gm._base_band(self.monster,'hp')
+        gm.set_trait_base(monster_target,'hp',monster_lower)
+        self.assertEqual(self.monster.traits.hp.base,monster_lower)
+        old_tier=self.monster.threat_tier
+        self.monster.threat_tier='t_missing'
+        self.assert_refusal('registry_key_not_found',lambda:gm.set_trait_base(monster_target,'hp',monster_lower))
+        self.monster.threat_tier=old_tier
+        old_race=self.player.race
+        self.player.race='t_missing'
+        self.assert_refusal('registry_key_not_found',lambda:gm.set_trait_base(self.target,'hp',0))
+        self.player.race=old_race
+
+    def test_registered_world_stages_preserve_order_and_gm_clock_rollback(self):
+        from world.rules import clock
+        registrations=dict(clock._EVENT_SOURCES)
+        self.addCleanup(lambda:(clock._EVENT_SOURCES.clear(),clock._EVENT_SOURCES.update(registrations)))
+        seen=[]
+        for stage in reversed(clock._STAGE_ORDER[5:]):
+            clock.register_event_source(stage,lambda start,end,stage=stage:seen.append((stage,start,end)) or [])
+        before=read_world_clock().tick
+        gm.advance_clock(3)
+        self.assertEqual([stage for stage,_,_ in seen],list(clock._STAGE_ORDER[5:]))
+        self.assertTrue(all((start,end)==(before,before+3) for _,start,end in seen))
 
     def test_clock_source_scope_bounds_and_real_settlement_rollback(self):
         from world.rules import clock

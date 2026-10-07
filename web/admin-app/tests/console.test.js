@@ -5,6 +5,8 @@ import GmConsolePrompt from '../components/GmConsolePrompt.vue';
 import GmRawEditor from '../components/GmRawEditor.vue';
 import GmConsoleResult from '../components/GmConsoleResult.vue';
 import WorldPanel from '../views/overview/WorldPanel.vue';
+import GmEntityView from '../components/GmEntityView.vue';
+import { NPC_DETAIL } from './runtime-helpers.js';
 import { GmApiError } from '../lib/api.js';
 import { KIND_VERBS, VERB_FIELDS, argumentsFor, saveNotice } from '../lib/console.js';
 
@@ -56,6 +58,14 @@ describe('closed contextual console vocabulary',()=>{
 });
 
 describe('actual save confirmation and result',()=>{
+  it('renders actual saved outcome over a stale no-save preview without sending a client baseline',async()=>{
+    const client=api({get:vi.fn(async()=>({tick:42,baseline_tick:42,will_snapshot:false}))});
+    const wrapper=render(GmConsolePrompt,{request,api:client}); await flushPromises();
+    expect(wrapper.get('[data-save-notice]').text()).toContain('本次不另存檔');
+    await wrapper.get('[data-confirm]').trigger('click'); await flushPromises();
+    expect(client.post).toHaveBeenCalledWith(request.path,request.body);
+    expect(wrapper.text()).toContain('actual-save');
+  });
   it.each([
     [status,'首次介入'],
     [{tick:42,baseline_tick:42,will_snapshot:false},'本次不另存檔'],
@@ -105,6 +115,30 @@ describe('actual save confirmation and result',()=>{
 });
 
 describe('ordered category-sensitive raw editing',()=>{
+  it('refreshes both curated and raw state and retains the result after the editor remounts',async()=>{
+    let mutated=false;
+    const client=api({
+      get:vi.fn(async path=>{
+        if(path==='/console/status')return status;
+        if(path==='/state/npcs/12')return {...NPC_DETAIL,label:mutated?'合成更新':NPC_DETAIL.label};
+        if(path==='/state/object/12/raw')return {raw:{attributes:[],tags:[]}};
+        throw new Error(path);
+      }),
+      post:vi.fn(async()=>{mutated=true;return saved;}),
+    });
+    const wrapper=render(GmEntityView,{kind:'npcs',id:'12',api:client}); await flushPromises();
+    await wrapper.findAll('[role=\"tab\"]')[1].trigger('click'); await flushPromises();
+    await button(wrapper,'編輯').trigger('click');
+    await wrapper.get('section[aria-label=\"原始資料編輯\"] input').setValue('t_notes');
+    await wrapper.get('section[aria-label=\"原始資料編輯\"] form').trigger('submit');
+    await button(wrapper,'確認批次').trigger('click'); await flushPromises();
+    await wrapper.get('[data-confirm]').trigger('click'); await flushPromises();
+    expect(client.get.mock.calls.filter(([path])=>path==='/state/npcs/12')).toHaveLength(2);
+    expect(client.get.mock.calls.filter(([path])=>path==='/state/object/12/raw')).toHaveLength(2);
+    expect(wrapper.text()).toContain('合成更新');
+    expect(wrapper.text()).toContain('actual-save');
+    expect(button(wrapper,'編輯')).toBeDefined();
+  });
   it('preserves refs/primitives and warning, then posts the batch and refreshes',async()=>{
     const client=api();
     const raw={attributes:[{key:'position',category:'state',value:{nested:[{'$ref':'#8'},false,3,null]}}],tags:[{key:'marker',category:'flags'}],typeclass:'typeclasses.objects.Object',components:['read_only']};

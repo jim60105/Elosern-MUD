@@ -3,9 +3,11 @@ import base64
 import pickle
 import sqlite3
 from unittest import TestCase, mock
+from types import SimpleNamespace
 from server.saves import snapshot
 from server.saves.tests._support import TempWorld, fixed_metadata
 from world.rules.clock import WorldDateTime
+from tools.spec_traceability import covers_requirement
 
 
 class SnapshotClockTests(TestCase):
@@ -17,6 +19,7 @@ class SnapshotClockTests(TestCase):
         with sqlite3.connect(self.world.layout.db_file) as connection:
             connection.execute('UPDATE typeclasses_attribute SET db_value=? WHERE id=1', (base64.b64encode(pickle.dumps(value)).decode('ascii'),))
 
+    @covers_requirement('gm-save-management::complete-world-save-contents')
     def test_manifest_uses_copy_despite_later_live_metadata_advance(self):
         def metadata():
             self.write_tick(999)
@@ -45,3 +48,22 @@ class SnapshotClockTests(TestCase):
         with mock.patch('server.saves.snapshot.log_info'):
             info = snapshot.create_snapshot('manual','injected',layout=self.world.layout, metadata=fixed_metadata, clock_reader=lambda path:None)
         self.assertIsNone(info.clock)
+
+    def test_manual_baseline_and_calendar_follow_copy_after_live_metadata_advance(self):
+        from server.console.snapshot_policy import SnapshotPolicy
+        def metadata():
+            self.write_tick(999)
+            return fixed_metadata()
+        def save(kind,label):
+            return snapshot.create_snapshot(kind,label,layout=self.world.layout,metadata=metadata)
+        policy=SnapshotPolicy(runner=lambda call:call(),saver=save,clock_reader=lambda:SimpleNamespace(tick=snapshot.snapshot_clock(self.world.layout.db_file)['tick']))
+        with mock.patch('server.saves.snapshot.log_info'):
+            info=policy.manual_save('copy')
+        self.assertEqual(info.clock['tick'],42)
+        self.assertEqual(info.clock['day'],WorldDateTime.from_tick(42).day_in_season)
+        self.assertEqual(policy.baseline_tick,42)
+        self.assertTrue(policy.status()['will_snapshot'])
+        self.write_tick(42)
+        with mock.patch('server.console.snapshot_policy.log_info'):
+            result=policy.execute(lambda:{'target':'#1'},action='set_wallet',account='synthetic',target='#1')
+        self.assertEqual(result['snapshot'],{'taken':False,'save_id':None})

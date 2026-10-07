@@ -71,6 +71,12 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertEqual(entity.species_key,'t_whisper_quail')
         self.assertEqual(entity.variant_key,'t_whisper_quail_ordinary')
         self.assertIs(entity.location,self.room2)
+        stronger=gm.spawn_monster('t_whisper_quail','t_whisper_quail_stronger',f'#{self.room1.pk}')
+        strong_entity=ObjectDB.objects.get(pk=int(stronger['target'][1:]))
+        from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS
+        profile=SYNTH_MONSTER_VARIANTS['t_whisper_quail_stronger'].combat_profile
+        for trait in ('hp','mp','sp','atk_phys','agility','defense','magic_power'):
+            self.assertEqual(strong_entity.traits.get(trait).base,getattr(profile,trait))
         before=ObjectDB.objects.count()
         from typeclasses.monsters import Monster
         original=Monster.move_to
@@ -84,6 +90,13 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertEqual(len([obj for obj in self.room2.contents if isinstance(obj, Monster) and obj.species_key=='t_whisper_quail']),1)
         self.assert_refusal('registry_key_not_found',lambda:gm.spawn_monster('t_missing','t_whisper_quail_ordinary',f'#{self.room2.pk}'))
         self.assert_refusal('target_kind_mismatch',lambda:gm.spawn_monster('t_whisper_quail','t_whisper_quail_ordinary',self.target))
+        self.assert_refusal('registry_key_not_found',lambda:gm.spawn_monster('t_whisper_quail','t_missing',f'#{self.room2.pk}'))
+        for value in (None,True,3,[],{}):
+            self.assert_refusal('invalid_argument',lambda:gm.spawn_monster(value,'t_whisper_quail_ordinary',f'#{self.room2.pk}'))
+            self.assert_refusal('invalid_argument',lambda:gm.spawn_monster('t_whisper_quail',value,f'#{self.room2.pk}'))
+        from world.tests.synthetic_data import synthetic_registries, make_monster_variant, SYNTH_MONSTER_VARIANTS
+        self.enterContext(synthetic_registries('monster_variants',extra={'monster_variants':{**SYNTH_MONSTER_VARIANTS,'t_other_variant':make_monster_variant('t_other_variant',species_key='t_other_species')}}))
+        self.assert_refusal('invalid_argument',lambda:gm.spawn_monster('t_whisper_quail','t_other_variant',f'#{self.room2.pk}'))
 
     def test_delete_real_hooks_cleanup_and_late_failure_rebinds_live_roster(self):
         from world.rules.combat_session.lifecycle import engage
@@ -92,6 +105,9 @@ class MapConsoleTests(ConsoleOwnerTest):
         monster_pk=self.monster.pk
         registrations=dict(skip_safety._BATTLEFIELDS)
         before=dict(self.player.db.active_combat)
+        context=self.player.ndb.action_context
+        from world.rules.surfaces import attribute_snapshot
+        buffs=attribute_snapshot(self.player,'buffs')
         original=self.monster.delete
         def late():
             original()
@@ -101,6 +117,8 @@ class MapConsoleTests(ConsoleOwnerTest):
                 gm.delete_entity(f'#{monster_pk}')
         self.assertTrue(ObjectDB.objects.filter(pk=monster_pk).exists())
         self.assertEqual(dict(self.player.db.active_combat),before)
+        self.assertIs(self.player.ndb.action_context,context)
+        self.assertEqual(attribute_snapshot(self.player,'buffs'),buffs)
         self.assertEqual(skip_safety._BATTLEFIELDS,registrations)
         restored=ObjectDB.objects.get(pk=monster_pk)
         self.assertIn(restored,field.roster.values())

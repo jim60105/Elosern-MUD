@@ -34,12 +34,29 @@ class RawTests(EvenniaTest):
         source = self.obj1.location
         with mock.patch.object(self.obj1.tags, 'add', side_effect=RuntimeError('late')):
             with self.assertRaises(RuntimeError):
-                apply_raw(self.target, [{'op':'set_attr','key':'repair','value':2}, {'op':'set_location','value':{'$ref':f'#{self.room2.pk}'}}, {'op':'add_tag','key':'later','category':None}])
+                apply_raw(self.target, [{'op':'set_attr','key':'repair','value':2}, {'op':'remove_tag','key':'original','category':'a'}, {'op':'set_location','value':{'$ref':f'#{self.room2.pk}'}}, {'op':'add_tag','key':'later','category':None}])
         self.assertEqual(self.obj1.db.repair, 1)
         self.assertIs(self.obj1.location, source)
         self.assertIn(self.obj1, source.contents)
         self.assertNotIn(self.obj1, self.room2.contents)
         self.assertTrue(self.obj1.tags.has('original', category='a'))
+
+    def test_forbidden_display_fields_models_execution_and_shapes(self):
+        invalid=[
+            {'op':'set_components','value':[]},{'op':'set_created','value':0},
+            {'op':'set_model','model':'world.narrative.MemoryRecord','value':{}},
+            {'op':'exec','code':'pass'},{'op':None},
+            {'op':'del_attr','key':''},{'op':'set_attr','key':'x','value':1,'extra':True},
+            {'op':'set_location','value':{'$ref':f'#{self.room1.pk}','extra':True}},
+            {'op':'set_attr','key':'x','value':{'$ref':True}},
+        ]
+        for operation in invalid:
+            with self.subTest(operation=operation),self.assertRaises(ConsoleError) as caught:
+                apply_raw(self.target,[operation])
+            self.assertEqual(caught.exception.code,'raw_edit_invalid')
+        for operations in (None,{},'set_attr',[None],['set_attr']):
+            with self.subTest(operations=operations),self.assertRaises(ConsoleError):
+                apply_raw(self.target,operations)
 
     def test_invalid_complete_batch_never_writes(self):
         invalid = [ {'op':'set_typeclass','value':'anything'}, {'op':'set_attr','key':'x','value':{'$unserializable':'object'}}, {'op':'set_attr','key':'x','value':{'$ref':'#99999999'}}, {'op':'set_attr','key':'x','value':{'$ref':'bad'}}, {'op':'set_attr','key':'x','value':float('inf')}, {'op':'set_attr','key':'x','value':[float('nan')]}, {'op':'add_tag','key':'x'}, {'op':'set_location','value':3}, {'op':'set_attr','key':'x','category':4,'value':1} ]

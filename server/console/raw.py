@@ -86,7 +86,6 @@ def apply_raw(target, operations):
     entity = resolve_target(target)
     prepared = _prepare(operations)
     attrs = {(entry["key"], entry["category"]): attribute_snapshot(entity, entry["key"], entry["category"]) for entry in prepared if entry["op"] in {"set_attr", "del_attr"}}
-    tags = [(tag.db_key, tag.db_category) for tag in entity.tags.all(return_objs=True)]
     location = entity.location
     containers = {obj for obj in (location, *(entry["value"] for entry in prepared if entry["op"] == "set_location")) if obj is not None}
     try:

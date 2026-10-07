@@ -1,12 +1,14 @@
 <script setup>
 // The NPC 記憶 tab (gm-portal-s3-runtime-state §5).
 //
-// Three read-only surfaces in one tab, all owner-scoped by the NPC's dbref:
+// Three inspection surfaces, all owner-scoped by the NPC's dbref:
 // the filtered effective memory list with each record's complete revision
 // history on demand, the newest ten context snapshots with their token
 // accounting and S2 evidence links, and the recall preview, which posts a
 // query — nothing else — to the authoritative ``fast_recall`` query under the
 // NPC's own owner/requester identity.
+// S6 revision interventions use the separate console gate and refresh these
+// immutable reads after commitment; they do not turn recall into a writer.
 import { computed, onMounted, reactive, ref } from "vue";
 import GmEntityListTable from "./GmEntityListTable.vue";
 import GmConsolePrompt from "./GmConsolePrompt.vue";

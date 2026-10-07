@@ -10,20 +10,19 @@ from world.quests.tests._fixtures import RegistryIsolationMixin
 
 class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
     def test_generated_definition_restores_without_store_creation_and_rebinds_stage_pins(self):
-        from world.tests.synthetic_data import make_quest, synthetic_registries
+        from world.tests.synthetic_data import make_quest, synthetic_registries, SYNTH_ARCHETYPES
         from world.quests.compile import CompiledQuest, IssuanceDescriptor, StageSpawnRequirement, register_generated_quest, SCENE_REQUIREMENT_REGISTRY
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestStage, QuestObjective, ObjectiveKind, DestinationKind, RoomLocator, QuestType
         from world.rules.guild_offers import QuestReward
         from world.rules.quest_issuance import Settlement, QUEST_ISSUANCE_REGISTRY
         from world.quests.generated_quest_store import read_payloads
         self.enterContext(synthetic_registries('archetypes'))
-        from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
         locator=RoomLocator(DestinationKind.BOUND_INSTANCE)
         definition=make_quest('t_gm_generated',quest_type=QuestType.EXPLORE,stages=(
             QuestStage(0,QuestObjective(ObjectiveKind.REACH,destination=locator)),
             QuestStage(1,QuestObjective(ObjectiveKind.REACH,destination=locator)),
         ))
-        archetype=next(iter(SCENE_ARCHETYPE_REGISTRY))
+        archetype=next(iter(SYNTH_ARCHETYPES))
         compiled=CompiledQuest(definition,QuestReward(copper=2,items=(),merit=0),IssuanceDescriptor(SYNTH_COMMISSIONER_KEY,Settlement.AUTO),tuple(StageSpawnRequirement(index,ObjectiveKind.REACH,locator,archetype,None,'合成測試場景。',()) for index in (0,1)))
         register_generated_quest(compiled)
         payloads=read_payloads()
@@ -86,6 +85,13 @@ class QuestConsoleTests(RegistryIsolationMixin, ConsoleOwnerTest):
         self.assert_refusal('registry_key_not_found',lambda:gm.issue_quest(self.target,'t_missing',SYNTH_COMMISSIONER_KEY))
         self.assert_refusal('invalid_argument',lambda:gm.issue_quest(self.target,'t_tarn_messenger','malformed'))
         self.assert_refusal('target_kind_mismatch',lambda:gm.issue_quest(f'#{self.npc.pk}','t_tarn_messenger',SYNTH_COMMISSIONER_KEY))
+        self.assertEqual(list(self.player.db.quest_log),before)
+        for value in (None,True,1,[],{}):
+            self.assert_refusal('invalid_argument',lambda:gm.issue_quest(self.target,value,SYNTH_COMMISSIONER_KEY))
+            self.assert_refusal('invalid_argument',lambda:gm.issue_quest(self.target,'t_tarn_messenger',value))
+            self.assert_refusal('invalid_argument',lambda:gm.set_quest_state(self.target,value,'failed'))
+            self.assert_refusal('invalid_argument',lambda:gm.set_quest_stage(self.target,value,0))
+        self.assert_refusal('invalid_argument',lambda:gm.issue_quest(self.target,'t_ember_cull','npc:t_unregistered'))
         self.assertEqual(list(self.player.db.quest_log),before)
 
     def test_obsolete_pin_release_and_replacement_failure_rollback(self):

@@ -42,9 +42,14 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         for path in routes:
             for headers in ({},{'HTTP_X_CSRFTOKEN':'x'*len(token)}):
                 self.assert_error_envelope(self.post(path,{},csrf,**headers),403,'csrf_failed')
+            accepted=self.post(path,{},csrf,HTTP_X_CSRFTOKEN=token)
+            self.assertEqual(accepted.status_code,400,accepted.content)
         self.assertEqual(self.saves,[])
         for kind in ('developer','superuser'):
-            self.assert_ok_envelope(self.client_for(kind).get('/gm/api/console/status'))
+            privileged=self.client_for(kind)
+            self.assert_ok_envelope(privileged.get('/gm/api/console/status'))
+            for path in routes:
+                self.assertEqual(self.post(path,{},privileged).status_code,400)
         body=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':5},csrf,HTTP_X_CSRFTOKEN=token))
         self.assertTrue(body['ok'])
         self.assertEqual(self.player.db.wallet,5)
@@ -63,6 +68,21 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         for verb in registry.VERBS:
             self.assert_error_envelope(self.client.get(f'/gm/api/console/{verb}'),405,'method_not_allowed')
         self.assertEqual(self.saves,[])
+
+    def test_missing_clock_status_and_write_are_noncreating(self):
+        from evennia.scripts.models import ScriptDB
+        from evennia.typeclasses.models import Attribute
+        ScriptDB.objects.filter(db_key='world_clock').delete()
+        before=(ScriptDB.objects.count(),Attribute.objects.count())
+        status=self.assert_ok_envelope(self.client.get('/gm/api/console/status'))
+        self.assertIsNone(status['tick'])
+        self.assertTrue(status['will_snapshot'])
+        refusal=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':1}),404)
+        self.assertEqual(refusal['error']['code'],'target_not_found')
+        self.assertEqual(before,(ScriptDB.objects.count(),Attribute.objects.count()))
+        self.assertEqual(self.saves,[])
+        self.assertIsNone(self.policy.baseline_tick)
+        self.assertEqual(self.player.db.wallet,0)
 
     def test_real_authoritative_wallet_raw_clock_deletion_and_domain_refusal(self):
         wallet=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':9}))['data']
@@ -146,6 +166,21 @@ class ConsoleApiTests(ConsoleOwnerTest,GmTestCase):
         self.assertEqual(failure['snapshot'],{'taken':False,'save_id':None})
         self.assertEqual(self.player.db.wallet,before)
         self.assertIsNone(self.policy.baseline_tick)
+
+    def test_manual_and_console_busy_statuses_leave_state_and_baseline_unchanged(self):
+        self.policy.baseline_tick=7
+        self.policy._lock.acquire()
+        try:
+            self.assert_error_envelope(self.post('/gm/api/saves/',{'label':'busy'}),409,'save_in_progress')
+            refusal=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':3}),500)
+            self.assertEqual(refusal['error']['code'],'snapshot_failed')
+            self.assertIn('正在進行',refusal['error']['message'])
+            self.assertEqual(refusal['snapshot'],{'taken':False,'save_id':None})
+            self.assertEqual(self.policy.baseline_tick,7)
+            self.assertEqual(self.player.db.wallet,0)
+            self.assertEqual(self.saves,[])
+        finally:
+            self.policy._lock.release()
 
     def test_snapshot_retained_on_domain_failure_and_projection_failure_not_refusal(self):
         refused=self.result(self.post('/gm/api/console/set_wallet',{'target':self.target,'copper':-1}),400)

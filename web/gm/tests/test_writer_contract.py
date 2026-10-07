@@ -12,19 +12,26 @@ ALLOWED_SERVICES={
     'world_api.py': {'reset_prompt_library'},
 }
 WRITE_SERVICES=set().union(*ALLOWED_SERVICES.values())
+DIRECT_WRITERS=set(VERBS)|{'apply_inventory_plan','materialize_registry_object','create_snapshot'}
+OWNER_MODULES={'world.rules.gm','world.maps.gm','world.quests.gm','world.narrative.gm'}
 
 
 def violations(source,filename):
     tree=ast.parse(source)
     errors=forbidden_assignments(tree)+forbidden_calls(tree)+forbidden_imports(tree)
     for node in ast.walk(tree):
-        if isinstance(node,ast.ImportFrom) and node.module and node.module.startswith(('world.rules.gm','world.maps.gm','world.quests.gm','world.narrative.gm')):
-            errors.append('direct-owner-import')
+        if isinstance(node,ast.ImportFrom) and node.module:
+            if node.module in OWNER_MODULES or any(f'{node.module}.{alias.name}' in OWNER_MODULES for alias in node.names):
+                errors.append('direct-owner-import')
+            if any(alias.name in DIRECT_WRITERS for alias in node.names):
+                errors.append('direct-writer-import')
         if isinstance(node,ast.Import):
             if any(alias.name.startswith(('world.rules.gm','world.maps.gm','world.quests.gm','world.narrative.gm')) for alias in node.names):
                 errors.append('direct-owner-import')
         if isinstance(node,ast.Call):
             name=ast.unparse(node.func)
+            if name=='snapshot.create_snapshot':
+                errors.append('uncoordinated-save')
             if name in WRITE_SERVICES and name not in ALLOWED_SERVICES.get(filename,set()):
                 errors.append(f'wrong-service:{name}')
     return errors
@@ -39,7 +46,7 @@ class WriterContractTests(unittest.TestCase):
                 self.assertEqual(violations(path.read_text(),path.name),[])
 
     def test_deliberately_forbidden_field_model_import_and_cross_transport_writes(self):
-        for source in ('entity.db.wallet = 1','entity.wallet = 1','entity.attributes.add("x",1)','Model.objects.create(content={})','from world.narrative.memory import record_memory','from world.rules.gm import set_wallet','import world.maps.gm','snapshot.delete_save("x")','apply_raw("#1",[])'):
+        for source in ('entity.db.wallet = 1','entity.wallet = 1','entity.attributes.add("x",1)','Model.objects.create(content={})','from world.narrative.memory import record_memory','from world.rules.gm import set_wallet','from world.rules import gm','from world.rules.equipment import apply_inventory_plan','import world.maps.gm','snapshot.delete_save("x")','snapshot.create_snapshot("manual","x")','apply_raw("#1",[])'):
             with self.subTest(source=source):
                 self.assertTrue(violations(source,'state_api.py'))
         for filename,services in ALLOWED_SERVICES.items():

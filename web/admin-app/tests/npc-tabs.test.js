@@ -198,6 +198,22 @@ describe("GmNpcDialogueTab", () => {
 });
 
 describe("NPC tab integration", () => {
+  it("leaves non-Evennia records read-only and exposes raw editing only for objects", async () => {
+    const records=fakeApi({"/state/memories/31":MEMORY_DETAIL});
+    const record=mountWith(GmEntityView,{props:{kind:"memories",id:"31",api:records}});
+    await flushPromises();
+    await record.findAll("[role='tab']")[1].trigger("click"); await flushPromises();
+    expect(record.findAll("button").some(button=>["主控台","編輯"].includes(button.text()))).toBe(false);
+    const objects=fakeApi({"/state/npcs/12":NPC_DETAIL,"/state/object/12/raw":{raw:{attributes:[],tags:[],typeclass:"typeclasses.npcs.NPC",components:["inspection-only"]}}});
+    const npc=mountWith(GmEntityView,{props:{kind:"npcs",id:"12",api:objects}});
+    await flushPromises();
+    await npc.findAll("[role='tab']")[1].trigger("click"); await flushPromises();
+    const editor=npc.findAll("button").find(button=>button.text()==="編輯");
+    expect(editor).toBeDefined();
+    await editor.trigger("click");
+    expect(npc.get("[role='note']").text()).toContain("typeclass 與 components 僅供檢視");
+    expect(npc.findAll("option").map(option=>option.text())).not.toContain("set_components");
+  });
   it("switches between the entity summary, raw data and both narrative tabs", async () => {
     const boundary = fakeApi({
       "/state/npcs/12": NPC_DETAIL,

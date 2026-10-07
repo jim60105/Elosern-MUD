@@ -10,6 +10,7 @@
 import { computed, ref, watch } from "vue";
 import GmCallDrawer from "./GmCallDrawer.vue";
 import GmConsoleDrawer from "./GmConsoleDrawer.vue";
+import GmConsoleResult from "./GmConsoleResult.vue";
 import GmRawEditor from "./GmRawEditor.vue";
 import GmEntityLink from "./GmEntityLink.vue";
 import GmError from "./GmError.vue";
@@ -32,6 +33,7 @@ const props = defineProps({
 
 const detail = ref({ status: "idle", data: null, error: null, loadedAt: null });
 const rawState = ref({ status: "idle", data: null, error: null });
+const lastRawResult = ref(null);
 const activeTab = ref("overview");
 const selectedCall = ref(null);
 const refreshing = ref(false);
@@ -125,6 +127,16 @@ async function refresh() {
   }
 }
 
+async function afterWrite() {
+  // A raw mutation can change every curated section, while a domain mutation
+  // can invalidate a previously opened raw tab. Never retain either cache.
+  if (props.kind !== "object") await loadDetail();
+  rawState.value = { status: "idle", data: null, error: null };
+  if (activeTab.value === "raw") await loadRaw();
+  if (activeTab.value === "memory") await memoryTab.value?.reload?.();
+  if (activeTab.value === "dialogue") await dialogueTab.value?.reload?.();
+}
+
 function selectTab(key, focus = false) {
   activeTab.value = key;
   if (focus) {
@@ -150,6 +162,7 @@ function onTabKeydown(event, key) {
 watch(
   () => [props.kind, props.id, props.owner, props.tab],
   () => {
+    lastRawResult.value = null;
     rawState.value = { status: "idle", data: null, error: null };
     selectedCall.value = null;
     if (props.kind === "object") {
@@ -184,7 +197,7 @@ function onDrawerClose() {
     </nav>
 
     <header class="gm-entity__header">
-      <GmConsoleDrawer :kind="kind" :target="`#${dbref ?? id}`" :api="api" @done="refresh" />
+      <GmConsoleDrawer :kind="kind" :target="`#${dbref ?? id}`" :api="api" @done="lastRawResult = null; afterWrite()" />
       <div class="gm-entity__identity">
         <p class="gm-entity__eyebrow">
           {{ kindLabel(kind) }}
@@ -298,7 +311,7 @@ function onDrawerClose() {
           <button type="button" class="ui-btn ui-btn--sm" @click="loadRaw">重試</button>
         </template>
       </GmError>
-      <GmRawEditor v-if="rawState.data && isDbrefKind(kind)" :target="`#${dbref ?? id}`" :raw="rawState.data.raw ?? rawState.data" :api="api" @done="refresh" />
+      <GmRawEditor v-if="rawState.data && isDbrefKind(kind)" :target="`#${dbref ?? id}`" :raw="rawState.data.raw ?? rawState.data" :api="api" @done="lastRawResult = $event; afterWrite()" />
       <GmJsonTree
         v-if="rawState.data"
         :value="rawState.data.raw ?? rawState.data"
@@ -339,6 +352,7 @@ function onDrawerClose() {
     </div>
 
     <GmCallDrawer :call-id="selectedCall" :api="api" @close="onDrawerClose" />
+    <GmConsoleResult :result="lastRawResult" />
   </div>
 </template>
 

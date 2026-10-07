@@ -36,6 +36,8 @@ class MemoryConsoleTests(ConsoleOwnerTest):
         self.assert_refusal('target_not_found',lambda:gm.retract_memory(target,99999999))
         for value in (True,-1,'1',1.5):
             self.assert_refusal('invalid_argument',lambda:gm.retract_memory(target,value))
+            self.assert_refusal('invalid_argument',lambda:gm.supersede_memory(target,old.pk,value))
+        self.assert_refusal('target_not_found',lambda:gm.supersede_memory(target,old.pk,99999999))
         old.refresh_from_db()
         self.assertEqual(old.effective_availability,'active')
 
