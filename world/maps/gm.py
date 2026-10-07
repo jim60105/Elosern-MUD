@@ -94,13 +94,12 @@ def delete_entity(target):
                 raise RuntimeError("entity deletion refused")
     except Exception:
         _flush_deleted_instance(entity)
-        # The original battlefield object survives; rebind its roster to real
-        # restored objects instead of reviving a deleted Python instance.
-        for field, ids in battlefields.values():
-            field.roster.clear()
-            field.roster.update({key: ObjectDB.objects.get(pk=identity) for key, identity in ids.items()})
+        # Restore the registration map before touching rosters: neither a stale
+        # roster entry nor any other roster problem may leave a live entity
+        # deregistered or mask the failure that opened this compensation.
         skip_safety._BATTLEFIELDS.clear()
         skip_safety._BATTLEFIELDS.update(registrations)
+        _rebind_battlefield_rosters(battlefields)
         for obj, before in surfaces:
             live = ObjectDB.objects.get(pk=pk) if obj is entity else obj
             restore_attributes(live, before)
@@ -110,3 +109,23 @@ def delete_entity(target):
             location.contents_cache.init()
         raise
     return {"target": target, "deleted": True, "room": f"#{location.pk}" if location is not None else None}
+
+
+def _rebind_battlefield_rosters(battlefields) -> None:
+    """Rebind every surviving roster to real restored objects.
+
+    The original battlefield object outlives the rollback, so its roster must
+    hold re-fetched objects rather than revoked Python instances. An entry whose
+    dbref is already gone carries no object to restore (``skip_safety`` itself
+    tolerates such a stale participant), so it is dropped exactly as the landed
+    advance compensation skips a vanished target, instead of raising inside the
+    compensation and abandoning the rest of it.
+    """
+    for field, identities in battlefields.values():
+        field.roster.clear()
+        for key, identity in identities.items():
+            if type(identity) is not int:
+                continue
+            member = ObjectDB.objects.filter(pk=identity).first()
+            if member is not None:
+                field.roster[key] = member

@@ -132,3 +132,38 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertNotIn(str(monster_pk),skip_safety._BATTLEFIELDS)
         self.assert_refusal('target_kind_mismatch',lambda:gm.delete_entity(self.target))
         self.assert_refusal('target_not_found',lambda:gm.delete_entity(f'#{monster_pk}'))
+
+    def test_delete_compensation_survives_a_stale_registration(self):
+        """An unrelated stale registration cannot abort the compensation."""
+        from evennia.utils.create import create_object
+        from world.rules.combat import Battlefield
+        from world.rules.combat_session.lifecycle import engage
+
+        # A participant deleted before its battlefield settled leaves the landed
+        # registration in place with a revoked instance in its roster (the state
+        # unregister_participants' dbref guard anticipates).
+        ghost=create_object('typeclasses.monsters.Monster',key='t_console_ghost',location=self.room1)
+        ally=create_object('typeclasses.monsters.Monster',key='t_console_ally',location=self.room1)
+        stale=Battlefield(teams={'enemies':frozenset({str(ghost.key)}),'allies':frozenset({str(ally.key)})},roster={str(ghost.key):ghost,str(ally.key):ally})
+        skip_safety.register_active_battlefield(stale)
+        ghost.delete()
+        self.assertIsNone(ghost.pk)
+        self.assertIn(str(ghost.key),stale.roster)
+        engage(self.player,self.monster)
+        field=skip_safety._BATTLEFIELDS[str(self.player.pk)]
+        monster_pk=self.monster.pk
+        registrations=dict(skip_safety._BATTLEFIELDS)
+        before=dict(self.player.db.active_combat)
+        original=self.monster.delete
+        def late():
+            original()
+            raise RuntimeError('after actual delete')
+        with mock.patch.object(self.monster,'delete',side_effect=late):
+            with self.assertRaises(RuntimeError):
+                gm.delete_entity(f'#{monster_pk}')
+        self.assertTrue(ObjectDB.objects.filter(pk=monster_pk).exists())
+        self.assertEqual(skip_safety._BATTLEFIELDS,registrations)
+        self.assertEqual(dict(self.player.db.active_combat),before)
+        self.assertIn(str(self.monster.key),field.roster)
+        self.assertNotIn(str(ghost.key),stale.roster)
+        self.assertIn(str(ally.key),stale.roster)
