@@ -395,6 +395,12 @@ usable 性玩具 entries.
 - **WHEN** a usable item and an equipment item both name the intimacy-device band
 - **THEN** both resolve the same `PriceEntry`, so a category's two mechanical shapes never require separate bands
 
+The price registry SHALL add `magic_armor` with integer minimum 10000 copper and no upper ceiling, preserve mundane armor bounds and the 100000-copper magic-weapon floor, and retain 10000 copper per gold.
+
+#### Scenario: Enchanted armor has its own price range
+- **WHEN** an enchanted armor offer costs 10000 copper or more, including above mundane armor maximum
+- **THEN** magic_armor validates it without changing mundane armor bounds
+
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
 This requirement fixes only the concrete human selections in the starting-kit registry; the
 general kit-existence/equipment-only/load-time-validation contract stays owned by the

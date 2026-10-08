@@ -62,6 +62,12 @@ SANCTUM_ADDED_KEYS = (
     "spark_candy", "slime_lube_gel", "hot_kiss_potion",
 )
 
+MILITARY_ADDED_KEYS = tuple(
+    f"military_{grade}_{shape}"
+    for grade in ("e", "d", "c", "b", "a", "s")
+    for shape in ("sword", "armor")
+)
+
 
 class AssortmentRegistryTests(unittest.TestCase):
     """Assortment identity is immutable, keyed, and covers the store exactly."""
@@ -109,7 +115,7 @@ class AssortmentRegistryTests(unittest.TestCase):
         # additions — nothing else entered or left (受洗聖水 stays inside the
         # 58; it only changed bundle, which the verbatim-move contract below
         # owns).
-        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS)
+        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS) | set(MILITARY_ADDED_KEYS)
         self.assertEqual(set(union), expected)
         self.assertEqual(len(union), len(expected))
 
@@ -190,7 +196,7 @@ class AssortmentRegistryTests(unittest.TestCase):
                 )
                 owner[item_key] = shop.key
                 union.append(item_key)
-        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS)
+        expected = set(PRE_SPLIT_OFFERED_KEYS) | set(SANCTUM_ADDED_KEYS) | set(MILITARY_ADDED_KEYS)
         self.assertEqual(set(union), expected)
         self.assertEqual(len(union), len(expected))
 

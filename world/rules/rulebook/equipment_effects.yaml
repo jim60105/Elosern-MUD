@@ -13,6 +13,30 @@ budgets:
   epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20}
   legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25}
 effects:
+  military_e_sword:
+    adjustments: {atk_phys: 3}
+  military_e_armor:
+    adjustments: {defense: 3}
+  military_d_sword:
+    adjustments: {atk_phys: 4}
+  military_d_armor:
+    adjustments: {defense: 5, agility: 1}
+  military_c_sword:
+    adjustments: {atk_phys: 6, agility: 1}
+  military_c_armor:
+    adjustments: {defense: 6, agility: 1}
+  military_b_sword:
+    adjustments: {atk_phys: 8, agility: 1}
+  military_b_armor:
+    adjustments: {defense: 8, agility: 2}
+  military_a_sword:
+    adjustments: {atk_phys: 10, agility: 3}
+  military_a_armor:
+    adjustments: {defense: 10, agility: 2}
+  military_s_sword:
+    adjustments: {atk_phys: 12, agility: 4}
+  military_s_armor:
+    adjustments: {defense: 12, agility: 3}
   apprentice_focus_staff:
     adjustments: {magic_power: 4, mp_cost: "-5%"}
   apothecary_beads:

@@ -39,6 +39,9 @@ PRICE_TABLE: dict[str, PriceEntry] = {
     "armor": PriceEntry(
         "armor", "防具", 200, 5000, "Body and off-hand armor."
     ),
+    "magic_armor": PriceEntry(
+        "magic_armor", "魔法防具", 10_000, None, "Repeatably enchanted armor."
+    ),
     "jewelry": PriceEntry(
         "jewelry", "首飾", 100, 5000, "Ordinary worn jewelry."
     ),

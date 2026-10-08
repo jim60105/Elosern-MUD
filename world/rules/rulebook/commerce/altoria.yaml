@@ -6,6 +6,12 @@
 assortments:
   - key: common_arms
     offers:
+      - {item_key: military_e_sword, buy_copper: 350, sell_copper: 175, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_d_sword, buy_copper: 800, sell_copper: 400, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_c_sword, buy_copper: 1600, sell_copper: 800, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_b_sword, buy_copper: 100000, sell_copper: 50000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_a_sword, buy_copper: 180000, sell_copper: 90000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_s_sword, buy_copper: 300000, sell_copper: 150000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
       - item_key: plain_sword
         buy_copper: 250
         sell_copper: 100
@@ -50,6 +56,12 @@ assortments:
         restock_quantity: 1
   - key: common_outfits
     offers:
+      - {item_key: military_e_armor, buy_copper: 300, sell_copper: 150, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_d_armor, buy_copper: 1800, sell_copper: 900, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_c_armor, buy_copper: 3200, sell_copper: 1600, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_b_armor, buy_copper: 30000, sell_copper: 15000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_a_armor, buy_copper: 60000, sell_copper: 30000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
+      - {item_key: military_s_armor, buy_copper: 120000, sell_copper: 60000, initial_stock: 2, max_stock: 4, restock_quantity: 1}
       - item_key: leather_armor
         buy_copper: 400
         sell_copper: 200
