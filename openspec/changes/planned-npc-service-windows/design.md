@@ -28,7 +28,7 @@ The chosen design reuses existing registries, resolver, service gate, schedule s
 
 ## Migration Plan
 
-Apply only after weekly-npc-schedule-cycles are present. Read predecessor delta plus live source before editing. This unreleased project has no save migration or backward aliases. Land source, tests, docs and all caller cutovers as one coherent change. Revert the owned implementation commit to roll back deployment; never delete persistent hosts or manufacture data as repair.
+Apply only after weekly-npc-schedule-cycles and guild-exam-schedule-hold are present. Read the core hold API and return unknown for indeterminate ownership/release constraints. This unreleased project has no save migration or backward aliases. Land source, tests and docs coherently; never delete persistent hosts or fabricate arrivals as repair.
 
 ## Verification and Ownership
 

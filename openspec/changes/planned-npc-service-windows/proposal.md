@@ -23,5 +23,6 @@ world/rules/npc_schedules.py or focused sibling reader; world/rules/service_gate
 ## Batch:
 
 depends-on: weekly-npc-schedule-cycles
+depends-on: guild-exam-schedule-hold
 
 Code-conflict notes: world/rules/npc_schedules.py or focused sibling reader; world/rules/service_gate.py; world/rules/clock.py read seam; schedule reader tests. Shared shard manifests and capability delta files require serialized integration. Full matrix and approved-section ownership are in shared-military-equipment/design.md.
