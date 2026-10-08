@@ -1,0 +1,38 @@
+## Context
+
+See proposal.md for motivation. Authority is docs/superpowers/specs/2026-10-08-human-guild-exams-and-monster-balance-design.md, approved commit 39d50b2b, together with the engine design. This slice owns sections 1 temporary-host supersession; 4.4 start settlement recovery except schedule release; 9 lifecycle; 10 recovery/rollback. Existing production seams are world/rules/guild_exams.py; world/rules/combat_session/{battlefield,lifecycle,settlement,snapshot,records}.py; world/lore/guild.py; world/rules/guild_config/; world/rules/npc_roster_validation.py; source inventory; service assembly; synthetic guild fixtures and consumers.
+
+## Goals / Non-Goals
+
+All state writes stay in world/rules; residences stay world/maps-owned; lore/skills remain immutable/read-only. No AI writer, compatibility alias, migration, new booking queue, difficulty selector, new F exam, reward/merit change, elf/beastfolk calibration, monster ability, retreat kill credit, combat formula change or unrelated refactor is authorized. The approved 2026-10-08 design supersedes disposable examiners and legacy HP/static ratio assumptions; preserve current simulated HP-to-zero and full pool restoration.
+Behavior tests use synthetic data and resolver-backed transitions/precedence/rollback, not wording/source assertions or copies of shipped rows. Authored rows use separate tagged data-contract checks under existing freeze discipline; never expand a freeze list to excuse missing behavior. Any new/moved non-browser module is registered exactly once in .github/evennia-shards.json; new browser class/method is registered exactly once in .github/browser-shards.json.
+Obtain canonical IDs with uv run --locked python -m tools.spec_traceability list after delta synchronization, never hand-build IDs. Maintain substantive covers_requirement annotations on discoverable tests; no skipped/empty claims. Every added requirement/scenario in this change has behavior coverage; unchanged requirements keep existing coverage. Remove obsolete tests/contracts/callers at their owning cutover.
+Changed persistent boundaries emit named-import world.observability info events with English snake_case names and available exam/host/branch/target/tick/session identifiers; exceptions re-raise, carry exc or existing reasoned exemption. Start/restriction/restore/terminal/hold/release/recovery trace events belong to their owning slice. No direct logging import or observability freeze expansion.
+
+## Decisions
+
+Keep start_guild_exam as the only mutation-capable start API. Revalidate canonical registration, exact next rank, matching branch, qualified persistent identity, co-location/service_available, true merit and no active battle/exam for both actor and host. Preflight usable policy, wearable kit/accessory slot and lineage before mutation. Serialize host dbref and exam-owned normal-outfit/restriction/timing snapshots with the record; deterministic attempt ID remains <character-id>:<target-rank>:<attempt-number>.
+Snapshot inventory/equipment/mirror state, restrictions/effects, traits/resources, records/session/rank/title, affinity and handler/ORM caches. Within one logical transaction replace kit, activate restriction, restore applicable full pools, create record/session and award existing +1 start affinity to the same persistent examiner. Failure restores storage AND caches, skip-safety registration and contained equipment mirrors with no partial attempt/affinity/session. Never create an opponent.
+Ordinary simulated HP-to-zero ActionResolver combat preserves costs/upkeep and simulation markers on every action and round, suppressing loot/DEFEAT/protected-entity failure/practice. At every pass/fail/flee/forfeit/round-bound/invalid recovery terminal, close once, remove exam-owned temporary effects/restrictions, restore normal outfit and both participants' full normal HP/MP/SP. Preserve unrelated normal effects, persona, learned records and dbref. PASS promotion and paired title remain atomic/idempotent; merit never spent. Failure in settlement leaves a recoverable active session and restores pre-settlement caches for retry.
+Cold recovery validates record/session/host/restriction identity. Resume a coherent simulation; otherwise settle invalid once and restore from persisted snapshots. Never delete a persistent host. Participant display-name collisions are handled before combat via existing NPC roster/key discipline; stable dbrefs determine qualification and participants.
+Cut over all callers/tests/exports of _spawn_opponent and _delete_exam_opponent and remove the factory/deletion code. Remove GuildRank examiner_name/examiner_title/examiner_profile_key and per-rank temporary card/age inventory assumptions, old unused profiles for F/E/D/C and obsolete generic examiner bindings. Preserve rank order/rewards/titles. Move validation/provenance to qualified persistent people; no aliases or migrations. Current command/browser still invoke the sole start API until appointment cutover; update their host resolution to qualified target identity so multiple differently qualified people never create ambiguity.
+This slice provides persisted start timing and an exam-owned active-host hold marker. Schedule release/catch-up behavior is owned exclusively by guild-exam-schedule-hold; do not claim weekly departure acceptance before that successor lands.
+
+The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
+
+## Risks / Trade-offs
+
+- Shared files can conflict. Integrate after required predecessors and serialize shared hunks/manifests as listed in the batch matrix.
+- Cached handlers can diverge from rolled-back storage. Snapshot both and assert deterministic before/after state where mutation occurs.
+- Planned attendance can fail under locks or future state changes. Report planned status and recheck actual start.
+- Projected balance does not establish runtime integration. Record only actual exercised evidence in the owning smoke.
+
+## Migration Plan
+
+Apply only after persistent-human-guild-hosts, guild-exam-restriction-policy are present. Read predecessor delta plus live source before editing. This unreleased project has no save migration or backward aliases. Land source, tests, docs and all caller cutovers as one coherent change. Revert the owned implementation commit to roll back deployment; never delete persistent hosts or manufacture data as repair.
+
+## Verification and Ownership
+
+Focused guild exam and combat-session recovery tests plus title rollback tests; actual persistent host/pair/accessory smoke over two attempts, base/skill/proficiency/persona/dbref unchanged, full normal pools restored. Synthetic corruption/fault cases assert byte-equivalent snapshots and retry exactly once.
+
+Each scenario in specs/ needs substantive synthetic behavior coverage. Retain exact approved authoring checks separately. Record deterministic snapshots before and after reads/failures and host baseline/ownership before and after exams. Update owning game/development authoring documentation with implemented shapes and observed behavior. Appointment owns both command documents; other slices do not rename commands. Run only final focused checks and the contract gate once all owned implementation edits are complete. Full browser/evidence verification remains CI-owned.
