@@ -19,6 +19,10 @@ The qualification registry SHALL map guild_branch_altoria E/D/C/B to Hok B, A to
 - **WHEN** an authored host has moved and edited its persona
 - **THEN** sync retains dbref/location and mutable state
 
+#### Scenario: Occupied key at persistent creation
+- **WHEN** another live entity holds the authored person's key before normal host creation
+- **THEN** one host is created with its own primary-key suffix and stable person provenance, and later sync/exams reuse its key/dbref without renaming
+
 ### Requirement: Normal hosts own literal bases gear and usable complete human skill lineages
 Hosts SHALL use approved section 3/4.3 normal bases and canonical ages, actual rank-matched military gear and full learned utility/sword prerequisite ownership and proficiency. Hok SHALL retain coastal literal inputs without reapplying subrace modifiers, normal physical reference 25/20/29, age 45 and nearshore/escort/hunt identity. Cassandra SHALL retain 40/40 and Augustine 68/52. Cards/dialogue SHALL match implemented capabilities with no fire-sword/far-ocean claims or OOC speech.
 

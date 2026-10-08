@@ -4,6 +4,8 @@
 
 ## 2. Owned Implementation and Behavior
 
+- [ ] 2.0 Add persistent_adventurer source/profile/age/orphan validation and distinct free-form/offline profiles while retaining silent rank-factory profiles until lifecycle; implement creation-time live occupancy suffixing and reuse by person/dbref. Verify independent roster startup and occupied-key creation/repeated-sync scenarios in world.rules.tests.test_human_guild_hosts and world.rules.tests.test_npc_roster_validation.
+
 - [ ] 2.1 Author profiles, normal bases/gear, active/passive ownership and usable prerequisite proficiency, qualification registry and fail-closed validation. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
 - [ ] 2.2 Materialize the three named HOME places at existing (4,3) frontage, reciprocal home/frontage/guild Exits, exact daily/weekly offsets and stable-key-to-dbref target bindings given in design.md. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
 - [ ] 2.3 Integrate stable idempotent NPC assembly and source/age/provenance inventory; reconcile all cards/dialogue and remove obsolete story claims. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.

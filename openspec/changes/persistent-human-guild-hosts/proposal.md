@@ -14,7 +14,7 @@ Author complete persistent Hok, Cassandra and Augustine adventurers with real ho
 - `human-guild-hosts`: Requirements defined by this change.
 
 ### Modified Capabilities
-None.
+- `npc-profile-registry`: Accept additive persistent-person sources and dialogue profiles while retaining existing rank factory contracts until lifecycle cutover.
 
 ## Impact
 
