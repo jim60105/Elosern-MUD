@@ -145,7 +145,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/FullLogOverlay", "Core/HudDrawer", "Core/DrawerHeader", "Core/EmptyState",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
                 "Action/OptionCard", "Action/RestForm", "Action/ChoiceCardRow",
-                "Action/DockBreadcrumb", "Action/SkillDetailPane",
+                "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
                 "Data/ParticipantFrame", "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ShopPanel",

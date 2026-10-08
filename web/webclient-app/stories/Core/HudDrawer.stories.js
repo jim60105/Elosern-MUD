@@ -27,10 +27,10 @@ function renderDrawer(args) {
   };
   if (args.skillDrawer) {
     // The skill drawer's composed chrome: the `skills` head icon, the
-    // skill-count subtitle, and the static cast-syntax footer hint — the
+    // skill-count subtitle, and the book's keyboard-guidance footer — the
     // same combination AppClient wires for `hudDrawer === 'skill'`.
     slots.foot = () =>
-      h("p", { class: "hud-drawer__cast-hint" }, "施放入口：cast <技法>[@威力]=<代號>");
+      h("p", { class: "hud-drawer__key-hint" }, "↑↓ 選擇 ‧ ←→ 收合／展開 ‧ Enter 前往動作 ‧ / 搜尋 ‧ Esc 關閉");
   } else if (args.hasFooter) {
     slots.foot = () => h("span", { class: "hud-drawer__foot-text" }, "Drawer footer");
   }

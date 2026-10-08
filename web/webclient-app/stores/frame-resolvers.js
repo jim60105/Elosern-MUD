@@ -49,6 +49,7 @@
 import ExplorationMenu from "../lib/exploration_menu.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
+import SkillUseMenu from "../lib/skill_use_menu.js";
 import stableStringify from "../lib/stable_stringify.js";
 
 // The one degradation marker shape. Frozen so a consumer can never mutate
@@ -232,6 +233,40 @@ export function createFrameResolver(deps) {
     return typeof value === "string" && value !== "" ? value : null;
   }
 
+  // --- skill-use family helpers -----------------------------------------------
+
+  // The SkillBook use model (skillbook-authoritative-casting D6): the second
+  // declared model-state home, holding only the client-local AREA selection
+  // for the committed `skill_use` preview. It follows the committed panel
+  // through `createModel` (vanished or disabled selections drop), keyed on
+  // the panel's content signature so repeat resolution is idempotent. Any
+  // other committed state (no preview, another skill, a mode other than
+  // exploration) clears it, so a stale selection can never be submitted.
+  let skillUse = null;
+  let skillUsePanelSig = null;
+
+  function skillUseModel(skillKey) {
+    const state = committed();
+    const panel = (state.panels && state.panels.skill_use) || null;
+    if (
+      !panel ||
+      panel.available !== true ||
+      state.mode !== "exploration" ||
+      (skillKey !== undefined && skillKey !== null && panel.skill.key !== skillKey)
+    ) {
+      skillUse = null;
+      skillUsePanelSig = null;
+      return null;
+    }
+    const sig = stableStringify(panel);
+    if (skillUse && sig === skillUsePanelSig) {
+      return skillUse;
+    }
+    skillUse = SkillUseMenu.createModel(panel, skillUse);
+    skillUsePanelSig = sig;
+    return skillUse;
+  }
+
   // --- creation family helpers ------------------------------------------------
 
   function requireCreationPanel() {
@@ -355,6 +390,26 @@ export function createFrameResolver(deps) {
       return menu ? isolate(menu) : marker(null);
     },
 
+    // --- skill-use family ---------------------------------------------------
+    // The book's hand-over frames. A preview that is unavailable, names
+    // another skill, or outlived exploration degrades them (pop).
+    "skilluse.root": (params) => {
+      const model = skillUseModel(skillKeyParam(params));
+      return model ? isolate(SkillUseMenu.useMenu(model)) : marker(null);
+    },
+    "skilluse.scale": (params) => {
+      const model = skillUseModel(skillKeyParam(params));
+      if (!model || !(model.panel.skill.freeform_scales || []).length) return marker(null);
+      return isolate(SkillUseMenu.scaleMenu(model));
+    },
+    "skilluse.opening": (params) => {
+      const model = skillUseModel(skillKeyParam(params));
+      const identity = params && params.identity;
+      if (!model || typeof identity !== "number") return marker(null);
+      const menu = SkillUseMenu.openingMenu(model, identity);
+      return menu ? isolate(menu) : marker(null);
+    },
+
     // --- creation family ----------------------------------------------------
     "creation.root": creationMenuSource("root"),
 
@@ -430,6 +485,10 @@ export function createFrameResolver(deps) {
     // panel form; a non-combat committed state clears it (duck round-2:
     // leaving combat can never hand stale selection to a re-adoption).
     combatModel,
+    // The SkillBook use model accessor (the second declared selection home):
+    // the store's AREA toggle and confirm read this one instance. Null unless
+    // an exploration `skill_use` preview for `skillKey` is committed.
+    skillUseModel,
   };
 }
 

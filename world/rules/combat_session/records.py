@@ -203,11 +203,16 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
     }
 
 
+def format_session_id(actor: Any, mode: str, tick: int) -> str:
+    """The one session-ID format (also used by read-only candidate previews)."""
+    return f"{mode}:{actor.pk}:{int(tick)}"
+
+
 def session_id_for(actor: Any, mode: str) -> str:
     """Return a deterministic session ID for one player and mode."""
     from world.rules.clock import get_world_clock
 
-    return f"{mode}:{actor.pk}:{int(get_world_clock().tick)}"
+    return format_session_id(actor, mode, get_world_clock().tick)
 
 
 def read_session(actor: Any) -> CombatSessionRecord | None:

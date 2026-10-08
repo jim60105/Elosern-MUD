@@ -31,6 +31,7 @@ import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
 import TitleBallotMenu from "./components/TitleBallotMenu.vue";
 import SkillBook from "./components/SkillBook.vue";
+import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
@@ -78,7 +79,7 @@ const {
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, questServicesPanel,
   questGuildAvailable, questServicesUnavailable, skillBookSubtitle,
-  inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_CAST_HINT,
+  inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   overviewShown, overviewActive, overviewMenu, overviewFocusKey,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
@@ -89,6 +90,7 @@ const {
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
   npcPersonaRetry, npcPersonaClose,
+  onSkillUse, skillUseDockShown, skillUseLocked,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The dialogue host's standing portrait (webclient-dialogue-stage-actors
 // D2): the committed `art` panel's raw catalog entry named by the committed
@@ -431,7 +433,7 @@ function onFoeLineupGone() {
           @back="onDockBack"
           @skip="store.skipBeats"
         >
-          <div class="dock-pane-host" :class="{ 'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' }">
+          <div class="dock-pane-host" :class="{ 'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' || skillUseDockShown }">
             <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
               <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
                 <h3>等待直到黎明</h3>
@@ -460,6 +462,18 @@ function onFoeLineupGone() {
               :focused-key="overviewActive ? store.view.focus.key : overviewFocusKey"
               :local-map="store.view.localMapModel"
               :active="overviewActive"
+              @focus-change="onDockFocusChange"
+              @activate="onDockActivate"
+            />
+            <!-- The SkillBook casting flow (skillbook-authoritative-casting):
+                 the book handed casting to the dock; its frames render here
+                 with their own detail card. -->
+            <SkillUseDock
+              v-else-if="skillUseDockShown"
+              :menu="store.view.combatMenu"
+              :focused-key="store.view.focus.key"
+              :detail="store.view.skillUse"
+              :locked="!!store.view.dispatch.inFlight"
               @focus-change="onDockFocusChange"
               @activate="onDockActivate"
             />
@@ -542,7 +556,20 @@ function onFoeLineupGone() {
         />
       </template>
       <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
-      <SkillBook v-else-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />
+      <SkillBook
+        v-else-if="store.view.hudDrawer === 'skill'"
+        :skills="panel('character') || {}"
+        :practice-disabled="skipDisabled"
+        :practice-feedback="practiceFeedback"
+        :mode="store.view.mode || 'exploration'"
+        :use-locked="skillUseLocked"
+        :use-pending-key="store.view.skillUsePendingKey"
+        :use-notice="store.view.skillUseNotice"
+        :return-target="store.view.bookReturn"
+        @practice="onPractice"
+        @practice-view="(open) => practiceOpen = open"
+        @use="onSkillUse"
+      />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
@@ -620,11 +647,11 @@ function onFoeLineupGone() {
         @action="onAction"
         @close="onHudDrawerClose"
       />
-      <!-- The cast-syntax footer hint is skill-drawer-only: a conditional
-           named slot means the other five drawers provide no `foot` slot, so
-           `HudDrawer` renders no footer for them. -->
+      <!-- The book's keyboard guidance is skill-drawer-only and absent while
+           the practice sub-screen replaces the book: a conditional named slot,
+           so the other drawers provide no `foot` slot and render no footer. -->
       <template v-if="store.view.hudDrawer === 'skill' && !practiceOpen" #foot>
-        <p class="hud-drawer__cast-hint" data-testid="skill-book-cast-hint">{{ SKILL_CAST_HINT }}</p>
+        <p class="hud-drawer__key-hint" data-testid="skill-book-key-hint">{{ SKILL_BOOK_KEY_HINT }}</p>
       </template>
     </HudDrawer>
 

@@ -110,6 +110,18 @@ def _freeform_gate_failure(
     return None
 
 
+def adjusted_cost(actor: Any, skill: Any, scale: float = 1.0) -> dict[str, int]:
+    """Return one skill's current adjusted cost for ``actor`` at ``scale``.
+
+    Delegates to the resolver's own step-2/step-6 cost formula so a preview
+    displays exactly the amounts the resolver checks and deducts. Modifiers
+    are read through the no-create context only.
+    """
+    from world.rules.action.gates import _adjusted_costs
+
+    return dict(_adjusted_costs(actor, skill, scale))
+
+
 def _skill_wide_failure(
     actor: Any,
     skill_key: str,

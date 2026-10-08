@@ -168,6 +168,9 @@ export function applyFrames(ctx) {
       return;
     }
     if (name === "menu-closed" || name === "escape-root") {
+      if (name === "menu-closed") {
+        ctx.noteSkillUseEscape();
+      }
       if (ctx.creation) {
         ctx.handleCreationMenuEvent(name);
       }
@@ -209,6 +212,12 @@ export function applyFrames(ctx) {
     // creation_dock.js keyboard journey): submenu opens, preset-card saves,
     // confirmation dispatches, and cancel pops one level.
     if (ctx.creation && ctx.handleCreationItem(item)) {
+      return;
+    }
+    // The SkillBook use flow owns its own frames (skillbook-authoritative-
+    // casting D6): local rows (AREA toggles, the scale and opening steps)
+    // never reach the generic exploration dispatch below.
+    if (ctx.handleSkillUseItem(name, item)) {
       return;
     }
     // The exploration dock owns the router in exploration mode (the G2

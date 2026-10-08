@@ -59,6 +59,7 @@ _PANEL_MODULES = (
     ("quest_log", "quest_log.py"),
     ("combat_beats", "combat_beats.py"),
     ("dream", "dream.py"),
+    ("skill_use", "skill_use.py"),
 )
 
 

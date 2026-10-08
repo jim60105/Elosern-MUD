@@ -565,6 +565,41 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "rest 3600s practice firebolt",
     },
     {
+      id: "EXPECTED SILENCE: explore.skill_preview book preview (reads, casts nothing)",
+      ids: ["explore.skill_preview"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.skill_preview", { skill_key: SYNTH_SKILL.id });
+      },
+    },
+    {
+      id: "skill-use dock: ordinary target cast (menu descriptor)",
+      ids: ["explore.cast"],
+      prepare() {
+        openExploration();
+        store.dispatchAction(
+          "explore.cast",
+          { skill_key: SYNTH_SKILL.id, target_ids: [7] },
+          { skillLabel: "合成癒合", targetLabel: "店長" },
+        );
+      },
+      expected: "cast 合成癒合=店長",
+    },
+    {
+      id: "skill-use dock: monster opening (server-authored opening label)",
+      ids: ["explore.cast"],
+      prepare() {
+        openExploration();
+        store.dispatchAction(
+          "explore.cast",
+          { skill_key: SYNTH_SKILL.id, opening_target_id: 9 },
+          { skillLabel: "合成癒合", actionLabel: "合成狼（開戰）" },
+        );
+      },
+      expected: "合成狼（開戰）",
+    },
+    {
       id: "guild rows: register / abandon / turnin / track / exam (payload-only)",
       ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_start"],
       prepare() {

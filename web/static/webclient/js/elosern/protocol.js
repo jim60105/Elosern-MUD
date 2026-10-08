@@ -37,6 +37,7 @@ var titles = require("./protocol/panels/titles.js");
 var misc = require("./protocol/panels/misc.js");
 var exotic = require("./protocol/panels/exotic.js");
 var combat_beats = require("./protocol/panels/combat_beats.js");
+var skill_use = require("./protocol/panels/skill_use.js");
 
 (function (root, factory) {
   "use strict";
@@ -273,6 +274,9 @@ var combat_beats = require("./protocol/panels/combat_beats.js");
     LORE_CODEX_MAX_LABEL_CODE_POINTS: C.LORE_CODEX_MAX_LABEL_CODE_POINTS,
     LORE_CODEX_MAX_FIELD_NAME_CODE_POINTS: C.LORE_CODEX_MAX_FIELD_NAME_CODE_POINTS,
     LORE_CODEX_MAX_FIELD_VALUE_CODE_POINTS: C.LORE_CODEX_MAX_FIELD_VALUE_CODE_POINTS,
+    validateSkillUsePanel: skill_use.validateSkillUsePanel,
+    SKILL_USE_SCHEMA_VERSION: skill_use.SKILL_USE_SCHEMA_VERSION,
+    SKILL_USE_MAX_CHOICES: skill_use.SKILL_USE_MAX_CHOICES,
     validatePanel: env.validatePanel,
     // The only accepted client->server synchronization body.
     syncEnvelope: function () {

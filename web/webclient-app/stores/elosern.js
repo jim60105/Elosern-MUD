@@ -44,6 +44,7 @@ import { applyInteraction } from "./elosern/interaction.js";
 import { applyTransport } from "./elosern/transport.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
+import { applySkillUse } from "./elosern/skill_use.js";
 
 export { resolveLocationLabel };
 
@@ -153,6 +154,7 @@ export const useElosernStore = defineStore("elosern", () => {
   applyCombat(ctx);
   applyCreation(ctx);
   applyInteraction(ctx);
+  applySkillUse(ctx);
   applyTransport(ctx);
   // The combat beat playback (webclient-combat-beat-queue, design D5) sits
   // between the transport (whose dispatch guard and lifecycle call its
@@ -210,6 +212,8 @@ export const useElosernStore = defineStore("elosern", () => {
     focusItemByKey: ctx.focusItemByKey,
     tabToRootAndConfirm: ctx.tabToRootAndConfirm,
     chooseScale: ctx.chooseScale,
+    // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
+    beginSkillUse: ctx.beginSkillUse,
     chooseShorthand: ctx.chooseShorthand,
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the

@@ -196,10 +196,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     );
     expect(wrapper.get(".drawer-header__subtitle").text()).toBe("主動 11 ‧ 被動 3");
-    // The footer states the client's own `/cast` syntax as static copy.
-    expect(wrapper.get('[data-testid="skill-book-cast-hint"]').text()).toBe(
-      "施放入口：cast <技法>[@威力]=<代號>",
-    );
+    // The retired cast-syntax footer is gone (skillbook-authoritative-
+    // casting): the footer carries the book's keyboard guidance instead, and
+    // graphical 施放 / 修煉 live in the book itself.
+    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("cast <技法>");
+    expect(wrapper.get('[data-testid="skill-book-key-hint"]').text()).toContain("Enter 前往動作");
     // The inventory drawer carries the reference's `inventory` backpack glyph
     // (align-drawer-chrome-symbols; the string shared with `items`) and its
     // header wallet subtitle (relocate-inventory-drawer-essentials); the
@@ -211,7 +213,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(invIcon.find("path").attributes("d")).toBe("M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2");
     expect(wrapper.find('[data-testid="hud-drawer__title"].drawer-header__title').exists()).toBe(true);
     expect(wrapper.get(".drawer-header__subtitle").text()).toBe("錢袋 3,240 銅");
-    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(false);
   });
 
   it("leaves the skill drawer subtitle empty when the character panel is missing or unavailable", async () => {
@@ -252,7 +254,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     // of the panel's availability.
     expect(wrapper.find(".drawer-header__subtitle").exists()).toBe(false);
     expect(wrapper.find(".drawer-header__icon").exists()).toBe(true);
-    expect(wrapper.find('[data-testid="skill-book-cast-hint"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="skill-book-key-hint"]').exists()).toBe(true);
   });
 
   it("leaves the inventory drawer subtitle blank when the character panel is unavailable", async () => {

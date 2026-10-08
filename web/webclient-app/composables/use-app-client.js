@@ -15,6 +15,7 @@ import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
+import { useSkillUse } from "./use-skill-use.js";
 
 export function useAppClient(store, shellRef, sceneBackdropRef) {
   // The single dispatch seam (webclient-action-feedback): every surface's
@@ -49,5 +50,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     // The NPC author editor (npc-persona-editor-window): its own correlated
     // read/update state machine over the single store dispatch entry.
     ...useNpcPersonaEditor(store, { shellRef }),
+    // The SkillBook 施放 hand-over to the dock (skillbook-authoritative-casting).
+    ...useSkillUse(store),
   };
 }

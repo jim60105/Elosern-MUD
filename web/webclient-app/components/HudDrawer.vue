@@ -198,11 +198,12 @@ defineExpose({ forceClose });
   transform: translateX(0);
 }
 
-/* The skill drawer's static cast-syntax hint (the reference's footer copy). */
-.hud-drawer__cast-hint {
+/* The skill drawer's keyboard guidance (slotted footer copy). */
+.hud-drawer__key-hint {
   margin: 0;
   color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
 }
 
 /* The workspace row under the header: an optional art column beside the
