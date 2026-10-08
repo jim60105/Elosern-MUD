@@ -11,9 +11,10 @@ Changed persistent boundaries emit named-import world.observability info events 
 
 ## Decisions
 
-Use predecessor persisted exam start timing/hold marker and authoritative schedule. Active exam holds movement AND schedule-state entries for that host; unrelated NPCs continue. Do not let departure/service state break the battle. Record or derive the held settled-through interval from exam/session timing and clock windows, never a general queue.
-Terminal settlement restores normal host before releasing the hold. Consume ordered held occurrences through the same _settle_occurrence and traversal machinery without advancing world time a second time. Preserve due/index ordering, effective_from, silencing and per-entry skip isolation. A weekly departure crossed in combat executes after release; no extra week at the guild. Duplicate terminal/recovery replay cannot traverse twice.
-Persist hold boundaries and consumed-through marker atomically with session settlement/release so a crash before or after release is recoverable. For valid resume keep hold; invalid recovery closes simulation and releases after restoration. Startup registers schedule source before any recovery time settlement. Corrupt/indeterminate held state returns unknown to availability rather than fabricating a visit. Clock/combat/release snapshot owners include both storage and caches; no nested advance.
+This is the complete scheduler hold/replay core predecessor, independent of production examination starts. Expose rules-owned begin_exam_schedule_hold(npc, exam_id, start_tick), read_exam_schedule_hold(npc), and release_exam_schedule_hold(npc, exam_id, through_tick). Persist host dbref, exam identity, start tick, held-through tick and consumed-through occurrence identity. APIs validate exact ownership, use storage/cache snapshots, and support an outer lifecycle transaction. No general queue is introduced.
+The existing schedule source consults this hold before executing movement or state entries; held occurrences remain recoverable and unrelated NPCs settle unchanged. Release consumes ordered occurrences through the same _settle_occurrence and real Exit machinery without another advance. Effective-from, silencing and per-entry failures remain authoritative. A weekly departure executes once after release.
+Lifecycle, which depends on this core, owns atomic activation with exam start and release after normal host restoration for every terminal/recovery path. This predecessor tests those API sequences with synthetic examination identities and timing; it does not edit guild_exams or activate an incomplete production cutover. A crash/retry can distinguish pending and consumed release; core snapshot hooks restore location/state/hold/caches on transactional failure.
+The read API reports a known hold or named indeterminate state. The availability reader depends on this change and owns its query integration; this core does not depend on or edit a future reader. Startup schedule registration remains before recovery advances.
 
 The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
 
@@ -26,7 +27,7 @@ The chosen design reuses existing registries, resolver, service gate, schedule s
 
 ## Migration Plan
 
-Apply only after weekly-npc-schedule-cycles, persistent-guild-exam-lifecycle are present. Read predecessor delta plus live source before editing. This unreleased project has no save migration or backward aliases. Land source, tests, docs and all caller cutovers as one coherent change. Revert the owned implementation commit to roll back deployment; never delete persistent hosts or manufacture data as repair.
+Apply only after weekly-npc-schedule-cycles is present. Persistent-guild-exam-lifecycle is a successor that wires these complete core APIs to production examination start and settlement. This unreleased project has no save migration or backward aliases. Land source, tests, docs and owned caller changes coherently. Revert the owned implementation commit to roll back deployment; never delete persistent hosts as repair.
 
 ## Verification and Ownership
 

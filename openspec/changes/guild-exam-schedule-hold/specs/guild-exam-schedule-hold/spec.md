@@ -4,6 +4,8 @@ Define defer active examiner schedules and replay held departures once after set
 
 ## ADDED Requirements
 
+The complete scheduler hold/read/release behavior defined below SHALL be available independently of production examination starts. Lifecycle SHALL wire activation/release only after this predecessor lands; availability-reader integration belongs to its dependent reader change. Scenarios in this predecessor use real synthetic NPCs and exam identities.
+
 ### Requirement: Active exams defer host schedule occurrences and release through shared traversal
 Exam-owned persisted timing/hold state SHALL defer movement and state occurrences only for the active host. Terminal settlement SHALL restore normal state then consume held occurrences in authored due/index order via ordinary occurrence/traversal machinery, without a second clock advance. Existing effective-from, silencing, locks/vetoes and per-entry failure isolation SHALL remain authoritative.
 

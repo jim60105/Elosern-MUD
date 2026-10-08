@@ -4,9 +4,9 @@
 
 ## 2. Owned Implementation and Behavior
 
-- [ ] 2.1 Add exam-owned schedule hold consultation and recoverable held-window accounting to existing clock settlement. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
-- [ ] 2.2 Release through the shared ordered occurrence/traversal seam after terminal host restoration, with persisted replay progress. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
-- [ ] 2.3 Integrate cold-start registration/recovery and availability hold semantics; test crash boundaries and schedule silencing. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
+- [ ] 2.1 Implement the complete begin/read/release hold APIs and schedule-source consultation with persisted identity/timing and storage/cache snapshots; verify synthetic exam-owned movement/state deferral and unrelated-NPC ordering in world.rules.tests.test_guild_exam_schedule_hold.
+- [ ] 2.2 Implement ordered real-Exit replay and consumed-through persistence without nested clock advance; verify release/retry/crash snapshots and crossed weekly departure once in that focused module.
+- [ ] 2.3 Expose known/indeterminate hold reads and preserve startup source-registration ordering; verify corruption/silencing behavior in the focused module. Lifecycle owns later start/terminal/recovery wiring; planned-npc-service-windows owns reader integration, so this task edits neither successor.
 
 ## 3. Traceability, Documentation and Handoff
 
