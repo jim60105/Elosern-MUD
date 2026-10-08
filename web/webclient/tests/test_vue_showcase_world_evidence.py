@@ -135,6 +135,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/ChoiceCardRow",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
+    # The SkillBook casting flow's dock pane joined with
+    # skillbook-authoritative-casting.
+    "Action/SkillUseDock",
     "Data/StatusPanel",
     "Data/VitalsTrack",
     "Data/SkillBook",

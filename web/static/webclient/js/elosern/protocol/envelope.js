@@ -69,6 +69,7 @@ var misc = require("./panels/misc.js");
 var exotic = require("./panels/exotic.js");
 var combatBeats = require("./panels/combat_beats.js");
 var dream = require("./panels/dream.js");
+var skillUse = require("./panels/skill_use.js");
 
 var PANEL_VALIDATORS = {
   art: art.validateArtPanel,
@@ -92,6 +93,7 @@ var PANEL_VALIDATORS = {
   lore_codex: exotic.validateLoreCodexPanel,
   combat_beats: combatBeats.validateCombatBeatsPanel,
   dream: dream.validateDreamPanel,
+  skill_use: skillUse.validateSkillUsePanel,
 };
 
 

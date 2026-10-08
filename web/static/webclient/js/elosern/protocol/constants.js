@@ -435,6 +435,7 @@ var PANEL_ALLOWLIST = {
   quest_log: 1,
   combat_beats: 1,
   dream: 2,
+  skill_use: 1,
 };
 
 var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;

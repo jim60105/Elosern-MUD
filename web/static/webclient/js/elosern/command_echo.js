@@ -111,6 +111,9 @@
     // success line is the player-facing outcome, delivered as narrative by the
     // commit itself (webclient-align-11).
     "explore.dialogue_leave",
+    // Opening the SkillBook use preview reads a server preview and casts
+    // nothing; only the confirmed `explore.cast` echoes a command line.
+    "explore.skill_preview",
     // Gallery management is webclient-only (D14); no fabricated text commands.
     "gallery.subject.select",
     "gallery.generate",
@@ -287,6 +290,17 @@
       return target === null
         ? join(["cast", skillPart])
         : join(["cast", skillPart + "=" + target]);
+    },
+    // The SkillBook field cast echoes the equivalent typed `cast` line with
+    // the same skill/target/scale composition as the combat dock's cast; a
+    // monster opening names the anchor through its server-authored label.
+    "explore.cast": function (payload, display) {
+      // A monster opening echoes the server-authored opening label (which
+      // names the anchor and discloses the fight), never a guessed name.
+      if (payload && payload.opening_target_id !== undefined) {
+        return label(display && display.actionLabel);
+      }
+      return RESOLVERS["combat.cast"](payload, display);
     },
     "combat.forfeit": function () {
       return "combat forfeit";

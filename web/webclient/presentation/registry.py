@@ -400,6 +400,21 @@ def build_production_registry() -> PresentationRegistry:
             presenter=combat_beats_presenter,
         )
     )
+    from web.webclient.presentation.skill_use import (
+        SKILL_USE_SCHEMA_VERSION,
+        skill_use_presenter,
+    )
+
+    # The on-demand SkillBook use preview (skillbook-authoritative-casting):
+    # available only for the session's current-epoch selection.
+    registry.register(
+        PresenterSpec(
+            name="skill_use",
+            schema_version=SKILL_USE_SCHEMA_VERSION,
+            unavailable_reason=("skill_use_unavailable", "技能施放預覽目前無法顯示"),
+            presenter=skill_use_presenter,
+        )
+    )
     from web.webclient.presentation.dream import DREAM_SCHEMA_VERSION, dream_presenter
     registry.register(PresenterSpec(
         name="dream", schema_version=DREAM_SCHEMA_VERSION,

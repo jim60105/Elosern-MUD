@@ -74,6 +74,9 @@ _DIALOGUE_TRIGGER_ACTION_IDS = frozenset({"explore.talk_scripted", "explore.talk
 # every live watcher of the actor (action-options-wiring-hardening D2).
 _COMBAT_TRIGGER_ACTION_IDS = frozenset({"combat.cast", "combat.flee", "combat.forfeit"})
 
+# The field cast whose instant-terminal opening also ends a combat.
+_FIELD_CAST_ACTION_ID = "explore.cast"
+
 
 class DispatchError(ValueError):
     """A UI action could not be admitted for a safe, stable reason."""
@@ -433,6 +436,16 @@ def _publish_completion(
     if result["outcome"] == "success" and action_id in _DIALOGUE_TRIGGER_ACTION_IDS:
         _schedule_dialogue_options(session, actor, coordinator)
     if result["outcome"] == "success" and action_id in _COMBAT_TRIGGER_ACTION_IDS:
+        _schedule_terminal_combat_options(actor)
+    # A field cast whose opening ended the encounter at once is a combat
+    # ending too (skillbook-authoritative-casting); an ordinary utility cast
+    # or a continuing opening round schedules nothing. The flag is internal
+    # adapter data that ``_normalize_result`` never copies to the wire.
+    if (
+        result["outcome"] == "success"
+        and action_id == _FIELD_CAST_ACTION_ID
+        and value.get("field_combat_terminal") is True
+    ):
         _schedule_terminal_combat_options(actor)
     return value
 

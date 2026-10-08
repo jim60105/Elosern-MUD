@@ -1023,6 +1023,36 @@ class CombatBeatsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class SkillUsePanelEvidenceTest(unittest.TestCase):
+    """skillbook-authoritative-casting: the client protocol mirrors the
+    version-1 ``skill_use`` panel (exact form, identity bounds, opening
+    line-up cross references). The DOM-independent Node sibling is its
+    executed evidence."""
+
+    @covers_requirement(
+        "webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only"
+    )
+    def test_skill_use_node_suite_passes(self):
+        suite = (
+            REPO_ROOT
+            / "web/static/webclient/js/tests/protocol_skill_use.test.js"
+        )
+        self.assertTrue(suite.is_file(), "the skill_use Node sibling is missing")
+        result = subprocess.run(
+            ["node", "--test", str(suite)],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "skill_use Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 class CombatBeatQueueEvidenceTest(unittest.TestCase):
     """webclient-combat-beat-queue: the script-side motion-token reader, the
     pure round plan / state machine / displayed hit points / page model, the

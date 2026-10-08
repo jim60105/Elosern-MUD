@@ -428,7 +428,9 @@
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_pages_beats_at_off",
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced",
         "web.tests.browser.test_browser_chrome_navigation.ChromeNavigationBrowserTest",
-        "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest"
+        "web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_keyboard_self_none_and_single_utility_casts",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookFieldCastJourneyTest.test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_reconnect_replays_no_round",
@@ -451,7 +453,11 @@
         "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_npc_departure_and_return_protects_draft",
         "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_puppet_switch_clears_editor",
         "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_cross_tab_conflict_reload_and_discard",
-        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_visibility_denial_and_restore_protects_draft"
+        "web.tests.browser.test_browser_npc_persona_editor_edges.NpcPersonaEditorEdgesBrowserTest.test_visibility_denial_and_restore_protects_draft",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_book_hierarchy_geometry_and_focus_at_both_viewports",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_cancel_back_returns_to_the_book_without_casting",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_monster_openings_disclose_the_whole_line_up",
+        "web.tests.browser.test_browser_skillbook_casting.SkillBookCastingBrowserTest.test_tampered_cast_shapes_are_rejected_without_casting"
       ]
     }
   ]

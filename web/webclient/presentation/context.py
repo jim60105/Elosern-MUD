@@ -129,6 +129,9 @@ class PresentationContext:
             admitted action that settled an ordinary round supplies it; every
             other publication path builds its context without one, so the
             beats panel is available exactly once per settled round.
+        skill_use: The copied ``(skill_key, scale)`` SkillBook use selection
+            of the current transport-and-puppet epoch (or ``None``). Only the
+            ``skill_use`` presenter reads it; it never authorizes a cast.
     """
 
     actor: Any
@@ -139,6 +142,7 @@ class PresentationContext:
     proposal: ProposalSnapshot | None = field(default=None)
     gallery_subject: str | None = field(default=None)
     combat_round: Any = field(default=None)
+    skill_use: tuple[str, float] | None = field(default=None)
 
 
 __all__ = [

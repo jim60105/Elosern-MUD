@@ -38,11 +38,12 @@ service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`,
 `shop.sell`, the two inventory adapters `inventory.use` and
 `inventory.toggle_equip`, the six creation adapters `creation.preset`,
 `creation.custom`, `creation.concept`, `creation.roll_name`,
-`creation.activate`, and `creation.reset`, the fourteen exploration adapters
+`creation.activate`, and `creation.reset`, the sixteen exploration adapters
 `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`,
 `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`,
 `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`,
-`explore.possess`, `explore.possess_release`, and `explore.deliver`, the two
+`explore.possess`, `explore.possess_release`, `explore.deliver`,
+`explore.skill_preview`, and `explore.cast`, the two
 title ballot adapters `title.accept` and `title.decline`, the two title codex
 adapters `title.equip` and `title.remove`, the persona adapter
 `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and
@@ -55,6 +56,9 @@ the four personal official-art preference adapters `gallery.official.select`,
 `gallery.official.clear_selection`, `gallery.official.geometry.set`, and
 `gallery.official.geometry.clear`, and the four dream collaboration adapters
 `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`.
+`explore.skill_preview` SHALL perform only epoch-scoped presentation selection;
+`explore.cast` SHALL perform field use through the deterministic core. Neither
+SHALL route through the text command parser.
 
 #### Scenario: Unknown action cannot become a command
 
@@ -73,8 +77,8 @@ the four personal official-art preference adapters `gallery.official.select`,
 
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
 
-- **WHEN** the production registry is loaded after the practice-webclient change, the gallery management changes add their seven gallery adapters, the personal official-art preference change adds its four gallery preference adapters, the correspondence change adds its four letter adapters, the NPC author-editor change adds its two adapters, and the dream-sleep-surface change adds its four dream adapters
-- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `npc.persona.read`, `npc.persona.update`,
+- **WHEN** the production registry is loaded after the practice-webclient, gallery management, personal official-art preference, correspondence, NPC author-editor, dream-sleep-surface and SkillBook casting changes
+- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, `explore.cast`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, `character.persona.update`, `npc.persona.read`, `npc.persona.update`,
 `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, `gallery.stage.update`,
 `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, `gallery.official.geometry.clear`,
 `letters.list`, `letters.collect`, `letters.read`, `letters.send`, `dream.say`,
@@ -85,6 +89,11 @@ validator and deterministic adapter
 
 - **WHEN** a dispatcher test installs a synthetic proof adapter
 - **THEN** that adapter exists only in the test-owned registry and does not appear in the production registry
+
+#### Scenario: Skill preview is not a cast
+
+- **WHEN** the two SkillBook action IDs are resolved through the production registry
+- **THEN** each has its own exact validator/adapter, preview selection makes no canonical gameplay mutation, and field casting executes only through its deterministic entry
 
 ### Requirement: Adapters may receive the authenticated session through a fixed optional third parameter
 

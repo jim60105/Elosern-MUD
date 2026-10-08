@@ -559,7 +559,7 @@ class ActionCommandBranchTests(TestCase):
         command = _command(CmdCast, "skill=missing")
         command._active_session = Mock(return_value=None)
         command.caller.search.return_value = None
-        with patch("commands.action.settle_out_of_combat_cast") as settle:
+        with patch("world.rules.cast_settlement.settle_out_of_combat_cast") as settle:
             command.func()
         settle.assert_not_called()
 
@@ -609,7 +609,7 @@ class ActionCommandBranchTests(TestCase):
             outcome="success", time_cost_seconds=5, event_log="log", reason=None
         )
         with patch(
-            "commands.action.settle_out_of_combat_cast",
+            "world.rules.cast_settlement.settle_out_of_combat_cast",
             return_value=CastSettlement(success, ()),
         ), patch("commands.action.render_plain_text", return_value="done"):
             command._cast_out_of_combat("skill", "")
@@ -618,7 +618,7 @@ class ActionCommandBranchTests(TestCase):
         command.caller.msg.reset_mock()
         failed = SimpleNamespace(outcome="rejected", reason=object())
         with patch(
-            "commands.action.settle_out_of_combat_cast",
+            "world.rules.cast_settlement.settle_out_of_combat_cast",
             return_value=CastSettlement(failed, ()),
         ):
             command._cast_out_of_combat("skill", "")

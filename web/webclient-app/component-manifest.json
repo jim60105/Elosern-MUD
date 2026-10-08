@@ -28,6 +28,7 @@
     "Action/SceneOverview",
     "Action/DockVerbPopover",
     "Action/SkillDetailPane",
+    "Action/SkillUseDock",
     "Data/StatusPanel",
     "Data/VitalsTrack",
     "Data/ConditionChips",

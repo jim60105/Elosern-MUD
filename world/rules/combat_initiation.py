@@ -8,6 +8,7 @@ dependency direction is one-way — ``combat_initiation`` imports
 ``combat_session``, never the reverse.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from django.db import transaction
@@ -25,6 +26,7 @@ from world.rules.action import (
 from world.rules.action_preview import revalidate_submission
 from world.rules.clock import read_world_clock
 from world.rules.combat_session import (
+    CombatSessionError,
     CombatSessionRecord,
     _context_for,
     engage_group,
@@ -69,19 +71,27 @@ def _room_monsters(actor: Any) -> list[Monster]:
     return sorted(monsters, key=lambda monster: int(monster.pk))
 
 
-def _candidate_record(actor: Any, targets: list[Any]) -> CombatSessionRecord:
+def _candidate_record(
+    actor: Any,
+    targets: list[Any],
+    *,
+    session_id: str | None = None,
+) -> CombatSessionRecord:
     """Build the engagement record without persisting it.
 
     Mirrors ``engage_group()``'s record construction step for step (same
     ``session_id_for`` mode, ``combat_companions()`` party collection, and
     sorted-pk enemy ordering), stopping short of ``_persist`` — the
     candidate battlefield is "reconstruct, then stop" (design §5, D-3).
+    A read-only preview passes its own ``session_id`` so building the
+    candidate never creates the world-clock script (``session_id_for``
+    reads the clock through the creating accessor).
     """
     from world.rules.party import combat_companions
 
     companions = [int(companion.pk) for companion in combat_companions(actor)]
     return CombatSessionRecord(
-        session_id=session_id_for(actor, "hostile"),
+        session_id=session_id if session_id is not None else session_id_for(actor, "hostile"),
         mode="hostile",
         room_id=int(actor.location.pk),
         player_ids=(int(actor.pk), *companions),
@@ -91,6 +101,157 @@ def _candidate_record(actor: Any, targets: list[Any]) -> CombatSessionRecord:
         rounds_elapsed=0,
         exam_id=None,
     )
+
+
+@dataclass(frozen=True)
+class FieldOpeningPreview:
+    """One side-effect-free verdict on opening combat with one cast.
+
+    Attributes:
+        enabled: Whether ``initiate_field_combat`` would pass every
+            pre-mutation gate right now.
+        reason: The stable rejection reason when disabled, else ``None``.
+        detail: The rejection detail when disabled, else ``None``.
+        targets: The concrete enemy line-up the opening would engage: the
+            anchor alone for a non-AREA skill, every living co-located
+            monster (sorted pk) for an AREA skill. Filled even when a later
+            gate disables the opening, so a disclosure can name the line-up.
+        battlefield: The unpersisted candidate battlefield, when built.
+        context: The candidate battlefield's action context, when built.
+        session_reason: The stable ``SessionReason`` value when the
+            candidate battlefield itself could not be built (``reason`` is
+            then ``None``), else ``None``.
+    """
+
+    enabled: bool
+    reason: RejectReason | None
+    detail: str | None
+    targets: tuple[Any, ...]
+    battlefield: Any = None
+    context: Any = None
+    session_reason: str | None = None
+
+
+def _opening_line_up(actor: Any, skill: Any, target: Any) -> list[Any]:
+    """The enemy line-up an opening cast engages (field-combat-initiation D-5).
+
+    AREA opens against the whole room as an explicit concrete list (never a
+    shorthand — ``commanded_damage_reaches_enemy()`` reads concrete keys);
+    anything else (SINGLE, and NONE/SELF which then reject on shape) opens
+    against the named monster alone.
+    """
+    if skill is not None and skill.target_spec is TargetSpec.AREA:
+        return _room_monsters(actor)
+    return [target]
+
+
+def _prepare_opening(
+    actor: Any,
+    skill_key: str,
+    target: Any,
+    scale: float = 1.0,
+    *,
+    session_id: str | None = None,
+) -> FieldOpeningPreview:
+    """Run every pre-mutation initiation gate in the execution order.
+
+    Shared verbatim by ``initiate_field_combat`` (which then engages) and
+    the read-only ``preview_field_opening`` (which stops here), so a preview
+    can never advertise an opening the initiation would refuse. Nothing here
+    persists, registers, or advances anything: the candidate record is
+    reconstructed, then dropped.
+    """
+    # The initiation API enforces its own target contract: an AREA skill's
+    # line-up is chosen from the room, so without this check a direct caller
+    # could open a fight and fire the room-wide action while nominally
+    # aiming at nothing (self, an NPC, an absent monster). AREA expansion
+    # (D-5) applies only once a legitimate field-combat target anchors the
+    # initiation. (Aim decides the fight; damage decides the settlement —
+    # the reason names the mistake a caller of THIS entry can make.)
+    if field_combat_target(actor, target) is None:
+        return FieldOpeningPreview(
+            False, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, str(skill_key), ()
+        )
+    skill = SKILL_REGISTRY.get(skill_key)
+    targets = _opening_line_up(actor, skill, target)
+    # Explicit gate, first (D-4): validation deliberately supplies a
+    # battlefield, so world/rules/action.py's own usable_out_of_combat gate
+    # would pass. Checking here is what keeps the skill-field-availability
+    # audit meaningful; it runs before the candidate battlefield exists so
+    # its answer cannot be masked by anything downstream.
+    if skill is not None and not skill.usable_out_of_combat:
+        return FieldOpeningPreview(
+            False,
+            RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
+            skill_key,
+            tuple(targets),
+        )
+    record = _candidate_record(actor, targets, session_id=session_id)
+    battlefield = reconstruct_battlefield(actor, record)
+    context = _context_for(battlefield, record)
+    preview = revalidate_submission(
+        actor, skill_key, context, targets, scale=scale
+    )
+    if not preview.enabled:
+        return FieldOpeningPreview(
+            False, preview.reason, preview.detail, tuple(targets), battlefield, context
+        )
+    preflight = ActionResolver.preflight(
+        ActionRequest(
+            actor=actor,
+            skill_key=skill_key,
+            targets=targets,
+            context=context,
+            scale=scale,
+        )
+    )
+    if preflight.outcome == "rejected":
+        return FieldOpeningPreview(
+            False,
+            preflight.reason,
+            preflight.detail,
+            tuple(targets),
+            battlefield,
+            context,
+        )
+    return FieldOpeningPreview(True, None, None, tuple(targets), battlefield, context)
+
+
+def preview_field_opening(
+    actor: Any,
+    skill_key: str,
+    target: Any,
+    scale: float = 1.0,
+) -> FieldOpeningPreview:
+    """Read-only availability of opening combat against ``target``.
+
+    Applies the identical gates ``initiate_field_combat`` applies before it
+    engages, against an unpersisted candidate battlefield. It never creates
+    the world-clock script (the candidate session ID reads the existing clock
+    or tick 0), never persists a session, never registers skip-safety, and
+    never rolls. A candidate that cannot be reconstructed (for example two
+    line-up participants sharing one key) reports a disabled opening with a
+    stable reason instead of raising, so one awkward room never blanks a
+    whole preview.
+    """
+    from world.rules.combat_session.records import format_session_id
+
+    clock = read_world_clock()
+    session_id = format_session_id(actor, "hostile", clock.tick if clock is not None else 0)
+    try:
+        return _prepare_opening(
+            actor, skill_key, target, scale=scale, session_id=session_id
+        )
+    except CombatSessionError as error:  # observability: ignore R2: a candidate battlefield that cannot be built is a read-only disabled verdict carrying the stable session reason; the preview surface reports it, and the real initiation path still raises
+        skill = SKILL_REGISTRY.get(skill_key)
+        try:
+            line_up = tuple(_opening_line_up(actor, skill, target))
+        except Exception:  # observability: ignore R2: the line-up only decorates an already-disabled verdict; the CombatSessionError is the reported reason
+            line_up = (target,)
+        session_reason = str(error.args[0]) if error.args else "malformed_session"
+        return FieldOpeningPreview(
+            False, None, session_reason, line_up, session_reason=session_reason
+        )
 
 
 def initiate_field_combat(
@@ -111,66 +272,15 @@ def initiate_field_combat(
     the skill's damage. A rejection at any gate costs nothing: no session,
     no resource, no roll, no world time.
     """
-    # The initiation API enforces its own target contract: an AREA skill's
-    # line-up is chosen from the room, so without this check a direct caller
-    # could open a fight and fire the room-wide action while nominally
-    # aiming at nothing (self, an NPC, an absent monster). AREA expansion
-    # (D-5) applies only once a legitimate field-combat target anchors the
-    # initiation. (Aim decides the fight; damage decides the settlement —
-    # the reason names the mistake a caller of THIS entry can make.)
-    if field_combat_target(actor, target) is None:
-        return {
-            "outcome": "rejected",
-            "reason": RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET,
-            "detail": str(skill_key),
-        }
-    skill = SKILL_REGISTRY.get(skill_key)
-    # Explicit gate, first (D-4): validation deliberately supplies a
-    # battlefield, so world/rules/action.py's own usable_out_of_combat gate
-    # would pass. Checking here is what keeps the skill-field-availability
-    # audit meaningful; it runs before the candidate battlefield exists so
-    # its answer cannot be masked by anything downstream.
-    if skill is not None and not skill.usable_out_of_combat:
-        return {
-            "outcome": "rejected",
-            "reason": RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
-            "detail": skill_key,
-        }
-    # D-5: the skill's own TargetSpec picks the enemy line-up. AREA opens
-    # against the whole room as an explicit concrete list (never a
-    # shorthand — commanded_damage_reaches_enemy() reads concrete keys);
-    # anything else (SINGLE, and NONE/SELF which then reject on shape)
-    # opens against the named monster alone.
-    if skill is not None and skill.target_spec is TargetSpec.AREA:
-        targets: list[Any] = _room_monsters(actor)
-    else:
-        targets = [target]
-    record = _candidate_record(actor, targets)
-    battlefield = reconstruct_battlefield(actor, record)
-    context = _context_for(battlefield, record)
-    preview = revalidate_submission(
-        actor, skill_key, context, targets, scale=scale
-    )
+    preview = _prepare_opening(actor, skill_key, target, scale=scale)
     if not preview.enabled:
         return {
             "outcome": "rejected",
             "reason": preview.reason,
             "detail": preview.detail,
         }
-    request = ActionRequest(
-        actor=actor,
-        skill_key=skill_key,
-        targets=targets,
-        context=context,
-        scale=scale,
-    )
-    preflight = ActionResolver.preflight(request)
-    if preflight.outcome == "rejected":
-        return {
-            "outcome": "rejected",
-            "reason": preflight.reason,
-            "detail": preflight.detail,
-        }
+    targets = list(preview.targets)
+    battlefield = preview.battlefield
     # Freeze the dispatch BEFORE anything executes (D-9): the same
     # two-part judgement submit_opening_action() applies, computed over the
     # pre-action candidate battlefield and the concrete target keys.

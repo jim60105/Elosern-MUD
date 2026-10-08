@@ -145,12 +145,13 @@ export function useDrawers(store, { panel, panelAvailable }) {
     return p?.reason?.message || "隊伍資訊目前無法顯示";
   });
 
-  // The skill drawer's footer: the client's own `/cast` syntax as static,
-  // client-local presentation copy (no OOB field carries it).
-  const SKILL_CAST_HINT = "施放入口：cast <技法>[@威力]=<代號>";
+  // The skill drawer's footer: the book's keyboard guidance (client-local
+  // presentation copy). The retired cast-syntax footer is gone: graphical
+  // use and practice live in the book itself (skillbook-authoritative-casting).
+  const SKILL_BOOK_KEY_HINT = "↑↓ 選擇 ‧ ←→ 收合／展開 ‧ Enter 前往動作 ‧ / 搜尋 ‧ Esc 關閉";
 
   return {
-    SKILL_CAST_HINT,
+    SKILL_BOOK_KEY_HINT,
     drawerTitle,
     drawerIcon,
     drawerHasArt,

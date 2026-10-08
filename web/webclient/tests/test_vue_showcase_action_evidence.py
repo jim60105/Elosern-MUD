@@ -137,6 +137,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 *ACTION_FAMILY_KEYS,
                 "Action/RestForm", "Action/DockBreadcrumb",
                 "Action/SkillDetailPane",
+                # The SkillBook casting flow's dock pane joined with
+                # skillbook-authoritative-casting.
+                "Action/SkillUseDock",
                 "Data/StatusPanel",
                 "Data/VitalsTrack", "Data/SkillBook",
                 "Data/ConditionChips", "Data/ParticipantFrame",

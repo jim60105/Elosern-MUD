@@ -4,14 +4,11 @@ from typing import Any
 
 from commands.command import Command
 
-from world.rules.action import (
-    ActionRequest,
-    RejectReason,
-)
-from world.rules.cast_settlement import settle_out_of_combat_cast
+from world.rules.action import RejectReason
 from world.rules.combat import BattlefieldActionContext
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import render_plain_text
+from world.rules.field_cast import cast_in_field
 from world.rules.player_messages import (
     CONTINUE_COMBAT_MESSAGE,
     rejection_message,
@@ -20,7 +17,6 @@ from world.rules.player_messages import (
 )
 from world.rules.progression import scale_for_label
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY
 
 
 class CmdCast(Command):
@@ -126,44 +122,14 @@ class CmdCast(Command):
             if target is None:
                 return
             targets.append(target)
-        # Field-combat routing (field-combat-initiation D-1/D-6): the target
-        # decides whether combat starts. A living co-located hostile Monster
-        # routes to initiate_field_combat() with this skill as the fight's
-        # opening action, whatever the skill does. A damaging skill aimed at
-        # anything else is refused HERE, before any resource, roll, session,
-        # or clock access — the resolver gate would refuse it too, but the
-        # router names the actual mistake. A non-damaging skill aimed
-        # elsewhere keeps the existing settlement route unchanged.
-        if targets:
-            from world.rules.combat_initiation import (
-                field_combat_target,
-                initiate_field_combat,
-            )
-
-            monster = field_combat_target(self.caller, targets[0])
-            if monster is not None:
-                result = initiate_field_combat(
-                    self.caller, skill_key, monster, scale=scale
-                )
-                from world.rules.combat_result import settle_to_messages
-
-                lines, message = settle_to_messages(result)
-                for line in lines:
-                    self.caller.msg(line)
-                self.caller.msg(message)
-                return
-        skill = SKILL_REGISTRY.get(skill_key)
-        if skill is not None and any(
-            effect.startswith("damage:") for effect in skill.effects
-        ):
-            # Covers a resolved non-monster target AND no target at all:
-            # "anything other than" includes nothing, and this fires before
-            # the settlement API, so no resource, roll, session, or clock
-            # access happens on any of these casts.
-            self.caller.msg(
-                rejection_message(RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
-            )
-            return
+        # Field routing lives in ONE deterministic entry shared with the
+        # WebClient ``explore.cast`` adapter (field-combat-initiation D-1/D-6,
+        # skillbook-authoritative-casting D3): a living co-located hostile
+        # Monster target opens combat with this skill as the opening action,
+        # whatever the skill does; a damaging skill aimed at anything else
+        # (or at nothing) is refused before any resource, roll, session, or
+        # clock access; everything else keeps the settlement route. Only the
+        # trusted context selection below stays with the command.
         active_context = self.caller.ndb.action_context
         if active_context is not None:
             context = active_context
@@ -174,15 +140,25 @@ class CmdCast(Command):
             and isinstance(context, BattlefieldActionContext)
         ):
             context = BattlefieldActionContext(context.battlefield)
-        settlement = settle_out_of_combat_cast(
-            ActionRequest(
-                actor=self.caller,
-                skill_key=skill_key,
-                targets=targets,
-                context=context,
-                scale=scale,
-            )
+        outcome = cast_in_field(
+            self.caller,
+            skill_key,
+            targets=targets,
+            scale=scale,
+            context=context,
         )
+        if outcome.route == "rejected":
+            self.caller.msg(rejection_message(outcome.reason))
+            return
+        if outcome.route == "initiation":
+            from world.rules.combat_result import settle_to_messages
+
+            lines, message = settle_to_messages(outcome.combat_result)
+            for line in lines:
+                self.caller.msg(line)
+            self.caller.msg(message)
+            return
+        settlement = outcome.settlement
         if settlement.result.outcome == "success":
             self.caller.msg(render_plain_text(settlement.result.event_log))
             for line in settlement.notifications:

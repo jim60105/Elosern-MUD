@@ -1319,7 +1319,7 @@ reference-surface header: the title in the serif heading face at the shared work
 tracking, and the subtitle as the small muted line beside it. Every reference drawer SHALL declare one
 leading head icon (a decorative, `aria-hidden` glyph from the shared glyph registry rendered before its
 title). The drawer's close control SHALL carry an accessible name (e.g. an `aria-label`) but MAY be
-rendered icon-only, with no visible text node — "labelled" in this requirement means an accessible name,
+rendered icon-only, with no visible text node; "labelled" in this requirement means an accessible name,
 not necessarily visible text.
 
 At most one drawer SHALL be open at any time; opening a second SHALL close the first. While a drawer
@@ -1333,12 +1333,13 @@ The skill-book drawer specifically SHALL carry, whenever the `character` panel i
 subtitle stating its owner's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that
 same payload `SkillBook` renders) in the drawer head; when the panel is unavailable the subtitle is
 empty, matching the drawer's existing degrade-without-inventing-data contract. The skill-book drawer
-SHALL carry a footer stating the client's own cast-command syntax
-(`施放入口：cast <技法>[@威力]=<代號>`) as static client-local presentation copy — not a value the OOB
-protocol carries, so its presence does not depend on any panel's availability — whenever the drawer
-presents the skill book itself; while the declared-practice sub-screen replaces the book body, that
-footer is absent and the head title reads 修煉, because the cast syntax belongs to the book view the
-sub-screen replaced.
+SHALL provide discoverable graphical skill-use and practice affordances under the
+`webclient-skillbook-casting` contract, without requiring a cast-syntax footer or memorized skill/target
+keys. The prescribed static `施放入口：cast <技法>[@威力]=<代號>` footer SHALL be removed. While the
+declared-practice sub-screen replaces the book body, the head title SHALL read 修煉 and book-use
+guidance SHALL be absent. Explicitly transferring from book use to dock-owned casting SHALL close
+the modal book and transfer focus to that flow without leaving a drawer trap active; ordinary drawer
+close paths SHALL retain their existing opener restoration.
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
@@ -1370,7 +1371,11 @@ sub-screen replaced.
 
 #### Scenario: The skill-book drawer states its skill counts and cast syntax
 - **WHEN** the skill-book drawer opens with the `character` panel available
-- **THEN** its head carries a leading skill glyph and a `主動 {n} ‧ 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
+- **THEN** its head carries a leading skill glyph and a `主動 {n} ‧ 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once, and graphical use/practice are discoverable without the old cast-syntax footer
+
+#### Scenario: Book use transfers the modal focus owner
+- **WHEN** the player deliberately activates book use and its authoritative flow is ready
+- **THEN** the book closes, its scrim/trap retires, and focus moves to the sole dock-owned casting flow without a behind-drawer control becoming interactive
 
 ### Requirement: Reference drawers present no router frame and never host a dock row region
 No reference drawer SHALL present a keyboard router frame. Opening any reference drawer — including the 背包 ‧ 裝備 drawer from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, and the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row — SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer. No reference drawer body SHALL render the dock's row renderer (`dock-menu`) or detail pane (`dock-detail`) in any state. Closing a reference drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the control that opened it. Committed rows inside a reference drawer SHALL remain reachable by keyboard without a hosted router frame.
@@ -2015,11 +2020,12 @@ converted whole `seconds` through the shared dispatch/confirmation lock. While a
 flight or its declared presentation revision is pending, the control SHALL be disabled. The
 server-authored result line (success summary or rejection message) SHALL render as escaped text
 inside the sub-screen and nowhere else, and closing the sub-screen SHALL restore the book body,
-the original drawer title, and the book's cast-syntax footer.
+the original drawer title, and the book's graphical use/practice guidance without restoring the
+removed cast-syntax footer. Casting SHALL NOT replace or bypass this practice workflow.
 
 #### Scenario: Practice dispatches one server-trusted intent
 - **WHEN** the player opens 修煉 from an active skill row, selects the skill, enters `2` hours, and confirms
-- **THEN** exactly one `ui_action` is submitted — `explore.practice` with that `skill` and `seconds: 7200` — and the drawer controls stay locked until the result revision is adopted
+- **THEN** exactly one `ui_action` is submitted, `explore.practice` with that `skill` and `seconds: 7200`, and the drawer controls stay locked until the result revision is adopted
 
 #### Scenario: The result line is the server's
 - **WHEN** a practice result arrives
@@ -2031,7 +2037,7 @@ the original drawer title, and the book's cast-syntax footer.
 
 #### Scenario: Closing the practice screen restores the book
 - **WHEN** the player closes the practice sub-screen
-- **THEN** the drawer shows the skill book again with its original title and its cast-syntax footer, and no second drawer was opened
+- **THEN** the drawer shows the skill book again with its original title and graphical use/practice guidance, no cast-syntax footer and no second drawer
 
 ### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
 The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character

@@ -5,15 +5,15 @@ import SkillBook from "../../components/SkillBook.vue";
 import { SKILLS_SLICE_SAMPLE } from "../../stories/fixtures.js";
 
 // Payload values referenced from the sample fixture instead of restating
-// shipped catalog strings in this test's source (test-data-independence): the
-// search / row-selection assertions exercise the component against the payload
-// the fixture authors, whatever its rows are named.
+// shipped catalog strings in this test's source (test-data-independence).
 const FIRE_GROUP_LABEL = SKILLS_SLICE_SAMPLE.actives[0].groups[0].label;
-const BASIC_ROW_LABEL = SKILLS_SLICE_SAMPLE.actives[1].groups[0].skills[0].label;
-const FIRESTORM_KEY = SKILLS_SLICE_SAMPLE.actives[0].groups[0].skills[2].key;
-const BASIC_ATTACK_KEY = SKILLS_SLICE_SAMPLE.actives[1].groups[0].skills[0].key;
+const FIREBOLT = SKILLS_SLICE_SAMPLE.actives[0].groups[0].skills[0];
+const FIREBALL = SKILLS_SLICE_SAMPLE.actives[0].groups[0].skills[1];
+const FIRESTORM = SKILLS_SLICE_SAMPLE.actives[0].groups[0].skills[2];
+const MARTIAL = SKILLS_SLICE_SAMPLE.actives[1];
+const LEGACY = MARTIAL.groups[0].skills.find((row) => !("cost" in row));
 
-describe("SkillBook (B3 data family)", () => {
+describe("SkillBook (skillbook-authoritative-casting master–detail book)", () => {
   let wrapper;
 
   afterEach(() => {
@@ -24,16 +24,22 @@ describe("SkillBook (B3 data family)", () => {
 
   function mountBook(props = {}) {
     wrapper = mount(SkillBook, {
-      props: {
-        skills: SKILLS_SLICE_SAMPLE,
-        ...props,
-      },
+      attachTo: document.body,
+      props: { skills: SKILLS_SLICE_SAMPLE, ...props },
     });
     return wrapper;
   }
 
-  function categories(w) {
-    return w.findAll('[data-testid="skill-book__category"]');
+  const categories = (w) => w.findAll('[data-testid="skill-book__category"]');
+  const row = (w, key) => w.get(`[data-testid="skill-book__skill"][data-key="${key}"]`);
+  const detail = (w) => w.get('[data-testid="skill-book__detail"]');
+
+  async function select(w, key) {
+    const head = w.findAll('[data-testid="skill-book__category-head"]');
+    for (const h of head) {
+      if (h.attributes("aria-expanded") === "false") await h.trigger("click");
+    }
+    await row(w, key).trigger("click");
   }
 
   function setQuery(w, value) {
@@ -44,16 +50,16 @@ describe("SkillBook (B3 data family)", () => {
 
   it("keeps practice separate and converts fractional hours to seconds", async () => {
     const w = mountBook();
-    await w.get('button[aria-label="修煉火矢"]').trigger("click");
+    await w.get(`button[aria-label="修煉${FIREBOLT.label}"]`).trigger("click");
     expect(w.find('[data-testid="skill-book"]').exists()).toBe(false);
     await w.get('input[type="number"]').setValue("1.5");
     await w.get("form").trigger("submit");
-    expect(w.emitted("practice")).toEqual([[{ skill: "firebolt", seconds: 5400 }]]);
+    expect(w.emitted("practice")).toEqual([[{ skill: FIREBOLT.key, seconds: 5400 }]]);
   });
 
   it("rejects out-of-range duration and blocks repeat practice while locked", async () => {
     const w = mountBook();
-    await w.get('button[aria-label="修煉火矢"]').trigger("click");
+    await w.get(`button[aria-label="修煉${FIREBOLT.label}"]`).trigger("click");
     await w.get('input[type="number"]').setValue("12.01");
     await w.get("form").trigger("submit");
     expect(w.get('[role="alert"]').text()).toContain("12");
@@ -67,286 +73,173 @@ describe("SkillBook (B3 data family)", () => {
     expect(w.emitted("practice")[0][0].seconds).toBe(43200);
   });
 
-  // The book's own title/count heading is gone (the counts now render once,
-  // in the drawer head's subtitle, computed in AppClient). The remaining
-  // tab / search assertions keep their `data-testid` values, unchanged.
-
-  it("opens on the active tab with the payload's category, group, and skill ordering", async () => {
+  it("keeps the payload's category, group, and skill order in a keyboard tree", () => {
     const w = mountBook();
-    expect(w.get('[data-testid="skill-book__tab--active"]').attributes("aria-selected")).toBe("true");
-    expect(
-      w.get('[data-testid="skill-book__tab--passive"]').attributes("aria-selected"),
-    ).toBe("false");
-
-    const cats = categories(w);
-    expect(cats.map((c) => c.attributes("data-category"))).toEqual([
+    expect(w.get('[data-testid="skill-book__tree"]').attributes("role")).toBe("tree");
+    expect(categories(w).map((c) => c.attributes("data-category"))).toEqual([
       "elemental_magic",
       "martial_arts",
       "sexual_act",
     ]);
-    expect(cats[0].text()).toContain("元素魔法");
-    expect(cats[0].text()).toContain(FIRE_GROUP_LABEL);
-    // Sub-group order and skill order are the payload's own.
-    expect(cats[0].text()).toContain("火矢");
-    expect(cats[0].text().indexOf("火矢")).toBeLessThan(cats[0].text().indexOf("火球"));
-    expect(cats[0].text().indexOf("火球")).toBeLessThan(
-      cats[0].text().indexOf("微光治癒"),
-    );
-    // A null-keyed group renders no group heading.
-    const martial = cats[1];
-    expect(
-      martial.find('[data-testid="skill-book__group--ungrouped"]').exists(),
-    ).toBe(true);
-    expect(martial.find('[data-testid="skill-book__group-label"]').exists()).toBe(false);
+    const first = categories(w)[0];
+    expect(first.text()).toContain(FIRE_GROUP_LABEL);
+    expect(first.text().indexOf(FIREBOLT.label)).toBeLessThan(first.text().indexOf(FIREBALL.label));
+    // Only the first category starts expanded; the others show their header.
+    expect(first.attributes("data-open")).toBe("true");
+    expect(categories(w)[1].attributes("data-open")).toBe("false");
+    // The first visible skill is selected and owns the tree's tab stop.
+    expect(row(w, FIREBOLT.key).attributes("aria-selected")).toBe("true");
+    expect(row(w, FIREBOLT.key).attributes("tabindex")).toBe("0");
   });
 
-  it("switches to the passive tab and shows only passive categories", async () => {
+  it("moves selection with the arrow keys and Enter goes to the actions without casting", async () => {
+    const w = mountBook();
+    const tree = w.get('[data-testid="skill-book__tree"]');
+    await tree.trigger("keydown", { key: "ArrowDown" });
+    await nextTick();
+    expect(row(w, FIREBALL.key).attributes("aria-selected")).toBe("true");
+    expect(detail(w).get('[data-testid="skill-book__detail-title"]').text()).toBe(FIREBALL.label);
+    await tree.trigger("keydown", { key: "ArrowDown" });
+    await tree.trigger("keydown", { key: "ArrowLeft" });
+    await nextTick();
+    // ← from a skill lands on its category header; ← again collapses it.
+    await tree.trigger("keydown", { key: "ArrowLeft" });
+    await nextTick();
+    expect(categories(w)[0].attributes("data-open")).toBe("false");
+    await tree.trigger("keydown", { key: "ArrowRight" });
+    await nextTick();
+    expect(categories(w)[0].attributes("data-open")).toBe("true");
+    await row(w, FIREBOLT.key).trigger("click");
+    await tree.trigger("keydown", { key: "Enter" });
+    await nextTick();
+    expect(document.activeElement?.getAttribute("data-testid")).toBe("skill-book__use");
+    expect(w.emitted("use")).toBeUndefined();
+  });
+
+  it("switches to the passive tab with read-only rows and no actions", async () => {
     const w = mountBook();
     await w.get('[data-testid="skill-book__tab--passive"]').trigger("click");
-    expect(w.get('[data-testid="skill-book__tab--passive"]').attributes("aria-selected")).toBe("true");
-    expect(categories(w).map((c) => c.attributes("data-category"))).toEqual([
-      "enhancement",
-    ]);
-    expect(w.text()).toContain("強化身體");
-    expect(w.text()).not.toContain("火矢");
+    expect(categories(w).map((c) => c.attributes("data-category"))).toEqual(["enhancement"]);
+    expect(w.findAll('[data-testid="skill-book__passive-badge"]').length).toBeGreaterThan(0);
+    expect(w.find('[data-testid="skill-book__use"]').exists()).toBe(false);
+    expect(w.find('[data-testid="skill-book__practice"]').exists()).toBe(false);
+    expect(w.find('[data-testid="skill-book__field"]').exists()).toBe(false);
+    expect(w.get('[data-testid="skill-book__passive-note"]').text()).toContain("不需施放");
   });
 
-  it("honors the initialTab showcase prop", () => {
-    const w = mountBook({ initialTab: "passive" });
-    expect(w.get('[data-testid="skill-book__tab--passive"]').attributes("aria-selected")).toBe("true");
-    expect(categories(w).map((c) => c.attributes("data-category"))).toEqual([
-      "enhancement",
-    ]);
-  });
-
-  it("filters by skill, group, and category label through the search", async () => {
+  it("filters through the search and offers a way out of an empty result", async () => {
     const w = mountBook();
     setQuery(w, FIRE_GROUP_LABEL);
     await nextTick();
-    const cats = categories(w);
-    expect(cats.map((c) => c.attributes("data-category"))).toEqual(["elemental_magic"]);
-    expect(w.text()).toContain("火矢");
-    expect(w.text()).toContain("火風暴");
-    expect(w.text()).not.toContain("微光治癒");
-    expect(w.text()).not.toContain(BASIC_ROW_LABEL);
-
-    setQuery(w, "治癒");
-    await nextTick();
-    expect(w.text()).toContain("微光治癒");
-    expect(w.text()).not.toContain("火矢");
-  });
-
-  it("shows the honest empty state when nothing matches", async () => {
-    const w = mountBook();
+    expect(categories(w).map((c) => c.attributes("data-category"))).toEqual(["elemental_magic"]);
     setQuery(w, "不存在");
     await nextTick();
-    expect(w.get('[data-testid="skill-book__empty"]').text()).toBe("沒有符合的技能");
-    expect(categories(w)).toHaveLength(0);
+    const empty = w.get('[data-testid="skill-book__empty"]');
+    expect(empty.text()).toContain("沒有符合「不存在」的技能");
+    await empty.get("button").trigger("click");
+    expect(w.get('[data-testid="skill-book__search"]').element.value).toBe("");
   });
 
-  it("renders per-skill cost, target, and cast detail only when the payload provides it", () => {
+  it("marks only field-usable rows, with words rather than colour alone", () => {
     const w = mountBook();
-
-    // cost {mp} + target_spec single, no cast detail.
-    const firebolt = w.find('[data-testid="skill-book__skill"][data-key="firebolt"]');
-    expect(firebolt.find('[data-testid="skill-book__cost"]').text()).toBe("10 mp");
-    expect(firebolt.find('[data-testid="skill-book__target"]').text()).toBe("單一目標");
-    expect(firebolt.find('[data-testid="skill-book__cast"]').exists()).toBe(false);
-
-    // Power scales become the cast detail, with their per-scale mp costs.
-    const fireball = w.find('[data-testid="skill-book__skill"][data-key="fireball"]');
-    expect(fireball.find('[data-testid="skill-book__cost"]').text()).toBe("14 mp");
-    expect(fireball.find('[data-testid="skill-book__cast"]').text()).toBe(
-      "威力 1/4（4 mp）‧1/2（7 mp）‧1（14 mp）‧2（28 mp）‧4（56 mp）",
-    );
-
-    // Multi-resource cost and the area target with cast shorthands.
-    const firestorm = w.find('[data-testid="skill-book__skill"][data-key="firestorm"]');
-    expect(firestorm.find('[data-testid="skill-book__cost"]').text()).toBe("30 mp ‧ 5 sp");
-    expect(firestorm.find('[data-testid="skill-book__target"]').text()).toBe("範圍");
-    expect(firestorm.find('[data-testid="skill-book__cast"]').text()).toBe("範圍代號 all-enemies／all");
-
-    // The empty cost object is the descriptor's free form: rendered 免費,
-    // never an invented cost.
-    const basic = w.find('[data-testid="skill-book__skill"][data-key="basic_attack"]');
-    expect(basic.find('[data-testid="skill-book__cost"]').text()).toBe("免費");
-    const flee = w.find('[data-testid="skill-book__skill"][data-key="flee"]');
-    expect(flee.find('[data-testid="skill-book__cost"]').text()).toBe("免費");
-    expect(flee.find('[data-testid="skill-book__target"]').text()).toBe("無目標");
-
-    // The unregistered-key fallback row carries no detail fields at all.
-    const legacy = w.find('[data-testid="skill-book__skill"][data-key="legacy_stance"]');
-    expect(legacy.find('[data-testid="skill-book__cost"]').exists()).toBe(false);
-    expect(legacy.find('[data-testid="skill-book__target"]').exists()).toBe(false);
-    expect(legacy.find('[data-testid="skill-book__cast"]').exists()).toBe(false);
+    expect(row(w, FIREBOLT.key).find('[data-testid="skill-book__field"]').text()).toBe("戰鬥外可用");
+    expect(row(w, FIREBALL.key).find('[data-testid="skill-book__field"]').exists()).toBe(false);
+    expect(w.text()).not.toMatch(/\bcombat\b/);
   });
 
-  it("renders passive rows as label-only (the payload gives them no detail)", () => {
-    const w = mountBook({ initialTab: "passive" });
-    const rows = w.findAll('[data-testid="skill-book__skill"]');
-    expect(rows).toHaveLength(3);
-    // Each passive row now carries a trailing 被動 badge.
-    // Vue drops the whitespace-only text nodes between the row's elements,
-    // so the badge text concatenates directly onto the skill label.
-    expect(rows.map((r) => r.text())).toEqual(["強化身體被動", "防衛本能被動", "精靈長壽被動"]);
-  });
-
-  it("renders the combat pill only for rows whose usable_out_of_combat is true", () => {
+  it("states costs with a resource prefix and a range for advertised rungs", () => {
     const w = mountBook();
-    // Three fixture rows carry usable_out_of_combat: true → the pill renders.
-    for (const key of ["firebolt", "gale_dash", "solace"]) {
-      const row = w.find(`[data-testid="skill-book__skill"][data-key="${key}"]`);
-      const pill = row.find('[data-testid="skill-book__ooc"]');
-      expect(pill.exists()).toBe(true);
-      expect(pill.text()).toBe("combat");
-    }
-
-    // Every other active row lacks the field, so the pill is absent.
-    for (const key of ["fireball", FIRESTORM_KEY, "mend_glow", "quake", BASIC_ATTACK_KEY, "light_blade", "flee", "legacy_stance"]) {
-      const row = w.find(`[data-testid="skill-book__skill"][data-key="${key}"]`);
-      expect(row.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
-    }
-
+    expect(row(w, FIREBOLT.key).get('[data-testid="skill-book__cost"]').text()).toBe(`MP${FIREBOLT.cost.mp}`);
+    expect(row(w, FIREBALL.key).get('[data-testid="skill-book__cost"]').text()).toBe("MP4–56");
+    expect(row(w, FIREBALL.key).get('[data-testid="skill-book__cost"]').classes()).toContain("mp");
   });
 
-  it("renders no combat pill on the passive tab", () => {
-    const w = mountBook({ initialTab: "passive" });
-    expect(w.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
+  it("renders detail cells only when the payload provides them", async () => {
+    const w = mountBook();
+    await select(w, LEGACY.key);
+    expect(row(w, LEGACY.key).find('[data-testid="skill-book__cost"]').exists()).toBe(false);
+    expect(detail(w).find('[data-testid="skill-book__capability"]').exists()).toBe(false);
+    // An undescribed row offers no 施放 (nothing is invented) but keeps 修煉.
+    expect(w.find('[data-testid="skill-book__use"]').exists()).toBe(false);
+    expect(w.find('[data-testid="skill-book__practice"]').exists()).toBe(true);
   });
 
-  it("rotates the category chevron with the details open state", async () => {
-    // Attach to the document so jsdom recomputes styles when the native
-    // `open` attribute changes (a detached tree does not track it reliably).
-    const w = mount(SkillBook, {
-      props: { skills: SKILLS_SLICE_SAMPLE },
-      attachTo: document.body,
-    });
-    const cats = categories(w);
-    // The first category starts open, the second closed (the component's
-    // `:open="index === 0"` binding).
-    expect(cats[0].element.hasAttribute("open")).toBe(true);
-    expect(cats[1].element.hasAttribute("open")).toBe(false);
-    // The open category's chevron resolves to the draft's 90° rotation; a
-    // closed category's chevron has no transform set (jsdom reports "").
-    expect(
-      window.getComputedStyle(cats[0].find('[data-testid="skill-book__category-chevron"]').element).transform,
-    ).toBe("rotate(90deg)");
-    expect(
-      window.getComputedStyle(cats[1].find('[data-testid="skill-book__category-chevron"]').element).transform,
-    ).toBe("");
-    // Setting the native `open` attribute flips the computed transform.
-    cats[1].element.open = true;
+  it("distinguishes static capability from current availability", async () => {
+    const w = mountBook();
+    const capability = detail(w).get('[data-testid="skill-book__capability"]');
+    expect(capability.text()).toContain("可於戰鬥外使用");
+    expect(capability.text()).toContain("對同場魔物施放將直接開戰");
+    expect(capability.text()).toContain("於施放時依當下狀態判定");
+    await select(w, FIRESTORM.key);
+    expect(detail(w).text()).toContain("僅能在戰鬥中使用");
+    // A combat-only skill outside combat never looks executable.
+    const use = w.get('[data-testid="skill-book__use"]');
+    expect(use.attributes("disabled")).toBeDefined();
+    expect(w.get('[data-testid="skill-book__use-note"]').text()).toContain("僅能在戰鬥中使用");
+  });
+
+  it("shows the advertised 威力 rungs as a read-only table", async () => {
+    const w = mountBook();
+    await select(w, FIREBALL.key);
+    const table = w.get('[data-testid="skill-book__scales"]');
+    expect(table.findAll("th").map((th) => th.text())).toEqual(FIREBALL.freeform_scales.map((e) => `×${e.label}`));
+    expect(table.find("button").exists()).toBe(false);
+  });
+
+  it("emits one use intent for an exploration field skill and nothing while locked", async () => {
+    const w = mountBook();
+    await w.get('[data-testid="skill-book__use"]').trigger("click");
+    expect(w.emitted("use")).toEqual([[FIREBOLT.key]]);
+    await w.setProps({ useLocked: true });
+    await w.get('[data-testid="skill-book__use"]').trigger("click");
+    expect(w.emitted("use")).toHaveLength(1);
+  });
+
+  it("adapts the action to the mode: combat hand-off, dialogue refusal", async () => {
+    const w = mountBook({ mode: "combat" });
+    const use = w.get('[data-testid="skill-book__use"]');
+    expect(use.text()).toBe("改用戰鬥指令");
+    await use.trigger("click");
+    expect(w.emitted("use")).toEqual([[FIREBOLT.key]]);
+    await w.setProps({ mode: "dialogue" });
+    expect(w.get('[data-testid="skill-book__use"]').attributes("disabled")).toBeDefined();
+    expect(w.get('[data-testid="skill-book__use-note"]').text()).toContain("對話中無法施放");
+  });
+
+  it("shows the pending state and a refused preview's server message", async () => {
+    const w = mountBook({ usePendingKey: FIREBOLT.key });
+    const use = w.get('[data-testid="skill-book__use"]');
+    expect(use.text()).toBe("準備中…");
+    expect(use.attributes("aria-busy")).toBe("true");
+    await w.setProps({ usePendingKey: null, useNotice: { skillKey: FIREBOLT.key, message: "你的資源不足。" } });
+    const alert = w.get('[data-testid="skill-book__notice"]');
+    expect(alert.attributes("role")).toBe("alert");
+    expect(alert.text()).toBe("無法施放：你的資源不足。");
+  });
+
+  it("returns focus to the invoking skill's 施放 when reopened from the dock", async () => {
+    const w = mountBook({ returnTarget: { skillKey: FIREBALL.key, seq: 1 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await nextTick();
-    expect(
-      window.getComputedStyle(cats[1].find('[data-testid="skill-book__category-chevron"]').element).transform,
-    ).toBe("rotate(90deg)");
-    w.unmount();
+    expect(row(w, FIREBALL.key).attributes("aria-selected")).toBe("true");
+    // The combat-only skill's 施放 is disabled, so focus lands on its row.
+    expect(document.activeElement?.getAttribute("data-key")).toBe(FIREBALL.key);
+    await w.setProps({ returnTarget: { skillKey: FIREBOLT.key, seq: 2 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement?.getAttribute("data-testid")).toBe("skill-book__use");
   });
 
-  it("renders group colour dots only for reference-sampled elements", () => {
-    const w = mountBook();
-    const fireDot = w.find('[data-testid="skill-book__group--fire"] [data-testid="skill-book__group-dot"]');
-    expect(fireDot.element.style.background).toBe("var(--seal-500)");
-    const waterDot = w.find('[data-testid="skill-book__group--water"] [data-testid="skill-book__group-dot"]');
-    expect(waterDot.element.style.background).toBe("var(--vit-mp)");
-    const windDot = w.find('[data-testid="skill-book__group--wind"] [data-testid="skill-book__group-dot"]');
-    expect(windDot.element.style.background).toBe("var(--warn)");
-    const soloDot = w.find('[data-testid="skill-book__group--solo"] [data-testid="skill-book__group-dot"]');
-    expect(soloDot.element.style.background).toBe("var(--seal-500)");
-    // A group for an element the reference never colour-codes renders with no dot.
-    expect(
-      w.find('[data-testid="skill-book__group--earth"] [data-testid="skill-book__group-dot"]').exists(),
-    ).toBe(false);
+  it("states the withheld panel's reason and offers only the combat hand-off", async () => {
+    const w = mountBook({
+      skills: { schema_version: 7, available: false, reason: { code: "character_unavailable", message: "角色狀態目前無法顯示" } },
+      mode: "combat",
+    });
+    expect(w.get('[data-testid="skill-book__unavailable"]').text()).toBe("角色狀態目前無法顯示");
+    expect(w.find('[data-testid="skill-book__empty"]').exists()).toBe(false);
+    expect(w.find('[data-testid="skill-book__detail"]').exists()).toBe(false);
+    await w.get('[data-testid="skill-book__combat-handoff"]').trigger("click");
+    expect(w.emitted("use")).toEqual([[null]]);
+    await w.setProps({ useLocked: true });
+    expect(w.get('[data-testid="skill-book__combat-handoff"]').attributes("disabled")).toBeDefined();
   });
-
-  it("colour-codes cost cells by the resource they spend", () => {
-    const w = mountBook();
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="firebolt"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("mp");
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="light_blade"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("sp");
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="gale_dash"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("sp");
-    // A mixed mp+sp cost reads the SP tone — sp wins when both are present.
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="firestorm"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("sp");
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="basic_attack"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("free");
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="flee"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("free");
-    expect(
-      w.find('[data-testid="skill-book__skill"][data-key="solace"] [data-testid="skill-book__cost"]').classes(),
-    ).toContain("free");
-  });
-
-  it("keeps a zero-value resource key on the free colour", () => {
-    const skills = {
-      actives: [
-        {
-          category: "elemental_magic",
-          label: "元素魔法",
-          groups: [
-            {
-              group: "earth",
-              label: "岩系",
-              skills: [
-                { key: "z1", label: "岩刺", cost: { sp: 0 }, target_spec: "single" },
-                { key: "z2", label: "岩甲", cost: { mp: 0, sp: 0 }, target_spec: "self" },
-              ],
-            },
-          ],
-        },
-      ],
-      passives: [],
-    };
-    const w = mountBook({ skills });
-    const z1 = w.find('[data-testid="skill-book__skill"][data-key="z1"]');
-    expect(z1.find('[data-testid="skill-book__cost"]').text()).toBe("免費");
-    expect(z1.find('[data-testid="skill-book__cost"]').classes()).toContain("free");
-    const z2 = w.find('[data-testid="skill-book__skill"][data-key="z2"]');
-    expect(z2.find('[data-testid="skill-book__cost"]').classes()).toContain("free");
-  });
-
-  it("renders the combat pill with the reference's bordered-pill styling", () => {
-    const w = mountBook();
-    const pill = w.get('[data-testid="skill-book__ooc"]');
-    expect(pill.text()).toBe("combat");
-    const cs = window.getComputedStyle(pill.element);
-    expect(cs.borderRadius).toBe("var(--radius-sm)");
-    expect(cs.color).toContain("var(--ok)");
-  });
-
-  it("renders the 被動 badge on passive-tab rows only", () => {
-    const wp = mountBook({ initialTab: "passive" });
-    const rows = wp.findAll('[data-testid="skill-book__skill"]');
-    for (const row of rows) {
-      expect(row.find('[data-testid="skill-book__passive-badge"]').text()).toBe("被動");
-    }
-    wp.unmount();
-    const wa = mountBook();
-    expect(wa.find('[data-testid="skill-book__passive-badge"]').exists()).toBe(false);
-  });
-
-  it("shows the list-conventions legend on the active tab only", () => {
-    const wa = mountBook();
-    const legend = wa.find('[data-testid="skill-book__legend"]');
-    expect(legend.exists()).toBe(true);
-    expect(legend.text().replace(/\s+/g, " ").trim()).toBe(
-      "依分類分群；戰鬥外 表示非戰鬥亦可施放；未解鎖之性愛行為「藏而不列」。",
-    );
-    const okSpan = legend.find("span");
-    expect(okSpan.text()).toBe("戰鬥外");
-    expect(okSpan.element.style.color).toBe("var(--ok)");
-    wa.unmount();
-    const wp = mountBook({ initialTab: "passive" });
-    expect(wp.find('[data-testid="skill-book__legend"]').exists()).toBe(false);
-  });
-
-
 });

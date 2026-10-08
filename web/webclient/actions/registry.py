@@ -89,7 +89,8 @@ def build_production_action_registry() -> ActionRegistry:
     ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
     ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
-    ``explore.deliver``), the two
+    ``explore.deliver``) plus the two SkillBook use adapters
+    (``explore.skill_preview``, ``explore.cast``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), and the
@@ -521,6 +522,35 @@ def build_production_action_registry() -> ActionRegistry:
             # and quest log (and possibly the recipient's) together, so every
             # completion publishes a full canonical snapshot (design D4).
             affected_panels=(),
+        )
+    )
+    from web.webclient.actions.skill_use_actions import (
+        AFFECTED_CAST,
+        AFFECTED_PREVIEW,
+        _field_cast_adapter,
+        _skill_preview_adapter,
+        validate_field_cast_payload,
+        validate_skill_preview_payload,
+    )
+
+    registry.register(
+        ActionSpec(
+            action_id="explore.skill_preview",
+            validate_payload=validate_skill_preview_payload,
+            adapter=_skill_preview_adapter,
+            # Presentation selection only: the one panel it changes.
+            affected_panels=AFFECTED_PREVIEW,
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.cast",
+            validate_payload=validate_field_cast_payload,
+            adapter=_field_cast_adapter,
+            # A field cast can move time, resources, proficiency, mode, the
+            # party, quests, and the room roster together: every completion
+            # publishes a full canonical snapshot (design D5).
+            affected_panels=AFFECTED_CAST,
         )
     )
     registry.register(

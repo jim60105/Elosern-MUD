@@ -2,10 +2,11 @@
 
 // The character's skill data as the SkillBook consumes it: the character
 // payload's actives/passives grouping, with the rows the C1 getter backs from
-// a committed `context_actions` v5 skill descriptor extended with that
-// descriptor's display subset — `cost` (a bounded object, the empty object
-// being the v5 free form), `target_spec`, the optional `freeform_scales`
-// array, and `shorthands`. Rows the getter has no descriptor for stay the
+// the character presenter's registry enrichment — `cost` (a bounded object,
+// the empty object being the free form), `target_spec`, the
+// `usable_out_of_combat` boolean, and the optional `freeform_scales` array
+// (the exact optional fields the character row validator accepts). Rows the
+// getter has no descriptor for stay the
 // character payload's own `{key, label}` shape: `flee` shows the free-cost
 // form, and the unregistered-key `legacy_stance` row (the character payload's
 // own unknown-key degradation) proves detail cells render only when the
@@ -32,6 +33,7 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "火球",
               cost: { mp: 14 },
               target_spec: "single",
+              usable_out_of_combat: false,
               freeform_scales: [
                 { scale: 0.25, label: "1/4", mp_cost: 4 },
                 { scale: 0.5, label: "1/2", mp_cost: 7 },
@@ -45,7 +47,7 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "火風暴",
               cost: { mp: 30, sp: 5 },
               target_spec: "area",
-              shorthands: ["all-enemies", "all"],
+              usable_out_of_combat: false,
             },
           ],
         },
@@ -58,6 +60,7 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "微光治癒",
               cost: { mp: 11 },
               target_spec: "self",
+              usable_out_of_combat: true,
             },
           ],
         },
@@ -83,6 +86,7 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "震地",
               cost: { mp: 24 },
               target_spec: "area",
+              usable_out_of_combat: false,
             },
           ],
         },
@@ -101,18 +105,21 @@ export const SKILLS_SLICE_SAMPLE = {
               label: "基本攻擊",
               cost: {},
               target_spec: "single",
+              usable_out_of_combat: true,
             },
             {
               key: "light_blade",
               label: "輕劍式",
               cost: { sp: 6 },
               target_spec: "single",
+              usable_out_of_combat: false,
             },
             {
               key: "flee",
               label: "逃跑",
               cost: {},
               target_spec: "none",
+              usable_out_of_combat: false,
             },
             { key: "legacy_stance", label: "legacy_stance" },
           ],

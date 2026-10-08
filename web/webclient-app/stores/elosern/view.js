@@ -288,6 +288,16 @@ export function applyView(ctx) {
       // sticky `focusSkillKey` the mutation paths read never leaks a stale
       // skill into those frames.
       focusedSkill: combatNow ? currentFrameSkill(combatNow, currentItem) : null,
+      // The SkillBook use flow (skillbook-authoritative-casting): the dock
+      // detail model of the current flow frame (null outside it), the
+      // pending/active phase the book reads, the DOM-focus hand-over
+      // counter, the book's return target, and the last refused entry.
+      skillUse: mounted ? ctx.skillUseView(rs, currentItem) : null,
+      skillUsePhase: ctx.skillUse ? ctx.skillUse.phase : null,
+      skillUsePendingKey: ctx.skillUse && ctx.skillUse.phase === "pending" ? ctx.skillUse.skillKey : null,
+      skillUseNotice: ctx.skillUseNotice,
+      dockFocusRequest: ctx.dockFocusRequest,
+      bookReturn: ctx.bookReturn,
 
       // The character-creation dock stage (the legacy creation dock port): the
       // keyboard-router menu the overlay mirrors. Null outside creation mode.
@@ -362,6 +372,7 @@ export function applyView(ctx) {
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
     ctx.syncHudDrawer(prev, rs);
+    ctx.syncSkillUse(prev, rs);
     // A free-form borrow speaks to the conversation's host. A refused
     // borrowed send keeps the borrow for the retry (webclient-dialogue-
     // choices-overlay D9), so a commit that ends the conversation — any
