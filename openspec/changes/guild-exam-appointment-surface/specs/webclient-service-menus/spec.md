@@ -87,7 +87,7 @@ The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and
 - **WHEN** the actor has a completed, unclaimed record at the local branch
 - **THEN** the row's `turnin` is enabled with the `guild.quest_turnin` action and the quest ID, and after the claim is recorded the same row's `turnin` becomes disabled with a stable already-claimed reason
 
-#### Scenario: Exam request shows the exact next rank only
+#### Scenario: Exam eligibility shows the exact next rank only
 - **WHEN** a registered F member has merit at or above the E threshold and no active session
 - **THEN** `rank` reports the exact next rank E and enables `exam_request` with payload `{target_rank: "E"}`, and no other rank can be selected
 
