@@ -13,14 +13,10 @@ edge.
 After the core's defeat phases, the aftermath SHALL compute the minimum
 non-negative integer seconds `t` such that the stored gauge-regen model
 (`world/rules/clock.py`: HP advances as `floor(current + carried +
-scaled_rate × elapsed)` with a carried float remainder, where `scaled_rate`
-is the player's HP regen rate multiplied by the rulebook `recovery`
-section's defeat scale, active while `defeat_weak` is mounted) first
-reaches or exceeds the wake target `ceil(max_hp × 0.05)`; it SHALL advance
-the world clock once by exactly `t` with source `defeat_aftermath`, then
-clamp the player's HP to exactly the target. The wake state SHALL never sit
-above the target. When the player's HP is already at or above the target at
-solve time, `t` is `0`: no advance, no clamp, no event.
+scaled_rate × elapsed)`) first reaches or exceeds the wake target
+`ceil(max_hp × 0.05)`; it SHALL advance the world clock once by exactly
+`t` with source `defeat_aftermath`, then clamp the player's HP to exactly
+the target.
 
 #### Scenario: Defeat wakes at exactly 5% after the computed advance
 - **WHEN** a defeat settles with the player at HP 1, regen rate and remainder fixed by fixture, and the rulebook scale in force
@@ -33,6 +29,15 @@ solve time, `t` is `0`: no advance, no clamp, no event.
 #### Scenario: Already-above-target settles inertly
 - **WHEN** the solve begins with HP at or above the wake target
 - **THEN** the clock does not advance, HP is unchanged, and no recovery event is emitted
+
+#### Scenario: The scaled regen model behind the solve
+- **WHEN** the solve evaluates the stored gauge-regen model
+- **THEN** `carried` is the float remainder the model carries, and `scaled_rate` is the player's HP regen rate multiplied by the rulebook `recovery` section's defeat scale, active while `defeat_weak` is mounted
+- **AND** when the player's HP is already at or above the target at solve time, `t` is `0`
+
+#### Scenario: The wake state never sits above the target
+- **WHEN** a defeated player wakes
+- **THEN** the wake state never sits above the wake target
 
 ### Requirement: Unreachable recovery is capped and reported, never truncated silently
 The `recovery` rulebook section SHALL declare `max_recovery_seconds`. If

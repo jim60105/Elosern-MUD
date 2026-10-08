@@ -10,11 +10,7 @@ Declares SkillCategory as a StrEnum of exactly eight presentation categories in 
 this declaration order: `ELEMENTAL_MAGIC`, `MARTIAL_ARTS`, `ENHANCEMENT`, `DIVINE_MYSTERY`,
 `UTILITY`, `SEXUAL_ACT`, `HOLY_RITE`. Declaration order is the frozen display order, so `HOLY_RITE`
 SHALL be declared last and no existing member's position SHALL move. `MOVEMENT`, `INNATE_GIFT`,
-`CHURCH`, and `RITUAL` SHALL NOT be members: the movement passives and innate traits are
-acquisition-granted passives of the `ENHANCEMENT` family and survive only as display-level groups
-inside it, and `CHURCH`/`RITUAL` are the rejected naming candidates for the family the seventh
-member now names (`holy_rite`, 神聖聖儀 — church-block skills are named by their invoked rite, not by
-the location).
+`CHURCH`, and `RITUAL` SHALL NOT be members.
 
 #### Scenario: SkillCategory declares the exact member set in order
 - **WHEN** `SkillCategory` is inspected
@@ -27,6 +23,17 @@ the location).
 #### Scenario: The rejected naming candidates are absent
 - **WHEN** the enum's value set is inspected
 - **THEN** neither `"church"` nor `"ritual"` is a member value, and `"holy_rite"` is
+
+#### Scenario: Retired passives survive as ENHANCEMENT display groups
+- **WHEN** the retired `MOVEMENT`/`INNATE_GIFT` names are considered
+- **THEN** the movement passives and innate traits are acquisition-granted passives of the
+  `ENHANCEMENT` family and survive only as display-level groups inside it
+
+#### Scenario: The seventh member names the family by its invoked rite
+- **WHEN** the seventh member's name is chosen
+- **THEN** `CHURCH`/`RITUAL` are the rejected naming candidates for the family the seventh member
+  now names (`holy_rite`, 神聖聖儀 — church-block skills are named by their invoked rite, not by
+  the location)
 
 ### Requirement: Every SkillDef declares a required category and an optional group
 `SkillDef` SHALL declare `category: SkillCategory` with no default value, and `group: str | None`
@@ -87,14 +94,8 @@ category and no category naming a key absent from `SKILL_REGISTRY`.
 ### Requirement: Category group vocabulary is closed per category
 `ELEMENTAL_MAGIC` entries SHALL declare a non-null `group` that is a key of `ELEMENT_REGISTRY`.
 `SEXUAL_ACT` entries SHALL declare a non-null `group`. `ENHANCEMENT` entries SHALL declare `group`
-in the closed display-tag vocabulary `{None, "天賦", "身法"}`: the three former `INNATE_GIFT` traits
-(`elf_longevity`, `reincarnation_boon_elosia`, `reincarnation_boon_yuka`) declare `"天賦"`, the two
-former `MOVEMENT` passives (`flight`, `flash_step`) declare `"身法"`, and every other enhancement
-member declares `None`. `HOLY_RITE` entries SHALL declare `group` in the closed vocabulary
-`{None, "聖禮"}`: the four Series D sexual-ministry rows (`rite_anointing_touch`,
-`rite_milk_blessing`, `rite_holy_kiss`, `rite_confession_bed`) declare `"聖禮"` — their carried
-presentation metadata from the `SEXUAL_ACT` home, kept so the sub-group rule fires on the moved rows
-— and every other `HOLY_RITE` member declares `None`. `MARTIAL_ARTS`, `DIVINE_MYSTERY` and `UTILITY`
+in the closed display-tag vocabulary `{None, "天賦", "身法"}`. `HOLY_RITE` entries SHALL declare
+`group` in the closed vocabulary `{None, "聖禮"}`. `MARTIAL_ARTS`, `DIVINE_MYSTERY` and `UTILITY`
 entries SHALL declare `group is None`.
 
 #### Scenario: Every elemental_magic member's group is a known element key
@@ -118,18 +119,24 @@ entries SHALL declare `group is None`.
 - **WHEN** every `SKILL_REGISTRY` entry classified `MARTIAL_ARTS`, `DIVINE_MYSTERY`, or `UTILITY` is inspected
 - **THEN** each such entry's `group` is `None`
 
+#### Scenario: Re-homed passives carry their lineage display tags
+- **WHEN** the former `INNATE_GIFT`/`MOVEMENT` rows declare their enhancement groups
+- **THEN** the three former `INNATE_GIFT` traits (`elf_longevity`, `reincarnation_boon_elosia`,
+  `reincarnation_boon_yuka`) declare `"天賦"`, the two former `MOVEMENT` passives (`flight`,
+  `flash_step`) declare `"身法"`, and every other enhancement member declares `None`
+
+#### Scenario: Series D rows carry their presentation metadata into holy_rite
+- **WHEN** the four Series D sexual-ministry rows (`rite_anointing_touch`, `rite_milk_blessing`,
+  `rite_holy_kiss`, `rite_confession_bed`) declare `"聖禮"`
+- **THEN** this is their carried presentation metadata from the `SEXUAL_ACT` home, kept so the
+  sub-group rule fires on the moved rows, and every other `HOLY_RITE` member declares `None`
+
 ### Requirement: Classifying a skill changes no other field
 Assigning `category`/`group` to any `SKILL_REGISTRY` entry SHALL NOT change that entry's `kind`,
 `cost`, `effects`, `element`, `target_spec`, or `faction_constraint` from their values before this
 requirement's classification was introduced. The Phase B re-homing of the five acquired-passive keys
-and `flee` SHALL likewise change only `category`/`group`. The `effects` pin for `divine_sexual_arts`
-tracks the one authorised post-classification rewrite made by `integrate-divine-sexual-arts-catalog`
-(the `sexual_event:` → `sexual_event_target:` prefix migration of the same declared event); no other
-field of that entry changed. The `holy_rite` re-classification of the fifteen church-block ACTIVE
-rows SHALL likewise change only `category` (the four Series D rows keep their `group="聖禮"`
-untouched); in particular `rite_morning_devotion` keeps `kind=ACTIVE` and every row keeps its exact
-`effects` value — the same two rows on rails, every other row the same declaration it carried —
-because cast mechanics are a separate change's work.
+and `flee` SHALL likewise change only `category`/`group`. The `holy_rite` re-classification of the
+fifteen church-block ACTIVE rows SHALL likewise change only `category`.
 
 #### Scenario: divine_sexual_arts keeps its mechanics after reclassification
 - **WHEN** `SKILL_REGISTRY["divine_sexual_arts"]` is inspected after classification
@@ -151,3 +158,19 @@ because cast mechanics are a separate change's work.
 - **THEN** the first two keep `effects=["self_buff_apply:lamb_seal"]` and
   `effects=["session_stamp:martyr_key"]` respectively, all three keep their `kind`, `cost`,
   `element`, and `target_spec`, and each now carries `category` `HOLY_RITE` with `group` `None`
+
+#### Scenario: The divine_sexual_arts effects pin tracks one authorised rewrite
+- **WHEN** `divine_sexual_arts`' `effects` pin is compared to its pre-classification value
+- **THEN** the difference is the one authorised post-classification rewrite made by
+  `integrate-divine-sexual-arts-catalog` (the `sexual_event:` → `sexual_event_target:` prefix
+  migration of the same declared event); no other field of that entry changed
+
+#### Scenario: Series D rows keep their group through re-classification
+- **WHEN** the fifteen church-block ACTIVE rows are re-classified to `holy_rite`
+- **THEN** the four Series D rows keep their `group="聖禮"` untouched
+
+#### Scenario: Church rows stay on the same rails
+- **WHEN** the holy_rite re-classification lands
+- **THEN** in particular `rite_morning_devotion` keeps `kind=ACTIVE` and every row keeps its exact
+  `effects` value — the same two rows on rails, every other row the same declaration it carried —
+  because cast mechanics are a separate change's work

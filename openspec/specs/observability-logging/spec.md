@@ -5,7 +5,7 @@ Define the structured logging facade (`world/observability`) that is the sole ga
 ## Requirements
 
 ### Requirement: Facade is the sole game-code log entry point
-All game code under world/, typeclasses/, commands/, server/ and web/ MUST emit operational logs exclusively through world.observability (log_info/log_warn/log_error/log_debug). The facade MUST depend only on stdlib, Evennia logger, Django settings and observability-local modules; it MUST NOT import other game modules. After a log line is written it SHALL feed the observability-local recent sink for llm_call and warn/error events. Sink failures SHALL remain inside the never-raises boundary and SHALL NOT erase or prevent the already-written operational line.
+All game code under world/, typeclasses/, commands/, server/ and web/ MUST emit operational logs exclusively through world.observability (log_info/log_warn/log_error/log_debug). The facade MUST depend only on stdlib, Evennia logger, Django settings and observability-local modules; it MUST NOT import other game modules.
 
 #### Scenario: Facade routes levels to the Evennia logger
 - **WHEN** log_info, log_warn or log_error emits a valid event
@@ -19,8 +19,17 @@ All game code under world/, typeclasses/, commands/, server/ and web/ MUST emit 
 - **WHEN** the recent-event sink raises
 - **THEN** the facade returns normally and the previously written line remains available
 
+#### Scenario: Written lines feed the recent sink
+- **WHEN** a log line is written for an llm_call or warn/error event
+- **THEN** it also feeds the observability-local recent sink
+
+#### Scenario: Sink failures stay inside the never-raises boundary
+- **WHEN** the recent sink fails
+- **THEN** the failure remains inside the never-raises boundary and does not erase or prevent the
+  already-written operational line
+
 ### Requirement: Facade renders one structured grep-friendly line
-Every facade emission MUST be a single line of the form `[level] event | mod.func:line | k=v ... [ | tb: summary]`. The caller segment MUST be derived by the facade from its own call stack, never passed by callers. Context keys MUST be sorted, None-valued keys omitted, numeric and boolean values rendered verbatim, strings with spaces double-quoted, and containers rendered with repr. Every rendered context value MUST be truncated at 200 characters and embedded newlines escaped. Events MUST remain stable English snake_case identifiers. Player prose and prompt content MAY enter logs; credentials MUST NOT. Full LLM payloads SHALL live in the transcript referenced by call_id rather than being duplicated unbounded in operational lines.
+Every facade emission MUST be a single line of the form `[level] event | mod.func:line | k=v ... [ | tb: summary]`. The caller segment MUST be derived by the facade from its own call stack, never passed by callers. Events MUST remain stable English snake_case identifiers.
 
 #### Scenario: Context ordering and formatting are deterministic
 - **WHEN** the same event is logged twice with the same context
@@ -29,6 +38,24 @@ Every facade emission MUST be a single line of the form `[level] event | mod.fun
 #### Scenario: Long multiline player prose
 - **WHEN** a context string contains more than 200 characters and embedded newlines
 - **THEN** its bounded representation occupies one operational line without blanket prose redaction
+
+#### Scenario: Context rendering rules
+- **WHEN** a context mapping is rendered
+- **THEN** keys are sorted, None-valued keys are omitted, numeric and boolean values render verbatim,
+  strings with spaces are double-quoted, and containers render with repr
+
+#### Scenario: Context values are bounded
+- **WHEN** any context value is rendered
+- **THEN** it is truncated at 200 characters and embedded newlines are escaped
+
+#### Scenario: Prose allowed, credentials forbidden
+- **WHEN** deciding what may enter logs
+- **THEN** player prose and prompt content MAY enter logs, while credentials MUST NOT
+
+#### Scenario: Full LLM payloads live in the transcript
+- **WHEN** a full LLM payload would otherwise be logged
+- **THEN** it lives in the transcript referenced by call_id rather than being duplicated unbounded in
+  operational lines
 
 ### Requirement: log_error captures the exception chain in one line and the full traceback separately
 
@@ -51,10 +78,8 @@ including caller-frame lookup, context rendering, exception formatting,
 Evennia-logger import failure, or logger write failure. Each stage is
 guarded: on any internal failure the facade MUST fall back to writing a
 best-effort rendered line to stderr via the standard library, and even if
-the fallback itself fails the facade call MUST return normally. Django
-settings unavailability counts as `VERBOSE` false (debug writes nothing)
-and never triggers the fallback. `BaseException` (interrupt/signal) is not
-swallowed.
+the fallback itself fails the facade call MUST return normally.
+`BaseException` (interrupt/signal) is not swallowed.
 
 #### Scenario: Logger failure degrades to stderr
 
@@ -72,6 +97,11 @@ swallowed.
 - **WHEN** `log_debug` is called in a process without configured Django
   settings
 - **THEN** nothing is written to any sink and nothing is raised
+
+#### Scenario: Django settings unavailability maps to VERBOSE false
+
+- **WHEN** Django settings are unavailable during a facade call
+- **THEN** that counts as `VERBOSE` false (debug writes nothing) and never triggers the fallback
 
 ### Requirement: Command execution emits boundary events
 
@@ -102,12 +132,7 @@ Each server-startup step in the composition-root catalog MUST log a
 `startup_step` info event with `step` and `ms` context on success, and MUST
 log through the facade (not a swallowed free-text warning) on failure or
 degradation, so the startup log alone answers which subsystems came up
-healthy and which degraded. Fail-loud steps keep propagate-on-failure
-semantics (log with `exc` then re-raise); boot-tolerant steps keep their
-tolerance but log structured degradation with `step` context. The catalog
-is the ordered list of startup operations named in the change design.
-Wrapping MUST NOT re-order steps, and existing startup-order guard tests
-MUST be migrated to behavioral assertions in the same change.
+healthy and which degraded.
 
 #### Scenario: Every catalog step logs exactly one success event
 
@@ -128,8 +153,26 @@ MUST be migrated to behavioral assertions in the same change.
 - **THEN** the step logs a facade error with `exc` and the exception keeps
   propagating so the server does not partially boot
 
+#### Scenario: Step failure semantics are preserved by the wrapping
+
+- **WHEN** startup steps are wrapped in facade logging
+- **THEN** fail-loud steps keep propagate-on-failure semantics (log with `exc` then re-raise) and
+  boot-tolerant steps keep their tolerance but log structured degradation with `step` context
+
+#### Scenario: The catalog is fixed and its order is preserved
+
+- **WHEN** the wrapping is applied
+- **THEN** the catalog is the ordered list of startup operations named in the change design, and
+  wrapping MUST NOT re-order steps
+
+#### Scenario: Startup-order guard tests migrate
+
+- **WHEN** this change lands
+- **THEN** existing startup-order guard tests are migrated to behavioral assertions in the same
+  change
+
 ### Requirement: LLM and narrative diagnostic correlation
-llm_call, llm_call_retry, and llm_cached_tokens_reported SHALL include the guarded call_id. The letter command cmd_in SHALL record truncated args rather than args_count. correspondence_reply_captured and correspondence_reply_failed SHALL carry the letter body; correspondence_reply_failed and dream_surface_generation_failed SHALL carry call_id when generation was attempted, and dream failures SHALL carry player input. Failures before a guarded call exists SHALL not fabricate an identifier. Full prompts SHALL be retrieved through the transcript, not duplicated into these failure events. All game-code operational logging SHALL continue through named facade imports with caller-binding patches in tests. Private visibility, PRIVATE_AUTHORING_CATEGORIES, memory/recall/thread access controls and all in-world knowledge boundaries SHALL remain unchanged.
+llm_call, llm_call_retry, and llm_cached_tokens_reported SHALL include the guarded call_id. Failures before a guarded call exists SHALL not fabricate an identifier.
 
 #### Scenario: Letter and dream failures explainable
 - **WHEN** guarded generation fails for a letter reply or dream input
@@ -142,3 +185,29 @@ llm_call, llm_call_retry, and llm_cached_tokens_reported SHALL include the guard
 #### Scenario: Logging does not widen narrative access
 - **WHEN** an actor attempts private memory, recall, or thread access previously denied
 - **THEN** the same denial remains in force despite prose being permitted in logs
+
+#### Scenario: Letter command records truncated args
+- **WHEN** the letter command's cmd_in event is logged
+- **THEN** it records truncated args rather than args_count
+
+#### Scenario: Correspondence events carry the letter body
+- **WHEN** correspondence_reply_captured or correspondence_reply_failed is logged
+- **THEN** the event carries the letter body
+
+#### Scenario: Generation-failure events carry call_id and input
+- **WHEN** correspondence_reply_failed or dream_surface_generation_failed is logged and generation was
+  attempted
+- **THEN** the event carries call_id, and dream failures additionally carry player input
+
+#### Scenario: Full prompts stay in the transcript
+- **WHEN** a failure event would need the full prompt
+- **THEN** it is retrieved through the transcript, not duplicated into the failure event
+
+#### Scenario: Logging stays on named facade imports
+- **WHEN** game-code operational logging is written
+- **THEN** it continues through named facade imports with caller-binding patches in tests
+
+#### Scenario: Narrative boundaries are untouched
+- **WHEN** this logging change lands
+- **THEN** private visibility, PRIVATE_AUTHORING_CATEGORIES, memory/recall/thread access controls and
+  all in-world knowledge boundaries remain unchanged

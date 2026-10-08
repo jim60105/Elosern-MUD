@@ -12,17 +12,7 @@ nothing in this capability writes game state.
 as a pure, side-effect-free entitlement query that validates `element` against `ELEMENT_REGISTRY`
 first (an unrecognized element SHALL raise `ValueError` even when the entity owns a fabricated
 `<element>_mastery`), then returns whether `f"{element}_mastery"` appears in
-`entity.skills.owned_keys()` (direct ownership only, never `conferred_grants()`). It SHALL grant no
-scale by itself. `world/rules/progression.py` SHALL define `freeform_scales_for(entity, skill) ->
-tuple[float, ...]` as the single ladder authority: it returns `()` for a skill with no element or an
-entity that is not `freeform_mastery_entitled` for that skill's element, and otherwise the ascending
-rungs of the `progression.yaml` `freeform_scale_ladder` whose `min_level` the entity's OWN
-`skill_proficiency_level` for THAT SKILL reaches — 0.25 unconditionally for an entitled actor, 0.5
-at level >= 1, 1.0 at >= 3, 2.0 at >= 6, 4.0 at >= 10; a skill whose derived tip cap is below 10 can
-never include 4.0. The skill anchoring is the contract: proficiency in a sibling skill of the same
-element SHALL NOT raise the returned set, so no consumer can advertise a rung the resolver would
-reject. Neither function SHALL write any entity state. The empty tuple is the entitlement signal
-consumed by the freeform-casting gate: without it, every non-`1.0` scale for that skill is forbidden.
+`entity.skills.owned_keys()` (direct ownership only, never `conferred_grants()`).
 
 #### Scenario: A mastery holder's scale set follows the cast skill's proficiency ladder
 - **WHEN** `freeform_scales_for(entity, skill)` is called for a fire skill on an entity whose
@@ -45,3 +35,33 @@ consumed by the freeform-casting gate: without it, every non-`1.0` scale for tha
 - **WHEN** `freeform_mastery_entitled(entity, "not_an_element")` is called on an entity owning
   `"not_an_element_mastery"`
 - **THEN** it raises `ValueError` and writes no state
+
+#### Scenario: freeform_scales_for is the single ladder authority
+- **WHEN** `world/rules/progression.py`'s `freeform_scales_for(entity, skill) -> tuple[float, ...]`
+  is called
+- **THEN** it returns `()` for a skill with no element or an entity that is not
+  `freeform_mastery_entitled` for that skill's element, and otherwise the ascending rungs of the
+  `progression.yaml` `freeform_scale_ladder` whose `min_level` the entity's OWN
+  `skill_proficiency_level` for THAT SKILL reaches — 0.25 unconditionally for an entitled actor,
+  0.5 at level >= 1, 1.0 at >= 3, 2.0 at >= 6, 4.0 at >= 10
+
+#### Scenario: Entitlement grants no scale by itself
+- **WHEN** `freeform_mastery_entitled` returns `True`
+- **THEN** it SHALL grant no scale by itself
+
+#### Scenario: A low derived tip cap excludes the top rung
+- **WHEN** a skill's derived tip cap is below 10
+- **THEN** the returned set can never include 4.0
+
+#### Scenario: Skill anchoring protects consumers from rejected rungs
+- **WHEN** proficiency is anchored to the cast skill
+- **THEN** proficiency in a sibling skill of the same element SHALL NOT raise the returned set, so
+  no consumer can advertise a rung the resolver would reject
+
+#### Scenario: Neither function writes entity state
+- **WHEN** either function is called
+- **THEN** neither SHALL write any entity state
+
+#### Scenario: The empty tuple gates non-default scales
+- **WHEN** the freeform-casting gate consumes the returned tuple and it is empty
+- **THEN** every non-`1.0` scale for that skill is forbidden

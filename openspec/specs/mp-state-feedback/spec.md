@@ -6,7 +6,7 @@ Define the canonical MP-change writer, its exactly-once mp_zero outcome reaction
 ## Requirements
 
 ### Requirement: Every authored MP decrease flows through one canonical writer returning the actual change
-The rules layer SHALL provide one canonical MP-change writer that every authored MP mutation — spell-effect drain/restore, buff rate ticks, cast-cost payment and all future MP transfer effects — routes through rather than writing the gauge directly. The writer SHALL clamp to the gauge's own bounds, return the actual signed change applied, and treat a clamped no-op as an actual change of zero. No production MP-decrease site may bypass it; adding an MP writer beside it SHALL be treated as a contract violation found by the enumeration the implementation performs over every gauge-mp write site.
+The rules layer SHALL provide one canonical MP-change writer that every authored MP mutation — spell-effect drain/restore, buff rate ticks, cast-cost payment and all future MP transfer effects — routes through rather than writing the gauge directly. The writer SHALL clamp to the gauge's own bounds, return the actual signed change applied, and treat a clamped no-op as an actual change of zero.
 
 #### Scenario: Diverse sources share the writer
 - **WHEN** a synthetic cast effect, a buff rate tick with an mp-target and a routed cast cost each decrease MP
@@ -20,8 +20,12 @@ The rules layer SHALL provide one canonical MP-change writer that every authored
 - **WHEN** a positive change is applied through the writer near or above the gauge maximum
 - **THEN** MP clamps at its maximum and no depletion outcome event is dispatched
 
+#### Scenario: No production MP-decrease site may bypass the writer
+- **WHEN** the implementation enumerates every gauge-mp write site
+- **THEN** no production MP-decrease site bypasses the writer, and adding an MP writer beside it is treated as a contract violation found by that enumeration
+
 ### Requirement: MP reaching zero via a decrease dispatches one attributed outcome event exactly once
-The canonical writer SHALL dispatch exactly one `mp_zero` outcome reaction each time stored MP crosses from positive to zero **via a decrease**, carrying the event's source skill (when authored) and source tier, falling back to the configured first tier for unattributed sources. A change that finds MP already at zero, an increase, a clamped zero-actual decrease, and an hp-target change SHALL never dispatch it. The event SHALL ride the existing outcome-reaction dispatch path so all rules sharing the event vocabulary see it.
+The canonical writer SHALL dispatch exactly one `mp_zero` outcome reaction each time stored MP crosses from positive to zero **via a decrease**, carrying the event's source skill (when authored) and source tier, falling back to the configured first tier for unattributed sources. A change that finds MP already at zero, an increase, a clamped zero-actual decrease, and an hp-target change SHALL never dispatch it.
 
 #### Scenario: Crossing fires once with attribution
 - **WHEN** an attributed decrease takes stored MP from a positive value to exactly zero
@@ -35,8 +39,12 @@ The canonical writer SHALL dispatch exactly one `mp_zero` outcome reaction each 
 - **WHEN** an unattributed MP decrease (e.g. an environment-style writer) causes the crossing
 - **THEN** the event carries the configured first-tier fallback rather than no tier
 
+#### Scenario: The event rides the shared dispatch path
+- **WHEN** an `mp_zero` event is dispatched
+- **THEN** it rides the existing outcome-reaction dispatch path so all rules sharing the event vocabulary see it
+
 ### Requirement: Depletion rules filter the event's source at the rule layer, never by suppressing dispatch
-The state-reaction vocabulary SHALL gain exactly one closed `when` key qualifying which authored source skill an outcome event must name for the rule to match, evaluated fail-closed (missing source, unknown skill, unloaded entity skills, or non-string value never match) and load-time rejected on rules without an event condition. Rules SHALL share this key with the outcome event vocabulary. Suppression of the event itself by the writer based on listeners, sources, or element SHALL be impossible: every qualified rule — including synthetic alternate-element ones — reacts to the same dispatched fact.
+The state-reaction vocabulary SHALL gain exactly one closed `when` key qualifying which authored source skill an outcome event must name for the rule to match, evaluated fail-closed (missing source, unknown skill, unloaded entity skills, or non-string value never match) and load-time rejected on rules without an event condition. Rules SHALL share this key with the outcome event vocabulary.
 
 #### Scenario: Qualified rule reacts and unqualified sources do not
 - **WHEN** a synthetic depletion event names the skill one reaction rule qualifies and, separately, a different source drains MP to zero
@@ -49,6 +57,10 @@ The state-reaction vocabulary SHALL gain exactly one closed `when` key qualifyin
 #### Scenario: Reaction cascades stay in the initiating transaction
 - **WHEN** a matching reaction applies its marker inside a cast, buff tick, or clock advance whose transaction later fails
 - **THEN** MP, the reaction-applied marker and every transitive surface restore with the initiating settlement
+
+#### Scenario: Writer-side suppression of the event is impossible
+- **WHEN** the writer considers suppressing the dispatched event based on listeners, sources, or element
+- **THEN** such suppression is impossible: every qualified rule — including synthetic alternate-element ones — reacts to the same dispatched fact
 
 ### Requirement: Cast-cost payment is a routed write on the staged deduction
 The resource-deduction step SHALL route the `mp` resource through the canonical writer inside its already-staged pending effect, carrying the cast skill as the event source, while hp and sp deduction behavior stays unchanged. The staged check/deduction amount agreement (preflight, recheck, commit) SHALL be preserved, and an MP crossing caused by paying a cast cost SHALL dispatch the same attributed event as any other decrease.

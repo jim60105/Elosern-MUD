@@ -5,7 +5,7 @@ The read-only version-3 `exploration` panel and version-7 `character` panel, the
 ## Requirements
 
 ### Requirement: The exploration panel is an exact read-only version-3 presentation panel
-The production presentation registry SHALL register panel name `exploration` at schema version 3. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`; `available` SHALL be true and `kind` SHALL be `exploration`. `move` SHALL be a bounded list of at most 12 exit descriptors, each containing exactly `exit_ref`, `label`, `destination`, `enabled`, and nullable `disabled_reason`, where `exit_ref` is the same opaque 1..64-ASCII-character identifier the `local_map` move action uses, `label` is a bounded localized direction/exit label, `destination` is the canonical destination node ID, and `enabled`/`disabled_reason` reflect a currently present, traversable Exit from the actor's location (a locked or absent exit is a disabled row, never omitted, so the player learns it exists). `look` SHALL contain exactly `room`, `entities`, and `objects`: `room` is an exact room descriptor with a room marker for `explore.look`, `entities` is a bounded list of at most 32 present character/NPC/monster descriptors each carrying an opaque identity, bounded display name, bounded kind, and nullable opaque `portrait_ref`, and `objects` is a bounded list of at most 32 present object descriptors carrying an opaque identity and bounded display name. `interact` SHALL be a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, and a bounded `affordances` list of at most 8 descriptors; a target descriptor SHALL carry no keyword list and no other field, because a conversation's topics reach the browser only through the `dialogue` panel's `choices` once the conversation is open. An action affordance SHALL contain exactly `kind` (`"action"`), `action_id`, `label`, `enabled`, and nullable `disabled_reason`. The panel's accepted-action enumeration SHALL be derived from the shared `ACTION_CODE_ALLOWLIST` rather than a private duplicate, minus the two in-conversation codes `explore.talk_scripted` and `explore.talk_freeform`, which SHALL NOT appear on any target descriptor: the target affordances the presenter emits are drawn from `explore.talk_open`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.possess`, `explore.possess_release`, and `explore.deliver`, which is exactly the client mirror's target-scoped action list. Exactly the `explore.deliver` action affordance additionally carries `params` — the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`) — and every other action affordance SHALL carry no `params` (its dispatch payload is re-derived from the target identity at the dock). A navigation affordance SHALL contain exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`. Navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer. `character`, `quests`, and `inventory` SHALL each be availability entries with exactly `available` (boolean): `character` SHALL be available in exploration mode, and `quests`/`inventory` SHALL be available only when the `services` panel is registered and available. The presenter SHALL build the payload only from canonical room, entity, component, object, and service data, SHALL emit no live object or filesystem reference, SHALL NOT mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and SHALL use the registered common unavailable form outside exploration mode. Rendering the panel for a room whose legal vocabulary entries include a possession affordance SHALL NOT raise inside the presenter: any entry the shared vocabulary may legally emit SHALL either be serialized as an accepted target affordance or be folded into the target's single conversation affordance, so a bound companion standing in the room can never degrade the panel from within. The server validator and the production client mirror SHALL reject a version-2 payload, a target carrying a `keywords` field, and a target affordance naming `explore.talk_scripted` or `explore.talk_freeform`.
+The production presentation registry SHALL register panel name `exploration` at schema version 3 with `available` true and `kind` `exploration`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`.
 
 #### Scenario: Exploration snapshot carries the exploration root
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot
@@ -45,8 +45,53 @@ The production presentation registry SHALL register panel name `exploration` at 
 - **WHEN** the server validator or the client mirror receives an exploration payload whose NPC target carries a `navigate` affordance with surface `npc_persona`
 - **THEN** the payload is accepted, and a descriptor carrying any field beyond the five navigation fields is rejected as a protocol error
 
+#### Scenario: Move rows are bounded exit descriptors
+- **WHEN** the presenter builds `move` for a room with current Exits
+- **THEN** `move` is a bounded list of at most 12 exit descriptors, each containing exactly `exit_ref`, `label`, `destination`, `enabled`, and nullable `disabled_reason`
+- **AND** `exit_ref` is the same opaque 1..64-ASCII-character identifier the `local_map` move action uses, `label` is a bounded localized direction/exit label, and `destination` is the canonical destination node ID
+- **AND** `enabled`/`disabled_reason` reflect a currently present, traversable Exit from the actor's location, so a locked or absent exit is a disabled row, never omitted, and the player learns it exists
+
+#### Scenario: Look carries exactly room, entities, and objects
+- **WHEN** the presenter builds the `look` section
+- **THEN** it contains exactly `room`, `entities`, and `objects`: `room` is an exact room descriptor with a room marker for `explore.look`, `entities` is a bounded list of at most 32 present character/NPC/monster descriptors each carrying an opaque identity, bounded display name, bounded kind, and nullable opaque `portrait_ref`, and `objects` is a bounded list of at most 32 present object descriptors carrying an opaque identity and bounded display name
+
+#### Scenario: Interact targets carry exactly their four fields and a bounded affordance list
+- **WHEN** the presenter builds `interact`
+- **THEN** it is a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, and a bounded `affordances` list of at most 8 descriptors
+- **AND** a target descriptor carries no keyword list and no other field, because a conversation's topics reach the browser only through the `dialogue` panel's `choices` once the conversation is open
+
+#### Scenario: An action affordance carries exactly its five fields
+- **WHEN** the presenter serializes an action affordance
+- **THEN** it contains exactly `kind` (`"action"`), `action_id`, `label`, `enabled`, and nullable `disabled_reason`
+
+#### Scenario: Accepted actions derive from the shared allowlist minus in-conversation codes
+- **WHEN** the panel's accepted-action enumeration is assembled
+- **THEN** it is derived from the shared `ACTION_CODE_ALLOWLIST` rather than a private duplicate, minus the two in-conversation codes `explore.talk_scripted` and `explore.talk_freeform`, which never appear on any target descriptor
+- **AND** the target affordances the presenter emits are drawn from `explore.talk_open`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.possess`, `explore.possess_release`, and `explore.deliver`, which is exactly the client mirror's target-scoped action list
+
+#### Scenario: Only the deliver affordance carries params
+- **WHEN** the presenter emits target action affordances
+- **THEN** exactly the `explore.deliver` action affordance additionally carries `params` — the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`) — and every other action affordance carries no `params`, its dispatch payload being re-derived from the target identity at the dock
+
+#### Scenario: A navigation affordance carries exactly its five fields and opens only a drawer
+- **WHEN** the presenter serializes a navigation affordance
+- **THEN** it contains exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`
+- **AND** navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
+
+#### Scenario: Availability entries carry only the available boolean
+- **WHEN** the presenter builds `character`, `quests`, and `inventory`
+- **THEN** each is an availability entry with exactly `available` (boolean): `character` is available in exploration mode, and `quests`/`inventory` are available only when the `services` panel is registered and available
+
+#### Scenario: A vocabulary-emitted possession entry never raises in the presenter
+- **WHEN** the panel is rendered for a room whose legal vocabulary entries include a possession affordance
+- **THEN** the presenter does not raise: the entry is either serialized as an accepted target affordance or folded into the target's single conversation affordance, so a bound companion standing in the room can never degrade the panel from within
+
+#### Scenario: The presenter stays read-only over canonical data
+- **WHEN** the `exploration` presenter builds its payload
+- **THEN** it is built only from canonical room, entity, component, object, and service data, emits no live object or filesystem reference, does not mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and uses the registered common unavailable form outside exploration mode
+
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
-The production action registry SHALL register `explore.talk_open`. Its payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything and with the same stable codes and messages `explore.talk_scripted` uses: a possessed actor with the possession-refusal code; an `npc_id` that does not re-resolve to an NPC present in the actor's current location — never a stored, remote, or ambiguous reference — with `no_npc`; a host whose talk schedule gate blocks talk with `schedule_blocked` and the gate's reason; and an NPC that is not a conversable host with `not_dialogue_host`. A conversable host SHALL be an `LLMNPC`, or an NPC carrying a resolved `ScriptedDialogue` component whose authored dialogue table resolves. On success the adapter SHALL take the session line from the host's resolved offline greeting (`world.rules.dialogue.offline_greeting_for`: the host's own `db.npc_offline_greeting` field when non-empty, else the dialogue-table greeting, else the provenance profile greeting) and, when it resolves to nothing, from one fixed server-authored fallback line naming the host (`{name}看向你，等你開口。`) owned by `world/rules/player_messages.py`; it SHALL record the session through the deterministic dialogue-session seam, deliver the line to the actor's narrative (a greeting prefixed by the host's name and `說：`, the fallback verbatim), and return a deterministic success result that publishes a full snapshot at one newer revision, so the committed mode `dialogue` and the available `dialogue` panel — carrying that line and the host's authored choices — arrive atomically. The adapter SHALL make no LLM or network request, SHALL NOT advance the world clock, SHALL NOT change affinity, memory, party, quest, inventory, or any other state beyond the session, and SHALL NOT schedule an action-options generation. `explore.talk_open` SHALL be a member of the shared `ACTION_CODE_ALLOWLIST` and SHALL NOT be a suggestible action code, so no suggestion card or AI proposal names it.
+The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: a possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
 
 #### Scenario: A scripted host opens with its greeting
 - **WHEN** an actor submits `explore.talk_open` for a present scripted host whose authored table carries a greeting and two keywords
@@ -80,8 +125,39 @@ The production action registry SHALL register `explore.talk_open`. Its payload S
 - **WHEN** a client submits `explore.talk_open` with `keyword_id`, `speech`, a missing `npc_id`, or a non-positive `npc_id`
 - **THEN** the dispatcher rejects it as `malformed_payload` without invoking the adapter
 
+#### Scenario: Conversable host is an LLMNPC or a resolving scripted host
+- **WHEN** the adapter classifies whether a present NPC is a conversable host
+- **THEN** a conversable host is an `LLMNPC`, or an NPC carrying a resolved `ScriptedDialogue` component whose authored dialogue table resolves
+
+#### Scenario: The offline greeting resolves through the fixed precedence chain
+- **WHEN** the adapter takes the session line from the host's resolved offline greeting via `world.rules.dialogue.offline_greeting_for`
+- **THEN** the chain is the host's own `db.npc_offline_greeting` field when non-empty, else the dialogue-table greeting, else the provenance profile greeting
+- **AND** when it resolves to nothing, the line is one fixed server-authored fallback line naming the host (`{name}看向你，等你開口。`) owned by `world/rules/player_messages.py`
+
+#### Scenario: The session line reaches the narrative in its delivered form
+- **WHEN** a successful `explore.talk_open` delivers the resolved session line to the actor's narrative
+- **THEN** a greeting is prefixed by the host's name and `說：`, and the fallback line is delivered verbatim
+- **AND** the deterministic success result publishes a full snapshot at one newer revision, so the committed mode `dialogue` and the available `dialogue` panel — carrying that line and the host's authored choices — arrive atomically
+
+#### Scenario: talk_open touches no state beyond the session
+- **WHEN** a successful `explore.talk_open` runs
+- **THEN** the adapter makes no LLM or network request, does not advance the world clock, does not change affinity, memory, party, quest, inventory, or any other state beyond the session, and does not schedule an action-options generation
+
+#### Scenario: talk_open is allowlisted but never suggestible
+- **WHEN** the shared action-code registries are consulted
+- **THEN** `explore.talk_open` is a member of the shared `ACTION_CODE_ALLOWLIST` and is not a suggestible action code, so no suggestion card or AI proposal names it
+
+#### Scenario: Rejections reuse talk_scripted's codes and message set
+- **WHEN** the adapter rejects a possess, resolution, schedule, or host-class failure
+- **THEN** it uses the same stable codes and messages `explore.talk_scripted` uses
+- **AND** an `npc_id` must re-resolve to an NPC present in the actor's current location — never a stored, remote, or ambiguous reference — else `no_npc`; a host whose talk schedule gate blocks talk rejects with `schedule_blocked` and the gate's reason; and an NPC that is not a conversable host rejects with `not_dialogue_host`
+
+#### Scenario: The session line comes from the greeting or fallback
+- **WHEN** a successful `explore.talk_open` resolves its session line
+- **THEN** it takes the session line from the host's resolved offline greeting, else one fixed server-authored fallback line naming the host, delivers the line, and records the session
+
 ### Requirement: Exploration affordances are server-authored, never inferred from prose
-Every `interact` affordance SHALL be derived from canonical data with the same checks commands use, never from typeclass names, display prose, or other heuristics. Every present conversable host — an `LLMNPC`, or an NPC with a resolved dialogue component (`ScriptedDialogue`) whose authored dialogue table resolves — SHALL carry exactly one conversation affordance, labelled 交談 and naming `explore.talk_open`, listed before the target's other affordances; it SHALL be enabled unless the puppeted actor is a possessed NPC, in which case it SHALL be disabled with the stable possession-refusal code and message. An NPC with a resolved `ScriptedDialogue` component whose authored table cannot be resolved SHALL instead carry one disabled 交談 affordance with the stable `dialogue_unavailable` reason. No target SHALL carry an `explore.talk_scripted` or `explore.talk_freeform` affordance or a keyword list: the host's authored keywords and free-form speech are offered by the dialogue surface once the conversation is open, and the shared vocabulary's per-keyword and free-form entries remain the source of suggestion cards. `explore.party_invite` SHALL be offered only for a present NPC with an eligible free-form dialogue surface (an `LLMNPC`) that is not already a companion of the actor, SHALL be enabled when the actor's party has fewer than 4 companions and disabled with the full-party reason otherwise, and SHALL never be offered for an already-bound companion (the leave affordance covers it). `explore.party_leave` SHALL be offered only for a present NPC that is currently a bound companion of the actor. `explore.engage` SHALL be offered only for a present living hostile `Monster` when the actor has no active combat session. A `navigate`-kind service affordance (`surface` `"guild"` or `"shop"`) SHALL be offered only when the current room has exactly one unambiguous `GuildStaff` or `Merchant` host for a service the actor can use, and it opens the corresponding service drawer rather than inventing a mutation. No affordance SHALL reference a remote, absent, or ambiguous host or target. Every adapter SHALL re-verify at commit time, against the actor's current location and current canonical state, the affordance that produced its descriptor — presence in the actor's location, the exact typeclass/component/eligibility, and the unchanged keyword, party, or host condition — so a target removed from the room, type-changed, or no longer eligible between render and submit is rejected before the display, dialogue, invite, leave, or engage API is called and before any memory, intent, party, session, or time state changes.
+Every `interact` affordance SHALL be derived from canonical data with the same checks commands use, never from typeclass names, display prose, or other heuristics. Every present conversable host SHALL carry exactly one conversation affordance, labelled 交談 and naming `explore.talk_open`, listed before the target's other affordances; it SHALL be enabled unless the puppeted actor is a possessed NPC, in which case it SHALL be disabled with the stable possession-refusal code and message.
 
 #### Scenario: A scripted host exposes its authored keywords
 - **WHEN** a present NPC carries a `ScriptedDialogue` component with two authored keywords and the player opens a conversation with it
@@ -119,8 +195,42 @@ Every `interact` affordance SHALL be derived from canonical data with the same c
 - **WHEN** a target's other affordances already fill the eight-descriptor bound
 - **THEN** the descriptor keeps the 編輯人物設定 navigation as its last entry and drops the lowest-priority other affordance
 
+#### Scenario: A scripted host whose table cannot be resolved carries a disabled 交談
+- **WHEN** a present NPC carries a resolved `ScriptedDialogue` component whose authored table cannot be resolved
+- **THEN** it carries one disabled 交談 affordance with the stable `dialogue_unavailable` reason
+
+#### Scenario: No in-conversation codes or keyword lists are offered
+- **WHEN** the presenter builds target affordances
+- **THEN** no target carries an `explore.talk_scripted` or `explore.talk_freeform` affordance or a keyword list: the host's authored keywords and free-form speech are offered by the dialogue surface once the conversation is open, and the shared vocabulary's per-keyword and free-form entries remain the source of suggestion cards
+
+#### Scenario: Party invite eligibility and enablement
+- **WHEN** the presenter decides whether to offer `explore.party_invite`
+- **THEN** it is offered only for a present NPC with an eligible free-form dialogue surface (an `LLMNPC`) that is not already a companion of the actor
+- **AND** it is enabled when the actor's party has fewer than 4 companions and disabled with the full-party reason otherwise, and never offered for an already-bound companion (the leave affordance covers it)
+
+#### Scenario: Party leave targets only bound companions
+- **WHEN** the presenter decides whether to offer `explore.party_leave`
+- **THEN** it is offered only for a present NPC that is currently a bound companion of the actor
+
+#### Scenario: Engage targets only living hostile monsters outside combat
+- **WHEN** the presenter decides whether to offer `explore.engage`
+- **THEN** it is offered only for a present living hostile `Monster` when the actor has no active combat session
+
+#### Scenario: A navigate service affordance needs an unambiguous usable host
+- **WHEN** the presenter decides whether to offer a `navigate`-kind service affordance (`surface` `"guild"` or `"shop"`)
+- **THEN** it is offered only when the current room has exactly one unambiguous `GuildStaff` or `Merchant` host for a service the actor can use, and it opens the corresponding service drawer rather than inventing a mutation
+
+#### Scenario: No affordance references a remote, absent, or ambiguous target
+- **WHEN** the presenter builds any interact affordance
+- **THEN** it references no remote, absent, or ambiguous host or target
+
+#### Scenario: Adapters re-verify their descriptor's affordance at commit time
+- **WHEN** an exploration adapter runs after the dispatcher's checks
+- **THEN** it re-verifies, against the actor's current location and current canonical state, the affordance that produced its descriptor — presence in the actor's location, the exact typeclass/component/eligibility, and the unchanged keyword, party, or host condition
+- **AND** a target removed from the room, type-changed, or no longer eligible between render and submit is rejected before the display, dialogue, invite, leave, or engage API is called and before any memory, intent, party, session, or time state changes
+
 ### Requirement: The character panel is an exact read-only version-7 panel
-The production presentation registry SHALL register panel name `character` at schema version 7. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `traits`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `persona`, and `intimate`; `available` SHALL be true and `kind` SHALL be `character`. `traits` SHALL be a bounded list of at most 32 rows, each containing exactly `key`, `label`, `base`, `current`, nullable `max`, `effective`, and a bounded list of at most 16 `layers`, derived from the character-breakdown-view read model: `base` is the stored literal value (never skill-baked), `effective` is the authoritative-computation value, `current` remains the total-display field on every row (static traits report it equal to `effective`; gauges report the persisted resource remainder and an effective `max` whose layers decompose the maximum, equipment gauge caps rendered as equipment flat layers); each layer contains exactly `source` (`skill`, `condition`, or `equipment`), bounded `name` (registry label only), `kind` (`mult`, `flat`, or `pct`), and signed `amount`, in the read model's deterministic order. `actives` and `passives` SHALL each be an ordered, category-grouped list of skills owned through `SkillHandler.owned_keys()`, filtered to `SkillKind.ACTIVE` and `SkillKind.PASSIVE` respectively — never read from raw imported-skill storage — with the exact grouped shape and ordering defined by this capability's skill-grouping requirement below. `equipment` SHALL be a bounded list of at most 32 rows, each with exactly `slot`, `item_key`, bounded `display_name`, and a bounded server-formatted `adjustment` summary generated from the equipment rulebook and registry in Traditional Chinese, derived from canonical equipment state. `disguise` SHALL contain exactly `active` (boolean), `description` (bounded string), and a bounded list of at most 32 `displayed` rows, each with exactly `key`, `label`, and `value`, describing the outwardly displayed values when `disguise_active` is true and empty otherwise; it SHALL NEVER substitute disguised values for true traits. `guild` SHALL contain exactly `rank` (nullable rank key) and `merit` (non-negative safe integer). `wallet` SHALL be a non-negative safe integer of copper. `persona` SHALL contain exactly `background`, `personality`, `life_story`, and `habit` (each a nullable bounded string from the character's persona record, omitted or malformed-non-string content rendered as `null`, every value bounded by the shared persona-field cap); the section is display-only and is never used to infer any mechanical value, and it SHALL NOT include the `identity`, `appearance`, or `social_connection` persona keys. `intimate` SHALL be `null` when the actor has no persisted sexual-state record at all (neither a materialized handler nor an import-time baseline), and otherwise SHALL contain exactly `arousal`, `wetness`, `shame`, `exposure`, and `climax_phase` — each a member of that field's fixed vocabulary tuple in `world/lore/sexual_vocab.py` (never a raw numeric gauge value, matching the domain's existing vocabulary-closed presentation; `exposure` is the effective value per the equipment overlay contract) — and `climax_today` (a non-negative safe integer). The presenter SHALL strictly read canonical records and registries through the no-mutation status/service read models — sharing the same canonical trait/equipment/disguise/sexual-state source the compact `status` panel builds from, so the two panels never diverge — SHALL emit no live object reference, SHALL NOT mutate traits, equipment, disguise, guild, wallet, persona, sexual state, or world time, and SHALL use the common unavailable form outside exploration mode.
+The production presentation registry SHALL register panel name `character` at schema version 7 with `available` true and `kind` `character`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `traits`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `persona`, and `intimate`.
 
 #### Scenario: Expanded state shows true values and an honest disguise
 - **WHEN** an elf with active disguise opens the Character root
@@ -170,32 +280,50 @@ The production presentation registry SHALL register panel name `character` at sc
 - **WHEN** an actor's persisted sexual-state record exists but is structurally malformed (e.g. a level field's stored value is absent from its vocabulary)
 - **THEN** the entire `character` panel becomes unavailable via the common unavailable form, with no partial or fabricated `intimate` value
 
+#### Scenario: Trait rows carry the breakdown-view shape
+- **WHEN** the presenter builds `traits`
+- **THEN** it is a bounded list of at most 32 rows, each containing exactly `key`, `label`, `base`, `current`, nullable `max`, `effective`, and a bounded list of at most 16 `layers`, derived from the character-breakdown-view read model
+- **AND** `base` is the stored literal value (never skill-baked), `effective` is the authoritative-computation value, and `current` remains the total-display field on every row: static traits report it equal to `effective`, gauges report the persisted resource remainder and an effective `max` whose layers decompose the maximum, with equipment gauge caps rendered as equipment flat layers
+
+#### Scenario: Trait layers carry exactly their four fields in deterministic order
+- **WHEN** a trait row serializes its `layers`
+- **THEN** each layer contains exactly `source` (`skill`, `condition`, or `equipment`), bounded `name` (registry label only), `kind` (`mult`, `flat`, or `pct`), and signed `amount`, in the read model's deterministic order
+
+#### Scenario: Actives and passives come from owned keys, never raw imported storage
+- **WHEN** the presenter builds `actives` and `passives`
+- **THEN** each is an ordered, category-grouped list of skills owned through `SkillHandler.owned_keys()`, filtered to `SkillKind.ACTIVE` and `SkillKind.PASSIVE` respectively — never read from raw imported-skill storage — with the exact grouped shape and ordering defined by this capability's skill-grouping requirement below
+
+#### Scenario: Equipment rows carry the server-formatted adjustment summary
+- **WHEN** the presenter builds `equipment`
+- **THEN** it is a bounded list of at most 32 rows, each with exactly `slot`, `item_key`, bounded `display_name`, and a bounded server-formatted `adjustment` summary generated from the equipment rulebook and registry in Traditional Chinese, derived from canonical equipment state
+
+#### Scenario: Disguise reports displayed values without touching true traits
+- **WHEN** the presenter builds `disguise`
+- **THEN** it contains exactly `active` (boolean), `description` (bounded string), and a bounded list of at most 32 `displayed` rows, each with exactly `key`, `label`, and `value`, describing the outwardly displayed values when `disguise_active` is true and empty otherwise
+- **AND** it never substitutes disguised values for true traits
+
+#### Scenario: Guild and wallet carry their exact scalar shapes
+- **WHEN** the presenter builds `guild` and `wallet`
+- **THEN** `guild` contains exactly `rank` (nullable rank key) and `merit` (non-negative safe integer), and `wallet` is a non-negative safe integer of copper
+
+#### Scenario: Persona carries exactly the four bounded prose keys
+- **WHEN** the presenter builds `persona`
+- **THEN** it contains exactly `background`, `personality`, `life_story`, and `habit`, each a nullable bounded string from the character's persona record, omitted or malformed-non-string content rendered as `null`, every value bounded by the shared persona-field cap
+- **AND** the section is display-only, never used to infer any mechanical value, and does not include the `identity`, `appearance`, or `social_connection` persona keys
+
+#### Scenario: Intimate reports vocabulary members, never raw gauges
+- **WHEN** the presenter builds `intimate` for an actor with a persisted sexual-state record
+- **THEN** it is `null` when the actor has no persisted sexual-state record at all (neither a materialized handler nor an import-time baseline), and otherwise contains exactly `arousal`, `wetness`, `shame`, `exposure`, and `climax_phase` — each a member of that field's fixed vocabulary tuple in `world/lore/sexual_vocab.py`, never a raw numeric gauge value, matching the domain's existing vocabulary-closed presentation, with `exposure` the effective value per the equipment overlay contract — and `climax_today` (a non-negative safe integer)
+
+#### Scenario: The character presenter reads canonically and mutates nothing
+- **WHEN** the `character` presenter builds its payload
+- **THEN** it strictly reads canonical records and registries through the no-mutation status/service read models — sharing the same canonical trait/equipment/disguise/sexual-state source the compact `status` panel builds from, so the two panels never diverge — emits no live object reference, does not mutate traits, equipment, disguise, guild, wallet, persona, sexual state, or world time, and uses the common unavailable form outside exploration mode
+
 ### Requirement: Character panel skills are grouped by category with the same ordering rule as the combat panel
 Each of `actives` and `passives` SHALL be an ordered array of category groups, structurally identical
-in shape to `context_actions`'s `skills` field: each category group SHALL contain the category's
-stable key, a bounded display label, and an ordered array of one or more sub-groups; each sub-group
-SHALL contain a nullable group key, a label that is non-null exactly when the group key is non-null,
-and an ordered array of `{key, label}` skill rows, each bounded the same as the prior version's
-passive-row bounds. Category ordering SHALL follow `SkillCategory`'s declaration order (seven members
-after the `holy_rite` addition; `movement` and `innate_gift` are no longer categories); sub-group
-ordering within `elemental_magic` SHALL follow `ELEMENT_REGISTRY`'s declaration order; sub-group
-ordering within `enhancement` SHALL follow the fixed order `null` group, then `"天賦"`, then
-`"身法"`, independent of ownership order; sub-group ordering within `holy_rite` SHALL follow the
-fixed order `null` group, then `"聖禮"`, independent of ownership order. A category with zero owned
-skills of that kind (active or passive) SHALL be omitted from the corresponding array entirely; a
-category whose skills carry no `group` SHALL emit exactly one sub-group with a `null` group key and
-label. Within each sub-group, skill rows SHALL be ordered as `SkillHandler.owned_keys()` returns
-them, without alphabetical reordering. The total count of skill rows across every category and
-sub-group, flattened, SHALL NOT exceed 32 for `passives` and SHALL NOT exceed 96 for `actives`,
-tracked as independent bounds; the 96-row actives bound is sized above every
-registry-authorizable active row an actor can hold plus headroom, so a legitimately progressed
-character never trips it — the bound remains a fail-closed wire guard, not a truncation mechanism,
-and the panel SHALL NEVER drop, clip, or reorder rows to fit it. These bounds apply to the
-flattened totals, not to the count of top-level category-group entries in either array, which is
-separately bounded by the number of `SkillCategory` members plus exactly one — the extra slot
-carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys absent from
-`SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered key still
-renders.
+in shape to `context_actions`'s `skills` field, and category ordering SHALL follow `SkillCategory`'s
+declaration order — the same ordering rule as the combat panel — with every skill row kept: the panel
+SHALL NEVER drop, clip, or reorder rows to fit a bound.
 
 #### Scenario: Innate active skills are visible for the first time
 - **WHEN** the character panel is built for a freshly created character with no imported skill data
@@ -259,8 +387,41 @@ renders.
   owning skills in all seven real categories plus one unregistered key still renders inside the
   group bound of eight (`len(SkillCategory) + 1`, mirrored by the client constant)
 
+#### Scenario: Category groups and sub-groups carry their exact shape
+- **WHEN** the presenter builds a category group
+- **THEN** it contains the category's stable key, a bounded display label, and an ordered array of one or more sub-groups
+- **AND** each sub-group contains a nullable group key, a label that is non-null exactly when the group key is non-null, and an ordered array of `{key, label}` skill rows, each bounded the same as the prior version's passive-row bounds
+
+#### Scenario: The seven-category taxonomy replaces movement and innate_gift
+- **WHEN** category ordering is enumerated
+- **THEN** `SkillCategory` has seven members after the `holy_rite` addition, and `movement` and `innate_gift` are no longer categories
+
+#### Scenario: Sub-group orderings are fixed per category
+- **WHEN** the presenter orders sub-groups inside a category
+- **THEN** sub-group ordering within `elemental_magic` follows `ELEMENT_REGISTRY`'s declaration order
+- **AND** sub-group ordering within `enhancement` follows the fixed order `null` group, then `"天賦"`, then `"身法"`, independent of ownership order
+- **AND** sub-group ordering within `holy_rite` follows the fixed order `null` group, then `"聖禮"`, independent of ownership order
+
+#### Scenario: Empty categories are omitted and ungrouped categories emit one null sub-group
+- **WHEN** the presenter assembles the `actives` or `passives` array
+- **THEN** a category with zero owned skills of that kind (active or passive) is omitted from the corresponding array entirely
+- **AND** a category whose skills carry no `group` emits exactly one sub-group with a `null` group key and label
+
+#### Scenario: Skill rows keep owned_keys order within a sub-group
+- **WHEN** the presenter orders rows inside a sub-group
+- **THEN** they are ordered as `SkillHandler.owned_keys()` returns them, without alphabetical reordering
+
+#### Scenario: Flattened row-count bounds are independent fail-closed guards
+- **WHEN** a panel's flattened skill-row totals are validated
+- **THEN** the total count of skill rows across every category and sub-group, flattened, does not exceed 32 for `passives` and does not exceed 96 for `actives`, tracked as independent bounds
+- **AND** the 96-row actives bound is sized above every registry-authorizable active row an actor can hold plus headroom, so a legitimately progressed character never trips it — the bound remains a fail-closed wire guard, not a truncation mechanism, and the panel never drops, clips, or reorders rows to fit it
+
+#### Scenario: Category-group entry count is separately bounded with one fallback slot
+- **WHEN** the count of top-level category-group entries in either array is bounded
+- **THEN** the flattened row bounds apply to flattened totals, not to that count, which is separately bounded by the number of `SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered key still renders
+
 ### Requirement: explore.move traverses a re-resolved Exit through the shared movement path
-The production action registry SHALL register `explore.move`. Its payload SHALL accept exactly `exit_ref` (1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL obtain the actor from the authenticated session, verify the actor's current node ID equals `current_node` (the stale guard), re-resolve the Exit from the actor's location by the opaque `exit_ref`, re-check that the Exit's location is the actor's location and that its destination exists, re-check the `traverse` lock against the actor, and then invoke the Exit's own traversal method so `MovementCostMixin.at_post_traverse` charges the shared `CLOCK_YAML["command_defaults"]["move"]` cost and records the destination node through `record_arrival`. The adapter SHALL NOT relocate the actor directly, SHALL NOT accept a destination room ID, SHALL NOT charge time itself, and SHALL NOT assign location, knowledge, or clock state directly. A missing exit, a wrong node guard, a denied lock, or an active combat session (the `at_pre_move` veto) SHALL reject with a stable code and Traditional Chinese message and SHALL NOT advance the clock or record discovery. On success the adapter SHALL publish a full snapshot at one newer revision so the location change, clock charge, map, header, and shop/quest state refresh together.
+The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref` (1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's current node ID equals `current_node` (the stale guard), re-resolve the Exit from the actor's location by the opaque `exit_ref`, re-check that the Exit's location and destination are valid and the `traverse` lock allows the actor, and invoke the Exit's own traversal method.
 
 #### Scenario: Keyboard movement charges the same 30 seconds as the command path
 - **WHEN** an actor submits `explore.move` with a valid `exit_ref` and matching `current_node` for a traversable exit
@@ -278,8 +439,26 @@ The production action registry SHALL register `explore.move`. Its payload SHALL 
 - **WHEN** an actor in an active combat session submits `explore.move`
 - **THEN** the `at_pre_move` veto rejects the traversal, no time is charged, and no knowledge is recorded
 
+#### Scenario: The move adapter never manipulates world state directly
+- **WHEN** the `explore.move` adapter runs
+- **THEN** it does not relocate the actor directly, does not accept a destination room ID, does not charge time itself, and does not assign location, knowledge, or clock state directly
+- **AND** it obtains the actor from the authenticated session
+
+#### Scenario: Traversal charges and records through the shared movement path
+- **WHEN** the adapter invokes the Exit's own traversal method
+- **THEN** `MovementCostMixin.at_post_traverse` charges the shared `CLOCK_YAML["command_defaults"]["move"]` cost and records the destination node through `record_arrival`
+- **AND** the re-checks confirm the Exit's location is the actor's location and that its destination exists
+
+#### Scenario: A rejected move leaves clock and discovery untouched
+- **WHEN** a missing exit, a wrong node guard, a denied lock, or an active combat session (the `at_pre_move` veto) blocks a move
+- **THEN** the adapter rejects with a stable code and Traditional Chinese message and does not advance the clock or record discovery
+
+#### Scenario: A successful move refreshes everything in one snapshot
+- **WHEN** an `explore.move` succeeds
+- **THEN** the adapter publishes a full snapshot at one newer revision so the location change, clock charge, map, header, and shop/quest state refresh together
+
 ### Requirement: explore.look reuses the command appearance path
-The production action registry SHALL register `explore.look`. Its payload SHALL accept exactly one of `room` (the exact boolean true) or `target_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve `target_id` against the actor's current location's present contents when given — never from a stored, remote, or ambiguous reference — and re-verify presence and ordinary display/access rules, and route the look through the same appearance path the `look` command uses — for the room marker, `PlayerCharacter.at_look(actor.location)`, and for a target, the ordinary target display path. The adapter SHALL present the returned appearance through the escaped text output path, SHALL NOT parse the text to infer state, SHALL NOT mutate traits, knowledge, location, or time, and SHALL publish no panel replacement beyond the ordinary result. A missing, remote, unpermitted, or no-longer-present target SHALL reject with a stable code and message.
+The production action registry SHALL register `explore.look`, whose payload SHALL accept exactly one of `room` (the exact boolean true) or `target_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve `target_id` against the actor's current location's present contents when given, re-verify presence and ordinary display/access rules, and route the look through the same appearance path the `look` command uses.
 
 #### Scenario: Looking at a present entity uses ordinary display rules
 - **WHEN** an actor submits `explore.look` with a present target's `target_id`
@@ -289,8 +468,24 @@ The production action registry SHALL register `explore.look`. Its payload SHALL 
 - **WHEN** an actor submits `explore.look` with a `target_id` that is not present or not permitted
 - **THEN** the adapter rejects with a stable reason, no appearance is emitted, and no canonical state changes
 
+#### Scenario: Target resolution never trusts stale or remote references
+- **WHEN** the `explore.look` adapter re-resolves a `target_id`
+- **THEN** it resolves only against the actor's current location's present contents — never from a stored, remote, or ambiguous reference
+
+#### Scenario: The look routes through the command's appearance paths
+- **WHEN** the adapter routes the look through the `look` command's appearance path
+- **THEN** for the room marker it uses `PlayerCharacter.at_look(actor.location)`, and for a target the ordinary target display path
+
+#### Scenario: The look presents text without parsing or mutating state
+- **WHEN** the appearance path returns its text
+- **THEN** the adapter presents it through the escaped text output path, does not parse the text to infer state, does not mutate traits, knowledge, location, or time, and publishes no panel replacement beyond the ordinary result
+
+#### Scenario: An unresolvable target rejects with a stable code
+- **WHEN** the requested target is missing, remote, unpermitted, or no-longer-present
+- **THEN** the adapter rejects with a stable code and message
+
 ### Requirement: explore.talk_scripted invokes the deterministic dialogue API with keyword buttons
-The production action registry SHALL register `explore.talk_scripted`. Its payload SHALL accept exactly `npc_id` (a positive integer) and `keyword_id` (a 1..64-character non-empty string). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents — never a stored, remote, or ambiguous reference — and re-verify presence, a resolved dialogue component, and the keyword's presence in the host's dialogue table, and then call the read-only `world.rules.dialogue` response API — the same deterministic seam the `talk` command uses — so a `ScriptedDialogue` host answers through the authored tables with the same state effects as the command path. On its success path the adapter SHALL record the exchange through the deterministic dialogue-session seam (the character-held session helper owned by `world.rules.dialogue`); it SHALL NOT invent a response, and SHALL NOT assign dialogue or component state directly. A missing NPC, a no-longer-present NPC, a non-host, an unregistered keyword, or a present-but-unreachable NPC SHALL reject with a stable code and message and SHALL NOT write state.
+The production action registry SHALL register `explore.talk_scripted`, whose payload SHALL accept exactly `npc_id` (a positive integer) and `keyword_id` (a 1..64-character non-empty string). The adapter SHALL re-resolve the NPC from present contents of the actor's current location, re-verify presence, a resolved dialogue component, and the keyword's presence in the host's dialogue table, and call the read-only `world.rules.dialogue` response API.
 
 #### Scenario: Scripted keyword buttons match authored behavior
 - **WHEN** an actor submits `explore.talk_scripted` for a present dialogue host with a registered keyword
@@ -309,8 +504,25 @@ The production action registry SHALL register `explore.talk_scripted`. Its paylo
 - **THEN** the character's dialogue session names that NPC with the authored response line,
   recorded before the adapter's response is delivered
 
+#### Scenario: Target resolution never trusts stale or remote references
+- **WHEN** the `explore.talk_scripted` adapter re-resolves the NPC
+- **THEN** it resolves only from the actor's current location's present contents — never a stored, remote, or ambiguous reference
+
+#### Scenario: Scripted answers run the same seam as the talk command
+- **WHEN** the adapter calls the dialogue response API
+- **THEN** it uses the same deterministic seam the `talk` command uses, so a `ScriptedDialogue` host answers through the authored tables with the same state effects as the command path
+- **AND** the adapter obtains the actor from the authenticated session
+
+#### Scenario: A successful exchange is recorded through the session seam
+- **WHEN** `explore.talk_scripted` succeeds
+- **THEN** the adapter records the exchange through the deterministic dialogue-session seam (the character-held session helper owned by `world.rules.dialogue`), does not invent a response, and does not assign dialogue or component state directly
+
+#### Scenario: Any invalid scripted talk rejects without writing state
+- **WHEN** the NPC is missing, no-longer-present, a non-host, the keyword is unregistered, or the NPC is present-but-unreachable
+- **THEN** the adapter rejects with a stable code and message and does not write state
+
 ### Requirement: explore.talk_freeform runs the guarded dialogue seam through an injected client
-The production action registry SHALL register `explore.talk_freeform`. Its payload SHALL accept exactly `npc_id` (a positive integer) and `speech` (a non-empty string of at most 512 code points). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents — never a stored, remote, or ambiguous reference — and re-verify presence and free-form eligibility (an `LLMNPC`), obtain the `npc_dialogue` profile client from the exploration composition root (a live `OpenAICompatClient` when the profile is enabled, or a non-`None` offline stub when disabled — the stub is never called because the guardrail degrades before any transport work), and run `npc.at_talked_to(speech, actor, client)`. The seam SHALL present the reply or the degraded authored greeting/silence through the escaped text path, record chat memory, and route any verified intent through the deterministic applier; an illegal or unverifiable AI intent SHALL be discarded while the speech is kept. On the settled success path (reply or authored degrade line) the adapter SHALL record the exchange through the deterministic dialogue-session seam BEFORE publishing, so the published snapshot carries the `dialogue` mode and panel atomically with the reply: the adapter supplies the settled-line observer to `at_talked_to` (the seam's resolution value stays unchanged), and the seam invokes the observer only after the reply or the authored degrade line was actually presented and the completion gate still passes — a mid-flight-stale settlement and a silent degrade invoke it never. The adapter SHALL return a Deferred that resolves to a safe success result after the seam settles, SHALL publish a full snapshot at one newer revision so any applied intent (including a `request_guild_exam` mode change) refreshes atomically, and SHALL NOT assign memory, intent, guild, quest, inventory, or combat state directly. A missing, no-longer-present, or non-eligible NPC SHALL reject synchronously with a stable code before any client or transport work. With the LLM entirely offline the action SHALL still complete through the authored greeting or silence with no network request and no state change beyond the permitted degrade path.
+The production action registry SHALL register `explore.talk_freeform`, whose payload SHALL accept exactly `npc_id` (a positive integer) and `speech` (a non-empty string of at most 512 code points). The adapter SHALL re-resolve the NPC from present contents of the actor's current location, re-verify presence and free-form eligibility (an `LLMNPC`), obtain the `npc_dialogue` profile client from the exploration composition root, and run `npc.at_talked_to(speech, actor, client)`.
 
 #### Scenario: Free-form dialogue retains its server-held target
 - **WHEN** an actor submits `explore.talk_freeform` for a present `LLMNPC` with bounded speech
@@ -339,6 +551,37 @@ The production action registry SHALL register `explore.talk_freeform`. Its paylo
 - **THEN** the dialogue session is not written (or already cleared by the movement seam) by the
   stale completion
 
+#### Scenario: Target resolution never trusts stale or remote references
+- **WHEN** the `explore.talk_freeform` adapter re-resolves the NPC
+- **THEN** it resolves only from the actor's current location's present contents — never a stored, remote, or ambiguous reference
+- **AND** the adapter obtains the actor from the authenticated session
+
+#### Scenario: The composition root supplies a live client or a never-called stub
+- **WHEN** the adapter obtains the `npc_dialogue` profile client from the exploration composition root
+- **THEN** it is a live `OpenAICompatClient` when the profile is enabled, or a non-`None` offline stub when disabled — the stub is never called because the guardrail degrades before any transport work
+
+#### Scenario: The seam presents, remembers, and applies only verified intents
+- **WHEN** the dialogue seam settles
+- **THEN** it presents the reply or the degraded authored greeting/silence through the escaped text path, records chat memory, and routes any verified intent through the deterministic applier
+- **AND** an illegal or unverifiable AI intent is discarded while the speech is kept
+
+#### Scenario: The settled-line observer records the session before publishing
+- **WHEN** the settled success path (reply or authored degrade line) completes
+- **THEN** the exchange is recorded through the deterministic dialogue-session seam BEFORE publishing, so the published snapshot carries the `dialogue` mode and panel atomically with the reply
+- **AND** the adapter supplies the settled-line observer to `at_talked_to` (the seam's resolution value stays unchanged), and the seam invokes the observer only after the reply or the authored degrade line was actually presented and the completion gate still passes — a mid-flight-stale settlement and a silent degrade invoke it never
+
+#### Scenario: The Deferred publishes one newer snapshot without direct assignment
+- **WHEN** the seam settles
+- **THEN** the adapter returns a Deferred that resolves to a safe success result after the seam settles, publishes a full snapshot at one newer revision so any applied intent (including a `request_guild_exam` mode change) refreshes atomically, and does not assign memory, intent, guild, quest, inventory, or combat state directly
+
+#### Scenario: An invalid freeform target rejects synchronously before client work
+- **WHEN** the NPC is missing, no-longer-present, or non-eligible
+- **THEN** the adapter rejects synchronously with a stable code before any client or transport work
+
+#### Scenario: Full LLM offline still completes the action
+- **WHEN** the LLM is entirely offline
+- **THEN** the action still completes through the authored greeting or silence with no network request and no state change beyond the permitted degrade path
+
 ### Requirement: Freeform-talk completion rechecks presence before applying intents
 
 The freeform-talk adapter SHALL re-run the co-location and interactability checks when the deferred reply settles, before any intent application, and SHALL return a clear stale-completion result when the checks fail.
@@ -348,7 +591,7 @@ The freeform-talk adapter SHALL re-run the co-location and interactability check
 - **THEN** the adapter shows the speech, discards the intent, and reports the stale context to the player
 
 ### Requirement: explore.party_invite proposes a party through the guarded dialogue seam
-The production action registry SHALL register `explore.party_invite`. Its payload SHALL accept exactly `npc_id` (a positive integer) and `message` (a string of at most 512 code points, possibly empty). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents — never a stored, remote, or ambiguous reference — re-verify presence, free-form eligibility (an `LLMNPC`), no existing binding, and a party below the 4-companion bound, obtain the `npc_dialogue` profile client from the exploration composition root (a live `OpenAICompatClient` when the profile is enabled, or a non-`None` offline stub when disabled — the stub is never called because the guardrail degrades before any transport work), and run `npc.run_npc_exchange(message, actor, client)`. On the degraded terminal the adapter SHALL apply the fixed threshold decision (`affinity >= 70`) with deterministic accept/reject lines; otherwise it SHALL present the reply's speech and route the reply's intent through `apply_npc_intent`, rendering the join, refusal, full-party, duplicate, and remote notifications with the same fixed Traditional Chinese messages the `invite` command uses, and SHALL never override an AI decision with the threshold. The adapter SHALL return a Deferred that resolves to a safe success result after the seam settles, SHALL publish a full snapshot at one newer revision so the applied membership binding refreshes atomically, and SHALL NOT assign memory, intent, party, or affinity state directly. A missing, no-longer-present, non-eligible, already-bound NPC or a full party SHALL reject synchronously with a stable code before any client or transport work.
+The production action registry SHALL register `explore.party_invite`, whose payload SHALL accept exactly `npc_id` (a positive integer) and `message` (a string of at most 512 code points, possibly empty). The adapter SHALL re-verify the NPC's presence in the actor's current location, free-form eligibility (an `LLMNPC`), no existing binding, and a party below the 4-companion bound, obtain the `npc_dialogue` profile client, and run `npc.run_npc_exchange(message, actor, client)`.
 
 #### Scenario: An invited generative NPC joins through the webclient
 - **WHEN** an actor submits `explore.party_invite` for a present unbound `LLMNPC` and the dialogue reply carries `party_invite` with `accept: true`
@@ -362,8 +605,33 @@ The production action registry SHALL register `explore.party_invite`. Its payloa
 - **WHEN** an actor with 4 companions submits `explore.party_invite`
 - **THEN** the adapter rejects synchronously with the full-party reason and the dialogue seam is never invoked
 
+#### Scenario: Target resolution never trusts stale or remote references
+- **WHEN** the `explore.party_invite` adapter re-resolves the NPC
+- **THEN** it resolves only from the actor's current location's present contents — never a stored, remote, or ambiguous reference
+- **AND** the adapter obtains the actor from the authenticated session, and obtains the profile client from the exploration composition root
+
+#### Scenario: The composition root supplies a live client or a never-called stub
+- **WHEN** the adapter obtains the `npc_dialogue` profile client from the exploration composition root
+- **THEN** it is a live `OpenAICompatClient` when the profile is enabled, or a non-`None` offline stub when disabled — the stub is never called because the guardrail degrades before any transport work
+
+#### Scenario: The degraded terminal decides on the fixed affinity threshold
+- **WHEN** the exchange reaches the degraded terminal
+- **THEN** the adapter applies the fixed threshold decision (`affinity >= 70`) with deterministic accept/reject lines
+
+#### Scenario: The online terminal follows the AI decision
+- **WHEN** the dialogue reply settles online
+- **THEN** the adapter presents the reply's speech and routes the reply's intent through `apply_npc_intent`, rendering the join, refusal, full-party, duplicate, and remote notifications with the same fixed Traditional Chinese messages the `invite` command uses, and never overrides an AI decision with the threshold
+
+#### Scenario: The Deferred publishes one newer snapshot without direct assignment
+- **WHEN** the exchange seam settles
+- **THEN** the adapter returns a Deferred that resolves to a safe success result after the seam settles, publishes a full snapshot at one newer revision so the applied membership binding refreshes atomically, and does not assign memory, intent, party, or affinity state directly
+
+#### Scenario: An invalid invite rejects synchronously before client work
+- **WHEN** the NPC is missing, no-longer-present, non-eligible, or already-bound, or the party is full
+- **THEN** the adapter rejects synchronously with a stable code before any client or transport work
+
 ### Requirement: explore.party_leave dismisses a bound companion without affinity change
-The production action registry SHALL register `explore.party_leave`. Its payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents — never a stored, remote, or ambiguous reference — re-verify that the NPC is currently a bound companion, and dismiss it through `world/rules/party.py::leave_party(npc, actor, reason="dismissed")`. Dismissal SHALL NOT change affinity in either direction, SHALL notify the actor with the fixed Traditional Chinese dismissal message shared with the `leave` command, SHALL publish a full snapshot at one newer revision, and SHALL NOT assign party or affinity state directly. A missing, no-longer-present, or unbounded NPC SHALL reject synchronously with a stable code and no state change.
+The production action registry SHALL register `explore.party_leave`. Its payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents, re-verify that the NPC is currently a bound companion, and dismiss it through `world/rules/party.py::leave_party(npc, actor, reason="dismissed")`.
 
 #### Scenario: Webclient dismissal removes the binding
 - **WHEN** an actor submits `explore.party_leave` for a present bound companion
@@ -373,8 +641,20 @@ The production action registry SHALL register `explore.party_leave`. Its payload
 - **WHEN** an actor submits `explore.party_leave` for a present NPC that is not a companion
 - **THEN** the adapter rejects with a stable reason and no party or affinity state changes
 
+#### Scenario: Target resolution never trusts stale or remote references
+- **WHEN** the `explore.party_leave` adapter re-resolves the NPC
+- **THEN** it resolves only from the actor's current location's present contents — never a stored, remote, or ambiguous reference
+
+#### Scenario: Dismissal notifies, publishes, and assigns nothing directly
+- **WHEN** a dismissal succeeds through `leave_party`
+- **THEN** affinity is unchanged in either direction, the actor is notified with the fixed Traditional Chinese dismissal message shared with the `leave` command, a full snapshot is published at one newer revision, and the adapter does not assign party or affinity state directly
+
+#### Scenario: An invalid leave rejects synchronously with no state change
+- **WHEN** the NPC is missing, no-longer-present, or unbounded
+- **THEN** the adapter rejects synchronously with a stable code and no state change
+
 ### Requirement: explore.engage delegates to the existing engage contract
-The production action registry SHALL register `explore.engage`. Its payload SHALL accept exactly `monster_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the monster from the actor's current location's present contents — never a stored, remote, or ambiguous reference — and call `world.rules.combat_session.engage(actor, monster)` — re-verifying a `PlayerCharacter` with no active session, a living hostile `Monster` in the same room, and recording the initial overwhelm classification. The adapter SHALL NOT assign session, battlefield, skip-safety, or location state directly and SHALL NOT run any combat action. On success the completion SHALL publish `status` and `context_actions` at one newer revision with the mode change to `combat` so the browser tears down the exploration dock and mounts the ordinary combat menu; `services` and `exploration` SHALL be unavailable in combat mode. A rejection SHALL publish the safe stable reason and SHALL NOT create a session or advance time.
+The production action registry SHALL register `explore.engage`. Its payload SHALL accept exactly `monster_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the monster from the actor's current location's present contents, and call `world.rules.combat_session.engage(actor, monster)`.
 
 #### Scenario: Engage transitions to the combat dock
 - **WHEN** an actor submits `explore.engage` for a present living hostile monster
@@ -384,8 +664,28 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 - **WHEN** an actor submits `explore.engage` for a target that is absent, dead, or not a hostile `Monster`
 - **THEN** the adapter rejects with a stable reason, no session is created, and the exploration dock remains usable
 
+#### Scenario: Monster resolution never trusts stale or remote references
+- **WHEN** the `explore.engage` adapter re-resolves the monster
+- **THEN** it resolves only from the actor's current location's present contents — never a stored, remote, or ambiguous reference
+
+#### Scenario: Engage re-verifies its contract and records the overwhelm class
+- **WHEN** the adapter calls `engage`
+- **THEN** it re-verifies a `PlayerCharacter` with no active session, a living hostile `Monster` in the same room, and records the initial overwhelm classification
+
+#### Scenario: The engage adapter never touches combat state directly
+- **WHEN** the `explore.engage` adapter runs
+- **THEN** it does not assign session, battlefield, skip-safety, or location state directly and does not run any combat action
+
+#### Scenario: A successful engage switches mode and refreshes both panels
+- **WHEN** an engage succeeds
+- **THEN** the completion publishes `status` and `context_actions` at one newer revision with the mode change to `combat` so the browser tears down the exploration dock and mounts the ordinary combat menu, and `services` and `exploration` are unavailable in combat mode
+
+#### Scenario: An engage rejection creates nothing
+- **WHEN** an engage is rejected
+- **THEN** the completion publishes the safe stable reason and does not create a session or advance time
+
 ### Requirement: explore.wait obeys the shared skip safety and clock API
-The production action registry SHALL register `explore.wait`. Its payload SHALL accept exactly one of `daypart` (one of `midnight`, `dawn`, `noon`, `dusk`), `seconds` (a positive integer no greater than the documented WebClient skip maximum, a protocol-level bound that never changes command behavior), or `sleep` (the exact boolean true). The adapter SHALL obtain the actor from the authenticated session, recheck `evaluate_skip_safety(actor)` against current canonical state (active combat or a co-located living monster rejects), compute the seconds exactly as the matching command does — through the shared `world/rules` skip helper that `rest`/`sleep`/`wait` also consume, so `seconds_until_daypart` for a daypart, the bounded full-regen computation for `sleep`, and the submitted `seconds` verbatim for a duration can never diverge between command and WebClient — and then call `get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])`. The adapter SHALL present the returned `ScheduledEvent` summary through the escaped text path, SHALL NOT advance time itself or let the browser choose an unsafe value, and SHALL publish a full snapshot at one newer revision so the advanced header, status, shop hours, and quest deadlines refresh together. An unsafe location, active combat, unknown daypart, or out-of-bounds duration SHALL reject with a stable code and message and SHALL NOT advance the clock.
+The production action registry SHALL register `explore.wait`. Its payload SHALL accept exactly one of `daypart` (`midnight`, `dawn`, `noon`, `dusk`), `seconds` (a positive integer within the documented WebClient skip maximum), or `sleep` (the exact boolean true). The adapter SHALL recheck `evaluate_skip_safety(actor)` and call `get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])` with the seconds computed via the shared `world/rules` skip helper as the matching command does.
 
 #### Scenario: Wait until dawn advances to the next occurrence
 - **WHEN** a safe actor submits `explore.wait` with `daypart: "dawn"`
@@ -399,78 +699,33 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 - **WHEN** a safe actor submits `explore.wait` with `seconds: 3600`
 - **THEN** the clock advances by exactly 3600 seconds with `AdvanceSource.SKIP`, and a value above the protocol bound is rejected before any advance
 
+#### Scenario: The duration bound is protocol-only
+- **WHEN** the `seconds` payload bound is documented
+- **THEN** it is the documented WebClient skip maximum, a protocol-level bound that never changes command behavior
+
+#### Scenario: Skip safety rejects combat and co-located monsters
+- **WHEN** the adapter rechecks `evaluate_skip_safety(actor)` against current canonical state
+- **THEN** active combat or a co-located living monster rejects
+
+#### Scenario: The shared skip helper keeps command and WebClient computations identical
+- **WHEN** the adapter computes the seconds to advance
+- **THEN** it goes through the shared `world/rules` skip helper that `rest`/`sleep`/`wait` also consume, so `seconds_until_daypart` for a daypart, the bounded full-regen computation for `sleep`, and the submitted `seconds` verbatim for a duration can never diverge between command and WebClient
+
+#### Scenario: The wait summary is presented and one newer snapshot published
+- **WHEN** the clock advance returns its `ScheduledEvent`
+- **THEN** the adapter presents the summary through the escaped text path, does not advance time itself or let the browser choose an unsafe value, and publishes a full snapshot at one newer revision so the advanced header, status, shop hours, and quest deadlines refresh together
+
+#### Scenario: An unsafe or malformed wait rejects without advancing the clock
+- **WHEN** the location is unsafe, combat is active, the daypart is unknown, or the duration is out of bounds
+- **THEN** the adapter rejects with a stable code and message and does not advance the clock
+
 ### Requirement: The keyboard-first exploration dock roots at the scene overview and opens dialogue directly
 
 In exploration mode the exploration dock SHALL own the action-dock surface, and in dialogue mode it SHALL
 stay mounted, hidden with the collapsed command region (`webclient-contextual-hud`), with its router
-holding the same root; its root
-frame SHALL be one scene overview composed only from the validated `exploration` panel and the
-committed `context_actions` `suggestions` envelope. The overview SHALL present, in this reading order:
-
-- an 出口 row with one chip per `move` row in payload order — a disabled row SHALL stay visible as a
-  disabled chip carrying its server-authored reason, never omitted — and activating an enabled exit
-  chip SHALL submit the unchanged `explore.move` payload;
-- a 人物 row with one chip per `interact` target in payload order, followed by one look chip per
-  `look.entities` descriptor that has no `interact` descriptor; activating a target chip SHALL open
-  that target's verb popover and activating a look chip SHALL submit `explore.look` for it;
-- a 物件 row with one chip per `look.objects` descriptor, whose activation SHALL submit
-  `explore.look` for that object;
-- a footer holding 查看房間 (submitting `explore.look` for the room), 等待／休息, and — whenever the
-  suggestions envelope's status is not `unavailable` — 建議, labelled `建議 (N)` with N the number of
-  cards the suggestions frame will list when that number is positive.
-
-A row with no chip SHALL be omitted together with its label. The overview SHALL carry no 移動, 查看,
-互動, 角色狀態, 任務, or 背包 entry: the character status, quest, and inventory surfaces are opened from
-the top navigation bar, which is their sole keyboard-visible stop. Chips SHALL wrap inside the fixed
-command region, and an overview taller than the region SHALL scroll inside it with the focused chip
-kept in view. An exit chip SHALL carry the exit's direction glyph from the fixed table of canonical
-direction words and, while enabled, the destination's display name resolved from the committed
-`local_map` nodes; an exit label outside that table SHALL render verbatim with no guessed direction,
-and a destination absent from the committed lattice SHALL fall back to the exit's own label.
-
-The verb popover SHALL be one child frame of the overview, rendered as a card inside the command
-region over the inert overview, with a head naming the target. It SHALL list that target's
-server-authored affordances in payload order — 交談, which SHALL submit exactly one `explore.talk_open`
-with the target's identity and no further step, party invitation and dismissal, engage,
-delivery with its server-normalized parameters, and a `navigate`-kind guild or shop entry that opens
-its drawer without pushing a frame — followed by 查看, which submits `explore.look` for the target,
-and a back row. The popover SHALL offer no keyword list, no free-form dialogue row, and no path that
-borrows the command line: a conversation's topics and free-form speech are offered only by the
-dialogue surface once `explore.talk_open` has opened it. A disabled 交談 SHALL stay focusable with
-its server-authored reason and SHALL submit nothing. A target with no mapped affordance SHALL still
-open a popover holding 查看 and the back row. 等待／休息 SHALL open the three-operation waiting frame —
-等待直到黎明 submitting the dawn daypart, 睡眠至完全恢復 submitting the sleep flag, and 休息 N 小時
-opening the bounded custom-hours form — with every value parsed and validated server-side and no
-client-side clock derivation (the form's own hours-to-whole-seconds unit conversion at the
-presentation boundary is unit entry, not clock arithmetic, as pinned by the waiting-surface
-requirement); 建議 SHALL open the suggestions frame owned by `webclient-options-surface`. Both SHALL
-render inside the command region in place of the overview. Every child frame — the verb popover, the
-waiting frame, and the suggestions frame — SHALL end with an enabled back row returning to its parent,
-so pointer and keyboard users backtrack through the identical router path; Escape SHALL pop exactly
-one level and SHALL restore the parent frame's previously focused entry (the chip that opened the
-popover or the child frame).
-
-When the committed location changes — a move from an exit chip, the minimap, or a typed command —
-the dock SHALL return to the overview: any open popover or child frame SHALL be closed in the same
-commit that publishes the new room, and no frame from the previous room SHALL remain activatable.
-When a commit changes the mode from `exploration` to `dialogue` — a conversation opened from 交談, a
-suggestion card, or a typed command — the dock SHALL likewise return to the overview in that commit,
-so no popover or child frame stays open over the conversation, and the command region that holds the
-dock is then collapsed for the rest of the conversation. While the dock is collapsed its router SHALL
-claim no key and SHALL submit nothing; leaving dialogue SHALL present that overview again.
-
-The overview SHALL be navigated as rows of chips: ArrowLeft and ArrowRight SHALL move to the previous
-and next chip in reading order, wrapping across the whole overview; ArrowUp and ArrowDown SHALL move
-to the chip at the same position in the previous or next row, clamped to that row's last chip and
-wrapping across rows, and SHALL be no-ops when the overview has one row. Enter SHALL open or submit
-the focused entry. The popover and every other child frame SHALL be navigated as a vertical list.
-Disabled entries SHALL remain focusable for their explanation but SHALL NOT submit, and held or
-repeated Enter and any mutation while one is in flight or awaiting its declared presentation revision
-SHALL be suppressed. The dock SHALL keep its rendered cells matched to the keyboard router's current
-frame at every depth, so a back row, an Escape, or a panel replacement never leaves a deeper frame's
-cells activatable while the router navigates the parent. The service surfaces SHALL be reached from
-the top navigation bar and from a target's `navigate` affordance instead of a standalone Services
-root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged.
+holding the same root; its root frame SHALL be one scene overview composed only from the validated
+`exploration` panel and the committed `context_actions` `suggestions` envelope, and the overview SHALL
+present the 出口, 人物, and 物件 rows and the footer in that reading order.
 
 #### Scenario: Move, Look, and dialogue complete without typed input
 - **WHEN** a player uses only arrows and Enter to activate an exit chip, then activates a scripted dialogue host's chip, chooses 交談, and then presses the digit of the first choice the dialogue surface offers
@@ -548,8 +803,105 @@ root; the `services` panel payload and its seven `guild.*`/`shop.*` adapters are
 - **WHEN** the browser adopts a valid update or snapshot whose mode is `combat`
 - **THEN** the exploration dock synchronously unloads, unregisters its keyboard handlers, discards local selection and speech state, and only the combat dock owns action-dock focus
 
+#### Scenario: The 出口 row mirrors move rows in payload order
+- **WHEN** the overview renders the 出口 row
+- **THEN** it carries one chip per `move` row in payload order, and a disabled row stays visible as a disabled chip carrying its server-authored reason, never omitted
+- **AND** activating an enabled exit chip submits the unchanged `explore.move` payload
+
+#### Scenario: The 人物 row pairs interact chips with look chips
+- **WHEN** the overview renders the 人物 row
+- **THEN** it carries one chip per `interact` target in payload order, followed by one look chip per `look.entities` descriptor that has no `interact` descriptor
+- **AND** activating a target chip opens that target's verb popover and activating a look chip submits `explore.look` for it
+
+#### Scenario: The 物件 row looks at each object
+- **WHEN** the overview renders the 物件 row
+- **THEN** it carries one chip per `look.objects` descriptor, whose activation submits `explore.look` for that object
+
+#### Scenario: The footer carries room look, waiting, and conditional suggestions
+- **WHEN** the overview renders its footer
+- **THEN** it holds 查看房間 (submitting `explore.look` for the room), 等待／休息, and — whenever the suggestions envelope's status is not `unavailable` — 建議, labelled `建議 (N)` with N the number of cards the suggestions frame will list when that number is positive
+
+#### Scenario: An empty row loses its label too
+- **WHEN** an overview row has no chip
+- **THEN** the row is omitted together with its label
+
+#### Scenario: Navigation-carried entries are absent from the overview
+- **WHEN** the overview renders
+- **THEN** it carries no 移動, 查看, 互動, 角色狀態, 任務, or 背包 entry: the character status, quest, and inventory surfaces are opened from the top navigation bar, which is their sole keyboard-visible stop
+
+#### Scenario: Chips wrap and the overview scrolls inside the command region
+- **WHEN** the overview's chips exceed the fixed command region's width or height
+- **THEN** chips wrap inside the region and an overview taller than the region scrolls inside it with the focused chip kept in view
+
+#### Scenario: Exit chips carry canonical glyphs and resolved destinations
+- **WHEN** an exit chip renders
+- **THEN** it carries the exit's direction glyph from the fixed table of canonical direction words and, while enabled, the destination's display name resolved from the committed `local_map` nodes
+- **AND** an exit label outside that table renders verbatim with no guessed direction, and a destination absent from the committed lattice falls back to the exit's own label
+
+#### Scenario: The verb popover is a child card over the inert overview
+- **WHEN** a target chip opens its verb popover
+- **THEN** the popover is one child frame of the overview, rendered as a card inside the command region over the inert overview, with a head naming the target
+
+#### Scenario: The popover lists server-authored affordances before look and back
+- **WHEN** the popover renders a target's affordances
+- **THEN** it lists them in payload order — 交談, which submits exactly one `explore.talk_open` with the target's identity and no further step, party invitation and dismissal, engage, delivery with its server-normalized parameters, and a `navigate`-kind guild or shop entry that opens its drawer without pushing a frame — followed by 查看, which submits `explore.look` for the target, and a back row
+
+#### Scenario: The popover never borrows the dialogue surface or command line
+- **WHEN** a target's popover renders
+- **THEN** it offers no keyword list, no free-form dialogue row, and no path that borrows the command line: a conversation's topics and free-form speech are offered only by the dialogue surface once `explore.talk_open` has opened it
+
+#### Scenario: A disabled 交談 explains in place
+- **WHEN** a target's affordance list holds a disabled 交談
+- **THEN** it stays focusable with its server-authored reason and submits nothing
+
+#### Scenario: An affordance-less target still gets a popover
+- **WHEN** a target has no mapped affordance and its chip is activated
+- **THEN** it still opens a popover holding 查看 and the back row
+
+#### Scenario: 等待／休息 opens the three-operation waiting frame
+- **WHEN** the player activates 等待／休息
+- **THEN** it opens the three-operation waiting frame — 等待直到黎明 submitting the dawn daypart, 睡眠至完全恢復 submitting the sleep flag, and 休息 N 小時 opening the bounded custom-hours form — with every value parsed and validated server-side and no client-side clock derivation (the form's own hours-to-whole-seconds unit conversion at the presentation boundary is unit entry, not clock arithmetic, as pinned by the waiting-surface requirement)
+
+#### Scenario: 建議 opens the options-surface suggestions frame in place
+- **WHEN** the player activates 建議 or 等待／休息
+- **THEN** 建議 opens the suggestions frame owned by `webclient-options-surface` and both frames render inside the command region in place of the overview
+
+#### Scenario: Every child frame backtracks through the identical router path
+- **WHEN** the verb popover, the waiting frame, or the suggestions frame is open
+- **THEN** it ends with an enabled back row returning to its parent, so pointer and keyboard users backtrack through the identical router path, and Escape pops exactly one level and restores the parent frame's previously focused entry (the chip that opened the popover or the child frame)
+
+#### Scenario: A committed location change closes every child frame
+- **WHEN** the committed location changes — a move from an exit chip, the minimap, or a typed command
+- **THEN** the dock returns to the overview: any open popover or child frame is closed in the same commit that publishes the new room, and no frame from the previous room remains activatable
+
+#### Scenario: A dialogue-mode commit collapses the dock's command region
+- **WHEN** a commit changes the mode from `exploration` to `dialogue` — a conversation opened from 交談, a suggestion card, or a typed command
+- **THEN** the dock returns to the overview in that commit, so no popover or child frame stays open over the conversation, and the command region that holds the dock is then collapsed for the rest of the conversation
+- **AND** while the dock is collapsed its router claims no key and submits nothing, and leaving dialogue presents that overview again
+
+#### Scenario: Arrow keys walk the chip grid
+- **WHEN** the player presses ArrowLeft/ArrowRight or ArrowUp/ArrowDown on the overview
+- **THEN** ArrowLeft and ArrowRight move to the previous and next chip in reading order, wrapping across the whole overview
+- **AND** ArrowUp and ArrowDown move to the chip at the same position in the previous or next row, clamped to that row's last chip and wrapping across rows, and are no-ops when the overview has one row
+
+#### Scenario: Enter activates the focused entry and child frames are lists
+- **WHEN** the player presses Enter on an overview entry, or navigates a child frame
+- **THEN** Enter opens or submits the focused entry, and the popover and every other child frame is navigated as a vertical list
+
+#### Scenario: Disabled and in-flight entries cannot submit
+- **WHEN** focus is on a disabled entry, or an action is in flight or awaiting its declared presentation revision
+- **THEN** the disabled entry stays focusable for its explanation but does not submit, and held or repeated Enter and any mutation are suppressed
+
+#### Scenario: Rendered cells always match the router's current frame
+- **WHEN** a back row, an Escape, or a panel replacement changes the active frame
+- **THEN** the dock keeps its rendered cells matched to the keyboard router's current frame at every depth, so no deeper frame's cells remain activatable while the router navigates the parent
+
+#### Scenario: Service surfaces have no standalone Services root
+- **WHEN** the player reaches the guild or shop surfaces
+- **THEN** they are reached from the top navigation bar and from a target's `navigate` affordance instead of a standalone Services root, and the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged
+
 ### Requirement: Portrait focus stays client-local against the art catalog seam
-Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that references entries in the server-authored art `portrait_catalog` when the art capability supplies one and `null` otherwise. The browser SHALL switch portrait focus only among verified catalog values emitted by the server, SHALL NOT construct portrait subject keys or URLs from entity data, SHALL NOT send a focus mutation or input message, and SHALL NOT treat a `portrait_ref: null` descriptor or an absent catalog as a failure — look, interact, and dialogue proceed normally with no portrait card.
+Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that references entries in the server-authored art `portrait_catalog` when the art capability supplies one and `null` otherwise. The browser SHALL switch portrait focus only among verified catalog values emitted by the server, SHALL NOT construct portrait subject keys or URLs from entity data, and SHALL NOT send a focus mutation or input message.
 
 #### Scenario: Absence of art never blocks exploration
 - **WHEN** the art catalog is absent or a descriptor carries `portrait_ref: null`
@@ -559,8 +911,12 @@ Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that refere
 - **WHEN** the server supplies a `portrait_catalog` and an exploration descriptor references a catalog identity
 - **THEN** client-local focus switches only to that server-verified value and no subject key or URL is constructed by the browser
 
+#### Scenario: Missing art is never a failure
+- **WHEN** a descriptor carries `portrait_ref: null` or the catalog is absent
+- **THEN** it is not treated as a failure — look, interact, and dialogue proceed normally with no portrait card
+
 ### Requirement: Exploration actions reject stale, duplicate, and tampered input without mutation
-Every exploration action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` mismatch SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter. A duplicate live request ID SHALL return its cached result without re-executing. After those checks, commit-time domain revalidation is authoritative: an exit, NPC, monster, keyword, or daypart that changed between render and submit is handled against current canonical state, and a tampered `exit_ref`, `current_node`, `npc_id`, `monster_id`, `keyword_id`, `speech`, `daypart`, `skill`, or `seconds` that fails current revalidation SHALL be rejected with a stable code and Traditional Chinese message with no location, time, knowledge, dialogue, quest, inventory, combat, practice progression, or memory change. A transport drop after submit SHALL NOT be auto-retried; reconnect SHALL rebuild the dock from the new-epoch full snapshot and display the uncertain-result notice.
+Every exploration action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` mismatch SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter. A duplicate live request ID SHALL return its cached result without re-executing.
 
 #### Scenario: Stale revision cannot move or talk twice
 - **WHEN** an older-revision `explore.move` or `explore.talk_freeform` is submitted after a newer revision is active
@@ -578,8 +934,20 @@ Every exploration action SHALL pass the existing dispatcher's epoch, base revisi
 - **WHEN** the transport disconnects after sending `explore.talk_freeform` and reconnects without another action
 - **THEN** the new-epoch snapshot rebuilds the dock from canonical location, knowledge, and NPC state, the uncertain-result notice is shown, and no dialogue or mutation is automatically replayed
 
+#### Scenario: Commit-time domain revalidation is authoritative
+- **WHEN** an exit, NPC, monster, keyword, or daypart changed between render and submit
+- **THEN** it is handled against current canonical state after the dispatcher's checks
+
+#### Scenario: A tampered payload field rejects with zero state change
+- **WHEN** a tampered `exit_ref`, `current_node`, `npc_id`, `monster_id`, `keyword_id`, `speech`, `daypart`, `skill`, or `seconds` fails current revalidation
+- **THEN** the action is rejected with a stable code and Traditional Chinese message with no location, time, knowledge, dialogue, quest, inventory, combat, practice progression, or memory change
+
+#### Scenario: A dropped transport is never auto-retried
+- **WHEN** the transport drops after an action is submitted
+- **THEN** the action is not auto-retried, and reconnect rebuilds the dock from the new-epoch full snapshot and displays the uncertain-result notice
+
 ### Requirement: Exploration browser acceptance is keyboard-only and desktop-bounded
-The managed localhost Playwright suite SHALL exercise, using keyboard controls only at 1451x790 and 2560x1440: grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; the 任務 and 背包 ‧ 裝備 drawers reachable through Quests/Inventory without a service submenu frame; and reconnect retention. Tests SHALL use deterministic fixtures, SHALL make no remote, LLM, or image-generation request, SHALL assert that no take/drop control and no remote or ambiguous host control is rendered, and SHALL assert that `portrait_ref: null` produces no portrait card and no focus packet.
+The managed localhost Playwright suite SHALL exercise the exploration surface using keyboard controls only at 1451x790 and 2560x1440, on deterministic fixtures, with no remote, LLM, or image-generation request.
 
 #### Scenario: A full exploration journey completes in Chromium
 - **WHEN** a seeded actor uses arrows and Enter to move through an exit, look at the room, talk to a scripted host, open Quests, and wait until dawn
@@ -593,6 +961,14 @@ The managed localhost Playwright suite SHALL exercise, using keyboard controls o
 - **WHEN** the exploration dock is open in any room
 - **THEN** no `explore.take`/`explore.drop` affordance or generic object-mutation control exists anywhere in the rendered surface
 
+#### Scenario: The suite covers the full exploration journey
+- **WHEN** the suite exercises the exploration surface
+- **THEN** it covers grid, wilderness, instance, and interior movement through `explore.move` with matching time and map updates; look at the room and look at present entities; scripted keyword dialogue and free-form dialogue with offline degrade to greeting/silence; engage transitioning to the combat dock; wait/rest daypart and duration acceptance plus safety rejections; stale, duplicate, and tampered rejections; the 任務 and 背包 ‧ 裝備 drawers reachable through Quests/Inventory without a service submenu frame; and reconnect retention
+
+#### Scenario: The suite asserts the absence of forbidden controls and portrait artifacts
+- **WHEN** an acceptance test inspects the rendered surface
+- **THEN** it asserts that no take/drop control and no remote or ambiguous host control is rendered, and that `portrait_ref: null` produces no portrait card and no focus packet
+
 ### Requirement: Exploration move rows advertise canonical destinations
 The exploration menu's wilderness move rows SHALL use the canonical destination resolver so the advertised destination equals the node the player actually arrives at.
 
@@ -601,7 +977,7 @@ The exploration menu's wilderness move rows SHALL use the canonical destination 
 - **THEN** each row's destination is the canonical arrival node, including the gateway south row that returns to the grid
 
 ### Requirement: The waiting surface offers exactly three operations
-The exploration dock's Wait frame SHALL offer exactly three operations and no other time boundary: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, submitting `explore.wait` with the exact `sleep` flag; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching. The rendered frame SHALL show exactly those three cards plus the frame's back row, and the card whose item key equals the keyboard router's focused key SHALL carry the focused treatment. The custom form SHALL accept hours with fractional input allowed, SHALL bound the value to at least one second and at most the documented WebClient skip maximum (twelve hours), SHALL convert hours to whole seconds exactly once at the presentation boundary, and SHALL dispatch that value as the unchanged `explore.wait` `seconds` payload; it SHALL NOT derive or display a resulting world time, and a rejected or out-of-bounds value SHALL show a Traditional Chinese bound message with no dispatch. The remaining exploration root structure and the server-side skip maximum are unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it.
+The exploration dock's Wait frame SHALL offer exactly three operations and no other time boundary: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, submitting `explore.wait` with the exact `sleep` flag; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
 
 #### Scenario: The waiting frame renders the three operations
 - **WHEN** the player opens Wait in exploration mode
@@ -619,8 +995,24 @@ The exploration dock's Wait frame SHALL offer exactly three operations and no ot
 - **WHEN** an action is in flight or the client awaits its declared presentation revision
 - **THEN** all three waiting controls are disabled and Enter or pointer activation on them submits nothing
 
+#### Scenario: The frame shows three cards plus a back row with focused treatment
+- **WHEN** the Wait frame renders
+- **THEN** it shows exactly those three cards plus the frame's back row, and the card whose item key equals the keyboard router's focused key carries the focused treatment
+
+#### Scenario: The custom hours form bounds, converts, and dispatches once
+- **WHEN** the player fills in the 休息 N 小時 form
+- **THEN** it accepts hours with fractional input allowed, bounds the value to at least one second and at most the documented WebClient skip maximum (twelve hours), converts hours to whole seconds exactly once at the presentation boundary, and dispatches that value as the unchanged `explore.wait` `seconds` payload
+
+#### Scenario: The form shows no resulting world time and reports bounds in Chinese
+- **WHEN** the custom form is filled in, or its value is rejected or out of bounds
+- **THEN** it does not derive or display a resulting world time, and a rejected or out-of-bounds value shows a Traditional Chinese bound message with no dispatch
+
+#### Scenario: The surrounding skip vocabulary is unchanged
+- **WHEN** the waiting surface is scoped
+- **THEN** the remaining exploration root structure and the server-side skip maximum are unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
+
 ### Requirement: explore.practice advances the clock for one declared skill
-The production action registry SHALL register `explore.practice` with a payload of exactly `skill` (a bounded non-space key of at most 64 characters) and `seconds` (the same positive-integer bound as the `explore.wait` `seconds` payload). The adapter SHALL recheck `evaluate_skip_safety(actor)` against current canonical state and the declared skill through the rules' practice preflight before any advance, rejecting a combat, hostility, or unsafe-location context with the shared skip-safety rejection and an unknown or capped skill with the stable codes `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED`, each with zero clock advance and no surviving practice booking. Skill ownership and cap SHALL be revalidated at commit time against current canonical state. On success the adapter SHALL perform exactly one `AdvanceSource.SKIP` advance carrying the booking, so the clock's existing whole-hour practice settlement stage remains the sole writer of practice progression — plain rest, sleep, and unlabeled skips grant nothing — SHALL clear a stale booking on rejection paths, and SHALL publish a full snapshot at exactly one newer revision whose summary line (prefixed 修煉結束。) reaches the narrative through the escaped text path.
+The production action registry SHALL register `explore.practice` with a payload of exactly `skill` (a bounded non-space key of at most 64 characters) and `seconds` (the same positive-integer bound as the `explore.wait` `seconds` payload). The adapter SHALL recheck `evaluate_skip_safety(actor)` against current canonical state and the declared skill through the rules' practice preflight before any advance, with zero clock advance and no surviving practice booking on rejection.
 
 #### Scenario: Declared practice grows only the booked skill
 - **WHEN** a safe actor who owns an uncapped active skill submits `explore.practice` with that `skill` and `seconds: 7200`
@@ -638,8 +1030,24 @@ The production action registry SHALL register `explore.practice` with a payload 
 - **WHEN** the shared skip advance raises after the booking was recorded
 - **THEN** the clock growth and the booking are both restored, the rejection renders without a partial practice grant, and no skill progression is applied
 
+#### Scenario: Skip safety and skill preflight carry the stable rejection codes
+- **WHEN** the practice preflight runs before any advance
+- **THEN** a combat, hostility, or unsafe-location context rejects with the shared skip-safety rejection, and an unknown or capped skill rejects with the stable codes `PRACTICE_SKILL_UNKNOWN` or `PRACTICE_SKILL_CAPPED`
+
+#### Scenario: Ownership and cap are revalidated at commit time
+- **WHEN** the practice action reaches commit
+- **THEN** skill ownership and cap are revalidated against current canonical state
+
+#### Scenario: The whole-hour settlement stage stays the sole practice writer
+- **WHEN** a practice advance succeeds
+- **THEN** the adapter performs exactly one `AdvanceSource.SKIP` advance carrying the booking, so the clock's existing whole-hour practice settlement stage remains the sole writer of practice progression — plain rest, sleep, and unlabeled skips grant nothing
+
+#### Scenario: Rejections clear stale bookings and success publishes one newer snapshot
+- **WHEN** the practice action finishes
+- **THEN** rejection paths clear a stale booking, and success publishes a full snapshot at exactly one newer revision whose summary line (prefixed 修煉結束。) reaches the narrative through the escaped text path
+
 ### Requirement: Interaction publication and shared local target resolution use visible candidates
-The interaction target list SHALL include only room-content targets visible to the actor under the existing room view/search policy, applied before deterministic ordering and list limits. Excluded targets SHALL contribute no identity, display name, portrait, disabled affordance or editor-availability information. Local host uniqueness used by these target affordances SHALL be evaluated over those visible candidates. Id-based exploration actions using the shared local-presence policy SHALL re-resolve through that same current visible candidate set, preserving each action's existing missing-target outcome and later capability, possession and schedule checks. A previously published id SHALL NOT serve as continuing authorization.
+The interaction target list SHALL include only room-content targets visible to the actor under the existing room view/search policy, applied before deterministic ordering and list limits, and Id-based exploration actions using the shared local-presence policy SHALL re-resolve through that same current visible candidate set. A previously published id SHALL NOT serve as continuing authorization.
 
 #### Scenario: Denied targets never publish
 - **WHEN** the actor's room contains visible and view-denied or search-denied NPCs and Monsters
@@ -656,3 +1064,15 @@ The interaction target list SHALL include only room-content targets visible to t
 #### Scenario: Forged hidden talk target rejects
 - **WHEN** a client submits talk-open for a co-located conversable NPC denied by current visibility
 - **THEN** the existing no-NPC result is returned and no dialogue session or speech is emitted
+
+#### Scenario: Excluded targets contribute nothing
+- **WHEN** a room-content target is excluded by the visibility policy
+- **THEN** it contributes no identity, display name, portrait, disabled affordance or editor-availability information
+
+#### Scenario: Local host uniqueness counts only visible candidates
+- **WHEN** target affordances evaluate local host uniqueness
+- **THEN** it is evaluated over the visible candidates only
+
+#### Scenario: Re-resolution preserves each action's existing outcomes
+- **WHEN** an Id-based exploration action re-resolves through the current visible candidate set
+- **THEN** it preserves the action's existing missing-target outcome and later capability, possession and schedule checks

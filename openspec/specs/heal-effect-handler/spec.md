@@ -10,10 +10,7 @@ revival of knocked-out targets.
 ### Requirement: heal effect prefix restores HP capped at max
 `world/rules/combat.py` SHALL register a `heal` effect handler via `register_effect_handler`, staging a
 `PendingEffect` per target that increases `entity.traits.hp.value` by a caster-stat-derived amount,
-clamped so the result never exceeds `entity.traits.hp.max` and never decreases HP. A `heal:<shape>`
-effect SHALL be declared only on a skill whose `target_spec` matches the shape (`single` on `SINGLE`
-or `SELF` skills, `area` on `AREA` skills); `SkillDef` construction SHALL reject a mismatched pairing
-so the declared shape is never silently ignored at use time.
+clamped so the result never exceeds `entity.traits.hp.max` and never decreases HP.
 
 #### Scenario: Healing a damaged target restores HP up to but not past max
 - **WHEN** a `heal:single` effect resolves against a target at 40% of max HP
@@ -26,6 +23,12 @@ so the declared shape is never silently ignored at use time.
 #### Scenario: A heal shape mismatching the skill's target spec fails at construction
 - **WHEN** a `SkillDef` is constructed with `target_spec=AREA` and `effects=["heal:single"]`
 - **THEN** construction raises `ValueError`
+
+#### Scenario: A heal effect is declarable only on a matching target spec
+
+- **WHEN** a `heal:<shape>` effect is declared on a skill
+- **THEN** it is declared only on a skill whose `target_spec` matches the shape (`single` on `SINGLE` or `SELF` skills, `area` on `AREA` skills)
+- **AND** `SkillDef` construction rejects a mismatched pairing so the declared shape is never silently ignored at use time
 
 ### Requirement: heal:area targets every valid target in the action's target set
 `heal:area` SHALL apply the same clamped restoration independently to every target selected for that effect from the action
@@ -42,13 +45,7 @@ resolution pipeline's validated AREA candidates, with no cross-target interactio
 staging a `PendingEffect` that increases the acting entity's `hp.value` by a caster-derived amount
 (clamped to `hp.max`), independent of and unaffected by the skill's own resolved target list — mirroring
 how `self_buff_apply` binds to the actor rather than `targets`. The magnitude basis SHALL follow the
-parsed effect: the bare form keeps the caster-stat `_heal_magnitude` basis verbatim (coefficient,
-`heal_gain` amplification, freeform scale), while the `self_heal:missing_fraction:<f>` form SHALL
-compute `round(missing_hp × f)` from the ACTING entity's own HP gap (its maximum minus its current
-stored HP) read at staging time — never the target's gap — multiplied by the freeform cast scale
-through the same scaled-magnitude leg as the stat basis. The missing-fraction basis SHALL NOT apply
-the stat-derived `heal_gain` amplification, and both bases SHALL share the identical
-`_restored_amount`/`_apply_heal` clamping, staged-log amount, and commit-time guards.
+parsed effect.
 
 #### Scenario: self_heal restores the caster even when the skill's targets are enemies
 - **WHEN** a skill with `effects=["damage:fire:magic", "self_heal"]` is cast at an enemy `SINGLE` target
@@ -71,14 +68,28 @@ the stat-derived `heal_gain` amplification, and both bases SHALL share the ident
 - **WHEN** a `self_heal:missing_fraction:<f>` effect resolves with the caster already at `hp.max`
 - **THEN** the staged amount is zero, HP stays at maximum, and no exception is raised
 
+#### Scenario: The bare form keeps the caster-stat magnitude basis verbatim
+
+- **WHEN** a bare `self_heal` effect resolves
+- **THEN** its magnitude basis is the caster-stat `_heal_magnitude` basis kept verbatim (coefficient, `heal_gain` amplification, freeform scale)
+
+#### Scenario: The missing-fraction form computes from the acting entity's own gap at staging time
+
+- **WHEN** a `self_heal:missing_fraction:<f>` effect resolves
+- **THEN** it computes `round(missing_hp × f)` from the ACTING entity's own HP gap (its maximum minus its current stored HP) read at staging time — never the target's gap
+- **AND** the result is multiplied by the freeform cast scale through the same scaled-magnitude leg as the stat basis
+- **AND** the missing-fraction basis does not apply the stat-derived `heal_gain` amplification
+
+#### Scenario: Both magnitude bases share the identical commit machinery
+
+- **WHEN** either `self_heal` magnitude basis stages or commits
+- **THEN** both bases share the identical `_restored_amount`/`_apply_heal` clamping, staged-log amount, and commit-time guards
+
 ### Requirement: Neither heal nor self_heal can revive a knocked-out target
 Both handlers SHALL rely on the existing action-resolution/targeting pipeline's own alive-only
-validation (`target_dead` rejection for `hp <= 0` targets, and AREA shorthand's exclusion of
-`knocked_out` entities) rather than implementing any bypass. A `heal`/`self_heal` commit SHALL be a
+validation rather than implementing any bypass. A `heal`/`self_heal` commit SHALL be a
 no-op when the affected entity is not alive at commit time, so no ordering of effects within one
 action (and no `self_heal` on a knocked-out caster) can restore a knocked-out entity to positive HP.
-This holds identically for every `self_heal` magnitude basis: a missing-fraction declaration on a
-dead or mid-action-knocked-out caster stages zero or commits nothing.
 
 #### Scenario: A heal cannot be cast targeting a knocked-out ally
 - **WHEN** a player attempts to cast a `heal:single` skill directly at a knocked-out (`hp <= 0`) ally
@@ -94,3 +105,13 @@ dead or mid-action-knocked-out caster stages zero or commits nothing.
 - **WHEN** a cast carrying `self_heal:missing_fraction:<f>` executes with the caster at `hp <= 0`
 - **THEN** the caster's HP stays at zero or below — neither the staged amount nor the commit revives
   or credits them
+
+#### Scenario: The relied-upon alive-only validation surfaces are named
+
+- **WHEN** the handlers defer to the existing targeting pipeline's alive-only validation
+- **THEN** that validation is the `target_dead` rejection for `hp <= 0` targets and the AREA shorthand's exclusion of `knocked_out` entities
+
+#### Scenario: The no-revive rule holds identically for every self_heal magnitude basis
+
+- **WHEN** a missing-fraction declaration is cast by a dead or mid-action-knocked-out caster
+- **THEN** it stages zero or commits nothing, identically to the stat basis

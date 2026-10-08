@@ -14,12 +14,7 @@ The player combat session SHALL scan each resolved player action round for damag
 that player action against ally-side companion NPCs (participants that are NPCs in
 `player.db.party` and present on the battlefield). Each qualifying hit SHALL call the sole affinity
 writer with the `friendly_fire` source and a penalty of `friendly_fire_penalty_per_hit` (rulebook,
-default 1) — one call per hit, with no per-battle cap. The penalty SHALL apply exactly as a
-negative delta through the writer: never resetting or restoring the daily budget, applying
-unclamped downward (floor 0), and running the party auto-leave recheck. Damage that is not caused
-by a player action — companion-vs-companion damage, enemy behavior, and buff-tick damage — SHALL
-never trigger the penalty. A hit against a participant that is not a companion NPC SHALL write
-nothing and create no record, including when that participant has no affinity record at all.
+default 1) — one call per hit, with no per-battle cap.
 
 #### Scenario: An AREA skill hitting two companions applies two penalties
 - **WHEN** a player action with an AREA target hits two companion NPCs in one round
@@ -57,17 +52,17 @@ nothing and create no record, including when that participant has no affinity re
 - **THEN** the per-hit penalty equals that value, and loading rejects a missing, non-integer, or
   non-positive value
 
+#### Scenario: The penalty is an ordinary negative delta
+- **WHEN** a qualifying hit applies its penalty through the sole affinity writer
+- **THEN** it applies exactly as a negative delta: never resetting or restoring the daily budget,
+  applying unclamped downward (floor 0), and running the party auto-leave recheck
+
 ### Requirement: The scan, penalties, and auto-leave commit atomically with the round
-The damage scan, every penalty write, and any resulting auto-leave SHALL run inside the player
-action round's transaction boundary, so a failure anywhere rolls the whole round's affinity effects
-back and the round's damage result cannot commit with partial penalties. The scan SHALL run inside
-the outer round transaction of the player action (the transaction that also persists the round's
-damage and session metadata), so a penalty failure rolls back the round's damage together with the
-penalties and party state. The auto-leave
-notification SHALL be delivered to the player only after the transaction commits. Companion
-membership for the round SHALL be snapshotted at scan time: a companion that leaves the party
-because of an earlier hit in the same round still qualifies for every hit that round, so the
-penalty count never depends on the iteration order of damage events.
+The damage scan, every penalty write, and any resulting auto-leave SHALL run inside the outer
+round transaction of the player action (the transaction that also persists the round's damage and
+session metadata), so a failure anywhere rolls back the round's damage, penalties, and party
+state together and the round's damage result cannot commit with partial penalties. The auto-leave
+notification SHALL be delivered to the player only after the transaction commits.
 
 #### Scenario: A mid-round leave does not cancel later hits
 - **WHEN** the first hit of a player action drops a companion below the threshold (auto-leave
@@ -89,6 +84,12 @@ penalty count never depends on the iteration order of damage events.
 #### Scenario: Penalty failure rolls back the round's damage
 - **WHEN** an auto-leave write fails after the round's damage events were applied
 - **THEN** the damage, penalties, and party state all roll back together
+
+#### Scenario: Membership is snapshotted at scan time for the whole round
+- **WHEN** a companion leaves the party because of an earlier hit in the same round
+- **THEN** that companion still qualifies for every hit that round, because the round's companion
+  membership was snapshotted at scan time, so the penalty count never depends on the iteration
+  order of damage events
 
 ### Requirement: Shipped content provides reachable friendly-fire triggers
 

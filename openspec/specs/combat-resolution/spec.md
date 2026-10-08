@@ -38,16 +38,19 @@ agility values are read through `SkillHandler.effective_value("agility")` (chang
 ### Requirement: Damage multiplier is banded by margin of success, with a magnitude-only critical on a
 natural 100
 `world/rules/rulebook/combat.yaml`'s `damage` section SHALL declare `crit_multiplier`,
-`solid_hit_margin`, `solid_hit_multiplier`, `base_multiplier`, and `floor`. Damage SHALL be computed as
-`max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`, where
-`roll_multiplier` is `crit_multiplier` if the raw, unmodified `roll_d100()` result equals 100,
-`solid_hit_multiplier` if the margin of success is at least `solid_hit_margin`, and `base_multiplier`
-otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defaulting to 1.0. For a declared conditional policy, the attack component SHALL additionally use the matched attack multiplier once, defense SHALL be zero only when its configured bypass predicate matches **or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which SHALL validate at construction (an attack multiplier with an empty predicate stays invalid)**, and floor(max_hp * declared_fraction) SHALL be added after defense subtraction on a successful hit. The existing damage floor, freeform magnitude scaling and final floor SHALL follow these components; unconfigured effects retain the ordinary formula. After the full authored amount pipeline completes, the damage stage SHALL consult the target's ACTIVE validated divert profiles (a `modifiers.divert` buff profile naming a gauge, a fraction in (0,1] and a cumulative cap): each profile in definition-key-ascending order converts `min(round(residual * fraction), cap − consumed, owner's current gauge amount)` of the RESIDUAL into a payment from the owner's gauge through the canonical resource writer, with the reduced HP amount being the only HP write staged and the payment attributed to the profile's persisted grant-time source. Diverted damage SHALL NOT be reported as HP loss to loss-driven feedback, a miss or zero-amount hit SHALL neither stage a divert nor consume budget, a rolled-back commit SHALL restore the gauge payment and consumed budget, and the consumed-budget accounting SHALL follow the loaded retain-or-replace posture (a fresh cast's grant replaces the instance budget; a data-omitting refresh retains it). Existing nonlethal projection SHALL apply before defeat/knockout event consumers. This calculation SHALL only run when the to-hit check (above) already succeeded — a natural
-100 SHALL NOT cause a miss to become a hit.
+`solid_hit_margin`, `solid_hit_multiplier`, `base_multiplier`, and `floor`. Damage SHALL be
+`max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`,
+`roll_multiplier` being `crit_multiplier` on a raw unmodified `roll_d100()` of 100, else
+`solid_hit_multiplier` at margin >= `solid_hit_margin`, else `base_multiplier`.
 
 #### Scenario: A bare hit uses the base multiplier
 - **WHEN** an attack hits with a margin of success below `solid_hit_margin` and the raw roll is not 100
 - **THEN** damage is computed using `base_multiplier`
+
+#### Scenario: The calculation runs only after a successful to-hit check
+
+- **WHEN** damage computation is reached
+- **THEN** it runs only when the to-hit check (above) already succeeded — a natural 100 does not cause a miss to become a hit
 
 #### Scenario: A comfortable hit uses the solid-hit multiplier
 - **WHEN** an attack hits with a margin of success at or above `solid_hit_margin`
@@ -108,6 +111,56 @@ otherwise. `effect_potency` SHALL be the validated per-effect coefficient, defau
 - **THEN** the listener and any defeat projection observe only `amount − diverted`, the diverted MP
   payment is attributed to the profile's grant-time source, and a commit failure restores HP, gauge
   and consumed budget together
+
+#### Scenario: effect_potency is the validated per-effect coefficient
+
+- **WHEN** damage is computed for a configured effect
+- **THEN** `effect_potency` is the validated per-effect coefficient, defaulting to 1.0
+
+#### Scenario: A conditional policy uses the matched attack multiplier once
+
+- **WHEN** a declared conditional policy's damage is computed
+- **THEN** the attack component additionally uses the matched attack multiplier once
+
+#### Scenario: Defense is zero only under a matched or unconditional bypass
+
+- **WHEN** a declared conditional policy resolves defense
+- **THEN** defense is zero only when its configured bypass predicate matches or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which validates at construction (an attack multiplier with an empty predicate stays invalid)
+
+#### Scenario: The maximum-HP component is added after defense subtraction
+
+- **WHEN** a declared conditional policy with a maximum-HP fraction hits
+- **THEN** floor(max_hp * declared_fraction) is added after defense subtraction on a successful hit
+
+#### Scenario: Existing ordering rules follow the new components
+
+- **WHEN** damage components are combined
+- **THEN** the existing damage floor, freeform magnitude scaling and final floor follow these components, and unconfigured effects retain the ordinary formula
+
+#### Scenario: Divert profiles are validated buff profiles with gauge, fraction, and cap
+
+- **WHEN** the damage stage consults divert handling after the full authored amount pipeline completes
+- **THEN** it reads only the target's ACTIVE validated divert profiles — a `modifiers.divert` buff profile naming a gauge, a fraction in (0,1] and a cumulative cap
+
+#### Scenario: Each divert converts a bounded share of the residual
+
+- **WHEN** an active divert profile applies to a residual
+- **THEN** it converts `min(round(residual * fraction), cap − consumed, owner's current gauge amount)` of the RESIDUAL into a payment from the owner's gauge through the canonical resource writer, the reduced HP amount is the only HP write staged, and the payment is attributed to the profile's persisted grant-time source
+
+#### Scenario: Diversion never fakes HP loss and never runs on a miss
+
+- **WHEN** damage is diverted, a miss or zero-amount hit lands, or a diverting commit is rolled back
+- **THEN** diverted damage is not reported as HP loss to loss-driven feedback, a miss or zero-amount hit neither stages a divert nor consumes budget, and a rolled-back commit restores the gauge payment and consumed budget
+
+#### Scenario: Budget accounting follows the retain-or-replace posture
+
+- **WHEN** consumed-budget accounting is loaded
+- **THEN** it follows the loaded retain-or-replace posture: a fresh cast's grant replaces the instance budget, a data-omitting refresh retains it
+
+#### Scenario: Nonlethal projection runs before defeat consumers
+
+- **WHEN** a diverting or rider-bearing hit approaches zero
+- **THEN** the existing nonlethal projection applies before defeat/knockout event consumers
 
 ### Requirement: effective_power combines four effective stats multiplied by max hp
 `world/rules/combat.py` SHALL provide `effective_power(entity) -> float`, computed as the sum of
@@ -190,14 +243,6 @@ time to pass.
 `world/rules/combat.py`'s per-round upkeep SHALL call change 6's `tick_buffs(entity)` for every living
 roster member unconditionally and SHALL call change 7's
 `world.rules.sexual_state.decay_tick(entity, round_seconds)` with the configured round duration.
-Immediately after `decay_tick`, the upkeep SHALL call `world.rules.sexual_state.climax_settlement_
-action(entity)` and, when it returns `"extend"` or `"end"`, SHALL emit the correspondingly named event
-(`climax_extended` or `climax_ends`) through `world.rules.sexual_transitions.apply_event()`. The
-upkeep SHALL collect the damaging tick records `tick_buffs` returns, per roster member, and SHALL hand
-them to the round's upkeep settlement (`world/rules/upkeep.py`) so the round's EventLogs and staged
-effects include the settled tick damage, defeat crossings, and quest effects. `run_round`
-SHALL accept keyword-only `simulated` and `nonlethal_keys` policy flags and SHALL forward them to the
-upkeep settlement.
 
 #### Scenario: Buff ticks run every round with no self-arming guard
 - **WHEN** a round completes with a poisoned combatant present
@@ -229,26 +274,27 @@ upkeep settlement.
 - **WHEN** `run_round` is called with `simulated=True` or with `nonlethal_keys` naming a roster member
 - **THEN** upkeep defeat entries are tagged `simulated` with no kill credit, and protected members floor at 1 HP and are marked knocked out instead of defeated
 
+#### Scenario: Climax settlement follows decay_tick immediately
+
+- **WHEN** upkeep finishes `decay_tick` for a living roster member
+- **THEN** it immediately calls `world.rules.sexual_state.climax_settlement_action(entity)` and, when that returns `"extend"` or `"end"`, emits the correspondingly named event (`climax_extended` or `climax_ends`) through `world.rules.sexual_transitions.apply_event()`
+
+#### Scenario: Damaging tick records feed the round's upkeep settlement
+
+- **WHEN** `tick_buffs` returns damaging tick records for roster members
+- **THEN** the upkeep collects them per roster member and hands them to the round's upkeep settlement (`world/rules/upkeep.py`) so the round's EventLogs and staged effects include the settled tick damage, defeat crossings, and quest effects
+
+#### Scenario: run_round accepts and forwards the policy flags
+
+- **WHEN** `run_round` is invoked
+- **THEN** it accepts keyword-only `simulated` and `nonlethal_keys` policy flags and forwards them to the upkeep settlement
+
 ### Requirement: The turn loop consumes actions_per_turn as the round's action count, with zero skipping before ActionResolver is called
 `world/rules/combat.py`'s `run_round()` SHALL consult each acting combatant's combat-modifier
 evaluation (the merged bundle and the matched rules' per-rule bundles) and consume the table's
 `actions_per_turn` output as that combatant's action count for the round. The zero-lock decision
-SHALL read the matched rules' per-rule zero-action results — an
-entity matching any zero-action rule SHALL have its turn skipped entirely (producing an `EventLog`
-with kind `"action_skipped"`) without calling `ActionResolver.resolve()` exactly as before this
-widening, and a co-existing positive grant rule can never unlock that skip — while every entity not
-locked SHALL provision its count from the merged bundle's positive `actions_per_turn` value. The
-loop SHALL provision exactly that many action slots for the combatant at the combatant's single
-sequence position, each slot
-re-checking the round's liveness predicate (fled, knocked out, or depleted) before requesting an
-action so a combatant defeated or knocked out by an earlier actor's settlement loses its remaining
-slots without an event; the round's settlement stays one transaction per round either way. A
-positive count beyond the loop's declared maximum provisions the maximum (a documented fuse, never
-a silent unbounded loop). An absent key means one action, so every bundle shipped before this
-widening — none of which co-matches a grant with a lock — resolves byte-identically. This check
-SHALL read the combat-modifier rules' output keys only, with no branch distinguishing which
-underlying rule (poison, paralysis, arousal, climax phase, or an extra-action grant) produced the
-value.
+SHALL read the matched rules' per-rule zero-action results, and every entity not locked SHALL
+provision its count from the merged bundle's positive `actions_per_turn` value.
 
 #### Scenario: A climax-in-progress combatant's turn is skipped, not attempted
 - **WHEN** `evaluate_combat_modifiers(entity)` returns `{"actions_per_turn": 0}` for the acting
@@ -288,6 +334,26 @@ value.
 - **THEN** the lock leg is evaluated first and skips the combatant's whole turn (chance rules
   resolving per the chance requirement) with no provider call, exactly as a lone lock does today
 
+#### Scenario: Slots re-check liveness inside the single round transaction
+
+- **WHEN** a combatant's provisioned action slots are requested during the round
+- **THEN** each slot re-checks the round's liveness predicate (fled, knocked out, or depleted) before requesting an action, so a combatant defeated or knocked out by an earlier actor's settlement loses its remaining slots without an event, and the round's settlement stays one transaction per round either way
+
+#### Scenario: Pre-widening bundles resolve byte-identically
+
+- **WHEN** any bundle shipped before this widening — none of which co-matches a grant with a lock — is read
+- **THEN** an absent `actions_per_turn` key means one action and the bundle resolves byte-identically to pre-widening behavior
+
+#### Scenario: Only output keys are read, never rule identities
+
+- **WHEN** the loop reads the combat-modifier rules' output
+- **THEN** it reads the output keys only, with no branch distinguishing which underlying rule (poison, paralysis, arousal, climax phase, or an extra-action grant) produced the value
+
+#### Scenario: A matched zero-action rule skips the turn outright
+
+- **WHEN** an entity matches any zero-action rule
+- **THEN** its turn is skipped entirely (producing an `EventLog` with kind `"action_skipped"`) without calling `ActionResolver.resolve()`
+
 ### Requirement: Golden fixed-seed tests cover a normal exchange and a lopsided exchange
 `world/rules/tests/` SHALL contain a fixed-seed golden test for a same-tier ("normal") combat exchange
 and a separate fixed-seed golden test for a cross-race ("lopsided") exchange, per design doc §10.
@@ -308,12 +374,8 @@ and a separate fixed-seed golden test for a cross-race ("lopsided") exchange, pe
 
 The skill-heal magnitude funnel SHALL read the caster's magic stat through the
 same equipment-adjusted magic path as magic-school damage, and SHALL apply the
-merged bundle's `heal_gain` signed percentage (rule-table and equipment
-contributions merged) with one normative formula: compute the unamplified base
-amount as today (`max(round(adjusted_magic × multiplier), heal.floor)`), then
-`max(floor(base_amount × (1 + percent/100)), heal.floor)`. Consumable item-use
-healing SHALL keep its flat rulebook amount and SHALL NOT be scaled by
-`heal_gain`.
+merged bundle's `heal_gain` signed percentage with one normative formula:
+`max(floor(base_amount × (1 + percent/100)), heal.floor)`.
 
 #### Scenario: Holy gear amplifies a skill heal
 
@@ -331,17 +393,23 @@ healing SHALL keep its flat rulebook amount and SHALL NOT be scaled by
 - **WHEN** the same actor drinks a registered healing potion
 - **THEN** the restore amount equals the item-effect rulebook amount exactly
 
+#### Scenario: The merged percentage is rule-table and equipment contributions
+
+- **WHEN** the funnel reads `heal_gain`
+- **THEN** it applies the merged bundle's signed percentage with rule-table and equipment contributions merged
+
+#### Scenario: The unamplified base amount is computed as today
+
+- **WHEN** the funnel computes `base_amount` before amplification
+- **THEN** the unamplified base amount is computed as today: `max(round(adjusted_magic × multiplier), heal.floor)`
+
 ### Requirement: run_round accepts an optional first-actor override that reorders the rolled sequence and nothing else
 `world/rules/combat.py`'s `run_round()` SHALL accept a keyword-only
 `first_actor: str | None = None`. When it is `None`, `run_round()` SHALL behave exactly as it does
 without the parameter, including the call it makes into `roll_initiative()`. When it names a key
 present in `roll_initiative(battlefield)`'s returned sequence, `run_round()` SHALL move that key to
 the head of the sequence and SHALL preserve the relative order of every other key, then iterate the
-resulting order. `run_round()` SHALL NOT re-roll, re-score, or bypass `roll_initiative()` in order
-to honor the override, SHALL NOT grant the named combatant an additional action, and SHALL NOT skip
-any other combatant. A `first_actor` naming a key absent from that sequence — a dead, fled,
-knocked-out, or non-roster key — SHALL be a silent no-op that leaves the rolled order untouched and
-SHALL NOT raise.
+resulting order.
 
 #### Scenario: The named combatant acts first while everyone else keeps their rolled relative order
 - **WHEN** `run_round(battlefield, provider, first_actor=key)` runs under a fixed seed for a
@@ -373,17 +441,21 @@ SHALL NOT raise.
 - **THEN** the round resolves in the unmodified rolled order without raising, and no combatant is
   added to or removed from the sequence
 
+#### Scenario: Honoring the override never changes action counts
+
+- **WHEN** `run_round()` honors a `first_actor` override
+- **THEN** it does not re-roll, re-score, or bypass `roll_initiative()` to honor the override, does not grant the named combatant an additional action, and does not skip any other combatant
+
+#### Scenario: An absent first_actor key never raises
+
+- **WHEN** `first_actor` names a key absent from the rolled sequence — a dead, fled, knocked-out, or non-roster key
+- **THEN** the override is a silent no-op that leaves the rolled order untouched and does not raise
+
 ### Requirement: The round loop folds declarative in-round order operations into its sequence
 `world/rules/combat.py`'s round loop SHALL treat the initiative sequence as a per-round snapshot
 that declarative position markers may reshape before each remaining combatant's turn: a live buff
 instance whose definition declares an in-round order operation relocates its holder's not-yet-acted
-key within the snapshot — an advance operation moves the key ahead of the combatants still to act,
-a retreat operation moves it behind them — with same-key operations collapsing last-declared-wins.
-An operation naming a combatant that already acted this round, fled, or was never in the sequence
-SHALL be a silent no-op. Effect resolution SHALL NEVER mutate the initiative sequence directly;
-the marker instances are the single declarative source the loop reads, and the next round's
-sequence SHALL be produced by the untouched round-start roll. The shipped opening-only first-actor
-override and its move-to-head semantics SHALL stay exactly as written.
+key within the snapshot.
 
 #### Scenario: An advance marker moves a not-yet-acted combatant ahead of the remaining tail
 - **WHEN** a synthetic buff instance declaring an advance operation is live on a combatant that has
@@ -403,22 +475,32 @@ override and its move-to-head semantics SHALL stay exactly as written.
 - **THEN** the relocation changes only WHEN the combatant acts, never HOW MANY times, and the
   combatant's action count is not altered by any order operation
 
+#### Scenario: Advance moves ahead and retreat moves behind the remaining tail
+
+- **WHEN** an in-round order operation relocates a not-yet-acted key within the snapshot
+- **THEN** an advance operation moves the key ahead of the combatants still to act, a retreat operation moves it behind them, and same-key operations collapse last-declared-wins
+
+#### Scenario: Operations on ineligible keys are silent no-ops
+
+- **WHEN** an operation names a combatant that already acted this round, fled, or was never in the sequence
+- **THEN** it is a silent no-op
+
+#### Scenario: Markers are the single declarative source of order changes
+
+- **WHEN** effect resolution wants to change turn order
+- **THEN** it never mutates the initiative sequence directly — the marker instances are the single declarative source the loop reads, and the next round's sequence is produced by the untouched round-start roll
+
+#### Scenario: The shipped first-actor override is untouched
+
+- **WHEN** in-round order operations exist alongside the opening-only first-actor override
+- **THEN** the shipped override and its move-to-head semantics stay exactly as written
+
 ### Requirement: A declared action-loss chance gates the round skip with one recorded roll
 A combat-modifier rule's zero-action lock MAY declare a probability for the loss, validated fail
 closed at rule load (the declaration is legal only alongside a zero action count, within the closed
 percentage range). The decision SHALL read the matched rules' per-rule bundles: any matched
 zero-action rule WITHOUT a declared chance SHALL force the certain skip regardless of co-existing
 chances, and otherwise the maximum declared chance among matched zero-action rules SHALL decide.
-`evaluate_combat_modifiers()` and its shipped generic merge SHALL stay pure reads that never roll,
-and the round loop's skip leg SHALL be the sole consumer: for a chance-decided zero the loop rolls
-exactly once per affected combatant per round using the shared dice seam — at or under the decided
-chance the shipped skip event is produced with its roll and chance recorded in the event data;
-above it the combatant acts normally. An undeclared-zero lock with no co-existing chance SHALL skip
-with certainty exactly as shipped; a chance-decided winner SHALL provision its action slots from
-the merged bundle's positive `actions_per_turn` value with a floor of one action exactly like an
-entity whose turn was never locked (co-matching grant rules count toward that count), and the
-side-effect-free action preview SHALL keep reporting the deterministic bundle state without ever
-consuming the roll.
 
 #### Scenario: A chance-bearing lock skips on a losing roll and acts on a winning one
 - **WHEN** a synthetic lock rule declares a chance on its zero-action `then` and fixed dice make one
@@ -446,3 +528,23 @@ consuming the roll.
   non-integer, or as a boolean
 - **THEN** rule loading raises naming the offending rule id, and every previously valid rule file
   loads unchanged
+
+#### Scenario: The skip leg is the sole consumer with one recorded roll
+
+- **WHEN** a chance-decided zero is resolved in the round loop
+- **THEN** `evaluate_combat_modifiers()` and its shipped generic merge have stayed pure reads that never rolled, and the loop — the sole consumer — rolls exactly once for that combatant this round using the shared dice seam: at or under the decided chance the shipped skip event is produced with its roll and chance recorded in the event data, above it the combatant acts normally
+
+#### Scenario: An undeclared-zero lock skips with certainty as shipped
+
+- **WHEN** a zero-action lock declares no chance and no chance-declaring rule co-matches
+- **THEN** the combatant skips with certainty exactly as shipped
+
+#### Scenario: A chance-decided winner provisions slots like an unlocked entity
+
+- **WHEN** a combatant wins its chance contest
+- **THEN** it provisions its action slots from the merged bundle's positive `actions_per_turn` value with a floor of one action exactly like an entity whose turn was never locked (co-matching grant rules count toward that count)
+
+#### Scenario: The action preview never consumes the roll
+
+- **WHEN** the side-effect-free action preview runs against a chance-bearing lock holder
+- **THEN** it keeps reporting the deterministic bundle state without ever consuming the roll

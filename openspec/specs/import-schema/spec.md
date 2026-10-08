@@ -8,8 +8,6 @@ Defines CHARACTER_SCHEMA_V1 and WORLD_SCHEMA_V1, dispatched solely by an explici
 `"character"`, and `WORLD_SCHEMA_V1` SHALL require a `record_type` property constrained to the
 literal value `"world_entry"`. Dispatch between the two schemas SHALL be performed by reading this
 field, never by inferring the record's kind from which other fields happen to be present or absent.
-A record whose `record_type` is missing, `null`, or any value other than the one its intended schema
-requires SHALL be rejected, with the rejection message naming both valid values.
 
 #### Scenario: A character record with the correct record_type passes the discriminator check
 - **WHEN** a character record has `"record_type": "character"`
@@ -40,6 +38,11 @@ requires SHALL be rejected, with the rejection message naming both valid values.
 - **WHEN** a record has `"record_type": "npc"` (neither `"character"` nor `"world_entry"`)
 - **THEN** the record is rejected, and the rejection message names both `"character"` and
   `"world_entry"` as the only valid values
+
+#### Scenario: A missing or null record_type is rejected naming both valid values
+
+- **WHEN** a record's `record_type` is missing, `null`, or any value other than the one its intended schema requires
+- **THEN** the record is rejected, with the rejection message naming both valid values
 
 ### Requirement: CHARACTER_SCHEMA_V1 bounds age and apparent_age to the 0-10000 reasonable range
 `world/imports/schema.py` SHALL define `CHARACTER_SCHEMA_V1` as a JSON Schema (draft 2020-12)
@@ -215,10 +218,7 @@ The import schema SHALL constrain every entity `key` to printable characters exc
 ### Requirement: CHARACTER_SCHEMA_V1 accepts an optional affinity_elements array
 `world/imports/schema.py` SHALL define `CHARACTER_SCHEMA_V1`'s `affinity_elements` as an optional
 array of at most 8 unique strings, each a lowercase key from exactly the eight lore elements
-(`fire`, `water`, `wind`, `earth`, `lightning`, `ice`, `light`, `dark`). Duplicate entries SHALL
-fail structural validation via `uniqueItems: true`, an unknown element SHALL fail via an enum
-constraint, and an over-long array SHALL fail via `maxItems: 8`. The property's `description` SHALL
-state that an absent or empty array means neutral progression.
+(`fire`, `water`, `wind`, `earth`, `lightning`, `ice`, `light`, `dark`).
 
 #### Scenario: A valid affinity_elements array passes schema validation
 - **WHEN** a character record's `affinity_elements` is `["fire", "wind"]`
@@ -242,12 +242,20 @@ state that an absent or empty array means neutral progression.
 - **THEN** schema validation passes and the record is neutral unless the semantic layer rules
   otherwise
 
+#### Scenario: Each structural constraint has its own failure mechanism
+
+- **WHEN** a character record's `affinity_elements` violates a constraint
+- **THEN** duplicate entries fail structural validation via `uniqueItems: true`, an unknown element fails via an enum constraint, and an over-long array fails via `maxItems: 8`
+
+#### Scenario: The description states neutral progression for absent or empty
+
+- **WHEN** `CHARACTER_SCHEMA_V1["properties"]["affinity_elements"]["description"]` is inspected
+- **THEN** it states that an absent or empty array means neutral progression
+
 ### Requirement: CHARACTER_SCHEMA_V1 requires an explicit sex value constrained to the canonical vocabulary
 `world/imports/schema.py` SHALL define `CHARACTER_SCHEMA_V1`'s `sex` as a required property
 constrained by JSON Schema `enum` to `world.lore.sex.SEX_VALUES` exactly
-(`"female"`, `"male"`, `"other"`). A record omitting `sex` SHALL fail structural validation on the
-missing-required-property check; a record whose `sex` is not one of the three vocabulary values
-SHALL fail on the enum constraint. `"other"` SHALL be accepted as a valid, deliberate declaration —
+(`"female"`, `"male"`, `"other"`). `"other"` SHALL be accepted as a valid, deliberate declaration —
 not merely as a fallback for an absent value, since the property is required.
 
 #### Scenario: A valid sex value passes schema validation
@@ -268,14 +276,15 @@ not merely as a fallback for an absent value, since the property is required.
   with no separate code path distinguishing an explicit declaration from an absent one (there is no
   absent case, since the property is required)
 
+#### Scenario: Each sex violation fails on its own schema mechanism
+
+- **WHEN** a character record omits `sex`, or its `sex` is not one of the three vocabulary values
+- **THEN** the omission fails structural validation on the missing-required-property check, and the wrong value fails on the enum constraint
+
 ### Requirement: The character record schema defines an optional profession field and an optional components field
 `CHARACTER_SCHEMA_V1` SHALL define two new OPTIONAL fields: `profession` (a non-empty string or
-`null`; the registry-membership check is semantic, not schema-level) and `components` (an array of
-`{type, kwargs}` objects, `type` a non-empty string, `kwargs` an object with string keys). When
-both fields are absent, a record SHALL be structurally identical to the pre-change schema;
-`components` entries are valid only alongside a `profession` blueprint and never for a
-`PlayerCharacter`-targeted import; `profession` SHALL reject unknown keys in the shared batch
-validator (see import-loader), not by schema constants.
+`null`) and `components` (an array of `{type, kwargs}` objects, `type` a non-empty string,
+`kwargs` an object with string keys).
 
 #### Scenario: An absent profession field leaves the record unchanged
 - **WHEN** a pre-existing valid record omits both new fields
@@ -300,4 +309,9 @@ validator (see import-loader), not by schema constants.
   explicit empty array counts — but carries no `profession` (absent or explicit `null`)
 - **THEN** validation rejects it naming the `components` field and the reason (the assembly plan
   exists only alongside a blueprint)
+
+#### Scenario: Unknown profession keys are rejected by the shared batch validator, not schema constants
+
+- **WHEN** a record's `profession` key is checked for registry membership
+- **THEN** the check happens in the shared batch validator (see import-loader), not by schema constants
 

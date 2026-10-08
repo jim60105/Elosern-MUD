@@ -18,16 +18,8 @@ and webclient surfaces build on it.
 `world/ai/action_options.py` SHALL provide a guarded entry point
 `generate_action_options(context, client, *, fingerprint) -> defer.Deferred` that runs the
 `action_options` layer's validation-retry-degrade pipeline and resolves, on success, to a frozen
-`OptionSet` (always `status: "ready"`) carrying between `MIN_CARDS` (3) and `MAX_CARDS` (5)
-cards; on a disabled profile, a transport failure, or exhausted retries it SHALL resolve to
-`None` — the deterministic rules take over (`suggestions=degraded`), with no partial success and
-no state change. The client SHALL be a required injected argument; the call SHALL invoke
-`client.get_response` with a descriptor carrying `schema_id="action_options"` and the registered
-output schema, and SHALL request structured output only per the profile's
-`supports_response_format` capability. The profile gate SHALL run before any prompt construction
-or transport work. The `fingerprint` SHALL be required and opaque to the layer: it is carried
-from the caller into the enriched `OptionSet` and into the ladder entry point, and is never
-rendered into the prompt.
+`OptionSet` (always `status: "ready"`) carrying between `MIN_CARDS` (3) and `MAX_CARDS` (5) cards;
+on a disabled profile, a transport failure, or exhausted retries it SHALL resolve to `None`.
 
 #### Scenario: A valid proposal resolves with no retry
 - **WHEN** the endpoint returns a card set satisfying the registered output schema, the
@@ -45,17 +37,37 @@ rendered into the prompt.
 - **THEN** the call resolves to `None` immediately with no retry loop on the same broken
   transport, and the deterministic game continues unaffected
 
+#### Scenario: A degrade hands off cleanly to the deterministic rules
+- **WHEN** the call resolves to `None`
+- **THEN** the deterministic rules take over (`suggestions=degraded`), with no partial success
+  and no state change
+
+#### Scenario: The client is injected and carries the registered schema descriptor
+- **WHEN** the entry point runs a generation
+- **THEN** the client is a required injected argument and the call invokes `client.get_response`
+  with a descriptor carrying `schema_id="action_options"` and the registered output schema
+
+#### Scenario: Structured output follows the profile capability
+- **WHEN** the entry point invokes `client.get_response`
+- **THEN** structured output is requested only per the profile's `supports_response_format`
+  capability
+
+#### Scenario: The profile gate precedes all work
+- **WHEN** a generation call begins
+- **THEN** the profile gate runs before any prompt construction or transport work
+
+#### Scenario: The fingerprint is required, carried, and never prompted
+- **WHEN** the caller passes the required `fingerprint`
+- **THEN** it is opaque to the layer: carried from the caller into the enriched `OptionSet` and
+  into the ladder entry point, and never rendered into the prompt
+
 ### Requirement: Bounded-context serialization is public-only and truncation-ordered
 
 The context builder SHALL assemble a frozen context from caller-supplied plain data with hard
 budgets: `room_name` ≤ 40 chars, `room_summary` ≤ 300, `narrative_tail` ≤ 600, `npc_entries` ≤ 8
 with persona digests ≤ 160 chars each, `monster_entries` ≤ 4 with ≤ 80 chars each, `objective`
 ≤ 120, and `affordances` ≤ 16 entries. Truncation SHALL follow the fixed order: narrative tail is
-dropped first, then persona-digest characters, then NPC entries (oldest first);
-`affordances`, `room_name`, and `room_summary` SHALL never be truncated. The context builder SHALL
-emit a `LEAK_BLOCKLIST` (numeric literals and hidden trait keys of the deterministic view) that is
-consumed by validation only and never serialized into the prompt. NPC entries SHALL carry stable
-positional identity so the prompt's `{npc_index}` references resolve deterministically.
+dropped first, then persona-digest characters, then NPC entries (oldest first).
 
 #### Scenario: Over-budget context truncates in the fixed order
 - **WHEN** the call-site passes a context whose tail exceeds 600 chars, a digest exceeds 160, and
@@ -78,19 +90,27 @@ positional identity so the prompt's `{npc_index}` references resolve determinist
 - **WHEN** the same plain-data inputs are passed twice
 - **THEN** the builder returns an identical frozen context with no live entity references
 
+#### Scenario: The truncatable set is closed
+- **WHEN** truncation runs under budget pressure
+- **THEN** `affordances`, `room_name`, and `room_summary` are never truncated
+
+#### Scenario: The leak blocklist is validation-only
+- **WHEN** the context builder composes the `LEAK_BLOCKLIST` (numeric literals and hidden trait
+  keys of the deterministic view)
+- **THEN** it is consumed by validation only and never serialized into the prompt
+
+#### Scenario: NPC entries resolve positionally
+- **WHEN** the rendered prompt references `{npc_index}`
+- **THEN** each reference resolves deterministically via the NPC entry's stable positional
+  identity
+
 ### Requirement: Prompt assembly honors the registered placeholder allowlist
 
 `build_action_options_prompt(context)` SHALL render the system/user message pair through the
 prompt library's two `action_options` keys (`render_prompt("action_options.system", ...)` and
 `render_prompt("action_options.user", ...)`) using exactly the seven `ActionOptionsContext`
 fields as the user message's substitution keys and no context tokens in the system message,
-substituting only placeholders allowlisted per key in `world/prompts/registry.py`. The
-affordance list in the user message SHALL carry each entry's canonical `action_id` + typed
-params and the NPC entries SHALL carry their stable `{npc_index}` references so freeform cards
-can target a present person without the model typing an id. A placeholder parity contract test
-SHALL assert each key's allowlist equals the serialized fields it renders (asserting the user
-key's allowlist equals the real field set and the system key's is empty), and the module SHALL
-NOT embed prompt text as a Python constant.
+substituting only placeholders allowlisted per key in `world/prompts/registry.py`.
 
 #### Scenario: The rendered user message exposes the vocabulary and bindings
 - **WHEN** a context with two NPCs and three affordances is rendered
@@ -101,6 +121,18 @@ NOT embed prompt text as a Python constant.
 - **WHEN** the prompt file declares a placeholder that is absent from the allowlist
 - **THEN** the prompt-library contract test fails with a named error, and no render proceeds with
   an unverified placeholder
+
+#### Scenario: The user message carries canonical affordance payloads
+- **WHEN** the user message renders the affordance list and NPC entries
+- **THEN** each affordance carries its canonical `action_id` + typed params and each NPC entry
+  carries its stable `{npc_index}` reference, so freeform cards can target a present person
+  without the model typing an id
+
+#### Scenario: A placeholder parity contract test guards the allowlists
+- **WHEN** the placeholder parity contract test runs
+- **THEN** it asserts each key's allowlist equals the serialized fields it renders (the user
+  key's allowlist equals the real field set and the system key's is empty), and the module
+  embeds no prompt text as a Python constant
 
 ### Requirement: Freeform NPC references are bound before validation
 
@@ -126,16 +158,9 @@ offending card and enter the retry loop.
 
 The generated output SHALL be validated by the layer's per-call semantic validator — a total
 function running enrichment, the freeform binding, and then the full ladder via the schema
-change's entry point `validate_optionset(raw, *, fingerprint, affordances, leak_blocklist)`
-(canonical affordance match against the context's affordance tuple replacing model-typed params,
-leak gates on labels/hints, count bounds, and the text gates the ladder owns) — and the result
-SHALL carry the caller-supplied `fingerprint` and the context's `LEAK_BLOCKLIST` through the
-ladder. A set the ladder accepts with fewer than `MIN_CARDS` (3) cards SHALL be rejected as a
-generation-rule failure by the layer. Any rejection SHALL append the round's complete error
-message to the prompt and retry within the `1 + max_retries` budget; exhaustion SHALL resolve to
-`None`. A transport failure SHALL NOT enter this loop. The validator SHALL NEVER raise into the
-pipeline: parsing, enrichment, binding, or ladder exceptions SHALL be converted into named error
-messages (ladder rejections as `"stage N: <code>"`) and returned with the round's error list.
+change's entry point `validate_optionset(raw, *, fingerprint, affordances, leak_blocklist)`.
+A set the ladder accepts with fewer than `MIN_CARDS` (3) cards SHALL be rejected as a
+generation-rule failure by the layer.
 
 #### Scenario: Invalid output is retried with the errors appended
 - **WHEN** the endpoint returns output that fails the ladder or the enrichment/binding step
@@ -157,17 +182,38 @@ messages (ladder rejections as `"stage N: <code>"`) and returned with the round'
 - **WHEN** every attempt returns output that still fails validation
 - **THEN** the call resolves to `None` and the deterministic game continues unaffected
 
+#### Scenario: The ladder's owned checks are the schema contract's
+- **WHEN** the ladder validates a round's output
+- **THEN** its checks are canonical affordance match against the context's affordance tuple
+  replacing model-typed params, leak gates on labels/hints, count bounds, and the text gates the
+  ladder owns
+
+#### Scenario: The ladder call carries the caller context
+- **WHEN** the validator invokes the ladder
+- **THEN** the result carries the caller-supplied `fingerprint` and the context's
+  `LEAK_BLOCKLIST` through the ladder
+
+#### Scenario: Any rejection retries with the round's complete error
+- **WHEN** any rejection occurs in a round
+- **THEN** the round's complete error message is appended to the prompt and the pipeline retries
+  within the `1 + max_retries` budget, and exhaustion resolves to `None`
+
+#### Scenario: A transport failure stays out of the retry loop
+- **WHEN** a transport failure occurs
+- **THEN** it does not enter the validation-retry loop
+
+#### Scenario: The validator never raises into the pipeline
+- **WHEN** parsing, enrichment, binding, or ladder handling raises during a round
+- **THEN** the exception is converted into a named error message (ladder rejections as
+  `"stage N: <code>"`) and returned with the round's error list, never raised into the pipeline
+
 ### Requirement: Guardrail hooks install atomically and idempotently
 
 `register_action_options()` SHALL install the layer's degrade fallback and the `action_options`
-output schema (validating the model's raw wire shape: optional `params` on `known_action` cards
-and `npc_index` on `freeform` cards — never the caller-injected `fingerprint`/`status`/
-`action_code`/`params`) through the guardrail registry seam, atomically and idempotently: a
-second call SHALL be a no-op that keeps the first registration, and a partial registration
-failure SHALL remove every hook the module itself installed before the error propagates (never
-a half-registered layer). Server startup SHALL register the layer beside the other generative
-layers; when the `action_options` profile slot or the schema registry is not yet available, the
-startup wrapper SHALL log a bounded warning and skip registration instead of aborting startup.
+output schema through the guardrail registry seam, atomically and idempotently: a second call
+SHALL be a no-op that keeps the first registration, and a partial registration failure SHALL
+remove every hook the module itself installed before the error propagates (never
+a half-registered layer).
 
 #### Scenario: Double registration is a no-op
 - **WHEN** `register_action_options()` is called twice
@@ -185,6 +231,15 @@ startup wrapper SHALL log a bounded warning and skip registration instead of abo
 - **THEN** startup logs a bounded warning, skips the layer's registration, and completes
   normally; a later explicit call of `register_action_options()` after the prerequisites land
   installs cleanly
+
+#### Scenario: The output schema validates the raw wire shape only
+- **WHEN** the registered `action_options` output schema validates the model's raw wire shape
+- **THEN** it checks optional `params` on `known_action` cards and `npc_index` on `freeform`
+  cards — never the caller-injected `fingerprint`/`status`/`action_code`/`params`
+
+#### Scenario: Server startup registers the layer beside the others
+- **WHEN** server startup runs with the prerequisites available
+- **THEN** it registers the `action_options` layer beside the other generative layers
 
 ### Requirement: The layer is strictly proposal-only
 

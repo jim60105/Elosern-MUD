@@ -10,25 +10,11 @@ one shared bound helper and preserved through the whole blueprint lifecycle.
 ## Requirements
 
 ### Requirement: Quest blueprint npc_req entries may declare portrait policy and characterization
-`BlueprintNpcReq` (the scenario director's `npc_req` entry shape) SHALL require two per-occupant
-identity fields: `display_name` (the authored name: bounded non-empty text validated through the
-shared NPC name rule) and `title` (the authored NPC title: single-line plain text validated
-through the shared NPC title rule). It SHALL additionally accept three optional fields: `age` and
-`apparent_age` (paired integers), and `portrait` (an object with exactly one bounded `stable_key`
-field). A `portrait` block SHALL mean the occupant carries a named portrait policy with
-`mode == "named"` and that `stable_key`; there is no `mode` field in the blueprint. The age floor is
-a hard bound: every present `age`/`apparent_age` value SHALL satisfy
-`type(value) is int` (booleans and `None` reject) with `0 <= v`, and SHALL NOT exceed the race's
-`RaceProfile.lifespan` upper bound resolved from the entry's tier through
-`NPC_TIER_REGISTRY[tier].race_key` — never a copied constant. `age` and `apparent_age` SHALL be
-paired (both present or both absent); a key present with a `None` value is not an absence and
-rejects. `portrait` SHALL be a mapping with exactly one `stable_key` field (no extra keys) whose
-value is bounded non-empty text without colons or control characters, and not digit-only — the
-digit-only region of the character-portrait keyspace is reserved for player characters (whose
-stable keys are `str(pk)`), so a blueprint can never claim a player's portrait subject. An entry
-missing `display_name` or `title` SHALL be rejected before any compilation.
-`BlueprintNpcReq.portrait` SHALL be a frozen value object so the blueprint's immutability-by-
-construction guard (`_reject_mutable_containers`) is preserved.
+`BlueprintNpcReq` (the scenario director's `npc_req` entry shape) SHALL require the per-occupant
+identity fields `display_name` (authored name: bounded non-empty text validated through the
+shared NPC name rule) and `title` (authored NPC title: single-line plain text validated through
+the shared NPC title rule), and SHALL accept the optional paired integers `age`/`apparent_age`
+and a `portrait` object with exactly one bounded `stable_key` field.
 
 #### Scenario: A named occupant with a story-driven age validates
 - **WHEN** a blueprint stage declares `npc_req: [{"role": "librarian", "tier": "civilian", "display_name": "莉絲‧晨星", "title": "城鎮圖書館員", "age": 68, "apparent_age": 68, "portrait": {"stable_key": "library_keeper"}}]`
@@ -85,15 +71,44 @@ construction guard (`_reject_mutable_containers`) is preserved.
   `display_name`, title, or ages
 - **THEN** the blueprint is rejected; identical characterization under the shared key validates
 
+#### Scenario: A portrait block means the named policy
+- **WHEN** an `npc_req` entry carries a `portrait` block with a `stable_key`
+- **THEN** the occupant carries a named portrait policy with `mode == "named"` and that
+  `stable_key`, and there is no `mode` field in the blueprint
+
+#### Scenario: The age ceiling resolves from the race lifespan
+- **WHEN** an `npc_req` entry declares an `age` or `apparent_age`
+- **THEN** the value SHALL NOT exceed the race's `RaceProfile.lifespan` upper bound resolved from
+  the entry's tier through `NPC_TIER_REGISTRY[tier].race_key` — never a copied constant
+
+#### Scenario: The age integer type check rejects booleans and None
+- **WHEN** any present `age`/`apparent_age` value is checked
+- **THEN** it SHALL satisfy `type(value) is int` (booleans and `None` reject) with `0 <= v`, the
+  age floor being a hard bound
+
+#### Scenario: A None-valued age key is not an absence
+- **WHEN** an `npc_req` entry declares the `age` or `apparent_age` key with a `None` value
+- **THEN** the blueprint is rejected, because a key present with a `None` value is not an absence
+
+#### Scenario: Portrait stable keys exclude colons, control characters, and digits
+- **WHEN** a `portrait` mapping's `stable_key` value is validated
+- **THEN** it must be bounded non-empty text without colons or control characters, and not
+  digit-only — the digit-only region of the character-portrait keyspace is reserved for player
+  characters (whose stable keys are `str(pk)`), so a blueprint can never claim a player's
+  portrait subject
+
+#### Scenario: The portrait value object keeps the blueprint immutable
+- **WHEN** `BlueprintNpcReq.portrait` is constructed
+- **THEN** it is a frozen value object so the blueprint's immutability-by-construction guard
+  (`_reject_mutable_containers`) is preserved
+
 ### Requirement: The blueprint lifecycle preserves the characterization fields
 The scenario director's output jsonschema SHALL declare the identity fields (`display_name`,
 `title`) and the three optional fields; `to_payload()` SHALL serialize all five; `from_payload()`
 SHALL reconstruct them into the frozen value object, rejecting a payload that lacks the required
 `title` with a named compile error rather than a `KeyError`; and the canonical digest
 serialization (the content hash that distinguishes quests) SHALL include them — including the
-`title`. A round trip `from_payload(to_payload(blueprint))` SHALL preserve all fields, and two
-blueprints that differ only in characterization (including only in `title`) SHALL yield different
-digest keys.
+`title`.
 
 #### Scenario: A round trip preserves the characterization
 - **WHEN** a blueprint carrying all fields passes through `to_payload()` and back through
@@ -109,18 +124,16 @@ digest keys.
 - **WHEN** `from_payload()` receives a characterization payload lacking `title`
 - **THEN** it raises the named compile error identifying the missing field
 
+#### Scenario: Characterization-only differences yield different digest keys
+- **WHEN** two blueprints differ only in characterization (including only in `title`)
+- **THEN** they yield different digest keys
+
 ### Requirement: The shared bound helper is the single validation rule source for both layers
 A pure validation function SHALL exist under `world/quests/` (never under `world/ai/` and never
 importing it) that validates every per-occupant field — requiring `display_name` and `title` —
-against a resolved race-lifespan upper bound, implementing exactly the rules above — including
-`type(value) is int`, missing-key-vs-`None` distinction, and the exactly-one-`stable_key` portrait
-rule — and additionally enforcing the authored-name uniqueness rules across the entry set. The
-title and name rules SHALL be obtained by delegating to the single shared validators in
-`world/rules/npc_identity.py` via a function-local deferred import; neither validation layer SHALL
-inline or duplicate the character-set rules itself. The scenario director's blueprint validation
-and the deterministic compile boundary SHALL both call this helper (the scenario director imports
-it read-only, the same direction it already uses for `world/lore` registries); neither SHALL inline
-the age/name/title/key checks itself. The age floor SHALL be a named constant in the helper.
+against a resolved race-lifespan upper bound, implementing exactly the rules above. The scenario
+director's blueprint validation and the deterministic compile boundary SHALL both call this
+helper; neither SHALL inline the age/name/title/key checks itself.
 
 #### Scenario: Both validation layers call the shared helper
 - **WHEN** the blueprint validator and the compiler each validate an entry carrying the fields
@@ -135,14 +148,33 @@ the age/name/title/key checks itself. The age floor SHALL be a named constant in
 - **WHEN** the title validation behaviour changes in `world/rules/npc_identity.py`
 - **THEN** blueprint validation adopts it with no edit under `world/quests/` or `world/ai/`
 
+#### Scenario: The helper carries the full rule set
+- **WHEN** the shared helper validates entries
+- **THEN** it implements the rules including `type(value) is int`, the missing-key-vs-`None`
+  distinction, and the exactly-one-`stable_key` portrait rule, and additionally enforces the
+  authored-name uniqueness rules across the entry set
+
+#### Scenario: Name and title rules come from the shared validators
+- **WHEN** either validation layer needs the name or title character-set rules
+- **THEN** they are obtained by delegating to the single shared validators in
+  `world/rules/npc_identity.py` via a function-local deferred import, and neither validation
+  layer inlines or duplicates the character-set rules itself
+
+#### Scenario: The scenario director imports the helper read-only
+- **WHEN** the scenario director calls the shared helper
+- **THEN** it imports it read-only from `world/quests/`, the same direction it already uses for
+  `world/lore` registries
+
+#### Scenario: The age floor is a named constant
+- **WHEN** the shared helper enforces the age floor
+- **THEN** the bound is a named constant in the helper
+
 ### Requirement: The compile boundary carries the characterization fields
 `StageSpawnRequirement` (the deterministic requirements value the SceneBuilder consumes) SHALL
 carry the authored `display_name`, the authored `title`, and the optional paired
 `age`/`apparent_age` and named-portrait `stable_key` through from the accepted blueprint, all
 validated by the shared helper. The requirements value SHALL preserve the fields in deterministic
-order, and the canonical content digest over the compiled requirements SHALL include the
-characterization including `title` so identical scenes with different characterization stay
-distinguishable.
+order.
 
 #### Scenario: A compiled requirement preserves the fields
 - **WHEN** an accepted blueprint with all fields is compiled
@@ -152,6 +184,11 @@ distinguishable.
 #### Scenario: A title-only difference stays distinguishable after compile
 - **WHEN** two accepted blueprints differ only in an occupant's `title`
 - **THEN** their compiled requirements digests differ
+
+#### Scenario: The compiled digest includes the characterization
+- **WHEN** the canonical content digest is computed over the compiled requirements
+- **THEN** it includes the characterization including `title`, so identical scenes with different
+  characterization stay distinguishable
 
 ### Requirement: The hand-written template pool may carry characterization fields
 `world/ai/director_templates.py` SHALL declare the required `display_name` and `title` (and may

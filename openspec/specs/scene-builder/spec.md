@@ -11,13 +11,7 @@ located only and never accumulate spawned entities.
 ## Requirements
 
 ### Requirement: SceneBuilder is the deterministic requirements-to-spawn materialization layer
-`world/quests/scene_builder.py` SHALL be a deterministic module that imports no `world.ai` module and
-no live transport, SHALL consume a stage's spawn requirements only as plain validated data
-(`StageSpawnRequirement` read through `scene_requirements_for(definition_key)`), and SHALL change game
-state only through the deterministic lifecycle APIs: `world.maps.instance.spawn_instance_room` for
-instance rooms, Evennia prototype spawning for occupants, `world.maps.instance.register_owned_entity`
-for occupant ownership, and `world.quests.binding.bind_stage_runtime` for stage binding. The module
-SHALL be importable and callable from `commands/` without referencing the generative package.
+`world/quests/scene_builder.py` SHALL be a deterministic module that imports no `world.ai` module and no live transport, consumes a stage's spawn requirements only as plain validated data (`StageSpawnRequirement` via `scene_requirements_for(definition_key)`), and changes game state only through the deterministic lifecycle APIs: `world.maps.instance.spawn_instance_room`, Evennia prototype spawning, `world.maps.instance.register_owned_entity`, and `world.quests.binding.bind_stage_runtime`.
 
 #### Scenario: The module stays inside the deterministic-path ban
 - **WHEN** the repository-wide deterministic-path contract scans `world/quests/`
@@ -29,21 +23,16 @@ SHALL be importable and callable from `commands/` without referencing the genera
 - **THEN** it spawns and binds only through the named deterministic APIs and never calls a
   generative-layer module to write state
 
+#### Scenario: Each lifecycle API serves its named role
+- **WHEN** the materializer's state writes are inspected
+- **THEN** instance rooms are created through `world.maps.instance.spawn_instance_room`, occupants through Evennia prototype spawning, occupant ownership through `world.maps.instance.register_owned_entity`, and stage binding through `world.quests.binding.bind_stage_runtime`
+
+#### Scenario: Commands can drive the builder without the generative package
+- **WHEN** a module under `commands/` imports and calls the SceneBuilder
+- **THEN** the call succeeds without referencing the generative package
+
 ### Requirement: Anti-hallucination: the proposal never chooses numbers, stats, or class lineage
-SceneBuilder SHALL accept from a stage's registered requirements only registry keys — archetype in
-`SCENE_ARCHETYPE_REGISTRY`, NPC tier in `NPC_TIER_REGISTRY`, monster tier in `MONSTER_TIER_REGISTRY`,
-anchor in `ANCHOR_PLACEMENT_REGISTRY`, and a layer — and SHALL derive every stored numeric stat
-deterministically from the immutable lore tables (`world.rules.traits.build_initial_traits` for NPC
-role tiers and `build_initial_traits_for_monster_tier` for monster tiers). Every occupant SHALL be
-spawned through a prototype whose parent is selected only from the module's
-`SCENE_OCCUPANT_PROTOTYPE_WHITELIST`. A requirement that fails to resolve, or any payload that
-attempts to supply a numeric stat, a typeclass path, or a prototype parent outside the whitelist,
-SHALL be rejected with a named `SceneBuilderError` before any room or entity is created. The
-number ban SHALL cover mechanical and balance values — numeric stats, rewards, and bands. The
-validated characterization fields (`display_name`, paired `age`/`apparent_age` bounded by the
-age floor and the race lifespan, and the portrait `stable_key`) are authored content like
-speech and SHALL NOT be treated as mechanical numbers; they never feed stored stats, which remain
-derived deterministically from the lore tables.
+SceneBuilder SHALL accept from a stage's registered requirements only registry keys — archetype in `SCENE_ARCHETYPE_REGISTRY`, NPC tier in `NPC_TIER_REGISTRY`, monster tier in `MONSTER_TIER_REGISTRY`, anchor in `ANCHOR_PLACEMENT_REGISTRY`, and a layer — and SHALL derive every stored numeric stat deterministically from the immutable lore tables (`world.rules.traits.build_initial_traits` for NPC role tiers and `build_initial_traits_for_monster_tier` for monster tiers).
 
 #### Scenario: An unknown key is rejected before any spawn
 - **WHEN** a stage's requirement names an archetype or tier absent from the lore registries
@@ -65,14 +54,24 @@ derived deterministically from the lore tables.
 - **THEN** each occupant's stored `hp`, `atk_phys`, `agility`, and `defense` equal the values the
   lore registries produce, and no number from any proposal influenced them
 
+#### Scenario: Occupants spawn only from whitelisted prototypes
+- **WHEN** the materializer spawns an occupant
+- **THEN** the prototype's parent is selected only from the module's `SCENE_OCCUPANT_PROTOTYPE_WHITELIST`
+
+#### Scenario: An unresolvable requirement or forged payload identity is rejected
+- **WHEN** a requirement fails to resolve, or a payload attempts to supply a numeric stat, a typeclass path, or a prototype parent outside the whitelist
+- **THEN** it is rejected with a named `SceneBuilderError` before any room or entity is created
+
+#### Scenario: The number ban spans mechanical and balance values
+- **WHEN** a proposal attempts to supply mechanical or balance values
+- **THEN** numeric stats, rewards, and bands are all banned and none is accepted
+
+#### Scenario: Characterization fields are authored content, not numbers
+- **WHEN** a requirement carries the validated `display_name`, paired `age`/`apparent_age` bounded by the age floor and the race lifespan, and the portrait `stable_key`
+- **THEN** they are treated as authored content like speech and SHALL NOT be treated as mechanical numbers, and they never feed stored stats, which remain derived deterministically from the lore tables
+
 ### Requirement: NPC role tiers resolve deterministic physical stats through the lore registries
-SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` entry's `race_key` and
-`static_tier_key` via `world.rules.traits.build_initial_traits(race_key, tier=static_tier_key)`,
-which reads the tier's `magic_band` floor into `magic_power` (the deleted race-level
-`starting_magic_level` has no successor constant); it SHALL read these values from the
-immutable registries and SHALL NOT duplicate balance constants anywhere in `world/quests/`. The
-spawn path SHALL share the lineage auto-seed helper (prerequisite proficiency seeded to exactly
-the edge values for owned deep skills; explicit assignments win).
+SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` entry's `race_key` and `static_tier_key` via `world.rules.traits.build_initial_traits(race_key, tier=static_tier_key)`, reading the values from the immutable registries; it SHALL NOT duplicate balance constants anywhere in `world/quests/`.
 
 #### Scenario: Two NPCs of one tier store identical lore-derived stats
 - **WHEN** two occupants are spawned from the same `npc_req` tier
@@ -87,27 +86,16 @@ the edge values for owned deep skills; explicit assignments win).
 - **THEN** every race key and static tier key resolves in `RACE_REGISTRY` and
   `STATIC_TIER_REGISTRY`, with the static tier belonging to the declared race
 
+#### Scenario: Magic power comes from the tier's magic_band floor
+- **WHEN** an NPC occupant's traits are derived
+- **THEN** the derivation reads the tier's `magic_band` floor into `magic_power`, and the deleted race-level `starting_magic_level` has no successor constant
+
+#### Scenario: The spawn path shares the lineage auto-seed helper
+- **WHEN** the spawn path materializes an occupant with deep skills
+- **THEN** it shares the lineage auto-seed helper — prerequisite proficiency seeded to exactly the edge values for owned deep skills, with explicit assignments winning
+
 ### Requirement: Materializing a stage spawns the destination, sets scene metadata, and binds one stage atomically and idempotently
-`world/quests/scene_builder.py::materialize_stage(actor, quest_id, *, origin_room=None)` SHALL resolve
-the actor's current active stage and its registered spawn requirements. For an `instance`-layer
-destination it SHALL spawn one `InstanceRoom` through `world.maps.instance.spawn_instance_room` using
-the whitelisted `instance_room` prototype with a plain exit pair, set `scene_archetype`, `named`, and
-the scene description (the requirement's `scene_sentence` or the archetype registry's), spawn one NPC
-per `npc_req` entry and `objective.quantity` monsters for a monster-tier DEFEAT stage, register every
-occupant as an owned entity, map occupants to objective targets for DEFEAT stages, and bind room and
-entity identities through `bind_stage_runtime`. (ESCORT stages are permanent destinations located
-only; the SceneBuilder never spawns or binds an escort's protected entities, so an ESCORT can never
-auto-complete on entry.) For a permanent `anchor`/`grid` destination it SHALL only locate the existing
-room and SHALL NOT spawn occupants or bind — occupant-bearing scenes are always instance-layer
-(enforced at publication), so a permanent layer never accumulates spawned scene entities and needs no
-scene cleanup. The whole instance materialization SHALL run inside one outer `transaction.atomic()`
-(the room spawn, the exit pair, the occupants, their ownership, and the binding), so a failure at any
-point rolls back every created object and restores the actor's quest-log state so no stale binding is
-observable; the player's move into the scene SHALL happen only after the materialization commits.
-Repeating the call for an already-bound current stage SHALL be idempotent — it returns the existing
-binding (validated to still be an `InstanceRoom`) and spawns nothing. An unknown quest, an inactive or
-terminal stage, a stage with no spawn requirements, or a caller not at a valid origin SHALL raise a
-named `SceneBuilderError` variant with no state change.
+`world/quests/scene_builder.py::materialize_stage(actor, quest_id, *, origin_room=None)` SHALL, for an `instance`-layer destination, spawn one `InstanceRoom`, set scene metadata, spawn occupants, and bind room and entity identities through `bind_stage_runtime` inside one outer `transaction.atomic()`; for a permanent `anchor`/`grid` destination it SHALL only locate the existing room, never spawning occupants or binding.
 
 #### Scenario: An instance scene is spawned, described, and bound
 - **WHEN** a current `BOUND_INSTANCE` stage with `npc_reqs` is materialized from a caller's room
@@ -145,17 +133,44 @@ named `SceneBuilderError` variant with no state change.
   without spawn requirements, or an origin room that does not match the stage's declared `anchor_near`
 - **THEN** it raises a named `SceneBuilderError` variant and no state changes
 
+#### Scenario: The call resolves the actor's current active stage
+- **WHEN** `materialize_stage` is invoked
+- **THEN** it resolves the actor's current active stage and that stage's registered spawn requirements
+
+#### Scenario: Instance materialization uses the whitelisted prototype and plain exit pair
+- **WHEN** an `instance`-layer destination materializes
+- **THEN** the `InstanceRoom` spawns through `world.maps.instance.spawn_instance_room` using the whitelisted `instance_room` prototype with a plain exit pair
+
+#### Scenario: The room carries the scene metadata
+- **WHEN** an instance room is spawned
+- **THEN** the room's `scene_archetype`, `named`, and scene description (the requirement's `scene_sentence` or the archetype registry's) are set
+
+#### Scenario: Occupants are spawned per requirement and owned
+- **WHEN** an instance stage carrying `npc_req` entries — or a monster-tier DEFEAT stage — is materialized
+- **THEN** one NPC is spawned per `npc_req` entry and `objective.quantity` monsters are spawned for a monster-tier DEFEAT stage, and every occupant is registered as an owned entity
+
+#### Scenario: An ESCORT stage never spawns or binds its protected entities
+- **WHEN** an ESCORT stage is materialized
+- **THEN** it is treated as a permanent destination located only, the SceneBuilder never spawns or binds the escort's protected entities, and an ESCORT can never auto-complete on entry
+
+#### Scenario: Occupant-bearing scenes are instance-layer by publication rule
+- **WHEN** a quest definition is published
+- **THEN** occupant-bearing scenes are enforced to be instance-layer, so a permanent layer never accumulates spawned scene entities and needs no scene cleanup
+
+#### Scenario: The atomic scope covers every instance write
+- **WHEN** an instance materialization runs
+- **THEN** the room spawn, the exit pair, the occupants, their ownership, and the binding all run inside the one outer `transaction.atomic()`, so a failure at any point rolls back every created object and restores the actor's quest-log state leaving no stale binding observable
+
+#### Scenario: The move into the scene follows the commit
+- **WHEN** a caller materializes a scene it is entering
+- **THEN** the player's move into the scene happens only after the materialization commits
+
+#### Scenario: The idempotent return is validated
+- **WHEN** a repeated `materialize_stage` call for an already-bound current stage returns the existing binding
+- **THEN** the returned binding is validated to still be an `InstanceRoom`
+
 ### Requirement: The composition root posts one generated quest to the guild board and degrades offline
-`server/ai_director_service.py::request_generated_quest(client=None, *, context)` SHALL bridge the
-director's guarded proposal to the deterministic compile boundary: it SHALL call
-`generate_quest_blueprint` with the injected client (or an `OpenAICompatClient` built from the
-`scenario_director` profile when no client is injected and that profile is enabled), compile the
-accepted blueprint through `compile_quest_blueprint`, and publish it through `register_generated_quest`
-so the offer appears on the guild board. It SHALL defer every `world.ai` import to the call path so
-importing the module at server startup cannot bind a `None` logger. The call SHALL resolve to the
-registered `CompiledQuest` — never to `None` and never to an unregistered definition — and SHALL
-resolve to a context-fitting hand-written template quest when the profile is disabled or every attempt
-degrades, exactly as `generate_quest_blueprint` degrades.
+`server/ai_director_service.py::request_generated_quest(client=None, *, context)` SHALL bridge the director's guarded proposal to the deterministic compile boundary: it SHALL call `generate_quest_blueprint` with the injected client, compile the accepted blueprint through `compile_quest_blueprint`, and publish it through `register_generated_quest` so the offer appears on the guild board.
 
 #### Scenario: A generated quest reaches the guild board
 - **WHEN** a client returns a valid context-fitting blueprint and `request_generated_quest` runs
@@ -171,13 +186,24 @@ degrades, exactly as `generate_quest_blueprint` degrades.
 - **WHEN** `server.ai_director_service` is cold-imported before `evennia._init()`
 - **THEN** the import succeeds and no generative module-level logger is bound at import time
 
+#### Scenario: The client falls back to the enabled profile
+- **WHEN** no client is injected and the `scenario_director` profile is enabled
+- **THEN** `request_generated_quest` calls `generate_quest_blueprint` with an `OpenAICompatClient` built from the `scenario_director` profile
+
+#### Scenario: Generative imports defer to the call path
+- **WHEN** the module's source is inspected
+- **THEN** every `world.ai` import is deferred to the call path, so importing the module at server startup cannot bind a `None` logger
+
+#### Scenario: The call never resolves empty or unregistered
+- **WHEN** `request_generated_quest` resolves
+- **THEN** it resolves to the registered `CompiledQuest` — never to `None` and never to an unregistered definition
+
+#### Scenario: Degradation matches the blueprint generator
+- **WHEN** the profile is disabled or every attempt degrades
+- **THEN** the call resolves to a context-fitting hand-written template quest, exactly as `generate_quest_blueprint` degrades
+
 ### Requirement: The hand-written template pool gains an instance-layer scene so offline play exercises the materializer
-`world/ai/director_templates.py` SHALL add at least one instance-layer template whose stage carries
-`location_req.layer: "instance"` and a non-empty `npc_req`, so a disabled-profile `guild request` can
-resolve to a quest whose scene change 21's SceneBuilder materializes. The added template SHALL satisfy
-the output schema, every semantic validator (including the scene-bound rules), and compile to a
-definition whose instance stage binds through `bind_stage_runtime`, keeping the offline loop fully
-playable without an LLM.
+`world/ai/director_templates.py` SHALL add at least one instance-layer template whose stage carries `location_req.layer: "instance"` and a non-empty `npc_req`, so a disabled-profile `guild request` can resolve to a quest whose scene change 21's SceneBuilder materializes. The added template SHALL satisfy the output schema, every semantic validator (including the scene-bound rules), and compile to a definition whose instance stage binds through `bind_stage_runtime`.
 
 #### Scenario: The new instance template validates and compiles
 - **WHEN** the instance-layer template is run through the output schema, the semantic validators, and
@@ -191,24 +217,12 @@ playable without an LLM.
 - **THEN** the degraded draw is the instance-layer template, which SceneBuilder can materialize into a
   real room and occupants
 
+#### Scenario: The offline loop stays fully playable without an LLM
+- **WHEN** the new instance template serves disabled-profile requests end to end
+- **THEN** the offline loop remains fully playable without an LLM
+
 ### Requirement: Scene entry and generated-quest triggers are deterministic commands that keep the offline loop playable
-`commands/scene.py::CmdEnterScene` (`進入`/`enter`) SHALL materialize the caller's first enterable
-active instance stage (the first active quest, in log order, whose current stage carries a
-registered instance-layer spawn requirement whose declared `anchor_near`, if any, matches the
-caller's current location — unless the caller is already inside the bound room) through
-`materialize_stage` and, after the scene commits, move the caller into the spawned room through the
-plain exit the builder created (ordinary traversal, which charges the standard `move` clock cost and
-records map knowledge); the command SHALL verify the exit's traverse access before traversing and
-SHALL report success only after the caller actually reaches the room. When the caller has no
-enterable instance scene (permanent destination, no requirements, or a wrong anchor) it SHALL report
-that side-effect-free. `commands/guild.py::CmdGuildRequest` (`guild request`/`guild 委託`) SHALL build
-the director request context from the caller's guild registration and call `request_generated_quest`,
-reporting the posted offer's definition key (or the named error when no compatible template exists
-offline); while a request is in flight it SHALL reject a duplicate submission. Neither command SHALL
-import a `world.ai` module. The combined offline flow — every `LLM_PROFILES` entry disabled → `guild
-request` posts the instance-layer template quest → `guild accept` accepts it → `進入` materializes the
-scene → the bound occupants are defeated → `guild turnin` claims the reward — SHALL complete with no
-LLM call and no generative state mutation.
+`commands/scene.py::CmdEnterScene` (`進入`/`enter`) SHALL materialize the caller's first enterable active instance stage through `materialize_stage` and, only after the scene commits, move the caller into the spawned room through the plain exit the builder created. `commands/guild.py::CmdGuildRequest` SHALL call `request_generated_quest` with a context built from the caller's guild registration. Neither command SHALL import a `world.ai` module.
 
 #### Scenario: The offline end-to-end loop materializes an instance scene without an LLM
 - **WHEN** every `LLM_PROFILES` entry is disabled and the full request → accept → materialize → fight
@@ -234,6 +248,34 @@ LLM call and no generative state mutation.
 - **WHEN** the created plain exit denies traverse access or the caller's move is vetoed
 - **THEN** `進入` does not report that the caller entered the scene
 
+#### Scenario: Entry stage selection is anchored and log-ordered
+- **WHEN** `CmdEnterScene` picks the stage to materialize
+- **THEN** it selects the first active quest, in log order, whose current stage carries a registered instance-layer spawn requirement whose declared `anchor_near`, if any, matches the caller's current location — unless the caller is already inside the bound room
+
+#### Scenario: The move into the spawned room is ordinary traversal
+- **WHEN** the caller moves through the builder-created plain exit
+- **THEN** the traversal is ordinary: it charges the standard `move` clock cost and records map knowledge
+
+#### Scenario: Traverse access is verified before the command reports
+- **WHEN** `CmdEnterScene` traverses the created exit
+- **THEN** it verifies the exit's traverse access before traversing and reports success only after the caller actually reaches the room
+
+#### Scenario: No enterable scene is reported side-effect-free
+- **WHEN** the caller has no enterable instance scene (permanent destination, no requirements, or a wrong anchor)
+- **THEN** `進入` reports that side-effect-free
+
+#### Scenario: The guild request reports the posted offer or the named error
+- **WHEN** `CmdGuildRequest` (`guild request`/`guild 委託`) runs
+- **THEN** it reports the posted offer's definition key, or the named error when no compatible template exists offline
+
+#### Scenario: A duplicate request is rejected while one is in flight
+- **WHEN** `guild request` is submitted while a previous request is still in flight
+- **THEN** the duplicate submission is rejected
+
+#### Scenario: The named offline flow completes without an LLM
+- **WHEN** every `LLM_PROFILES` entry is disabled and the combined flow runs: `guild request` posts the instance-layer template quest → `guild accept` accepts it → `進入` materializes the scene → the bound occupants are defeated → `guild turnin` claims the reward
+- **THEN** the flow completes with no LLM call and no generative state mutation
+
 ### Requirement: Every scene-builder test runs offline and the boundary invariants stay green
 Scene-builder tests SHALL use `evennia.utils.test_resources.EvenniaTest` for database, typeclass,
 room, and command integration and `FakeLLMClient` for the composition service; they SHALL never
@@ -252,18 +294,7 @@ under `world/ai/` SHALL import the SceneBuilder.
   or any other state writer
 
 ### Requirement: The occupant spawn path exposes a post-commit portrait-eligibility seam with unchanged atomicity
-`world/quests/scene_builder.py`'s occupant spawn path SHALL apply the characterization carried by
-`StageSpawnRequirement` (display name, paired canonical ages, and the named portrait
-`stable_key` from `blueprint-portrait-policy`) when present: `db.display_name`, `db.age` /
-`db.apparent_age` (declared values, or the deterministic age baseline 25 when a portrait policy
-is declared and the ages are absent), and `db.portrait_policy = {"mode": "named",
-"stable_key": ...}`. After materialization, the spawn path SHALL, inside the same atomic
-materialization, schedule a portrait ensure through `transaction.on_commit` for any occupant that
-carries that explicit named portrait policy, so the schedule fires only after the materialization
-transaction commits and an art failure can never roll back a materialized scene. A rolled-back
-materialization SHALL emit no post-commit portrait job, and the existing full rollback behavior
-SHALL be unchanged. A generic role-based occupant without characterization carries no policy and
-schedules nothing.
+`world/quests/scene_builder.py`'s occupant spawn path SHALL apply the characterization carried by `StageSpawnRequirement` (display name, paired canonical ages, and the named portrait `stable_key` from `blueprint-portrait-policy`) when present: `db.display_name`, `db.age` / `db.apparent_age` (declared values, or the deterministic age baseline 25 when a portrait policy is declared and the ages are absent), and `db.portrait_policy = {"mode": "named", "stable_key": ...}`.
 
 #### Scenario: A generic role-based occupant schedules no portrait
 - **WHEN** an occupant carries no portrait policy
@@ -285,17 +316,20 @@ schedules nothing.
 - **THEN** `db.portrait_policy` is exactly `{"mode": "named", "stable_key": ...}` and canonical
   ages are present before the policy is set
 
+#### Scenario: The portrait schedule fires only after the commit
+- **WHEN** an occupant carrying an explicit named portrait policy is materialized inside the atomic materialization
+- **THEN** the spawn path schedules a portrait ensure through `transaction.on_commit`, inside the same atomic materialization, so the schedule fires only after the materialization transaction commits and an art failure can never roll back a materialized scene
+
+#### Scenario: A rollback keeps its existing full behavior
+- **WHEN** the materialization transaction rolls back
+- **THEN** it emits no post-commit portrait job and the existing full rollback behavior is unchanged
+
+#### Scenario: A generic occupant without characterization schedules nothing
+- **WHEN** a generic role-based occupant without characterization is spawned
+- **THEN** it carries no portrait policy and schedules nothing
+
 ### Requirement: NPC characterization carries a complete compact card through compile, restore, and materialization
-Every occupant characterization on a `StageSpawnRequirement` SHALL carry a complete compact NPC
-card. The compiled requirement, the canonical payload, and the durable generated-quest payload SHALL
-store the normalized card, and decoding a durable payload SHALL reproduce it unchanged; a payload
-whose occupant card is missing or does not satisfy the card contract SHALL fail decoding with an
-error naming the quest, stage, and occupant, with no fallback decoder. Materialization SHALL
-revalidate the card through the shared characterization helper before any spawn and SHALL write it
-through the deterministic NPC persona initializer with `generated_quest` provenance naming the
-quest, stage, and occupant position, inside the same atomic materialization. Re-materializing a
-stage SHALL never overwrite an existing occupant's card. The card is characterization only and
-SHALL never influence stored stats.
+Every occupant characterization on a `StageSpawnRequirement` SHALL carry a complete compact NPC card. The compiled requirement, the canonical payload, and the durable generated-quest payload SHALL store the normalized card, and decoding a durable payload SHALL reproduce it unchanged. Materialization SHALL revalidate the card through the shared characterization helper before any spawn and SHALL write it through the deterministic NPC persona initializer inside the same atomic materialization.
 
 #### Scenario: A card survives compile and restore unchanged
 - **WHEN** a blueprint occupant card is compiled, encoded into the durable store, decoded at restore, and materialized
@@ -313,15 +347,24 @@ SHALL never influence stored stats.
 - **WHEN** an occupant's card was edited to version 2 and the same stage is materialized again idempotently
 - **THEN** the occupant's card and version 2 are unchanged
 
+#### Scenario: A payload with a missing or nonconforming card fails decoding by name
+- **WHEN** a durable payload's occupant card is missing or does not satisfy the card contract
+- **THEN** decoding fails with an error naming the quest, stage, and occupant, with no fallback decoder
+
+#### Scenario: The persona write carries generated_quest provenance
+- **WHEN** materialization writes an occupant's card through the deterministic NPC persona initializer
+- **THEN** the provenance is `generated_quest` naming the quest, stage, and occupant position
+
+#### Scenario: Re-materialization never overwrites an occupant card
+- **WHEN** a stage is re-materialized over existing occupants
+- **THEN** no existing occupant's card is overwritten
+
+#### Scenario: The card never influences stored stats
+- **WHEN** a characterized occupant is materialized
+- **THEN** the card is characterization only and never influences stored stats
+
 ### Requirement: Scene materialization exposes deterministic flavor context for fresh instance scenes
-For a freshly spawned `instance`-layer scene (not an already-bound stage, not a permanent
-destination), `materialize_stage` SHALL include in its `SceneMaterialization` result an optional
-flavor context: a plain bounded dict with exactly the four keys `scene_sentence` (the requirement's
-sentence or the archetype registry's), `quest_context` (the definition's `display_name` plus its
-`quest_type`), `room_name` (the scene room's name), and `region` (the anchor placement display name
-when the requirement declares `anchor_near`, else empty). A scene with neither a requirement sentence
-nor a resolvable archetype sentence SHALL carry `None`. The context assembly SHALL reference no
-generative module and no LLM profile (the deterministic-path ban stays green).
+For a freshly spawned `instance`-layer scene (not an already-bound stage, not a permanent destination), `materialize_stage` SHALL include in its `SceneMaterialization` result an optional flavor context: a plain bounded dict with exactly the four keys `scene_sentence`, `quest_context`, `room_name`, and `region`.
 
 #### Scenario: A fresh instance scene carries the four-key flavor context
 - **WHEN** a fresh instance scene materializes with a scene-sentence context and an `anchor_near`
@@ -337,16 +380,16 @@ generative module and no LLM profile (the deterministic-path ban stays green).
 - **WHEN** a stage's requirement has neither a scene sentence nor a resolvable archetype sentence
 - **THEN** the result's flavor context is `None`
 
+#### Scenario: Each flavor key has its deterministic source
+- **WHEN** the flavor context is assembled
+- **THEN** `scene_sentence` is the requirement's sentence or the archetype registry's, `quest_context` is the definition's `display_name` plus its `quest_type`, `room_name` is the scene room's name, and `region` is the anchor placement display name when the requirement declares `anchor_near`, else empty
+
+#### Scenario: The context assembly stays off the generative path
+- **WHEN** the flavor-context assembly is inspected
+- **THEN** it references no generative module and no LLM profile, keeping the deterministic-path ban green
+
 ### Requirement: The scene flavor write is deterministic and never affects materialization
-`world/quests/scene_builder.py` SHALL provide an `apply_scene_flavor(room, text)` helper as the sole
-writer of `room.db.scene_flavor`: it SHALL verify the room's database row authoritatively
-(`ObjectDB.objects.filter(pk=room.pk).exists()`) before any read-modify-write — a cached typeclass
-is not proof of existence after reclamation — SHALL no-op (returning `False`) when the room is gone
-or already carries a flavor, SHALL catch database and object-deletion exceptions and return `False`
-for them, SHALL otherwise write the flavor and return `True`, SHALL never touch `room.db.desc`, and
-SHALL never raise from a flavor context (a failure SHALL be a logged diagnostic with no state
-change). The helper and its scheduling callers SHALL contain no reference to `world.ai` or any LLM
-profile, keeping `world/quests` inside the deterministic-path ban.
+`world/quests/scene_builder.py` SHALL provide an `apply_scene_flavor(room, text)` helper as the sole writer of `room.db.scene_flavor`: it SHALL verify the room's database row authoritatively (`ObjectDB.objects.filter(pk=room.pk).exists()`) before any read-modify-write, SHALL otherwise write the flavor and return `True`, SHALL never touch `room.db.desc`, and SHALL never raise from a flavor context (a failure SHALL be a logged diagnostic with no state change).
 
 #### Scenario: The sole writer applies once and only once
 - **WHEN** `apply_scene_flavor` runs for an existing flavor-less room
@@ -366,6 +409,22 @@ profile, keeping `world/quests` inside the deterministic-path ban.
 - **WHEN** the flavor-related source in `world/quests` is inspected
 - **THEN** it contains no `world.ai`, `ollama`, or `llm_client` fragment, and the existing
   deterministic-path contract test passes without modification
+
+#### Scenario: The database row, not the cache, proves existence
+- **WHEN** the helper decides whether the room still exists
+- **THEN** it trusts the authoritative database check because a cached typeclass is not proof of existence after reclamation
+
+#### Scenario: Gone or already-flavored rooms are a no-op
+- **WHEN** the room is gone or already carries a flavor
+- **THEN** the helper no-ops and returns `False`
+
+#### Scenario: Database and deletion exceptions return False
+- **WHEN** a database or object-deletion exception is raised during the flavor write
+- **THEN** the helper catches it and returns `False`
+
+#### Scenario: Scheduling callers stay generative-free
+- **WHEN** the helper's scheduling callers are inspected
+- **THEN** they contain no reference to `world.ai` or any LLM profile, keeping `world/quests` inside the deterministic-path ban
 
 ### Requirement: Generated quest content is durably stored at registration time
 The system SHALL persist the compiled definition, guild offer, and stage spawn requirements of every generated quest to durable storage as part of `register_generated_quest`.

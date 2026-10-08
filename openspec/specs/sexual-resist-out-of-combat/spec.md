@@ -12,17 +12,7 @@ keeps malformed or foreign resist entries inert.
 ## Requirements
 
 ### Requirement: An out-of-combat forced sexual act applies the same affinity penalty as an in-combat one
-`world/rules/cast_settlement.py` SHALL provide `_scan_out_of_combat_sexual_coercion(actor, targets,
-event_log) -> tuple[tuple[str, ...], _CoercionRestoreState | None]`, scanning one resolved
-out-of-combat cast's `EventLog.entries` for
-`EventEntry` records with `kind == "sexual_resist"`. For every such entry whose `data` is a mapping with
-`data["resisted"] is False` and `data["auto_comply"] is False` — a forced outcome — and whose `target`
-key resolves against the cast's own `targets` list to an `NPC`, it SHALL apply `-sexual_forced_penalty`
-through `world.rules.affinity.apply_affinity_change(target, actor, AffinitySource.SEXUAL_FORCED, ...)`,
-the same sole writer, source, and rulebook-configured penalty magnitude `sexual-resist-turn-cost`'s
-in-combat `_scan_sexual_coercion` already uses. An entry recording compliance (`resisted is False,
-auto_comply is True`, rolled or automatic) or a successful resistance (`resisted is True`) SHALL apply
-no penalty.
+`world/rules/cast_settlement.py` SHALL provide `_scan_out_of_combat_sexual_coercion(actor, targets, event_log) -> tuple[tuple[str, ...], _CoercionRestoreState | None]`, scanning a resolved out-of-combat cast's `EventLog.entries` for `kind == "sexual_resist"` records, and applying `-sexual_forced_penalty` through `world.rules.affinity.apply_affinity_change(target, actor, AffinitySource.SEXUAL_FORCED)` for every forced outcome whose `target` resolves to an `NPC` in the cast's `targets` list.
 
 #### Scenario: A forced out-of-combat act applies exactly one penalty
 - **WHEN** an out-of-combat cast's resolved `EventLog` contains one `kind == "sexual_resist"` entry with
@@ -46,6 +36,18 @@ no penalty.
   out of combat (through `_scan_out_of_combat_sexual_coercion`) against an equivalent `NPC` target
 - **THEN** both calls apply the identical `-sexual_forced_penalty` delta read from `get_config()` through
   `AffinitySource.SEXUAL_FORCED`, with no separate out-of-combat magnitude or source
+
+#### Scenario: The forced-outcome data predicate
+- **WHEN** the scan inspects a `kind == "sexual_resist"` entry
+- **THEN** it treats the entry as forced only when `data` is a mapping with `data["resisted"] is False` and `data["auto_comply"] is False`
+
+#### Scenario: A complied-with or resisted entry applies no penalty
+- **WHEN** an entry records compliance (`resisted is False, auto_comply is True`, rolled or automatic) or a successful resistance (`resisted is True`)
+- **THEN** `_scan_out_of_combat_sexual_coercion` applies no penalty for that entry
+
+#### Scenario: The penalty writer and magnitude are the in-combat ones
+- **WHEN** the scan penalizes a forced out-of-combat outcome
+- **THEN** it uses the same sole writer, source, and rulebook-configured penalty magnitude `sexual-resist-turn-cost`'s in-combat `_scan_sexual_coercion` already uses
 
 ### Requirement: The scan resolves forced targets against the cast's own target list, with one independent penalty per target
 `_scan_out_of_combat_sexual_coercion` SHALL resolve each qualifying entry's `target` key against the
@@ -80,19 +82,7 @@ multi-target list) SHALL apply one independent penalty per forced target.
   and no affinity change occurs; a non-resistible act with the same target list is unaffected
 
 ### Requirement: The coercion scan runs inside the out-of-combat settlement's outer transaction and rolls back on failure
-`world/rules/cast_settlement.py::settle_out_of_combat_cast` SHALL call
-`_scan_out_of_combat_sexual_coercion(request.actor, request.targets, result.event_log)` inside the same
-outer `transaction.atomic()` that wraps `ActionResolver.resolve` and the clock advance, immediately after
-a successful resolution and before the clock advance. A rejected resolution SHALL never invoke the scan.
-Before applying any penalty, the scan SHALL snapshot the touched `NPC` targets' `relations_data` and the
-actor's party-membership surfaces; if applying a penalty or its resulting auto-leave raises, the scan
-SHALL restore those snapshotted surfaces (through `world.rules.affinity.restore_relations_surfaces` and
-`world.rules.party.restore_membership_surfaces`) before re-raising, so the failure propagates to
-`settle_out_of_combat_cast`'s own outer rollback with no in-process cache left holding a rolled-back
-value. The scan SHALL also return its snapshot (as `_CoercionRestoreState`), and
-`settle_out_of_combat_cast` SHALL restore it from its outer `except` block when a later step of the
-transaction — after the scan's penalty block succeeded — fails (for example the clock advance), so a
-rolled-back penalty is never left readable through the in-process idmapper cache.
+`world/rules/cast_settlement.py::settle_out_of_combat_cast` SHALL call `_scan_out_of_combat_sexual_coercion(request.actor, request.targets, result.event_log)` inside the same outer `transaction.atomic()` that wraps `ActionResolver.resolve` and the clock advance, immediately after a successful resolution and before the clock advance. A rejected resolution SHALL never invoke the scan.
 
 #### Scenario: A successful out-of-combat forced cast commits the penalty with the rest of the settlement
 - **WHEN** a player casts a resistible sexual act on a present `NPC` out of combat and the target's
@@ -118,6 +108,22 @@ rolled-back penalty is never left readable through the in-process idmapper cache
 - **THEN** the penalized `NPC` targets' `relations_data` and the actor's party-membership surfaces read
   back at their pre-cast values both through a fresh database read and through the in-process idmapper
   cache, and no partial resolution, practice award, or clock advance persists
+
+#### Scenario: The scan snapshots the surfaces it will touch before penalizing
+- **WHEN** `_scan_out_of_combat_sexual_coercion` is about to apply any penalty
+- **THEN** it first snapshots the touched `NPC` targets' `relations_data` and the actor's party-membership surfaces
+
+#### Scenario: The scan restores its own snapshots before re-raising
+- **WHEN** applying a penalty or its resulting auto-leave raises inside the scan
+- **THEN** the scan restores the snapshotted surfaces (through `world.rules.affinity.restore_relations_surfaces` and `world.rules.party.restore_membership_surfaces`) before re-raising, so the failure propagates to `settle_out_of_combat_cast`'s own outer rollback with no in-process cache left holding a rolled-back value
+
+#### Scenario: The scan hands its snapshot back for the outer rollback
+- **WHEN** `_scan_out_of_combat_sexual_coercion` completes
+- **THEN** it returns its snapshot (as `_CoercionRestoreState`)
+
+#### Scenario: The settlement restores the returned snapshot from its outer except block
+- **WHEN** a later step of the transaction — after the scan's penalty block succeeded — fails (for example the clock advance)
+- **THEN** `settle_out_of_combat_cast` restores the returned snapshot from its outer `except` block, so a rolled-back penalty is never left readable through the in-process idmapper cache
 
 ### Requirement: An out-of-combat forced act's party auto-leave notification reaches the player
 When a penalty applied by `_scan_out_of_combat_sexual_coercion` drops a companion `NPC`'s affinity below

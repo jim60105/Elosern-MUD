@@ -10,10 +10,7 @@ Defines target resolution as four ordered validations — presence, alive, range
 (3) range, (4) faction constraint. Each validation SHALL reject with its own named `RejectReason` when
 it fails, and no later validation SHALL run for a candidate that already failed an earlier one for
 `TargetSpec.SINGLE`. The faction check enforces only the self-only rule carried by the supplied
-`TargetRequirement`: for `ANY` requirements every relation passes; for `SELF_ONLY` requirements only
-the actor passes. A requirement whose `forbid_self` flag is set SHALL additionally reject the actor as
-a `SINGLE` target with `RejectReason.TARGET_SPEC_MISMATCH`. The resolver SHALL NOT inspect the
-identity, category, or effect list of whatever definition produced the requirement.
+`TargetRequirement`.
 
 #### Scenario: A target not present in the room or battlefield rejects at presence
 - **WHEN** target resolution runs against a candidate `context.is_present()` reports `False` for
@@ -50,18 +47,25 @@ identity, category, or effect list of whatever definition produced the requireme
   and once constructed directly with no definition behind it
 - **THEN** both resolutions accept and reject exactly the same candidates for the same reasons
 
+#### Scenario: ANY requirements pass every relation at the faction check
+- **WHEN** the faction check evaluates a requirement whose constraint is `ANY`
+- **THEN** every relation passes
+
+#### Scenario: SELF_ONLY requirements pass only the actor at the faction check
+- **WHEN** the faction check evaluates a requirement whose constraint is `SELF_ONLY`
+- **THEN** only the actor passes
+
+#### Scenario: The resolver ignores the producing definition's other properties
+- **WHEN** the resolver processes any requirement
+- **THEN** it SHALL NOT inspect the identity, category, or effect list of whatever definition
+  produced the requirement
+
 ### Requirement: SINGLE and AREA target specs filter candidates differently
-Target-shape validation SHALL run before candidate validation. `TargetSpec.NONE` SHALL accept no
-candidates. `TargetSpec.SELF` SHALL accept empty input normalized to the actor or exactly one
-explicit candidate identical to the actor, preserving trusted direct policy requests while rejecting
-every other shape. `TargetSpec.SINGLE` SHALL require exactly one explicit candidate and SHALL reject
-shorthand. `TargetSpec.AREA` SHALL require either a nonempty explicit candidate list with no
-duplicate object identity or one approved shorthand. A shape violation SHALL reject with
+Target-shape validation SHALL run before candidate validation, and a shape violation SHALL reject with
 `RejectReason.TARGET_SPEC_MISMATCH` before candidate validation. After shape validation, SELF and
 SINGLE candidate failure SHALL reject the entire action with the first of the four ordered
-validation reasons. AREA candidates SHALL be validated independently and invalid candidates SHALL be
-silently dropped; a valid AREA input whose final target list is empty after filtering SHALL reject with
-`RejectReason.NO_VALID_TARGETS_IN_AREA` before effect resolution or resource deduction.
+validation reasons, while AREA candidates SHALL be validated independently and invalid candidates
+SHALL be silently dropped.
 
 #### Scenario: SINGLE rejects the whole action on one invalid target
 - **WHEN** a `TargetSpec.SINGLE` skill is resolved against one dead target
@@ -89,16 +93,34 @@ silently dropped; a valid AREA input whose final target list is empty after filt
 - **WHEN** an explicit AREA list contains the same object identity more than once
 - **THEN** it rejects with `RejectReason.TARGET_SPEC_MISMATCH` before filtering, effect staging, or resource deduction
 
+#### Scenario: SELF accepts only actor-normalized input
+- **WHEN** a `TargetSpec.SELF` skill receives input
+- **THEN** it accepts empty input normalized to the actor or exactly one explicit candidate
+  identical to the actor, preserving trusted direct policy requests while rejecting every other shape
+
+#### Scenario: SINGLE requires exactly one explicit candidate
+- **WHEN** a `TargetSpec.SINGLE` skill's input shape is validated
+- **THEN** it requires exactly one explicit candidate and rejects shorthand
+
+#### Scenario: AREA requires a clean list or approved shorthand
+- **WHEN** a `TargetSpec.AREA` skill's input shape is validated
+- **THEN** it requires either a nonempty explicit candidate list with no duplicate object identity
+  or one approved shorthand
+
+#### Scenario: NONE accepts no candidates
+- **WHEN** a `TargetSpec.NONE` skill's input shape is validated
+- **THEN** it accepts no candidates — any supplied target is a shape violation
+
+#### Scenario: An emptied AREA list rejects before effects or resources
+- **WHEN** a valid AREA input's final target list is empty after filtering
+- **THEN** it rejects with `RejectReason.NO_VALID_TARGETS_IN_AREA` before effect resolution or
+  resource deduction
+
 ### Requirement: Targeting rules are supplied by a definition-owned TargetRequirement
 `world/rules/targeting.py` SHALL resolve targets against a `TargetRequirement` value — carrying the
-target shape (`TargetSpec`), the `FactionConstraint` (`ANY`/`SELF_ONLY`; legacy `ALLY`/`ENEMY` values
-are retained for legacy test data and restrict nothing), and a `forbid_self` flag — produced by the
-definition being acted on, never assembled by the calling request. A skill definition SHALL expose its
-own requirement; any other kind of definition that can describe these three rules SHALL be able to use
-the identical resolver without owning or fabricating a skill. Faction validation SHALL compare the
-requirement's constraint against `context.relation_to(actor, target)`, which SHALL return
-`Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean in-combat flag. The `ANY`
-value is the default and accepts every `Relation` value; `SELF_ONLY` accepts only `Relation.SELF`.
+target shape (`TargetSpec`), the `FactionConstraint` (`ANY`/`SELF_ONLY`), and a `forbid_self` flag —
+produced by the definition being acted on, never assembled by the calling request. Faction validation
+SHALL compare the requirement's constraint against `context.relation_to(actor, target)`.
 
 #### Scenario: The skill's own constraint governs, regardless of who casts it or how
 - **WHEN** two different callers both invoke the same `skill_key` against the same target, once from
@@ -122,6 +144,26 @@ value is the default and accepts every `Relation` value; `SELF_ONLY` accepts onl
 - **THEN** resolution succeeds and applies the identical four ordered validations, with no skill
   definition supplied at any point
 
+#### Scenario: relation_to returns a three-way Relation
+- **WHEN** `context.relation_to(actor, target)` is called
+- **THEN** it returns `Relation.SELF`, `Relation.ALLY`, or `Relation.ENEMY` — never a boolean
+  in-combat flag
+
+#### Scenario: ANY is the default and accepts every Relation
+- **WHEN** a requirement carries the `ANY` constraint value
+- **THEN** it is the default and accepts every `Relation` value; `SELF_ONLY` accepts only
+  `Relation.SELF`
+
+#### Scenario: Legacy constraint values are retained but restrict nothing
+- **WHEN** a requirement carries a legacy `ALLY`/`ENEMY` `FactionConstraint` value
+- **THEN** those values are retained for legacy test data and restrict nothing
+
+#### Scenario: Any definition describing the three rules can use the resolver
+- **WHEN** a skill definition or any other kind of definition that can describe these three rules
+  needs targeting
+- **THEN** a skill definition exposes its own requirement, and any other such definition can use the
+  identical resolver without owning or fabricating a skill
+
 ### Requirement: Out-of-combat targeting has no hostility model
 `RoomActionContext.relation_to()` SHALL return `Relation.SELF` for the actor itself and
 `Relation.ALLY` for every other present entity — never `Relation.ENEMY` — so that a definition whose
@@ -143,15 +185,9 @@ legacy test data, never declared by shipped skills) restrict nothing.
 ### Requirement: Combat shortcuts are convenience UI, not permission boundaries
 `expand_target_shorthand(actor, context, shorthand)` SHALL resolve `all-enemies`,
 `all-allies`, and `all` into an explicit deterministic candidate list of live entity values drawn from
-`context.battlefield.roster`. Shorthand SHALL be accepted only for a `TargetSpec.AREA` skill. When the
-roster is a mapping keyed by entity key, expansion SHALL use
-its values rather than its keys. The resulting candidates SHALL be validated by the identical
-four-step AREA-filtering logic used for an explicitly supplied target list; no validation SHALL be
-skipped.
-`all-allies` SHALL include both `Relation.ALLY` entities and the actor's `Relation.SELF` entity.
-Shorthand selection is a convenience for the player and neither widens nor narrows the skill's
-targeting scope: the same candidates would be valid if listed explicitly, and an `ANY` skill may
-still be given explicit ally or enemy targets.
+`context.battlefield.roster`. Shorthand SHALL be accepted only for a `TargetSpec.AREA` skill. The
+resulting candidates SHALL be validated by the identical four-step AREA-filtering logic used for an
+explicitly supplied target list; no validation SHALL be skipped.
 
 #### Scenario: A dead ally on the roster is filtered out of all-allies, not included
 - **WHEN** `all-allies` expands to a roster mapping that includes one dead ally
@@ -184,15 +220,26 @@ still be given explicit ally or enemy targets.
 - **WHEN** a SINGLE skill receives `all-enemies` in a battlefield containing exactly one enemy
 - **THEN** target-shape validation rejects with `RejectReason.TARGET_SPEC_MISMATCH` before expansion can authorize it
 
+#### Scenario: Expansion reads a mapping roster's values not its keys
+- **WHEN** the roster is a mapping keyed by entity key
+- **THEN** expansion uses its values rather than its keys
+
+#### Scenario: all-allies includes allies and the actor
+- **WHEN** `all-allies` is expanded
+- **THEN** it includes both `Relation.ALLY` entities and the actor's `Relation.SELF` entity
+
+#### Scenario: Shorthand never changes the skill's targeting scope
+- **WHEN** a player selects a shorthand
+- **THEN** it is a convenience that neither widens nor narrows the skill's targeting scope: the same
+  candidates would be valid if listed explicitly, and an `ANY` skill may still be given explicit ally
+  or enemy targets
+
 ### Requirement: ActionContext is a shared protocol implemented differently by combat and non-combat
 callers
 `world/rules/targeting.py` SHALL define `ActionContext` as a protocol (`battlefield`, `is_present()`,
 `relation_to()`, `is_in_range()`) consumed identically regardless of implementation.
 `is_in_range()` SHALL take exactly `(actor, target)`: range is a property of the two entities and the
-world, never of the definition being acted on, so no implementation can branch on what is being used.
-`RoomActionContext` SHALL be a complete, built implementation for out-of-combat use.
-`BattlefieldActionContext` SHALL be declared as the conformance target for change 9, not implemented by
-this change.
+world, never of the definition being acted on.
 
 #### Scenario: RoomActionContext satisfies the full protocol
 - **WHEN** `RoomActionContext` is constructed with a room and queried via all four protocol members
@@ -209,6 +256,12 @@ this change.
 - **WHEN** `is_in_range()` is inspected on every shipped implementation
 - **THEN** its parameter list is exactly `(actor, target)` and no implementation receives a skill,
   item, or other definition
+
+#### Scenario: The two implementations split by context
+- **WHEN** the protocol's implementations are inspected
+- **THEN** `RoomActionContext` is a complete, built implementation for out-of-combat use, and
+  `BattlefieldActionContext` is declared as the conformance target for change 9, not implemented by
+  this change
 
 ### Requirement: RoomActionContext exposes the room through event_context
 `world/rules/targeting.py`'s `RoomActionContext.__init__` SHALL copy the caller-supplied

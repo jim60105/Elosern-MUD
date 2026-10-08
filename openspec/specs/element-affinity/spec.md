@@ -13,10 +13,8 @@ gate-only value and never a stored trait.
 `world/rules/progression.py` SHALL define `element_affinity_multiplier(entity, element: str) ->
 float` as a pure read-only query that reads `entity.db.affinity_elements` and returns exactly `1.1`
 when `element` is in that collection, `0.9` when the collection is non-empty and `element` is not in
-it, and `1.0` when the collection is empty or absent. The `1.1` and `0.9` constants SHALL be read
-from `progression.yaml` (`affinity_element_multiplier` / `non_affinity_element_multiplier`) and SHALL
-be finite and non-negative. An unrecognized element key SHALL raise `ValueError`. This function SHALL
-NOT write any entity attribute.
+it, and `1.0` when the collection is empty or absent. An unrecognized element key SHALL raise
+`ValueError`. This function SHALL NOT write any entity attribute.
 
 #### Scenario: A neutral entity returns 1.0 for every element
 - **WHEN** `element_affinity_multiplier(entity, "fire")` is called on an entity with no
@@ -37,21 +35,18 @@ NOT write any entity attribute.
 - **WHEN** `element_affinity_multiplier(entity, "not_an_element")` is called
 - **THEN** it raises `ValueError` and no attribute is written
 
+#### Scenario: Multiplier constants come from progression.yaml
+- **WHEN** the multiplier constants are loaded
+- **THEN** the `1.1` and `0.9` values are read from `progression.yaml`
+  (`affinity_element_multiplier` / `non_affinity_element_multiplier`) and are finite and
+  non-negative
+
 ### Requirement: affinity_elements is one validated per-entity source of truth
 An entity's affinity set SHALL be stored in exactly one attribute, `entity.db.affinity_elements`, as
 a list of lowercase, de-duplicated element keys each present in `ELEMENT_REGISTRY`. Every identity
 channel that grants affinities (player preset, custom creation, character import) SHALL write this
 attribute inside its normal all-or-nothing write; no rule SHALL consult `Subrace.affinity_elements`
-at cast time. For elves the subrace is the sole affinity authority in every channel: the set is
-always seeded from `SUBRACE_REGISTRY[subrace].affinity_elements`, an elf preset SHALL declare an
-empty set (validated at registry load), and an elf-supplied set from custom creation or import SHALL
-be rejected. The subrace seed itself SHALL be validated (every key exists in `ELEMENT_REGISTRY`, no
-duplicates) when the registry loads or when the seed is resolved, so an invalid seed can never be
-persisted. An entity with an empty or absent affinity set is neutral and gets the `1.0` multiplier
-for every element. The multiplier is a pure transient factor: it is never stored, never
-replaces `magic_power`, and never changes `magic_power.max`. Its live consumer is
-`use-driven-skill-lineage`'s practice-XP formula (favored element x1.1, non-favored x0.9,
-physical or non-elemental x1.0).
+at cast time.
 
 #### Scenario: An elf subrace seed may exceed the player input bound
 - **WHEN** an eolas elf activates with `SUBRACE_REGISTRY["eolas"].affinity_elements` (all eight
@@ -72,3 +67,25 @@ physical or non-elemental x1.0).
 #### Scenario: An invalid subrace seed fails closed
 - **WHEN** a subrace's `affinity_elements` contains an unknown element key or a duplicate
 - **THEN** registry load or seed resolution raises, and no entity persists the invalid set
+
+#### Scenario: Elf subrace is the sole affinity authority
+- **WHEN** any identity channel grants affinities to an elf
+- **THEN** the set is always seeded from `SUBRACE_REGISTRY[subrace].affinity_elements`, an elf
+  preset declares an empty set (validated at registry load), and an elf-supplied set from custom
+  creation or import is rejected
+
+#### Scenario: Subrace seeds are validated before persistence
+- **WHEN** the subrace seed is loaded or resolved
+- **THEN** it is validated — every key exists in `ELEMENT_REGISTRY`, no duplicates — so an
+  invalid seed can never be persisted
+
+#### Scenario: The multiplier is a pure transient factor
+- **WHEN** the affinity multiplier is applied
+- **THEN** it is never stored, never replaces `magic_power`, and never changes `magic_power.max`;
+  an entity with an empty or absent affinity set is neutral and gets the `1.0` multiplier for
+  every element
+
+#### Scenario: The live consumer is the practice-XP formula
+- **WHEN** skill practice XP is awarded under `use-driven-skill-lineage`
+- **THEN** the formula applies the multiplier: favored element ×1.1, non-favored ×0.9, physical
+  or non-elemental ×1.0

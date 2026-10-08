@@ -10,7 +10,7 @@ production paths that do not go through import or characterization.
 
 ### Requirement: Procedurally spawned NPCs carry canonical age attributes
 
-The system SHALL persist `age` and `apparent_age` as part of each production spawn/sync flow, independently setting only absent fields. When that source authors a validated canonical age pair, each absent field SHALL receive its corresponding authored value; otherwise each absent field SHALL receive the generic baseline 18. Authored age values SHALL be integers, never booleans, within inclusive 0..10000. A present age SHALL NOT be overwritten by defaults, source changes, restart, or edited persona text.
+The system SHALL persist `age` and `apparent_age` in every production spawn/sync flow, setting only absent fields, each independently. When the source authors a validated canonical age pair, each absent field SHALL receive its authored value; otherwise it SHALL receive the generic baseline 18. Authored ages SHALL be integers, never booleans, within inclusive 0..10000. A present age SHALL NOT be overwritten by defaults, source changes, restart, or edited persona text.
 
 #### Scenario: Spawn without existing age gets the default age
 - **WHEN** an NPC is created by an unauthored production spawn or sync path and has no `age` or `apparent_age`

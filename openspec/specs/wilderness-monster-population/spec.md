@@ -11,20 +11,8 @@ decision.
 ### Requirement: population_for_coordinates is a pure, deterministic function over the bounded map
 `world/maps/wilderness_population.py` SHALL define a frozen `MonsterPopulation` dataclass carrying
 `tier: str` and `name_zh: str`, and a pure function `population_for_coordinates(x: int, y: int) ->
-MonsterPopulation | None`. For every valid `(x, y)`, the function SHALL read no database state, no
-network state, no random or wall-clock input, and SHALL return the same value for the same input on
-every call. A returned `tier` SHALL name a key of `world.lore.monsters.MONSTER_TIER_REGISTRY`, and a
-returned `name_zh` SHALL be drawn from that tier's `example_monsters_zh`.
-
-The function SHALL define immutable `_REGION_TIER` and `_REGION_DENSITY` mappings covering every key
-of `WILDERNESS_REGION_REGISTRY`: `western_hills_valleys`, `southwest_coast`, `southeast_coast`, and
-`eastern_plains` at `low` tier; `northwest_highland_forest` at `mid`; `north_deep_forest` and
-`central_mountains` at `high`. Presence outside the hunting band SHALL use
-`(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the named densities (6 / 3 / 3 / 3 / 7 /
-8 / 8 in registry order). The returned monster name SHALL be selected by
-`name_index = (x * 92821 + y * 68917) % len(tier.example_monsters_zh)` on every branch, hunting band
-included — the same multiplier pair as the terrain spec, with the index expression explicit so the
-entry pin is formula-derived, not special-cased.
+MonsterPopulation | None` that reads no database state, no network state, and no random or
+wall-clock input.
 
 #### Scenario: Same input always returns the same output
 - **WHEN** `population_for_coordinates(x, y)` is called twice with the same `(x, y)` in the same
@@ -53,6 +41,28 @@ entry pin is formula-derived, not special-cased.
   presence formula yields `>= _REGION_DENSITY`
 - **THEN** `population_for_coordinates` returns `None`
 
+#### Scenario: Returned values are drawn from the tier registry
+- **WHEN** `population_for_coordinates` returns a non-`None` population
+- **THEN** its `tier` names a key of `world.lore.monsters.MONSTER_TIER_REGISTRY` and its `name_zh`
+  is drawn from that tier's `example_monsters_zh`
+
+#### Scenario: Region mappings are immutable and cover every registry key
+- **WHEN** the function's `_REGION_TIER` and `_REGION_DENSITY` mappings are inspected
+- **THEN** they are immutable and cover every key of `WILDERNESS_REGION_REGISTRY`:
+  `western_hills_valleys`, `southwest_coast`, `southeast_coast`, and `eastern_plains` at `low` tier;
+  `northwest_highland_forest` at `mid`; `north_deep_forest` and `central_mountains` at `high`
+
+#### Scenario: Presence outside the hunting band follows the density formula
+- **WHEN** presence is decided for a coordinate outside the hunting band
+- **THEN** it uses `(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the named densities
+  (6 / 3 / 3 / 3 / 7 / 8 / 8 in registry order)
+
+#### Scenario: Name selection is formula-derived on every branch
+- **WHEN** the returned monster name is selected, on any branch including the hunting band
+- **THEN** it uses `name_index = (x * 92821 + y * 68917) % len(tier.example_monsters_zh)` — the same
+  multiplier pair as the terrain spec, with the index expression explicit so the entry pin is
+  formula-derived, not special-cased
+
 ### Requirement: A hunting band around the capital's north gate always hosts a low-tier monster
 Every provider-valid coordinate within Chebyshev distance 3 of the `capital_altoria` entry's
 north-gate `approach_cell` `(60, 103)` — the cell a traveler lands on leaving the 北門 toward the
@@ -73,33 +83,10 @@ band members.
 
 ### Requirement: ensure_population idempotently places and respawns monsters at a coordinate
 `world/maps/wilderness_population.py` SHALL define `ensure_population(wilderness, coordinates) ->
-None` that reconciles a wilderness coordinate against `population_for_coordinates`. Every monster it
-creates SHALL carry a persistent ownership marker `monster.db.population_key ==
-"wilderness:{x}:{y}"` for its coordinate; reconciliation SHALL act only on monsters bearing a matching
-marker and SHALL never delete, move, or modify any other `Monster` at the coordinate:
-- When the model returns `None`, SHALL delete and remove from `wilderness.db.itemcoordinates` every
-  marker-matching `Monster` at the coordinate (stale-cleanup), leaving foreign monsters untouched.
-- When the model returns a population, SHALL reconcile the coordinate to exactly one living
-  marker-matching `Monster`: delete/pop dead or surplus marker-matching monsters, then create one
-  `Monster` with `threat_tier` set to the model's tier, `apply_monster_tier("floor")` applied, its
-  `db.skills` left at the innate-only default, `db.population_key` set, registered at
-  `wilderness.db.itemcoordinates[monster] == coordinates`, and `.location` set to the room currently
-  active at that coordinate if one exists. When exactly one living marker-matching monster whose
-  `threat_tier` and key still match the model already exists, SHALL make no change; a marker-matching
-  monster that has drifted from the model (wrong tier or name), a dead marker-matching monster, or any
-  surplus marker-matching monsters SHALL be deleted and replaced by one fresh `Monster` matching the
-  model.
-- When the regional ambient placement rules cover the coordinate's region, the reconciliation SHALL
-  additionally reconcile the species-bearing ambient individuals those rules author, within the
-  authored regional quantity and capacity, building each through the individual construction owner from
-  an authored variant key selected by the same pure coordinate-hash determinism (no RNG, no database
-  state, no wall clock), each additionally carrying its ambient ownership marker. Species-bearing
-  reconciliation SHALL stay inside this owner's marker domain and SHALL NOT act on site-, quest-,
-  story-, or session-owned individuals, and the tier-example branch above SHALL keep its current
-  behaviour for coordinates the ambient species rules do not cover.
-
-The created monster SHALL be engageable and defeatable through the existing player combat-session
-path without further setup.
+None` that reconciles a wilderness coordinate against `population_for_coordinates`, leaving it
+conforming to the model. Every monster it creates SHALL carry a persistent ownership marker
+`monster.db.population_key == "wilderness:{x}:{y}"` for its coordinate; reconciliation SHALL act
+only on monsters bearing a matching marker.
 
 #### Scenario: An empty coordinate is populated once
 - **WHEN** `ensure_population` is called for a coordinate whose model returns a population and which
@@ -145,6 +132,43 @@ path without further setup.
 #### Scenario: Ambient species selection is pure across restarts
 - **WHEN** the ambient species selection for one coordinate is recomputed in a fresh process
 - **THEN** it selects the same authored variant with no RNG, database, or wall-clock input
+
+#### Scenario: Stale cleanup removes every marker-matching monster when the model returns None
+- **WHEN** the model returns `None` for a coordinate holding marker-matching monsters
+- **THEN** reconciliation deletes them and removes them from `wilderness.db.itemcoordinates`,
+  leaving foreign monsters untouched
+
+#### Scenario: A created monster is fully configured
+- **WHEN** reconciliation creates a `Monster` for a populated coordinate
+- **THEN** it has `threat_tier` set to the model's tier, `apply_monster_tier("floor")` applied, its
+  `db.skills` left at the innate-only default, `db.population_key` set, is registered at
+  `wilderness.db.itemcoordinates[monster] == coordinates`, and `.location` is set to the room
+  currently active at that coordinate if one exists
+
+#### Scenario: An already-matching monster is left untouched
+- **WHEN** exactly one living marker-matching monster whose `threat_tier` and key still match the
+  model already exists at a populated coordinate
+- **THEN** reconciliation makes no change
+
+#### Scenario: Foreign monsters are never deleted, moved, or modified
+- **WHEN** reconciliation runs at a coordinate hosting monsters without a matching marker
+- **THEN** it never deletes, moves, or modifies any other `Monster` at the coordinate
+
+#### Scenario: Ambient individuals are built through the construction owner
+- **WHEN** regional ambient placement rules cover the coordinate's region and species-bearing
+  reconciliation creates ambient individuals
+- **THEN** each is built through the individual construction owner from an authored variant key
+  selected by the same pure coordinate-hash determinism, within the authored regional quantity and
+  capacity, and each additionally carries its ambient ownership marker
+
+#### Scenario: Uncovered coordinates keep the tier-example branch
+- **WHEN** the ambient species rules do not cover a coordinate's region
+- **THEN** the tier-example branch keeps its current behaviour for that coordinate
+
+#### Scenario: Created monsters are immediately combat-ready
+- **WHEN** a player engages a monster created by `ensure_population`
+- **THEN** it is engageable and defeatable through the existing player combat-session path without
+  further setup
 
 ### Requirement: A registered wilderness monster survives room recycling
 A monster registered through `ensure_population` SHALL be tracked by the wilderness script's

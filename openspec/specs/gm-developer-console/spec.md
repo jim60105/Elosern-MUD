@@ -7,7 +7,7 @@ Provide a protected, recoverable developer console for operator-directed world r
 
 ### Requirement: Protected deterministic console boundary
 
-All console routes SHALL reuse landed Developer/superuser access, same-origin session transport, JSON envelopes, CSRF protection on POST, resolver coverage and request/denial events. Only registered owner-backed domain verbs and the server-owned raw editing boundary SHALL apply console state changes; the web layer SHALL validate transport shape and forward without writing persistent fields. Runtime inspection readers, dashboard GET and recall SHALL remain immutable. Authored data SHALL remain read-only, AI SHALL remain unable to apply state, and the isolated GM bundle SHALL remain operational without LLM/SD services. Arbitrary code execution, typeclass editing, non-Evennia-model raw editing and an audit model SHALL NOT be exposed.
+All console routes SHALL reuse landed Developer/superuser access, same-origin session transport, JSON envelopes, CSRF protection on POST, resolver coverage and request/denial events. Only registered owner-backed domain verbs and the server-owned raw editing boundary SHALL apply console state changes; the web layer SHALL validate transport shape and forward without writing persistent fields.
 
 #### Scenario: Access and CSRF matrix
 - **WHEN** anonymous, ordinary, Developer and superuser accounts call every console route, and privileged POSTs have missing, invalid or valid CSRF tokens
@@ -21,9 +21,23 @@ All console routes SHALL reuse landed Developer/superuser access, same-origin se
 - **WHEN** the console is used with external generation services offline
 - **THEN** local operations remain usable, no authored registry/rulebook/prompt source is written, and game bundle, OOB and /admin/ contracts remain unchanged
 
+#### Scenario: Readers stay immutable
+- **WHEN** runtime inspection readers, dashboard GET and recall are exercised
+- **THEN** they remain immutable
+
+#### Scenario: Authored-data, AI and bundle isolation guarantees
+- **WHEN** the console's isolation guarantees are checked
+- **THEN** authored data remains read-only, AI remains unable to apply state, and the isolated GM
+  bundle remains operational without LLM/SD services
+
+#### Scenario: Exposed-surface exclusions
+- **WHEN** the console's exposed surface is enumerated
+- **THEN** arbitrary code execution, typeclass editing, non-Evennia-model raw editing and an audit
+  model are not exposed
+
 ### Requirement: Tick-conditioned recoverable intervention
 
-Before every dispatched domain verb or raw batch, the console SHALL compare the current in-game tick — read inside the same serialized gameplay boundary that performs the operation — with a process-memory baseline. No baseline after process start, or any difference from it, SHALL require a complete `auto_intervention` save through the existing save subsystem before executing the operation. An unchanged tick SHALL take no new save. After an executed write attempt, the baseline SHALL become the tick represented by the save that gated that attempt plus the operation's own clock advance (the advanced seconds after a successful in-game clock advance, zero otherwise, including for a rejected operation), so a player tick progressed after that save is never absorbed; a rejected operation SHALL leave game state unchanged, although a successfully created pre-save SHALL remain available. A failed snapshot, or a console request that cannot obtain the serialization it needs, SHALL return `snapshot_failed`, leave the operation unexecuted and the baseline unchanged, and SHALL NOT claim a save was taken. A save whose copied database carries no world clock SHALL leave the baseline unset rather than substitute a live value, so the next console write takes a new save. Successful manual saves SHALL reset the baseline to the tick their own copied database represents, never a later live read; failed manual saves SHALL not reset it, and a manual-save attempt that meets contention SHALL keep its existing fail-fast refusal instead of queueing behind a console operation. The baseline SHALL not be persisted or inferred from old saves after process restart.
+Before every dispatched domain verb or raw batch, the console SHALL compare the current in-game tick — read inside the same serialized gameplay boundary that performs the operation — with a process-memory baseline. No baseline after process start, or any difference from it, SHALL require a complete `auto_intervention` save through the existing save subsystem before executing the operation. An unchanged tick SHALL take no new save.
 
 #### Scenario: First write and process restart
 - **WHEN** a registered console write is dispatched with no baseline, including the first write after restart with old saves present
@@ -57,9 +71,36 @@ Before every dispatched domain verb or raw batch, the console SHALL compare the 
 - **WHEN** a completed pre-save's copied database carries no world clock
 - **THEN** no live value is substituted, the baseline is left unset so the next console write takes a save, and the operation still reports its real completed save
 
+#### Scenario: Clock-advance absorption detail
+- **WHEN** the baseline is recomputed after an executed write attempt
+- **THEN** the baseline becomes the tick represented by the save that gated that attempt plus the
+  operation's own clock advance — the advanced seconds after a successful in-game clock advance,
+  zero otherwise, including for a rejected operation — so a player tick progressed after the gating
+  save is never absorbed
+
+#### Scenario: Rejected operation after a completed pre-save
+- **WHEN** an operation is rejected after its pre-save completed
+- **THEN** it leaves game state unchanged, although the successfully created pre-save remains
+  available
+
+#### Scenario: Snapshot failure and serialization refusal semantics
+- **WHEN** a snapshot fails, or a console request cannot obtain the serialization it needs
+- **THEN** the request returns `snapshot_failed`, leaves the operation unexecuted and the baseline
+  unchanged, and does not claim a save was taken
+
+#### Scenario: Manual-save baseline reset
+- **WHEN** a manual save succeeds or fails, or a manual-save attempt meets contention
+- **THEN** a successful save resets the baseline to the tick its own copied database represents,
+  never a later live read; a failed save does not reset it, and a contended attempt keeps its
+  existing fail-fast refusal instead of queueing behind a console operation
+
+#### Scenario: Baseline is process-memory only
+- **WHEN** the process restarts with old saves present
+- **THEN** the baseline was never persisted and is not inferred from old saves
+
 ### Requirement: Gameplay-thread serialized console execution
 
-Every console operation SHALL run as one synchronous operation on the gameplay event loop that owns world-state writes, never on the request thread, so that no player action can interleave between its tick check, its state change and any compensation. While that loop is not running at all — deterministic tests, management commands, or a server already shutting down — the operation SHALL run inline on the request thread instead, because no concurrent gameplay exists to serialize with; a handoff attempted from inside a handoff SHALL refuse with `snapshot_failed` rather than block. The pre-save and all snapshot file work SHALL complete on the request thread before that operation, outside any game transaction and without holding the art gate the gameplay loop needs. The console's serialization SHALL be taken without waiting — a request that cannot take it SHALL refuse rather than queue — and the gameplay-thread operation SHALL NOT take the console's own serialization, so the two can never deadlock.
+Every console operation SHALL run as one synchronous operation on the gameplay event loop that owns world-state writes, never on the request thread, so that no player action can interleave between its tick check, its state change and any compensation. The pre-save and all snapshot file work SHALL complete on the request thread before that operation.
 
 #### Scenario: Player action cannot interleave with a console operation
 - **WHEN** a player inventory or time change is attempted while a console operation is executing on the gameplay event loop
@@ -73,9 +114,30 @@ Every console operation SHALL run as one synchronous operation on the gameplay e
 - **WHEN** a console write requires a pre-save
 - **THEN** the backup, art mirror and manifest write complete on the request thread before the state change starts, and the operation's own transaction contains no file I/O
 
+#### Scenario: Snapshot work excludes game transactions and the art gate
+- **WHEN** snapshot file work runs on the request thread
+- **THEN** it runs outside any game transaction and without holding the art gate the gameplay loop
+  needs
+
+#### Scenario: Inline execution while the gameplay loop is down
+- **WHEN** the gameplay event loop is not running at all — deterministic tests, management commands,
+  or a server already shutting down
+- **THEN** the operation runs inline on the request thread instead, because no concurrent gameplay
+  exists to serialize with
+
+#### Scenario: Nested handoff refuses instead of blocking
+- **WHEN** a handoff is attempted from inside a handoff
+- **THEN** it refuses with `snapshot_failed` rather than block
+
+#### Scenario: Serialization is taken without waiting
+- **WHEN** the console's serialization is acquired
+- **THEN** it is taken without waiting — a request that cannot take it refuses rather than queues —
+  and the gameplay-thread operation does not take the console's own serialization, so the two can
+  never deadlock
+
 ### Requirement: Complete validated domain verb batch
 
-The console SHALL expose exactly the approved first batch: `give_item`, `take_item`, `set_wallet`, `set_trait_base`, `set_gauge`, `advance_clock`, `teleport`, `spawn_monster`, `delete_entity`, `set_quest_state`, `set_quest_stage`, `issue_quest`, `retract_memory` and `supersede_memory`. Each SHALL validate argument types, ranges, registry keys, target existence and target kind before its game-state writes. Numeric integer arguments SHALL reject booleans rather than silently treating them as integers. Invalid inputs and execution failures SHALL leave all affected persistent and live cached state unchanged and return stable errors; valid operations SHALL be all-or-nothing, including cascaded state.
+The console SHALL expose exactly the approved first batch: `give_item`, `take_item`, `set_wallet`, `set_trait_base`, `set_gauge`, `advance_clock`, `teleport`, `spawn_monster`, `delete_entity`, `set_quest_state`, `set_quest_stage`, `issue_quest`, `retract_memory` and `supersede_memory`. Each SHALL validate argument types, ranges, registry keys, target existence and target kind before its game-state writes.
 
 #### Scenario: Closed registry and verb validation matrix
 - **WHEN** every named verb is exercised with valid arguments and each invalid type, range, missing key, missing target and incompatible target-kind case
@@ -85,9 +147,19 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 - **WHEN** a failure is injected after an initial mutation in each verb, including its dependent settlement or cleanup
 - **THEN** persistent rows, Attributes, traits, locations, pins and applicable live registrations match pre-operation state and no success action is reported
 
+#### Scenario: Booleans are rejected as numeric integers
+- **WHEN** a numeric integer argument receives a boolean
+- **THEN** it is rejected rather than silently treated as an integer
+
+#### Scenario: Failure and atomicity outcomes
+- **WHEN** an input is invalid or execution fails
+- **THEN** all affected persistent and live cached state is left unchanged and a stable error is
+  returned
+- **AND** valid operations are all-or-nothing, including cascaded state
+
 ### Requirement: Inventory wallet and trait operations
 
-`give_item` and `take_item` SHALL accept a registered item key and positive integer quantity, apply the complete inventory delta and preserve acquisition/quest consequences. The canonical repeated-key inventory SHALL stay authoritative while its existing materialized item objects stay in sync: granting a key SHALL materialize its contained object, and taking a key SHALL remove one matching held object when one exists, so a mixed or key-only holding is never left in a state ordinary drop/give refuses and a partial removal never leaves surplus objects. Taking an equipped item SHALL synchronize its equipment state and gauge limits rather than reject solely because it is equipped. `set_wallet` SHALL accept only integer copper at least zero. `set_trait_base` SHALL store a literal base within the authoritative trait scale, never a skill-multiplied or disguise value. `set_gauge` SHALL change a known gauge within its authoritative current bounds. Unknown item or trait keys and impossible quantities/values SHALL be rejected without partial writes.
+`give_item` and `take_item` SHALL accept a registered item key and positive integer quantity, apply the complete inventory delta and preserve acquisition/quest consequences. The canonical repeated-key inventory SHALL stay authoritative while its existing materialized item objects stay in sync. Taking an equipped item SHALL synchronize its equipment state and gauge limits rather than reject solely because it is equipped.
 
 #### Scenario: Item grant and equipped removal
 - **WHEN** registered items are granted in quantity or an equipped item's last held copy is taken
@@ -109,6 +181,22 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 - **WHEN** a target with skill multipliers and disguised stats receives a valid base change
 - **THEN** stored true base equals the supplied literal value, derived effects use existing rules, and disguise is neither copied into nor substituted for true traits
 
+#### Scenario: Key materialization and removal synchronization
+- **WHEN** a key is granted or taken
+- **THEN** granting materializes its contained object, and taking removes one matching held object
+  when one exists, so a mixed or key-only holding is never left in a state ordinary drop/give
+  refuses and a partial removal never leaves surplus objects
+
+#### Scenario: Wallet, trait and gauge acceptance bounds
+- **WHEN** `set_wallet`, `set_trait_base` or `set_gauge` receives a value
+- **THEN** `set_wallet` accepts only integer copper at least zero, `set_trait_base` stores a literal
+  base within the authoritative trait scale and never a skill-multiplied or disguise value, and
+  `set_gauge` changes a known gauge within its authoritative current bounds
+
+#### Scenario: Unknown keys and impossible values reject cleanly
+- **WHEN** an unknown item or trait key or an impossible quantity/value is supplied
+- **THEN** the operation is rejected without partial writes
+
 ### Requirement: Full GM clock settlement
 
 `advance_clock` SHALL accept nonnegative integer seconds within the authoritative single-advance bound and advance the shared world clock using a distinct GM source. It SHALL run the existing full ordered settlement against the applicable world entities and registered world stages, without requiring a bound character or using player time-skip safety gates as a substitute. Settlement failure SHALL restore clock and every touched state surface.
@@ -123,7 +211,7 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 
 ### Requirement: Map lifecycle verbs with consequences
 
-`teleport` SHALL move a compatible entity to a room with normal departure/arrival consequences for dialogue sessions, party following and instance pins, but no movement time cost. `spawn_monster` SHALL require a valid species/variant pair and room and use authoritative species construction without invented stats. `delete_entity` SHALL invoke Evennia delete hooks and release skip-safety and combat participant registrations; it SHALL NOT leave stale registrations or replace deletion with a raw record removal.
+`teleport` SHALL move a compatible entity to a room with normal departure/arrival consequences for dialogue sessions, party following and instance pins, but no movement time cost. `spawn_monster` SHALL require a valid species/variant pair and room and use authoritative species construction without invented stats. `delete_entity` SHALL invoke Evennia delete hooks and release skip-safety and combat participant registrations.
 
 #### Scenario: Teleport consequences without cost
 - **WHEN** an entity with dialogue, companions and instance pins teleports to another room
@@ -137,9 +225,13 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 - **WHEN** a registered combat or skip-safety participant is deleted
 - **THEN** delete hooks execute and its applicable registrations are released, with failure leaving no partial deletion or cleanup
 
+#### Scenario: Deletion is a real delete, not a record wipe
+- **WHEN** `delete_entity` runs
+- **THEN** it leaves no stale registrations and does not replace deletion with a raw record removal
+
 ### Requirement: Quest lifecycle repair and issuance
 
-`set_quest_state` and `set_quest_stage` SHALL update the specified owning character's existing frozen quest record through quest-owned lifecycle operations, using registered definition/state/stage validation, releasing obsolete bindings/pins and creating applicable new bindings/pins. `issue_quest` SHALL validate the registered definition and issuer and create a properly initialized owned record through quest issuance. Ordinary lifecycle reward/settlement rules SHALL remain authoritative; console repair SHALL not fabricate unrelated quest structures or duplicate rewards.
+`set_quest_state` and `set_quest_stage` SHALL update the specified owning character's existing frozen quest record through quest-owned lifecycle operations, using registered definition/state/stage validation, releasing obsolete bindings/pins and creating applicable new bindings/pins. `issue_quest` SHALL validate the registered definition and issuer and create a properly initialized owned record through quest issuance.
 
 #### Scenario: State and stage repair
 - **WHEN** a valid existing runtime or generated quest is moved to a valid state or stage
@@ -148,6 +240,11 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 #### Scenario: Issuance and invalid lifecycle input
 - **WHEN** a registered quest with valid issuer is issued, or an unknown definition, missing record, invalid state/stage/issuer or binding failure is supplied
 - **THEN** valid issuance creates a complete initialized record and invalid cases leave the owner's records, bindings, pins and any reward surfaces unchanged
+
+#### Scenario: Repair never fabricates or duplicates
+- **WHEN** the console repairs quest lifecycle state
+- **THEN** ordinary lifecycle reward/settlement rules remain authoritative, and repair does not
+  fabricate unrelated quest structures or duplicate rewards
 
 ### Requirement: Append-only memory interventions
 
@@ -163,7 +260,7 @@ The console SHALL expose exactly the approved first batch: `give_item`, `take_it
 
 ### Requirement: Transactional universal Evennia raw editing
 
-A raw write SHALL apply an ordered batch to exactly one existing Evennia object atomically. Supported operations SHALL be `set_attr` with key, optional category and JSON value; `del_attr`; `add_tag` and `remove_tag` with category; and `set_location` without movement settlement. Nested S3 `{"$ref":"#123"}` values SHALL resolve to actual existing object references, including S3's optional display metadata; JSON containers and primitives SHALL otherwise retain their meaning. Invalid batch shapes, operations, unresolved/malformed references and non-JSON or `$unserializable` sentinels SHALL reject the whole batch. Components, typeclass and other displayed fields SHALL remain non-editable. Raw writes SHALL bypass rule validation and invariant checks, including movement consequences, while still requiring access, snapshot policy and transaction safety.
+A raw write SHALL apply an ordered batch to exactly one existing Evennia object atomically. Supported operations SHALL be `set_attr` with key, optional category and JSON value; `del_attr`; `add_tag` and `remove_tag` with category; and `set_location` without movement settlement.
 
 #### Scenario: Categorized batch and reference round-trip
 - **WHEN** an operator sets/deletes categorized Attributes, adds/removes categorized tags and sets location, with object references nested in JSON
@@ -177,11 +274,28 @@ A raw write SHALL apply an ordered batch to exactly one existing Evennia object 
 - **WHEN** set_location is used instead of teleport
 - **THEN** location changes without movement settlement, dialogue/party/pin repair or movement cost, and the UI continues to identify raw mode as bypassing the rules
 
+#### Scenario: Nested object references resolve
+- **WHEN** a raw batch carries nested S3 `{"$ref":"#123"}` values
+- **THEN** they resolve to actual existing object references, including S3's optional display
+  metadata, and JSON containers and primitives otherwise retain their meaning
+
+#### Scenario: Whole-batch rejection on invalid content
+- **WHEN** a batch has an invalid shape or operation, an unresolved or malformed reference, or a
+  non-JSON or `$unserializable` sentinel
+- **THEN** the whole batch is rejected
+
+#### Scenario: Non-editable displayed fields
+- **WHEN** a raw batch targets components, typeclass or other displayed fields
+- **THEN** those fields remain non-editable
+
+#### Scenario: Raw bypass scope and retained guarantees
+- **WHEN** a raw write executes
+- **THEN** it bypasses rule validation and invariant checks, including movement consequences, while
+  still requiring access, snapshot policy and transaction safety
+
 ### Requirement: Shared console transport results and errors
 
-The portal SHALL expose POST `/gm/api/console/<verb>`, POST `/gm/api/state/object/<dbref>/raw` and read-only GET `/gm/api/console/status`. The status payload SHALL contain at least `tick`, nullable `baseline_tick` and `will_snapshot`, without creating a clock, save or baseline; when no world clock exists, `tick` is null and the next write is announced as one that would need a save and cannot be submitted. Accepted write responses SHALL carry real `snapshot: {"taken": bool, "save_id": string|null}` metadata and the successful operation's updated target state; deleted targets SHALL return deletion identity rather than attempt to read a nonexistent object. Status and pre-execution refusal SHALL never claim a snapshot. Failures SHALL retain the standard error object, zh-TW reason and stable code, with snapshot metadata recording any completed pre-save. Clients SHALL branch on code only.
-
-Errors SHALL be `unknown_verb` (404), `invalid_argument` (400), `registry_key_not_found` (404), `target_not_found` (404), `target_kind_mismatch` (400), `raw_edit_invalid` (400) and `snapshot_failed` (500); a write attempted while no world clock exists SHALL report `target_not_found`, and the `snapshot_failed` message SHALL distinguish a failed save from a save or console operation already in progress. Existing access/CSRF/method errors SHALL retain their existing statuses. Unexpected execution failures SHALL remain visible as HTTP 500 `internal_error`, not be relabelled successful or validation failures.
+The portal SHALL expose POST `/gm/api/console/<verb>`, POST `/gm/api/state/object/<dbref>/raw` and read-only GET `/gm/api/console/status`. Failures SHALL retain the standard error object, zh-TW reason and stable code, with snapshot metadata recording any completed pre-save. Clients SHALL branch on code only.
 
 #### Scenario: Routes and reserved status path
 - **WHEN** permitted clients GET status, POST a registered/unregistered verb or POST a raw batch
@@ -195,9 +309,39 @@ Errors SHALL be `unknown_verb` (404), `invalid_argument` (400), `registry_key_no
 - **WHEN** delete_entity or advance_clock succeeds
 - **THEN** the response carries the deleted target's identity or updated world-clock state respectively without fabricating an entity read
 
+#### Scenario: Status payload contract
+- **WHEN** the status route responds
+- **THEN** the payload contains at least `tick`, nullable `baseline_tick` and `will_snapshot`,
+  without creating a clock, save or baseline
+- **AND** when no world clock exists, `tick` is null and the next write is announced as one that
+  would need a save and cannot be submitted
+
+#### Scenario: Write-response metadata contract
+- **WHEN** a write is accepted
+- **THEN** the response carries real `snapshot: {"taken": bool, "save_id": string|null}` metadata
+  and the successful operation's updated target state
+- **AND** deleted targets return deletion identity rather than an attempt to read a nonexistent
+  object
+- **AND** status and pre-execution refusal never claim a snapshot
+
+#### Scenario: Named error codes and statuses
+- **WHEN** a defined error occurs
+- **THEN** the codes are `unknown_verb` (404), `invalid_argument` (400), `registry_key_not_found`
+  (404), `target_not_found` (404), `target_kind_mismatch` (400), `raw_edit_invalid` (400) and
+  `snapshot_failed` (500)
+- **AND** a write attempted while no world clock exists reports `target_not_found`, and the
+  `snapshot_failed` message distinguishes a failed save from a save or console operation already in
+  progress
+
+#### Scenario: Retained and unexpected-error statuses
+- **WHEN** an access/CSRF/method error or an unexpected execution failure occurs
+- **THEN** existing access/CSRF/method errors retain their existing statuses, and unexpected
+  execution failures remain visible as HTTP 500 `internal_error`, not relabelled successful or
+  validation failures
+
 ### Requirement: Contextual portal controls and confirmation
 
-Entity headers SHALL open a 主控台 side drawer containing only applicable verbs: player characters receive item/wallet/trait/gauge/teleport/quest actions; monsters receive trait/gauge/teleport/delete actions; rooms receive spawn_monster. The Evennia raw tab SHALL offer an 編輯 toggle with a permanent 繞過規則層 warning throughout edit mode; non-Evennia raw pages SHALL remain read-only. Each NPC memory row SHALL offer 撤銷 and 取代, and the dashboard world section SHALL offer 推進時鐘. Confirmation SHALL name the operation and display whether the current tick policy predicts a pre-save, explicitly covering the initial no-baseline case. Execution SHALL re-evaluate policy rather than trusting a stale dialog. Cancellation SHALL send no write. Results SHALL show a toast and refresh the affected section; failures SHALL show code and message. No standalone catalogue or placeholder console route SHALL be added.
+Entity headers SHALL open a 主控台 side drawer containing only applicable verbs. Confirmation SHALL name the operation and display whether the current tick policy predicts a pre-save, explicitly covering the initial no-baseline case. Execution SHALL re-evaluate policy rather than trusting a stale dialog. Cancellation SHALL send no write.
 
 #### Scenario: Entity-kind filtering and raw warning
 - **WHEN** character, monster, room, NPC and uncurated object pages are opened and raw edit mode is toggled
@@ -211,9 +355,32 @@ Entity headers SHALL open a 主控台 side drawer containing only applicable ver
 - **WHEN** confirmation opens with no baseline, equal tick or differing tick, the game tick changes before submission, or the operator cancels
 - **THEN** the displayed notice matches the fetched status, submitted execution uses the actual current policy and real returned save metadata, and cancellation causes no console POST
 
+#### Scenario: Per-kind verb sets in the drawer
+- **WHEN** the 主控台 drawer opens
+- **THEN** player characters receive item/wallet/trait/gauge/teleport/quest actions, monsters receive
+  trait/gauge/teleport/delete actions, and rooms receive spawn_monster
+
+#### Scenario: Raw edit toggle and read-only non-Evennia pages
+- **WHEN** the Evennia raw tab is used
+- **THEN** it offers an 編輯 toggle with a permanent 繞過規則層 warning throughout edit mode, and
+  non-Evennia raw pages remain read-only
+
+#### Scenario: Memory rows and clock control offered
+- **WHEN** the portal renders NPC memory rows and the dashboard world section
+- **THEN** each NPC memory row offers 撤銷 and 取代, and the dashboard world section offers
+  推進時鐘
+
+#### Scenario: Result and failure display
+- **WHEN** an operation finishes
+- **THEN** results show a toast and refresh the affected section, and failures show code and message
+
+#### Scenario: No extra console routes
+- **WHEN** the portal's route table is inspected
+- **THEN** no standalone catalogue or placeholder console route was added
+
 ### Requirement: Console operational evidence and operator guidance
 
-Every dispatched console operation SHALL emit `gm_action` through the observability facade with operator account, verb or `raw_edit`, target identifiers, bounded argument summary and result in context; completed pre-save identity SHALL be available when taken. Failed snapshots and rejected/execution-failed operations SHALL be visible, not logged as success. Exceptions SHALL follow facade exception rules, context SHALL respect credential exclusion and one-line truncation, and new production files SHALL not enter the freeze list. Implementation SHALL amend `AGENTS.md` to name the four owner console modules and raw boundary, and both it and `docs/gm/overview.md` SHALL state that manual patching of quest records, money, experience, inventory and combat results happens only through the console, with conditional tick-based pre-saves, never a Django shell. No experience or combat-result domain verb SHALL be implied by that guidance.
+Every dispatched console operation SHALL emit `gm_action` through the observability facade with operator account, verb or `raw_edit`, target identifiers, bounded argument summary and result in context; completed pre-save identity SHALL be available when taken. Failed snapshots and rejected/execution-failed operations SHALL be visible, not logged as success.
 
 #### Scenario: Success and failure evidence
 - **WHEN** a domain verb/raw batch succeeds, rejects or cannot take its required save
@@ -223,9 +390,21 @@ Every dispatched console operation SHALL emit `gm_action` through the observabil
 - **WHEN** S6 implementation is delivered
 - **THEN** both guidance documents describe console-only manual patching and conditional snapshots, AGENTS names every owner/raw path, and authored-source editing and shell bans remain unambiguous
 
+#### Scenario: Facade conventions and freeze-list exclusion
+- **WHEN** console events flow through the facade
+- **THEN** exceptions follow facade exception rules, context respects credential exclusion and
+  one-line truncation, and new production files do not enter the freeze list
+
+#### Scenario: Guidance amendment content
+- **WHEN** the implementation amends `AGENTS.md` and `docs/gm/overview.md`
+- **THEN** `AGENTS.md` names the four owner console modules and raw boundary, and both documents
+  state that manual patching of quest records, money, experience, inventory and combat results
+  happens only through the console, with conditional tick-based pre-saves, never a Django shell
+- **AND** no experience or combat-result domain verb is implied by that guidance
+
 ### Requirement: Complete S6 acceptance and repository contracts
 
-Acceptance SHALL exercise every verb's normal path, every validation failure and injected all-or-nothing failure; teleport dialogue/party/pins, deletion registrations, full GM clock settlement, append-only memory, raw references/atomicity/non-editable typeclass, materialized/key-only/mixed item mirrors with late-failure rollback, and all snapshot cases including manual baseline reset, snapshot-backed represented-tick provenance, contention refusal and gameplay-thread interleaving of a player change with a console operation and with a failed compensation. Tests SHALL preserve S3 reader immutability and establish web writer dispatch ownership. Vitest SHALL cover entity filtering, warning persistence, confirmation save notice, cancellation, result/error display and affected refresh; every new component SHALL have Storybook coverage and component-manifest registration. Fixtures SHALL be deterministic and synthetic, with no live external services. Every new non-browser Python test module, including those under `web/gm/tests/`, SHALL have exactly one `.github/evennia-shards.json` owner; any added browser method/class SHALL have exactly one `.github/browser-shards.json` owner. Each resulting main requirement SHALL have substantive discoverable tests annotated using canonical IDs from the traceability tool after spec synchronization, not guessed active-change IDs. Focused tests, both lints, local traceability and the contract gate SHALL run before implementation handoff; complete managed browser/evidence verification SHALL remain CI-owned.
+Acceptance SHALL exercise every verb's normal path, every validation failure and injected all-or-nothing failure, and all snapshot cases. Tests SHALL preserve S3 reader immutability and establish web writer dispatch ownership. Fixtures SHALL be deterministic and synthetic, with no live external services.
 
 #### Scenario: Behavioral and static acceptance
 - **WHEN** the S6 focused acceptance suites and contracts run
@@ -234,3 +413,33 @@ Acceptance SHALL exercise every verb's normal path, every validation failure and
 #### Scenario: Shard and traceability ownership
 - **WHEN** tests are added or main requirements synchronize during implementation/archive
 - **THEN** their exact manifests and substantive canonical annotations are updated in the owning change, local contract/traceability checks pass and no skipped, unrelated or placeholder test is offered as coverage
+
+#### Scenario: Acceptance coverage matrix
+- **WHEN** the acceptance suite is enumerated
+- **THEN** it covers teleport dialogue/party/pins, deletion registrations, full GM clock settlement,
+  append-only memory, raw references/atomicity/non-editable typeclass, materialized/key-only/mixed
+  item mirrors with late-failure rollback, and all snapshot cases including manual baseline reset,
+  snapshot-backed represented-tick provenance, contention refusal and gameplay-thread interleaving
+  of a player change with a console operation and with a failed compensation
+
+#### Scenario: Frontend coverage obligations
+- **WHEN** the console frontend is tested
+- **THEN** Vitest covers entity filtering, warning persistence, confirmation save notice,
+  cancellation, result/error display and affected refresh, and every new component has Storybook
+  coverage and component-manifest registration
+
+#### Scenario: Shard-owner uniqueness
+- **WHEN** new tests are added
+- **THEN** every new non-browser Python test module, including those under `web/gm/tests/`, has
+  exactly one `.github/evennia-shards.json` owner, and any added browser method/class has exactly
+  one `.github/browser-shards.json` owner
+
+#### Scenario: Canonical traceability annotation
+- **WHEN** a resulting main requirement gains tests
+- **THEN** it has substantive discoverable tests annotated using canonical IDs from the
+  traceability tool after spec synchronization, not guessed active-change IDs
+
+#### Scenario: Handoff gate versus CI ownership
+- **WHEN** implementation is about to be handed off
+- **THEN** focused tests, both lints, local traceability and the contract gate have run, while
+  complete managed browser/evidence verification remains CI-owned

@@ -27,16 +27,9 @@ promotion. Skipping ranks and examining from S SHALL be rejected.
 ### Requirement: start_guild_exam is the sole trigger and validates authority itself
 `start_guild_exam(actor, examiner, target_rank, requested_by=...)` SHALL be the only examination-start
 API. It SHALL validate examiner authority through the shared `world/rules/service_gate.py::
-service_available` resolver applied to the examiner's `GuildExaminer` component — a `remote`
-verdict (actor and examiner not co-located) and an `off_anchor` verdict (place-bound examiner
-away from its anchor room) are both refused before any eligibility check, and a
-`malformed_binding` verdict fails closed — SHALL require a matching GuildExaminer component,
-eligibility, and no active combat or examination. A successfully started examination SHALL additionally grant +1 affinity (`guild`
-source) with the examiner through the sole-writer affinity API (`world/rules/affinity.py`), applied
-inside the same atomic block that creates the exam record and combat session (the temporary
-opponent is pre-spawned before any mutation); the examiner's affinity record SHALL join the
-existing exam snapshot/restore surfaces so any failure restores it; a rejected start SHALL grant
-nothing. `requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
+service_available` resolver applied to the examiner's `GuildExaminer` component, SHALL require a
+matching GuildExaminer component, eligibility, and no active combat or examination.
+`requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
 
 #### Scenario: Command trigger starts an eligible exam
 - **WHEN** local GuildExaminer invokes the API for an eligible next rank with `requested_by="command"`
@@ -56,6 +49,24 @@ nothing. `requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
   requests the next-rank examination
 - **THEN** the start is refused with the gate's fixed off-anchor message and no exam record,
   opponent, combat session, merit, affinity, or rank change is created
+
+#### Scenario: Gate verdicts refuse before eligibility
+- **WHEN** the gate returns a `remote` verdict (actor and examiner not co-located) or an
+  `off_anchor` verdict (place-bound examiner away from its anchor room)
+- **THEN** both are refused before any eligibility check, and a `malformed_binding` verdict fails
+  closed
+
+#### Scenario: A started exam grants +1 affinity atomically
+- **WHEN** an examination starts successfully
+- **THEN** it additionally grants +1 affinity (`guild` source) with the examiner through the
+  sole-writer affinity API (`world/rules/affinity.py`), applied inside the same atomic block that
+  creates the exam record and combat session (the temporary opponent is pre-spawned before any
+  mutation)
+
+#### Scenario: The affinity record joins the restore surfaces
+- **WHEN** an exam start fails after the affinity grant would have been staged
+- **THEN** the examiner's affinity record, joined to the existing exam snapshot/restore surfaces,
+  is restored, and a rejected start grants nothing
 
 ### Requirement: Examination start is all-or-nothing across opponent, record, and session
 The exam trigger SHALL preflight all eligibility/profile/spawn inputs, then create the temporary opponent,
@@ -90,10 +101,7 @@ The pre-exam description SHALL state that the examination is a 「模擬戰」 (
 both sides are restored to full HP/MP/SP before and after. Guild-exam combat SHALL use the normal
 ActionResolver, initiative, modifiers, and round scheduler with ordinary lethal semantics: the examiner
 follows the normal combat flow until one side's HP reaches 0. No session-wide nonlethal floor SHALL be
-applied. Before the exam starts and after it settles, the candidate's and the examiner's HP, MP, and SP
-SHALL be restored to full, regardless of outcome. As a simulation, the fight SHALL NOT emit ordinary
-kill rewards: no kill loot, no DEFEAT quest progress, and no protected-entity failure; and no growth of any kind: every examination resolution carries the `simulated` event-context marker, so lineage practice accrual is skipped for every skill used. MP/SP costs and
-ordinary upkeep SHALL remain committed during the battle.
+applied.
 
 #### Scenario: Examiner defeat passes the exam
 - **WHEN** the candidate reduces the examiner's HP to 0
@@ -115,14 +123,30 @@ ordinary upkeep SHALL remain committed during the battle.
 - **WHEN** exam rounds resolve
 - **THEN** the same ActionResolver, initiative, modifiers, upkeep, and HP-to-zero defeat logic as ordinary combat apply, with no nonlethal policy
 
+#### Scenario: Both sides are restored to full regardless of outcome
+- **WHEN** an examination begins and later settles, win or lose
+- **THEN** the candidate's and the examiner's HP, MP, and SP are restored to full before the exam
+  starts and after it settles, regardless of outcome
+
+#### Scenario: The simulation emits no ordinary kill rewards
+- **WHEN** an examination fight ends lethally
+- **THEN** it emits no ordinary kill rewards — no kill loot, no DEFEAT quest progress, and no
+  protected-entity failure
+
+#### Scenario: The simulated marker skips all growth
+- **WHEN** an examination resolves
+- **THEN** it carries the `simulated` event-context marker, so lineage practice accrual is skipped
+  for every skill used — no growth of any kind
+
+#### Scenario: Costs and upkeep still commit during the exam
+- **WHEN** exam rounds resolve
+- **THEN** MP/SP costs and ordinary upkeep remain committed during the battle
+
 ### Requirement: Exam settlement is idempotent and promotes only a passing candidate
 Every attempt SHALL use ID `<character-id>:<target-rank>:<attempt-number>`. Opponent knockout SHALL
 atomically record PASS and advance rank one step. Candidate knockout, flee, invalid recovery, or round
 cap SHALL record FAIL without rank or merit change. Settlement SHALL delete the temporary opponent,
 close combat state, and be idempotent by exam ID.
-A PASS settlement SHALL additionally grant the new rank's paired fixed title into
-`db.title_collection` within the same promotion transaction (auto-equipping the fixed slot only
-when empty); a rolled-back promotion revokes the entry with the transaction.
 
 #### Scenario: Passing promotes exactly one rank
 - **WHEN** an eligible F candidate knocks out the E examiner
@@ -143,6 +167,11 @@ when empty); a rolled-back promotion revokes the entry with the transaction.
 #### Scenario: Replayed settlement cannot promote twice
 - **WHEN** PASS settlement is invoked again for an already settled exam ID
 - **THEN** rank and every exam surface remain unchanged
+
+#### Scenario: A PASS grants the rank's paired fixed title
+- **WHEN** a PASS settlement promotes a candidate
+- **THEN** the new rank's paired fixed title is granted into `db.title_collection` within the same
+  promotion transaction, auto-equipping the fixed slot only when empty
 
 ### Requirement: Guild exam opponents carry canonical age
 
@@ -180,7 +209,7 @@ key while the authored name is used whenever it is free.
   identical
 
 ### Requirement: Exam opponents receive their rank examiner's card at spawn
-Spawning an examination opponent SHALL initialize the opponent's compact NPC card from the target rank's examiner profile, with `profile` provenance naming that profile, inside the same all-or-nothing examination start as the opponent, the exam record, and the combat session. A persona initialization failure SHALL delete the partially built opponent and roll the whole start back. Each spawn SHALL receive its own card instance at version 1, so editing one opponent's card never changes another opponent or a later spawn.
+Spawning an examination opponent SHALL initialize the opponent's compact NPC card from the target rank's examiner profile, with `profile` provenance naming that profile, inside the same all-or-nothing examination start as the opponent, the exam record, and the combat session.
 
 #### Scenario: An opponent carries its examiner's card
 - **WHEN** a qualified candidate starts the F-rank examination
@@ -193,3 +222,11 @@ Spawning an examination opponent SHALL initialize the opponent's compact NPC car
 #### Scenario: Spawns do not share edits
 - **WHEN** one spawned opponent's card is updated and a later examination spawns another opponent of the same rank
 - **THEN** the later opponent carries the unedited profile card at version 1
+
+#### Scenario: A persona failure deletes the partial opponent
+- **WHEN** persona card initialization fails during an examination start
+- **THEN** the partially built opponent is deleted and the whole start rolls back
+
+#### Scenario: Each spawn gets its own card instance
+- **WHEN** examination opponents spawn repeatedly for one rank
+- **THEN** each spawn receives its own card instance at version 1, so editing one opponent's card never changes another opponent or a later spawn

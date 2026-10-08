@@ -11,11 +11,9 @@ sanctum, or the kind of goods its counter keeps.
 
 ### Requirement: The temple is one building with three open counters
 The capital's sanctuary SHALL be authored as worship, ministry and commerce occupying one
-location openly, never as a public face with a concealed interior. Its rooms, descriptions,
-host titles and dialogue SHALL NOT frame the sanctum's ministry or its shop as hidden,
-restricted, discovered, or as something an outsider is not expected to know about. No lock,
+location openly, never as a public face with a concealed interior. No lock,
 reveal, plot gate, knowledge check or discovery step SHALL stand between a player and any of
-the three, because the world holds the sanctum's business to be common knowledge.
+the three.
 
 #### Scenario: Nothing about the sanctuary is gated
 - **WHEN** a player who has never visited walks into the sanctuary and its shop
@@ -26,6 +24,10 @@ the three, because the world holds the sanctum's business to be common knowledge
 - **WHEN** the sanctuary's room descriptions, host titles and dialogue responses are read
 - **THEN** none of them describes the ministry or the shop as hidden, secret, restricted or
   surprising
+
+#### Scenario: The open authoring is justified by common knowledge
+- **WHEN** the openness of the three counters is questioned
+- **THEN** the ground is that the world holds the sanctum's business to be common knowledge
 
 ### Requirement: The sanctum's goods trade through the ordinary path
 The sanctum's shop SHALL be an ordinary merchant place. Its goods SHALL be listed, bought and
@@ -56,14 +58,19 @@ SHALL represent that as one square with two doors rather than as two separate bu
 ### Requirement: The sanctuary's host ministers and does not trade
 The sanctuary's own host SHALL carry a dialogue capability and no trade capability: her
 counter blesses, preaches and answers questions about the ministry, and sells nothing. The
-shop's host SHALL carry the trade capability; like every capital merchant she answers from
-her own shopkeeper's table about her own goods, never from the sanctuary's offices.
-Affinity with the sanctuary SHALL therefore accumulate through conversation and affinity
-with its shop through trade, matching how every other location's primary channel is already
-decided by which capability its host carries.
+shop's host SHALL carry the trade capability. Affinity with the sanctuary SHALL therefore
+accumulate through conversation and affinity with its shop through trade.
 
 #### Scenario: The two hosts' trade offices are disjoint
 - **WHEN** both hosts' components are inspected after synchronization
 - **THEN** the sanctuary's host carries a scripted-dialogue component and no merchant
   component, and the shop's host carries a merchant component; the priest's own table
   ships no trade guidance she could not execute
+
+#### Scenario: The shop host answers from her own table
+- **WHEN** the shop's host answers visitors
+- **THEN** like every capital merchant she answers from her own shopkeeper's table about her own goods, never from the sanctuary's offices
+
+#### Scenario: Affinity channels follow the host's capability
+- **WHEN** affinity accrues around the sanctuary and its shop
+- **THEN** the split matches how every other location's primary channel is already decided by which capability its host carries

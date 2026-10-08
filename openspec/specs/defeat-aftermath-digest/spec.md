@@ -17,13 +17,8 @@ At the end of the defeat aftermath, each entity the violation sequence
 selected SHALL receive exactly one digest outcome — `residue`,
 `humiliated`, or `none` — selected by the first matching rulebook row in
 `world/rules/rulebook/defeat_aftermath.yaml` evaluated against ONLY that
-entity's own existing sexual-state fields (its `sensitivity` level, its
-`shame` level, its end-of-sequence arousal ordinal) plus the sequence's
-in-memory `ViolationOutcome` for that entity (climax count, zero-landed
-flag) handed through the same settlement call — never a persisted digest
-input, and no replay bookkeeping. The digest section's rulebook schema
-SHALL reject any race/species/persona condition key at load; the digest
-SHALL read no affinity value and no other entity's state.
+entity's own existing sexual-state fields plus the sequence's in-memory
+`ViolationOutcome` for that entity handed through the same settlement call.
 
 #### Scenario: High sensitivity with a climax digests residue
 - **WHEN** a violated entity with high `sensitivity` ends the sequence with sequence-recorded climax ≥ 1
@@ -40,6 +35,15 @@ SHALL read no affinity value and no other entity's state.
 #### Scenario: A Monster's pinned shame can never reach the humiliated band
 - **WHEN** any violated entity whose `shame` is pinned at 無 digests
 - **THEN** the outcome is `residue` or `none`, because the shame band in the row can never match — established without the rulebook reading species
+
+#### Scenario: Digest inputs are the in-memory handoff only
+- **WHEN** settlement hands a digest its `ViolationOutcome` for a violated entity
+- **THEN** the digest reads only that in-memory handoff plus the entity's own sexual-state fields — never a persisted digest input, and it performs no replay bookkeeping
+- **AND** the evaluated sexual-state fields are its `sensitivity` level, its `shame` level, and its end-of-sequence arousal ordinal, and the handoff carries its climax count and zero-landed flag
+
+#### Scenario: The digest reads no affinity and no other entity's state
+- **WHEN** a digest is evaluated for any violated entity
+- **THEN** it reads no affinity value and no other entity's state
 
 ### Requirement: Digest outcomes mount shipped-surface buffs on violated entities and bystanders stay lighter
 The `residue` and `humiliated` outcomes SHALL mount their buff rows from
@@ -75,9 +79,7 @@ observation line, no digest outcome, and no buff.
 ### Requirement: The Narrator overlays aftermath entries and always degrades to templates
 The Narrator overlay SHALL be a pure render function over the aftermath
 EventLog entries appended after the fixed wake lines: exactly one prose
-paragraph per entry, never rewriting or duplicating an entry already
-rendered, and never gating state. The prompt library's `narrator.system`
-guidance SHALL cover the aftermath kind vocabulary. Any narrator failure,
+paragraph per entry and never gating state. Any narrator failure,
 timeout, or disabled profile SHALL discard only the overlay — the
 deterministic wake lines and template lines remain the complete render and
 the settled state is unchanged.
@@ -97,3 +99,11 @@ the settled state is unchanged.
 #### Scenario: Offline defeat still completes and renders
 - **WHEN** a full defeat aftermath settles with every LLM profile failing
 - **THEN** the player and companions receive digest-selected wake lines, all declared state writes occurred, and no narrator exception surfaces to the player
+
+#### Scenario: Entries are never rewritten or duplicated
+- **WHEN** the overlay renders a sequence of aftermath entries
+- **THEN** it never rewrites or duplicates an entry already rendered
+
+#### Scenario: Narrator system prompt covers the aftermath kind vocabulary
+- **WHEN** the prompt library's `narrator.system` guidance is inspected
+- **THEN** it covers the aftermath kind vocabulary

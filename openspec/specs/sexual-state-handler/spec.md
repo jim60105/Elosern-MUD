@@ -28,12 +28,7 @@ SHALL derive every field's initial value from that dict, defaulting any optional
 (`wetness`, `shame`, `exposure`, `climax_phase`) to its vocabulary's first (lowest) level. Two
 production construction paths SHALL produce that dict: the character import loader, and preset
 activation in `world/rules/character_creation.py` when the selected preset declares a
-`sexual_baseline`. The companion builder `world/rules/starting_companions.py` writes the same
-raw record onto each built companion NPC from the partner preset's own declared baseline,
-conditioned identically (an undeclared baseline writes nothing), so it is the same
-preset-activation production path applied to companion construction, not a third writer class.
-A preset declaring no baseline SHALL leave the attribute absent, so the existing
-default-construction rules apply unchanged.
+`sexual_baseline`.
 
 #### Scenario: A fully-specified baseline is used verbatim
 - **WHEN** `entity.db.sexual` is `{"arousal": "微興奮", "virgin": true, "sensitivity": {}}`
@@ -47,6 +42,18 @@ default-construction rules apply unchanged.
 #### Scenario: A preset-declared baseline reaches the handler
 - **WHEN** a character is activated from a preset declaring a `sexual_baseline` and its `entity.sexual` is first constructed
 - **THEN** every field derives from the preset's declared record rather than from the generic default baseline
+
+#### Scenario: The companion builder reuses the preset-activation path
+- **WHEN** `world/rules/starting_companions.py` builds a companion NPC from a partner preset that
+  declares a baseline
+- **THEN** it writes the same raw record onto the built companion from that declared baseline,
+  conditioned identically (an undeclared baseline writes nothing), so it is the same
+  preset-activation production path applied to companion construction, not a third writer class
+
+#### Scenario: A preset with no baseline leaves the attribute absent
+- **WHEN** the selected preset declares no `sexual_baseline`
+- **THEN** `entity.db.sexual` is left absent, so the existing default-construction rules apply
+  unchanged
 
 ### Requirement: Monster entities without an imported baseline default to 普通 sensitivity with shame clamped to 無
 When `entity.db.sexual` is absent and the entity is a `Monster`, `SexualState`'s construction SHALL
@@ -173,9 +180,7 @@ files.
 `SexualState`'s construction SHALL read `entity.db.sexual["arousal"]` (the import contract's existing
 level-string field, unchanged by this capability) and initialize the `pleasure` counter trait
 (`0..100`) at that level's configured band floor from `sexual_pleasure.yaml`, defaulting to
-`AROUSAL_LEVELS[0]`'s floor (`0`) when the baseline omits `arousal` or when no baseline is present
-(the existing `_generic_default_baseline()` / `build_monster_sexual_baseline()` paths, both of which
-already default `arousal` to `AROUSAL_LEVELS[0]`).
+`AROUSAL_LEVELS[0]`'s floor (`0`) when the baseline omits `arousal`.
 
 #### Scenario: An imported arousal level resolves to its band floor
 - **WHEN** `entity.db.sexual` is `{"arousal": "微興奮", "virgin": true, "sensitivity": {}}`
@@ -190,6 +195,12 @@ already default `arousal` to `AROUSAL_LEVELS[0]`).
 - **WHEN** a `Monster` entity with no `entity.db.sexual` baseline has `entity.sexual` read
 - **THEN** `entity.sexual.pleasure.value` equals `0`, and `entity.sexual.arousal.level` equals
   `"平靜"`
+
+#### Scenario: No-baseline construction paths default arousal to the first level
+- **WHEN** no baseline is present and construction goes through the existing
+  `_generic_default_baseline()` / `build_monster_sexual_baseline()` paths
+- **THEN** both paths already default `arousal` to `AROUSAL_LEVELS[0]`, so `pleasure`
+  initializes at that floor (`0`)
 
 ### Requirement: pleasure is bounded 0 to 100 and every mutation clamps at those bounds
 `SexualState.pleasure` SHALL be a counter trait bounded `min=0, max=100`. No mutation path — decay,
@@ -253,26 +264,10 @@ level of decay per configured field" behaviour as an observable arousal-level ef
   crossing to `84` numerically also crosses into a band whose own floor is far below `85`
 
 ### Requirement: SexualState exposes eleven independent, unbounded, lifetime behaviour counters, each with exactly one sanctioned mutator
-`SexualState` SHALL expose exactly the eleven counter fields below, each an unbounded (`min=0`, no
-`max`) counter starting at `0` for every entity regardless of any imported baseline, each readable
-through its own property, and each mutable **only** through its own named method, which SHALL
-increment it by exactly `1`. No rule, effect handler, or other caller SHALL be able to increment,
-decrement, or reset any of the eleven through any path other than its named mutator. None of the
-eleven SHALL be reset by `reset_daily_counters()`.
-
-| Field | Mutator |
-|---|---|
-| `masturbation_count` | `record_masturbation()` |
-| `toy_use_count` | `record_toy_use()` |
-| `exposure_act_count` | `record_exposure_act()` |
-| `watched_count` | `record_watched()` |
-| `duo_act_count` | `record_duo_act()` |
-| `group_act_count` | `record_group_act()` |
-| `hostile_act_count` | `record_hostile_act()` |
-| `restraint_count` | `record_restraint()` |
-| `interspecies_act_count` | `record_interspecies_act()` |
-| `climax_count` | `record_climax_count()` |
-| `climax_extension_count` | `record_climax_extension()` |
+`SexualState` SHALL expose exactly the eleven counter fields named in the mapping scenario below,
+each an unbounded (`min=0`, no `max`) counter starting at `0` for every entity regardless of any
+imported baseline, each readable through its own property, and each mutable **only** through its
+own named method, which SHALL increment it by exactly `1`.
 
 #### Scenario: Every counter starts at zero regardless of baseline
 - **WHEN** `entity.sexual` is read for the first time on any entity, imported or not, `Monster` or
@@ -307,20 +302,29 @@ eleven SHALL be reset by `reset_daily_counters()`.
   `SexualState`) to read or write any of the eleven counters — every access goes through the named
   property or mutator
 
+#### Scenario: The eleven counters map one-to-one to their named mutators
+- **WHEN** the exposed counters and their sanctioned mutators are enumerated
+- **THEN** the mapping is exactly: `masturbation_count` → `record_masturbation()`,
+  `toy_use_count` → `record_toy_use()`, `exposure_act_count` → `record_exposure_act()`,
+  `watched_count` → `record_watched()`, `duo_act_count` → `record_duo_act()`,
+  `group_act_count` → `record_group_act()`, `hostile_act_count` → `record_hostile_act()`,
+  `restraint_count` → `record_restraint()`, `interspecies_act_count` → `record_interspecies_act()`,
+  `climax_count` → `record_climax_count()`, `climax_extension_count` →
+  `record_climax_extension()`
+
+#### Scenario: No other path can move a counter
+- **WHEN** a rule, effect handler, or any other caller attempts to change one of the eleven
+  counters
+- **THEN** it cannot increment, decrement, or reset any of them through any path other than its
+  named mutator
+
 ### Requirement: SexualState.unlocked_act_keys() gates the sexual act catalogue by counter thresholds, or unlocks it entirely for a mastery holder
 `SexualState` SHALL expose `unlocked_act_keys() -> frozenset[str]`, returning every key in
 `SEXUAL_ACT_REGISTRY` whose `unlock` mapping's thresholds are all met by the entity's own lifetime
-counters **and which does not declare `SexualActDef.ownership_gated=True`**, **or** the entire
-`SEXUAL_ACT_REGISTRY` keyset **minus every act whose paired `SkillDef` declares
-`requires_divine_arts=True` and minus every `ownership_gated=True` row** when the entity directly
-owns any skill whose parsed effects include a `SexualMasteryEffect`. The mastery check SHALL consult
-`entity.skills.base_owned_keys()`, never `entity.skills.owned_keys()` and never
-`entity.skills.conferred_grants()`. Ownership-gated rows are reachable only through actual base
-ownership (`base_owned_keys()` — the sole input `_step1_ownership` effectively sees through
-`owned_keys()`), which the derivation path never supplies; the shipped
-`divine_sexual_arts` row is the only ownership-gated act, and it is excluded from both branches by
-both of its markers simultaneously, so no shipped entity's derived set changes beyond gaining that
-one key's exclusion.
+counters **and which does not declare `SexualActDef.ownership_gated=True`**, **or** — when the
+entity directly owns any skill whose parsed effects include a `SexualMasteryEffect` — the entire
+`SEXUAL_ACT_REGISTRY` keyset minus the divine-arts and ownership-gated exclusions stated in the
+mastery scenarios.
 
 #### Scenario: An act unlocks when every one of its thresholds is met
 - **WHEN** `unlocked_act_keys()` is read on an entity whose counters meet every threshold in one
@@ -360,6 +364,23 @@ one key's exclusion.
 - **WHEN** `unlocked_act_keys()`'s implementation is inspected
 - **THEN** its mastery-ownership check calls `entity.skills.base_owned_keys()`, and no line in that
   check calls `entity.skills.owned_keys()`
+
+#### Scenario: The mastery check consults only base ownership
+- **WHEN** the mastery check decides whether the blanket unlock applies
+- **THEN** it consults `entity.skills.base_owned_keys()`, never `entity.skills.owned_keys()` and
+  never `entity.skills.conferred_grants()`
+
+#### Scenario: Ownership-gated rows require actual base ownership
+- **WHEN** the derivation path computes an entity's unlocked set
+- **THEN** ownership-gated rows are reachable only through actual base ownership
+  (`base_owned_keys()` — the sole input `_step1_ownership` effectively sees through
+  `owned_keys()`), which the derivation path never supplies
+
+#### Scenario: The shipped divine row is excluded by both markers
+- **WHEN** the shipped `divine_sexual_arts` row is evaluated by either branch
+- **THEN** it is the only ownership-gated act, and it is excluded from both branches by both of
+  its markers simultaneously, so no shipped entity's derived set changes beyond gaining that one
+  key's exclusion
 
 ### Requirement: saturate_sensitivity() pins every resolvable body part to the top sensitivity level
 `SexualState.saturate_sensitivity()` SHALL set every `world.lore.sexual_vocab.BODY_PARTS` member's
@@ -446,16 +467,7 @@ traits, act-driven transitions, transition rule matching, snapshots, and
 persistence SHALL operate on the stored ordinal alone, and bias SHALL never
 raise an exposure field-change event. Every player-facing read surface
 (status read model and the status web payload alike) SHALL render the same
-effective ordinal with unchanged row/payload schemas. Every shipped consumer
-of stored exposure SHALL be classified (stored vs effective) in a structural
-allowlist test, and a new raw consumer outside the allowlist SHALL fail it.
-Modules that name `exposure` only as preset-declaration vocabulary — authored
-baseline card keywords and the validator's level table in
-`world/lore/player_presets.py` — are enumerated in the same structural
-allowlist as declaration-only exemptions: they construct baseline records and
-SHALL NOT read `entity.sexual`, stored `sexual_traits` state, or an effective
-overlay. The exemption is per-module and auditable; a live-state read added to
-an exempt module SHALL still be classified as a consumer.
+effective ordinal with unchanged row/payload schemas.
 
 #### Scenario: Progression ignores what is worn
 
@@ -477,3 +489,22 @@ an exempt module SHALL still be classified as a consumer.
 - **WHEN** a new module reads the stored exposure trait outside the
   stored-classified allowlist
 - **THEN** the structural test fails until it is classified
+
+#### Scenario: Every shipped consumer is classified
+
+- **WHEN** the structural allowlist test audits the shipped consumers of stored exposure
+- **THEN** every one of them is classified (stored vs effective) in the allowlist
+
+#### Scenario: Declaration-only vocabulary modules are exempted per-module
+
+- **WHEN** the structural allowlist enumerates modules that name `exposure` only as
+  preset-declaration vocabulary — authored baseline card keywords and the validator's level
+  table in `world/lore/player_presets.py`
+- **THEN** they are enumerated in the same structural allowlist as declaration-only exemptions:
+  they construct baseline records and SHALL NOT read `entity.sexual`, stored `sexual_traits`
+  state, or an effective overlay
+
+#### Scenario: The exemption is per-module and auditable
+
+- **WHEN** a live-state read is added to an exempt declaration-only module
+- **THEN** it SHALL still be classified as a consumer

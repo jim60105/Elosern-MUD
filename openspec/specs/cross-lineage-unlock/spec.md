@@ -26,11 +26,7 @@ A rulebook table at `world/rules/rulebook/cross_lineage_unlock.yaml` SHALL decla
 
 ### Requirement: A clause is satisfied by distinct qualifying groups
 
-Each clause SHALL declare a `scope` selecting registry nodes, a `min_level` integer at least 1, and a `distinct_groups` integer at least 1 (defaulting to 1 when omitted). A `scope` SHALL select nodes either declaratively — by `category`, optionally narrowed by `group` — or by an explicit `keys` list of registry keys.
-
-A declarative scope SHALL select `ACTIVE` nodes only: a `PASSIVE` member of the named category or group SHALL never be sampled, because practice accrues on use alone and a `PASSIVE` node therefore remains at level 0 forever. Selected nodes SHALL be partitioned into groups by their `group` field; a scope narrowed to a single `group`, and an explicit `keys` scope, SHALL form exactly one group.
-
-A group SHALL qualify when at least one node in it has a derived proficiency level greater than or equal to `min_level`. A clause SHALL be satisfied when the number of qualifying groups is greater than or equal to `distinct_groups`.
+Each clause SHALL declare a `scope` selecting registry nodes, a `min_level` integer at least 1, and a `distinct_groups` integer at least 1 (defaulting to 1 when omitted). A group SHALL qualify when at least one node in it has a derived proficiency level greater than or equal to `min_level`. A clause SHALL be satisfied when the number of qualifying groups is greater than or equal to `distinct_groups`.
 
 #### Scenario: One node at the threshold qualifies its group
 
@@ -52,14 +48,31 @@ A group SHALL qualify when at least one node in it has a derived proficiency lev
 - **WHEN** a clause requires `min_level` 5 and the entity's highest node in scope sits at level 4
 - **THEN** the clause is not satisfied
 
+#### Scenario: A scope selects declaratively or by explicit keys
+
+- **WHEN** a clause's `scope` is declared
+- **THEN** it selects nodes either declaratively — by `category`, optionally narrowed by `group` — or by an explicit `keys` list of registry keys
+
+#### Scenario: A declarative scope samples ACTIVE nodes only
+
+- **WHEN** a declarative scope names a category or group
+- **THEN** it selects `ACTIVE` nodes only and never samples a `PASSIVE` member, because practice accrues on use alone and a `PASSIVE` node therefore remains at level 0 forever
+
+#### Scenario: Selected nodes are partitioned into groups by their group field
+
+- **WHEN** a scope selects its nodes
+- **THEN** those nodes are partitioned into groups by their `group` field for the qualifying-group count
+
+#### Scenario: A narrowed or explicit scope forms exactly one group
+
+- **WHEN** a scope is narrowed to a single `group`, or is an explicit `keys` scope
+- **THEN** it forms exactly one group
+
 ### Requirement: The table fails closed on any rule that can never fire
 
-Loading the table SHALL raise `ValueError` naming the offending rule `id` when a rule is unsatisfiable or malformed by construction, rather than admitting a rule that silently never fires. The load SHALL reject a rule when any of the following holds:
+Loading the table SHALL raise `ValueError` naming the offending rule `id` when a rule is unsatisfiable or malformed by construction, rather than admitting a rule that silently never fires, rejecting a rule when:
 
-- a `grants` or `scope` entry names a key absent from `SKILL_REGISTRY`
-- a clause's scope selects no nodes at all
 - fewer of the clause's groups hold at least one sampled node whose derived proficiency cap is greater than or equal to `min_level` than the clause's `distinct_groups` demands
-- an explicit `keys` scope names a node that is not `ACTIVE` — naming such a key is an authoring error, since it can never reach any threshold (a declarative scope instead never samples one, so it cannot fail this way)
 - `min_level` or `distinct_groups` is not an integer of at least 1, or `grants`/`requires` is empty
 
 #### Scenario: An unreachable threshold fails at load
@@ -77,6 +90,11 @@ Loading the table SHALL raise `ValueError` naming the offending rule `id` when a
 - **WHEN** a declarative scope names a category that contains both `ACTIVE` and `PASSIVE` members
 - **THEN** loading succeeds, and the clause's groups contain only the `ACTIVE` members
 
+#### Scenario: Naming a PASSIVE key in an explicit scope is an authoring error that can never reach a threshold
+
+- **WHEN** an explicit `keys` scope names a node that is not `ACTIVE`
+- **THEN** it is an authoring error rejected at load, since such a key can never reach any threshold, whereas a declarative scope never samples a `PASSIVE` node at all, so it cannot fail this way
+
 #### Scenario: A grant naming an unknown key fails at load
 
 - **WHEN** a rule's `grants` names a key absent from `SKILL_REGISTRY`
@@ -85,6 +103,21 @@ Loading the table SHALL raise `ValueError` naming the offending rule `id` when a
 #### Scenario: A clause demanding more groups than can qualify fails at load
 
 - **WHEN** a clause declares `distinct_groups` 3 over a scope containing only two groups that can reach `min_level`
+- **THEN** loading raises `ValueError` naming the rule `id`
+
+#### Scenario: A scope entry naming an unknown key fails at load
+
+- **WHEN** a clause's `scope` entry names a key absent from `SKILL_REGISTRY`
+- **THEN** loading raises `ValueError` naming the rule `id` and the unknown key
+
+#### Scenario: A scope that selects no nodes fails at load
+
+- **WHEN** a clause's scope selects no nodes at all
+- **THEN** loading raises `ValueError` naming the rule `id`
+
+#### Scenario: A malformed integer or an empty list fails at load
+
+- **WHEN** `min_level` or `distinct_groups` is not an integer of at least 1, or `grants` or `requires` is empty
 - **THEN** loading raises `ValueError` naming the rule `id`
 
 ### Requirement: A granted key is never a condition source

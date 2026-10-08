@@ -12,29 +12,7 @@ The presentation registry SHALL register a `party` panel at schema version 2. It
 SHALL contain exactly `schema_version`, `available`, and `slots`, where `slots` is an ordered
 array of zero to four companion rows, and the registered common unavailable form SHALL keep the
 shared field set, reason, and semantics. Each slot row SHALL contain exactly `identity`,
-`display_name`, `portrait_ref`, `hp_current`, `hp_maximum`, and `bond_stage`: `identity` SHALL be
-the companion's positive integer database identity — the same field a combat participant row
-carries, so a client can join the two panels; `display_name` SHALL be the canonical NPC display
-name truncated to the shared display-name bound; `portrait_ref` SHALL be the opaque string key of
-the companion NPC's default gallery portrait — an ASCII decimal string of 1–32 characters
-that resolves through the art panel's
-`portrait_catalog`, emitted by the same reference format the art panel presenter uses — or `null`
-when the companion has no gallery record or no default card, in which case the client renders its
-truthful initial-letter placeholder; `hp_current` and `hp_maximum` SHALL
-be non-negative integers from the companion's true traits; and `bond_stage` SHALL be the
-canonical stage NAME string from the affinity rulebook's stage table. The raw affinity number
-SHALL NOT appear anywhere in the payload. The presenter SHALL be read-only: it SHALL NOT mutate
-party membership, traits, affinity, combat, quest, or world state, and SHALL emit no live object
-or filesystem reference. The presenter SHALL resolve `portrait_ref` by reading each companion's
-gallery record (`world.art.gallery.record_for` with `create=False`) and its default card, never
-by creating a record, queueing generation, or inventing a URL.
-
-While the session actor is a possessed NPC, the presenter SHALL resolve the party's bound OWNER —
-the player named by the NPC-side `party_member` back-reference — and serialize that player's live
-companions with their owner-keyed bond stages, so the panel keeps listing the whole party,
-including the possessed companion, instead of the NPC's own (empty) party binding. When the
-back-reference resolves to no live player, the presenter SHALL raise the registry-unavailable
-error and the panel SHALL take the shared unavailable form.
+`display_name`, `portrait_ref`, `hp_current`, `hp_maximum`, and `bond_stage`.
 
 #### Scenario: A two-companion party serializes exactly the six-key bounded rows
 - **WHEN** a puppeted explorer with two live companions — one with a gallery portrait, one without — receives a full snapshot
@@ -42,6 +20,10 @@ error and the panel SHALL take the shared unavailable form.
   true HP integers, each companion's canonical bond stage name, the first companion's
   `portrait_ref` as a non-null `portrait_catalog` key and the second's as `null`, and no raw
   affinity value appears in the payload
+
+#### Scenario: The raw affinity number never appears
+- **WHEN** any party payload is serialized
+- **THEN** the raw affinity number appears nowhere in the payload
 
 #### Scenario: Possession keeps listing the owner's party
 - **WHEN** the player possesses one of her two companions and the next full snapshot arrives
@@ -70,15 +52,61 @@ error and the panel SHALL take the shared unavailable form.
 - **WHEN** a creation-pending puppet receives a snapshot
 - **THEN** `party` uses the shared unavailable form with its standard reason
 
+#### Scenario: Identity is the database identity shared with combat rows
+- **WHEN** a slot row is serialized
+- **THEN** `identity` is the companion's positive integer database identity — the same field a
+  combat participant row carries, so a client can join the two panels
+
+#### Scenario: Display names honor the shared bound
+- **WHEN** the companion's canonical NPC display name exceeds the shared display-name bound
+- **THEN** `display_name` is the canonical name truncated to that bound
+
+#### Scenario: portrait_ref is the art panel's opaque reference format
+- **WHEN** a companion's gallery record has a default card
+- **THEN** `portrait_ref` is the opaque string key of the companion NPC's default gallery portrait
+  — an ASCII decimal string of 1–32 characters that resolves through the art panel's
+  `portrait_catalog`, emitted by the same reference format the art panel presenter uses
+
+#### Scenario: A missing portrait is null, not fabricated
+- **WHEN** the companion has no gallery record or no default card
+- **THEN** `portrait_ref` is `null` and the client renders its truthful initial-letter placeholder
+
+#### Scenario: HP fields come from the true traits
+- **WHEN** a slot row is serialized
+- **THEN** `hp_current` and `hp_maximum` are non-negative integers from the companion's true traits
+
+#### Scenario: bond_stage carries only the stage name
+- **WHEN** a slot row is serialized
+- **THEN** `bond_stage` is the canonical stage NAME string from the affinity rulebook's stage table
+
+#### Scenario: The presenter is read-only and leak-free
+- **WHEN** the party presenter runs
+- **THEN** it does not mutate party membership, traits, affinity, combat, quest, or world state,
+  and emits no live object or filesystem reference
+
+#### Scenario: Portrait resolution never writes or invents
+- **WHEN** the presenter resolves `portrait_ref`
+- **THEN** it reads each companion's gallery record (`world.art.gallery.record_for` with
+  `create=False`) and its default card, never creating a record, queueing generation, or inventing
+  a URL
+
+#### Scenario: A possessed NPC presents the bound owner's party
+- **WHEN** the session actor is a possessed NPC
+- **THEN** the presenter resolves the party's bound OWNER — the player named by the NPC-side
+  `party_member` back-reference — and serializes that player's live companions with their
+  owner-keyed bond stages, so the panel keeps listing the whole party, including the possessed
+  companion, instead of the NPC's own (empty) party binding
+
+#### Scenario: A dangling owner back-reference raises unavailable
+- **WHEN** the `party_member` back-reference resolves to no live player
+- **THEN** the presenter raises the registry-unavailable error and the panel takes the shared
+  unavailable form
+
 ### Requirement: Party presentation stays current across membership and combat changes
 The coordinator SHALL include the `party` panel in the presentation updates it pushes after the
 party write seams (`join_party`, `leave_party`, membership purge) and wherever it already
-re-pushes companion-adjacent state on combat settlement, so committed `party.slots` never
-displays a dismissed companion, a stale HP integer, or a stale `portrait_ref` after the next
-settlement commit. The panel
-SHALL be pushed for exploration and combat puppets alike. The client-side panel allowlists (the
-UMD protocol mirror and the Vue store mirror) SHALL name `party` in lockstep with the server
-registry so a committed party payload validates identically on all three.
+re-pushes companion-adjacent state on combat settlement. The panel SHALL be pushed for
+exploration and combat puppets alike.
 
 #### Scenario: Dismissing a companion re-pushes the party panel
 - **WHEN** a companion leaves the party through the leave seam while the puppet is connected
@@ -95,6 +123,17 @@ registry so a committed party payload validates identically on all three.
 - **THEN** every registered panel name appears in all three lists and the contract fails on any
   drift
 
+#### Scenario: Committed slots never show stale companion state
+- **WHEN** updates are pushed per the seams and settlement re-pushes
+- **THEN** committed `party.slots` never displays a dismissed companion, a stale HP integer, or a
+  stale `portrait_ref` after the next settlement commit
+
+#### Scenario: Client mirrors name the panel in lockstep
+- **WHEN** the client-side panel allowlists (the UMD protocol mirror and the Vue store mirror)
+  are compared with the server registry
+- **THEN** they name `party` in lockstep so a committed party payload validates identically on all
+  three
+
 ### Requirement: Party tokens are joined, not duplicated
 The `party` panel SHALL NOT carry a combat token field: the session's `aN` numbering SHALL stay
 owned solely by the combat view, and any surface needing both SHALL join `party.slots` to the
@@ -110,10 +149,7 @@ combat panel's participant rows by `identity`.
 The Vue PartyDrawer SHALL render, on each companion row, the `explore.possess` affordance from
 the shared exploration vocabulary (enabled state and disabled reason exactly as emitted), and
 SHALL present the single `explore.possess_release` control while the vocabulary carries one; the
-controls SHALL dispatch through the same `ui_action` path as every other affordance. The `party`
-panel payload itself SHALL NOT gain any possession field: possession state reaches the client
-through the vocabulary and the possession banner only, and the schema-version-2 six-key row
-contract is unchanged.
+controls SHALL dispatch through the same `ui_action` path as every other affordance.
 
 #### Scenario: A possessable companion row offers the action
 - **WHEN** the drawer renders a co-located bound companion whose possess entry is enabled
@@ -128,3 +164,8 @@ contract is unchanged.
 - **WHEN** the party panel payload is validated while the player possesses a companion
 - **THEN** the payload is byte-identical in shape to the schema-version-2 contract and carries no
   possession field
+
+#### Scenario: Possession state rides the vocabulary and banner only
+- **WHEN** possession state reaches the client
+- **THEN** it arrives through the vocabulary and the possession banner only, and the
+  schema-version-2 six-key row contract is unchanged

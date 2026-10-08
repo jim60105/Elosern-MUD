@@ -7,7 +7,7 @@ Provide recoverable local world-state save slots containing the database and gen
 
 ### Requirement: Complete world save contents
 
-A save SHALL contain the SQLite world database and generated art, excluding nested save archives, authored source, model files, logs and transcripts. Its manifest SHALL include id, label, kind, creation time, world clock tick and in-game date, player character name/location summary, latest applied migration per app, file count and size. Its world clock tick and in-game date SHALL be read from the copied database the save contains, not from a later live read, so the recorded in-game time always describes the world the save holds. IDs SHALL follow `YYYYMMDDTHHMMSS-<6 hex>` and every route and save function accepting an ID SHALL validate it before filesystem access. Only complete database/art pairs SHALL be listed.
+A save SHALL contain the SQLite world database and generated art, excluding nested save archives, authored source, model files, logs and transcripts. Its world clock tick and in-game date SHALL be read from the copied database the save contains, not from a later live read, so the recorded in-game time always describes the world the save holds.
 
 #### Scenario: Save metadata and contents
 - **WHEN** a snapshot is created from a temporary world database and art store containing a nested save archive
@@ -21,9 +21,21 @@ A save SHALL contain the SQLite world database and generated art, excluding nest
 - **WHEN** the live world clock advances after a snapshot's database backup has completed and before its metadata is collected
 - **THEN** the manifest's world clock tick and in-game date are the values contained in the save's copied database, and the console baseline derived from that save is that same tick
 
+#### Scenario: Identifier format and validation
+- **WHEN** any route or save function accepts a save ID
+- **THEN** IDs follow `YYYYMMDDTHHMMSS-<6 hex>` and the ID is validated before filesystem access
+
+#### Scenario: Only complete pairs are listed
+- **WHEN** the save list is assembled
+- **THEN** only complete database/art pairs are listed
+
+#### Scenario: Manifest field completeness
+- **WHEN** a save manifest is written
+- **THEN** it includes id, label, kind, creation time, world clock tick and in-game date, player character name/location summary, latest applied migration per app, file count and size
+
 ### Requirement: Consistent snapshots without damaged art history
 
-Only one snapshot SHALL run at a time; concurrent snapshot attempts SHALL fail with `save_in_progress`. A snapshot SHALL pause art draining, obtain a consistent SQLite online backup, mirror art with hardlink-and-copy-fallback, and resume art draining in `finally` on success or failure. Art publication SHALL use temporary-file atomic replacement so subsequent generation, seeding, cutout or cleanup cannot modify saved bytes. Failed creation SHALL remove partial directories and SHALL NOT leave a listed half-save.
+Only one snapshot SHALL run at a time; concurrent snapshot attempts SHALL fail with `save_in_progress`. A snapshot SHALL pause art draining, obtain a consistent SQLite online backup, mirror art with hardlink-and-copy-fallback, and resume art draining in `finally` on success or failure. Failed creation SHALL remove partial directories and SHALL NOT leave a listed half-save.
 
 #### Scenario: Live SQLite writes
 - **WHEN** database writes occur while a snapshot uses the online backup API
@@ -41,9 +53,13 @@ Only one snapshot SHALL run at a time; concurrent snapshot attempts SHALL fail w
 - **WHEN** snapshot failure is injected during backup, art mirroring, manifest writing or either final rename
 - **THEN** partial and newly published incomplete halves are removed, no half-save is listed, and ArtDrainScript is resumed
 
+#### Scenario: Art publication is atomically replaced
+- **WHEN** art is published during or after a snapshot
+- **THEN** publication uses temporary-file atomic replacement so subsequent generation, seeding, cutout or cleanup cannot modify saved bytes
+
 ### Requirement: Retention and manual deletion
 
-Each automatic kind SHALL retain at most `GM_AUTOSAVE_KEEP` saves after successful creation, defaulting to 10 with an environment override, deleting the oldest of that kind. A selected automatic restore target SHALL survive pre-restore snapshot retention until pending application finishes; pruning of its kind SHALL be deferred during that interval and completed at subsequent server startup. Manual saves SHALL never be automatically deleted. Explicit operator deletion SHALL require confirmation and SHALL be limited to manual saves, refusing automatic saves with `save_delete_forbidden`.
+Each automatic kind SHALL retain at most `GM_AUTOSAVE_KEEP` saves after successful creation, defaulting to 10 with an environment override, deleting the oldest of that kind. A selected automatic restore target SHALL survive pre-restore snapshot retention until pending application finishes; pruning of its kind SHALL be deferred during that interval and completed at subsequent server startup. Manual saves SHALL never be automatically deleted.
 
 #### Scenario: Independent automatic retention
 - **WHEN** new automatic saves exceed the configured limit with both automatic kinds and manual saves present
@@ -56,6 +72,10 @@ Each automatic kind SHALL retain at most `GM_AUTOSAVE_KEEP` saves after successf
 #### Scenario: Deletion policy
 - **WHEN** the operator confirms deletion of a manual save or attempts deletion of an automatic save
 - **THEN** the manual save's database and art halves are deleted, while the automatic save remains and returns `save_delete_forbidden`
+
+#### Scenario: Manual deletion requires confirmation
+- **WHEN** an operator explicitly deletes a save
+- **THEN** deletion requires confirmation and is limited to manual saves, refusing automatic saves with `save_delete_forbidden`
 
 ### Requirement: Guarded restore request
 
@@ -79,7 +99,7 @@ Restore requests SHALL reject saves containing migrations unknown to current cod
 
 ### Requirement: Pre-start restore with rollback and result
 
-Both launchers SHALL apply pending restoration before `evennia migrate`. The pre-start tool SHALL run using only the standard library, verify the manifest and every saved file, refuse incompatible migrations, move originals aside and install the selected database and live art without consuming save archives. On success it SHALL remove moved-aside originals and the marker; on failure it SHALL roll originals back, remove the marker and allow normal startup. Both outcomes SHALL write `RESTORE_RESULT.json`. Older compatible saves SHALL migrate forward during normal startup. Captured in-progress art work SHALL be requeued through the existing lease reclaim.
+Both launchers SHALL apply pending restoration before `evennia migrate`. The pre-start tool SHALL run using only the standard library, verify the manifest and every saved file, refuse incompatible migrations, move originals aside and install the selected database and live art without consuming save archives. Both outcomes SHALL write `RESTORE_RESULT.json`.
 
 #### Scenario: Successful restore and forward migration
 - **WHEN** either launcher starts with a compatible older save pending
@@ -101,9 +121,21 @@ Both launchers SHALL apply pending restoration before `evennia migrate`. The pre
 - **WHEN** restored art jobs were captured as in-progress
 - **THEN** existing lease reclaim requeues them rather than leaving them permanently stuck
 
+#### Scenario: Success and failure bookkeeping
+- **WHEN** pre-start restoration succeeds or fails
+- **THEN** success removes the moved-aside originals and the marker, and failure rolls the originals back, removes the marker, and allows normal startup
+
+#### Scenario: Older saves migrate forward
+- **WHEN** an older compatible save is restored
+- **THEN** it migrates forward during normal startup
+
+#### Scenario: Captured art work is requeued
+- **WHEN** art work was captured in progress at save time
+- **THEN** it is requeued through the existing lease reclaim
+
 ### Requirement: Protected save API and streaming download
 
-S5 SHALL add GET/POST `/gm/api/saves/`, POST `/gm/api/saves/<id>/restore`, POST `/gm/api/saves/<id>/delete`, and GET `/gm/api/saves/<id>/download` using the existing `gm-portal-access-api` protection, envelope, CSRF and request-event contracts. List SHALL provide saves and latest restore result; creation SHALL create a manual save with a label. A completed manual save SHALL reset the process-local gm-developer-console baseline to the tick its own copied database represents, never a later live read; failed creation, including a refusal, SHALL not change the baseline. Manual-save creation SHALL keep its fail-fast contention behavior: an attempt that cannot take the snapshot serialization it needs SHALL return the existing `save_in_progress` refusal and SHALL NOT be queued behind another save or a console operation. Download success SHALL stream an uncompressed tar of the database, art and manifest instead of a JSON success body; failures before streaming SHALL use the JSON error envelope. Clients SHALL branch on the S5 error codes `save_not_found`, `invalid_save_id`, `save_incompatible`, `save_in_progress`, and `save_delete_forbidden`, not message text. Upload/import SHALL NOT be exposed.
+S5 SHALL add GET/POST `/gm/api/saves/`, POST `/gm/api/saves/<id>/restore`, POST `/gm/api/saves/<id>/delete`, and GET `/gm/api/saves/<id>/download` using the existing `gm-portal-access-api` protection, envelope, CSRF and request-event contracts. List SHALL provide saves and latest restore result; creation SHALL create a manual save with a label. Upload/import SHALL NOT be exposed.
 
 #### Scenario: Access and CSRF matrix
 - **WHEN** anonymous, ordinary, Developer and superuser accounts exercise all save routes, and privileged POSTs use missing, invalid or valid CSRF tokens
@@ -125,9 +157,26 @@ S5 SHALL add GET/POST `/gm/api/saves/`, POST `/gm/api/saves/<id>/restore`, POST 
 - **WHEN** the live clock advances after a manual save's database backup and before its metadata collection, or a second manual save is attempted while a snapshot-affecting operation is running
 - **THEN** the completed save's reported in-game date and the console baseline are the tick contained in its copied database, the later player tick still requires a save, and the second attempt receives `save_in_progress` without creating a queued save
 
+#### Scenario: Completed manual saves reset the console baseline
+- **WHEN** a manual save completes
+- **THEN** it resets the process-local gm-developer-console baseline to the tick its own copied database represents, never a later live read
+- **AND** failed creation, including a refusal, does not change the baseline
+
+#### Scenario: Creation contention stays fail-fast
+- **WHEN** a manual-save creation attempt cannot take the snapshot serialization it needs
+- **THEN** it returns the existing `save_in_progress` refusal and is not queued behind another save or a console operation
+
+#### Scenario: Download streaming versus JSON failures
+- **WHEN** a download succeeds, or fails before streaming begins
+- **THEN** success streams an uncompressed tar of the database, art and manifest instead of a JSON success body, and pre-streaming failures use the JSON error envelope
+
+#### Scenario: Clients branch on error codes
+- **WHEN** a client handles an S5 save failure
+- **THEN** it branches on the codes `save_not_found`, `invalid_save_id`, `save_incompatible`, `save_in_progress`, and `save_delete_forbidden`, not message text
+
 ### Requirement: Operator saves page
 
-The isolated GM SPA SHALL enable the S5 saves page and show label, kind badge, creation time, in-game date, player summaries and size, plus the latest restore result when present. It SHALL offer labelled creation, restore, download and confirmed deletion for manual saves only. The danger-style restore confirmation SHALL explain that current state is saved first, the server shuts down and the operator must start it again. It SHALL use the landed GM component/fetch boundary and remain usable offline without touching game-client contracts. S6 contextual console surfaces SHALL be available under gm-developer-console rather than being required to remain disabled.
+The isolated GM SPA SHALL enable the S5 saves page and show label, kind badge, creation time, in-game date, player summaries and size, plus the latest restore result when present. It SHALL offer labelled creation, restore, download and confirmed deletion for manual saves only.
 
 #### Scenario: Save management actions
 - **WHEN** the operator opens the saves page with manual and automatic saves present
@@ -145,9 +194,21 @@ The isolated GM SPA SHALL enable the S5 saves page and show label, kind badge, c
 - **WHEN** LLM/SD services are offline and the saves page is loaded directly or via navigation
 - **THEN** the page remains usable with local saves, the GM-only route is enabled, S6 contextual entry points remain independently available and the game bundle/OOB remain unchanged
 
+#### Scenario: Restore confirmation explains consequences
+- **WHEN** the restore confirmation dialog is shown
+- **THEN** it uses danger styling and explains that current state is saved first, the server shuts down, and the operator must start it again
+
+#### Scenario: Boundary and offline usability
+- **WHEN** the saves page is built and run
+- **THEN** it uses the landed GM component/fetch boundary and remains usable offline without touching game-client contracts
+
+#### Scenario: S6 contextual surfaces are available
+- **WHEN** S6 contextual console surfaces are considered
+- **THEN** they are available under gm-developer-console rather than being required to remain disabled
+
 ### Requirement: Save operational observability
 
-Server-side save operations SHALL emit `save_created`, `save_failed`, `save_deleted`, `save_restore_requested`, `save_restored` and `save_restore_failed` through `world.observability`, each with `save` and `kind` in context. GM writes SHALL additionally emit `gm_action` with operator account and target identifiers. The standard-library pre-start restore tool SHALL report through stdout and the result file rather than importing the facade; server startup SHALL translate its result to the corresponding restore event. New production modules SHALL NOT enter the observability freeze list.
+Server-side save operations SHALL emit `save_created`, `save_failed`, `save_deleted`, `save_restore_requested`, `save_restored` and `save_restore_failed` through `world.observability`, each with `save` and `kind` in context. GM writes SHALL additionally emit `gm_action` with operator account and target identifiers.
 
 #### Scenario: Operation events
 - **WHEN** creation succeeds/fails, a save is deleted or a restore request succeeds
@@ -156,3 +217,11 @@ Server-side save operations SHALL emit `save_created`, `save_failed`, `save_dele
 #### Scenario: Startup outcome translation
 - **WHEN** startup reads a successful or failed restore result
 - **THEN** it emits `save_restored` or `save_restore_failed` respectively with save/kind context and the page can display the recorded outcome
+
+#### Scenario: The pre-start tool reports without the facade
+- **WHEN** the standard-library pre-start restore tool runs
+- **THEN** it reports through stdout and the result file rather than importing the facade, and server startup translates its result to the corresponding restore event
+
+#### Scenario: Freeze list stays closed
+- **WHEN** new production save modules are added
+- **THEN** they do not enter the observability freeze list

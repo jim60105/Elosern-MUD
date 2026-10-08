@@ -9,13 +9,7 @@ Defines the element-agnostic ground-hazard marker primitive: a validated `marker
 A buff definition MAY declare the closed-vocabulary `marker: ground` clause at definition load. A row
 that declares it SHALL be a ground-hazard marker whose canonical「站在其上」fact is exactly the
 holder carrying a live (unexpired, non-paused) instance of that definition — there is no separate
-position, tile, or room state, and no generic code SHALL read an element, skill or definition-key
-identity to honor the clause. Marker rows compose with the shipped definition vocabulary without
-restriction (a marker row may additionally carry `rate`, `bounds` or an empty `modifiers` mapping);
-a row without the clause SHALL load, apply, tick and expire bit-identically to its pre-clause
-behavior. The clause value SHALL be validated fail-closed at load — a value outside the closed
-marker vocabulary, a non-string, or a boolean SHALL name the offending definition key and fail the
-load.
+position, tile, or room state.
 
 #### Scenario: A synthetic marker hazard damages its holder while it lasts
 - **WHEN** a synthetic marker row carrying a negative hp `rate` is applied by a living caster and the
@@ -35,8 +29,25 @@ load.
 - **THEN** the definition load fails naming the offending key, and no partially-loaded definition set
   is observable
 
+#### Scenario: Honoring the clause reads no identity
+- **WHEN** generic code honors the marker clause
+- **THEN** it SHALL read no element, skill, or definition-key identity to do so
+
+#### Scenario: Marker rows compose with the shipped vocabulary unrestricted
+- **WHEN** a marker row additionally carries `rate`, `bounds`, or an empty `modifiers` mapping
+- **THEN** it composes with the shipped definition vocabulary without restriction
+
+#### Scenario: A clause-less row behaves exactly as before the clause
+- **WHEN** a row without the marker clause loads, applies, ticks, and expires
+- **THEN** each is bit-identical to its pre-clause behavior
+
+#### Scenario: A malformed marker value names the key and fails the load
+- **WHEN** a declared marker-clause value is outside the closed marker vocabulary, is a non-string,
+  or is a boolean
+- **THEN** validation fails closed at load, naming the offending definition key
+
 ### Requirement: A ground marker extinguishes when its holder leaves the battlefield
-A live ground-marker instance SHALL end — through the existing buff-removal path, with zero further ticks or credit legs — when its holder flees the combat session, is knocked out, or the combat session ends, without waiting for its authored duration. This battlefield-exit extinguishment SHALL apply ONLY to rows declaring the marker clause — now covering both closed marker values, `ground` and `positional`, through the same removal path and the same persisted transitions: an ordinary buff's cross-combat persistence, refresh-stacking and expiry semantics SHALL be unchanged, and a marker still held by a still-active combatant SHALL persist across rounds exactly like any other timed buff. Marker expiry, dispel and cleanse SHALL remove the instance through the shipped paths unchanged, and removal SHALL never damage or revive any entity. Ground-row extinguishment behavior SHALL stay bit-identical to its shipped behavior.
+A live ground-marker instance SHALL end — through the existing buff-removal path, with zero further ticks or credit legs — when its holder flees the combat session, is knocked out, or the combat session ends, without waiting for its authored duration. This battlefield-exit extinguishment SHALL apply ONLY to rows declaring the marker clause — now covering both closed marker values, `ground` and `positional`, through the same removal path and the same persisted transitions.
 
 #### Scenario: Fleeing steps off the hazard
 - **WHEN** a synthetic marker holder flees mid-session and the clock advances past a would-be tick interval
@@ -57,3 +68,15 @@ A live ground-marker instance SHALL end — through the existing buff-removal pa
 #### Scenario: The same transitions sweep positional rows
 - **WHEN** a synthetic positional-marker holder flees, is knocked out, or ends the session while a ground-marker holder and an ordinary-buff holder remain under observation
 - **THEN** the positional instance is removed at the transition through the same path with zero side effects, ground extinguishment behavior is unchanged, and the ordinary buff persists on its own clock
+
+#### Scenario: Ground-row extinguishment stays bit-identical to shipped behavior
+- **WHEN** battlefield-exit extinguishment runs for a ground-marker row
+- **THEN** its behavior is bit-identical to its shipped behavior
+
+#### Scenario: Ordinary-buff and active-holder semantics are untouched
+- **WHEN** battlefield-exit extinguishment runs alongside ordinary buffs and still-fighting marker holders
+- **THEN** an ordinary buff's cross-combat persistence, refresh-stacking and expiry semantics are unchanged, and a marker still held by a still-active combatant persists across rounds exactly like any other timed buff
+
+#### Scenario: Expiry, dispel and cleanse remove markers through the shipped paths
+- **WHEN** a marker instance is expired, dispelled, or cleansed
+- **THEN** it is removed through the shipped paths unchanged, and the removal never damages or revives any entity

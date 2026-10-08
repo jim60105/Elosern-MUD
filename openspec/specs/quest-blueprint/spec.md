@@ -39,11 +39,9 @@ at the inventory-owning transaction boundary.
 
 ### Requirement: Destinations distinguish permanent locations from future bound instances
 `DestinationKind` SHALL contain `ANCHOR`, `GRID`, and `BOUND_INSTANCE`. An ANCHOR locator SHALL carry
-exactly one `anchor_key` present in `ANCHOR_PLACEMENT_REGISTRY`; a lore-known anchor without a placement
-SHALL be rejected because it has no reachable room. A GRID locator SHALL carry exactly one `(x, y, z)`
-tuple whose map key is known to the xyzgrid; a BOUND_INSTANCE locator SHALL carry neither and SHALL
-resolve only through the accepted record's `stage_room_id`. Wilderness coordinates SHALL NOT be
-representable by this change.
+exactly one `anchor_key` present in `ANCHOR_PLACEMENT_REGISTRY`. A GRID locator SHALL carry exactly one
+`(x, y, z)` tuple whose map key is known to the xyzgrid; a BOUND_INSTANCE locator SHALL carry neither
+static location field.
 
 #### Scenario: An anchor destination is structurally valid
 - **WHEN** a REACH objective names a key present in `ANCHOR_PLACEMENT_REGISTRY` through an ANCHOR locator
@@ -62,21 +60,16 @@ representable by this change.
 - **WHEN** content attempts to declare a wilderness-coordinate destination
 - **THEN** no `DestinationKind` value can represent it in this change
 
+#### Scenario: A bound-instance destination resolves through the accepted record
+- **WHEN** a destination is declared with `DestinationKind.BOUND_INSTANCE`
+- **THEN** it carries no static location field and resolves only through the accepted record's `stage_room_id`
+
 ### Requirement: Registration validates every runtime-critical objective field
 `register_quest_definition()` SHALL treat re-registering equal content under the same key as an
-idempotent no-op and SHALL reject conflicting content under an existing key. It SHALL reject empty
-stages, non-contiguous stage indices starting anywhere other than zero, non-positive quantities,
-invalid destination shapes, unknown static location keys, and invalid objective parameters. DEFEAT
-SHALL declare exactly one selector family: a known `monster_tier`; or `requires_bound_targets=True` with
-no site key; or a bound clear-out over an authored site (`requires_bound_targets=True` together with a
-known `site_key`, whose quantity SHALL NOT exceed that site's authored capacity); or the complete
-regional species-hunt selector (a known region key, a known species key, and a non-empty
-countable-variant tuple owned by that species). A partial hunt selector, a hunt combined with the tier or
-with the bound selector, a site key without the bound flag, a site key combined with the tier or with the
-hunt selector, and an unknown site key are each invalid. REACH SHALL declare
-a destination; ESCORT SHALL declare a destination and SHALL be unable to complete until protected
-runtime entities are bound. `deadline_hours` SHALL be either `None`, meaning no deadline, or a positive
-integer.
+idempotent no-op and SHALL reject conflicting content under an existing key. DEFEAT SHALL declare
+exactly one selector family. REACH and ESCORT SHALL declare a destination; ESCORT SHALL be unable
+to complete until protected runtime entities are bound. `deadline_hours` SHALL be `None`
+(no deadline) or a positive integer.
 
 #### Scenario: A complete hand-written definition registers
 - **WHEN** a definition has contiguous stages and every objective supplies its required typed fields
@@ -95,6 +88,12 @@ integer.
 - **WHEN** an ESCORT objective has no destination, a DEFEAT objective has no selector, or a quantity is
   zero
 - **THEN** registration raises `QuestDefinitionError` rather than deferring failure to event handling
+
+#### Scenario: Structural field validation happens at registration
+- **WHEN** a definition has empty stages, non-contiguous stage indices starting anywhere other than
+  zero, a non-positive quantity, an invalid destination shape, an unknown static location key, or
+  invalid objective parameters
+- **THEN** registration raises `QuestDefinitionError` and leaves the registry unchanged
 
 #### Scenario: A complete site clear-out registers
 - **WHEN** a DEFEAT objective declares `requires_bound_targets=True`, a registered site key, and a quantity at or below that site's capacity
@@ -119,6 +118,31 @@ integer.
 #### Scenario: A partial hunt selector is rejected
 - **WHEN** a DEFEAT objective supplies a species key without a region key, or a species/variant pair without any countable variant
 - **THEN** registration raises `QuestDefinitionError` and the registry is unchanged
+
+#### Scenario: The four DEFEAT selector families
+- **WHEN** DEFEAT objective selectors are enumerated for validity
+- **THEN** exactly one family must be declared: a known `monster_tier`; or `requires_bound_targets=True`
+  with no site key; or a bound clear-out over an authored site (`requires_bound_targets=True` together
+  with a known `site_key`, whose quantity SHALL NOT exceed that site's authored capacity); or the
+  complete regional species-hunt selector (a known region key, a known species key, and a non-empty
+  countable-variant tuple owned by that species)
+
+#### Scenario: A hunt beside the bound selector is rejected
+- **WHEN** a DEFEAT objective combines the regional species-hunt selector with `requires_bound_targets=True`
+- **THEN** registration raises `QuestDefinitionError`
+
+#### Scenario: A site key beside the hunt selector is rejected
+- **WHEN** a DEFEAT objective declares a site key together with the regional species-hunt selector
+- **THEN** registration raises `QuestDefinitionError`
+
+#### Scenario: An unknown site key is rejected
+- **WHEN** a DEFEAT objective declares a site key that is not a registered authored site
+- **THEN** registration raises `QuestDefinitionError`
+
+#### Scenario: REACH and ESCORT must declare a destination
+- **WHEN** a REACH objective declares no destination, or an ESCORT objective declares none
+- **THEN** registration raises `QuestDefinitionError`, and an ESCORT objective with a destination
+  still cannot complete until its protected runtime entities are bound
 
 ### Requirement: The hand-written catalog is idempotent and provides an offline quest
 `world/quests/catalog.py` SHALL declare at least one deterministic introductory hunt using only
@@ -171,14 +195,8 @@ The system SHALL refuse to publish an ESCORT quest unless its stage can actually
 ### Requirement: Species-hunt objectives carry a validated region/species/variant selector
 `QuestObjective` SHALL support the approved regional species-hunt semantics as a deterministic, deeply
 immutable selector: a region key naming a key of `WILDERNESS_REGION_REGISTRY`, a species key naming a
-key of `MONSTER_SPECIES_REGISTRY`, a positive quantity, and a non-empty tuple of countable variant keys.
-Registration SHALL reject: an unknown region or species key; any countable variant key that is not a
-registered variant owned by the declared species; a hunt that declares no ordinary baseline variant of
-that species among its countable variants (the guarantee that ordinary-eligible living targets exist at
-acceptance must be expressible); and a hunt combined with the tier selector or the bound-target flag
-(a hunt declares exactly one selector family). Display names SHALL NOT participate in selector
-resolution, and an ordinary hunt SHALL NOT be representable as "count every variant of every species in
-a tier".
+key of `MONSTER_SPECIES_REGISTRY`, a positive quantity, and a non-empty tuple of countable variant
+keys owned by that species. Display names SHALL NOT participate in selector resolution.
 
 #### Scenario: A valid hunt registers
 - **WHEN** a definition's DEFEAT stage declares region, species, quantity, and countable variant keys all owned by that species including at least one ordinary variant
@@ -188,6 +206,11 @@ a tier".
 - **WHEN** a hunt's countable variants include a variant owned by a different species
 - **THEN** registration raises `QuestDefinitionError` and the registry is unchanged
 
+#### Scenario: An unknown region or species key is rejected
+- **WHEN** a hunt names a region key absent from `WILDERNESS_REGION_REGISTRY` or a species key absent
+  from `MONSTER_SPECIES_REGISTRY`
+- **THEN** registration raises `QuestDefinitionError`
+
 #### Scenario: Two selectors at once is rejected
 - **WHEN** a hunt objective also declares `monster_tier` or `requires_bound_targets=True`
 - **THEN** registration raises `QuestDefinitionError`
@@ -196,16 +219,22 @@ a tier".
 - **WHEN** a hunt is authored with a species display name instead of a species key
 - **THEN** registration rejects it: only the shared stable-key form is a valid selector
 
+#### Scenario: A hunt with no ordinary baseline variant is rejected
+- **WHEN** a hunt's countable variants include no ordinary baseline variant of that species
+- **THEN** registration raises `QuestDefinitionError`, because the guarantee that ordinary-eligible
+  living targets exist at acceptance must be expressible
+
+#### Scenario: Bulk tier sweeps are not expressible
+- **WHEN** content attempts to represent an ordinary hunt as "count every variant of every species in
+  a tier"
+- **THEN** no selector form represents it
+
 ### Requirement: Quest records carry grade, rating rationale, and background flavor as three separate authored fields
 `QuestDefinition` SHALL keep the authored guild grade (`rank`, existing semantics unchanged) and SHALL
 additionally carry two separately authored prose fields: a rating rationale explaining the risk the
 authored arrangement, abilities, or terrain create, and a background flavor describing the issuer's
-motivation and the local events — both readable offline with no generative service. A variant's
-individual danger grade SHALL NOT propagate into or overwrite the definition's grade, and no
-completion, failure, or progress rule SHALL read either prose field: completion derives only from the
-structured objectives. The prose fields SHALL be bounded, immutable, and Traditional Chinese
-player-facing text, and a definition MAY carry the rationale or flavor without any ability reference:
-flavor SHALL NOT grant, imply, or require an unregistered ability.
+motivation and the local events — both readable offline with no generative service. The prose fields
+SHALL be bounded, immutable, and Traditional Chinese player-facing text.
 
 #### Scenario: Three fields, three jobs
 - **WHEN** a hunt definition authored with grade, rationale, and flavor is inspected
@@ -219,17 +248,19 @@ flavor SHALL NOT grant, imply, or require an unregistered ability.
 - **WHEN** gameplay events that the flavor text narrates occur without satisfying the structured objectives
 - **THEN** no progress, completion, or failure occurs
 
+#### Scenario: Completion reads only structured objectives
+- **WHEN** completion, failure, or progress rules evaluate a definition
+- **THEN** none of them reads either prose field: completion derives only from the structured objectives
+
+#### Scenario: Flavor carries no ability
+- **WHEN** a definition carries the rationale or flavor without any ability reference
+- **THEN** registration accepts it, and flavor SHALL NOT grant, imply, or require an unregistered ability
+
 ### Requirement: Published regional species hunts are legally provisionable in their authored region
-A published regional species hunt SHALL be provisionable by the region's own authored placement: the hunt's
-region SHALL have an ambient placement rule, at least one of the hunt's ordinary countable variants SHALL
-be in that rule's eligible variant set (otherwise the acceptance-time guarantee could only ever refuse),
-and the hunt's required quantity SHALL NOT exceed the region's authored per-coordinate legal supply —
-`min(quantity, capacity)` of that rule. A region with no authored ambient placement SHALL carry no
-regional hunt, because such a hunt could never be satisfied and the board is not an inventory of
-impossible work. The shipped catalog SHALL carry exactly one regional hunt per species that a
-placement-covered region actually places. This is a property of published content, not a promise that
-every acceptance succeeds: the acceptance-time guarantee still refuses with its named reason when the
-world is not provisioned or the region's authored capacity is momentarily exhausted.
+A published regional species hunt SHALL be provisionable by the region's own authored placement: the
+hunt's region SHALL have an ambient placement rule, at least one of the hunt's ordinary countable
+variants SHALL be in that rule's eligible variant set, and the hunt's required quantity SHALL NOT
+exceed the region's authored per-coordinate legal supply — `min(quantity, capacity)` of that rule.
 
 #### Scenario: Every published hunt can be provisioned by its region
 - **WHEN** each published regional hunt is compared against its region's authored ambient placement rule
@@ -247,15 +278,23 @@ world is not provisioned or the region's authored capacity is momentarily exhaus
 - **WHEN** a placement-covered region's ambient rule names variants of two species
 - **THEN** the shipped catalog carries one hunt for each of them, each naming its own species and the countable variants that species owns
 
+#### Scenario: Provisionability is a content property, not an acceptance promise
+- **WHEN** a published hunt's acceptance runs while the world is not provisioned or the region's
+  authored capacity is momentarily exhausted
+- **THEN** the acceptance-time guarantee still refuses with its named reason; the requirement binds
+  published content, not every acceptance
+
+#### Scenario: An unplaceable hunt could only ever refuse
+- **WHEN** a hunt's region has an ambient placement rule that names none of the hunt's ordinary
+  countable variants, or a region with no authored ambient placement were to carry a regional hunt
+- **THEN** such a hunt could never be satisfied — the acceptance-time guarantee could only ever refuse,
+  and the board is not an inventory of impossible work
+
 ### Requirement: Every shipped hunt carries authored rank, rating rationale, background flavor, and a rank-banded reward
-Every published hunt SHALL carry an authored guild rank, an authored rating rationale describing the risk
-the arrangement, numbers, or terrain create, an authored background flavor describing the issuer's
-motivation and local events, and a hand-written reward whose copper lies inside the rank's own reward band
-in the guild-economy rulebook. The rank SHALL be authored for the arrangement and SHALL NOT be derived
-from a targeted variant's individual danger grade: a run of hunts whose strongest countable or bound
-individual is graded above the hunt's rank SHALL remain lawful and unchanged. The prose fields SHALL
-describe effects and risks that actually exist in play and SHALL NOT assert an effect of a special ability
-that has no mechanics.
+Every published hunt SHALL carry an authored guild rank, an authored rating rationale describing the
+risk the arrangement, numbers, or terrain create, an authored background flavor describing the
+issuer's motivation and local events, and a hand-written reward whose copper lies inside the rank's
+own reward band in the guild-economy rulebook.
 
 #### Scenario: A hunt offers a reward inside its rank band
 - **WHEN** each published hunt's registered guild offer is checked against its definition's rank
@@ -273,21 +312,18 @@ that has no mechanics.
 - **WHEN** every published hunt's rationale and flavor are validated at registration
 - **THEN** each is bounded Traditional Chinese prose and the pair fits the shared rendered-detail budget
 
+#### Scenario: A graded-up individual run remains lawful
+- **WHEN** a run of published hunts has its strongest countable or bound individual graded above the
+  hunt's rank
+- **THEN** the run SHALL remain lawful and unchanged: the rank is authored for the arrangement and
+  SHALL NOT be derived from a targeted variant's individual danger grade
+
 ### Requirement: A site clear-out names an authored site and binds that site's own living individuals
-A site clear-out objective SHALL name a key of the authored site registry and SHALL remain a hand-written
-content form: the deterministic compile boundary SHALL NOT author a site key from a generative proposal,
-and the stored payload SHALL round-trip the key with an absent-key default rather than inventing one.
-Registration SHALL also reject a definition declaring a site key that another registered definition
-already declares: two clear-outs over one site would bind the same living individuals, so each would
-credit the same defeats. That uniqueness check SHALL compare the declared site key against definitions
-registered under a different definition key only, and SHALL leave the equal-content idempotent
-re-registration path unchanged, so registering the same catalog again neither collides with itself nor
-becomes a conflicting-content rejection.
-The objective SHALL bind the site's own individuals — the site's authored variant set, placed at its
-authored coordinate under its ownership marker — and SHALL NOT cause any individual to be spawned,
-moved, populated, or recovered: a clear-out never becomes a second population owner. The bound set SHALL
-be exactly the living individuals the site owns at binding time, so a later recovery's fresh individuals
-are strangers to an existing binding and can only be bound by a clear-out issued after their creation.
+A site clear-out objective SHALL name a key of the authored site registry and SHALL remain a
+hand-written content form: the deterministic compile boundary SHALL NOT author a site key from a
+generative proposal. Registration SHALL reject a definition declaring a site key that another
+registered definition already declares. The objective SHALL bind the site's own individuals — the
+site's authored variant set, placed at its authored coordinate under its ownership marker.
 
 #### Scenario: The selector names a registered site
 - **WHEN** a site clear-out names an authored site key
@@ -312,3 +348,17 @@ are strangers to an existing binding and can only be bound by a clear-out issued
 #### Scenario: A recovered site's newcomers are not an old clear-out's targets
 - **WHEN** a clear-out's bound individuals are defeated and the site later recovers fresh individuals
 - **THEN** the old record's bound set is unchanged, and only a clear-out issued after the recovery binds the newcomers
+
+#### Scenario: The stored payload round-trips the site key
+- **WHEN** a definition declaring a site key is stored and decoded again
+- **THEN** the payload round-trips the declared key, and a payload without the key decodes to the
+  absent-key default rather than an invented one
+
+#### Scenario: One site admits one clear-out because the individuals are shared
+- **WHEN** two clear-outs over one site were both registered
+- **THEN** each would bind the same living individuals and credit the same defeats — which is why the
+  second declaration is rejected
+
+#### Scenario: A clear-out never becomes a second population owner
+- **WHEN** a clear-out binds or runs
+- **THEN** it causes no individual to be spawned, moved, populated, or recovered

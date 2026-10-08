@@ -5,7 +5,7 @@ Provide a separately built operator SPA that shares only approved visual tokens 
 ## Requirements
 
 ### Requirement: Independent same-origin GM build
-The GM SPA SHALL remain separately built from web/admin-app/ through vite.gm.config.js and pnpm run build:gm into web/static/gm/dist/ with stable index.js/index.css referenced by its shell. CI/container builds SHALL build both GM and game bundles from sources. Game Vite entry, frozen contracts, .elosern-root styles, OOB and /admin/ SHALL remain untouched. LLM/SD offline conditions SHALL not prevent the GM shell or dashboard from loading; services SHALL show offline/critical states without requiring active LLM probes.
+The GM SPA SHALL remain separately built from web/admin-app/ through vite.gm.config.js and pnpm run build:gm into web/static/gm/dist/ with stable index.js/index.css referenced by its shell.
 
 #### Scenario: Production assets
 - **WHEN** CI or container builds run
@@ -14,6 +14,14 @@ The GM SPA SHALL remain separately built from web/admin-app/ through vite.gm.con
 #### Scenario: External services offline
 - **WHEN** LLM and SD are unavailable
 - **THEN** the dashboard remains usable with truthful service states and sends no LLM probes
+
+#### Scenario: Game surfaces untouched
+- **WHEN** the GM build evolves
+- **THEN** the game Vite entry, frozen contracts, .elosern-root styles, OOB and /admin/ remain untouched
+
+#### Scenario: Offline conditions do not block loading
+- **WHEN** LLM/SD offline conditions occur
+- **THEN** they do not prevent the GM shell or dashboard from loading, and services show offline/critical states without requiring active LLM probes
 
 ### Requirement: Enforced token-only game dependency boundary
 The GM application SHALL import from `web/webclient-app/` only `styles/tokens.css` and `styles/fonts*.css`. All other game-tree imports, including `app-shell.css`, components, stores, transport, and utilities, SHALL be forbidden. A dependency-free Node test SHALL scan imports throughout `web/admin-app/` and enforce the resolved-path allowlist, including JavaScript/Vue imports and CSS imports.
@@ -27,7 +35,7 @@ The GM application SHALL import from `web/webclient-app/` only `styles/tokens.cs
 - **THEN** the boundary test fails and identifies the importing source and forbidden dependency
 
 ### Requirement: Operator component layer
-The GM application SHALL supply `GmShell`, `GmNav`, `GmPageHeader`, `GmPanel`, `GmTable`, `GmEmpty`, `GmError`, and `GmStatusBadge`, built only on approved tokens; the badge SHALL wrap `.status-marker`. The desktop-first shell SHALL have side navigation, a page header with operator account and logout, and a panel/table content area. Narrow viewports SHALL remain usable without dedicated mobile layouts. UI copy SHALL use Traditional Chinese; data identifiers SHALL remain verbatim in a monospace face. Danger buttons and seal-red SHALL be reserved for destructive or state-changing actions.
+The GM application SHALL supply `GmShell`, `GmNav`, `GmPageHeader`, `GmPanel`, `GmTable`, `GmEmpty`, `GmError`, and `GmStatusBadge`, built only on approved tokens; the badge SHALL wrap `.status-marker`. The desktop-first shell SHALL have side navigation, a page header with operator account and logout, and a panel/table content area.
 
 #### Scenario: Component coverage
 - **WHEN** the component layer is delivered
@@ -37,9 +45,23 @@ The GM application SHALL supply `GmShell`, `GmNav`, `GmPageHeader`, `GmPanel`, `
 - **WHEN** an operator opens the S1 home view at a desktop or narrow viewport
 - **THEN** account/logout, navigation, and content remain usable, UI copy is Traditional Chinese, and any identifiers are unmodified and monospace
 
+#### Scenario: Narrow viewports
+- **WHEN** the shell is viewed on narrow viewports
+- **THEN** it remains usable without dedicated mobile layouts
+
+#### Scenario: Copy and identifier typography
+- **WHEN** GM UI text or data identifiers render
+- **THEN** UI copy uses Traditional Chinese and data identifiers remain verbatim in a monospace face
+
+#### Scenario: Danger styling reserved
+- **WHEN** danger buttons or seal-red are used
+- **THEN** they are reserved for destructive or state-changing actions
+
 ### Requirement: S1 navigation and history routing
 
-The SPA SHALL retain history routing at /gm/ and session identity/time/version. The home overview SHALL render the gm-operations-dashboard snapshot instead of calling the removed health endpoint, using the landed S1 fetch boundary and component layer and S2a transcript-detail contract. Navigation SHALL retain the approved future sections; genuinely undelivered sections SHALL remain disabled with 尚未開放 and no placeholder pages. Delivered S6 SHALL use contextual entity drawers, raw/memory actions and the dashboard clock control under gm-developer-console, not a standalone intervention route. The navigation SHALL omit the obsolete disabled GM 介入 entry rather than imply that delivered S6 is unavailable or provide a placeholder link. Router guards SHALL handle authorization failures without redirect loops.
+The SPA SHALL retain history routing at /gm/ and session identity/time/version.
+The home overview SHALL render the gm-operations-dashboard snapshot instead of calling the removed health endpoint, using the landed S1 fetch boundary and component layer and S2a transcript-detail contract.
+Router guards SHALL handle authorization failures without redirect loops.
 
 #### Scenario: Foundation overview
 - **WHEN** a permitted operator loads /gm/
@@ -57,8 +79,24 @@ The SPA SHALL retain history routing at /gm/ and session identity/time/version. 
 - **WHEN** S6 is delivered and the operator navigates to an entity, raw tab, NPC memory tab or dashboard world section
 - **THEN** the appropriate console controls are available there, no obsolete disabled GM 介入 entry or standalone placeholder remains, and genuinely undelivered entries retain disabled behavior
 
+#### Scenario: Approved future sections retained
+- **WHEN** navigation is rendered
+- **THEN** the approved future sections are retained
+
+#### Scenario: Undelivered section disabled state
+- **WHEN** a section is genuinely undelivered
+- **THEN** it remains disabled with 尚未開放 and no placeholder pages
+
+#### Scenario: S6 routed contextually
+- **WHEN** S6 is delivered
+- **THEN** it uses contextual entity drawers, raw/memory actions and the dashboard clock control under gm-developer-console, not a standalone intervention route
+
+#### Scenario: Obsolete intervention entry omitted
+- **WHEN** navigation renders with S6 delivered
+- **THEN** the navigation omits the obsolete disabled GM 介入 entry rather than imply that delivered S6 is unavailable or provide a placeholder link
+
 ### Requirement: Single GM fetch boundary
-All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 `forbidden` responses to the permission-denied view, and surface other errors by stable code; a 403 `csrf_failed` is a transport failure and SHALL surface by its code rather than selecting the permission-denied view. Network failure and malformed bodies SHALL produce explicit client errors, never fabricated success data. S1 SHALL test POST header wiring without introducing a production write endpoint.
+All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django session credentials. The boundary SHALL unwrap success data, attach the `csrftoken` cookie as `X-CSRFToken` for POST writes, redirect 401 responses to the configured login destination with a GM return path, route 403 `forbidden` responses to the permission-denied view, and surface other errors by stable code.
 
 #### Scenario: Success and POST wiring
 - **WHEN** a success envelope is fetched or a test POST is issued with a CSRF cookie
@@ -71,6 +109,18 @@ All GM API calls SHALL use `web/admin-app/lib/api.js` with same-origin Django se
 #### Scenario: Other error outcomes
 - **WHEN** an API call receives a 404 envelope, a network failure, or a malformed JSON/envelope body
 - **THEN** it surfaces the server error code or an explicit client failure code and does not treat the response as data
+
+#### Scenario: CSRF failure is a transport failure
+- **WHEN** an API call receives a 403 `csrf_failed` response
+- **THEN** it is treated as a transport failure and surfaces by its code rather than selecting the permission-denied view
+
+#### Scenario: No fabricated success data
+- **WHEN** a network failure or a malformed body occurs
+- **THEN** the boundary produces an explicit client error and never fabricated success data
+
+#### Scenario: S1 POST header wiring test
+- **WHEN** S1 acceptance covers POST header wiring
+- **THEN** the test exercises the wiring without introducing a production write endpoint
 
 ### Requirement: Frontend acceptance gates
 Vitest SHALL cover envelope handling, 401/403/404, network failure, malformed bodies, CSRF header wiring, router guards, and shell navigation including disabled sections. The dependency-boundary test and all GM component stories SHALL run in their respective CI coverage gates without removing game-client coverage.

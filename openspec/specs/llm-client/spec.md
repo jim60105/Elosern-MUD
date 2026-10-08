@@ -5,7 +5,12 @@ Defines the OpenAI-compatible chat completions client contract: an asynchronous,
 ## Requirements
 
 ### Requirement: OpenAI-compatible chat completions client
-`world/ai/client.py` SHALL define `OpenAICompatClient`, a subclass of Evennia's `LLMClient` that keeps the Twisted async HTTP skeleton and overrides the request to OpenAI's `/v1/chat/completions` contract. Each call SHALL accept a layer-neutral per-call request descriptor containing the chat `messages` sequence of role/content pairs and, optionally, an output jsonschema and a schema identifier. The client SHALL build a JSON request body containing the profile's `model`, the messages, and the profile's `temperature`. For output length the body SHALL carry the profile's `max_completion_tokens` under that field name when the profile sets it, and the profile's `max_tokens` under `max_tokens` otherwise — never both. Each configured sampling field (`frequency_penalty`, `presence_penalty`, `top_k`, `top_p`, `repetition_penalty`, `min_p`, `top_a`) SHALL appear verbatim under its OpenAI field name, and every sampling field the profile leaves unset SHALL be absent from the body entirely, so a default-configured profile produces a byte-identical body to the pre-configuration client. Reasoning control SHALL follow the profile's `reasoning_style` only when `reasoning_enabled` or `reasoning_effort` is set: `openrouter` emits a nested `reasoning` object carrying the non-`None` subset of `enabled` and `effort`; `vllm` emits `chat_template_kwargs.enable_thinking` when `reasoning_enabled` is set and never sends `effort`; `off` emits neither. A `response_format` hint SHALL be included exactly when the profile's `supports_response_format` flag is true and the descriptor declares a schema. A successful response SHALL be parsed from the OpenAI envelope and SHALL return `choices[0].message.content`.
+`world/ai/client.py` SHALL define `OpenAICompatClient`, a subclass of Evennia's `LLMClient` that
+keeps the Twisted async HTTP skeleton and overrides the request to OpenAI's
+`/v1/chat/completions` contract. Each call SHALL accept a layer-neutral per-call request
+descriptor carrying the chat `messages` sequence of role/content pairs and, optionally, an output
+jsonschema and a schema identifier. The body SHALL carry the profile's `model`, the messages, and
+the profile's `temperature`.
 
 #### Scenario: A valid chat completion returns the message content
 - **WHEN** the client posts a valid `/v1/chat/completions` request and the endpoint returns HTTP 200 with a body whose `choices[0].message.content` is a non-empty string
@@ -51,8 +56,35 @@ Defines the OpenAI-compatible chat completions client contract: an asynchronous,
 - **WHEN** a profile leaves both `reasoning_enabled` and `reasoning_effort` unset, under any `reasoning_style`
 - **THEN** the request body contains no reasoning-related key of any shape
 
+#### Scenario: Output length uses one field, never both
+- **WHEN** the client serializes the output-length bound
+- **THEN** the body carries the profile's `max_completion_tokens` under that field name when the
+  profile sets it, and the profile's `max_tokens` under `max_tokens` otherwise — never both
+
+#### Scenario: Unset sampling fields are absent entirely
+- **WHEN** the profile leaves a sampling field (`frequency_penalty`, `presence_penalty`,
+  `top_k`, `top_p`, `repetition_penalty`, `min_p`, `top_a`) unset
+- **THEN** that field is absent from the body entirely, configured fields appear verbatim under
+  their OpenAI field names, and a default-configured profile produces a byte-identical body to
+  the pre-configuration client
+
+#### Scenario: OpenRouter effort-only emits the non-None subset
+- **WHEN** a profile with `reasoning_style = "openrouter"` sets only `reasoning_effort`
+- **THEN** reasoning control follows the `reasoning_style` only when `reasoning_enabled` or
+  `reasoning_effort` is set, and the nested `reasoning` object carries the non-`None` subset
+  (here only `effort`)
+
+#### Scenario: Success is parsed from the OpenAI envelope
+- **WHEN** a successful response arrives
+- **THEN** it SHALL be parsed from the OpenAI envelope and SHALL return
+  `choices[0].message.content`
+
 ### Requirement: Asynchronous calls with bounded request timeouts
-Every client call SHALL be asynchronous, returning a Twisted Deferred rather than blocking the Evennia server, and SHALL honor a per-request timeout from the governing profile. The timeout SHALL cover the complete exchange from request establishment through response-body parsing, so an endpoint that sends headers but never completes the body still errbacks within the bound. A call that exceeds the timeout SHALL resolve as a failure on the error path rather than hanging indefinitely, SHALL cancel or abort the underlying request to the extent Twisted supports, and SHALL NOT be retried by the client itself.
+Every client call SHALL be asynchronous, returning a Twisted Deferred rather than blocking the
+Evennia server, and SHALL honor a per-request timeout from the governing profile. The timeout
+SHALL cover the complete exchange from request establishment through response-body parsing. A
+call that exceeds the timeout SHALL resolve as a failure on the error path rather than hanging
+indefinitely, and SHALL NOT be retried by the client itself.
 
 #### Scenario: A slow endpoint is abandoned at the timeout bound
 - **WHEN** an endpoint does not respond within the profile's timeout
@@ -65,6 +97,11 @@ Every client call SHALL be asynchronous, returning a Twisted Deferred rather tha
 #### Scenario: The server is not blocked while waiting
 - **WHEN** a chat completion request is in flight against a slow endpoint
 - **THEN** the client returns a Deferred immediately and no synchronous network or event-loop work is performed by the caller
+
+#### Scenario: A timed-out request is cancelled or aborted
+- **WHEN** a call exceeds its timeout bound
+- **THEN** the client SHALL cancel or abort the underlying request to the extent Twisted
+  supports
 
 ### Requirement: Safe failure signaling without exceptions escaping
 A connection error, HTTP error status, malformed response body, or timeout SHALL be reported as a failed Deferred (or an empty result per the governing call contract) and SHALL NOT raise an exception into the caller or leave a partially consumed state. Debug logging SHALL record a safe error summary that contains no player content, prompt text, or local file path.
@@ -89,7 +126,11 @@ The default profile SHALL target a local OpenAI-compatible endpoint. The base UR
 - **THEN** the default profile's base URL equals that value exactly
 
 ### Requirement: Request headers carry authentication and attribution without leaking the key
-The client SHALL build the request headers passed to the transport by first deriving, only when the corresponding profile field is non-empty, an `Authorization` header of the exact form `Bearer <api_key>`, an `X-Title` header carrying `app_title`, and an `HTTP-Referer` header carrying `app_url`, and SHALL always derive a `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting (per the `outbound-http-identity` capability — the shared accessor, never a client-local literal), and then overlaying the profile's frozen `headers` mapping so that an explicitly configured header of the same (exact-case) name wins over the derived one. Credential-bearing standard header names are rejected in the profile mapping upstream, so the `Authorization` escape hatch cannot smuggle a bearer value past the `repr` exclusion. The api key SHALL NOT appear in any log line, any error message or failure representation, or any client/profile debug output produced on any success or failure path.
+The client SHALL build the request headers passed to the transport by deriving, only when the
+corresponding profile field is non-empty, an `Authorization` header `Bearer <api_key>`, an
+`X-Title` header carrying `app_title`, and an `HTTP-Referer` header carrying `app_url`, plus
+always a `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting, then overlaying
+the profile's frozen `headers` mapping so an explicit same-name (exact-case) header wins.
 
 #### Scenario: Explicit headers win over derived attribution
 - **WHEN** a profile sets `app_title = "Elosern"` AND an explicit `headers` mapping entry `X-Title: Other`
@@ -119,12 +160,36 @@ The client SHALL build the request headers passed to the transport by first deri
 - **WHEN** a request governed by a profile with a non-empty `api_key` fails with any transport error (connection, HTTP status, malformed body, or timeout)
 - **THEN** the failure representation, the safe log line, and every message observable by the calling layer contain no trace of the key
 
+#### Scenario: The derived identity comes from the shared accessor
+- **WHEN** the client derives the `User-Agent` header
+- **THEN** it follows the `outbound-http-identity` capability — the shared accessor, never a
+  client-local literal
+
+#### Scenario: The Authorization escape hatch cannot smuggle a bearer value
+- **WHEN** credential-bearing standard header names are rejected in the profile mapping upstream
+- **THEN** the `Authorization` escape hatch cannot smuggle a bearer value past the `repr`
+  exclusion
+
+#### Scenario: The key never appears in any log or debug output
+- **WHEN** any success or failure path produces a log line, error message, failure
+  representation, or client/profile debug output
+- **THEN** none of them contains the api key
+
 ### Requirement: A default profile produces an unchanged wire format
-When every optional endpoint-configuration field of the profile holds its omit default (empty string or `None`), the serialized request body SHALL equal the pre-configuration client's byte-for-byte, and the serialized headers SHALL equal the profile's frozen mapping plus exactly one additional derived `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting (when no explicit `User-Agent` mapping entry was present in the profile), so existing local endpoints observe no difference from the endpoint-configuration change other than the declared client identity added by `outbound-http-identity`.
+When every optional endpoint-configuration field of the profile holds its omit default (empty
+string or `None`), the serialized request body SHALL equal the pre-configuration client's
+byte-for-byte, and the serialized headers SHALL equal the profile's frozen mapping plus exactly
+one additional derived `User-Agent` header carrying the effective `HTTP_USER_AGENT` setting (when
+no explicit `User-Agent` mapping entry was present in the profile).
 
 #### Scenario: Byte identity under defaults
 - **WHEN** the client serializes a request under a profile with no optional field set
 - **THEN** the body JSON contains exactly `model`, `messages`, `temperature`, `max_tokens` (plus `response_format` under the existing opt-in rule) and the headers are the profile's frozen mapping plus the derived `User-Agent` entry and nothing else
+
+#### Scenario: Existing local endpoints observe no difference
+- **WHEN** an existing local endpoint receives requests under a default profile
+- **THEN** it observes no difference from the endpoint-configuration change other than the
+  declared client identity added by `outbound-http-identity`
 
 ### Requirement: LLM calls and transport failures emit observability events
 

@@ -15,13 +15,7 @@ counter-gated catalogue but none of the three.
 ## Requirements
 
 ### Requirement: Three hand-built acts are registered, gated exclusively by requires_divine_arts, with no counter unlock
-`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain the three
-`(SkillDef, SexualActDef)` pairs — `絕頂律令`, `時姦`, `神域搾取` — each declaring
-`requires_divine_arts=True`, `unlock={}`, `target_part=None`, `resistible=True`,
-`actor_counters=()`, `participant_counters=()`. None SHALL be constructed via `_act_family()`.
-`sexual-catalog-divine-mutators` extends the same tuple to seven entries; this requirement pins
-the identity and fields of these three pairs and SHALL NOT be read as limiting the tuple size —
-none of the three pairs SHALL be modified or removed.
+`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain the three `(SkillDef, SexualActDef)` pairs — `絕頂律令`, `時姦`, `神域搾取` — each declaring `requires_divine_arts=True`, `unlock={}`, `target_part=None`, `resistible=True`, `actor_counters=()`, `participant_counters=()`.
 
 #### Scenario: A non-divine race cannot cast any of the three acts regardless of counters
 - **WHEN** an actor whose race's `can_use_divine_arts` is `False` attempts to cast `絕頂律令`, `時姦`,
@@ -40,16 +34,16 @@ none of the three pairs SHALL be modified or removed.
 - **THEN** `unlocked_act_keys()`/`owned_keys()` include the full counter-gated catalogue but none of
   `絕頂律令`, `時姦`, or `神域搾取`
 
+#### Scenario: The three pairs are hand-built
+- **WHEN** `divine.py`'s construction code is inspected
+- **THEN** none of the three pairs is constructed via `_act_family()`
+
+#### Scenario: Later tuple extension does not disturb these three pairs
+- **WHEN** `sexual-catalog-divine-mutators` extends the same tuple to seven entries
+- **THEN** this requirement pins the identity and fields of these three pairs and is not read as limiting the tuple size — none of the three pairs is modified or removed
+
 ### Requirement: 絕頂律令 sets every target's pleasure to its ceiling and walks climax_phase to 進行中 in one cast, never touching the actor
-`絕頂律令` SHALL declare `TargetSpec.AREA` and one effect, `divine_pleasure_max:絕頂律令`. Its handler
-SHALL explicitly exclude the acting entity from the entities it applies to — even if the acting entity
-is present in the resolved `targets` list (the `"all"` AREA shorthand does not exclude the actor, and
-`_step4b_sexual_resist_gate` does not remove an actor present in `targets`, so this exclusion SHALL NOT
-rely on either upstream mechanism) — and for every remaining entity SHALL call the existing
-`_apply_pleasure_gain` function twice in sequence: once with `gain=100`, once with `gain=0`. It SHALL
-declare no `pleasure:` effect for the acting entity. An empty or partial `targets` list (from resisted
-targets being dropped before this handler runs) SHALL be handled as an ordinary outcome, never a
-rejection.
+`絕頂律令` SHALL declare `TargetSpec.AREA` and one effect, `divine_pleasure_max:絕頂律令`. Its handler SHALL explicitly exclude the acting entity from the entities it applies to — even if the acting entity is present in the resolved `targets` list — and for every remaining entity SHALL call the existing `_apply_pleasure_gain` function twice in sequence: once with `gain=100`, once with `gain=0`.
 
 #### Scenario: A target starting below the climax threshold reaches 進行中 in one cast
 - **WHEN** `絕頂律令` is cast at an `AREA` of targets, one of whom starts at `climax_phase="未達"` and
@@ -82,6 +76,18 @@ rejection.
 - **THEN** the cast succeeds, the resisting target's `pleasure`/`climax_phase` are unchanged, and the
   non-resisting target's `pleasure` becomes `100` per the scenarios above
 
+#### Scenario: The actor exclusion does not rely on upstream mechanisms
+- **WHEN** the resolved `targets` list is produced
+- **THEN** the `"all"` AREA shorthand does not exclude the actor, and `_step4b_sexual_resist_gate` does not remove an actor present in `targets`, so the handler's exclusion does not rely on either upstream mechanism
+
+#### Scenario: No pleasure effect is declared for the acting entity
+- **WHEN** `絕頂律令`'s effects are declared
+- **THEN** it declares no `pleasure:` effect for the acting entity
+
+#### Scenario: An empty or partial targets list is an ordinary outcome
+- **WHEN** the `targets` list is empty or partial (from resisted targets being dropped before this handler runs)
+- **THEN** it is handled as an ordinary outcome, never a rejection
+
 ### Requirement: 時姦 stages three climax extensions on every target in one cast, never touching the actor
 `時姦` SHALL declare `TargetSpec.SINGLE` and one effect, `divine_climax_extension_stage:3`. Its
 handler SHALL call `target.sexual.stage_climax_extension(3)` for every entity in the resolved
@@ -110,13 +116,7 @@ handler SHALL call `target.sexual.stage_climax_extension(3)` for every entity in
   that target, and no `RejectedAction` is raised
 
 ### Requirement: 神域搾取 converts one target's pleasure one-to-one into the caster's MP, SP, and HP, then zeroes the target's pleasure
-`神域搾取` SHALL declare `TargetSpec.SINGLE` and one effect, `divine_drain:神域搾取`. Its handler SHALL
-read the resolved target's `pleasure.value`, add that amount to the caster's `mp`, `sp`, and `hp`
-traits (each independently clamped at that trait's own maximum), then set the target's `pleasure` to
-`0`. Neither participant SHALL receive a `pleasure:` effect from this act. Because `TargetSpec.SINGLE`'s
-"exactly one target" guarantee is enforced only at targeting time, before the resist gate runs, the
-handler SHALL treat an empty `targets` list (a successfully-resisted sole target) as an ordinary no-op —
-never a rejection — and SHALL reject only if `targets` contains more than one entity.
+`神域搾取` SHALL declare `TargetSpec.SINGLE` and one effect, `divine_drain:神域搾取`. Its handler SHALL read the resolved target's `pleasure.value`, add that amount to the caster's `mp`, `sp`, and `hp` traits (each independently clamped at that trait's own maximum), then set the target's `pleasure` to `0`.
 
 #### Scenario: A mid-range target pleasure value is drained one-to-one into all three caster resources
 - **WHEN** `神域搾取` is cast at a target whose `pleasure` is `62`, by a caster whose `mp`, `sp`, and
@@ -139,6 +139,18 @@ never a rejection — and SHALL reject only if `targets` contains more than one 
   `targets` empty by the time the drain handler runs
 - **THEN** the cast succeeds (the resist verdict is logged), the caster's `mp`/`sp`/`hp` are unchanged,
   and no `RejectedAction` is raised
+
+#### Scenario: Neither participant receives a pleasure effect
+- **WHEN** `神域搾取`'s effects are declared
+- **THEN** neither participant receives a `pleasure:` effect from this act
+
+#### Scenario: An empty targets list is an ordinary no-op, never a rejection
+- **WHEN** the drain handler runs with an empty `targets` list (a successfully-resisted sole target)
+- **THEN** because `TargetSpec.SINGLE`'s "exactly one target" guarantee is enforced only at targeting time, before the resist gate runs, the empty list is treated as an ordinary no-op — never a rejection
+
+#### Scenario: Rejection happens only for more than one entity
+- **WHEN** the drain handler sees its `targets` list
+- **THEN** it rejects only if `targets` contains more than one entity
 
 ### Requirement: The three new effect prefixes are line-agnostic dispatch-table entries
 `action.py`'s `_EFFECT_HANDLERS` SHALL register `divine_pleasure_max:`, `divine_climax_extension_stage:`,

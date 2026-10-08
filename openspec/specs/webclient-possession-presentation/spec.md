@@ -26,8 +26,7 @@ The presentation layer SHALL expose a possession banner payload (schema-version 
 possessed NPC's canonical display name and entry tick while the session actor is a possessed NPC,
 and the shared unavailable form otherwise; its fixed presentation line is 「你透過{host}的雙眼行動」
 with `{host}` substituted. The Vue shell SHALL render it persistently (not a transient toast)
-while available, and the UMD/Vue client mirrors SHALL validate the payload in lockstep with the
-server registry.
+while available.
 
 #### Scenario: The banner names the possessed companion
 - **WHEN** a connected client receives a snapshot while possessing a companion
@@ -38,16 +37,15 @@ server registry.
 - **WHEN** possession releases
 - **THEN** the banner uses the shared unavailable form and the shell removes the line
 
+#### Scenario: Client mirrors validate in lockstep
+- **WHEN** the server registry defines the banner payload
+- **THEN** the UMD/Vue client mirrors validate the payload in lockstep with the server registry
+
 ### Requirement: Panels render the honest v1 hybrid under the banner
 While possessing, the wallet, quest/objectives, guild-rank, and status panels SHALL keep rendering
 A's persisted state (A owns those fields; NPCs own none of them), except that `status.actor.identity`
 SHALL address the controlled session actor B as the existing bounded string identity, so it joins
-the integer identities in `party.slots` after decimal-string normalization. Status name, resources,
-conditions, full title, location, disguise and combat fields SHALL retain their existing owner-keyed
-hybrid contract. The inventory/equipment panels SHALL render from the possessed NPC's own attributes
-through the existing `toggle_equipment`/item-key surface — the banner requirement is what makes the
-A-keyed panels honest rather than laundering A's purse through B's hands. No panel gains
-possession-specific fields; every panel keeps its existing schema.
+the integer identities in `party.slots` after decimal-string normalization.
 
 #### Scenario: A's wallet shows while possessing
 - **WHEN** a snapshot arrives mid-possession
@@ -57,18 +55,32 @@ possession-specific fields; every panel keeps its existing schema.
 - **WHEN** the client requests inventory presentation mid-possession
 - **THEN** the rows come from the possessed NPC's own inventory keys, not A's
 
+#### Scenario: Inventory uses the existing item-key surface
+- **WHEN** the inventory/equipment panels render while possessing
+- **THEN** they render from the possessed NPC's own attributes through the existing `toggle_equipment`/item-key surface
+
 #### Scenario: The status identity addresses the controlled figure
 - **WHEN** the player A possesses companion B
 - **THEN** `status.actor.identity` is B's decimal database identity as a string while the status name, resources and conditions remain A's persisted state
+
+#### Scenario: Status fields keep the hybrid contract
+- **WHEN** panels render mid-possession
+- **THEN** status name, resources, conditions, full title, location, disguise and combat fields retain their existing owner-keyed hybrid contract
+
+#### Scenario: The banner keeps A-keyed panels honest
+- **WHEN** A-keyed panels render while possessing
+- **THEN** the banner requirement is what makes them honest rather than laundering A's purse through B's hands
+
+#### Scenario: Panel schemas unchanged
+- **WHEN** possession presentation is delivered
+- **THEN** no panel gains possession-specific fields and every panel keeps its existing schema
 
 ### Requirement: The dispatcher refuses possession-incompatible actions with fixed zero-write results
 While the session actor is a possessed NPC, dispatches of `shop.buy`, `shop.sell`,
 `explore.talk_scripted`, `explore.talk_freeform`, and `explore.engage` SHALL be rejected by the
 adapters with outcome `rejected`, stable codes `possessed_shop`, `possessed_talk`, and
 `possessed_engage`, and the fixed Traditional Chinese messages, BEFORE any validator-scoped
-state read, wallet movement, dialogue session, or combat session change; the
-`ui_action_result` contract (request id, epoch guard) is unchanged. A `guild` navigation opener
-SHALL behave exactly as the shop refusal path (no state) while possessed.
+state read, wallet movement, dialogue session, or combat session change.
 
 #### Scenario: A purchase attempt moves nothing
 - **WHEN** a possessing client dispatches `shop.buy` at a fully priced vendor
@@ -79,13 +91,20 @@ SHALL behave exactly as the shop refusal path (no state) while possessed.
 - **WHEN** a possession-refused result races an epoch bump
 - **THEN** the stale refused result is suppressed exactly like any other completion
 
+#### Scenario: Action result contract unchanged
+- **WHEN** a possession refusal is returned
+- **THEN** the `ui_action_result` contract (request id, epoch guard) is unchanged
+
+#### Scenario: Guild navigation opener refuses too
+- **WHEN** a possessing client opens a `guild` navigation opener
+- **THEN** it behaves exactly as the shop refusal path (no state) while possessed
+
 ### Requirement: The possession controls complete the action round-trip
 `explore.possess` SHALL resolve through the deterministic entry gates of
 `world/rules/possession.py`, surfacing each gate reason as outcome `rejected` with the gate's
 stable code and fixed line, and `explore.possess_release` SHALL call the rules release; success
 results SHALL be followed by the full presentation update that carries the re-pointed actor and
-banner. `explore.possess`/`explore.possess_release` SHALL never appear in suggestion candidates
-(their absence from `SUGGESTIBLE_ACTION_IDS` is the mechanism; no new filter).
+banner.
 
 #### Scenario: A gated possess attempt round-trips the gate
 - **WHEN** a client dispatches `explore.possess` for a companion failing the co-location gate
@@ -95,3 +114,7 @@ banner. `explore.possess`/`explore.possess_release` SHALL never appear in sugges
 - **WHEN** a possess dispatch succeeds
 - **THEN** the client receives the action result followed by a snapshot carrying the banner and
   the possessed actor's panels
+
+#### Scenario: Possession controls never suggested
+- **WHEN** suggestion candidates are computed
+- **THEN** `explore.possess`/`explore.possess_release` never appear (their absence from `SUGGESTIBLE_ACTION_IDS` is the mechanism; no new filter)

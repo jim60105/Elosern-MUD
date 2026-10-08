@@ -5,7 +5,10 @@ The read-only version-2 `services` panel payload (host resolution, player summar
 ## Requirements
 
 ### Requirement: The services panel is an exact read-only exploration-mode panel
-The production presentation registry SHALL register `services` schema version 4. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and `pagination`; `available` SHALL be true and `kind` SHALL be `services`. `schema_version` SHALL be integer 4. `host` SHALL be null or contain exactly `identity` (1..64 opaque ASCII characters) and `display_name` (1..256 Unicode code points) and SHALL be display-only reconciliation metadata that never enters a `ui_action` payload. `pagination` SHALL contain exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and equal to the number of rows shipped in that surface (zero when the surface is null). `player` SHALL contain exactly `wallet`, `guild_registered`, `guild_rank`, `guild_merit`, `next_rank`, and `next_threshold`: wallet SHALL be a non-negative JavaScript-safe integer, `guild_registered` a boolean, `guild_rank` null or a 1..8-character rank key, `guild_merit` a non-negative safe integer, and `next_rank`/`next_threshold` null when the actor holds the top rank, otherwise the next rank key and its positive catalog merit threshold. `guild`, `shop`, and `inventory` SHALL each be null or an exact section object. In exploration mode all sections SHALL retain their ordinary availability. In active combat `host`, `guild`, and `shop` SHALL be null, their pagination totals SHALL be zero, and canonical `player` plus `inventory` SHALL remain available so personal item actions expose no remote service. The presenter SHALL strictly read canonical records and registries through the no-mutation service read model, SHALL emit no live object reference and no filesystem path, and SHALL NOT mutate registration, quests, wallet, inventory, equipment, merchant stock, rank, merit, traits, location, combat, or world time. The whole panel SHALL use the registered common unavailable form only when a global prerequisite fails — the actor is creation-pending or the actor/player/inventory summary cannot be read without mutation; a failure confined to one exploration surface SHALL make only that surface unavailable with a stable reason while the other surfaces and narrative stay healthy.
+The production presentation registry SHALL register `services` schema version 4. Its available payload SHALL
+contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and
+`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 4.
+The presenter SHALL strictly read canonical records and registries through the no-mutation service read model.
 
 #### Scenario: Exploration snapshot carries the full services panel
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot
@@ -31,8 +34,52 @@ The production presentation registry SHALL register `services` schema version 4.
 - **WHEN** services presentation raises while status and narrative remain healthy
 - **THEN** only `services` becomes correlated unavailable, status still renders, and normal text output remains usable
 
+#### Scenario: Host metadata shape is bounded and display-only
+- **WHEN** the `host` field is present on an available payload
+- **THEN** it contains exactly `identity` (1..64 opaque ASCII characters) and `display_name` (1..256 Unicode code
+  points), and host metadata is display-only reconciliation metadata that never enters a `ui_action` payload
+
+#### Scenario: Pagination totals are exact safe integers of shipped rows
+- **WHEN** any surface ships rows or is null
+- **THEN** `pagination` contains exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and
+  `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and
+  equal to the number of rows shipped in that surface (zero when the surface is null)
+
+#### Scenario: Player summary carries its exact six fields
+- **WHEN** the `player` section is built
+- **THEN** it contains exactly `wallet`, `guild_registered`, `guild_rank`, `guild_merit`, `next_rank`, and
+  `next_threshold`: `wallet` is a non-negative JavaScript-safe integer, `guild_registered` a boolean,
+  `guild_rank` null or a 1..8-character rank key, and `guild_merit` a non-negative safe integer
+
+#### Scenario: Top rank reports no next threshold
+- **WHEN** the actor holds the top rank
+- **THEN** `next_rank` and `next_threshold` are null, and otherwise they carry the next rank key and its positive
+  catalog merit threshold
+
+#### Scenario: Section fields are null or exact objects
+- **WHEN** an available services payload is built in exploration mode
+- **THEN** `guild`, `shop`, and `inventory` are each null or an exact section object, and all sections retain
+  their ordinary availability
+
+#### Scenario: Combat keeps personal data with no remote service
+- **WHEN** the actor is in active combat
+- **THEN** canonical `player` plus `inventory` remain available so personal item actions expose no remote service
+
+#### Scenario: Presenter output leaks no internals
+- **WHEN** the presenter serializes any services payload
+- **THEN** it emits no live object reference and no filesystem path, and does not mutate registration, quests,
+  wallet, inventory, equipment, merchant stock, rank, merit, traits, location, combat, or world time
+
+#### Scenario: Unreadable summary triggers the common unavailable form
+- **WHEN** the actor/player/inventory summary cannot be read without mutation
+- **THEN** the whole panel uses the registered common unavailable form, which is reserved for such global
+  prerequisite failures
+
 ### Requirement: Service presentation resolves hosts per service class and a stable player summary
-Each service surface SHALL resolve its own local host independently from the actor's current room using the same deterministic rule as commands: `guild` and `rank` SHALL resolve a `GuildStaff` and `GuildExaminer` host respectively, and `shop` SHALL resolve a `Merchant` host, each through `resolve_local_service_host`; zero or multiple hosts of the host class a surface requires SHALL make that surface unavailable rather than letting the browser choose a remote or ambiguous host. Different host classes present in the same room SHALL NOT create cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` SHALL make both the guild and rank surfaces available. The top-level `host` SHALL be the display-only reconciliation identity of the resolved single local `GuildStaff` host when exactly one exists, else the resolved single local `Merchant` host when exactly one exists, else null; it SHALL NOT be the availability authority for any surface and SHALL NEVER be submitted in an action payload. The `player` summary SHALL derive from canonical wallet, parsed guild registration, canonical `guild_rank`, the true `guild_merit` counter, and the catalog's merit thresholds; it SHALL NEVER read `disguised_stats` or registration snapshot values for wallet, rank, merit, or eligibility.
+Each service surface SHALL resolve its own local host independently from the actor's current room through
+`resolve_local_service_host`, under the same deterministic rule as commands: `guild` and `rank` SHALL resolve a
+`GuildStaff` and `GuildExaminer` host respectively, and `shop` SHALL resolve a `Merchant` host; zero or multiple
+hosts of a surface's required class SHALL make that surface unavailable, never a remote or ambiguous host.
 
 #### Scenario: Guild hall resolves one guild host and its examiner
 - **WHEN** the actor stands in a room containing exactly one `GuildStaff` host that also carries `GuildExaminer`
@@ -58,8 +105,32 @@ Each service surface SHALL resolve its own local host independently from the act
 - **WHEN** an elf with true rank F and true merit 0 holds a disguise
 - **THEN** `player` reports rank F, merit 0, and no displayed-stat value, and no surface derives eligibility from the disguise
 
+#### Scenario: Different host classes never create cross-class ambiguity
+- **WHEN** different host classes are present in the same room
+- **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` makes
+  both the guild and rank surfaces available
+
+#### Scenario: Top-level host follows the guild-then-merchant preference
+- **WHEN** the top-level `host` field is computed
+- **THEN** it is the display-only reconciliation identity of the resolved single local `GuildStaff` host when
+  exactly one exists, else the resolved single local `Merchant` host when exactly one exists, else null
+
+#### Scenario: Host is metadata, never authority or payload field
+- **WHEN** any surface availability is computed or any action is dispatched
+- **THEN** the top-level `host` is not the availability authority for any surface and is never submitted in an
+  action payload
+
+#### Scenario: Player summary derives only from canonical sources
+- **WHEN** the `player` summary is built
+- **THEN** it derives from canonical wallet, parsed guild registration, canonical `guild_rank`, the true
+  `guild_merit` counter, and the catalog's merit thresholds, and never reads `disguised_stats` or registration
+  snapshot values for wallet, rank, merit, or eligibility
+
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
-The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and `rank` and SHALL be present only when exactly one local `GuildStaff` host resolves. `registration` SHALL contain exactly `registered` (boolean) and `register` (an action descriptor); `register` SHALL be enabled only for an unregistered actor with one local `GuildStaff` host and otherwise carry a stable disabled reason. `board` SHALL be a bounded list of at most 12 offer rows in the deterministic rank/key order returned by the board API, each containing exactly `definition_key`, `display_name`, `objective_summary`, `reward_summary`, `rank`, and `accept`; each `objective_summary`/`reward_summary` SHALL be server-rendered from immutable quest values, and `accept` SHALL be enabled only while that offer is board-eligible and the actor has no active record for it. `quests` SHALL be a bounded list of at most 12 quest-log rows in deterministic record order, each containing exactly `quest_id`, `definition_key`, `display_name`, `state`, `stage_index`, `stage_progress`, `objective_summary`, `deadline_line`, `detail`, `abandon`, and `turnin`; `state` SHALL be one of `in_progress`, `completed`, or `failed`; `detail` SHALL be the server-rendered full quest detail; `abandon` SHALL be enabled only for an `in_progress` record with one local `GuildStaff` host; and `turnin` SHALL be enabled only for a `completed` record with one local `GuildStaff` host and the quest ID absent from the actor's reward claims. `rank` SHALL be present only when exactly one local `GuildExaminer` host resolves and SHALL contain exactly `rank`, `merit`, `next_rank`, `next_threshold`, `eligible`, and `exam_start`: `exam_start` SHALL be enabled only when the actor is registered, a local `GuildExaminer` host exists, an exact next rank exists, true merit meets its threshold, and no active combat or examination exists, and its action payload SHALL carry exactly the next-rank key.
+The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and `rank` and SHALL be present only
+when exactly one local `GuildStaff` host resolves. `board` and `quests` SHALL be bounded lists of at most 12 rows
+each, ordered deterministically, with server-rendered text derived only from immutable quest values and canonical
+records; each action descriptor carries an enabled state or a stable disabled reason.
 
 #### Scenario: Unregistered player can register
 - **WHEN** an unregistered actor stands in the guild hall
@@ -89,8 +160,53 @@ The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and
 - **WHEN** the guild section is built for an actor with registration, an active quest, and eligible exam state
 - **THEN** registration, quest log, merit, rank, wallet, and exam records are byte-for-byte unchanged
 
+#### Scenario: Registration section shape and enablement gate
+- **WHEN** the `registration` section is built
+- **THEN** it contains exactly `registered` (boolean) and `register` (an action descriptor), and `register` is
+  enabled only for an unregistered actor with one local `GuildStaff` host and otherwise carries a stable disabled
+  reason
+
+#### Scenario: Board rows carry their exact fields in board API order
+- **WHEN** the `board` list ships
+- **THEN** it holds at most 12 offer rows in the deterministic rank/key order returned by the board API, each
+  containing exactly `definition_key`, `display_name`, `objective_summary`, `reward_summary`, `rank`, and `accept`
+
+#### Scenario: Board accept gates on eligibility and no active record
+- **WHEN** a board offer row's `accept` descriptor is computed
+- **THEN** it is enabled only while that offer is board-eligible and the actor has no active record for it
+
+#### Scenario: Quest rows carry their exact fields in record order
+- **WHEN** the `quests` list ships
+- **THEN** it holds at most 12 quest-log rows in deterministic record order, each containing exactly `quest_id`,
+  `definition_key`, `display_name`, `state`, `stage_index`, `stage_progress`, `objective_summary`, `deadline_line`,
+  `detail`, `abandon`, and `turnin`; `state` is one of `in_progress`, `completed`, or `failed`, and `detail` is the
+  server-rendered full quest detail
+
+#### Scenario: Abandon enables only for an in-progress record at a staff host
+- **WHEN** a quest row's `abandon` descriptor is computed
+- **THEN** it is enabled only for an `in_progress` record with one local `GuildStaff` host
+
+#### Scenario: Turn-in requires an unclaimed completed record at a staff host
+- **WHEN** a quest row's `turnin` descriptor is computed
+- **THEN** it is enabled only for a `completed` record with one local `GuildStaff` host and the quest ID absent
+  from the actor's reward claims
+
+#### Scenario: Rank section presence and exact fields
+- **WHEN** the `rank` section is computed
+- **THEN** it is present only when exactly one local `GuildExaminer` host resolves and contains exactly `rank`,
+  `merit`, `next_rank`, `next_threshold`, `eligible`, and `exam_start`
+
+#### Scenario: Exam start requires every condition and the next-rank payload
+- **WHEN** `exam_start` is computed
+- **THEN** it is enabled only when the actor is registered, a local `GuildExaminer` host exists, an exact next
+  rank exists, true merit meets its threshold, and no active combat or examination exists, and its action payload
+  carries exactly the next-rank key
+
 ### Requirement: The shop surface covers stock, quantity, buy, sell, and sellable inventory
-The `shop` section SHALL contain exactly `open`, `stock`, and `sellable` and SHALL be present only in exploration mode when exactly one local `Merchant` host resolves. `open` SHALL be the boolean derived from the world-clock opening computation with no redundant flag. `stock` SHALL be a bounded list of at most 12 rows in catalog offer order, each containing exactly `item_key`, `display_name`, `buy_copper`, `sell_copper`, `stock`, `max_stock`, and `buy`; every copper value SHALL be the exact integer catalog value. `buy` SHALL be enabled only when the shop is open, the item is known and offered, stock is positive, and the actor can afford at least one unit; otherwise it SHALL carry a stable disabled reason. `sellable` SHALL be a bounded list of at most 12 rows in deterministic order, each containing exactly `item_key`, `display_name`, `sell_copper`, `held`, and `sell`; `sell` SHALL be enabled only when the shop is open, the item is sellable and offered, the actor holds at least one, and the merchant's stock cap is not already at maximum. `inventory` SHALL be present in exploration and combat modes and SHALL contain exactly `rows` and `wallet`, with at most 32 rows. Each row SHALL contain exactly `item_key`, `display_name`, `held`, `equipped`, `presentation`, and `action`, preserving repeated item keys and showing aggregate quantities as presentation only. `presentation` SHALL be null for an unregistered but structurally valid item key; otherwise it SHALL contain exactly `kind`, `icon_key`, `rarity`, and `summary`, copied verbatim from the immutable item registry. Each non-null presentation key SHALL be 1..32 lowercase ASCII letters or underscores and `summary` SHALL be 1..240 Unicode code points. `action` SHALL be null for unknown or inspect-only items. A usable item SHALL carry an `inventory.use` descriptor and equipment SHALL carry an `inventory.toggle_equip` descriptor, with current `enabled` state and a stable disabled reason derived by side-effect-free deterministic preflight. No inventory row SHALL expose an effect amount, condition threshold, consumable flag, slot choice, actor, target, drag, or drop action.
+The `shop` section SHALL contain exactly `open`, `stock`, and `sellable` and SHALL be present only in exploration
+mode when exactly one local `Merchant` host resolves. Copper values SHALL be exact integer catalog values, and
+`buy`/`sell` SHALL be enabled only when the shop is open and the trade is legal, otherwise carrying a stable
+disabled reason. The `inventory` section SHALL be present in exploration and combat modes with at most 32 rows.
 
 #### Scenario: Open shop lists exact integer stock and prices
 - **WHEN** the merchant is open during opening hours
@@ -120,8 +236,58 @@ The `shop` section SHALL contain exactly `open`, `stock`, and `sellable` and SHA
 - **WHEN** five accessories are equipped and an additional held accessory is listed
 - **THEN** the additional item's toggle descriptor is disabled with the accessory-cap reason while each equipped accessory remains enabled for unequip
 
+#### Scenario: Open flag is the world-clock boolean only
+- **WHEN** the `open` field is computed
+- **THEN** it is the boolean derived from the world-clock opening computation with no redundant flag
+
+#### Scenario: Stock rows carry exact fields in catalog offer order
+- **WHEN** the `stock` list ships
+- **THEN** it is a bounded list of at most 12 rows in catalog offer order, each containing exactly `item_key`,
+  `display_name`, `buy_copper`, `sell_copper`, `stock`, `max_stock`, and `buy`
+
+#### Scenario: Buy enablement requires open, offer, stock, and affordability
+- **WHEN** a stock row's `buy` descriptor is computed
+- **THEN** it is enabled only when the shop is open, the item is known and offered, stock is positive, and the
+  actor can afford at least one unit
+
+#### Scenario: Sellable rows carry exact fields and sell gates
+- **WHEN** the `sellable` list ships
+- **THEN** it is a bounded list of at most 12 rows in deterministic order, each containing exactly `item_key`,
+  `display_name`, `sell_copper`, `held`, and `sell`, and `sell` is enabled only when the shop is open, the item is
+  sellable and offered, the actor holds at least one, and the merchant's stock cap is not already at maximum
+
+#### Scenario: Inventory section carries its exact two fields
+- **WHEN** the `inventory` section is built
+- **THEN** it contains exactly `rows` and `wallet`
+
+#### Scenario: Inventory rows preserve duplicates and aggregate honestly
+- **WHEN** the actor holds repeated copies of one item key
+- **THEN** each row contains exactly `item_key`, `display_name`, `held`, `equipped`, `presentation`, and `action`,
+  repeated item keys are preserved, and aggregate quantities appear as presentation only
+
+#### Scenario: Presentation is verbatim registry data with bounded shape
+- **WHEN** a row's `presentation` is built for a registered item
+- **THEN** it contains exactly `kind`, `icon_key`, `rarity`, and `summary`, copied verbatim from the immutable
+  item registry; each non-null presentation key is 1..32 lowercase ASCII letters or underscores and `summary` is
+  1..240 Unicode code points
+
+#### Scenario: Action descriptors come from side-effect-free preflight
+- **WHEN** a row's `action` descriptor is computed
+- **THEN** it is null for unknown or inspect-only items; a usable item carries an `inventory.use` descriptor and
+  equipment carries an `inventory.toggle_equip` descriptor, each with current `enabled` state and a stable
+  disabled reason derived by side-effect-free deterministic preflight
+
+#### Scenario: Inventory rows leak no mechanics or authority fields
+- **WHEN** any inventory row ships
+- **THEN** it exposes no effect amount, condition threshold, consumable flag, slot choice, actor, target, drag,
+  or drop action
+
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-The production action registry SHALL retain every existing combat, service, creation, exploration, and options action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, and `inventory.toggle_equip`. `guild.register` SHALL accept exactly an empty payload and retain its current idempotency. Guild quest and exam actions SHALL retain their exact bounded identifiers; `guild.quest_track` SHALL accept exactly `quest_id` (the shared bounded quest identifier) and boolean `tracked`; `shop.buy` and `shop.sell` SHALL retain exactly bounded `item_key` and integer `quantity`. Each inventory action SHALL accept exactly `item_key` as a 1..64-character non-empty string. Every adapter SHALL obtain the actor from the authenticated session, re-resolve every local host and referenced quest, definition, item, rank, mechanic, and current condition, and invoke only its listed public deterministic API. No inventory payload SHALL accept actor, host, branch, session, effect, consumable, quantity, target, slot, HP, combat, price, stock, or wallet fields. No adapter SHALL assign `.db`, traits, registration, rank, merit, quest log, wallet, inventory, equipment, merchant stock, location, combat, or clock state directly. No action SHALL route an action ID or payload through the text command parser.
+The production action registry SHALL retain every existing combat, service, creation, exploration, and options
+action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action
+set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`,
+`guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, and
+`inventory.toggle_equip`.
 
 #### Scenario: Existing registration reaches its deterministic API once
 - **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
@@ -163,8 +329,44 @@ The production action registry SHALL retain every existing combat, service, crea
 - **WHEN** any service or inventory action contains an unknown actor, host, session, effect, or slot-like field
 - **THEN** exact-schema validation rejects before adapter invocation
 
+#### Scenario: Payload schemas are exact and bounded
+- **WHEN** any service action payload is validated
+- **THEN** `guild.register` accepts exactly an empty payload, guild quest and exam actions retain their exact
+  bounded identifiers, `guild.quest_track` accepts exactly `quest_id` (the shared bounded quest identifier) and
+  boolean `tracked`, and `shop.buy` and `shop.sell` retain exactly bounded `item_key` and integer `quantity`
+
+#### Scenario: Registration idempotency is retained
+- **WHEN** registration is submitted again after the actor is already registered
+- **THEN** `guild.register` retains its current idempotency
+
+#### Scenario: Inventory actions carry only a bounded item key
+- **WHEN** an `inventory.use` or `inventory.toggle_equip` payload is validated
+- **THEN** it accepts exactly `item_key` as a 1..64-character non-empty string
+
+#### Scenario: Adapters are session-scoped and re-resolve everything
+- **WHEN** any service adapter runs
+- **THEN** it obtains the actor from the authenticated session, re-resolves every local host and referenced quest,
+  definition, item, rank, mechanic, and current condition, and invokes only its listed public deterministic API
+
+#### Scenario: Inventory payloads reject every authority field
+- **WHEN** an inventory payload carries any of actor, host, branch, session, effect, consumable, quantity, target,
+  slot, HP, combat, price, stock, or wallet fields
+- **THEN** exact-schema validation rejects it
+
+#### Scenario: Adapters never write canonical state directly
+- **WHEN** any adapter settles
+- **THEN** no adapter assigns `.db`, traits, registration, rank, merit, quest log, wallet, inventory, equipment,
+  merchant stock, location, combat, or clock state directly
+
+#### Scenario: Actions never route through the text parser
+- **WHEN** any service or inventory action is dispatched
+- **THEN** no action routes an action ID or payload through the text command parser
+
 ### Requirement: Service actions reject stale, duplicate, and tampered input without mutation
-Every service and inventory action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` that does not equal the newest values issued for the live session SHALL return `stale` with a fresh full snapshot and SHALL invoke no adapter. A duplicate live request ID SHALL return its cached result without re-executing. After those checks, commit-time domain revalidation is authoritative: a price, stock, rank, quest, claim, HP value, ownership fact, mechanic, or equipment capacity that changed between render and commit SHALL be handled against current canonical state and SHALL not double-apply any mutation. A tampered or no-longer-valid identifier SHALL reject with a stable code and Traditional Chinese message, leaving wallet, inventory, contained mirrors, equipment, stock, quests, merit, rank, claims, traits, clock, combat, and every in-process cache unchanged. A service host that disappeared or became ambiguous SHALL close its controls and return current local-service state without mutation.
+Every service and inventory action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and
+request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` that does not equal the
+newest values issued for the live session SHALL return `stale` with a fresh full snapshot and SHALL invoke no
+adapter. A duplicate live request ID SHALL return its cached result without re-executing.
 
 #### Scenario: Stale inventory revision invokes no adapter
 - **WHEN** a potion dialog rendered at revision N submits after a newer revision is active
@@ -202,8 +404,26 @@ Every service and inventory action SHALL pass the existing dispatcher's epoch, b
 - **WHEN** an unknown, unheld, or mechanically incompatible item key passes envelope validation
 - **THEN** domain revalidation rejects before mutation and returns the canonical refreshed inventory
 
+#### Scenario: Commit-time domain revalidation is authoritative
+- **WHEN** a price, stock, rank, quest, claim, HP value, ownership fact, mechanic, or equipment capacity changed
+  between render and commit
+- **THEN** it is handled against current canonical state and no mutation is double-applied
+
+#### Scenario: Tampered identifiers reject with full-state preservation
+- **WHEN** a tampered or no-longer-valid identifier is submitted
+- **THEN** it rejects with a stable code and Traditional Chinese message, leaving wallet, inventory, contained
+  mirrors, equipment, stock, quests, merit, rank, claims, traits, clock, combat, and every in-process cache
+  unchanged
+
+#### Scenario: Vanished or ambiguous hosts close controls without mutation
+- **WHEN** a service host disappeared or became ambiguous
+- **THEN** its controls close and current local-service state is returned without mutation
+
 ### Requirement: Service action completion updates canonical panels and preserves narrative
-After an admitted service or inventory action settles, the server SHALL emit every returned message through the ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before sending the matching safe `ui_action_result`. Existing guild, quest, and shop actions SHALL retain their established affected-panel sets. `inventory.use` and `inventory.toggle_equip` SHALL publish a full snapshot because they may change inventory, contained mirrors, status, character equipment, clock-derived state, combat/context state, terminal mode, and art. Entering combat SHALL unload exploration service menus and their local forms, but services v3 SHALL retain personal player/inventory data and the combat UI SHALL own a separate inventory affordance; guild and shop actions SHALL remain absent in combat. Every success or domain-rejection message SHALL be emitted as text and never parsed by the browser to update panel state.
+After an admitted service or inventory action settles, the server SHALL emit every returned message through the
+ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before
+sending the matching safe `ui_action_result`. Existing guild, quest, and shop actions SHALL retain their
+established affected-panel sets.
 
 #### Scenario: Turn-in updates wallet and merit panels together
 - **WHEN** a completed quest is turned in successfully
@@ -229,8 +449,25 @@ After an admitted service or inventory action settles, the server SHALL emit eve
 - **WHEN** deterministic economy rejects for insufficient funds
 - **THEN** only the stable safe rejection is emitted, wallet and stock remain unchanged, and refreshed services permits another legal choice
 
+#### Scenario: Inventory actions publish a full snapshot
+- **WHEN** `inventory.use` or `inventory.toggle_equip` settles
+- **THEN** a full snapshot is published because the action may change inventory, contained mirrors, status,
+  character equipment, clock-derived state, combat/context state, terminal mode, and art
+
+#### Scenario: Combat retains services v3 personal data and its own affordance
+- **WHEN** the actor enters combat
+- **THEN** exploration service menus and their local forms are unloaded, services v3 retains personal
+  player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
+  absent in combat
+
+#### Scenario: Prose never drives panel state
+- **WHEN** any success or domain-rejection message is produced
+- **THEN** it is emitted as text and never parsed by the browser to update panel state
+
 ### Requirement: Reconnect rebuilds services without replaying intent
-WebSocket loss SHALL preserve the last rendered services view under the foundation offline overlay and lock every service mutation. After reconnect, the first valid new-epoch snapshot SHALL rebuild host, player summary, guild, shop, and inventory sections from canonical persistence even when its revision is lower than the retired epoch. The browser SHALL discard old-epoch packets, SHALL NOT restore an unsubmitted quantity or selection as authority, and SHALL NOT resubmit an uncertain prior mutation. An action submitted but unconfirmed before transport loss SHALL be treated as unconfirmed with the approved notice, never retried.
+WebSocket loss SHALL preserve the last rendered services view under the foundation offline overlay and lock every
+service mutation. After reconnect, the first valid new-epoch snapshot SHALL rebuild host, player summary, guild,
+shop, and inventory sections from canonical persistence even when its revision is lower than the retired epoch.
 
 #### Scenario: Reconnect restores a shop view
 - **WHEN** the transport disconnects while the shop drawer holds a typed but unsubmitted quantity and reconnects without another game action
@@ -240,8 +477,24 @@ WebSocket loss SHALL preserve the last rendered services view under the foundati
 - **WHEN** transport closes after sending `guild.quest_turnin` but before its result is observed
 - **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
 
+#### Scenario: Old-epoch packets are discarded
+- **WHEN** a packet from the retired epoch arrives after reconnect
+- **THEN** the browser discards it
+
+#### Scenario: Stale selections are never restored as authority
+- **WHEN** reconnect completes with an unsubmitted selection pending from before transport loss
+- **THEN** the browser does not restore the unsubmitted selection as authority and does not resubmit an uncertain
+  prior mutation
+
+#### Scenario: Unconfirmed submissions get the approved notice
+- **WHEN** an action was submitted but unconfirmed before transport loss
+- **THEN** it is treated as unconfirmed with the approved notice and never retried
+
 ### Requirement: Service browser acceptance is keyboard-only, confirmation-protected, and desktop-bounded
-The managed localhost browser suite SHALL exercise, using keyboard controls at 1451x790 and 2560x1440, all existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus item-use confirmation at both acceptance viewports, full-HP refusal, combat item use through the frameless combat bag drawer, and direct equipment toggle. Singleton replacement and the five-accessory cap with its sixth-accessory warning SHALL be established by deterministic rule and action-adapter tests and rendered in the component showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a live browser journey to hold. The guild services SHALL be reached through the frameless quest drawer and the shop through the frameless shop drawer; neither drawer SHALL render a `dock-menu` or `dock-detail` element in any journey. The journeys SHALL assert the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and bounded drawer dimensions.
+The managed localhost browser suite SHALL exercise, using keyboard controls at 1451x790 and 2560x1440, all
+existing registration, quest, exam, shop, stale/duplicate, repeated-inventory, and reconnect journeys plus
+item-use confirmation at both acceptance viewports, full-HP refusal, combat item use through the frameless
+combat bag drawer, and direct equipment toggle.
 
 #### Scenario: Guild board journey completes in Chromium
 - **WHEN** a seeded registered member opens the quest drawer from the guild clerk's navigate row and uses Tab and Enter to reach and activate an eligible board offer's accept control
@@ -271,15 +524,26 @@ The managed localhost browser suite SHALL exercise, using keyboard controls at 1
 - **WHEN** every reference drawer is closed in exploration or combat
 - **THEN** no shop, quest-board, lore, or inventory surface exists in the DOM or tab order and no fabricated row renders
 
+#### Scenario: Registry gaps move to rule tests and the showcase
+- **WHEN** singleton replacement and the five-accessory cap with its sixth-accessory warning are validated
+- **THEN** they are established by deterministic rule and action-adapter tests and rendered in the component
+  showcase, because the shipped item registry publishes no accessory items and no second singleton weapon for a
+  live browser journey to hold
+
+#### Scenario: Services ride the frameless drawers only
+- **WHEN** any acceptance journey opens guild services or the shop
+- **THEN** guild services are reached through the frameless quest drawer and the shop through the frameless shop
+  drawer, and neither drawer renders a `dock-menu` or `dock-detail` element in any journey
+
+#### Scenario: Journeys assert the dispatch and layout invariants
+- **WHEN** any acceptance journey runs
+- **THEN** it asserts the single dispatch entry, in-flight locking, mode gating, honest wallet rendering, and
+  bounded drawer dimensions
+
 ### Requirement: The quest browser exposes the tracking toggle
-The quest book SHALL render, on each quest row, a tracking control that dispatches
-`guild.quest_track` for that row's `quest_id`: labelled and enabled as tracking for an
-`in_progress` row whose `tracked` is false, as untracking for a row whose `tracked` is true, and
-disabled with a stable reason otherwise. The control SHALL be present regardless of any local
-service host, because tracking is host-independent by contract. Keyboard and pointer activation SHALL submit the same
-action identifier and payload through the same dispatch entry and gates. The control SHALL render
-only from the committed row's `tracked` field, and the row's presented tracking state SHALL
-change only when a commit carrying the new field lands.
+The quest book SHALL render, on each quest row, a tracking control that dispatches `guild.quest_track` for
+that row's `quest_id`: labelled and enabled as tracking for an `in_progress` row whose `tracked` is false, as
+untracking for a row whose `tracked` is true, and disabled with a stable reason otherwise.
 
 #### Scenario: Tracking from the browser dispatches once
 - **WHEN** the player activates a tracked-false active quest row's tracking control
@@ -294,6 +558,19 @@ change only when a commit carrying the new field lands.
   staff
 - **THEN** exactly one `guild.quest_track` request is submitted and the row flips on the commit
 
+#### Scenario: The control exists with no local service host
+- **WHEN** a quest row renders with no local service host present
+- **THEN** its tracking control is still present, because tracking is host-independent by contract
+
+#### Scenario: Keyboard and pointer share one dispatch path
+- **WHEN** the tracking control is activated by keyboard or pointer
+- **THEN** both submit the same action identifier and payload through the same dispatch entry and gates
+
+#### Scenario: Presented tracking state follows commits only
+- **WHEN** the tracking control renders and the player activates it
+- **THEN** the control renders only from the committed row's `tracked` field, and the row's presented tracking
+  state changes only when a commit carrying the new field lands
+
 ### Requirement: The quest drawer separates the player's quest book from the guild counter
 
 The quest drawer SHALL render two distinct surfaces. The quest book SHALL render from the
@@ -301,10 +578,6 @@ The quest drawer SHALL render two distinct surfaces. The quest book SHALL render
 service host. The guild counter SHALL render from the `services` panel's `guild` section and SHALL be
 present only when that section is available. Each surface SHALL be its own component reading its own
 panel; neither SHALL read the other's panel for its own content.
-
-The quest book SHALL list every stored record. The guild counter SHALL carry registration, the quest
-board for accepting new quests, and guild rank with the promotion examination, and SHALL NOT re-list
-the holder's accepted quest records, so no quest is presented twice in one drawer.
 
 #### Scenario: The quest book renders away from any clerk
 - **WHEN** a holder with stored records opens the quest drawer in a room with no guild staff
@@ -326,14 +599,21 @@ the holder's accepted quest records, so no quest is presented twice in one drawe
 - **THEN** the available surface renders normally and the unavailable one renders its honest absent
   marker with no fabricated rows
 
+#### Scenario: The quest book lists every stored record
+- **WHEN** the quest book renders
+- **THEN** it lists every stored record
+
+#### Scenario: The counter carries counter business and never re-lists quests
+- **WHEN** the guild counter renders
+- **THEN** it carries registration, the quest board for accepting new quests, and guild rank with the
+  promotion examination, and does not re-list the holder's accepted quest records, so no quest is presented
+  twice in one drawer
+
 ### Requirement: Counter-only quest actions appear on a book row only when the counter offers them
 
 Abandon and turn-in SHALL be rendered on a quest book row only when the `services` panel's guild
 section carries a quest row with the same `quest_id` and that action is enabled there. Matching by
-`quest_id` SHALL be the only join between the two panels. Tracking SHALL be rendered from the
-`quest_log` row's own descriptor and SHALL be available regardless of any host, because
-`guild.quest_track` is host-independent by contract. The book SHALL NOT synthesize an abandon or
-turn-in descriptor, and SHALL NOT enable one whose counter-side descriptor is disabled.
+`quest_id` SHALL be the only join between the two panels.
 
 #### Scenario: Away from a clerk only tracking is offered
 - **WHEN** the quest book renders with no guild section available
@@ -351,6 +631,16 @@ turn-in descriptor, and SHALL NOT enable one whose counter-side descriptor is di
 #### Scenario: A book row with no counter-side match offers no counter actions
 - **WHEN** a private commission's row renders while a guild clerk is present
 - **THEN** it offers tracking only, because the guild section carries no row with that quest ID
+
+#### Scenario: Tracking comes from the book row's own descriptor
+- **WHEN** a quest book row renders its tracking control
+- **THEN** tracking is rendered from the `quest_log` row's own descriptor and is available regardless of any
+  host, because `guild.quest_track` is host-independent by contract
+
+#### Scenario: The book never invents counter descriptors
+- **WHEN** the book renders a row whose counter side has no enabled abandon or turn-in descriptor
+- **THEN** the book synthesizes no abandon or turn-in descriptor and enables none whose counter-side descriptor
+  is disabled
 
 ### Requirement: The quest book discloses each quest's commissioner and settlement
 

@@ -9,23 +9,10 @@ a direct player-facing view on `look <target>`.
 `world/rules/displayed_stats.py` SHALL provide
 `display_stat_block(entity, looker=None) -> str | None` that renders one
 `label：value` row per key in the fixed order `atk_phys`, `agility`, `defense`,
-`magic_power`, `hp`, every value read through `get_display_value()`. The labels SHALL be the
-canonical Traditional Chinese trait labels used by the character panel (`生命` for `hp`, `攻擊` for
-`atk_phys`, `敏捷` for `agility`, `防禦` for `defense`, `魔力` for `magic_power`). The `hp` row
-SHALL render the gauge's current value (the value the accessor returns), not a maximum. The
-function SHALL return `None` for a non-living target (an object or a room) and SHALL omit — never
-raise on — a missing or malformed trait row. The function SHALL be read-only: it SHALL NOT write
-attributes, mutate traits, advance the clock, or record map knowledge.
-
-When `looker` is the observing entity itself (a self-look), the block
-SHALL instead render the character-breakdown-view rows server-side in
-Traditional Chinese: one row per panel stat in the fixed panel order,
-showing the total-display value and, for named-source contributions, the
-layer segments `（來源 ＋8｜來源 ×1.1｜來源 −10%）` produced from the same
-single breakdown assembly that feeds the character panel — never a second
-computation path. Every non-self observation (`looker` absent or a
-different entity) SHALL render the five-row third-party block exactly as
-before.
+`magic_power`, `hp`, every value read through `get_display_value()` with the
+canonical Traditional Chinese labels enumerated by the label scenario below. The
+`hp` row SHALL render the gauge's current value (the value the accessor
+returns), not a maximum. The function SHALL be read-only.
 
 #### Scenario: Third-party rows are unchanged
 - **WHEN** `display_stat_block(entity, looker=observer)` is called with an
@@ -56,6 +43,32 @@ before.
   malformed while the other four keys are valid
 - **THEN** the block renders the four valid rows and omits the 生命 row without raising
 
+#### Scenario: Rows carry canonical Traditional Chinese trait labels
+- **WHEN** the block renders its five rows
+- **THEN** the labels are the character panel's canonical labels: `生命` for `hp`, `攻擊` for
+  `atk_phys`, `敏捷` for `agility`, `防禦` for `defense`, `魔力` for `magic_power`
+
+#### Scenario: A self-look renders the breakdown rows server-side
+- **WHEN** `display_stat_block(entity, looker=entity)` is called with the looker being the
+  observing entity itself
+- **THEN** the block renders the character-breakdown-view rows server-side in Traditional Chinese:
+  one row per panel stat in the fixed panel order, showing the total-display value and, for
+  named-source contributions, the layer segments `（來源 ＋8｜來源 ×1.1｜來源 −10%）`
+
+#### Scenario: Self-look rows reuse the single breakdown assembly
+- **WHEN** a self-look renders its breakdown rows
+- **THEN** they are produced from the same single breakdown assembly that feeds the character
+  panel — never a second computation path
+
+#### Scenario: Rendering performs no side effects
+- **WHEN** `display_stat_block` renders a block
+- **THEN** it writes no attributes, mutates no traits, advances no clock, and records no map
+  knowledge
+
+#### Scenario: An absent looker renders the five-row third-party block
+- **WHEN** `display_stat_block(entity)` is called with `looker` absent or a different entity
+- **THEN** the five-row third-party block renders exactly as before
+
 ### Requirement: The disguise accessor tolerates a malformed disguise record
 `get_display_value()` SHALL treat a `disguised_stats` value that is not a mapping (for example an
 integer or a boolean) as "no disguise" and fall back to the true trait value, instead of raising.
@@ -83,9 +96,9 @@ the target is a living entity. Bare `look` (the room) SHALL append nothing.
 The WebClient `explore.look` action's target detail SHALL route through the same shared
 target-appearance path as the text command, so a `target_id` submission SHALL present the identical
 description and displayed-stats block with no browser-side computation of any value. The action
-SHALL NOT parse the block or the appearance text to infer state, SHALL NOT mutate traits, SHALL
-publish no panel replacement beyond the ordinary narrative result, and SHALL leave the frozen
-version-1 `exploration` panel payload untouched.
+SHALL NOT parse the block or the appearance text to infer state, SHALL NOT
+mutate traits, and SHALL leave the frozen version-1 `exploration` panel
+payload untouched.
 
 #### Scenario: WebClient target look carries the same block
 - **WHEN** an actor submits `explore.look` with a present living target's `target_id`

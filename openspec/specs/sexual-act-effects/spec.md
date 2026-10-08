@@ -49,11 +49,7 @@ no entity appearing twice.
 ### Requirement: compute_pleasure_gain scales base_pleasure by ratio, sensitivity, shame, and participant count
 `world/rules/sexual_act_effects.py` SHALL define `compute_pleasure_gain(participant, part,
 base_pleasure, ratio, participant_count) -> int`, returning `round(base_pleasure * ratio *
-sensitivity_multiplier * shame_multiplier * participant_multiplier)`, where the sensitivity and shame
-multipliers are read from `PLEASURE_CONFIG.sensitivity_multipliers`/`.shame_multipliers` (unchanged,
-`pleasure-gauge`-owned) keyed by `participant.sexual.sensitivity[part].level` and
-`participant.sexual.shame.level`, and the participant multiplier is read from this change's own
-`sexual_act_effects.yaml` participant-count table.
+sensitivity_multiplier * shame_multiplier * participant_multiplier)`.
 
 #### Scenario: A neutral participant at 普通 sensitivity and 無 shame receives exactly the ratio-scaled base
 - **WHEN** `compute_pleasure_gain(participant, part, base_pleasure=10, ratio=1.0, participant_count=1)`
@@ -69,6 +65,10 @@ multipliers are read from `PLEASURE_CONFIG.sensitivity_multipliers`/`.shame_mult
 - **WHEN** `compute_pleasure_gain(participant, part, base_pleasure=10, ratio=0.0,
   participant_count=1)` is called
 - **THEN** it returns `0`
+
+#### Scenario: The multipliers read from their declared tables
+- **WHEN** the sensitivity, shame, and participant multipliers are resolved
+- **THEN** the sensitivity and shame multipliers are read from `PLEASURE_CONFIG.sensitivity_multipliers`/`.shame_multipliers` (unchanged, `pleasure-gauge`-owned) keyed by `participant.sexual.sensitivity[part].level` and `participant.sexual.shame.level`, and the participant multiplier is read from this change's own `sexual_act_effects.yaml` participant-count table
 
 ### Requirement: sexual_act_effects.yaml declares the participant-count table and the climax extension threshold, validated at load
 `world/rules/rulebook/sexual_act_effects.yaml` SHALL declare exactly `participant_multipliers`
@@ -89,18 +89,10 @@ closed on any deviation.
 - **THEN** loading it raises
 
 ### Requirement: The pleasure effect handler resolves each participant's part and ratio by role, applies gain, and stages a climax extension when a 進行中 participant's computed gain meets threshold
-`world/rules/action.py` SHALL register `pleasure:<act_key>` (surfaces `frozenset({"sexual"})`, no
-required event context). `participant_count` SHALL be computed once per cast as
-`len(participants(actor, targets))` and reused for every participant's gain computation. For the
-acting entity, the handler SHALL compute gain using `part=resolve_part(actor,
-SEXUAL_ACT_REGISTRY[act_key].actor_part)` and `ratio=SEXUAL_ACT_REGISTRY[act_key].
-actor_pleasure_ratio`; for every other participant, using `part=resolve_part(participant,
-SEXUAL_ACT_REGISTRY[act_key].target_part)` and `ratio=1.0`. For each entity in
-`participants(actor, targets)`, the handler SHALL stage one `PendingEffect` that adds that
-participant's computed gain to `entity.sexual.pleasure.base`. For any participant whose
-`climax_phase.level` is `"進行中"` at apply time and whose **computed, pre-clamp** gain is at least
-`climax_extension_threshold`, the same `PendingEffect` SHALL additionally call
-`entity.sexual.stage_climax_extension()`.
+`world/rules/action.py` SHALL register `pleasure:<act_key>`. `participant_count` SHALL be computed
+once per cast as `len(participants(actor, targets))` and reused for every participant's gain
+computation. For each entity in `participants(actor, targets)`, the handler SHALL stage one
+`PendingEffect` that adds that participant's computed gain to `entity.sexual.pleasure.base`.
 
 #### Scenario: Every participant's pleasure increases by their own computed gain
 - **WHEN** a `pleasure:<act_key>` effect resolves for an actor and one target
@@ -134,16 +126,23 @@ participant's computed gain to `entity.sexual.pleasure.base`. For any participan
   not `"進行中"`, regardless of the computed gain's size
 - **THEN** `entity.sexual.pending_climax_extension` is unchanged
 
+#### Scenario: The prefix registers with the declared surfaces and no context
+- **WHEN** the `pleasure:<act_key>` registration is inspected
+- **THEN** it declares surfaces `frozenset({"sexual"})` and no required event context
+
+#### Scenario: Roles pick the part and ratio inputs
+- **WHEN** the handler computes each participant's gain
+- **THEN** for the acting entity it uses `part=resolve_part(actor, SEXUAL_ACT_REGISTRY[act_key].actor_part)` and `ratio=SEXUAL_ACT_REGISTRY[act_key].actor_pleasure_ratio`; for every other participant, `part=resolve_part(participant, SEXUAL_ACT_REGISTRY[act_key].target_part)` and `ratio=1.0`
+
+#### Scenario: A threshold-meeting 進行中 gain extends the same PendingEffect
+- **WHEN** a participant's `climax_phase.level` is `"進行中"` at apply time and their **computed, pre-clamp** gain is at least `climax_extension_threshold`
+- **THEN** the same `PendingEffect` that applies the gain additionally calls `entity.sexual.stage_climax_extension()`
+
 ### Requirement: The counter effect handler increments actor_counters on the actor and participant_counters on every other participant
-`world/rules/action.py` SHALL register `sexual_counter:<act_key>` (surfaces
-`frozenset({"sexual"})`, no required event context). For each name in
+`world/rules/action.py` SHALL register `sexual_counter:<act_key>`. For each name in
 `SEXUAL_ACT_REGISTRY[act_key].actor_counters`, the handler SHALL stage one `PendingEffect` calling
-the actor's corresponding sanctioned mutator (per the explicit attribute-to-mutator table, never a
-derived string transform). For each name in `.participant_counters`, the handler SHALL stage one such
-call for every entity in `participants(actor, targets)` other than the actor. A name in the
-observer-gated counter set (`watched_count`, see the observer-gating requirement) SHALL be staged
-only when `observers_present()` is true for the cast; a cast with no observer SHALL silently skip
-that name while still staging every other declared counter.
+the actor's corresponding sanctioned mutator. For each name in `.participant_counters`, the handler
+SHALL stage one such call for every entity in `participants(actor, targets)` other than the actor.
 
 #### Scenario: An actor-only counter increments once on the actor and never on the target
 - **WHEN** a `sexual_counter:<act_key>` effect resolves for an act whose `actor_counters` names one
@@ -172,6 +171,18 @@ that name while still staging every other declared counter.
 - **WHEN** the same effect resolves while a co-located entity other than the actor is present
 - **THEN** the actor's `watched_count` increases by exactly one
 
+#### Scenario: The prefix registers with the declared surfaces and no context
+- **WHEN** the `sexual_counter:<act_key>` registration is inspected
+- **THEN** it declares surfaces `frozenset({"sexual"})` and no required event context
+
+#### Scenario: Mutators come from the explicit table only
+- **WHEN** the handler resolves a counter name to its mutator
+- **THEN** it follows the explicit attribute-to-mutator table, never a derived string transform
+
+#### Scenario: Observer-gated counter names stage only with an observer
+- **WHEN** a counter name in the observer-gated counter set (`watched_count`, see the observer-gating requirement) is declared
+- **THEN** it is staged only when `observers_present()` is true for the cast, and a cast with no observer silently skips that name while still staging every other declared counter
+
 ### Requirement: The counter-to-mutator table is explicit and structurally verified against SexualState
 `world/rules/sexual_act_effects.py` SHALL declare an explicit mapping from each of `SexualState`'s
 eleven lifetime counter attribute names to its sanctioned mutator method name, and SHALL NOT derive a
@@ -197,12 +208,7 @@ real, callable `SexualState` method.
 Applying a participant's computed pleasure gain SHALL go through one shared entry point that, in the
 same `PendingEffect.apply()` call and in this order: (1) captures the participant's arousal ordinal
 and whether `climax_phase.level` is `"接近"`, both **before** mutating `pleasure`; (2) mutates
-`entity.sexual.pleasure.base`; (3) if the arousal ordinal strictly increased, increments
-`entity.sexual.wetness.value` by exactly one; (4) if `entity.sexual.arousal.level` is now `"極限"`,
-calls `_apply_climax_phase_set(entity, "接近")`; (5) if the pre-mutation capture found
-`climax_phase.level == "接近"`, calls `_apply_climax_phase_set(entity, "進行中")`. Neither call in
-steps 4-5 SHALL be gated by any condition beyond what `_apply_climax_phase_set` itself already
-enforces (its own no-op on an invalid edge).
+`entity.sexual.pleasure.base`; (3) replays the arousal-coupled cascade over the captured state.
 
 #### Scenario: A first-time crossing into 極限 moves climax_phase to 接近 only
 - **WHEN** a participant's `climax_phase` is `"未達"` and a pleasure gain raises their arousal to the
@@ -230,18 +236,20 @@ enforces (its own no-op on an invalid edge).
 - **THEN** the arousal-ordinal and climax-phase captures are the first two statements, both reading
   `entity.sexual` before any line that mutates `entity.sexual.pleasure`
 
+#### Scenario: The phase-set calls carry no extra gating
+- **WHEN** the entry point reaches the step-4 or step-5 `_apply_climax_phase_set` call
+- **THEN** neither call is gated by any condition beyond what `_apply_climax_phase_set` itself already enforces (its own no-op on an invalid edge)
+
+#### Scenario: The cascade steps are fixed in order
+- **WHEN** the entry point replays the cascade after mutating `pleasure.base`
+- **THEN** (3) if the arousal ordinal strictly increased, it increments `entity.sexual.wetness.value` by exactly one; (4) if `entity.sexual.arousal.level` is now `"極限"`, it calls `_apply_climax_phase_set(entity, "接近")`; (5) if the pre-mutation capture found `climax_phase.level == "接近"`, it calls `_apply_climax_phase_set(entity, "進行中")`
+
 ### Requirement: sexual_event:<name> entries resolve through the participant-scoped handler with no name-based exception table
 Every `sexual_event:<name>` string an effect list carries (appended by `_act_family()` per
 `sexual-act-registry`'s corresponding requirement, or hand-declared) SHALL resolve through the
 existing `_handle_sexual_event` handler and `SexualEventEffect` dispatch branch. The handler SHALL
 apply the event to **every participant** of the cast — `participants(actor, targets)`, exactly like
-the pleasure and counter handlers — with **no name-based recipient exception**:
-`_builder.py`'s `_LEGACY_TARGET_SCOPED_EVENTS` SHALL NOT exist in any form, and the handler SHALL
-NOT read any event-name exception set. Recipient scope SHALL be decided statically by the effect
-prefix alone: `sexual_event:` participant-scoped, `sexual_event_actor:` actor-scoped,
-`sexual_event_target:` target-scoped (see the target-scoped requirement).
-`_FORBIDDEN_SEXUAL_EVENTS` is unrelated to recipient scope and remains the act-catalog emission
-prohibition alone.
+the pleasure and counter handlers — with **no name-based recipient exception**.
 
 #### Scenario: An act's declared event calls apply_event for every participant
 - **WHEN** an act whose `sexual_events` includes `"breast_sex_performed"` is cast against one target
@@ -264,16 +272,24 @@ prohibition alone.
 - **THEN** no `_LEGACY_TARGET_SCOPED_EVENTS` binding exists, while `_FORBIDDEN_SEXUAL_EVENTS` remains
   present and unchanged
 
+#### Scenario: The handler reads no exception set
+- **WHEN** the participant-scoped event handler resolves a name
+- **THEN** `_builder.py`'s `_LEGACY_TARGET_SCOPED_EVENTS` does not exist in any form and the handler reads no event-name exception set
+
+#### Scenario: Recipient scope is decided by the prefix alone
+- **WHEN** a sexual event effect's recipients are determined
+- **THEN** scope is decided statically by the effect prefix alone: `sexual_event:` participant-scoped, `sexual_event_actor:` actor-scoped, `sexual_event_target:` target-scoped (see the target-scoped requirement)
+
+#### Scenario: The forbidden set is unrelated to recipient scope
+- **WHEN** `_FORBIDDEN_SEXUAL_EVENTS` is considered
+- **THEN** it is unrelated to recipient scope and remains the act-catalog emission prohibition alone
+
 ### Requirement: The pair-event handler resolves one sex-conditional event per cast and applies it to every participant
 `world/rules/sexual_act_effects.py` SHALL define `pair_event_name(actor, targets, act) -> str |
-None`: it reads each participant's `sex` (an absent or `None` value reading as
-`world.lore.sex.DEFAULT_SEX`), builds the sorted two-member sex tuple, and returns the event name of
-the first `act.pair_events` entry whose sex pair equals it, or `None` when no entry matches.
-`world/rules/action.py` SHALL register the `act_pair_event:<act_key>` prefix (surfaces
-`frozenset({"sexual"})`, no required event context): the handler SHALL look the act up in
-`SEXUAL_ACT_REGISTRY` by the payload key, reject an absent act, resolve the event through
-`pair_event_name`, stage no effect when the resolution is `None`, and otherwise stage one
-`PendingEffect` calling `apply_event(participant, event)` for **every** participant of the cast.
+None`, returning the event name of the first `act.pair_events` entry whose sex pair equals the
+cast's sorted sex tuple, or `None` when no entry matches. `world/rules/action.py` SHALL register the
+`act_pair_event:<act_key>` prefix; its handler stages one `PendingEffect` calling
+`apply_event(participant, event)` for **every** participant of the cast.
 
 #### Scenario: An opposite-sex cast resolves first_vaginal_penetration for both participants
 - **WHEN** an act declaring the canonical three sex pairs is cast by an actor whose `sex` is
@@ -294,14 +310,32 @@ the first `act.pair_events` entry whose sex pair equals it, or `None` when no en
 - **WHEN** `act_pair_event:<key>` names an act absent from `SEXUAL_ACT_REGISTRY`
 - **THEN** the action rejects with `RejectReason.EFFECT_RESOLUTION_FAILED` naming the effect string
 
+#### Scenario: The prefix registers with the declared surfaces and no context
+- **WHEN** the `act_pair_event:<act_key>` registration is inspected
+- **THEN** it declares surfaces `frozenset({"sexual"})` and no required event context
+
+#### Scenario: The handler looks the act up by payload key
+- **WHEN** the `act_pair_event:<act_key>` handler resolves an effect
+- **THEN** it looks the act up in `SEXUAL_ACT_REGISTRY` by the payload key and rejects an absent act
+
+#### Scenario: A None resolution stages no effect
+- **WHEN** `pair_event_name` resolves to `None` for the cast
+- **THEN** the handler stages no effect
+
+#### Scenario: The handler resolves through pair_event_name
+- **WHEN** the `act_pair_event:<act_key>` handler processes a cast
+- **THEN** it resolves the event through `pair_event_name` before staging anything
+
+#### Scenario: The sex tuple is defaulted and sorted
+- **WHEN** `pair_event_name` resolves the cast's sex pair
+- **THEN** it reads each participant's `sex` (an absent or `None` value reading as `world.lore.sex.DEFAULT_SEX`) and builds the sorted two-member sex tuple to compare against each entry
+
 ### Requirement: observers_present returns whether any entity besides the actor observes a cast
 `world/rules/sexual_act_effects.py` SHALL define `observers_present(actor, targets, event_context)
 -> bool`, a deterministic, no-create read: a cast whose target list contains an entity other than
 the actor (an AREA cast's audience, or a SINGLE cast's partner) SHALL count as observed; otherwise
-the co-located candidates SHALL be the battlefield roster's members when
-`event_context["battlefield"]` is present, or the room's `LivingEntity` occupants when
-`event_context["room"]` is present, and the cast SHALL be observed when any candidate is not the
-actor. An event context carrying neither battlefield nor room SHALL read as unobserved.
+the co-located candidates SHALL be read from the event context, and the cast SHALL be observed when
+any candidate is not the actor.
 
 #### Scenario: An AREA cast is observed by its audience
 - **WHEN** `observers_present(actor, [target_a], event_context)` is called for an AREA cast with
@@ -326,16 +360,20 @@ actor. An event context carrying neither battlefield nor room SHALL read as unob
 - **WHEN** `observers_present(actor, [actor], {})` is called
 - **THEN** it returns `False` without raising
 
+#### Scenario: Candidate sources come from the event context
+- **WHEN** the target list holds only the actor and co-located candidates are resolved
+- **THEN** the candidates are the battlefield roster's members when `event_context["battlefield"]` is present, or the room's `LivingEntity` occupants when `event_context["room"]` is present
+
+#### Scenario: A context with neither battlefield nor room reads unobserved
+- **WHEN** the event context carries neither battlefield nor room
+- **THEN** the cast reads as unobserved
+
 ### Requirement: watched_during_activity and watched_count are observer-gated; the gated names are declared as module constants
 `world/rules/sexual_act_effects.py` SHALL declare `_OBSERVER_GATED_EVENTS` (containing exactly
 `"watched_during_activity"`) and `_OBSERVER_GATED_COUNTERS` (containing exactly `"watched_count"`).
 The actor-scoped event handler SHALL skip an event name in `_OBSERVER_GATED_EVENTS` when
 `observers_present()` is false, and the counter handler SHALL skip a counter name in
-`_OBSERVER_GATED_COUNTERS` under the same condition (see the modified counter requirement). A
-structural test SHALL assert `_OBSERVER_GATED_EVENTS` is a subset of `_ACTOR_SCOPED_EVENTS` (the
-actor-scoped event vocabulary in `world/skills/sexual_acts/_builder.py`), and separately that
-`_OBSERVER_GATED_COUNTERS` is a subset of `SexualState`'s sanctioned lifetime counter attribute
-names (the `_COUNTER_MUTATORS` key set).
+`_OBSERVER_GATED_COUNTERS` under the same condition (see the modified counter requirement).
 
 #### Scenario: An unobserved cast skips the watched event
 - **WHEN** an act declaring `watched_during_activity` is cast while no observer is present
@@ -344,6 +382,10 @@ names (the `_COUNTER_MUTATORS` key set).
 #### Scenario: An observed cast emits the watched event
 - **WHEN** the same act is cast while an observer is present
 - **THEN** `apply_event` is invoked with `"watched_during_activity"` for the actor
+
+#### Scenario: The gated names are structurally subset-checked
+- **WHEN** the structural test runs
+- **THEN** it asserts `_OBSERVER_GATED_EVENTS` is a subset of `_ACTOR_SCOPED_EVENTS` (the actor-scoped event vocabulary in `world/skills/sexual_acts/_builder.py`), and separately that `_OBSERVER_GATED_COUNTERS` is a subset of `SexualState`'s sanctioned lifetime counter attribute names (the `_COUNTER_MUTATORS` key set)
 
 ### Requirement: sexual_event_actor:<name> applies the named event to the actor only
 `world/rules/action.py` SHALL register the `sexual_event_actor:<name>` prefix (surfaces
@@ -365,18 +407,10 @@ observer-gating rule for a gated event name. The paired typed effect SHALL exist
 ### Requirement: sexual_event_target:<name> applies the named event to the resolved targets only
 `world/skills/effects.py`'s `parse_effect()` SHALL classify the `sexual_event_target:<name>` prefix
 into the new frozen `TargetSexualEventEffect(event_name)` dataclass via the existing
-`_parse_single_arg` helper — a missing or double payload raises `ValueError` at parse time, exactly
-like `sexual_event_actor:` (registry-construction fail-closed, never a silent use-time no-op) — and
-`world/rules/action.py` SHALL register the prefix (surfaces `frozenset({"sexual", "traits"})` — the
-general `apply_event` route can mutate `traits` for rulebook events beyond sexual state, matching
-the participant channel's declared surface — no required event context). The handler SHALL stage one
-`PendingEffect` calling
+`_parse_single_arg` helper, and `world/rules/action.py` SHALL register the prefix with no required
+event context. The handler SHALL stage one `PendingEffect` calling
 `apply_event(target, event_name, ...)` per resolved target and SHALL never apply the event to the
-acting entity, mirroring `sexual_event_actor:<name>` with the roles exchanged. A missing or empty
-event name never reaches the handler — it fails at `SkillDef` construction. An empty `targets`
-list (a fully resisted cast) SHALL be an ordinary no-op outcome, never a rejection. The prefix SHALL
-not carry observer gating: `watched_during_activity` remains reachable only through the
-actor-scoped channel's gated vocabulary.
+acting entity.
 
 #### Scenario: divine_sexual_arts stimulates the target and never the caster
 - **WHEN** `divine_sexual_arts` (declaring `sexual_event_target:stimulus_applied`) is cast against
@@ -401,17 +435,37 @@ actor-scoped channel's gated vocabulary.
 - **THEN** each raises `ValueError`, matching the `sexual_event_actor:` prefix's existing
   `_parse_single_arg` behaviour
 
+#### Scenario: Classification fails closed, never silently
+- **WHEN** a `sexual_event_target:` payload is malformed at classification time
+- **THEN** classification is registry-construction fail-closed — never a silent use-time no-op
+
+#### Scenario: A missing or empty name never reaches the handler
+- **WHEN** an effect string carries a missing or empty event name
+- **THEN** it fails at `SkillDef` construction and never reaches the handler
+
+#### Scenario: The prefix declares the sexual and traits surfaces
+- **WHEN** the `sexual_event_target:<name>` registration is inspected
+- **THEN** it declares surfaces `frozenset({"sexual", "traits"})` — the general `apply_event` route can mutate `traits` for rulebook events beyond sexual state, matching the participant channel's declared surface
+
+#### Scenario: Roles exchange relative to the actor-scoped channel
+- **WHEN** the target-scoped handler's behavior is compared with `sexual_event_actor:<name>`
+- **THEN** it mirrors that channel with the roles exchanged
+
+#### Scenario: An empty target list is an ordinary no-op
+- **WHEN** the resolved `targets` list is empty (a fully resisted cast)
+- **THEN** the outcome is an ordinary no-op, never a rejection
+
+#### Scenario: The target channel carries no observer gating
+- **WHEN** observer gating is considered for `sexual_event_target:`
+- **THEN** the prefix SHALL NOT carry it: `watched_during_activity` remains reachable only through the actor-scoped channel's gated vocabulary
+
 ### Requirement: The pleasure funnel applies the equipment pleasure percent
 
 `compute_pleasure_gain()` SHALL accept one signed `pleasure_percent`
 contributed by the caller from the pure equipment accessor
-(`equipment_pleasure_gain`, malformed storage → 0 — never the combat
-evaluator, whose output key-set SHALL remain unchanged) and compute exactly
+(`equipment_pleasure_gain`) and compute exactly
 `max(round(base × ratio × sensitivity × shame × crowd × (1 +
-pleasure_percent / 100)), 0)` with a single final rounding. The sensitivity
-ladder, shame ladder, virginity, and the eleven lifetime counters SHALL be
-unchanged by this fold, and `pleasure_percent = 0` SHALL reproduce the
-pre-change results exactly.
+pleasure_percent / 100)), 0)` with a single final rounding.
 
 #### Scenario: Lace lingerie amplifies gain
 
@@ -441,24 +495,32 @@ pre-change results exactly.
 - **THEN** the bundle contains no `pleasure_gain` key and resist/overwhelm
   consumers behave exactly as before
 
+#### Scenario: Malformed equipment storage reads zero
+
+- **WHEN** the equipment pleasure accessor meets malformed storage
+- **THEN** it yields 0
+
+#### Scenario: The percent never comes from the combat evaluator
+
+- **WHEN** a caller contributes the signed `pleasure_percent`
+- **THEN** it comes from the pure equipment accessor, never the combat evaluator, whose output key-set SHALL remain unchanged
+
+#### Scenario: The fold touches only the gain
+
+- **WHEN** the equipment pleasure percent is folded in
+- **THEN** the sensitivity ladder, shame ladder, virginity, and the eleven lifetime counters are unchanged by this fold
+
+#### Scenario: Zero percent reproduces pre-change results
+
+- **WHEN** `pleasure_percent = 0`
+- **THEN** the computation reproduces the pre-change results exactly
+
 ### Requirement: Every deterministic pleasure write lives in one shared module
 Every deterministic caller that mutates an entity's pleasure — the sexual-act pleasure handler, the
 divine maximum handler, the drain handler's forced reset, the defeat-aftermath settlements, and any
 future non-skill caller — SHALL apply its change by calling a function in the one shared pleasure
 module, never by assigning `entity.sexual.pleasure` directly. That module SHALL NOT import the cast
 pipeline, so a caller that is not a cast can use it without depending on skill resolution.
-
-The rulebook transition engine and the clock decay are the only other sanctioned deterministic
-writers: `sexual_transitions._apply_then` SHALL write the pleasure trait only for an effect its
-`sexual.yaml` rulebook declares (the `bounded_counter` kind), and `sexual_state.decay_tick` SHALL
-keep its own floor-relative decay step. Neither is an effect-applier entry point; neither SHALL gain
-callers beyond its existing rulebook- and clock-driven paths.
-
-The module SHALL expose exactly two writer functions, because two genuinely different semantics
-exist: a signed gain carrying the arousal-coupled cascade, and a forced reset to zero carrying none.
-A reset SHALL NOT be expressed as a negative gain: doing so would run the gain path's
-already-at-接近 branch and advance the target's climax phase, which draining a target to zero must
-never do.
 
 #### Scenario: No production code outside the sanctioned writers assigns pleasure
 - **WHEN** the deterministic production core is inspected for assignments to a pleasure trait — an
@@ -478,3 +540,19 @@ never do.
 - **WHEN** a caller that resolves no skill imports the shared pleasure module
 - **THEN** the import succeeds without importing the cast-resolution module, and the applied change
   produces the identical cascade a cast would produce for the same magnitude
+
+#### Scenario: The rulebook engine and clock decay are the only other writers
+- **WHEN** the sanctioned deterministic pleasure writers are enumerated
+- **THEN** they are the shared module plus the rulebook transition engine and the clock decay: `sexual_transitions._apply_then` writes the pleasure trait only for an effect its `sexual.yaml` rulebook declares (the `bounded_counter` kind), and `sexual_state.decay_tick` keeps its own floor-relative decay step
+
+#### Scenario: Neither alternative writer becomes an entry point
+- **WHEN** callers of `_apply_then` and `decay_tick` are audited
+- **THEN** neither is an effect-applier entry point, and neither has callers beyond its existing rulebook- and clock-driven paths
+
+#### Scenario: The module exposes exactly two writer functions
+- **WHEN** the shared pleasure module's public surface is inspected
+- **THEN** it exposes exactly two writer functions, because two genuinely different semantics exist: a signed gain carrying the arousal-coupled cascade, and a forced reset to zero carrying none
+
+#### Scenario: A reset is never expressed as a negative gain
+- **WHEN** a caller needs to force pleasure to zero
+- **THEN** it uses the reset function, never a negative gain: a negative gain would run the gain path's already-at-接近 branch and advance the target's climax phase, which draining a target to zero must never do

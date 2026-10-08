@@ -11,25 +11,9 @@ schedule-state interaction gating.
 
 `world/rules/npc_schedules.py` SHALL provide `settle_npc_schedules(start_tick, end_tick)` and
 register it through `world.rules.clock.register_event_source("npc_schedules", ...)` as the only
-`npc_schedules` source. Settlement SHALL query NPCs carrying the persistent `schedule` tag (the
-`npc-schedule-model` assignment API and startup sync maintain it) and, for every occurrence with
-`start_tick < due_tick <= end_tick` and `due_tick >= effective_from_tick`, settle it in
-`(due_tick, npc_stable_id, entry_index)` order — where `npc_stable_id` is the persistent primary
-key (`npc_id`), unique and JSON-safe where display keys are not. An occurrence due exactly at
-`start_tick` SHALL settle only when `effective_from_tick` equals that tick (the assignment
-happened at that same moment, so no earlier window could have settled it); any other occurrence at
-the start boundary was already settled by the preceding window. A `move` entry SHALL resolve its
-target to a destination room, traverse the real Exit path from the NPC's current room (locks and
-vetoes apply), and on success set `schedule_state` to the referenced template's `default_state`
-and emit `npc_departed` / `npc_arrived` events; a `state` entry SHALL update
-`npc.db.schedule_state` and emit `npc_state_changed`. Multi-day skips SHALL use boundary
-arithmetic, not per-second iteration. An NPC with no schedule SHALL produce no entries and no
-events. Every event SHALL carry a JSON-safe payload (the stable `npc_id`, a display `npc` key,
-and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`. Settlement SHALL
-first skip every NPC for which `world/rules/service_gate.py::schedule_silenced(npc)` is true —
-a bound party companion carrying a `place`-bound service component outside its anchor room —
-producing no entries, no events, and no state change for it, exactly as a schedule-less NPC;
-every other NPC SHALL settle byte-identically to the pre-change settlement.
+`npc_schedules` source. Settlement SHALL query NPCs carrying the persistent `schedule` tag and
+settle every occurrence with `start_tick < due_tick <= end_tick` and
+`due_tick >= effective_from_tick` in `(due_tick, npc_stable_id, entry_index)` order.
 
 #### Scenario: A due state entry updates the NPC's schedule state
 - **WHEN** an NPC with a schedule whose next `state` entry falls within `(start_tick, end_tick]`
@@ -91,6 +75,30 @@ The same source SHALL settle daily and weekly cycles phase-anchored to absolute 
 - **WHEN** bulk and consecutive bounded advances cross a week, season and year for identical schedules
 - **THEN** ordered events and final locations/states agree with no duplicates or clock charges
 
+#### Scenario: The schedule tag is maintained by the assignment API and startup sync
+- **WHEN** settlement queries the NPCs to settle
+- **THEN** it selects NPCs carrying the persistent `schedule` tag, which the `npc-schedule-model` assignment API and startup sync maintain
+
+#### Scenario: npc_stable_id is the persistent JSON-safe primary key
+- **WHEN** occurrences are ordered for settlement
+- **THEN** `npc_stable_id` is the persistent primary key (`npc_id`), unique and JSON-safe where display keys are not
+
+#### Scenario: An occurrence due exactly at the start boundary follows the effective-from rule
+- **WHEN** an occurrence is due exactly at `start_tick`
+- **THEN** it settles only when `effective_from_tick` equals that tick (the assignment happened at that same moment, so no earlier window could have settled it); any other occurrence at the start boundary was already settled by the preceding window
+
+#### Scenario: A move entry traverses the real Exit path under locks and vetoes
+- **WHEN** a due `move` entry is settled
+- **THEN** it resolves its target to a destination room and traverses the real Exit path from the NPC's current room, where locks and vetoes apply; on success it sets `schedule_state` to the referenced template's `default_state` and emits `npc_departed` / `npc_arrived` events
+
+#### Scenario: Every event carries a JSON-safe payload and computed due tick
+- **WHEN** a settlement event is emitted
+- **THEN** it carries a JSON-safe payload (the stable `npc_id`, a display `npc` key, and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`
+
+#### Scenario: Silenced NPCs are skipped first
+- **WHEN** settlement runs and `world/rules/service_gate.py::schedule_silenced(npc)` is true for an NPC — a bound party companion carrying a `place`-bound service component outside its anchor room
+- **THEN** settlement skips that NPC first, producing no entries, no events, and no state change for it, exactly as a schedule-less NPC, while every other NPC settles byte-identically to the pre-change settlement
+
 ### Requirement: NPC movement through settlement never charges the clock, records map knowledge,
 or triggers companion follow
 
@@ -114,11 +122,10 @@ player's map-knowledge record, and the party-follow state unchanged.
 ### Requirement: A failed entry settles as a per-entry skip without blocking settlement
 
 A `move` entry whose target cannot resolve, whose room has no traversable Exit to the destination,
-whose Exit is locked, whose destination is gone, or whose only candidate Exit is a redirecting
-non-standard traversal (an `at_traverse` that ignores the requested destination, such as the
-wilderness gates) SHALL skip only that entry: a bounded diagnostic log, no location/state change,
-and **no failure event** — the event stream contains only successful occurrences. Settlement SHALL
-never raise from one NPC's failure and SHALL never roll back other NPCs.
+whose Exit is locked, or whose destination is gone SHALL skip only that entry: a bounded
+diagnostic log, no location/state change, and **no failure event** — the event stream contains
+only successful occurrences. Settlement SHALL never raise from one NPC's failure and SHALL never
+roll back other NPCs.
 
 #### Scenario: A locked Exit skips only that move entry
 - **WHEN** an NPC's due `move` entry points through a locked Exit while another NPC has a valid
@@ -135,24 +142,17 @@ never raise from one NPC's failure and SHALL never roll back other NPCs.
 - **THEN** the entry is skipped, the NPC stays put (never relocated to an un-named room), and no
   event for that move is emitted
 
+#### Scenario: Redirecting non-standard traversal is a defined failure mode
+- **WHEN** a `move` entry's only candidate Exit is a redirecting non-standard traversal (an `at_traverse` that ignores the requested destination, such as the wilderness gates)
+- **THEN** it is treated as this per-entry-skip failure mode
+
 ### Requirement: Schedule state gates NPC-directed interactions at every host-resolving surface
 
 `world/rules/npc_schedules.py` SHALL provide
 `interaction_reason(npc, interaction_kind) -> str | None`: `None` when the NPC's `schedule_state`
 does not block the interaction kind, otherwise a stable authored Traditional Chinese rejection
-reason. The consult points SHALL be enumerated per kind and SHALL cover every surface that
-resolves a local NPC host and performs a transaction: `talk` SHALL be consulted by the scripted-talk
-command path — the text `talk` command and the WebClient `explore.talk_scripted` action — and the
-free-form dialogue seam (`LLMNPC.at_talked_to`; its direct `run_npc_exchange` callers are the
-party-invite surface, which is not an enumerated interaction kind and needs no gate in this
-change);
-`service_shop` SHALL be consulted by the shop buy/sell commands and the WebClient `shop.buy` /
-`shop.sell` action adapters; `service_guild` SHALL be consulted by the guild operation commands
-and the WebClient guild action adapters whenever the resolved local host is the NPC. A blocked
-interaction SHALL present the stable reason and SHALL write no state — no affinity gain, no guide
-progress, no memory append, no intent application, no transaction. The `engage` kind SHALL be
-declared in the API; it SHALL be unreachable today because the engagement surface rejects
-non-hostile targets, and SHALL require no gate at that surface.
+reason. A blocked interaction SHALL present the stable reason and SHALL write no state — no
+affinity gain, no guide progress, no memory append, no intent application, no transaction.
 
 #### Scenario: A busy schedule state blocks scripted talk with a stable reason
 - **WHEN** the player talks to a scripted-dialogue host whose `schedule_state` is `busy`,
@@ -183,9 +183,21 @@ non-hostile targets, and SHALL require no gate at that surface.
 - **WHEN** an NPC's `schedule_state` is `None` or does not block the interaction kind
 - **THEN** `interaction_reason` returns `None` and the interaction behaves exactly as before
 
+#### Scenario: The enumerated consult points per interaction kind
+- **WHEN** the consult points are enumerated
+- **THEN** the consult points SHALL be enumerated per kind, covering every surface that resolves a local NPC host and performs a transaction
+- **AND** `talk` is consulted by the scripted-talk command path — the text `talk` command and the WebClient `explore.talk_scripted` action — and the free-form dialogue seam (`LLMNPC.at_talked_to`)
+- **AND** its direct `run_npc_exchange` callers are the party-invite surface, which is not an enumerated interaction kind and needs no gate in this change
+- **AND** `service_shop` is consulted by the shop buy/sell commands and the WebClient `shop.buy` / `shop.sell` action adapters
+- **AND** `service_guild` is consulted by the guild operation commands and the WebClient guild action adapters whenever the resolved local host is the NPC
+
+#### Scenario: The engage kind is declared but unreachable and needs no gate
+- **WHEN** the `engage` interaction kind is considered
+- **THEN** it SHALL be declared in the API, SHALL be unreachable today because the engagement surface rejects non-hostile targets, and SHALL require no gate at that surface
+
 ### Requirement: The npc_schedules clock source is registered before startup combat recovery advances time
 
-The server `at_server_start()` composition root SHALL call `sync_npc_schedules()` — and through it `register_npc_schedules()` — before `restore_persisted_sessions()` may advance the world clock, so every schedule occurrence whose due tick falls inside a startup recovery settlement window (`start_tick < due_tick <= end_tick`, `due_tick >= effective_from_tick`) settles exactly as it would in an ordinary advance. The settlement window produced by a recovered session's accumulated rounds SHALL NOT lose an occurrence to an unregistered `npc_schedules` stage, and no later sync or backfill SHALL be required to recover it.
+The server `at_server_start()` composition root SHALL call `sync_npc_schedules()` — and through it `register_npc_schedules()` — before `restore_persisted_sessions()` may advance the world clock, so every schedule occurrence whose due tick falls inside a startup recovery settlement window settles exactly as it would in an ordinary advance.
 
 #### Scenario: A recovery advance settles an occurrence due inside its window
 
@@ -196,3 +208,11 @@ The server `at_server_start()` composition root SHALL call `sync_npc_schedules()
 
 - **WHEN** `at_server_start()` has completed its deterministic sync sequence
 - **THEN** the clock's registered `npc_schedules` source is `settle_npc_schedules` and it was registered before any startup-time world advance
+
+#### Scenario: The recovery settlement window uses the ordinary due-tick bounds
+- **WHEN** a startup recovery settlement window is evaluated for occurrences
+- **THEN** its bounds are `start_tick < due_tick <= end_tick` and `due_tick >= effective_from_tick`
+
+#### Scenario: No occurrence is lost to an unregistered stage and no backfill is required
+- **WHEN** a recovered session's accumulated rounds produce a settlement window
+- **THEN** the window SHALL NOT lose an occurrence to an unregistered `npc_schedules` stage, and no later sync or backfill SHALL be required to recover it

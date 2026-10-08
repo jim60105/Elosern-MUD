@@ -32,7 +32,7 @@ A spell SHALL support bounded state-derived magnitude from an explicitly declare
 - **THEN** worn exposure bias affects the bonus once within the vocabulary bounds
 
 ### Requirement: Interaction stimulus and resistance settle as one action
-A declared stimulus SHALL use the existing standard stimulus interval and equipment policy, with optional authored state bonus, and advance recipients through the canonical pleasure path. Random gains SHALL be selected before commit. A resisted generic contact spell SHALL charge normal MP/time but apply no healing, cleansing or stimulus to either participant and award no successful practice. A force-through outcome SHALL retain ordinary structured coercion consequences in every settlement mode. This SHALL NOT change standard sexual-act participant-credit semantics.
+A declared stimulus SHALL use the existing standard stimulus interval and equipment policy, with optional authored state bonus, and advance recipients through the canonical pleasure path. Random gains SHALL be selected before commit. A resisted generic contact spell SHALL charge normal MP/time but apply no healing, cleansing or stimulus to either participant and award no successful practice.
 
 #### Scenario: Resisted interaction has one paid outcome
 - **WHEN** a synthetic contact spell is resisted
@@ -45,3 +45,11 @@ A declared stimulus SHALL use the existing standard stimulus interval and equipm
 #### Scenario: Late error rolls back coupled state
 - **WHEN** a later commit or clock operation fails after stimulus changes phase
 - **THEN** HP, MP, pleasure, wetness, phase, counters and reaction buffs restore
+
+#### Scenario: A force-through outcome retains coercion consequences
+- **WHEN** a generic contact spell settles with a force-through outcome
+- **THEN** ordinary structured coercion consequences are retained in every settlement mode
+
+#### Scenario: Participant-credit semantics are unchanged
+- **WHEN** a declared stimulus settles as part of a spell action
+- **THEN** the standard sexual-act participant-credit semantics do not change

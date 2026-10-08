@@ -6,7 +6,7 @@ Define the typed gauge_transfer effect family with closed gauge set {mp, hp}, va
 ## Requirements
 
 ### Requirement: Gauge transfer is one typed effect family with a closed gauge set and validated magnitude modes
-A skill SHALL express a gauge movement with one typed effect carrying a gauge from the closed set {`mp`, `hp`} (any other gauge, including `sp`, SHALL fail at parse until a consumer exists), one closed direction (`drain`/`restore`), and exactly one magnitude mode: an authored fixed amount, a finite fraction of the target's current value in that gauge in `(0,1]`, or the target's entire pool. Direction legality SHALL be per gauge: `mp` admits both directions; `hp` admits `drain` ONLY — an `hp` restore declaration SHALL be a construction error because HP restoration is the heal effect's exclusive verb. Malformed prefixes, unknown gauges, unknown directions, out-of-range fractions, non-positive fixed amounts and any potency coefficient attached to a transfer SHALL fail at registry construction. The transfer SHALL not be reinterpreted by any element-, skill- or handler-name branch.
+A skill SHALL express a gauge movement with one typed effect carrying a gauge from the closed set {`mp`, `hp`}, one closed direction (`drain`/`restore`), and exactly one magnitude mode: an authored fixed amount, a finite fraction of the target's current value in that gauge in `(0,1]`, or the target's entire pool. Invalid transfer authoring SHALL fail at registry construction.
 
 #### Scenario: Each mode settles its authored magnitude
 - **WHEN** synthetic mp drain skills with fixed, fraction and whole-pool modes hit a pool with a known current value
@@ -24,8 +24,28 @@ A skill SHALL express a gauge movement with one typed effect carrying a gauge fr
 - **WHEN** a non-water synthetic skill declares the same prefixes and policies
 - **THEN** it settles identically through the generic parse, policy and handler with no element-specific code
 
+#### Scenario: Invalid transfer authoring fails at registry construction
+- **WHEN** authoring carries a malformed prefix, unknown gauge, unknown direction, out-of-range fraction, non-positive fixed amount, or any potency coefficient attached to a transfer
+- **THEN** registry construction fails before any cast is possible
+
+#### Scenario: Direction legality is per gauge
+- **WHEN** a transfer declares its direction
+- **THEN** `mp` admits both directions and `hp` admits `drain` ONLY; an `hp` restore declaration is a construction error
+
+#### Scenario: Hp restoration belongs to the heal effect
+- **WHEN** an authoring tries to restore hp through a gauge transfer
+- **THEN** it is rejected because HP restoration is the heal effect's exclusive verb
+
+#### Scenario: The gauge set stays closed until a consumer exists
+- **WHEN** a gauge other than `mp` or `hp`, including `sp`, is declared
+- **THEN** it fails at parse until a consumer for that gauge exists
+
+#### Scenario: No branch reinterprets a transfer
+- **WHEN** a transfer settles through any element, skill, or handler-name branch
+- **THEN** no such branch reinterprets it
+
 ### Requirement: Drains pay through their gauge's canonical writer on both legs and share on the actual amount
-A drain SHALL decrease the target through the canonical writer of its declared gauge — the mp gauge through the MP-depletion wave's canonical MP writer (dispatching the depletion outcome with the cast as attributed source whenever it zeroes the pool), the hp gauge through the existing attributed hp-loss write path the buff rate-tick consumes (dispatching the hp-loss outcome with source attribution and adding no new zero fact) — and SHALL return the configured caster recovery share of the ACTUAL amount drained, in the same gauge, through that gauge's writer on the caster. A share of a clamped or already-partial drain is computed on what was actually taken, never on the requested amount. An hp drain that reaches zero SHALL leave the terminal settlement to the combat/death pipeline's single settlement — exactly one death outcome per crossing, never a second kill path — honoring the same nonlethal knockout projection the combat stage already applies. Both legs SHALL settle inside the action's staged effects with snapshots so a commit failure restores target and caster together.
+A drain SHALL decrease the target through the canonical writer of its declared gauge and SHALL return the configured caster recovery share of the ACTUAL amount drained, in the same gauge, through that gauge's writer on the caster. A share of a clamped or already-partial drain is computed on what was actually taken, never on the requested amount.
 
 #### Scenario: Half-share on a clamped drain
 - **WHEN** a synthetic mp drain of 5 with 50 % caster share hits a pool holding 3
@@ -47,8 +67,24 @@ A drain SHALL decrease the target through the canonical writer of its declared g
 - **WHEN** a staged drain-and-share cast fails at a later commit point
 - **THEN** the target's gauge, the caster's gauge and any reaction-applied marker from the crossing are all restored
 
+#### Scenario: Mp drains route through the depletion wave's canonical writer
+- **WHEN** an mp drain depletes the target
+- **THEN** the write goes through the MP-depletion wave's canonical MP writer, dispatching the depletion outcome with the cast as attributed source whenever it zeroes the pool
+
+#### Scenario: Hp drains route through the attributed hp-loss write path
+- **WHEN** an hp drain removes HP
+- **THEN** the write goes through the existing attributed hp-loss write path the buff rate-tick consumes, dispatching the hp-loss outcome with source attribution and adding no new zero fact
+
+#### Scenario: Hp drain-to-zero never opens a second kill path
+- **WHEN** an hp drain reaches zero
+- **THEN** the terminal settlement is left to the combat/death pipeline's single settlement — exactly one death outcome per crossing, never a second kill path — honoring the same nonlethal knockout projection the combat stage already applies
+
+#### Scenario: Both legs settle inside staged effects with snapshots
+- **WHEN** a drain-and-share cast settles
+- **THEN** both legs settle inside the action's staged effects with snapshots, so a commit failure restores target and caster together
+
 ### Requirement: Restores clamp per target and add the caster's active marker-stack bonus
-An mp restore SHALL move its authored fixed amount plus one bonus per ACTIVE instance of each explicitly declared marker key counted on the CASTER, through the canonical MP writer's increase leg, clamped at each recipient's MP maximum. Restore SHALL never dispatch a depletion event, SHALL count the caster's own instances (never the recipient's), and SHALL read counts from stored buff state without materializing handlers on preview paths. The per-stack bonus is mp-restore-only in practice because the hp gauge admits no restore direction.
+An mp restore SHALL move its authored fixed amount plus one bonus per ACTIVE instance of each explicitly declared marker key counted on the CASTER, through the canonical MP writer's increase leg, clamped at each recipient's MP maximum. Restore SHALL never dispatch a depletion event and SHALL count the caster's own instances, never the recipient's.
 
 #### Scenario: Per-stack bonus reads the caster
 - **WHEN** a synthetic restore with a declared marker bonus runs from a caster holding one active instance of each of three declared marker keys while the recipient holds none
@@ -58,8 +94,16 @@ An mp restore SHALL move its authored fixed amount plus one bonus per ACTIVE ins
 - **WHEN** an area restore pushes one ally over their maximum while another gains fully
 - **THEN** the first lands exactly at maximum, the second gains the full amount, and no depletion event fires for anyone
 
+#### Scenario: Bonus counts read stored buff state on preview paths
+- **WHEN** a preview path needs the caster's marker-stack counts
+- **THEN** it reads them from stored buff state without materializing handlers
+
+#### Scenario: The per-stack bonus is mp-restore-only in practice
+- **WHEN** an author considers a marker-stack bonus on an hp restore
+- **THEN** none can exist, because the hp gauge admits no restore direction
+
 ### Requirement: Regen lock is a bounded marker consumed by the clock's closed-form regen
-A marker buff SHALL be able to zero one gauge's passive regeneration for its bounded duration through one ordinary combat-modifier rule contributing a per-gauge regen-scale bundle value, consumed by the world clock's existing closed-form regen computation as a multiplier (absent means unchanged). A zero scale SHALL neither accrue regeneration nor consume the carried sub-unit remainder, SHALL end exactly at expiry, and SHALL leave authored direct stat grants (item effects) untouched. No scheduler, cooldown table or element-specific branch may participate.
+A marker buff SHALL be able to zero one gauge's passive regeneration for its bounded duration through one ordinary combat-modifier rule contributing a per-gauge regen-scale bundle value, consumed by the world clock's existing closed-form regen computation as a multiplier (absent means unchanged). A zero scale SHALL neither accrue regeneration nor consume the carried sub-unit remainder, SHALL end exactly at expiry, and SHALL leave authored direct stat grants (item effects) untouched.
 
 #### Scenario: Locked gauge regenerates nothing while the lock lives
 - **WHEN** a synthetic entity at a depleted MP pool advances the clock under an active regen-lock marker and after its expiry
@@ -73,15 +117,15 @@ A marker buff SHALL be able to zero one gauge's passive regeneration for its bou
 - **WHEN** the regen stage runs for locked and unlocked entities over one multi-second advance
 - **THEN** the computation performs no per-second or per-quantum loop for either entity and unlocked arithmetic is bit-identical to the pre-change closed form
 
+#### Scenario: No scheduler or element-specific branch participates
+- **WHEN** a regen lock is implemented and evaluated
+- **THEN** no scheduler, cooldown table, or element-specific branch participates
+
 ### Requirement: A component's audience gate selects its recipients by stored target state
 An effect component SHALL be declarable with one immutable validated audience condition over a closed
 gauge-state vocabulary (the recipient's MP maximum being zero, or being positive), evaluated per
 resolved target from stored state at audience planning without handler materialization or random
-rolls. The gate SHALL skip ONLY its own component for non-matching targets — every other component of
-the same cast follows its own audience — and preflight and final resolution SHALL evaluate the
-identical gate against current state. Malformed gate declarations SHALL fail at authoring. The gate
-SHALL compose with the existing relation audiences (an ally-audience component may additionally
-require a gauge-state fact).
+rolls.
 
 #### Scenario: Max-zero rider delivers to one subset only
 - **WHEN** one synthetic cast carries an ungated component to all selected targets and a gated rider
@@ -103,3 +147,9 @@ require a gauge-state fact).
 - **WHEN** authoring declares an unknown gate field, a gate without a component, or a contradictory
   combination of both gate facts on one component
 - **THEN** skill construction raises before any cast is possible
+
+#### Scenario: The gate skips only its own component
+- **WHEN** a target fails one gated component while other components of the same cast also select that
+  target
+- **THEN** only the gated component is skipped for that target, and every other component of the cast
+  follows its own audience

@@ -5,19 +5,10 @@ Define atomic ActionResolver support for battlefield-level mutations.
 ## Requirements
 
 ### Requirement: SNAPSHOTTED_SURFACES gains a battlefield surface, covering Battlefield.fled
-`world/rules/action.py`'s `SNAPSHOTTED_SURFACES` SHALL include `"battlefield"` alongside its existing
-`"traits"`, `"sexual"`, `"buffs"`, and `"skill_grants"` entries. A `PendingEffect` declaring
-`surfaces=frozenset({"battlefield"})` SHALL be accepted by `register_effect_handler()` without raising
-`UnsnapshottedSurfaceError`. The set SHALL additionally include `"church"`, the character ledger
-attribute the holy-rite effect handlers stage against: adding a surface extends the snapshot
-inventory the commit point covers, and the commit mechanism itself is unchanged. A `PendingEffect`
-declaring `surfaces=frozenset({"church"})` SHALL be accepted by `register_effect_handler()` under the
-same rule, and the commit-time snapshot/restore dispatcher SHALL grow its own `"church"` branch in
-the same shape as the `"wallet"` and `"inventory"` branches — an attribute-keyed surface with an
-explicit branch in `_snapshot_touched`/`_restore_touched`
-(`world/rules/action/transaction.py`), not an entity-aggregate key — so a staged ledger write is
-restored byte-identically when a later pending effect fails mid-commit. Membership in the surface
-set alone is not the guarantee; the branch is.
+`world/rules/action.py`'s `SNAPSHOTTED_SURFACES` SHALL include `"battlefield"` and `"church"`
+alongside its existing `"traits"`, `"sexual"`, `"buffs"`, and `"skill_grants"` entries. A
+`PendingEffect` declaring `surfaces=frozenset({"battlefield"})` or `surfaces=frozenset({"church"})`
+SHALL be accepted by `register_effect_handler()` without raising `UnsnapshottedSurfaceError`.
 
 #### Scenario: Registering the disengage handler succeeds
 - **WHEN** `register_effect_handler("disengage", handler, surfaces=frozenset({"battlefield"}))` is
@@ -42,6 +33,22 @@ set alone is not the guarantee; the branch is.
 - **WHEN** `register_effect_handler("rite_blessing", handler, surfaces=frozenset({"church",
   "buffs"}))` is called
 - **THEN** it completes without raising `UnsnapshottedSurfaceError`
+
+#### Scenario: Church is the character ledger attribute behind the surface
+- **WHEN** the `"church"` surface entry is examined
+- **THEN** it names the character ledger attribute the holy-rite effect handlers stage against
+
+#### Scenario: Adding a surface only extends the snapshot inventory
+- **WHEN** a new surface joins `SNAPSHOTTED_SURFACES`
+- **THEN** it extends the snapshot inventory the commit point covers, and the commit mechanism itself is unchanged
+
+#### Scenario: The dispatcher grows an explicit church branch
+- **WHEN** the commit-time snapshot/restore dispatcher handles the `"church"` surface
+- **THEN** it grows its own `"church"` branch in the same shape as the `"wallet"` and `"inventory"` branches — an attribute-keyed surface with an explicit branch in `_snapshot_touched`/`_restore_touched` (`world/rules/action/transaction.py`), not an entity-aggregate key
+
+#### Scenario: The branch, not set membership, is the rollback guarantee
+- **WHEN** a staged church ledger write faces a later pending effect that fails mid-commit
+- **THEN** the write is restored byte-identically by the explicit branch — membership in the surface set alone is not the guarantee; the branch is
 
 ### Requirement: A Battlefield-shaped object is snapshotted and restored by shape, not by explicit
 declaration from the caller

@@ -25,7 +25,7 @@ The guard SHALL register a pre-execution `tool_call` handler that inspects every
 - **THEN** the guard treats the command as an Evennia test invocation and counts (or blocks it as unsupported) before anything runs
 
 ### Requirement: Recognized invocation forms
-The guard SHALL treat a command as a supported Evennia test invocation when, after splitting on top-level `&&` only, the final segment starts with `evennia test` optionally preceded by `uv run ` or `poetry run ` (zero or more flag tokens such as `--locked` allowed between `run` and `evennia`), and every earlier segment starts with `cd`. Commands in the supported grammar — `evennia test ...`, `uv run evennia test ...`, `uv run --locked evennia test ...`, `poetry run evennia test ...`, `cd foo && evennia test ...`, `cd projects && cd mygame && evennia test ...` (single line) — SHALL proceed to count-only discovery, with discovery wrapped by the same runner prefix as the original command.
+The guard SHALL treat a command as a supported Evennia test invocation when, after splitting on top-level `&&` only, the final segment starts with `evennia test` optionally preceded by `uv run ` or `poetry run ` (zero or more flag tokens such as `--locked` allowed between `run` and `evennia`), and every earlier segment starts with `cd`.
 
 #### Scenario: Wrapped runner prefixes are recognized
 - **WHEN** the command is `uv run evennia test world.tests` or `poetry run evennia test world.tests`
@@ -39,8 +39,12 @@ The guard SHALL treat a command as a supported Evennia test invocation when, aft
 - **WHEN** the command is `cd mygame && evennia test world.tests`
 - **THEN** the guard counts discovery relative to the resulting working directory and allows or blocks the original command as a whole
 
+#### Scenario: Supported grammar proceeds to discovery
+- **WHEN** the command is in the supported grammar — `evennia test ...`, `uv run evennia test ...`, `uv run --locked evennia test ...`, `poetry run evennia test ...`, `cd foo && evennia test ...`, `cd projects && cd mygame && evennia test ...` (single line)
+- **THEN** it proceeds to count-only discovery, with discovery wrapped by the same runner prefix as the original command
+
 ### Requirement: Count-only discovery without executing tests
-For a supported invocation, the guard SHALL run a count-only discovery by re-invoking the same command with `--testrunner=omp_evennia_count_runner.CountOnlyRunner` substituted for `evennia test`, executed as a direct subprocess (not through the Bash tool, so it does not re-enter the guard). The count runner SHALL call `setup_test_environment()` before `build_suite()` and `countTestCases()`, SHALL NOT create or modify databases, and SHALL NOT execute any test method. Discovery SHALL run under the same environment and working directory as the original Bash call, preserving caller-supplied environment entries and injecting the extension directory into `PYTHONPATH` so the runner module is importable.
+For a supported invocation, the guard SHALL run a count-only discovery by re-invoking the same command with `--testrunner=omp_evennia_count_runner.CountOnlyRunner` substituted for `evennia test`, executed as a direct subprocess (not through the Bash tool, so it does not re-enter the guard). The count runner SHALL call `setup_test_environment()` before `build_suite()` and `countTestCases()`, SHALL NOT create or modify databases, and SHALL NOT execute any test method.
 
 #### Scenario: Discovery sets up the Evennia test environment
 - **WHEN** count-only discovery runs against an Evennia project whose configured test runner initializes the Evennia environment during `setup_test_environment()`
@@ -53,6 +57,10 @@ For a supported invocation, the guard SHALL run a count-only discovery by re-inv
 #### Scenario: Caller environment is preserved
 - **WHEN** the original Bash call supplies environment overrides such as `MUD_TEST_SETTINGS`
 - **THEN** the discovery subprocess observes the same values
+
+#### Scenario: Discovery runs in the caller's environment
+- **WHEN** count-only discovery runs
+- **THEN** it runs under the same environment and working directory as the original Bash call, preserving caller-supplied environment entries and injecting the extension directory into `PYTHONPATH` so the runner module is importable
 
 ### Requirement: Discovery count marker protocol
 The count runner SHALL emit the discovered count as `__OMP_EVENNIA_TEST_COUNT_V1__=<n>` on its output, and the guard SHALL read the count from the last such marker in the combined output. A missing marker, or a value that is not a non-negative safe integer, SHALL be treated as a failed discovery and block the original command.
@@ -80,7 +88,7 @@ When discovery reports more than 100 tests, the guard SHALL block the original c
 - **THEN** the original command does not run and the reason contains the count (480), the maximum (100), the phrase "Run Focus Test", and narrowed-label examples
 
 ### Requirement: Fail-closed policy for unsupported shell composition
-The guard SHALL NOT attempt to reason about shell semantics beyond the supported grammar. Any Bash command that mentions `evennia test` but cannot be proven to be a single supported test invocation SHALL be blocked with a reason explaining the unsupported construct and a pointer to a standalone supported focused-test command. This includes at minimum: `;`, `|`, `<`, `>` operators; multi-line commands; background `&`; command substitution (backtick or `$(`, including inside double quotes); unterminated quotes, trailing escapes, or empty `&&` segments; `evennia test` not being the final `&&` segment (e.g. `evennia test && do-something`); non-`cd` prefix segments (e.g. `foo && evennia test`); inline environment-assignment prefixes (e.g. `MUD_TEST_SETTINGS=1 evennia test ...` — caller environment must be supplied through the Bash tool's `env` input instead); wrapping in another shell (e.g. `bash -lc 'evennia test'`); more than one `evennia test` segment; and a caller-supplied `--testrunner` flag (reserved by the guard). The reason SHALL name the specific unsupported construct rather than reporting a generic wrapper failure where the guard can distinguish one.
+The guard SHALL NOT attempt to reason about shell semantics beyond the supported grammar. Any Bash command that mentions `evennia test` but cannot be proven to be a single supported test invocation SHALL be blocked fail-closed with a reason explaining the unsupported construct and a pointer to a standalone supported focused-test command. The reason SHALL name the specific unsupported construct rather than reporting a generic wrapper failure where the guard can distinguish one.
 
 #### Scenario: Chained post-command is blocked
 - **WHEN** the command is `evennia test world.tests && do-something`
@@ -97,6 +105,30 @@ The guard SHALL NOT attempt to reason about shell semantics beyond the supported
 #### Scenario: Caller-supplied testrunner is rejected
 - **WHEN** the command includes `--testrunner=some.OtherRunner` alongside `evennia test`
 - **THEN** the guard blocks the command and states that `--testrunner` is reserved by the guard
+
+#### Scenario: Composition operators are blocked
+- **WHEN** the command uses `;`, `|`, `<`, `>` operators or a background `&`
+- **THEN** the guard blocks it as an unsupported construct
+
+#### Scenario: Multi-line commands are blocked
+- **WHEN** the command spans multiple lines
+- **THEN** the guard blocks it as an unsupported construct
+
+#### Scenario: Command substitution is blocked
+- **WHEN** the command contains command substitution (backtick or `$(`, including inside double quotes)
+- **THEN** the guard blocks it as an unsupported construct
+
+#### Scenario: Malformed quoting is blocked
+- **WHEN** the command has unterminated quotes, trailing escapes, or empty `&&` segments
+- **THEN** the guard blocks it as an unsupported construct
+
+#### Scenario: Non-cd prefix segment is blocked
+- **WHEN** the command has a non-`cd` prefix segment (e.g. `foo && evennia test`)
+- **THEN** the guard blocks it as an unsupported construct
+
+#### Scenario: Multiple test segments are blocked
+- **WHEN** the command contains more than one `evennia test` segment
+- **THEN** the guard blocks it as an unsupported construct
 
 ### Requirement: Discovery failure blocks the command
 If the discovery subprocess raises, exceeds its bounded timeout (60 s), or exits with a non-zero code, the guard SHALL block the original command and include the tail of the discovery output in the reason, instructing the caller to fix the discovery error and Run Focus Test with a narrower target. The original test command SHALL never run when its count could not be established.

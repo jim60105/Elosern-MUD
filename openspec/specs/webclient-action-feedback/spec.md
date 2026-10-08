@@ -15,11 +15,7 @@ The WebClient store SHALL maintain a client-local toast queue as the sole writer
 each entry carries a monotonically increasing id, a title, an optional subtitle, and a tone of
 `info` or `crit`; the queue holds at most four entries and appending a fifth evicts the oldest
 immediately (FIFO); every entry disappears automatically after roughly five seconds unless
-dismissed earlier, and clicking an entry dismisses it. The queue SHALL NOT be persisted anywhere,
-SHALL NOT enter the narrative feed, and its entries SHALL present only client-composed text or a
-verbatim server-authored action message — never data invented for a surface that has no backing
-read model. The rendered queue SHALL anchor above every overlay so a toast stays visible while the
-creation overlay is mounted, and its surface SHALL use the `feedback-` test-id prefix family.
+dismissed earlier, and clicking an entry dismisses it.
 
 #### Scenario: The queue bounds at four entries FIFO
 - **WHEN** a fifth toast is pushed onto a full queue
@@ -38,15 +34,26 @@ creation overlay is mounted, and its surface SHALL use the `feedback-` test-id p
 - **THEN** no storage write occurs, the narrative feed gains no line from the toast path, and a
   reload shows an empty queue
 
+#### Scenario: Toast entries carry only backed text
+- **WHEN** a toast entry is rendered
+- **THEN** it presents only client-composed text or a verbatim server-authored action message —
+  never data invented for a surface that has no backing read model
+
+#### Scenario: The queue anchors above every overlay
+- **WHEN** toasts render while any overlay is mounted
+- **THEN** the rendered queue anchors above every overlay so a toast stays visible while the
+  creation overlay is mounted
+
+#### Scenario: The toast surface uses the feedback test-id family
+- **WHEN** the toast surface is rendered
+- **THEN** it uses the `feedback-` test-id prefix family
+
 ### Requirement: The concept apply surfaces exactly one confirmation or one failure toast
 When the client applies the proposal delivered by a recognized matching successful
 `creation.concept` result, it SHALL surface exactly one info-toned toast confirming the apply;
 when it recognizes a matching non-success `creation.concept` result, it SHALL surface exactly one
 crit-toned toast whose title is the envelope's server-authored message verbatim (or the single
-stable fallback line when none is carried). Each tone SHALL have exactly one writer, and a
-recognized completion SHALL never yield two toasts of either tone for the same success or the
-same failure. Toasts SHALL be additive: the existing narrative single-line channel outside the
-creation overlay and the overlay's own result region keep their current behaviour unchanged.
+stable fallback line when none is carried).
 
 #### Scenario: A successful concept apply confirms once
 - **WHEN** a dispatched `creation.concept` settles with the applied success code and its
@@ -63,3 +70,13 @@ creation overlay and the overlay's own result region keep their current behaviou
 #### Scenario: A message-less failure still announces
 - **WHEN** a matching `creation.concept` failure carries no usable message
 - **THEN** the crit toast shows the single stable fallback line instead of nothing
+
+#### Scenario: Each tone has exactly one writer
+- **WHEN** a `creation.concept` completion is recognized
+- **THEN** each tone has exactly one writer, and the completion SHALL never yield two toasts of
+  either tone for the same success or the same failure
+
+#### Scenario: Toasts are additive to existing channels
+- **WHEN** concept-apply toasts are surfaced
+- **THEN** the existing narrative single-line channel outside the creation overlay and the
+  overlay's own result region keep their current behaviour unchanged

@@ -6,25 +6,7 @@ The host-independent quest-log read model — one exact read-only version-1 pane
 ## Requirements
 ### Requirement: The quest log panel is an exact read-only version-1 presentation panel
 
-The presentation registry SHALL register a `quest_log` panel at schema version 1. Its available form
-SHALL contain exactly `schema_version`, `available`, and `rows`, where `rows` is the holder's stored
-quest records in quest-log order, at most the shared `MAX_QUEST_ROWS` bound of twelve, and the
-registered common unavailable form SHALL keep the shared field set, reason, and semantics.
-When the holder stores more records than the cap, the panel SHALL carry the first `MAX_QUEST_ROWS`
-records in stored quest-log order.
-
-Each row SHALL contain exactly `quest_id`, `definition_key`, `display_name`, `state`, `stage_index`,
-`stage_total`, `stage_progress`, `objective_quantity`, `objective_line`, `deadline_line`, `detail`,
-`tracked`, `issuer`, `settlement`, `reward_line`, and `track`. `state` SHALL be one of the bounded
-stored states `in_progress`, `completed`, `failed`. `issuer` SHALL contain exactly `kind` (`guild` or
-`npc`), `key` (the record's stored issuer key, a grammar-valid issuer key whose namespace matches
-`kind`), and `label` (the bounded display name of the commissioner). `settlement` SHALL be the
-resolved issuance's settlement (`counter` or `auto`), or `null` when that issuance cannot be
-resolved. `deadline_line` and `reward_line` SHALL be nullable.
-`track` SHALL be the `guild.quest_track` action descriptor, always enabled.
-
-The presenter SHALL be read-only: it SHALL NOT mutate the quest log, tracking state, inventory,
-wallet, traits, or world state, and SHALL emit no live object or filesystem reference.
+The presentation registry SHALL register a `quest_log` panel at schema version 1. Its available form SHALL contain exactly `schema_version`, `available`, and `rows`, where `rows` is the holder's stored quest records in quest-log order, at most the shared `MAX_QUEST_ROWS` bound of twelve. The presenter SHALL be read-only: it SHALL NOT mutate the quest log, tracking state, inventory, wallet, traits, or world state, and SHALL emit no live object or filesystem reference.
 
 #### Scenario: A two-quest log serializes exactly the bounded rows
 - **WHEN** a puppeted holder with two stored records receives a full snapshot
@@ -38,6 +20,34 @@ wallet, traits, or world state, and SHALL emit no live object or filesystem refe
 #### Scenario: An empty log is available, not unavailable
 - **WHEN** a holder with no stored records receives a snapshot
 - **THEN** the panel is available with `rows: []`
+
+#### Scenario: The common unavailable form is the shared one
+- **WHEN** the registered common unavailable form for this panel is inspected
+- **THEN** it keeps the shared field set, reason, and semantics
+
+#### Scenario: An over-cap log carries the first twelve records
+- **WHEN** the holder stores more records than the cap
+- **THEN** the panel carries the first `MAX_QUEST_ROWS` records in stored quest-log order
+
+#### Scenario: The exact row field set
+- **WHEN** any row is serialized
+- **THEN** it contains exactly `quest_id`, `definition_key`, `display_name`, `state`, `stage_index`, `stage_total`, `stage_progress`, `objective_quantity`, `objective_line`, `deadline_line`, `detail`, `tracked`, `issuer`, `settlement`, `reward_line`, and `track`
+
+#### Scenario: State is bounded to the stored states
+- **WHEN** a row's `state` is serialized
+- **THEN** it is one of the bounded stored states `in_progress`, `completed`, `failed`
+
+#### Scenario: The issuer sub-object's exact shape
+- **WHEN** a row's `issuer` is serialized
+- **THEN** it contains exactly `kind` (`guild` or `npc`), `key` (the record's stored issuer key, a grammar-valid issuer key whose namespace matches `kind`), and `label` (the bounded display name of the commissioner)
+
+#### Scenario: Settlement reflects the resolved issuance
+- **WHEN** a row's `settlement` is serialized
+- **THEN** it is the resolved issuance's settlement (`counter` or `auto`), or `null` when that issuance cannot be resolved
+
+#### Scenario: Nullable lines and the always-enabled track descriptor
+- **WHEN** a row's `deadline_line`, `reward_line`, and `track` are serialized
+- **THEN** `deadline_line` and `reward_line` are nullable, and `track` is the `guild.quest_track` action descriptor, always enabled
 
 ### Requirement: The quest log panel is host-independent
 
@@ -56,12 +66,7 @@ read, so the player's own quest book is readable anywhere the player stands.
 
 ### Requirement: Row prose comes only from the canonical describe seams
 
-`objective_line` SHALL be `describe_objective` for the record's current stage objective,
-`deadline_line` SHALL be `describe_deadline` for the record's deadline against the current world
-tick, `detail` SHALL be `describe_quest_detail`, and `reward_line` SHALL be `describe_reward` for the
-resolved issuance. The presenter SHALL NOT compose, reword, truncate mid-sentence, or invent any of
-these lines, so the quest book, the objective tracker, and the guild counter render byte-identical
-prose for the same record.
+`objective_line` SHALL be `describe_objective` for the record's current stage objective, `deadline_line` SHALL be `describe_deadline` for the record's deadline against the current world tick, `detail` SHALL be `describe_quest_detail`, and `reward_line` SHALL be `describe_reward` for the resolved issuance.
 
 #### Scenario: The quest book and the tracker agree
 - **WHEN** the same tracked in-progress record is rendered into `quest_log` and into `objectives`
@@ -71,6 +76,14 @@ prose for the same record.
 - **WHEN** the same record is rendered into `quest_log` and into the `services` guild quest rows
   while a clerk is present
 - **THEN** the objective summary, the deadline line, and the detail are byte-identical in both
+
+#### Scenario: The presenter never composes or alters prose
+- **WHEN** any of these lines is rendered
+- **THEN** the presenter does not compose, reword, truncate mid-sentence, or invent any of them
+
+#### Scenario: All three surfaces render identical prose
+- **WHEN** the same record is rendered by the quest book, the objective tracker, and the guild counter
+- **THEN** all three render byte-identical prose for that record
 
 ### Requirement: An unresolvable issuance yields no reward line rather than a fabricated one
 

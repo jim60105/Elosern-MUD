@@ -7,19 +7,11 @@ Define deterministic, finite-stock merchant trading and clock-driven restocking.
 ## Requirements
 
 ### Requirement: Item and shop identities are immutable while numeric trade rules are YAML and lore-constrained
-`ITEM_REGISTRY` SHALL contain frozen item definitions with stable key, Traditional Chinese display name,
-price-table key, sellability, and complete immutable item presentation metadata. Presentation metadata
-SHALL contain only the closed kind, local-SVG icon key, rarity, and bounded Traditional Chinese summary
-defined by `item-presentation-metadata`; it SHALL NOT carry numeric trade or gameplay rules.
-`SHOP_REGISTRY` SHALL contain frozen definitions with stable identity and the immutable assortment keys
-the shop references; its offered item keys SHALL be derived from those assortments rather than listed on
-the shop. A shop SHALL NOT carry a component-type field: every shop host bears the same component type,
-so such a field is constant across the registry and cannot identify a row.
-Exact integer buy/sell copper, max/initial stock, restock quantity, and opening/restock hours SHALL come
-from the `world/rules/rulebook/commerce/` slices (one file per settlement plus `scales.yaml`). Loading SHALL join both sources and reject
-unknown, missing, or extra references, floats, negative prices, sell above buy, buy outside the referenced
-`PRICE_TABLE` range, and stock outside `0 <= initial <= max` with positive restock quantity. The
-per-shop accounting that every shop has numeric rules SHALL be keyed on shop identity.
+`ITEM_REGISTRY` SHALL contain frozen item definitions with stable identity and complete immutable
+item presentation metadata. `SHOP_REGISTRY` SHALL contain frozen definitions with stable identity
+and the immutable assortment keys the shop references. Exact integer buy/sell copper, max/initial
+stock, restock quantity, and opening/restock hours SHALL come from the
+`world/rules/rulebook/commerce/` slices (one file per settlement plus `scales.yaml`).
 
 #### Scenario: Initial ordinary goods validate
 - **WHEN** the meal, potion, and plain-sword offers are loaded
@@ -34,6 +26,37 @@ per-shop accounting that every shop has numeric rules SHALL be keyed on shop ide
 - **WHEN** a shop references two assortments
 - **THEN** its offered item keys are exactly the union of those assortments' item keys, and adding an
   item to one assortment adds it to that shop without editing the shop
+
+#### Scenario: Item definitions carry the stable identity fields
+- **WHEN** an `ITEM_REGISTRY` definition is inspected
+- **THEN** it carries a stable key, Traditional Chinese display name, price-table key, sellability,
+  and complete immutable item presentation metadata
+
+#### Scenario: Presentation metadata stays within the closed field set
+- **WHEN** item presentation metadata is validated
+- **THEN** it contains only the closed kind, local-SVG icon key, rarity, and bounded Traditional
+  Chinese summary defined by `item-presentation-metadata`, and it SHALL NOT carry numeric trade or
+  gameplay rules
+
+#### Scenario: Offered keys are derived, not listed on the shop
+- **WHEN** a shop definition is inspected
+- **THEN** its offered item keys are derived from its referenced assortments rather than listed on
+  the shop
+
+#### Scenario: Shops carry no component-type field
+- **WHEN** any shop definition is inspected
+- **THEN** it has no component-type field — every shop host bears the same component type, so such
+  a field is constant across the registry and cannot identify a row
+
+#### Scenario: Loading joins both sources and rejects malformed references
+- **WHEN** loading joins the registries with the commerce rulebook slices
+- **THEN** it rejects unknown, missing, or extra references, floats, negative prices, sell above
+  buy, buy outside the referenced `PRICE_TABLE` range, and stock outside
+  `0 <= initial <= max` with positive restock quantity
+
+#### Scenario: Per-shop accounting keys on shop identity
+- **WHEN** the accounting that every shop has numeric rules is maintained
+- **THEN** it is keyed on shop identity
 
 ### Requirement: Merchant stock is finite persistent repeated-item quantity state
 Each Merchant host SHALL persist stock by item key and a last-restock day. Startup SHALL initialize only
@@ -50,15 +73,8 @@ reject malformed or unknown stock keys instead of resetting them.
 
 ### Requirement: Buying and selling commit wallet, inventory, acquisition progress, and stock atomically
 `buy()` and `sell()` SHALL require positive integer quantity, local open Merchant, known offered item,
-and sufficient complete funds/stock/inventory. Buying SHALL subtract exact copper, add repeated item keys,
-and decrement stock. Selling SHALL remove the quantity, add exact copper, and increment stock without
-exceeding max. Buying SHALL stage ACQUIRE progress; selling SHALL not reverse it. A successful buy or
-sell SHALL additionally grant +1 affinity (`trade` source) with the local Merchant host through the
-sole-writer affinity API (`world/rules/affinity.py`) within the same transaction. Every surface —
-wallet, inventory, quest log, merchant stock, the host's `relations_data` affinity attribute, and
-the actor's traits — SHALL commit in one transaction with cache restoration: the trade snapshot
-SHALL include the host's affinity record and a failed trade SHALL restore it alongside the other
-surfaces.
+and sufficient complete funds/stock/inventory, committing every trade surface in one transaction
+with cache restoration.
 
 #### Scenario: Successful purchase uses integer copper
 - **WHEN** a player with 100 copper buys two 20-copper items from stock 3
@@ -78,6 +94,29 @@ surfaces.
 #### Scenario: Fault injection restores every trade surface
 - **WHEN** any wallet, inventory, quest-log, stock, or affinity write raises during trade
 - **THEN** database and in-process values for all five surfaces equal their pre-trade values
+
+#### Scenario: Buying moves copper, keys, and stock
+- **WHEN** a buy succeeds
+- **THEN** it subtracts exact copper, adds repeated item keys, and decrements stock
+
+#### Scenario: Selling moves quantity, copper, and stock
+- **WHEN** a sell succeeds
+- **THEN** it removes the quantity, adds exact copper, and increments stock without exceeding max
+
+#### Scenario: Buying stages ACQUIRE progress irreversibly
+- **WHEN** a buy and later a sell occur
+- **THEN** buying stages ACQUIRE progress and selling does not reverse it
+
+#### Scenario: Successful trades grant merchant affinity
+- **WHEN** a buy or sell succeeds
+- **THEN** it additionally grants +1 affinity (`trade` source) with the local Merchant host through
+  the sole-writer affinity API (`world/rules/affinity.py`) within the same transaction
+
+#### Scenario: The transaction covers every surface including affinity
+- **WHEN** a trade commits or fails
+- **THEN** every surface — wallet, inventory, quest log, merchant stock, the host's `relations_data`
+  affinity attribute, and the actor's traits — commits in one transaction; the trade snapshot
+  includes the host's affinity record and a failed trade restores it alongside the other surfaces
 
 ### Requirement: Opening status is clock-derived and emits ordered boundary events
 Shop opening SHALL be computed from WorldClock calendar and support same-day and overnight intervals.
@@ -114,13 +153,10 @@ unchanged and continue valid hosts.
 ### Requirement: Player-facing shop commands use only a local unambiguous merchant
 The character cmdset SHALL expose stock listing, buy, and sell commands with Traditional Chinese
 output. The stock listing SHALL identify the shop by its authored place name rather than a
-generic word, so two shops in one settlement are distinguishable by their listing alone.
+generic word.
 Commands SHALL resolve one Merchant host in the caller's current room and SHALL not permit
 remote dbref interaction. Host acceptance SHALL flow through
-`world/rules/service_gate.py::service_available`: `remote` keeps the existing remote-interaction
-rejection lineage, and an `off_anchor` or `malformed_binding` verdict SHALL refuse the trade with
-the gate's fixed registry message; every refusal writes no transaction, and a co-located,
-at-anchor (or `person`-bound) merchant behaves exactly as before the gate existed.
+`world/rules/service_gate.py::service_available`, and every refusal writes no transaction.
 
 #### Scenario: Altoria merchant is usable through commands
 - **WHEN** the player enters the general store during opening hours
@@ -139,6 +175,19 @@ at-anchor (or `person`-bound) merchant behaves exactly as before the gate existe
 #### Scenario: A remote merchant keeps its existing rejection lineage
 - **WHEN** the player attempts shop interaction with a merchant in another room
 - **THEN** the refusal matches the pre-change remote-merchant behavior
+
+#### Scenario: Gate verdicts map to fixed refusals
+- **WHEN** the service gate returns a verdict on a candidate merchant host
+- **THEN** `remote` keeps the existing remote-interaction rejection lineage, and an `off_anchor` or
+  `malformed_binding` verdict refuses the trade with the gate's fixed registry message
+
+#### Scenario: An at-anchor merchant behaves exactly as before
+- **WHEN** a co-located, at-anchor (or `person`-bound) merchant is used
+- **THEN** it behaves exactly as before the gate existed
+
+#### Scenario: Place-named listings distinguish same-settlement shops
+- **WHEN** two shops operate in one settlement
+- **THEN** they are distinguishable by their listing alone
 
 ### Requirement: Shop economy stays consistent with the canonical inventory
 Buy and sell SHALL keep operating on `db.inventory` as the canonical record, and their preflight checks

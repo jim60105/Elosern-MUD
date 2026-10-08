@@ -7,13 +7,9 @@ Defines resolve_overwhelm, which resolves overwhelm-classified encounters exclus
 never a separate combat algorithm
 `world/rules/overwhelm.py` SHALL provide `resolve_overwhelm(battlefield, action_provider, max_rounds,
 commanded_actor=None, commanded_skill=None) -> OverwhelmResult`. Every state mutation this function
-causes SHALL occur exclusively through calls to
-change 9's `combat.run_round(battlefield, action_provider)`, unmodified. This function SHALL NOT call
-`roll_d100()`, construct a `PendingEffect`, or perform any damage/to-hit computation of its own. The
-optional `commanded_actor` and `commanded_skill` keyword arguments SHALL be forwarded to
-`compress_event_logs()` together with the encounter's round-1 log slice, and SHALL influence only
-the compressed log record (the commanded-action marker), never combat math, round count, verdicts,
-or any entity state; callers that omit them receive identical resolution with no marker.
+causes SHALL occur exclusively through calls to change 9's
+`combat.run_round(battlefield, action_provider)`, unmodified. This function SHALL NOT call
+`roll_d100()`, construct a `PendingEffect`, or perform any damage/to-hit computation of its own.
 
 #### Scenario: resolve_overwhelm performs no combat math outside of run_round
 - **WHEN** `world/rules/overwhelm.py`'s source is inspected
@@ -40,14 +36,19 @@ or any entity state; callers that omit them receive identical resolution with no
   final hp are identical between the two calls; the only difference in `event_logs` is the
   commanded-action marker entry
 
+#### Scenario: The commanded keywords ride only the log compression
+- **WHEN** the optional `commanded_actor` and `commanded_skill` keyword arguments are supplied
+- **THEN** they are forwarded to `compress_event_logs()` together with the encounter's round-1 log
+  slice, and influence only the compressed log record (the commanded-action marker), never combat
+  math, round count, verdicts, or any entity state; callers that omit them receive identical
+  resolution with no marker
+
 ### Requirement: Single-shot resolution is exactly consistent with per-round resolution under the same
 seed and starting state
 Given a fixed random seed and an identical starting `Battlefield`, the sequence of entity-state
 mutations (hp, buffs, sexual state) produced by `resolve_overwhelm()` SHALL be identical to the
 sequence produced by calling `combat.run_round()` the same number of times, in a loop external to this
-change, under the same seed and starting state. This SHALL be demonstrated for the player-overwhelming
-direction. The foe-overwhelming (reverse) direction is not a dispatchable outcome: the session facade
-never invokes `resolve_overwhelm()` for it, so no reverse-equivalence contract exists.
+change, under the same seed and starting state.
 
 #### Scenario: Final hp values are identical between the two resolution paths
 - **WHEN** an overwhelm-classified `Battlefield` is resolved once via `resolve_overwhelm()` under a
@@ -65,6 +66,12 @@ never invokes `resolve_overwhelm()` for it, so no reverse-equivalence contract e
 - **WHEN** the same two resolution paths are compared to completion (encounter ends in both)
 - **THEN** `rounds_elapsed` is identical between the two paths, and the same team is left with living,
   non-fled members in both
+
+#### Scenario: Equivalence is demonstrated for the player-overwhelming direction only
+- **WHEN** this consistency contract is exercised
+- **THEN** it is demonstrated for the player-overwhelming direction; the foe-overwhelming (reverse)
+  direction is not a dispatchable outcome — the session facade never invokes `resolve_overwhelm()`
+  for it, so no reverse-equivalence contract exists
 
 ### Requirement: resolve_overwhelm stops the moment classify_overwhelm's verdict changes
 `resolve_overwhelm()` SHALL call `classify_overwhelm(battlefield)` before running each round via
@@ -90,9 +97,7 @@ from the verdict computed when `resolve_overwhelm()` was first called, reporting
 `resolve_overwhelm(battlefield, action_provider, max_rounds)` SHALL stop calling `combat.run_round()`
 once `rounds_elapsed` reaches `max_rounds`, regardless of whether `classify_overwhelm()` still returns
 the original verdict, and SHALL report the resulting `OverwhelmResult` with `battle_over` reflecting
-`combat.is_battle_over()`'s true value at that point (not assumed `True`) and `total_seconds` equal to
-the honest `rounds_elapsed * 6` for however many rounds actually ran — never a flat, fixed charge
-regardless of `rounds_elapsed`.
+`combat.is_battle_over()`'s true value at that point (not assumed `True`).
 
 #### Scenario: Hitting max_rounds stops the loop and reports the true, unfinished state honestly
 - **WHEN** a fixture is constructed where `classify_overwhelm()` continues returning the same verdict
@@ -106,6 +111,11 @@ regardless of `rounds_elapsed`.
   `max_rounds` — for any of the golden fixtures this change defines
 - **THEN** `OverwhelmResult.total_seconds` equals `rounds_elapsed * 6` in every case, and no code path in
   `resolve_overwhelm()` reports a fixed number regardless of `rounds_elapsed`
+
+#### Scenario: The capped report charges only the rounds actually run
+- **WHEN** `resolve_overwhelm()` stops at the `max_rounds` cap
+- **THEN** `total_seconds` equals the honest `rounds_elapsed * 6` for however many rounds actually
+  ran — never a flat, fixed charge regardless of `rounds_elapsed`
 
 ### Requirement: Reported time cost uses the identical rounds-times-six-seconds formula, unedited
 `OverwhelmResult.total_seconds` SHALL equal `rounds_elapsed * 6`, the identical formula
@@ -138,9 +148,8 @@ one round" language holds for this project's real calibrated stat bands.
 `resolve_overwhelm()`. It SHALL invoke the resolver only when both conditions hold: the player's team
 is the overwhelming side per `classify_overwhelm()`, **and**
 `overwhelm.commanded_damage_reaches_enemy()` reports that the submitted skill damages a member of
-the opposing team. A foe-overwhelming verdict, a contested verdict, a non-damaging skill, and a
-damaging skill aimed away from the opposing team SHALL each leave the resolver uncalled. No
-submission made inside an already-active session SHALL reach the resolver by any path.
+the opposing team. No submission made inside an already-active session SHALL reach the resolver by
+any path.
 
 #### Scenario: Foe-overwhelming encounters never reach the resolver in production
 - **WHEN** every production call site of `resolve_overwhelm()` is inspected
@@ -157,14 +166,17 @@ submission made inside an already-active session SHALL reach the resolver by any
   `classify_overwhelm()` decides for the player's team
 - **THEN** neither reaches `resolve_overwhelm()`, and each resolves exactly one ordinary round
 
+#### Scenario: Each unmet condition leaves the resolver uncalled
+- **WHEN** the encounter has a foe-overwhelming verdict, a contested verdict, a non-damaging skill,
+  or a damaging skill aimed away from the opposing team
+- **THEN** each of these leaves `resolve_overwhelm()` uncalled
+
 ### Requirement: resolve_overwhelm accepts a first-actor override that applies to round one only
 `world/rules/overwhelm.py`'s `resolve_overwhelm()` SHALL accept a keyword-only
 `first_actor: str | None = None` and SHALL forward it to `combat.run_round()` for the first round it
 runs only — the same `rounds == 0` slice `_resolve_overwhelm_raw()` already uses to capture the
 commanded-action marker window. Every subsequent round SHALL be run with `first_actor=None`, so
-ordinary initiative governs the rest of the compressed encounter. When `first_actor` is `None`,
-`resolve_overwhelm()` SHALL forward nothing new, preserving the existing discipline that a
-default-mode caller's call into `run_round()` is byte-identical to the pre-change signature.
+ordinary initiative governs the rest of the compressed encounter.
 
 #### Scenario: The override reaches round one and no later round
 - **WHEN** `resolve_overwhelm()` runs three rounds with `first_actor=key`
@@ -176,6 +188,11 @@ default-mode caller's call into `run_round()` is byte-identical to the pre-chang
   flag at its default
 - **THEN** its call into `combat.run_round()` passes exactly the arguments it passed before this
   parameter existed
+
+#### Scenario: A None override forwards nothing new
+- **WHEN** `first_actor` is `None`
+- **THEN** `resolve_overwhelm()` forwards nothing new, preserving the existing discipline that a
+  default-mode caller's call into `run_round()` is byte-identical to the pre-change signature
 
 ### Requirement: The first-actor override influences turn order alone, never resolution outputs
 `resolve_overwhelm(first_actor=...)` SHALL NOT change any damage or to-hit computation, the

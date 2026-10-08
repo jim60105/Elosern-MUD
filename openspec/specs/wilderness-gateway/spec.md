@@ -10,33 +10,11 @@ provisioning wired into server startup.
 ## Requirements
 
 ### Requirement: WILDERNESS_ENTRY_REGISTRY links a grid-placed anchor to an authored wilderness footprint and gates
-`world/lore/wilderness_entry.py` SHALL define frozen `WildernessGate` (`return_direction: str`,
-`grid_xy: tuple[int, int]`, `z_map_key: str`) and `WildernessEntryPoint` (`anchor_key: str`,
-`shape: tuple[str, ...]`, `origin_xy: tuple[int, int]`, `gates: tuple[WildernessGate, ...]`)
-dataclasses and a module-level `WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`.
-`shape` is an ASCII mask of `#` (anchor footprint cell) and `.` (outside), placed so that
-`shape[0][0]` corresponds to wilderness cell `origin_xy`. An entry with exactly one `#` cell is a
-point-shape anchor: it owns no footprint cells and every direction at its anchor cell is a
-gateway to its single registered gate. An entry with more than one `#` cell owns every mask cell
-as a footprint cell, and each of its gates is reachable only at that gate's exterior approach
-cell, where `return_direction` names the direction a wilderness-side traveler takes to enter the
-anchor. The registry SHALL expose derived pure helpers — `footprint_cells` (origin + mask
-offsets, empty for point-shape), `anchor_cell` (integer-rounded centroid of the `#` cells), and
-`approach_cell(gate)` (the anchor cell for point-shape entries; otherwise the first cell walking
-from `anchor_cell` along the face opposite `return_direction` that lies outside the footprint) —
-as the single geometry source for all consumers. Every entry's `anchor_key` SHALL exist as a key
-in change 12's `ANCHOR_PLACEMENT_REGISTRY`. The registry SHALL NOT be required to contain an
-entry for every `ANCHOR_PLACEMENT_REGISTRY` key. It SHALL hold one entry per settlement
-reachable across the wilderness, and currently holds two. The first is keyed
-`"capital_altoria"`: a 5×5 all-`#` mask at origin `(58, 98)` (anchor cell `(60, 100)`) with
-gates `return_direction="n"` → `(3, 0, "capital_altoria")` (approach cell `(60, 97)`) and
-`return_direction="w"` → `(6, 3, "capital_altoria")` (approach cell `(63, 100)`). The second is
-keyed `"village_ciaran"`: a smaller mask placed well clear of the capital's footprint, with a
-single gate returning to the village's entrance node.
-`anchor_cell` SHALL be the bounding-box midpoint `((min_x + max_x) // 2, (min_y + max_y) // 2)`
-of the `#` cells under Python floor division, and no two gates in the whole registry SHALL share
-the same `(approach_cell, return_direction)` pair. No entry's footprint SHALL overlap another
-entry's footprint.
+`world/lore/wilderness_entry.py` SHALL define the frozen `WildernessGate` and
+`WildernessEntryPoint` dataclasses and a module-level
+`WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint]`, and SHALL expose the derived
+pure helpers `footprint_cells`, `anchor_cell`, and `approach_cell(gate)` as the single geometry
+source for all consumers.
 
 #### Scenario: The registry has exactly one v2 entry after this change
 <!-- Scenario name retained verbatim: a MODIFIED block may not drop or rename an existing
@@ -82,31 +60,67 @@ entry's footprint.
 - **WHEN** the footprint cells of every registry entry are collected
 - **THEN** no cell belongs to two entries
 
+#### Scenario: Gate and entry dataclass fields
+- **WHEN** the dataclasses are defined
+- **THEN** `WildernessGate` is frozen with `return_direction: str`, `grid_xy: tuple[int, int]`,
+  `z_map_key: str`, and `WildernessEntryPoint` is frozen with `anchor_key: str`,
+  `shape: tuple[str, ...]`, `origin_xy: tuple[int, int]`, `gates: tuple[WildernessGate, ...]`
+
+#### Scenario: Shape mask placement convention
+- **WHEN** an entry's `shape` is authored
+- **THEN** it is an ASCII mask of `#` (anchor footprint cell) and `.` (outside), placed so that
+  `shape[0][0]` corresponds to wilderness cell `origin_xy`
+
+#### Scenario: Point-shape anchor opens every direction to its gate
+- **WHEN** an entry has exactly one `#` cell
+- **THEN** it is a point-shape anchor that owns no footprint cells and every direction at its
+  anchor cell is a gateway to its single registered gate
+
+#### Scenario: Footprint-anchor gates are reachable only at their approach cells
+- **WHEN** an entry has more than one `#` cell
+- **THEN** it owns every mask cell as a footprint cell, and each of its gates is reachable only
+  at that gate's exterior approach cell, where `return_direction` names the direction a
+  wilderness-side traveler takes to enter the anchor
+
+#### Scenario: Derived helper definitions
+- **WHEN** the derived pure helpers are evaluated
+- **THEN** `footprint_cells` is origin + mask offsets (empty for point-shape), `anchor_cell` is
+  the integer-rounded centroid of the `#` cells, and `approach_cell(gate)` is the anchor cell
+  for point-shape entries; otherwise the first cell walking from `anchor_cell` along the face
+  opposite `return_direction` that lies outside the footprint
+
+#### Scenario: Anchor coverage is required but not exhaustive
+- **WHEN** the registry's `anchor_key` coverage is checked
+- **THEN** every entry's `anchor_key` exists as a key in change 12's
+  `ANCHOR_PLACEMENT_REGISTRY`, the registry SHALL NOT be required to contain an entry for
+  every `ANCHOR_PLACEMENT_REGISTRY` key, and it SHALL hold one entry per settlement reachable
+  across the wilderness
+
+#### Scenario: Currently shipped registry contents
+- **WHEN** the registry's current authored contents are inspected
+- **THEN** it holds two entries: `"capital_altoria"`, a 5×5 all-`#` mask at origin `(58, 98)`
+  (anchor cell `(60, 100)`) with gates `return_direction="n"` → `(3, 0, "capital_altoria")`
+  (approach cell `(60, 97)`) and `return_direction="w"` → `(6, 3, "capital_altoria")`
+  (approach cell `(63, 100)`); and `"village_ciaran"`, a smaller mask placed well clear of the
+  capital's footprint, with a single gate returning to the village's entrance node
+
+#### Scenario: Anchor cell uses bounding-box midpoint floor division
+- **WHEN** `anchor_cell` is computed
+- **THEN** it is the bounding-box midpoint `((min_x + max_x) // 2, (min_y + max_y) // 2)` of the
+  `#` cells under Python floor division
+
+#### Scenario: Gate geometry pairs are unique registry-wide
+- **WHEN** all gates' `(approach_cell, return_direction)` pairs are collected
+- **THEN** no two gates in the whole registry share the same pair, and no entry's footprint
+  overlaps another entry's footprint
+
 ### Requirement: WildernessGateExit moves a traversing object from a grid room into the wilderness
 `typeclasses.exits.py::WildernessGateExit`, an ordinary `Exit`, SHALL fully override `at_traverse`
 to call `evennia.contrib.grid.wilderness.wilderness.enter_wilderness(traversing_object,
 coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
 name=WILDERNESS_NAME)` instead of moving to a fixed `destination`, where `<its anchor_key>` is
 read from `self.db.anchor_key` and `<its gate>` is the registered gate whose `return_direction`
-equals `self.db.gate_direction` — both attributes this change's `sync_wilderness()` (the
-`wilderness-gateway` capability's own provisioning requirement below) SHALL set at creation time.
-For a footprint anchor the arrival cell is the exterior approach cell (never a footprint cell);
-for a point-shape anchor `approach_cell` is the anchor cell itself, so the same formula lands
-the traveler on the entry cell. Before attempting to move, it SHALL call the traversing object's
-`at_pre_move(None)` hook and abort with no state change if it returns falsy, matching the veto
-convention every other exit in the game (including the stock `WildernessExit`) honors. On a
-successful traversal, it SHALL send departure/arrival room announcements, call
-`at_post_move(None)` on the traversing object, and complete through the shared
-movement-completion helper `typeclasses.exits.after_successful_movement(traversing_object,
-source_location, cost_key="wilderness_move",
-wilderness_coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
-wilderness_name=WILDERNESS_NAME)` — the shared movement boundary —
-which SHALL call `world.rules.movement.charge_movement(traversing_object, cost_key)` (the
-`movement-cost-charging` capability) and `world.rules.map_knowledge.record_arrival(traversing_object)`
-(the `map-knowledge` capability), rather than calling
-`world.rules.clock.get_world_clock().advance()` directly. The observable cost, success-only
-condition, and `AdvanceSource.COMMAND` source are unchanged; only the call sites are now the
-shared functions every movement lineage uses. The arrival recording SHALL NOT alter the charge.
+equals `self.db.gate_direction`.
 
 #### Scenario: Traversing a gate exit places the object at that gate's approach cell
 - **WHEN** a character traverses a `WildernessGateExit` configured for
@@ -145,22 +159,50 @@ shared functions every movement lineage uses. The arrival recording SHALL NOT al
   `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the exit nor the
   helper calls `world.rules.clock.get_world_clock().advance()` directly
 
+#### Scenario: Gate attributes are provisioned at creation
+- **WHEN** gate exits are created
+- **THEN** `self.db.anchor_key` and `self.db.gate_direction` are both attributes this change's
+  `sync_wilderness()` (the `wilderness-gateway` capability's own provisioning requirement
+  below) SHALL set at creation time
+
+#### Scenario: Arrival cell formula per anchor kind
+- **WHEN** the arrival cell is computed for a traversal
+- **THEN** for a footprint anchor it is the exterior approach cell (never a footprint cell), and
+  for a point-shape anchor `approach_cell` is the anchor cell itself, so the same formula lands
+  the traveler on the entry cell
+
+#### Scenario: Pre-move veto honors the game-wide convention
+- **WHEN** a traversal is attempted
+- **THEN** the exit calls the traversing object's `at_pre_move(None)` hook before attempting to
+  move and aborts with no state change if it returns falsy, matching the veto convention every
+  other exit in the game (including the stock `WildernessExit`) honors
+
+#### Scenario: Successful traversal completes through the shared helper
+- **WHEN** a traversal succeeds
+- **THEN** the exit sends departure/arrival room announcements, calls `at_post_move(None)` on
+  the traversing object, and completes through the shared movement-completion helper
+  `typeclasses.exits.after_successful_movement(traversing_object, source_location,
+  cost_key="wilderness_move",
+  wilderness_coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
+  wilderness_name=WILDERNESS_NAME)`
+
+#### Scenario: Shared completion preserves the observable charge
+- **WHEN** `after_successful_movement` completes the traversal
+- **THEN** it — not the exit — calls `world.rules.movement.charge_movement(traversing_object,
+  cost_key)` (the `movement-cost-charging` capability) and
+  `world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge`
+  capability), rather than calling `world.rules.clock.get_world_clock().advance()` directly
+- **AND** the observable cost, success-only condition, and `AdvanceSource.COMMAND` source are
+  unchanged; only the call sites are now the shared functions every movement lineage uses
+- **AND** the arrival recording SHALL NOT alter the charge
+
 ### Requirement: WildernessReturnExit routes every registered approach-cell-and-direction pair back to the grid
-`typeclasses.exits.py::WildernessReturnExit`, subclassing
+`typeclasses.exits.py::WildernessReturnExit`, subclassing the stock
 `evennia.contrib.grid.wilderness.wilderness.WildernessExit`, SHALL be
-`ElosernWildernessMapProvider.exit_typeclass`. It SHALL recognize a gateway step through one
-shared registry helper — the same helper the canonical resolver uses — that returns the owning
-entry and gate if and only if the traverser's current coordinates equal some entry's
-`approach_cell(gate)` and the exit's direction equals that gate's `return_direction`. For a
-recognized gateway step it SHALL move the traversing object to the `GridRoom` at the gate's
-`grid_xy`/`z_map_key` (resolved via the grid model, not via a hardcoded coordinate or via the
-exit object's stored anchor). For every other coordinate or direction, its **routing**
-(destination room, coordinate movement) SHALL behave identically to the stock
-`WildernessExit`. The hardcoded legacy rule (current coordinates equal to an entry's single
-`wilderness_xy` and exit key `"south"`) SHALL NOT exist in any form. This requirement governs
-routing only — every successful traversal's **clock cost** is governed by the separate "Every
-successful WildernessReturnExit traversal advances the clock, not only the registered return
-branch" requirement below, which applies uniformly regardless of which routing branch was taken.
+`ElosernWildernessMapProvider.exit_typeclass`. A gateway step — recognized through one shared
+registry helper, true if and only if the traverser's current coordinates equal some entry's
+`approach_cell(gate)` and the exit's direction equals that gate's `return_direction` — SHALL
+move the traversing object to the `GridRoom` at the gate's `grid_xy`/`z_map_key`.
 
 #### Scenario: Traversing north from the south approach cell returns through the south gate
 - **WHEN** a character at `(60, 97)` traverses the `"north"` exit
@@ -197,28 +239,39 @@ branch" requirement below, which applies uniformly regardless of which routing b
   `evennia.contrib.grid.wilderness.wilderness.WildernessExit.at_traverse` (ordinary coordinate
   movement within the wilderness)
 
+#### Scenario: Gateway recognition shares the canonical resolver's helper
+- **WHEN** a gateway step is recognized
+- **THEN** it goes through one shared registry helper — the same helper the canonical resolver
+  uses — that returns the owning entry and gate
+
+#### Scenario: The grid room is resolved through the grid model
+- **WHEN** a recognized gateway step resolves its destination
+- **THEN** the `GridRoom` is resolved via the grid model, not via a hardcoded coordinate or via
+  the exit object's stored anchor
+
+#### Scenario: Non-gateway routing matches the stock exit
+- **WHEN** the step is at any other coordinate or direction
+- **THEN** the exit's **routing** (destination room, coordinate movement) behaves identically to
+  the stock `WildernessExit`
+
+#### Scenario: The hardcoded legacy rule is removed
+- **WHEN** gateway recognition is implemented
+- **THEN** the hardcoded legacy rule (current coordinates equal to an entry's single
+  `wilderness_xy` and exit key `"south"`) SHALL NOT exist in any form
+
+#### Scenario: This requirement governs routing only
+- **WHEN** the clock cost of a successful traversal is considered
+- **THEN** it is governed by the separate "Every successful WildernessReturnExit traversal
+  advances the clock, not only the registered return branch" requirement below, which applies
+  uniformly regardless of which routing branch was taken
+
 ### Requirement: Every successful WildernessReturnExit traversal advances the clock, not only the registered return branch
 Every successful traversal through `WildernessReturnExit` — both the special-cased branch that routes
 back to a grid room, and the ordinary `super().at_traverse()` fallback that governs every other
 coordinate and direction — SHALL complete through the shared movement-completion helper
-`typeclasses.exits.after_successful_movement(...)` with `cost_key="wilderness_move"`, which SHALL call
-`world.rules.movement.charge_movement(traversing_object, cost_key)` (the `movement-cost-charging`
-capability) and `world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge`
-capability) on both branches — rather than calling
-`world.rules.clock.get_world_clock().advance()` directly. No successful step through this exit SHALL
-be free, and every successful step SHALL record its destination node. An unsuccessful traversal (the
-underlying `at_traverse_coordinates`/`at_pre_move` check fails, per the stock `WildernessExit`'s own
-logic) SHALL NOT advance the clock and SHALL NOT record an observation.
-
-This is the concrete fix for a defect a rubber-duck review found in an earlier draft of this
-capability: `ElosernWildernessMapProvider.exit_typeclass = WildernessReturnExit` installs this class on
-all eight directional exits at every wilderness coordinate (the `wilderness-map-provider` capability),
-so if only the registered return branch advanced the clock, every intermediate step of a continent
-crossing would cost nothing — contradicting the whole point of wiring wilderness movement to
-`WorldClock` at all. Folding both call sites onto the one shared completion helper (rather than each
-duplicating `get_world_clock().advance()` independently) is this change's own contribution: the same
-fix, now expressed once instead of twice, and consistent with how every other movement lineage in the
-project charges (`movement-cost-charging` capability).
+`typeclasses.exits.after_successful_movement(...)` with `cost_key="wilderness_move"`. No
+successful step through this exit SHALL be free, and every successful step SHALL record its
+destination node.
 
 #### Scenario: Traversing south from the registered entry coordinate advances the clock and records the grid node
 - **WHEN** a character successfully traverses the `"south"` exit at a registered entry coordinate
@@ -265,6 +318,33 @@ project charges (`movement-cost-charging` capability).
   `world.rules.map_knowledge.record_arrival(traversing_object)`, and neither the exit nor the helper
   calls `world.rules.clock.get_world_clock().advance()` directly
 
+#### Scenario: The helper performs both side effects on both branches
+- **WHEN** either branch completes successfully through the shared helper
+- **THEN** the helper calls `world.rules.movement.charge_movement(traversing_object, cost_key)`
+  (the `movement-cost-charging` capability) and
+  `world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge` capability)
+  on both branches
+- **AND** neither branch nor helper calls `world.rules.clock.get_world_clock().advance()`
+  directly
+
+#### Scenario: An unsuccessful traversal charges and records nothing
+- **WHEN** a traversal is unsuccessful (the underlying
+  `at_traverse_coordinates`/`at_pre_move` check fails, per the stock `WildernessExit`'s own
+  logic)
+- **THEN** it SHALL NOT advance the clock and SHALL NOT record an observation
+
+#### Scenario: Background — the both-branches fix closes a free-step defect
+- **WHEN** `ElosernWildernessMapProvider.exit_typeclass = WildernessReturnExit` installs this
+  class on all eight directional exits at every wilderness coordinate (the
+  `wilderness-map-provider` capability)
+- **THEN** advancing the clock only from the registered return branch would make every
+  intermediate step of a continent crossing cost nothing — contradicting the whole point of
+  wiring wilderness movement to `WorldClock` at all
+- **AND** folding both call sites onto the one shared completion helper (rather than each
+  duplicating `get_world_clock().advance()` independently) is this change's own contribution:
+  the same fix, now expressed once instead of twice, and consistent with how every other
+  movement lineage in the project charges (`movement-cost-charging` capability)
+
 ### Requirement: Leaving the wilderness through WildernessReturnExit triggers ordinary cleanup
 When a traversing object leaves a `TerrainRoom` through `WildernessReturnExit`'s grid-routing branch,
 the wilderness's own per-object bookkeeping (`itemcoordinates` entry removal, room recycling into
@@ -291,17 +371,7 @@ mapprovider=ElosernWildernessMapProvider())` and, for every gate of every
 `WILDERNESS_ENTRY_REGISTRY` entry whose destination `GridRoom` (at the gate's
 `grid_xy`/`z_map_key`) exists, SHALL idempotently ensure exactly one `WildernessGateExit` exists
 on that room **with `db.anchor_key` set to the entry's `anchor_key` and `db.gate_direction` set
-to that gate's `return_direction`** — the gate exit is not usable without these attributes
-(`WildernessGateExit.at_traverse` reads both and fails closed on lookup if either is unset), so a
-`sync_wilderness()` that creates the exit without setting them is not a conforming implementation
-of this requirement even though the exit object itself exists. When a gate's destination room does
-not exist, `sync_wilderness()` SHALL log a warning and skip creating that gate's exit, and SHALL
-NOT raise; other gates SHALL still be provisioned. `sync_wilderness()` SHALL be distinct in name
-and module role from change 12's `sync_grid()`, and SHALL NOT modify `sync_grid()`'s own behavior.
-Provisioned wilderness-side gate exits SHALL be keyed `荒野` (aliases `["wilderness",
-<direction>, <direction-initial>]`) — the same key on multiple rooms is safe because gateway
-resolution matches room and direction, never key aliases — and grid-side gate exits SHALL carry
-the wilderness return wording with the entry's `display_name_zh` in aliases.
+to that gate's `return_direction`**.
 
 #### Scenario: sync_wilderness creates the wilderness map and both city gates
 - **WHEN** `sync_wilderness()` runs after `sync_grid()` has already created the sample city
@@ -347,18 +417,35 @@ the wilderness return wording with the entry's `display_name_zh` in aliases.
 - **THEN** the call to `sync_wilderness()` appears after the call to `sync_grid()` in source
   order
 
+#### Scenario: Gate attributes are what make the exit usable
+- **WHEN** a gate exit's usability is considered
+- **THEN** the gate exit is not usable without these attributes
+  (`WildernessGateExit.at_traverse` reads both and fails closed on lookup if either is unset),
+  so a `sync_wilderness()` that creates the exit without setting them is not a conforming
+  implementation of this requirement even though the exit object itself exists
+
+#### Scenario: A missing destination room is skipped, not fatal
+- **WHEN** a gate's destination room does not exist
+- **THEN** `sync_wilderness()` SHALL log a warning and skip creating that gate's exit, and
+  SHALL NOT raise; other gates SHALL still be provisioned
+
+#### Scenario: sync_grid remains separate and untouched
+- **WHEN** `sync_wilderness()` is defined
+- **THEN** it SHALL be distinct in name and module role from change 12's `sync_grid()`, and
+  SHALL NOT modify `sync_grid()`'s own behavior
+
+#### Scenario: Provisioned exit keys and aliases
+- **WHEN** gate exits are provisioned
+- **THEN** wilderness-side gate exits SHALL be keyed `荒野` (aliases `["wilderness",
+  <direction>, <direction-initial>]`) — the same key on multiple rooms is safe because gateway
+  resolution matches room and direction, never key aliases — and grid-side gate exits SHALL
+  carry the wilderness return wording with the entry's `display_name_zh` in aliases
+
 ### Requirement: wilderness_move is a new, distinct clock cost, not a reuse of the grid's move constant
 `world/rules/rulebook/clock.yaml::command_defaults` SHALL include a new key, `wilderness_move: 9000`
 (seconds), distinct from the existing `move: 30` entry. No code in this change SHALL read `move` for
 wilderness traversal, and no code from change 12 (grid traversal) SHALL be modified to read
 `wilderness_move`.
-
-**Amended 2026-08-01 (change `map-movement-clock`):** the previous wording asserted that intra-city
-grid traversal "remains unwired to the clock" — a statement `map-movement-clock` makes false, since it
-wires every intra-city link to charge `command_defaults.move` through `CostedXYZExit` (the
-`sample-city-altoria` capability). The distinctness claim that is this requirement's real subject is
-unchanged: wilderness steps pay `wilderness_move`, grid steps pay `move`, and the two lineages never
-read each other's constant. The amended scenario below asserts exactly that.
 
 #### Scenario: wilderness_move is present and distinct from move
 - **WHEN** `world/rules/rulebook/clock.yaml` is inspected after this change lands
@@ -372,27 +459,21 @@ read each other's constant. The amended scenario below asserts exactly that.
   no grid-traversal code reads `wilderness_move` — grid traversal is unaffected by the wilderness
   cost, charging the ordinary `move` cost instead
 
+#### Scenario: Amended 2026-08-01 change map-movement-clock background
+- **WHEN** the previous wording's claim that intra-city grid traversal "remains unwired to the
+  clock" is re-read
+- **THEN** that statement is false, since `map-movement-clock` wires every intra-city link to
+  charge `command_defaults.move` through `CostedXYZExit` (the `sample-city-altoria`
+  capability)
+- **AND** the distinctness claim that is this requirement's real subject is unchanged:
+  wilderness steps pay `wilderness_move`, grid steps pay `move`, and the two lineages never
+  read each other's constant; the amended scenario above asserts exactly that
+
 ### Requirement: WILDERNESS_ENTRY_REGISTRY authored data is validated before persistence
 `world/lore/wilderness_entry.py` SHALL provide `validate_wilderness_entries()` — a pure,
 DB-free check of the whole registry — and `world/lore/sync.py`'s wilderness mirror step SHALL
 run it before mirroring, so malformed authored data fails at startup rather than producing an
-unwalkable or contradictory world. It SHALL reject: an empty mask or one with no `#`; any `#`
-cell outside the provider's valid rectangle; a footprint whose `#` cells are not 4-connected; a
-`return_direction` that is not a canonical wilderness direction or is duplicated within one
-entry; a footprint-entry gate whose approach-cell ray from `anchor_cell` crosses no footprint
-cell or whose approach cell is not a provider-valid cell outside the footprint; a point-shape
-entry with any number of gates other than exactly one; a `grid_xy` outside the extent of the map
-named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`. The
-shipped registry SHALL pass validation.
-The mask SHALL be a well-formed rectangle — every row the same non-empty length, containing only
-`#` and `.` (the `altoria_capital.MAPSTR` loading expectation) — and the derived `anchor_cell`
-SHALL itself be a `#` cell. Globally, two entries SHALL NOT have overlapping footprints; no
-footprint SHALL contain another entry's gate approach cell or point-shape anchor cell; and two
-gates SHALL NOT share the same `(approach_cell, return_direction)` pair; and two gates SHALL NOT
-share the same destination `(grid_xy, z_map_key)` room — one grid room hosts exactly one
-WildernessGateExit slot, so a second gate on that room would silently displace the first at
-provisioning time. A point-shape entry's anchor cell SHALL have all eight wilderness neighbors
-provider-valid, so a gateway is never advertised toward a cell the provider cannot honor.
+unwalkable or contradictory world. The shipped registry SHALL pass validation.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped
@@ -418,3 +499,32 @@ provider-valid, so a gateway is never advertised toward a cell the provider cann
 - **WHEN** `sync_all()` runs with the wilderness registry patched to a malformed entry
 - **THEN** the run fails with the validation error before any `lore:wilderness_entries:*` Script
   is created or updated
+
+#### Scenario: Per-entry rejection conditions
+- **WHEN** `validate_wilderness_entries()` checks an entry
+- **THEN** it SHALL reject: an empty mask or one with no `#`; any `#` cell outside the
+  provider's valid rectangle; a footprint whose `#` cells are not 4-connected; a
+  `return_direction` that is not a canonical wilderness direction or is duplicated within one
+  entry; a footprint-entry gate whose approach-cell ray from `anchor_cell` crosses no footprint
+  cell or whose approach cell is not a provider-valid cell outside the footprint; a point-shape
+  entry with any number of gates other than exactly one; a `grid_xy` outside the extent of the
+  map named by its `z_map_key`; and an `anchor_key` absent from `ANCHOR_PLACEMENT_REGISTRY`
+
+#### Scenario: Mask shape and anchor cell well-formedness
+- **WHEN** an entry's mask and derived anchor cell are validated
+- **THEN** the mask SHALL be a well-formed rectangle — every row the same non-empty length,
+  containing only `#` and `.` (the `altoria_capital.MAPSTR` loading expectation) — and the
+  derived `anchor_cell` SHALL itself be a `#` cell
+
+#### Scenario: Global cross-entry constraints
+- **WHEN** the validator checks the registry globally
+- **THEN** two entries SHALL NOT have overlapping footprints; no footprint SHALL contain
+  another entry's gate approach cell or point-shape anchor cell; two gates SHALL NOT share the
+  same `(approach_cell, return_direction)` pair; and two gates SHALL NOT share the same
+  destination `(grid_xy, z_map_key)` room — one grid room hosts exactly one WildernessGateExit
+  slot, so a second gate on that room would silently displace the first at provisioning time
+
+#### Scenario: Point-shape anchors need all neighbors provider-valid
+- **WHEN** a point-shape entry is validated
+- **THEN** its anchor cell SHALL have all eight wilderness neighbors provider-valid, so a
+  gateway is never advertised toward a cell the provider cannot honor

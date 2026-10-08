@@ -10,19 +10,11 @@ that never touches character or account state.
 ## Requirements
 
 ### Requirement: The character concept command runs a guarded generative proposal pipeline
-A pending character's command surface SHALL provide `character concept <構想>` (aliases 構想) that
-takes a bounded free-form concept string, runs the guarded `character_creation` generative layer
-with the injected client (composition-root pattern), and on a validated proposal presents the
-proposal summary and interactively collects the display name, actual age, and apparent age through
-the existing prompts with the proposal's normalised values as prefilled defaults — an empty reply
-accepts the default, a non-empty reply overrides it, and an absent proposal field leaves the
-mandatory prompt, whose empty name reply re-prompts until answered or cancelled — checked by the
-deterministic age-range check, then activates through the
-ordinary `CharacterCreationRequest` preflight and all-or-nothing activation path carrying the
-proposal's background and affinity elements alongside its other values. When the LLM is offline,
-retry-exhausted, or the layer degrades, the command SHALL return the stable Traditional Chinese
-message (生成不可用，請手動創角) and SHALL NOT modify any character or account state; the
-deterministic wizard remains fully usable.
+A pending character's command surface SHALL provide `character concept <構想>` (aliases 構想): it
+takes a bounded free-form concept, runs the guarded `character_creation` layer with the injected
+client (composition-root pattern), and on a validated proposal presents the summary, collects the
+display name and both ages through the existing prompts, and activates through the ordinary
+`CharacterCreationRequest` preflight and all-or-nothing activation path.
 
 #### Scenario: A concept guides an interactive custom activation
 - **WHEN** a pending player runs `character concept` with a bounded concept and the guarded layer
@@ -46,31 +38,35 @@ deterministic wizard remains fully usable.
 - **WHEN** a pending player runs `character concept` with an empty or over-bound concept
 - **THEN** the command rejects with a named error and no generative call is made
 
+#### Scenario: The proposal's normalised values prefill the prompts
+- **WHEN** a validated proposal is presented and the player reaches the name and age prompts
+- **THEN** the prompt's prefilled default is the proposal's normalised value, an empty reply
+  accepts the default, and a non-empty reply overrides it
+
+#### Scenario: An absent proposal field leaves the mandatory prompt
+- **WHEN** the proposal carries no value for one of the collected fields
+- **THEN** the prompt stays mandatory, and an empty name reply re-prompts until answered or
+  cancelled
+
+#### Scenario: Activation is age-checked and carries the full proposal
+- **WHEN** a concept-guided flow reaches activation
+- **THEN** the deterministic age-range check gates it, and the activation carries the proposal's
+  background and affinity elements alongside its other values
+
+#### Scenario: Retry exhaustion or a layer degrade returns the stable message
+- **WHEN** the generation is retry-exhausted or the `character_creation` layer degrades for any
+  reason
+- **THEN** the command SHALL return the stable Traditional Chinese message (生成不可用，請手動創角),
+  SHALL NOT modify any character or account state, and the deterministic wizard remains fully
+  usable
+
 ### Requirement: Proposals are validated deterministically against the registries
 The `character_creation` layer SHALL emit proposals shaped
 `{race_key, subrace_key, allocations, suggested_skills, persona{personality, life_story, habit}}`
 plus five optional transient-fill fields `display_name`, `age`, `apparent_age`, `background`, and
-`affinity_elements`; an omitted optional field SHALL normalise to its absent form (a null text or
-age, or a null affinity set) so consumers keep their own local default. Every proposal SHALL be
-validated deterministically before any presentation or activation proceeds: `race_key` exists in
-the lore registry; `subrace_key` is a registered subrace belonging to that race (a null, missing,
-or incompatible subrace is a whole-proposal failure, since every race has at least one subrace);
-`allocations` fall within that race's bands and sum to the race budget; every `suggested_skills`
-key exists in the skill registry; and `persona` contains exactly the three text fields with bounded
-lengths. A structural failure — a non-object, a key outside the ten-field contract, a wrong-typed
-optional field, an invalid persona shape, an over-budget or out-of-band allocation, or a missing /
-incompatible subrace — SHALL be treated as a whole-proposal validation failure: the proposal SHALL
-be retried with the error appended and, on exhaustion, degrade to the stable unavailable message;
-no partial proposal (for example race accepted but persona discarded) SHALL ever proceed. An
-in-range-typed but out-of-bounds transient-fill value SHALL instead be normalised in place on the
-validated proposal without any retry: a negative `age` or `apparent_age` SHALL be overwritten to
-0 and above 10000 to 10000; an over-long `display_name` SHALL be truncated to the 64-code-point
-display-name bound and an over-long `background` to the 600-character persona-field bound (each
-collapsing to absent when it trims to empty); `affinity_elements` SHALL drop unknown and duplicate
-keys in order and truncate to the chosen race's input bound, and an elf proposal's affinity set
-SHALL be forced empty. Normalisation SHALL never append an error to the LLM, consume a retry, or
-discard the proposal, and the deterministic age-range check SHALL remain the final authority on every
-submission.
+`affinity_elements`. Every proposal SHALL be validated deterministically against the registries
+before any presentation or activation proceeds, and every structural failure is a
+whole-proposal validation failure.
 
 #### Scenario: A valid proposal passes and guides the flow
 - **WHEN** the layer returns a proposal whose keys all resolve in the registries and whose
@@ -124,14 +120,52 @@ submission.
 - **THEN** validation rejects the whole proposal with a named error and the proposal is retried or
   degraded rather than partially normalised
 
+#### Scenario: An omitted optional field normalises to its absent form
+- **WHEN** the proposal omits one of the five optional transient-fill fields
+- **THEN** it normalises to its absent form — a null text or age, or a null affinity set — so
+  consumers keep their own local default
+
+#### Scenario: The registry checks define proposal validity
+- **WHEN** a proposal is validated
+- **THEN** the checks are: `race_key` exists in the lore registry; `subrace_key` is a registered
+  subrace belonging to that race (a null, missing, or incompatible subrace is a whole-proposal
+  failure, since every race has at least one subrace); `allocations` fall within that race's
+  bands and sum to the race budget; every `suggested_skills` key exists in the skill registry;
+  and `persona` contains exactly the three text fields with bounded lengths
+
+#### Scenario: An out-of-bounds transient fill is normalised in place
+- **WHEN** a structurally valid proposal carries an in-range-typed but out-of-bounds
+  transient-fill value
+- **THEN** it is normalised in place on the validated proposal without any retry: a negative
+  `age` or `apparent_age` is overwritten to 0 and above 10000 to 10000; an over-long
+  `display_name` is truncated to the 64-code-point display-name bound and an over-long
+  `background` to the 600-character persona-field bound, each collapsing to absent when it trims
+  to empty; `affinity_elements` drops unknown and duplicate keys in order and truncates to the
+  chosen race's input bound, and an elf proposal's affinity set is forced empty
+
+#### Scenario: Normalisation is silent and the age check stays supreme
+- **WHEN** any transient-fill normalisation applies
+- **THEN** no error is appended to the LLM, no retry is consumed, the proposal is not discarded,
+  and the deterministic age-range check remains the final authority on every submission
+
+#### Scenario: The structural-failure set is closed
+- **WHEN** the proposal is a non-object, carries a key outside the ten-field contract, a
+  wrong-typed optional field, an invalid persona shape, an over-budget or out-of-band allocation,
+  or a missing / incompatible subrace
+- **THEN** it is treated as a whole-proposal validation failure
+
+#### Scenario: A whole-proposal failure retries then degrades, never half-proceeds
+- **WHEN** whole-proposal validation fails
+- **THEN** the proposal is retried with the error appended and, on exhaustion, degrades to the
+  stable unavailable message; no partial proposal (for example race accepted but persona
+  discarded) ever proceeds
+
 ### Requirement: The character_creation layer is registered in the guardrail with retry and degrade
 `world/ai/` SHALL register a `character_creation` layer in the guardrail with an output jsonschema,
-semantic validation, bounded retries that append the error message, and a stable degrade fallback;
-malformed or out-of-contract output SHALL leave the database untouched and SHALL never produce a
-partial result. The layer SHALL be added to `LAYER_NAMES` so `default_profiles()` constructs its
-profile, SHALL be registered idempotently from `server/conf/at_server_startstop.py::at_server_start()`
-like every existing layer, SHALL import no state writer, and SHALL consume the client through the
-injected protocol like every other generative layer.
+semantic validation, bounded retries that append the error message, and a stable degrade fallback.
+The layer SHALL be added to `LAYER_NAMES` so `default_profiles()` constructs its profile, SHALL be
+registered idempotently from `server/conf/at_server_startstop.py::at_server_start()` like every
+existing layer.
 
 #### Scenario: Malformed output never touches the database
 - **WHEN** the layer returns non-JSON, schema-invalid, or semantically invalid output for every
@@ -149,17 +183,20 @@ injected protocol like every other generative layer.
 - **WHEN** the first attempt fails validation and the appended-error retries also fail
 - **THEN** the command returns the stable unavailable message without looping indefinitely
 
+#### Scenario: Malformed output is never a partial result
+- **WHEN** the layer returns malformed or out-of-contract output
+- **THEN** the database is left untouched and no partial result is ever produced
+
+#### Scenario: The layer obeys the generative-module contract
+- **WHEN** the `character_creation` layer module is inspected
+- **THEN** it imports no state writer and consumes the client through the injected protocol
+  like every other generative layer
+
 ### Requirement: The concept prompt requests the expanded blueprint and the race-affinity bound
 The `character_creation.system` prompt SHALL render a blueprint contract that names all ten
 contract fields including `display_name`, `age`, `apparent_age`, `background`, and
 `affinity_elements`, SHALL instruct that `affinity_elements` must not exceed the chosen race's
-listed bound and must be empty for an elf, and SHALL bound `background` to 600 characters. The
-authored prompt template (before player-concept interpolation) SHALL NOT state any age-range
-constraint or otherwise instruct the model about the 0..10000 bounds: age enforcement is
-server-side clamping, and the template carries no age-related instruction beyond naming the field.
-The registry-derived race catalog SHALL name each race's affinity input bound and the registered
-element keys so the model can respect them without inventing values, and SHALL stay within its
-existing bounded length with the established truncation marker.
+listed bound and must be empty for an elf, and SHALL bound `background` to 600 characters.
 
 #### Scenario: The blueprint names the expanded fields
 - **WHEN** the `character_creation.system` prompt is rendered
@@ -183,3 +220,19 @@ existing bounded length with the established truncation marker.
 - **WHEN** `build_race_catalog()` renders
 - **THEN** the catalog names every registered element key as the only values `affinity_elements`
   may carry, and the element line stays inside the catalog's bounded maximum length
+
+#### Scenario: The catalog lets the model respect the bounds without inventing values
+- **WHEN** the registry-derived race catalog is rendered
+- **THEN** it names each race's affinity input bound and the registered element keys so the
+  model can respect them without inventing values
+
+#### Scenario: The catalog stays inside its bounded length
+- **WHEN** the race catalog is assembled at any registry size
+- **THEN** it stays within its existing bounded length with the established truncation marker
+
+#### Scenario: Age bounds are enforced server-side, not in the template
+- **WHEN** the authored prompt template (before player-concept interpolation) is inspected for
+  age guidance
+- **THEN** it states no age-range constraint and does not otherwise instruct the model about the
+  0..10000 bounds — age enforcement is server-side clamping — and carries no age-related
+  instruction beyond naming the field

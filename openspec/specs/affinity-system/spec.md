@@ -10,17 +10,12 @@ auto-leave recheck seam consumed by later party changes.
 ## Requirements
 
 ### Requirement: Every NPC holds a hidden numeric affinity toward each player
-Each NPC SHALL hold one affinity record per player it has interacted with, stored as serialized
-data on the NPC's `relations_data` attribute through the `RelationHandler` mounted on
-`LivingEntity.relations`. A record SHALL contain `value` (initial 0), `cap` (initial 99, mutable
-only through `raise_affinity_cap`), the daily-gain counter, and the world-day tick at which that
-counter started. Deserialization SHALL tolerate missing fields with defaults and SHALL reject
-type-violating values by resetting the record to a fresh default (logging the event) rather than
-raising, so a corrupted record can never crash a look or a conversation. Reading affinity SHALL NOT
-create or persist a record: read APIs (`affinity_for`, `stage_for`) return defaults for players
-without a record, and a `has_record` check SHALL distinguish a stored record from a default. The
-numeric value SHALL be hidden from the player; only stage names are rendered (see the stage-ladder
-requirement).
+Each NPC SHALL hold one per-player affinity record as serialized data on the NPC's
+`relations_data` attribute through the `RelationHandler` mounted on `LivingEntity.relations`.
+A record SHALL contain `value` (initial 0), `cap` (initial 99, mutable only through
+`raise_affinity_cap`), the daily-gain counter, and the world-day tick at which that counter
+started. The numeric value SHALL be hidden from the player; only stage names are rendered (see
+the stage-ladder requirement).
 
 #### Scenario: A fresh NPC starts at zero affinity
 - **WHEN** a player reads the affinity record of an NPC with no prior interaction
@@ -44,16 +39,19 @@ requirement).
 - **THEN** every mutation goes through `raise_affinity_cap`, and a raised cap (e.g. 150) persists
   across serialization round trips without changing the value or the daily-gain fields
 
+#### Scenario: Deserialization tolerates missing fields and rejects type violations by resetting
+- **WHEN** a stored record is deserialized with fields missing, or with a type-violating value
+- **THEN** missing fields fall back to defaults, and a type-violating value resets the record to a fresh default (logging the event) rather than raising, so a corrupted record can never crash a look or a conversation
+
+#### Scenario: The read APIs return defaults without persisting
+- **WHEN** `affinity_for` or `stage_for` is called for a player that has never interacted with the NPC
+- **THEN** the default record is returned without creating or persisting anything, and the `has_record` check distinguishes a stored record from a default
+
 ### Requirement: The stage ladder maps hidden values to seven Traditional Chinese stage names
 `rulebook/affinity.yaml` SHALL define exactly seven stages with floors 0 (初識), 10 (熟識),
 30 (親睦), 50 (信賴), 70 (羈絆), 90 (至愛), and 100 (絕對羈絆), each with a stable ID, a floor, a
 display name, and an authored look-flavor template. The stage for a value SHALL be the last stage
 whose floor is at or below the value; values at or above 100 SHALL map to the topmost stage (絕對羈絆).
-Loading SHALL reject any deviation from the canonical floor sequence — a wrong stage count,
-non-increasing floors, or a floor outside the canonical set 0/10/30/50/70/90/100 — with a named
-validation error before any write. The same YAML SHALL carry the offline party-invite threshold
-(70), the daily interaction cap (5), and the quest-completion gain (2). Player-facing glyphs SHALL
-be Traditional Chinese forms (信賴, 絕對).
 
 #### Scenario: Stage boundaries map values to names
 - **WHEN** values 0, 10, 30, 50, 70, 90, 99, and 100 are resolved against the ladder
@@ -68,34 +66,25 @@ be Traditional Chinese forms (信賴, 絕對).
 - **WHEN** a record's `cap` has been raised beyond 99 and its value is 130
 - **THEN** the displayed stage is 絕對羈絆 and no numeric value or cap is rendered anywhere
 
+#### Scenario: A deviant ladder fails closed at load before any write
+- **WHEN** the ladder deviates from the canonical floor sequence — a wrong stage count, non-increasing floors, or a floor outside the canonical set 0/10/30/50/70/90/100
+- **THEN** loading rejects it with a named validation error before any write
+
+#### Scenario: The same YAML carries the tuning values
+- **WHEN** `rulebook/affinity.yaml` is read for its non-ladder settings
+- **THEN** it carries the offline party-invite threshold (70), the daily interaction cap (5), and the quest-completion gain (2)
+
+#### Scenario: Player-facing glyphs are Traditional Chinese
+- **WHEN** any player-facing affinity glyph is rendered
+- **THEN** it uses Traditional Chinese forms (信賴, 絕對)
+
 ### Requirement: apply_affinity_change is the sole affinity writer with a source-capped daily budget
 `world/rules/affinity.py` SHALL be the only module that writes affinity values, and
-`apply_affinity_change(npc, player, source, delta)` SHALL be its only *interaction* writer. The source SHALL be a member of the closed set
-(`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`, `friendly_fire`, `sexual_forced`); an
-unknown source SHALL be rejected without writing. The writer SHALL reject a non-NPC owner without
-writing. Before budgeting a capped positive delta it SHALL lazily reset the daily-gain counter when
-the record's stored tick differs from the current world day; negative deltas (including
-`friendly_fire` and `sexual_forced`) SHALL never reset the counter and never restore spent budget. Positive deltas from the capped sources
-SHALL draw from the remaining daily budget (`cap` 5 shared across `talk`, `trade`, `guild`,
-`ai_dialogue`); `quest_completion` deltas SHALL bypass the cap. The applied delta SHALL be
-`min(requested, remaining_budget, cap - value)`, the daily counter SHALL accrue only the actually
-applied increase, and a delta that applies zero SHALL consume no budget. Positive deltas SHALL
-clamp to the record's `cap`; negative deltas SHALL apply unclamped downward (floor 0) and always
-run the party auto-leave recheck hook. The function SHALL return a structured outcome (applied,
-delta used, budget capped) so callers can render feedback.
-
-The same module SHALL additionally expose exactly one *seed* writer,
-`seed_affinity(npc, player, value)`, for establishing a starting relationship that no interaction
-produced. It SHALL create a fresh record whose value is `value`, whose `cap` is `NATURAL_CAP`, and
-whose daily counter is zero stamped with the current world day. It SHALL reject a value outside
-`1..NATURAL_CAP` -- booleans and non-integers included -- and SHALL refuse to overwrite an existing
-record for the pair, so it can never be used to launder an interaction gain past the daily budget.
-It SHALL reject a non-NPC owner the same way. Every refusal SHALL raise `AffinitySeedError` with a
-stable reason, writing nothing. The write SHALL run inside one transaction with the host's
-in-process `relations_data` surface restored on failure, and a committed seed SHALL emit one
-`affinity_seed` boundary info event at the outermost durable commit. It SHALL NOT consume daily
-budget, resolve a source, or run the auto-leave recheck, because a seed is not an interaction. No
-module outside `world/rules/affinity.py` SHALL write an affinity record.
+`apply_affinity_change(npc, player, source, delta)` SHALL be its only *interaction* writer. The
+source SHALL be a member of the closed set (`talk`, `trade`, `guild`, `ai_dialogue`,
+`quest_completion`, `friendly_fire`, `sexual_forced`). The applied delta SHALL be
+`min(requested, remaining_budget, cap - value)`. The same module SHALL expose exactly one *seed*
+writer, `seed_affinity(npc, player, value)`.
 
 #### Scenario: Capped sources exhaust the daily budget
 - **WHEN** capped-source gains total 5 in one world day and a sixth capped gain is attempted
@@ -162,19 +151,46 @@ module outside `world/rules/affinity.py` SHALL write an affinity record.
 - **WHEN** `seed_affinity` is called with a player or monster as the affinity owner, or with a boolean or non-integer value
 - **THEN** it raises without writing
 
+#### Scenario: The writer returns a structured outcome
+- **WHEN** an interaction write completes through the sole-writer API
+- **THEN** it returns a structured outcome (applied, delta used, budget capped) so callers can render feedback
+
+#### Scenario: The daily counter resets lazily from the stored world-day tick
+- **WHEN** a capped positive delta is budgeted and the record's stored tick differs from the current world day
+- **THEN** the daily-gain counter is lazily reset before the budget is drawn
+
+#### Scenario: The shared daily budget covers the four capped interaction sources
+- **WHEN** positive deltas arrive from the capped sources
+- **THEN** they draw from the remaining daily budget — a `cap` of 5 shared across `talk`, `trade`, `guild`, and `ai_dialogue` — while `quest_completion` deltas bypass the cap
+
+#### Scenario: A positive delta clamps to the record cap
+- **WHEN** a positive delta would push the value above the record's `cap`
+- **THEN** the value clamps to `cap`
+
+#### Scenario: A negative delta floors at zero
+- **WHEN** a negative delta would push the value below zero
+- **THEN** it applies unclamped downward only to the floor of 0, and always runs the party auto-leave recheck hook
+
+#### Scenario: Every seed refusal raises a stable AffinitySeedError
+- **WHEN** `seed_affinity` refuses a call for any reason
+- **THEN** it raises `AffinitySeedError` with a stable reason, writing nothing, so a seed can never be used to launder an interaction gain past the daily budget
+
+#### Scenario: A failed seed write restores the in-process record surface
+- **WHEN** a seed write fails inside its transaction
+- **THEN** the host's in-process `relations_data` surface is restored
+
+#### Scenario: A committed seed emits one boundary info event
+- **WHEN** a seed transaction commits durably
+- **THEN** exactly one `affinity_seed` boundary info event is emitted at the outermost durable commit
+- **AND** the seed consumed no daily budget, resolved no source, and ran no auto-leave recheck, because a seed establishes a starting relationship that no interaction produced
+
 ### Requirement: Deterministic gains apply at talk, trade, and guild success paths
-A known-keyword talk answer SHALL grant +1 affinity (`talk` source) with the host NPC through a
-deterministic talk writer that resolves the keyword and applies the affinity gain in one
-transaction with cache restoration on failure; unknown
-keywords and no-keyword paths SHALL grant nothing. A successful buy or sell SHALL grant +1
-(`trade` source) with the local Merchant host. Successful guild registration, board acceptance,
-and examination start SHALL each grant +1 (`guild` source) with the respective host. Every gain
-SHALL be applied through the sole-writer API inside the host operation's all-or-nothing commit, so
-a failing or rejected host operation grants nothing. Service hosts SHALL be NPC instances: a
-host that cannot hold affinity is rejected before any write, so a successful operation always
-carries its gain. When a capped source is blocked by the daily
-budget, the call site SHALL present a fixed non-numeric Traditional Chinese hint and SHALL NOT
-expose the cap or any number.
+A known-keyword talk answer SHALL grant +1 affinity (`talk` source) with the host NPC, a
+successful buy or sell SHALL grant +1 (`trade` source) with the local Merchant host, and
+successful guild registration, board acceptance, and examination start SHALL each grant +1
+(`guild` source) with the respective host. Every gain SHALL be applied through the sole-writer
+API inside the host operation's all-or-nothing commit, so a failing or rejected host operation
+grants nothing.
 
 #### Scenario: Keyword talk grants affinity and unknown keywords grant nothing
 - **WHEN** the player talks to a scripted-dialogue host with a known keyword and then with an
@@ -196,16 +212,24 @@ expose the cap or any number.
 - **THEN** the player receives a fixed Traditional Chinese hint that does not contain the cap,
   the budget, or any number, and the NPC's value is unchanged
 
+#### Scenario: The talk writer commits keyword resolution and gain atomically
+- **WHEN** the deterministic talk writer processes a known keyword
+- **THEN** it resolves the keyword and applies the affinity gain in one transaction with cache restoration on failure
+
+#### Scenario: Unknown and no-keyword talk paths grant nothing
+- **WHEN** the player talks with an unknown keyword, or with no keyword at all
+- **THEN** no affinity is granted on either path
+
+#### Scenario: Service hosts are NPC instances that always carry their gain
+- **WHEN** an operation's service host is inspected for affinity capacity
+- **THEN** hosts SHALL be NPC instances: a host that cannot hold affinity is rejected before any write, so a successful operation always carries its gain
+
 ### Requirement: The party auto-leave recheck hook runs after negative affinity deltas
 The sole-writer API SHALL invoke the party auto-leave recheck after every negative delta. The hook
 SHALL be the wired rule from `party-core`: when the NPC is a bound companion and its affinity
 toward the player drops below the invite threshold (70), it SHALL call
 `world/rules/party.py::leave_party(npc, player, reason="affinity_below_threshold")` as part of the
-affinity write's transaction — a failed leave SHALL roll back the entire negative-delta operation
-— and the write API SHALL return the auto-leave notification line, which the caller SHALL send to
-the player only after its own transaction commits (the writer never sends it); a drop that stays
-at or above the threshold SHALL NOT end the party. The hook SHALL be deterministic and SHALL be
-side-effect free for non-companions.
+affinity write's transaction.
 
 #### Scenario: The hook is invoked on negative deltas
 - **WHEN** a negative delta is applied through the sole-writer API
@@ -224,6 +248,18 @@ side-effect free for non-companions.
 #### Scenario: A non-companion negative delta changes nothing
 - **WHEN** a negative delta applies to an NPC that is not a companion
 - **THEN** the hook runs, no party call occurs, and no notification is emitted
+
+#### Scenario: The writer returns the notification line but never sends it
+- **WHEN** an auto-leave fires during a negative-delta write
+- **THEN** the write API returns the auto-leave notification line, which the caller SHALL send to the player only after its own transaction commits — the writer never sends it
+
+#### Scenario: A drop that stays at or above the threshold keeps the party
+- **WHEN** a bound companion's affinity drops by a negative delta but stays at or above 70
+- **THEN** the party is not ended
+
+#### Scenario: The hook is deterministic
+- **WHEN** the same negative delta and companion state are replayed
+- **THEN** the hook produces the same recheck outcome, and it is side-effect free for non-companions
 
 ### Requirement: Affinity presentation is stage-only and never exposes the numeric value
 NPC appearance SHALL include one affinity stage line rendered from the record's stage for the

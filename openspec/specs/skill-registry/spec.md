@@ -28,15 +28,8 @@ as `world.skills.registry.SKILL_REGISTRY`, matching the exact module path and sy
 ### Requirement: Skills declare only self-only or free target scope
 `world/skills/registry.py` SHALL define a frozen `SkillDef` dataclass with the required fields `key`, `label`, `description`, `kind`,
 `target_spec`, `cost`, `usable_out_of_combat`, `element`, `effects`, `category`, and `faction_constraint`.
-`label` and `description` SHALL be nonempty Traditional Chinese player-facing strings bounded to 128 and 512 Unicode code points respectively.
-`faction_constraint` SHALL be a `FactionConstraint` value
-and SHALL default to `ANY`. Every skill SHALL declare its `faction_constraint` explicitly: all attack and
-recovery skills SHALL use `FactionConstraint.ANY` (freely targetable among enemies and allies); only a
-skill whose effect is inherently self-only SHALL use `FactionConstraint.SELF_ONLY` and restrict its
-target to the actor. Candidate selection SHALL NOT be restricted to enemies or allies only; an explicitly declared per-effect audience MAY deliver an individual component only to selected self/allies or enemies while leaving selection unrestricted; the legacy `ALLY`/`ENEMY`
-enum values are retained for legacy test data and restrict nothing. Its `cost` and `effects` collections SHALL reject mutation. Every
-production registry entry, including dynamically registered innate skills, SHALL supply all eleven
-fields directly; no generated key fallback or permissive metadata default SHALL exist.
+`label` and `description` SHALL be nonempty Traditional Chinese player-facing strings bounded to 128 and 512 Unicode code points
+respectively, and `faction_constraint` SHALL be a `FactionConstraint` value that defaults to `ANY`.
 
 #### Scenario: Every skill exposes immutable targeting and presentation metadata
 - **WHEN** any `SkillDef` in `SKILL_REGISTRY` is inspected after startup registration
@@ -66,6 +59,34 @@ fields directly; no generated key fallback or permissive metadata default SHALL 
 #### Scenario: Existing constructors do not receive a compatibility default
 - **WHEN** a caller constructs `SkillDef` without `label` or `description`
 - **THEN** construction fails and the caller must be updated to the current exact definition contract
+
+#### Scenario: Every skill declares its faction_constraint explicitly
+- **WHEN** any `SKILL_REGISTRY` entry's `faction_constraint` is inspected
+- **THEN** it is declared explicitly rather than left implicit: all attack and recovery skills use
+  `FactionConstraint.ANY` (freely targetable among enemies and allies)
+
+#### Scenario: Only inherently self-only effects use SELF_ONLY
+- **WHEN** a skill declares `FactionConstraint.SELF_ONLY`
+- **THEN** the skill's effect is inherently self-only and its target is restricted to the actor
+
+#### Scenario: Candidate selection stays unrestricted while per-effect audiences route components
+- **WHEN** targeting selects candidates for a skill and any effect declares an explicit per-effect audience
+- **THEN** candidate selection is not restricted to enemies or allies only, and the explicitly declared
+  per-effect audience MAY deliver an individual component only to selected self/allies or enemies while
+  leaving selection unrestricted
+
+#### Scenario: Legacy ALLY/ENEMY enum values restrict nothing
+- **WHEN** the legacy `ALLY`/`ENEMY` `FactionConstraint` enum values are inspected
+- **THEN** they are retained for legacy test data and restrict nothing
+
+#### Scenario: Cost and effects collections reject mutation
+- **WHEN** a `SkillDef`'s `cost` or `effects` collection is mutated
+- **THEN** the mutation is rejected
+
+#### Scenario: Production entries supply all eleven fields directly
+- **WHEN** any production registry entry, including dynamically registered innate skills, is constructed
+- **THEN** it supplies all eleven fields directly — no generated key fallback or permissive metadata
+  default exists
 
 ### Requirement: SkillKind and TargetSpec are forward-declared for change 8 to import
 `world/skills/registry.py` SHALL define `SkillKind` (`ACTIVE`, `PASSIVE`) and `TargetSpec` (`NONE`,
@@ -114,11 +135,9 @@ exhaustive transcription of every skill mentioned on every sample card.
 
 ### Requirement: body_enhancement family is PASSIVE, not ACTIVE
 `body_enhancement`, `body_enhancement_extreme`, and `body_enhancement_basic` SHALL declare
-`kind=SkillKind.PASSIVE` (reclassified from the previous `SkillKind.ACTIVE`, which had no working cast
-path — `stat_multiply` was never registered in `action.py`'s `_EFFECT_HANDLERS`, so every cast attempt
-unconditionally rejected `UNKNOWN_EFFECT_ID`). Ownership continues to apply the multiplier via
-`SkillHandler.effective_value` exactly as before; this requirement changes only `kind`, not any
-multiplier math.
+`kind=SkillKind.PASSIVE` (reclassified from the previous `SkillKind.ACTIVE`). Ownership continues to
+apply the multiplier via `SkillHandler.effective_value` exactly as before; this requirement changes
+only `kind`, not any multiplier math.
 
 #### Scenario: body_enhancement is not castable via the normal ACTIVE-skill cast path
 - **WHEN** a player attempts to cast `body_enhancement`
@@ -130,13 +149,15 @@ multiplier math.
 - **THEN** `entity.skills.effective_value("atk_phys")` reflects the `stat_multiply:atk_phys:1000`
   multiplier exactly as it did before this change
 
+#### Scenario: The previous ACTIVE kind had no working cast path
+- **WHEN** the pre-reclassification `SkillKind.ACTIVE` declaration is examined
+- **THEN** `stat_multiply` was never registered in `action.py`'s `_EFFECT_HANDLERS`, so every cast
+  attempt unconditionally rejected `UNKNOWN_EFFECT_ID`
+
 ### Requirement: flight and flash_step are PASSIVE
 `flight` and `flash_step` SHALL declare `kind=SkillKind.PASSIVE` (reclassified from the previous
-`SkillKind.ACTIVE`, which had no working cast path — `movement` was never registered in `action.py`'s
-`_EFFECT_HANDLERS`). Ownership alone triggers the waiver behavior defined by the
-`movement-cost-charging` capability; no cast action exists for either skill. Both SHALL declare an
-empty `cost`: a PASSIVE skill has no cast action from which any resource could be deducted, so a
-non-empty cost on either is inert data that can only mislead.
+`SkillKind.ACTIVE`) and an empty `cost`. Ownership alone triggers the waiver behavior defined by the
+`movement-cost-charging` capability; no cast action exists for either skill.
 
 #### Scenario: flight is not castable via the normal ACTIVE-skill cast path
 - **WHEN** a player attempts to cast `flight`
@@ -145,6 +166,16 @@ non-empty cost on either is inert data that can only mislead.
 #### Scenario: Neither movement waiver declares a spendable cost
 - **WHEN** the `cost` of `flight` and of `flash_step` is inspected
 - **THEN** both are empty
+
+#### Scenario: The previous ACTIVE kind had no working cast path
+- **WHEN** the pre-reclassification `SkillKind.ACTIVE` declaration is examined
+- **THEN** `movement` was never registered in `action.py`'s `_EFFECT_HANDLERS`, so neither skill ever
+  had a working cast path
+
+#### Scenario: A non-empty cost on a PASSIVE waiver would be inert misleading data
+- **WHEN** a non-empty `cost` is considered for either PASSIVE movement waiver
+- **THEN** it is rejected: a PASSIVE skill has no cast action from which any resource could be
+  deducted, so a non-empty cost on either is inert data that can only mislead
 
 ### Requirement: reincarnation_boon_yuna's effect string is well-formed
 `reincarnation_boon_yuna` SHALL declare `effects=["sexual_magic_mastery"]` (corrected from the
@@ -158,20 +189,10 @@ prefix). `sexual_magic_mastery` remains the sole mastery-domain declaration for 
 
 ### Requirement: Martial arts progression composes executable sword-and-shadow behavior
 The martial-arts skill family SHALL provide the documented 劍術 and 影流刀術 progression as executable
-skill behavior using the common effect, policy, buff, modifier, cast-condition and lineage mechanisms:
-stamina-costed strike rungs settling through the shared damage pipeline at their authored
-coefficients; multi-strike rungs resolving two or three independent rolls for one paid cast; an
-execution rung ignoring defense subtraction entirely; a devastation rung adding the shipped
-fraction-of-maximum-HP term on an area strike; a movement-impairing rider mounted on the struck
-target that lowers its agility on the real agility-driven consumers for its authored duration and
-then stops; a lingering-wound rider draining the struck target's HP on the shared tick cadence with
-defeat credited to the striker; a self-mounted rider raising only its holder's physical attack for
-its authored duration; a stance cast-condition that refuses the shadow line to an actor without the
-required passive stance and admits it once owned; and two independent lineage trees whose branch
-points feed their authored children and whose two-parent canopies unlock only when both parents reach
-their thresholds, with tip caps derived from the shared reverse-edge map. Martial skills SHALL carry
-no magic-tier label and no freeform scale ladder, and an elementless martial strike SHALL accrue
-practice at the neutral affinity factor regardless of the actor's declared affinities.
+skill behavior using the common effect, policy, buff, modifier, cast-condition and lineage mechanisms.
+Martial skills SHALL carry no magic-tier label and no freeform scale ladder, and an elementless
+martial strike SHALL accrue practice at the neutral affinity factor regardless of the actor's
+declared affinities.
 
 #### Scenario: The strike ladder settles at its authored coefficient for its stamina price
 - **WHEN** a synthetic actor resolves single-target and area martial compositions of ascending
@@ -235,16 +256,52 @@ practice at the neutral affinity factor regardless of the actor's declared affin
 - **THEN** neither actor's accrual differs from the neutral factor, no magic-tier label is produced for
   a stamina-costed martial skill, and no freeform scale ladder is offered for it
 
+#### Scenario: Strike rungs are stamina-costed and settle through the shared damage pipeline
+- **WHEN** any authored martial strike rung resolves
+- **THEN** its damage settles through the shared damage pipeline at the rung's authored coefficient
+  and its stamina price is deducted exactly once per resolved cast
+
+#### Scenario: Multi-strike rungs resolve two or three independent rolls for one paid cast
+- **WHEN** an authored multi-strike rung resolves against one target
+- **THEN** exactly its authored two or three independent rolls are recorded while resources and
+  practice are paid once for the single cast
+
+#### Scenario: An execution rung ignores defense subtraction entirely
+- **WHEN** an authored execution rung strikes a target
+- **THEN** its damage skips the defense subtraction entirely at the authored coefficient
+
+#### Scenario: A devastation rung adds the shipped fraction-of-maximum-HP term on an area strike
+- **WHEN** an authored devastation area rung lands
+- **THEN** each hit adds the shipped fraction-of-maximum-HP term on the area strike
+
+#### Scenario: A movement-impairing rider lowers the struck target's agility and then stops
+- **WHEN** a strike carrying the movement-impairing rider lands on a target
+- **THEN** the rider lowers the struck target's agility on the real agility-driven consumers for its
+  authored duration and then stops
+
+#### Scenario: A lingering-wound rider drains the struck target with defeat credited to the striker
+- **WHEN** a strike carrying the lingering-wound rider lands on a target
+- **THEN** the rider drains the struck target's HP on the shared tick cadence and a defeat from the
+  drain is credited to the striker
+
+#### Scenario: A self-mounted rider raises only its holder's physical attack
+- **WHEN** a composition mounts its self-mounted rider on the actor
+- **THEN** only the holder's physical attack rises by the authored amount for the authored duration
+
+#### Scenario: A stance cast-condition gates the shadow line
+- **WHEN** an actor without the required passive stance attempts the shadow line and an actor owning
+  the stance attempts it
+- **THEN** the cast-condition refuses the former and admits the latter once the stance is owned
+
+#### Scenario: Two independent lineage trees branch and gate their canopies
+- **WHEN** the two martial lineage trees progress
+- **THEN** each tree's branch points feed their authored children, each two-parent canopy unlocks only
+  when both parents reach their thresholds, and tip caps stay derived from the shared reverse-edge map
+
 ### Requirement: dual_wield_style is a PASSIVE stance, not a castable ACTIVE skill
 `dual_wield_style` SHALL declare `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, and an
 empty `cost` (reclassified from the previous `SkillKind.ACTIVE` with `TargetSpec.SELF` and
-`cost={"sp": 8}`, which had no working cast path — `weapon_style` is not registered in
-`action.py`'s `_EFFECT_HANDLERS`, so an in-combat cast attempt unconditionally rejected
-`UNKNOWN_EFFECT_ID` at effect resolution (out-of-combat attempts rejected earlier as
-`SKILL_NOT_USABLE_OUT_OF_COMBAT`)). `effects=["weapon_style:dual_wield"]` SHALL NOT change: the
-typed `WeaponStyleEffect` remains the declared stance representation, and the combat adjustment
-defined by the `combat-modifier-table` capability (`dual_wield_style_atk_phys_bonus`) continues to
-resolve from ownership via the `skill_owned` + `dual_wielding` rule row.
+`cost={"sp": 8}`).
 
 #### Scenario: dual_wield_style is not castable via the normal ACTIVE-skill cast path
 - **WHEN** a player who owns `dual_wield_style` as a passive skill attempts to cast it
@@ -255,6 +312,25 @@ resolve from ownership via the `skill_owned` + `dual_wielding` rule row.
 - **WHEN** an entity owns `dual_wield_style` as a passive skill and has two weapons equipped
 - **THEN** `evaluate_combat_modifiers(entity)` returns the `atk_phys: 5` adjustment exactly as it
   did before this change
+
+#### Scenario: The previous ACTIVE declaration had no working cast path
+- **WHEN** the pre-reclassification declaration is examined
+- **THEN** `weapon_style` is not registered in `action.py`'s `_EFFECT_HANDLERS`, so an in-combat cast
+  attempt unconditionally rejected `UNKNOWN_EFFECT_ID` at effect resolution
+
+#### Scenario: Out-of-combat cast attempts were rejected earlier
+- **WHEN** the pre-reclassification skill was cast out of combat
+- **THEN** the attempt was rejected earlier as `SKILL_NOT_USABLE_OUT_OF_COMBAT`
+
+#### Scenario: The declared stance effect string is unchanged
+- **WHEN** `dual_wield_style`'s `effects` are inspected after reclassification
+- **THEN** they remain `["weapon_style:dual_wield"]` — the typed `WeaponStyleEffect` remains the
+  declared stance representation
+
+#### Scenario: The rule-table combat adjustment keeps its declaration path
+- **WHEN** the `combat-modifier-table` capability's adjustment is resolved for an owner
+- **THEN** `dual_wield_style_atk_phys_bonus` continues to resolve from ownership via the
+  `skill_owned` + `dual_wielding` rule row
 
 ### Requirement: guardian_instinct and blade_art_mastery display text reflects character-sheet flavor
 `guardian_instinct`'s label/description SHALL read as 護主本能-flavored, and `blade_art_mastery`'s
@@ -282,10 +358,7 @@ exactly (all eight move to the flavor form together with the retired cast gate).
 `effects=["sexual_magic_mastery"]`, flavor/title content not gating any other skill's castability in
 this change) and `divine_sexual_arts` (神之秘法：性愛系統, `ACTIVE`, `usable_out_of_combat=True`, empty
 `cost`, `effects=["sexual_event_target:stimulus_applied"]`), both gated by `can_use_divine_arts` per
-the `divine-mystery` capability's requirement. `divine_sexual_arts` SHALL be registered through
-`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` catalogue row rather than an inline
-`SKILL_REGISTRY` entry in `world/skills/registry.py`, so its `SKILL_REGISTRY` entry and its
-`SEXUAL_ACT_REGISTRY` row are the same paired objects the catalogue import installs.
+the `divine-mystery` capability's requirement.
 
 #### Scenario: divine_sexual_mastery does not gate divine_sexual_arts
 - **WHEN** an elf entity owns `divine_sexual_arts` but not `divine_sexual_mastery`
@@ -309,6 +382,13 @@ the `divine-mystery` capability's requirement. `divine_sexual_arts` SHALL be reg
   `divine_sexual_arts`, because `world/skills/__init__.py` installs the sexual-act catalogue as its
   final bootstrap edge — registry assembly never depends on which module the host imports first
 
+#### Scenario: The catalogue row and registry entry are the same paired objects
+- **WHEN** `divine_sexual_arts` is registered through `world/skills/sexual_acts/divine.py`'s
+  `DIVINE_ACTS` catalogue row rather than an inline `SKILL_REGISTRY` entry in
+  `world/skills/registry.py`
+- **THEN** its `SKILL_REGISTRY` entry and its `SEXUAL_ACT_REGISTRY` row are the same paired objects
+  the catalogue import installs
+
 ### Requirement: light_sword_style deals damage via the standard damage convention
 `light_sword_style` SHALL declare `effects=["damage:light:physical"]` (changed from the previously
 inert `weapon_style:light_sword`), resolved by the already-registered `damage` effect handler.
@@ -323,10 +403,7 @@ The three per-character 轉生特典 passives SHALL declare labels that read 轉
 (`reincarnation_boon_yuka`), 轉生祝福‧悠奈 (`reincarnation_boon_yuna`), and 轉生祝福‧伊洛希雅
 (`reincarnation_boon_elosia`) — each matching the `display_name` of the preset character whose kit
 declares that boon in `PLAYER_PRESET_REGISTRY`. Their keys, costs, kinds, and target
-specs SHALL NOT change, and each `effects` list keeps its shape with exactly one re-keying: the
-伊洛希雅 boon's effect string is `growth_rate:practice:5:wind` — a scoped growth rate naming the wind
-tree, replacing the unscoped `growth_rate:practice:100`, whose three-segment form no longer parses. The derived `status_display.yaml` row `reincarnation_boon_yuka_agility_bonus`
-SHALL label itself 轉生祝福‧悠花敏捷提升.
+specs SHALL NOT change, and each `effects` list keeps its shape.
 
 #### Scenario: Every preset-carried boon label equals its owner's display name exactly
 - **WHEN** the label of each `reincarnation_boon_*` skill declared by a preset's skill kit is
@@ -340,20 +417,19 @@ SHALL label itself 轉生祝福‧悠花敏捷提升.
 - **WHEN** the `status_display.yaml` row keyed `reincarnation_boon_yuka_agility_bonus` is inspected
 - **THEN** its label is 轉生祝福‧悠花敏捷提升
 
+#### Scenario: The 伊洛希雅 boon effect string is re-keyed to the scoped growth rate
+- **WHEN** the 伊洛希雅 boon's `effects` list is inspected
+- **THEN** its effect string is `growth_rate:practice:5:wind` — a scoped growth rate naming the wind
+  tree, replacing the unscoped `growth_rate:practice:100`, whose three-segment form no longer parses;
+  this is the only re-keying across the three boons' `effects` lists
+
 ### Requirement: Every skill declares usable_out_of_combat deliberately, under one written policy
 `usable_out_of_combat` SHALL mean exactly "this skill may be *selected* while no combat session is
 in progress"; it SHALL NOT mean the skill's effects may resolve without a battlefield, which
 `action-resolution-pipeline`'s damaging-action gate governs independently.
 
 Every entry of `SKILL_REGISTRY` SHALL declare a deliberate value at its own construction site — or,
-for a generated family, at the builder that produces that family — judged by one policy: an `ACTIVE`
-skill SHALL declare `True` unless casting it with no fight in progress is meaningless, because the
-effect has nothing to act on, or would bypass a subsystem that owns the outcome. `PASSIVE` skills
-SHALL also carry a deliberate value even though the capability step rejects them with
-`RejectReason.SKILL_NOT_ACTIVE` before either out-of-combat gate is reached.
-
-Skills carrying a `world.skills.effects.DamageEffect` SHALL declare `True`: their only use outside a
-fight is opening one, and the damaging-action gate confines that use to a battlefield.
+for a generated family, at the builder that produces that family — judged by one written policy.
 
 #### Scenario: Damage-carrying skills are selectable outside combat
 - **WHEN** every `SKILL_REGISTRY` entry whose parsed `effects` include a `DamageEffect` is inspected
@@ -375,13 +451,26 @@ fight is opening one, and the damaging-action gate confines that use to a battle
 - **THEN** each skill's `usable_out_of_combat` is supplied as an argument at construction, and no
   module mutates the field on an already-built `SkillDef`
 
+#### Scenario: The ACTIVE policy default is True with a stated exception
+- **WHEN** an `ACTIVE` skill's `usable_out_of_combat` value is judged
+- **THEN** it declares `True` unless casting it with no fight in progress is meaningless, because the
+  effect has nothing to act on, or would bypass a subsystem that owns the outcome
+
+#### Scenario: PASSIVE skills also carry a deliberate value
+- **WHEN** a `PASSIVE` skill's `usable_out_of_combat` value is inspected
+- **THEN** it is still deliberately declared, even though the capability step rejects them with
+  `RejectReason.SKILL_NOT_ACTIVE` before either out-of-combat gate is reached
+
+#### Scenario: Why damage-carrying skills declare True
+- **WHEN** a skill carrying a `world.skills.effects.DamageEffect` declares its value
+- **THEN** it declares `True`: their only use outside a fight is opening one, and the damaging-action
+  gate confines that use to a battlefield
+
 ### Requirement: The set of skills declaring usable_out_of_combat False is a frozen inventory
 `world/skills/tests/` SHALL assert that the set of `SKILL_REGISTRY` keys declaring
-`usable_out_of_combat=False` equals an explicit literal set enumerated in the test. Because
-`SkillDef`'s construction helpers default the field to `False`, a newly authored skill that omits a
-deliberate value SHALL fall outside the pinned set and SHALL fail this assertion, naming the
-undecided key. The assertion SHALL cover the hand-written definitions, every generated family, the
-sexual-act catalog, and `flee` in one inventory.
+`usable_out_of_combat=False` equals an explicit literal set enumerated in the test. The assertion
+SHALL cover the hand-written definitions, every generated family, the sexual-act catalog, and
+`flee` in one inventory.
 
 #### Scenario: The inventory matches the registry exactly
 - **WHEN** the frozen-inventory test runs against the current registry
@@ -397,6 +486,12 @@ sexual-act catalog, and `flee` in one inventory.
   editing the test
 - **THEN** the frozen-inventory assertion fails, so every change of judgement is recorded in one
   place
+
+#### Scenario: Helper defaults make an undecided new skill fail the assertion
+- **WHEN** a newly authored skill omits a deliberate value while `SkillDef`'s construction helpers
+  default the field to `False`
+- **THEN** the skill falls outside the pinned set and fails the frozen-inventory assertion, naming
+  the undecided key
 
 ### Requirement: Spell cost labels include a sixth tier with deterministic column precedence
 Elemental spell cost classification SHALL include 神格 with single/direct costs 180 through 220 and area/strong costs 200 through 260, inclusive. It SHALL search all ascending tiers in the target-shape column before the opposite column. Labels SHALL NOT grant ownership, impose a race restriction, or introduce a numeric cast gate. Costs outside every band SHALL fail closed.
@@ -414,7 +509,7 @@ Elemental spell cost classification SHALL include 神格 with single/direct cost
 - **THEN** classification rejects it instead of inventing a tier or silently omitting the label
 
 ### Requirement: Light spell progression composes executable recovery and judgment behavior
-The light spell family SHALL provide the documented grace and judgment progression as executable skill behavior using the common effect, condition, recovery and reaction mechanisms. Branch and merge requirements SHALL gate use independently of ownership and preserve reverse-edge-derived proficiency caps. Recovery SHALL respect living-target HP bounds; mixed spells SHALL deliver damage and recovery/cleanse to their declared selected audiences; contact effects SHALL respect state gates and resistance; emergency peak effects SHALL retain ordinary phase locks. The apotheosis merge SHALL require both terminal branches, not the independent ordinary blessing leaf. The superseded stand-alone shield spell SHALL be removed without an alias. Verification SHALL use substantive program behavior and synthetic definitions, not an exact light key/count/label/cost/effect-table test contract.
+The light spell family SHALL provide the documented grace and judgment progression as executable skill behavior using the common effect, condition, recovery and reaction mechanisms. Branch and merge requirements SHALL gate use independently of ownership and preserve reverse-edge-derived proficiency caps.
 
 #### Scenario: Branch and merge progression uses existing mechanics
 - **WHEN** a synthetic two-root spell family has branching prerequisites and a two-parent capstone
@@ -428,8 +523,37 @@ The light spell family SHALL provide the documented grace and judgment progressi
 - **WHEN** ordinary recovery targets an enemy while a mixed spell selects both teams
 - **THEN** ordinary recovery still applies and the mixed spell follows its explicitly separate effect audiences
 
+#### Scenario: Recovery respects living-target HP bounds
+- **WHEN** a light recovery effect settles on a living target
+- **THEN** the recovery is bounded by the living target's HP
+
+#### Scenario: Mixed spells route each leg to its declared selected audience
+- **WHEN** a mixed light spell resolves
+- **THEN** it delivers damage and recovery/cleanse to their declared selected audiences
+
+#### Scenario: Contact effects respect state gates and resistance
+- **WHEN** a light contact effect resolves against a gated or resistant target
+- **THEN** the state gates and resistance are respected
+
+#### Scenario: Emergency peak effects retain ordinary phase locks
+- **WHEN** an emergency peak light effect resolves
+- **THEN** the ordinary phase locks still apply
+
+#### Scenario: The apotheosis merge requires both terminal branches
+- **WHEN** the apotheosis merge prerequisite shape is evaluated
+- **THEN** it requires both terminal branches, not the independent ordinary blessing leaf
+
+#### Scenario: The superseded stand-alone shield spell is removed without an alias
+- **WHEN** the superseded stand-alone shield spell is looked up after replacement
+- **THEN** it is removed without an alias
+
+#### Scenario: Verification uses substantive behavior rather than a light contract
+- **WHEN** the light family is verified
+- **THEN** verification uses substantive program behavior and synthetic definitions, not an exact
+  light key/count/label/cost/effect-table test contract
+
 ### Requirement: Water spell progression composes executable mana-tide behavior
-The water spell family SHALL provide the documented two-root tide/deep-sea progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: MP drain with caster recovery, MP-loss DoT tiers, an MP-diverting damage shield, marker-bonus and area MP restoration with a team share-bonus marker, execution-tier MP removal with bounded regen freeze, a source-qualified depletion reaction with a target-state damage redirect, a devastation area rung, and a two-parent capstone that drains every enemy and restores every ally in one paid cast. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf caps documented as authoring-time data, unconsumed by runtime code). The superseded dev-era water spells (including the five HP-heal keys) SHALL be deleted wholesale without an alias or deprecation shim, rejecting ordinary casts as unknown skills.
+The water spell family SHALL provide the documented two-root tide/deep-sea progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf caps documented as authoring-time data, unconsumed by runtime code).
 
 #### Scenario: The mana-tide verb is observable at settlement
 - **WHEN** synthetic water compositions mirroring the documented clauses resolve through ordinary action settlement
@@ -447,8 +571,21 @@ The water spell family SHALL provide the documented two-root tide/deep-sea progr
 - **WHEN** a player casts a deleted dev-era key through the ordinary cast surface after replacement
 - **THEN** it rejects with the existing unknown-skill reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast path could land on
 
+#### Scenario: The documented mana-tide rungs compose the family
+- **WHEN** the water family's authored rungs are enumerated
+- **THEN** they comprise MP drain with caster recovery, MP-loss DoT tiers, an MP-diverting damage
+  shield, marker-bonus and area MP restoration with a team share-bonus marker, execution-tier MP
+  removal with bounded regen freeze, a source-qualified depletion reaction with a target-state damage
+  redirect, a devastation area rung, and a two-parent capstone that drains every enemy and restores
+  every ally in one paid cast
+
+#### Scenario: The superseded dev-era water spells are deleted wholesale
+- **WHEN** the dev-era water spells (including the five HP-heal keys) are examined after replacement
+- **THEN** they are deleted wholesale without an alias or deprecation shim, rejecting ordinary casts
+  as unknown skills
+
 ### Requirement: Dark spell progression composes executable curse and erosion behavior
-The dark spell family SHALL provide the documented two-root curse/erosion progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms: stat-debuff ladders on authored axes and durations, a psychological action lock on one buffs key independent of any physical-stillness key, damage-bearing erosion DoTs whose every actual tick loss is transferred in full to the grant-time origin caster and extinguished with either party's death, an execution rung that ignores defense, a devastation area rung, cast-time self-recovery keyed to a declared fraction of the caster's own missing HP, and a two-parent capstone stacking damage, devastation, a wide stat debuff and self-recovery as independent effect components. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf cap unchanged).
+The dark spell family SHALL provide the documented two-root curse/erosion progression as executable skill behavior using the common effect, audience, policy, buff, modifier and reaction mechanisms. Branch and merge prerequisites SHALL gate use through the shared lineage engine independently of ownership, with prerequisite caps derived from the reverse-edge map (leaf cap unchanged).
 
 #### Scenario: The curse ladder weakens observable stats at settlement
 - **WHEN** synthetic dark debuff compositions mirroring the authored axes and durations resolve through ordinary action settlement and the clock advances
@@ -474,8 +611,18 @@ The dark spell family SHALL provide the documented two-root curse/erosion progre
 - **WHEN** a caller references a deleted dev-era buff binding or casts a never-existing key through the ordinary cast surface after replacement
 - **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
+#### Scenario: The documented curse/erosion rungs compose the family
+- **WHEN** the dark family's authored rungs are enumerated
+- **THEN** they comprise stat-debuff ladders on authored axes and durations, a psychological action
+  lock on one buffs key independent of any physical-stillness key, damage-bearing erosion DoTs whose
+  every actual tick loss is transferred in full to the grant-time origin caster and extinguished with
+  either party's death, an execution rung that ignores defense, a devastation area rung, cast-time
+  self-recovery keyed to a declared fraction of the caster's own missing HP, and a two-parent
+  capstone stacking damage, devastation, a wide stat debuff and self-recovery as independent effect
+  components
+
 ### Requirement: Earth spell progression composes executable terrain-and-guard behavior
-The earth spell family SHALL provide the documented two-root 護甲/地形 progression as executable skill behavior using the common effect, audience, policy, buff, reaction, modifier and lineage mechanisms: a fixed-defense ladder on the defense axis at authored ceilings and durations, an accuracy debuff rung, ground-hazard marker rows whose standing-on-it fact is the live marker instance and whose damage ticks at the authored DoT rungs and durations, the ice slow-rung key reused as pure consumer data beside every fissure, a synergy strike priced once on a standing-on-the-marker target while ignoring defense unconditionally for every target, devastation area rungs, an on-physical-hit counter settlement at the authored coefficient mounted by a detectable self-buff and silent against magic attackers, and a two-parent capstone stacking damage, devastation, the top-rung full-field marker and the slow rung as independent effect components — with the retired bind node's 束縛 verb staying exclusively ice's.
+The earth spell family SHALL provide the documented two-root 護甲/地形 progression as executable skill behavior using the common effect, audience, policy, buff, reaction, modifier and lineage mechanisms.
 
 #### Scenario: The defense ladder guards observable stats at settlement
 - **WHEN** synthetic earth self-cast and ally-area defense compositions mirroring the authored ceilings and durations resolve through ordinary action settlement and the clock advances
@@ -505,8 +652,23 @@ The earth spell family SHALL provide the documented two-root 護甲/地形 progr
 - **WHEN** a caller references the deleted bind node or its control binding, or casts a never-existing key through the ordinary cast surface after replacement
 - **THEN** it rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
+#### Scenario: The documented terrain-and-guard rungs compose the family
+- **WHEN** the earth family's authored rungs are enumerated
+- **THEN** they comprise a fixed-defense ladder on the defense axis at authored ceilings and
+  durations, an accuracy debuff rung, ground-hazard marker rows whose standing-on-it fact is the live
+  marker instance and whose damage ticks at the authored DoT rungs and durations, the ice slow-rung
+  key reused as pure consumer data beside every fissure, a synergy strike priced once on a
+  standing-on-the-marker target while ignoring defense unconditionally for every target, devastation
+  area rungs, an on-physical-hit counter settlement at the authored coefficient mounted by a
+  detectable self-buff and silent against magic attackers, and a two-parent capstone stacking damage,
+  devastation, the top-rung full-field marker and the slow rung as independent effect components
+
+#### Scenario: The 束縛 verb stays exclusively ice's
+- **WHEN** the retired bind node's 束縛 verb is examined after replacement
+- **THEN** it stays exclusively ice's — no earth rung reclaims it
+
 ### Requirement: Fire spell progression composes executable burn-and-immolation behavior
-The fire spell family SHALL provide the documented HP‧消滅 progression as executable skill behavior using the common effect, audience, policy, buff, reaction and lineage mechanisms: burn damage-over-time rows on the hp axis at the authored rungs and durations with the reused family key re-homed without alias, an on-physical-hit ignition of the attacker mounted by a detectable self-only armor buff through the shared outcome-reaction vocabulary (an ignition applied to the strike's source with grant-time attribution, never a reflected damage counter), a ground-lava marker hazard whose standing-on-it fact is the live marker instance and whose damage ticks at the authored DoT rung with the shared battlefield-exit extinguishment, a 處決級 execution rung that ignores defense subtraction through the shared damage policy, immolation cast costs priced as authored static coefficients beside a self-burn row that lands as an independent effect component regardless of the damage leg, and a three-way branch-point lineage whose two-parent 神格 capstone gates through the shared lineage engine with prerequisite caps derived from the shared reverse-edge map. No fire-specific behavior code SHALL exist: every clause above is data over the shipped event, marker, policy and lineage vocabularies.
+The fire spell family SHALL provide the documented HP‧消滅 progression as executable skill behavior using the common effect, audience, policy, buff, reaction and lineage mechanisms, with its three-way branch-point lineage's two-parent 神格 capstone gated through the shared lineage engine and prerequisite caps derived from the shared reverse-edge map. No fire-specific behavior code SHALL exist: every fire clause is data over the shipped event, marker, policy and lineage vocabularies.
 
 #### Scenario: The burn ladder scorches at the authored rung and expires
 - **WHEN** a synthetic single-target fire composition dealing its authored coefficient plus the family burn row resolves through ordinary action settlement and the clock advances past several tick intervals and then past expiry
@@ -536,8 +698,20 @@ The fire spell family SHALL provide the documented HP‧消滅 progression as ex
 - **WHEN** a caller casts a never-existing fire key through the ordinary cast surface after replacement, or a previously declared fire skill's off-tree healing clause is referenced as an effect binding
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
+#### Scenario: The documented burn-and-immolation rungs compose the family
+- **WHEN** the fire family's authored rungs are enumerated
+- **THEN** they comprise burn damage-over-time rows on the hp axis at the authored rungs and durations
+  with the reused family key re-homed without alias, an on-physical-hit ignition of the attacker
+  mounted by a detectable self-only armor buff through the shared outcome-reaction vocabulary (an
+  ignition applied to the strike's source with grant-time attribution, never a reflected damage
+  counter), a ground-lava marker hazard whose standing-on-it fact is the live marker instance and
+  whose damage ticks at the authored DoT rung with the shared battlefield-exit extinguishment, a
+  處決級 execution rung that ignores defense subtraction through the shared damage policy, and
+  immolation cast costs priced as authored static coefficients beside a self-burn row that lands as an
+  independent effect component regardless of the damage leg
+
 ### Requirement: Wind spell progression composes executable speed-and-knockback behavior
-The wind spell family SHALL provide the documented 動作與閃避 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, and lineage mechanisms: timed self/ally agility ladder rungs mounted as detectable buffs and settled through the shared merged combat-modifier bundle so the authored flat agility adjustments move the real agility-driven consumers (to-hit both poles, overwhelm estimation, resist scoring, flee contest) for exactly the authored durations and then stop; a same-axis bipolar rung whose mount raises its holder's agility while lowering its holder's attack accuracy through one validated modifier rule; an area ally rung whose agility adjustment lands on allies only, its defender-side term acting as evasion against incoming single-target strikes; knockback area rungs mounting the positional-marker rows at their authored world-second durations on enemy audiences through the same-settlement effect component (never a reflected or delayed reaction rule), with the shipped cross-primitive ground-marker sweep and the impossible-recipient refusals observing through the real casts; an unconditional two-roll single-target rung settling two independent strikes for one paid cast through the shared ordered-projection settlement; a 處決級 execution rung ignoring defense subtraction; devastation rungs at the shipped fraction magnitude; and the two-root branching lineage gating every rung through the shared prerequisite engine with the two-parent canopy unlocking only at both authored thresholds.
+The wind spell family SHALL provide the documented 動作與閃避 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, and lineage mechanisms, with its two-root branching lineage gating every rung through the shared prerequisite engine and the two-parent canopy unlocking only at both authored thresholds.
 
 #### Scenario: The agility ladder speeds its holder on the real consumers and expires
 - **WHEN** a synthetic self-cast composition mounts the authored ladder rung and the holder resolves physical exchanges and a flee contest against a control twin, then the clock advances past the authored duration
@@ -571,8 +745,24 @@ The wind spell family SHALL provide the documented 動作與閃避 progression a
 - **WHEN** a caller casts a never-existing wind key through the ordinary cast surface after replacement, or applies the retired dev-era mobility buff keys
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
+#### Scenario: The documented speed-and-knockback rungs compose the family
+- **WHEN** the wind family's authored rungs are enumerated
+- **THEN** they comprise timed self/ally agility ladder rungs mounted as detectable buffs and settled
+  through the shared merged combat-modifier bundle so the authored flat agility adjustments move the
+  real agility-driven consumers (to-hit both poles, overwhelm estimation, resist scoring, flee
+  contest) for exactly the authored durations and then stop; a same-axis bipolar rung whose mount
+  raises its holder's agility while lowering its holder's attack accuracy through one validated
+  modifier rule; an area ally rung whose agility adjustment lands on allies only, its defender-side
+  term acting as evasion against incoming single-target strikes; knockback area rungs mounting the
+  positional-marker rows at their authored world-second durations on enemy audiences through the
+  same-settlement effect component (never a reflected or delayed reaction rule), with the shipped
+  cross-primitive ground-marker sweep and the impossible-recipient refusals observing through the real
+  casts; an unconditional two-roll single-target rung settling two independent strikes for one paid
+  cast through the shared ordered-projection settlement; a 處決級 execution rung ignoring defense
+  subtraction; and devastation rungs at the shipped fraction magnitude
+
 ### Requirement: Ice spell progression composes executable physical-stillness behavior
-The ice spell family SHALL provide the documented physical-stillness progression as executable skill behavior using the common effect, audience, policy, buff, modifier and lineage mechanisms: a timed slow ladder settling through the shared merged-modifier bundle on the real agility consumers at the authored rungs and durations with the reused family key re-homed without alias; freeze and 定身 rungs that reduce the holder to zero actions per turn through the shared rule-table action-lock mechanism at authored durations, each rung a distinct key locked by its own rule row so rungs differentiate by duration and identity rather than by a second mechanism; a stillness-marker synergy strike whose damage policy references the family's live stillness-instance facts and prices a single OR-matched multiplier when ANY referenced stillness fact holds — across both the freeze and the 定身 action-lock families — and no multiplier at all when none holds; a frost-wall/mire footprint authored as ground-marker rows whose occupying fact is the live marker instance carrying the first-rung slow mount on the holder, with the shared battlefield-exit extinguishment; a 處決級 execution rung that ignores defense; 毀滅級 devastation riders adding the shipped maximum-HP fraction on any landed hit; a two-root branching lineage whose two route chains converge only at the two-parent capstone through the shared progression mechanics; and the retired dev-era rows — including the off-tree defensive buff — resolving as unknown definitions with no alias or deprecated path.
+The ice spell family SHALL provide the documented physical-stillness progression as executable skill behavior using the common effect, audience, policy, buff, modifier and lineage mechanisms, with its two-root branching lineage's two route chains converging only at the two-parent capstone through the shared progression mechanics.
 
 #### Scenario: The slow ladder moves the real agility consumers and expires
 - **WHEN** a synthetic ice composition applying the authored first-rung slow mounts on a victim and a second synthetic composition applies the authored heaviest rung, and the clock advances past several durations
@@ -602,8 +792,24 @@ The ice spell family SHALL provide the documented physical-stillness progression
 - **WHEN** a caller casts a never-existing ice key through the ordinary cast surface after replacement, or a previously declared defensive-wall buff key is referenced as an effect binding
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
 
+#### Scenario: The documented physical-stillness rungs compose the family
+- **WHEN** the ice family's authored rungs are enumerated
+- **THEN** they comprise a timed slow ladder settling through the shared merged-modifier bundle on the
+  real agility consumers at the authored rungs and durations with the reused family key re-homed
+  without alias; freeze and 定身 rungs that reduce the holder to zero actions per turn through the
+  shared rule-table action-lock mechanism at authored durations, each rung a distinct key locked by
+  its own rule row so rungs differentiate by duration and identity rather than by a second mechanism;
+  a stillness-marker synergy strike whose damage policy references the family's live stillness-instance
+  facts and prices a single OR-matched multiplier when ANY referenced stillness fact holds — across
+  both the freeze and the 定身 action-lock families — and no multiplier at all when none holds; a
+  frost-wall/mire footprint authored as ground-marker rows whose occupying fact is the live marker
+  instance carrying the first-rung slow mount on the holder, with the shared battlefield-exit
+  extinguishment; a 處決級 execution rung that ignores defense; 毀滅級 devastation riders adding the
+  shipped maximum-HP fraction on any landed hit; and the retired dev-era rows — including the off-tree
+  defensive buff — resolving as unknown definitions with no alias or deprecated path
+
 ### Requirement: Lightning spell progression composes executable turn-order behavior
-The lightning spell family SHALL provide the documented 回合 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, reaction and lineage mechanisms: an extra-action grant mounted as a detectable self-only buff and settled through the turn loop's action-count consumption at the authored duration; in-round order rewriting as declarative position markers only — a self advance mounted by its authoring node and tail retreats reaching the melee attackers of the two detection mounts through the shared outcome-reaction vocabulary and the struck victims of the 神格 canopy through the enemy-audience effect leg, each settled through the round loop's declarative fold at authored keys with already-acted combatants untouchable; the 麻痺 ladder locking every action through the shipped rule-table path at the authored 20/30-second rungs on family-owned keys with the shipped marker-path inventory untouched; a declared-chance micro-rung whose one recorded per-round roll decides the skip; a 多段 rung resolving three independent strikes under the widened cap with the shipped once-paid and single-terminal-emission discipline; a 處決級 execution rung that ignores defense; 毀滅級 devastation rungs; and a two-root branching lineage whose two 主宰 routes converge only at the two-parent 神格 canopy. All numeric values are authored data pinned at load/apply/presence, never re-derived by generic code.
+The lightning spell family SHALL provide the documented 回合 progression as executable skill behavior using the common effect, audience, policy, buff, modifier, reaction and lineage mechanisms, with its two-root branching lineage's two 主宰 routes converging only at the two-parent 神格 canopy. All numeric values are authored data pinned at load/apply/presence, never re-derived by generic code.
 
 #### Scenario: The extra-action grant provisions its second slot while live and one after lapse
 - **WHEN** a synthetic self-only grant composition mounts the authored extra-action row and the round loop next provisions that combatant while the mount is live, and separately the mount is allowed to lapse before the next provisioning
@@ -636,3 +842,18 @@ The lightning spell family SHALL provide the documented 回合 progression as ex
 #### Scenario: Retired dev-era clauses resolve as ordinary rejections
 - **WHEN** a caller casts a never-existing lightning key through the ordinary cast surface after replacement, or references the retired bounds-illusion payloads as effect bindings
 - **THEN** each rejects with the existing unknown-skill or unknown-definition reason exactly like any never-existing key, and no alias, redirect or deprecated row exists that any cast or buff path could land on
+
+#### Scenario: The documented turn-order rungs compose the family
+- **WHEN** the lightning family's authored rungs are enumerated
+- **THEN** they comprise an extra-action grant mounted as a detectable self-only buff and settled
+  through the turn loop's action-count consumption at the authored duration; in-round order rewriting
+  as declarative position markers only — a self advance mounted by its authoring node and tail
+  retreats reaching the melee attackers of the two detection mounts through the shared
+  outcome-reaction vocabulary and the struck victims of the 神格 canopy through the enemy-audience
+  effect leg, each settled through the round loop's declarative fold at authored keys with
+  already-acted combatants untouchable; the 麻痺 ladder locking every action through the shipped
+  rule-table path at the authored 20/30-second rungs on family-owned keys with the shipped
+  marker-path inventory untouched; a declared-chance micro-rung whose one recorded per-round roll
+  decides the skip; a 多段 rung resolving three independent strikes under the widened cap with the
+  shipped once-paid and single-terminal-emission discipline; a 處決級 execution rung that ignores
+  defense; and 毀滅級 devastation rungs

@@ -67,7 +67,7 @@ and every decision it produces SHALL be a pure function of `entity`/`battlefield
   target(s)
 
 ### Requirement: Target selection differs by archetype and is deterministic under a fixed seed
-`world/rules/monster_behaviour.py` SHALL select a single target by the acting monster's `BehaviourProfile.target_strategy` — `"lowest_hp"` (current `hp.value`) or `"highest_effective_power"` (change 9's `effective_power()`) — breaking an exact tie by drawing from `dice.roll_d100()`, never Python's `random` module directly. The SINGLE-target candidate set for STRIKE-class (physical-school damage) selections SHALL exclude enemies holding a live positional-marker instance (state-only, dice-free — the same metric and tie-break machinery applies to the remaining candidates): because skill choice can follow target choice, an acting monster whose owned SINGLE-target damage kit is exclusively strike-class SHALL apply the exclusion at candidate selection, while a monster owning a magic-school SINGLE-target damage skill MAY keep displaced candidates for that magic kit (magic reachability is ratified unaffected; the step-4a resolution gate remains the sole authority for strike-class pairings). When the strike-class candidate set is empty while the actor holds no reachable magic SINGLE kit, the policy SHALL return no action for this round, deterministic and reproducible under a fixed seed exactly like the no-living-enemies case. The AREA shorthand candidate set SHALL keep displaced candidates (area reachability is unaffected). The delegated `default_attack_policy`'s strike-class candidate set SHALL apply the identical positional exclusion.
+`world/rules/monster_behaviour.py` SHALL select a single target by the acting monster's `BehaviourProfile.target_strategy` — `"lowest_hp"` (current `hp.value`) or `"highest_effective_power"` (change 9's `effective_power()`) — breaking an exact tie by drawing from `dice.roll_d100()`, never Python's `random` module directly.
 
 #### Scenario: lowest_hp strategy selects the enemy with the least current hp
 - **WHEN** target selection runs with `target_strategy: lowest_hp` against a set of living enemies with distinct `hp.value`s
@@ -89,15 +89,41 @@ and every decision it produces SHALL be a pure function of `entity`/`battlefield
 - **WHEN** `_choose_target()`'s implementation is inspected
 - **THEN** the only randomness source it references is `world.rules.dice.roll_d100()`
 
+#### Scenario: Strike-class SINGLE candidate set excludes displaced enemies
+- **WHEN** a STRIKE-class (physical-school damage) SINGLE-target selection computes its candidate set
+- **THEN** the set excludes enemies holding a live positional-marker instance (state-only, dice-free
+  — the same metric and tie-break machinery applies to the remaining candidates)
+
+#### Scenario: The exclusion applies at candidate selection for strike-only kits
+- **WHEN** skill choice can follow target choice and the acting monster's owned SINGLE-target damage
+  kit is exclusively strike-class
+- **THEN** the positional exclusion is applied at candidate selection
+
+#### Scenario: Magic SINGLE kits may keep displaced candidates
+- **WHEN** the acting monster owns a magic-school SINGLE-target damage skill
+- **THEN** it MAY keep displaced candidates for that magic kit (magic reachability is ratified
+  unaffected; the step-4a resolution gate remains the sole authority for strike-class pairings)
+
+#### Scenario: No reachable kit yields no action this round
+- **WHEN** the strike-class candidate set is empty while the actor holds no reachable magic SINGLE kit
+- **THEN** the policy returns no action for this round, deterministic and reproducible under a fixed
+  seed exactly like the no-living-enemies case
+
+#### Scenario: The AREA shorthand candidate set keeps displaced enemies
+- **WHEN** the AREA shorthand candidate set is computed
+- **THEN** it keeps displaced candidates (area reachability is unaffected)
+
+#### Scenario: The delegated policy applies the identical positional exclusion
+- **WHEN** the delegated `default_attack_policy` computes its strike-class candidate set
+- **THEN** it applies the identical positional exclusion
+
 ### Requirement: Skill selection differs by archetype, comparing owned skills by a dice-free expected
 damage estimate when configured to
 `world/rules/monster_behaviour.py` SHALL select one affordable owned `ACTIVE` skill whose `effects`
 include a `damage:`-prefixed ID, filtered to `TargetSpec.SINGLE` or `TargetSpec.AREA` per the decided
 action shape, using the acting monster's `BehaviourProfile.skill_choice` — `"first_owned"` (no
 comparison) or `"highest_expected_damage"` (compares `SkillHandler.effective_value()` for the skill's
-attacking stat, minus the chosen target's `effective_value("defense")` when a single target is already
-known) — again breaking an exact tie via `dice.roll_d100()`. Affordability SHALL be evaluated before
-the area-versus-single decision so an unavailable preferred shape can fall back to an affordable one.
+attacking stat) — breaking an exact tie via `dice.roll_d100()`.
 
 #### Scenario: first_owned selects the first matching skill in the entity's own owned order
 - **WHEN** skill selection runs with `skill_choice: first_owned` against an entity owning two or more
@@ -123,6 +149,15 @@ the area-versus-single decision so an unavailable preferred shape can fall back 
 - **THEN** it contains no call to `dice.roll_d100()` except inside its own tie-break branch, and no call
   to `ActionResolver.resolve()` or any effect-handler function — the actual to-hit and damage rolls
   happen only once resolution is invoked on the returned `ActionRequest`
+
+#### Scenario: The estimate subtracts the known target's defense
+- **WHEN** `highest_expected_damage` compares skills and a single target is already known
+- **THEN** each skill's estimate subtracts the chosen target's `effective_value("defense")`
+
+#### Scenario: Affordability is evaluated before the area-versus-single decision
+- **WHEN** the policy evaluates which target shape to commit to
+- **THEN** affordability is evaluated before the area-versus-single decision, so an unavailable
+  preferred shape can fall back to an affordable one
 
 ### Requirement: Area-versus-single-target shape is decided before target/skill selection, reusing the
 existing all-enemies shorthand
@@ -194,10 +229,7 @@ roster, and that every choice is exactly reproducible under the fixture's seed.
 `world/rules/combat.py`'s `default_attack_policy(entity, battlefield)` SHALL consider every owned
 `ACTIVE` skill with a `damage:`-prefixed effect and select the first one `ActionResolver` can
 resolve — ownership, prerequisite satisfaction via `can_use_skill`, and MP affordability are the
-eligibility gates. A skill the resolver would reject (prerequisite-unsatisfied per `can_use_skill`,
-unowned, or MP-unaffordable for the current gauge) SHALL be skipped in favor of the next candidate —
-in practice the innate `basic_attack`, which is always affordable — and SHALL never be proposed in
-an `ActionRequest` that `ActionResolver` rejects. The policy SHALL NOT raise on a malformed spell.
+eligibility gates.
 
 #### Scenario: A prerequisite-unsatisfied spell falls back to the innate basic_attack
 - **WHEN** `default_attack_policy` runs for a non-Monster entity (e.g. a party NPC) that owns an
@@ -225,3 +257,14 @@ an `ActionRequest` that `ActionResolver` rejects. The policy SHALL NOT raise on 
 - **THEN** every round the NPC's resolved `basic_attack` action produces an `EventLog` entry — no
   round silently discards a rejected request and no `action_skipped` entry is emitted for a castable
   entity
+
+#### Scenario: Resolver-rejected skills are skipped, never proposed
+- **WHEN** a candidate skill would be rejected by the resolver (prerequisite-unsatisfied per
+  `can_use_skill`, unowned, or MP-unaffordable for the current gauge)
+- **THEN** it is skipped in favor of the next candidate — in practice the innate `basic_attack`,
+  which is always affordable — and never proposed in an `ActionRequest` that `ActionResolver`
+  rejects
+
+#### Scenario: A malformed spell never raises the policy
+- **WHEN** `default_attack_policy` encounters a malformed spell
+- **THEN** the policy does not raise

@@ -8,18 +8,10 @@ Defines the persisted asset-record contract (status, deterministic source hash, 
 ### Requirement: Asset records carry the full contract and never a live object reference
 `world/art/store.py` SHALL persist one record per subject key containing the subject kind and
 un-prefixed key, a deterministic source-description hash, a status (`missing` / `pending` /
-`in_progress` / `done` / `failed`), a same-store relative output identity (never a worker-supplied
-public URL and never an absolute path), an attempt count, a last error code, enqueued/claimed/
-completed timestamps, the expected aspect ratio (`16:9` for scenes, `3:4` for portraits), and a prior
-output identity retained across a failed forced regeneration. A record SHALL NOT hold a live object
+`in_progress` / `done` / `failed`), a same-store relative output identity, an attempt count, a last
+error code, enqueued/claimed/completed timestamps, the expected aspect ratio, and a prior output
+identity retained across a failed forced regeneration. A record SHALL NOT hold a live object
 reference.
-
-A record that carries a non-empty gallery image id is a GALLERY JOB record: it additionally carries
-that image id, the pending card's binding, face rectangle, and requested field ids, and its expected
-output identity is the per-image gallery path rather than the subject's fixed identity. A gallery job
-record SHALL carry no `output_identity` and no `prior_output_identity`: its published artifact is a
-gallery card, not a record field. Gallery job records SHALL be deleted when they reach a terminal
-settle, so the scanned record set is bounded by the jobs actually in flight.
 
 #### Scenario: A gallery job record carries the pending card metadata
 - **WHEN** a gallery image is requested for a subject
@@ -45,22 +37,29 @@ settle, so the scanned record set is bounded by the jobs actually in flight.
 - **THEN** the next drain, startup recovery, or `@art run` reclaims it to `pending` so the job is not
   lost and never stays stuck
 
+#### Scenario: Output identity is store-relative, never a URL or absolute path
+- **WHEN** a record's output identity is persisted
+- **THEN** it is a same-store relative identity — never a worker-supplied public URL and never an
+  absolute path
+
+#### Scenario: Aspect ratios follow the subject kind
+- **WHEN** records are created for scenes and for portraits
+- **THEN** the expected aspect ratio is `16:9` for scenes and `3:4` for portraits
+
+#### Scenario: A gallery job record carries no committed output fields
+- **WHEN** a record carries a non-empty gallery image id and is therefore a GALLERY JOB record
+- **THEN** it carries that image id, the pending card's binding, face rectangle, and requested field
+  ids, and no `output_identity` and no `prior_output_identity`, because its published artifact is a
+  gallery card, not a record field
+- **AND** its expected output identity is the per-image gallery path rather than the subject's fixed
+  identity
+
 ### Requirement: The queue is keyed by subject identity and enqueue is idempotent
 `world/art/queue.py::ensure(...)` SHALL be keyed by the full subject key and SHALL be idempotent for an
 existing `pending`, `in_progress`, or `done` record. A `missing` record SHALL become `pending`; a
 `failed` record SHALL re-enqueue to `pending` on the next ensure or staff retry. Forced staff
 regeneration SHALL reset the record to `pending` under the queue lock and SHALL preserve the prior
 valid output.
-
-Gallery generation SHALL NOT go through `ensure`. `world/art/queue.py` SHALL expose a separate
-gallery enqueue that creates one record per REQUESTED IMAGE under the key
-`art:<full-subject-key>:gen:<image-id>` with a freshly minted image id, so two requests for the same
-subject produce two independent jobs and a gallery request is never collapsed into an existing
-record. The gallery key shape SHALL NOT collide with the subject key `art:<full-subject-key>`, so
-subject consolidation, `ensure`, and forced requeue never see a gallery job. `failed_keys()` and the
-staff retry path SHALL exclude gallery job records, because a gallery retry is a new request, not a
-re-enqueue. Both queues SHALL share the one process-wide queue lock, the one pending ordering, and
-the one worker concurrency slot.
 
 #### Scenario: Two gallery requests for one subject produce two jobs
 - **WHEN** a gallery image is requested twice for the same subject
@@ -90,6 +89,29 @@ the one worker concurrency slot.
 - **THEN** the record becomes `pending`, the prior valid output identity is preserved, and a later
   invalid worker result leaves the prior output intact
 
+#### Scenario: Gallery generation bypasses ensure through a separate enqueue
+- **WHEN** a gallery image is generated
+- **THEN** it SHALL NOT go through `ensure`; `world/art/queue.py` exposes a separate gallery enqueue
+  that creates one record per REQUESTED IMAGE under the key `art:<full-subject-key>:gen:<image-id>`
+  with a freshly minted image id
+- **AND** a gallery request is never collapsed into an existing record
+
+#### Scenario: The gallery key shape cannot collide with the subject key
+- **WHEN** gallery job keys `art:<full-subject-key>:gen:<image-id>` coexist with subject keys
+  `art:<full-subject-key>`
+- **THEN** the gallery key shape never collides with the subject key, so subject consolidation,
+  `ensure`, and forced requeue never see a gallery job
+
+#### Scenario: A gallery retry is a new request, not a re-enqueue
+- **WHEN** `failed_keys()` or the staff retry path runs
+- **THEN** gallery job records are excluded, because a gallery retry is a new request, not a
+  re-enqueue
+
+#### Scenario: Both queues share the one lock, ordering, and slot
+- **WHEN** subject jobs and gallery jobs are queued together
+- **THEN** both queues share the one process-wide queue lock, the one pending ordering, and the one
+  worker concurrency slot
+
 ### Requirement: Scenes and portraits share one serialization lock and one worker concurrency slot
 `world/art/` SHALL expose a single queue lock shared by scene and portrait operations. Claiming,
 settling, and forced requeues SHALL acquire the lock, while the external worker subprocess SHALL run
@@ -104,89 +126,12 @@ wait. The external worker SHALL run at most one job at a time.
 
 ### Requirement: The internal worker contract generates every output through the sd-webui client and confines paths to the store root
 
-`world/art/worker.py` SHALL generate one image per claimed record by calling the configured
-internal sd-webui client (`world.art.sd_worker.SDWebUIClient` via the settings `ART_SD_CLIENT`
-dotted path) on a background thread with a bounded timeout, SHALL apply the portrait
-background-removal stage to the returned PNG bytes when and only when that stage's own
-enablement and subject-kind conditions hold (see the `art-portrait-cutout` capability),
-SHALL convert the resulting PNG bytes to the configured output format through
-`world/art/formats.py::encode(...)`, and SHALL write the encoded bytes to the engine
-pre-computed exact expected relative identity for that subject (`expected_output_identity(subject)`)
-whose extension is the store extension of the configured output format (`.png`, `.webp`, `.jpg`,
-`.avif`). The stage order SHALL be generate, then background removal, then encode, then write,
-then publish: the removal operates on the transport PNG bytes so the encoder's PNG-container
-contract, sanitization, metadata policy, and format selection are unchanged, and exactly one
-artifact is published per job. When the stage does not apply, the bytes reach `encode` exactly as
-they do today.
-The client result carries the validated PNG bytes, the server-reported generation seed (a
-non-negative integer parsed from the response `info` JSON, or `None` when `info` is absent,
-unparseable, or carries no non-negative integer `seed`), and the exact prompt pair and
-generation parameters (steps, CFG scale, width/height, and the sampler/scheduler/checkpoint
-values when set) that built the request — the worker encodes provenance from those returned
-values and SHALL NOT re-render the prompt library after the response, so embedded metadata can
-never describe a different generation than the bytes it ships with; a missing or invalid seed
-SHALL never fail an otherwise valid generation. The background-removal stage SHALL NOT alter that
-provenance: it is a local post-process, not a generation parameter, and the embedded
-parameters block continues to describe the request sd-webui served. A job SHALL settle `done`
-only when the encoded
-bytes are written to exactly the pre-computed expected identity, resolving to an existing
-regular file
-under the configured `ART_STORE_ROOT` (symlink-resolved), and a successful settle SHALL persist
-the returned seed on the record (nullable). The output write SHALL be atomic: bytes SHALL be
-written to a unique temporary file inside the store directory and moved onto the final identity
-with an atomic replace, so a failed or interrupted regeneration never corrupts or replaces the
-record's prior valid output. When a successful settle's identity extension differs from the
-prior committed identity's extension, the worker SHALL follow strict order: under the queue
-lock, the settlement validates BOTH the new target and the record's current committed
-`output_identity` (the authoritative prior — never the transient `prior_output_identity`
-recovery field) under the store root; installs the new file; transitions the record's
-committed identity/status in the same critical section; and only after that record transition
-commits, deletes exactly the prior identity file (re-checking under-root confinement) — a
-deletion error never reverts the committed transition and leaves the prior file as an
-unreferenced orphan (logged, cleaned by the next regeneration), while any failure at or before
-the record transition leaves the prior file on disk AND referenced. So one subject never has
-two stored files referenced by a record, and no settle order can strand a record pointing at a
-deleted file; a same-extension regeneration replaces in place and deletes nothing.
-
-For a GALLERY JOB record the pre-computed expected identity SHALL be the per-image gallery path
-`gallery/<kind-directory>/<subject-key>/<image-id><extension>` derived from the record — never
-`expected_output_identity(subject)` — and the publication SHALL be a card append rather than a record
-field transition: under the queue lock, while the claim's generation token is still current, the
-engine atomically replaces the temporary file onto that identity and appends exactly one card to the
-subject's `GalleryRecord` through the gallery write API, carrying the verbatim prompt pair and the
-server-reported seed from the returned `GeneratedImage`, the configured checkpoint when one is set,
-and the job record's pending binding, face rectangle, and requested field ids. The file write SHALL
-precede the card append, so an interruption leaves an orphan FILE (reclaimed by the startup prune)
-and never a card pointing at a missing file. A gallery job SHALL NOT delete any prior file and SHALL
-NOT touch any classic record's committed output. A gallery job that fails for any bounded reason
-SHALL append NO card, SHALL record the bounded error code on the subject's `GalleryRecord`, and SHALL
-leave every existing card intact. The background-removal stage applies to a gallery job on exactly
-the same subject-kind terms as to a classic record, and its failures settle through this gallery
-path.
-
-A named client error
-(`sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`, `sd_no_image`,
-`sd_decode_error`, `sd_not_png`, `sd_response_too_large`, `sd_image_dimensions_too_large`,
-`sd_format_error`), a background-removal error (`art_cutout_unavailable`,
-`art_cutout_error`), a prompt-render or client-config error (`sd_prompt_error`,
-`sd_client_config_error`), an internal error (`sd_internal_error`), or any rejected or
-timed-out item SHALL settle the record `failed` with a bounded error code and SHALL retain the
-record's prior valid output; no file outside the store root is ever written, deleted, or
-honored. Lease reclaim SHALL bound `in_progress` records by the worst-case duration of a
-claimed batch (`batch size × (generation timeout + per-item local-conversion allowance +
-per-item background-removal allowance) + margin`), never by a flat per-item timeout, so
-neither a slow generation, a slow local encode, nor a slow background-removal pass reclaims a
-legitimately slow batch mid-work. The background-removal allowance SHALL be
-`ART_REMBG_ALLOWANCE_SECONDS` when that stage is enabled and zero when it is disabled, so a
-deployment that does not run the stage keeps today's bound exactly. A lease that nevertheless
-expires mid-flight — the one-time model download is deliberately outside the bound — SHALL
-remain safe by the claim-token rule APPLIED SYMMETRICALLY: every worker-owned terminal settle —
-the successful publication AND the terminal failure — SHALL carry the claim-time `generation_token`
-snapshot and SHALL reject a mismatch as a no-op, so a stale worker's late result, whether success
-or failure, publishes nothing, settles nothing, and never touches a record another claim now owns.
-The worst outcome is one wasted generation, never a double publish, a corrupted output, or a
-stale failure stealing a live claim. (This change adds the guard to the classic terminal-failure
-path, which is status-only today; the gallery-failure path already carries the token.)
+`world/art/worker.py` SHALL generate one image per claimed record via the configured internal
+sd-webui client (`ART_SD_CLIENT`) on a background thread with a bounded timeout, SHALL encode the
+returned PNG bytes to the configured output format via `world/art/formats.py::encode(...)`, and
+SHALL write them to the engine pre-computed exact expected relative identity for the record;
+exactly one artifact is published per job in the order generate, background removal, encode, write,
+publish.
 
 #### Scenario: A valid generation completes a scene job
 - **WHEN** the internal client returns valid PNG bytes for a scene subject, the configured
@@ -303,6 +248,127 @@ path, which is status-only today; the gallery-failure path already carries the t
 - **THEN** no card references the file, the gallery is unchanged, and the startup prune reclaims the
   orphan file
 
+#### Scenario: The client is resolved through the ART_SD_CLIENT dotted path
+- **WHEN** the worker is configured through the settings `ART_SD_CLIENT` dotted path (for example
+  `world.art.sd_worker.SDWebUIClient`)
+- **THEN** generation calls go through that configured internal sd-webui client
+
+#### Scenario: The expected identity extension follows the configured format
+- **WHEN** the engine pre-computes the exact expected relative identity for a classic subject
+  (`expected_output_identity(subject)`)
+- **THEN** its extension is the store extension of the configured output format (`.png`, `.webp`,
+  `.jpg`, `.avif`)
+
+#### Scenario: The removal stage preserves the encoder contract and pass-through
+- **WHEN** the portrait background-removal stage applies to a job when and only when that stage's
+  own enablement and subject-kind conditions hold (see the `art-portrait-cutout` capability), or
+  when it does not apply
+- **THEN** when it applies, it operates on the transport PNG bytes so the encoder's PNG-container
+  contract, sanitization, metadata policy, and format selection are unchanged
+- **AND** when the stage does not apply, the bytes reach `encode` exactly as they do today
+
+#### Scenario: The client result carries bytes, seed, and the request's own parameters
+- **WHEN** the client returns a result
+- **THEN** it carries the validated PNG bytes, the server-reported generation seed (a non-negative
+  integer parsed from the response `info` JSON, or `None` when `info` is absent, unparseable, or
+  carries no non-negative integer `seed`), and the exact prompt pair and generation parameters
+  (steps, CFG scale, width/height, and the sampler/scheduler/checkpoint values when set) that built
+  the request
+- **AND** the worker encodes provenance from those returned values and SHALL NOT re-render the
+  prompt library after the response, so embedded metadata can never describe a different generation
+  than the bytes it ships with
+- **AND** a missing or invalid seed SHALL never fail an otherwise valid generation
+
+#### Scenario: Background removal never alters embedded provenance
+- **WHEN** the background-removal stage post-processes a job's bytes
+- **THEN** provenance is unaltered — it is a local post-process, not a generation parameter — and
+  the embedded parameters block continues to describe the request sd-webui served
+
+#### Scenario: Done requires the exact identity to exist under the store root
+- **WHEN** a job considers settling `done`
+- **THEN** it SHALL settle `done` only when the encoded bytes are written to exactly the
+  pre-computed expected identity, resolving to an existing regular file under the configured
+  `ART_STORE_ROOT` (symlink-resolved)
+- **AND** a successful settle SHALL persist the returned seed on the record (nullable)
+
+#### Scenario: The output write is atomic through a temporary file
+- **WHEN** the worker writes the encoded bytes
+- **THEN** they SHALL be written to a unique temporary file inside the store directory and moved
+  onto the final identity with an atomic replace, so a failed or interrupted regeneration never
+  corrupts or replaces the record's prior valid output
+
+#### Scenario: A format switch commits the record before deleting the prior file
+- **WHEN** a successful settle's identity extension differs from the prior committed identity's
+  extension
+- **THEN** the worker SHALL follow strict order: under the queue lock, the settlement validates BOTH
+  the new target and the record's current committed `output_identity` (the authoritative prior —
+  never the transient `prior_output_identity` recovery field) under the store root; installs the new
+  file; transitions the record's committed identity/status in the same critical section; and only
+  after that record transition commits, deletes exactly the prior identity file (re-checking
+  under-root confinement)
+- **AND** one subject never has two stored files referenced by a record, and no settle order can
+  strand a record pointing at a deleted file
+
+#### Scenario: A post-commit deletion error leaves an orphan, never a reverted commit
+- **WHEN** deleting the prior identity file after a committed format-switch transition fails
+- **THEN** the deletion error never reverts the committed transition and leaves the prior file as an
+  unreferenced orphan (logged, cleaned by the next regeneration)
+- **AND** any failure at or before the record transition leaves the prior file on disk AND referenced
+
+#### Scenario: A gallery job publishes through a card append under the current token
+- **WHEN** a GALLERY JOB record settles successfully
+- **THEN** the pre-computed expected identity is the per-image gallery path
+  `gallery/<kind-directory>/<subject-key>/<image-id><extension>` derived from the record — never
+  `expected_output_identity(subject)`
+- **AND** the publication is a card append rather than a record field transition: under the queue
+  lock, while the claim's generation token is still current, the engine atomically replaces the
+  temporary file onto that identity and appends exactly one card to the subject's `GalleryRecord`
+  through the gallery write API
+- **AND** the card carries the verbatim prompt pair and the server-reported seed from the returned
+  `GeneratedImage`, the configured checkpoint when one is set, and the job record's pending binding,
+  face rectangle, and requested field ids
+
+#### Scenario: A gallery job deletes nothing and touches no classic output
+- **WHEN** a gallery job publishes or fails
+- **THEN** it SHALL NOT delete any prior file and SHALL NOT touch any classic record's committed
+  output
+- **AND** the background-removal stage applies to a gallery job on exactly the same subject-kind
+  terms as to a classic record, and its failures settle through the gallery path
+
+#### Scenario: Every bounded error settles failed and retains the prior output
+- **WHEN** a named client error (`sd_connection_error`, `sd_timeout`, `sd_http_error`,
+  `sd_malformed_response`, `sd_no_image`, `sd_decode_error`, `sd_not_png`, `sd_response_too_large`,
+  `sd_image_dimensions_too_large`, `sd_format_error`), a background-removal error
+  (`art_cutout_unavailable`, `art_cutout_error`), a prompt-render or client-config error
+  (`sd_prompt_error`, `sd_client_config_error`), an internal error (`sd_internal_error`), or any
+  rejected or timed-out item occurs
+- **THEN** the record settles `failed` with a bounded error code and retains the record's prior valid
+  output
+- **AND** no file outside the store root is ever written, deleted, or honored
+
+#### Scenario: Lease reclaim is bounded by the worst-case claimed batch
+- **WHEN** lease reclaim bounds `in_progress` records
+- **THEN** the bound is the worst-case duration of a claimed batch
+  (`batch size × (generation timeout + per-item local-conversion allowance + per-item
+  background-removal allowance) + margin`), never a flat per-item timeout, so neither a slow
+  generation, a slow local encode, nor a slow background-removal pass reclaims a legitimately slow
+  batch mid-work
+- **AND** the background-removal allowance is `ART_REMBG_ALLOWANCE_SECONDS` when that stage is
+  enabled and zero when it is disabled, so a deployment that does not run the stage keeps today's
+  bound exactly
+
+#### Scenario: The claim token guards every terminal settle symmetrically
+- **WHEN** a lease expires mid-flight — the one-time model download is deliberately outside the
+  bound — and a stale worker later reaches a terminal settle
+- **THEN** every worker-owned terminal settle — the successful publication AND the terminal failure —
+  carries the claim-time `generation_token` snapshot and rejects a mismatch as a no-op, so a stale
+  worker's late result, whether success or failure, publishes nothing, settles nothing, and never
+  touches a record another claim now owns
+- **AND** the worst outcome is one wasted generation, never a double publish, a corrupted output, or
+  a stale failure stealing a live claim
+- **AND** this change adds the guard to the classic terminal-failure path, which is status-only
+  today; the gallery-failure path already carries the token
+
 ### Requirement: A changed source-description hash is reported, never silently applied
 `world/art/queue.py` SHALL compare the enqueued `source_hash` and the enqueued rendered-prompt
 digest (sha256 of the rendered positive/negative prompt pair) against the record's stored values.
@@ -332,48 +398,12 @@ proceed unchanged.
 
 ### Requirement: Media serving maps validated stored identities to same-origin URLs without exposing the store root
 
-`web/art_media.py` SHALL expose a same-origin route that serves only an output identity
-referenced by a `done` asset record — never an arbitrary path under the store root — after
-applying the same confinement check the worker uses, and SHALL reject `..`, symlinks,
-unexpected directories or extensions, absolute paths, and missing or out-of-root identities
-with a 404. The accepted extensions are exactly the store extensions of the supported output
-formats (`.png`, `.webp`, `.jpg`, `.avif`) — the closed set of ALL store extensions, never the
-currently configured format alone, so a store mid-way through a format switch stays servable —
-each served with its fixed media type (`image/png`, `image/webp`, `image/jpeg`, `image/avif`
-respectively) from a closed extension-to-type map. The read-only presenter SHALL build URLs
-only from validated stored identities — a `done` record's stored identity validated against the
-subject's directory/key shape and the same closed four-extension set, NOT against the currently
-configured output extension — and SHALL never expose `out_path` or the store root.
-
-The route SHALL additionally serve GALLERY identities of the exact shape
-`gallery/<kind>/<subject-key>/<image-id>.<ext>`, where `<kind>` is exactly `character` or `monster`
-and `<ext>` is one of the same closed four store extensions. A gallery identity SHALL be served only
-when the `GalleryRecord` addressed by its own `<kind>`/`<subject-key>` segments holds a card whose
-stored identity equals the requested identity exactly — resolved by a direct record lookup, never by
-scanning every record — and SHALL otherwise return 404. Every other rejection rule is unchanged:
-`..`, symlinks, absolute paths, unexpected directories or extensions, and out-of-root or missing
-identities return 404 without exposing the store root. The read-only presenter SHALL build a gallery
-URL only from a card's validated stored identity.
-
-The route SHALL additionally serve BUILT-IN FALLBACK identities of the exact shape
-`defaults/<fallback-key>.<ext>` from one fixed in-repo defaults directory (never the store root),
-with the same closed extension-to-media-type map and the same confinement discipline applied to that
-directory; an absent file, an unexpected sub-path, a symlink, or an out-of-directory resolution
-SHALL return 404. Serving fallbacks through this one route keeps `/art/...` the single media URL
-vocabulary the wire payloads accept.
-
-The route SHALL additionally serve OFFICIAL-COMPONENT identities of the closed shape
-`official/<fingerprint>/<root-relative-image-path>` addressing an image admitted by the startup
-official-artwork catalog (see the `official-artwork-catalog` capability). An official identity SHALL
-be served only when the catalog's current snapshot indexes that exact root-relative path with that
-exact fingerprint; the request SHALL be answered from the catalog lookup alone — never by accepting
-a caller-supplied filesystem path — under the same closed extension-to-media-type map and the same
-no-symlink, in-root confinement discipline applied to `ART_OFFICIAL_ROOT`. A missing file, an
-unindexed path, a stale fingerprint (for example after a maintenance restart replaced the bytes), a
-sub-path escape, a symlink, or an out-of-root resolution SHALL return 404; the game SHALL NOT retain
-historical artwork to serve old URLs, and a 404 SHALL NOT trigger any download, extraction, or
-re-scan. Personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and
-confinement rules unchanged.
+`web/art_media.py` SHALL expose a same-origin route that serves only an output identity referenced
+by a `done` asset record — never an arbitrary path under the store root — after applying the same
+confinement check the worker uses, and SHALL reject `..`, symlinks, unexpected directories or
+extensions, absolute paths, and missing or out-of-root identities with a 404. The read-only
+presenter SHALL build URLs only from validated stored identities and SHALL never expose `out_path`
+or the store root.
 
 #### Scenario: A built-in fallback identity is served from the defaults directory
 - **WHEN** `defaults/<fallback-key>.<ext>` is requested and that file exists in the in-repo defaults directory
@@ -424,6 +454,58 @@ confinement rules unchanged.
 #### Scenario: A stale or bogus official fingerprint returns 404 without acquiring
 - **WHEN** an official identity names a fingerprint the current catalog does not hold for that path, an unindexed path, or a path escaping the official root
 - **THEN** the route returns 404, no download/extraction/re-scan is attempted, and the official root is untouched
+
+#### Scenario: The accepted extension and media-type sets are closed and complete
+- **WHEN** the route accepts an identity for serving
+- **THEN** the accepted extensions are exactly the store extensions of the supported output formats
+  (`.png`, `.webp`, `.jpg`, `.avif`) — the closed set of ALL store extensions, never the currently
+  configured format alone, so a store mid-way through a format switch stays servable
+- **AND** each is served with its fixed media type (`image/png`, `image/webp`, `image/jpeg`,
+  `image/avif` respectively) from a closed extension-to-type map
+
+#### Scenario: The presenter validates the done record's stored identity shape
+- **WHEN** the read-only presenter resolves a `done` record's stored identity into a URL
+- **THEN** the identity is validated against the subject's directory/key shape and the same closed
+  four-extension set, NOT against the currently configured output extension
+
+#### Scenario: Gallery identities are served only on an exact card reference
+- **WHEN** a GALLERY identity of the exact shape `gallery/<kind>/<subject-key>/<image-id>.<ext>` is
+  requested, where `<kind>` is exactly `character` or `monster` and `<ext>` is one of the same closed
+  four store extensions
+- **THEN** it is served only when the `GalleryRecord` addressed by its own
+  `<kind>`/`<subject-key>` segments holds a card whose stored identity equals the requested identity
+  exactly — resolved by a direct record lookup, never by scanning every record — and otherwise
+  returns 404
+- **AND** every other rejection rule is unchanged: `..`, symlinks, absolute paths, unexpected
+  directories or extensions, and out-of-root or missing identities return 404 without exposing the
+  store root
+- **AND** the read-only presenter builds a gallery URL only from a card's validated stored identity
+
+#### Scenario: Built-in fallbacks keep /art/... the single media URL vocabulary
+- **WHEN** a BUILT-IN FALLBACK identity of the exact shape `defaults/<fallback-key>.<ext>` is
+  requested
+- **THEN** it is served from one fixed in-repo defaults directory (never the store root), with the
+  same closed extension-to-media-type map and the same confinement discipline applied to that
+  directory; an absent file, an unexpected sub-path, a symlink, or an out-of-directory resolution
+  SHALL return 404
+- **AND** serving fallbacks through this one route keeps `/art/...` the single media URL vocabulary
+  the wire payloads accept
+
+#### Scenario: Official identities are answered from the catalog lookup alone
+- **WHEN** an OFFICIAL-COMPONENT identity of the closed shape
+  `official/<fingerprint>/<root-relative-image-path>` is requested for an image admitted by the
+  startup official-artwork catalog (see the `official-artwork-catalog` capability)
+- **THEN** it is served only when the catalog's current snapshot indexes that exact root-relative
+  path with that exact fingerprint, answered from the catalog lookup alone — never by accepting a
+  caller-supplied filesystem path — under the same closed extension-to-media-type map and the same
+  no-symlink, in-root confinement discipline applied to `ART_OFFICIAL_ROOT`
+- **AND** a missing file, an unindexed path, a stale fingerprint (for example after a maintenance
+  restart replaced the bytes), a sub-path escape, a symlink, or an out-of-root resolution SHALL
+  return 404
+- **AND** the game SHALL NOT retain historical artwork to serve old URLs, and a 404 SHALL NOT trigger
+  any download, extraction, or re-scan
+- **AND** personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and
+  confinement rules unchanged
 
 ### Requirement: In-flight generation exposes a wire-stable status
 The art presenter SHALL normalize the internal `in_progress` record status to a wire-accepted value

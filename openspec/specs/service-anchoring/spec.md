@@ -16,11 +16,7 @@ Each service component created through profession assembly SHALL persist `servic
 or `place`, copied from the profession row's `default_binding`) and — only for `place` —
 `anchor_room_id` (the dbid of the resolved anchor room) as persistent component fields (Evennia
 contrib-components `DBField`s — not plain instance attributes), surviving a save/reload round-trip.
-The values SHALL be written only by the
-shared assembly (single writer), SHALL be re-converged from the roster for reused hosts at each
-sync (binding is authored config, not runtime identity — the never-rename/never-retitle contract is
-untouched), and an authored invalid combination (`place` without an anchor room, `person` carrying
-an anchor) SHALL be rejected at config/schema validation time for roster and import records alike.
+The values SHALL be written only by the shared assembly (single writer).
 
 #### Scenario: Shipped place-bound hosts persist binding and anchor
 - **WHEN** the roster sync creates or reuses the guild master and merchant
@@ -38,19 +34,18 @@ an anchor) SHALL be rejected at config/schema validation time for roster and imp
   `place`-bound component whose authored sources supply no anchor)
 - **THEN** config/schema validation rejects it with a named error and no component is created
 
+#### Scenario: Reused hosts re-converge their binding at each sync
+- **WHEN** a host is reused by a later roster sync
+- **THEN** its binding values are re-converged from the roster — binding is authored config, not
+  runtime identity — and the never-rename/never-retitle contract is untouched
+
 ### Requirement: One read-only resolver answers service availability with a stable vocabulary
 `world/rules/service_gate.py` SHALL provide `service_available(actor, host, component)` returning a
 frozen verdict with `allowed` and a nullable stable reason from exactly
-`{remote, off_anchor, malformed_binding}`: `remote` when actor and host are not co-located (checked
-first); `off_anchor` when the component is `place`-bound and the host's location is not the anchor
-room; `malformed_binding` when the stored binding is unknown, `place` lacks a resolvable anchor
-room, or the attributes are missing on a component this change's sync has re-converged — the
-resolver SHALL fail closed, never default open. The resolver SHALL write no state, and each
+`{remote, off_anchor, malformed_binding}`, evaluated under the reason conditions below in that
+order, failing closed and never defaulting open. The resolver SHALL write no state, and each
 `malformed_binding` verdict SHALL emit at most one debounced warn event per host carrying the host
-and component context. The fixed Traditional Chinese message for `off_anchor` SHALL be a
-registry-owned constant of the gate module consumed by every caller; `remote` refusals SHALL NOT
-gain a gate-owned message — they name the service per surface (merchant, guild staff) and stay in
-each caller's own message table, the gate exposing only the stable reason code.
+and component context.
 
 #### Scenario: Co-location rules first
 - **WHEN** a place-bound host in another room is queried
@@ -74,3 +69,17 @@ each caller's own message table, the gate exposing only the stable reason code.
 - **WHEN** the merchant surface and the guild surface each refuse a `remote` host through their
   command paths
 - **THEN** each refusal line names its own service and no gate-module constant supplies either line
+
+#### Scenario: The stable reasons have fixed conditions
+- **WHEN** the resolver evaluates a verdict
+- **THEN** `remote` is returned when actor and host are not co-located; `off_anchor` when the
+  component is `place`-bound and the host's location is not the anchor room; and
+  `malformed_binding` when the stored binding is unknown, `place` lacks a resolvable anchor room,
+  or the attributes are missing on a component this change's sync has re-converged
+
+#### Scenario: Refusal message ownership is split between gate and callers
+- **WHEN** a caller renders a refusal for an `off_anchor` or `remote` verdict
+- **THEN** the fixed Traditional Chinese message for `off_anchor` is a registry-owned constant of
+  the gate module consumed by every caller, while `remote` refusals gain no gate-owned message —
+  they name the service per surface (merchant, guild staff) and stay in each caller's own message
+  table, the gate exposing only the stable reason code

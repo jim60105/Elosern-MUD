@@ -7,28 +7,11 @@ Keeps combat_modifiers.yaml one table — buff-origin and sexual-origin rules al
 
 ### Requirement: combat_modifiers.yaml is one table evaluated by one condition engine, with no
 special-case branch between buff-origin and sexual-origin rows
-`world/rules/rulebook/combat_modifiers.yaml` SHALL contain both buff-presence rules (poison, paralysis,
-fear) and sexual-field-threshold rules (arousal, climax phase), and `world/rules/combat_modifiers.py`
+`world/rules/rulebook/combat_modifiers.yaml` SHALL contain both buff-presence rules and
+sexual-field-threshold rules, and `world/rules/combat_modifiers.py`
 SHALL evaluate every rule in the table through the identical `evaluate_condition()` function from
 `world/rules/rulebook/schema.py`. No function in `combat_modifiers.py` SHALL contain a conditional
-branch that distinguishes a sexual-origin condition from a buff-origin condition. Action-locking
-marker buffs added by the MP-depletion reaction wave (a suffocation marker, and the bind marker the
-water wave binds through the table) SHALL join as ordinary `buff_active`-origin rows carrying the
-existing `actions_per_turn: 0` bundle value — no new bundle key, no marker-specific consumer code —
-and every new rule ID SHALL keep the one-unit-test correspondence the table already enforces.
-The gauge-transfer wave SHALL extend the merged bundle with exactly two further generic leaf values
-following the existing heterogeneous-value posture: `{gauge}_regen_scale` (a per-gauge regen
-multiplier consumed only by the world-clock regen stage) and `recovery_share_bonus` (an additive
-drain-recovery share bonus consumed only by the gauge-transfer caster-share read site, folded gauge-agnostically). Both SHALL be
-produced by ordinary `buff_active`-origin rows, SHALL be absent-by-default rather than defaulted in
-table code, and SHALL NOT introduce a marker-specific consumer, an element name, or a skill key
-anywhere in the table or its evaluation module.
-The dark wave's psychological-stillness marker SHALL join the same way: the `fear` marker's
-「無法行動」 clause ships as one ordinary `buff_active: fear` row carrying `actions_per_turn: 0`
-alongside the pre-existing `fear` agility/accuracy row, and `fear` SHALL remain an buffs key
-INDEPENDENT of the ice wave's physical-still keys — no row, condition or consumer may equate,
-alias, or cross-match `fear` with any ice stillness key; their distinction is authoring-side
-narrative only.
+branch that distinguishes a sexual-origin condition from a buff-origin condition.
 
 #### Scenario: The seed table contains both condition origins
 - **WHEN** `world/rules/rulebook/combat_modifiers.yaml` is loaded
@@ -63,6 +46,40 @@ narrative only.
   either key restores exactly that entity's action without touching the other key's state, and no
   table row matches one key against the other's condition
 
+#### Scenario: The rule origins covered by the table's seed rows
+- **WHEN** the buff-presence and sexual-field-threshold origins are enumerated
+- **THEN** buff-presence covers poison, paralysis, and fear, and sexual-field-threshold
+  covers arousal and climax phase
+
+#### Scenario: Reaction-wave lock markers join as ordinary rows
+- **WHEN** the action-locking marker buffs added by the MP-depletion reaction wave — a
+  suffocation marker, and the bind marker the water wave binds through the table — join the
+  table
+- **THEN** each joins as an ordinary `buff_active`-origin row carrying the existing
+  `actions_per_turn: 0` bundle value — no new bundle key, no marker-specific consumer code
+- **AND** every new rule ID keeps the one-unit-test correspondence the table already
+  enforces
+
+#### Scenario: Gauge-transfer leaf values are generic and single-consumer
+- **WHEN** the gauge-transfer wave extends the merged bundle
+- **THEN** it adds exactly two further generic leaf values following the existing
+  heterogeneous-value posture: `{gauge}_regen_scale` (a per-gauge regen multiplier consumed
+  only by the world-clock regen stage) and `recovery_share_bonus` (an additive
+  drain-recovery share bonus consumed only by the gauge-transfer caster-share read site,
+  folded gauge-agnostically)
+- **AND** both are produced by ordinary `buff_active`-origin rows and are absent-by-default
+  rather than defaulted in table code
+- **AND** neither introduces a marker-specific consumer, an element name, or a skill key
+  anywhere in the table or its evaluation module
+
+#### Scenario: The fear marker ships its lock through the ordinary mechanism
+- **WHEN** the dark wave's psychological-stillness marker joins the table the same way
+- **THEN** the `fear` marker's 「無法行動」 clause ships as one ordinary `buff_active: fear`
+  row carrying `actions_per_turn: 0` alongside the pre-existing `fear` agility/accuracy row
+- **AND** `fear` remains an buffs key INDEPENDENT of the ice wave's physical-still keys — no
+  row, condition or consumer may equate, alias, or cross-match `fear` with any ice stillness
+  key; their distinction is authoring-side narrative only
+
 ### Requirement: evaluate_combat_modifiers() is a pure query that never writes to entity state
 `world/rules/combat_modifiers.py` SHALL provide `evaluate_combat_modifiers(entity)`, returning a merged
 adjustment bundle (a `dict` of field name to adjustment) computed by evaluating every rule in
@@ -89,7 +106,7 @@ NOT assign to `entity.traits`, `entity.buffs`, `entity.db.*`, or any other entit
 
 ### Requirement: Sexual-field rules degrade to inert until entity.sexual is real, then self-arm
 `world/rules/combat_modifiers.py`'s context-building step SHALL tolerate `entity.sexual` being `None`
-(change 3's current placeholder value) by omitting sexual-field context keys entirely, causing every
+by omitting sexual-field context keys entirely, causing every
 sexual-field rule in `combat_modifiers.yaml` to evaluate as not-satisfied rather than raising. Once
 `entity.sexual` is a real object exposing `arousal`/`climax_phase` (change 7's future contribution),
 the same rules SHALL evaluate against its real values with no code change to `combat_modifiers.py`.
@@ -104,6 +121,12 @@ the same rules SHALL evaluate against its real values with no code change to `co
   `arousal` at or above the `高度` threshold
 - **THEN** the returned bundle includes `high_arousal_agility_accuracy_penalty`'s adjustment
   (`agility: "-20%"`, `accuracy: -15`)
+
+#### Scenario: The tolerated None is change 3's current placeholder
+- **WHEN** the context-building step runs while the table is still ahead of the sexual-state
+  implementation
+- **THEN** `entity.sexual` is `None` as change 3's current placeholder value, and the inert
+  degradation applies to it
 
 ### Requirement: Every rule ID in combat_modifiers.yaml has exactly one corresponding unit test
 For every `Rule.id` present in `world/rules/rulebook/combat_modifiers.yaml`, `world/rules/tests/
@@ -148,14 +171,7 @@ conditions, with no special-casing by condition type in `combat_modifiers.py`.
 `combat_modifiers.yaml` SHALL contain one `skill_owned` row for each of `defense_instinct`,
 `blade_art_mastery`, `extreme_endurance`, `magic_circle_comprehension`, `precise_mana_control`,
 `retainer_martial_training`, `guardian_instinct`, and `reincarnation_boon_yuka`, each producing a
-nonzero adjustment consistent with the skill's Traditional-Chinese flavor description. Each row's
-adjustment SHALL surface through the same surfaces as every other combat-modifier row: the merged
-bundle returned by `evaluate_combat_modifiers()` and the player-visible WebClient status conditions
-(`build_status_read_model()`'s matched-modifier presentation). Every vocabulary key the table
-declares SHALL be consumed by the deterministic combat or resource math: `agility` and `accuracy`
-in to-hit resolution, `actions_per_turn` as an action lock, `defense` and `atk_phys` as flat
-adjustments in damage magnitude, and `mp_cost`/`sp_cost` as percentage adjustments in resource
-check and deduction.
+nonzero adjustment consistent with the skill's Traditional-Chinese flavor description.
 
 #### Scenario: Every one of the eight skills has a corresponding rule row
 - **WHEN** `combat_modifiers.yaml` is loaded
@@ -173,14 +189,24 @@ check and deduction.
 - **THEN** the returned bundle includes the same `defense_instinct` row adjustment as
   `evaluate_combat_modifiers()`, and the read creates no persistent attribute or handler state
 
+#### Scenario: The eight rows surface through the same surfaces as every other row
+- **WHEN** one of the eight rows' adjustments is produced
+- **THEN** it surfaces through the same surfaces as every other combat-modifier row: the merged
+  bundle returned by `evaluate_combat_modifiers()` and the player-visible WebClient status
+  conditions (`build_status_read_model()`'s matched-modifier presentation)
+
+#### Scenario: Every declared vocabulary key is consumed by deterministic math
+- **WHEN** the table's vocabulary keys are checked against consumers
+- **THEN** each is consumed by the deterministic combat or resource math: `agility` and
+  `accuracy` in to-hit resolution, `actions_per_turn` as an action lock, `defense` and
+  `atk_phys` as flat adjustments in damage magnitude, and `mp_cost`/`sp_cost` as percentage
+  adjustments in resource check and deduction
+
 ### Requirement: Flat defense and atk_phys bundle values adjust deterministic damage magnitude
 Damage resolution in `world/rules/combat.py`'s damage handler SHALL add the actor's flat `atk_phys`
 bundle value to the actor's effective physical attack stat before the damage multiplier is applied,
 and SHALL add the target's flat `defense` bundle value to the target's effective defense stat before
-the defense term is subtracted. The `atk_phys` adjustment SHALL apply only to physical-school
-attacks (`attack_key == "atk_phys"`); magic-school attacks (`magic_power`) SHALL NOT receive it. The
-`defense` adjustment SHALL apply to both physical and magic attacks, matching defense's existing
-dual-school mitigation role. An entity with no matching rows receives unchanged damage math.
+the defense term is subtracted.
 
 #### Scenario: A physical attacker with an atk_phys bonus deals more damage
 - **WHEN** an entity owning `retainer_martial_training` (bundle `atk_phys: 5`) lands a physical
@@ -199,14 +225,26 @@ dual-school mitigation role. An entity with no matching rows receives unchanged 
 - **THEN** the staged damage amount equals `round(attack * multiplier) - (effective_defense + 5)`,
   floored at the configured damage floor
 
+#### Scenario: The atk_phys adjustment is physical-school only
+- **WHEN** the actor's `atk_phys` bundle value is applied during damage resolution
+- **THEN** it applies only to physical-school attacks (`attack_key == "atk_phys"`);
+  magic-school attacks (`magic_power`) do not receive it
+
+#### Scenario: The defense adjustment keeps its dual-school role
+- **WHEN** the target's `defense` bundle value is applied during damage resolution
+- **THEN** it applies to both physical and magic attacks, matching defense's existing
+  dual-school mitigation role
+
+#### Scenario: No matching rows leaves damage math unchanged
+- **WHEN** an entity with no matching rows is involved in damage resolution
+- **THEN** it receives unchanged damage math
+
 ### Requirement: Percentage mp_cost and sp_cost bundle values adjust resource checks and deductions
 The action resolver's resource check (step 2) and resource deduction (step 6) SHALL apply the
 actor's `mp_cost` and `sp_cost` percentage bundle values to the skill's declared MP and SP costs,
-and SHALL use the same adjusted integer amount in both steps. The adjusted cost SHALL be computed
-with floor rounding and SHALL never be negative: `max(0, floor(amount * (1 + pct/100)))` for a
-signed, possibly fractional percentage. The staged deduction and its event-log representation SHALL
-report the adjusted amount, and the commit-time recheck SHALL compare against the adjusted amount.
-A resource key with no matching `X_cost` bundle entry SHALL use the declared cost unchanged.
+and SHALL use the same adjusted integer amount in both steps, computed with floor rounding and
+never negative: `max(0, floor(amount * (1 + pct/100)))` for a signed, possibly fractional
+percentage.
 
 #### Scenario: A cost reduction enables a cast the declared cost would reject
 - **WHEN** an entity owning `precise_mana_control` (bundle `mp_cost: "-10%"`) has MP exactly equal
@@ -225,15 +263,21 @@ A resource key with no matching `X_cost` bundle entry SHALL use the declared cos
 - **THEN** the adjusted cost is the integer floor of the scaled amount (e.g. a 10-cost skill with
   `"-5%"` adjusts to 9), identically across the check, the deduction, and the preview
 
+#### Scenario: Reporting and the commit-time recheck use the adjusted amount
+- **WHEN** a cost adjustment is applied
+- **THEN** the staged deduction and its event-log representation report the adjusted amount,
+  and the commit-time recheck compares against the adjusted amount
+
+#### Scenario: A key without an X_cost entry keeps its declared cost
+- **WHEN** a resource key has no matching `X_cost` bundle entry
+- **THEN** it uses the declared cost unchanged
+
 ### Requirement: Damage-estimation surfaces mirror the live adjusted damage math
 The overwhelm expected-damage estimator (`_expected_damage_per_attack`) and the monster
 highest-expected-damage skill-choice metric (`_choose_skill.expected_damage`) SHALL compute their
 attack and defense terms through the same adjusted-stat path as live damage resolution: an
 entity's `atk_phys` bundle value is added to the physical attack term and its `defense` bundle
-value to the defense term, exactly as in live damage. The estimator keeps its existing
-conservative base-multiplier shape; only the stat terms SHALL match live resolution. The
-overwhelm power-ratio heuristic (`effective_power`) SHALL keep ranking entities by raw effective
-stats.
+value to the defense term, exactly as in live damage.
 
 #### Scenario: Overwhelm expected damage includes the bundle adjustments
 - **WHEN** `_expected_damage_per_attack` is called on an attacker owning `retainer_martial_training`
@@ -245,6 +289,15 @@ stats.
 - **WHEN** a monster owning (or granted) `retainer_martial_training` chooses between a physical and
   a magic candidate skill
 - **THEN** the physical candidate's expected damage includes the flat `atk_phys` bundle value
+
+#### Scenario: Only the stat terms mirror live resolution
+- **WHEN** the estimator computes an expected damage
+- **THEN** it keeps its existing conservative base-multiplier shape; only the stat terms
+  match live resolution
+
+#### Scenario: The power-ratio heuristic keeps ranking on raw stats
+- **WHEN** the overwhelm power-ratio heuristic (`effective_power`) ranks entities
+- **THEN** it keeps ranking by raw effective stats
 
 ### Requirement: Preview, preflight, and resolve agree on adjusted resource costs
 `action_preview.py`'s skill-wide failure check SHALL apply the same `apply_cost_modifier`
@@ -281,13 +334,11 @@ exposes that fact as a queryable condition, or on bare ownership otherwise.
 
 ### Requirement: The no-create preview path resolves the derived arousal level from stored pleasure, not a raw arousal key
 `world/rules/combat_modifiers.py::build_no_create_condition_context()` SHALL resolve its `"arousal"`
-context entry from the persisted `pleasure` counter's stored value (via the same band lookup
-`SexualState.arousal` uses at read time), for any entity whose `sexual_traits` handler has been
-materialized, rather than from a raw `"arousal"` key — which SHALL NOT exist in that storage once an
-entity's `SexualState` has been built. For an entity whose handler has never been materialized, this
-path SHALL still read `"arousal"` as a level string from the entity's frozen import-time baseline
-Attribute, unchanged from before this capability's amendment. This resolution SHALL NOT read
-`entity.sexual`, construct a `TraitHandler`, or otherwise materialize any persistent state.
+context entry from the persisted `pleasure` counter's stored value, when the entity's
+`sexual_traits` handler is materialized, rather than from a raw `"arousal"` key. With an
+unmaterialized handler it still reads `"arousal"` as a level string from the baseline Attribute,
+and SHALL NOT read `entity.sexual`, construct a `TraitHandler`, or otherwise materialize any
+persistent state.
 
 #### Scenario: The preview path reflects live pleasure on a materialized entity
 - **WHEN** an entity's `SexualState` has been materialized and its `pleasure` has since been raised at
@@ -310,15 +361,24 @@ Attribute, unchanged from before this capability's amendment. This resolution SH
   already-materialized entity, in either order, with no state change between the two calls
 - **THEN** both return the same arousal-driven adjustment bundle
 
+#### Scenario: The band lookup matches the live property
+- **WHEN** the preview path derives the `"arousal"` level from the stored `pleasure` value
+- **THEN** it uses the same band lookup `SexualState.arousal` uses at read time
+
+#### Scenario: No raw arousal key survives a built SexualState
+- **WHEN** an entity's `SexualState` has been built
+- **THEN** a raw `"arousal"` key does not exist in that storage
+
+#### Scenario: The baseline read is unchanged from before the amendment
+- **WHEN** the unmaterialized-entity path reads `"arousal"` from the frozen import-time
+  baseline Attribute
+- **THEN** the read is unchanged from before this capability's amendment
+
 ### Requirement: high_exposure_defense_penalty prices raised exposure as a combat cost
 `world/rules/rulebook/combat_modifiers.yaml` SHALL declare a `high_exposure_defense_penalty` row
 whose condition is `{field: exposure, gte: 高}` and whose adjustment is `{defense: -15}` — a flat
-integer, matching every other `defense`-bundle row in this table (`defense` has no percentage-aware
-consumer anywhere in this codebase; only a flat integer is safe to merge and to consume in damage
-resolution) — evaluated by the same `evaluate_condition()` function as every other row in the table
-with no special-casing by condition origin. This row's threshold position (the second-highest of
-`EXPOSURE_LEVELS`' five levels) mirrors `high_arousal_agility_accuracy_penalty`'s threshold
-position on `AROUSAL_LEVELS`.
+integer — evaluated by the same `evaluate_condition()` function as every other row in the table
+with no special-casing by condition origin.
 
 #### Scenario: An entity at or above 高 exposure takes the defense penalty
 - **WHEN** `evaluate_combat_modifiers(entity)` is called on an entity whose `entity.sexual.exposure`
@@ -357,6 +417,17 @@ position on `AROUSAL_LEVELS`.
   the same `webclient-status-presentation` matched-condition surface as every other
   `combat_modifiers.yaml` rule
 
+#### Scenario: The defense adjustment is a merge-safe flat integer
+- **WHEN** the row's adjustment shape is chosen
+- **THEN** it is a flat integer, matching every other `defense`-bundle row in this table —
+  `defense` has no percentage-aware consumer anywhere in this codebase, and only a flat
+  integer is safe to merge and to consume in damage resolution
+
+#### Scenario: The threshold position mirrors the arousal penalty's
+- **WHEN** the row's threshold is placed on `EXPOSURE_LEVELS`
+- **THEN** it is the second-highest of the five levels, mirroring
+  `high_arousal_agility_accuracy_penalty`'s threshold position on `AROUSAL_LEVELS`
+
 ### Requirement: Worn equipment merges into the merged bundle of both evaluation paths
 
 The deterministic core SHALL expose one pure equipment-adjustment accessor
@@ -364,10 +435,7 @@ that reads the fail-closed normalized equipment mapping and folds each worn
 item's rulebook combat values into a single adjustment bundle. Both
 `evaluate_combat_modifiers()` and the no-create preview variant SHALL append
 that bundle after rule-table matching, so to-hit, damage, estimation,
-preview, cost, and resist consumers share one effective bundle. Malformed
-equipment storage SHALL yield an empty bundle: resolution SHALL proceed on
-base stats while mutation stays blocked by the existing preflight. The
-accessor and both evaluation paths SHALL NOT write any entity state.
+preview, cost, and resist consumers share one effective bundle.
 
 #### Scenario: Worn gear lands in combat resolution
 
@@ -390,15 +458,21 @@ accessor and both evaluation paths SHALL NOT write any entity state.
   then resolves it without state change between the two reads
 - **THEN** both paths apply the identical adjusted cost
 
+#### Scenario: Malformed equipment storage yields an empty bundle
+- **WHEN** equipment storage is malformed
+- **THEN** the accessor yields an empty bundle: resolution proceeds on base stats
+  while mutation stays blocked by the existing preflight
+
+#### Scenario: The accessor and both paths never write entity state
+- **WHEN** the accessor or either evaluation path runs
+- **THEN** none of them writes any entity state
+
 ### Requirement: Adjusted agility never resolves negative
 
 Every consumer path that derives a modifier-adjusted effective agility for
 to-hit, overwhelm estimation, resist scoring, or the flee contest SHALL share
 one accessor that applies both agility components of the merged bundle in
-order — the `agility` percentage string (rule-table rows and percent-shaped
-gear) scales the effective skill value, then the flat `agility_flat` addend
-(flat gear such as `shadow_blade`) is added — and clamps the adjusted value
-at 0. Initiative order keeps its documented raw-agility exception unchanged.
+order and clamps the adjusted value at 0.
 
 #### Scenario: Heavy gear cannot invert the to-hit inequality
 
@@ -412,16 +486,22 @@ at 0. Initiative order keeps its documented raw-agility exception unchanged.
 - **WHEN** a fleeing actor's modifiers drive raw adjusted agility below zero
 - **THEN** the flee contest scores the actor with agility 0
 
+#### Scenario: Percentage scales first, then the flat addend
+- **WHEN** the shared accessor applies the merged bundle's agility components
+- **THEN** the `agility` percentage string (rule-table rows and percent-shaped gear)
+  scales the effective skill value first, then the flat `agility_flat` addend (flat
+  gear such as `shadow_blade`) is added
+
+#### Scenario: Initiative keeps its raw-agility exception
+- **WHEN** initiative order is computed
+- **THEN** it keeps its documented raw-agility exception unchanged
+
 ### Requirement: Condition contexts match on effective exposure
 
 Both combat-modifier condition-context builders (the handler path and the
 no-create path) SHALL fill the exposure condition field from the effective
 (stored + equipment bias, clamped) ordinal, exposed as one shared immutable
 level view with `gte`/`lte`/equality comparison parity across both paths.
-Exposure-gated rules SHALL therefore fire on revealing equipment while
-written state and stored values never change. The no-create builder SHALL
-remain handler-free and write-free, and stored sexual levels SHALL be read
-through one neutral shared reader that imports no rules modules.
 
 #### Scenario: Revealing habit earns the exposure defense penalty with little written
 
@@ -449,17 +529,25 @@ through one neutral shared reader that imports no rules modules.
 - **WHEN** an unequipped entity's contexts are built
 - **THEN** exposure conditions match on the stored value exactly as before
 
+#### Scenario: Revealing gear fires exposure rules without writing state
+- **WHEN** revealing equipment raises a wearer's effective exposure past a rule
+  threshold
+- **THEN** the exposure-gated rule fires on the effective level while written state
+  and stored values never change
+
+#### Scenario: The no-create builder stays neutral and write-free
+- **WHEN** the no-create context builder resolves stored sexual levels
+- **THEN** it remains handler-free and write-free, reading stored sexual levels
+  through one neutral shared reader that imports no rules modules
+
 ### Requirement: Equipment-worn conditions match a shared worn-item fact
 
 The rulebook condition vocabulary SHALL include `equipment_worn:
 <item_key>` matching iff the entity currently wears that item key. The
-worn-item-keys fact SHALL come from one pure stored-equipment read
-(malformed storage → empty set, no writes, no handler materialization) and
+worn-item-keys fact SHALL come from one pure stored-equipment read and
 SHALL be present in the handler context, the no-create context, and the
 shared matcher's partial-context defaults, so live resolution, preview,
-resist scoring, and presentation all match identically. A context lacking
-the fact SHALL fail the condition (fail-closed). `equipment_worn` SHALL
-AND-compose with all existing conditions.
+resist scoring, and presentation all match identically.
 
 #### Scenario: Sister's grace fires while the habit is worn
 
@@ -496,3 +584,16 @@ AND-compose with all existing conditions.
 - **WHEN** the shipped display-coverage test runs against the rulebook
 - **THEN** every authored grace rule has its Traditional-Chinese label and
   severity entry in the status display rulebook
+
+#### Scenario: The worn-item read is pure and fail-safe
+- **WHEN** the worn-item-keys fact is read from stored equipment
+- **THEN** the read is pure — malformed storage yields an empty set, no writes, and
+  no handler materialization
+
+#### Scenario: A missing fact fails the condition closed
+- **WHEN** a condition context lacks the worn-item fact
+- **THEN** the `equipment_worn` condition fails (fail-closed)
+
+#### Scenario: equipment_worn composes with existing conditions
+- **WHEN** an `equipment_worn` condition is authored alongside other conditions
+- **THEN** it AND-composes with all existing conditions

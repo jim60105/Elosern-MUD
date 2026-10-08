@@ -16,11 +16,8 @@ in-memory digest-ready outcome handoff.
 On a hostile defeat with the adult path enabled, each living foe-team
 monster SHALL gain the pleasure points its archetype's row in
 `world/rules/rulebook/defeat_aftermath.yaml` declares, applied through the
-existing pleasure-counter path (arousal is derived). Points accumulated
-during the fight — including the player's own sexual-skill casts and the
-monster's own catalog acts — SHALL count toward the violation threshold;
-the victory delta is added on top, never replacing it. Clamping follows the
-existing counter bounds (overflow discarded).
+existing pleasure-counter path (arousal is derived), with clamping following
+the existing counter bounds (overflow discarded).
 
 #### Scenario: Arousal carries over from the player's own mid-fight sexual casts
 - **WHEN** the player raised a winning monster's pleasure mid-fight so its derived arousal ordinal sits one step below the archetype threshold, and the victory delta is two steps
@@ -29,6 +26,10 @@ existing counter bounds (overflow discarded).
 #### Scenario: Pleasure overflow clamps without wrapping
 - **WHEN** a victory delta would push a monster's pleasure counter past its maximum
 - **THEN** pleasure rests at the maximum and arousal reflects the clamped ordinal
+
+#### Scenario: Mid-fight accumulation counts toward the threshold
+- **WHEN** points accumulated during the fight — including the player's own sexual-skill casts and the monster's own catalog acts — are tallied against the violation threshold
+- **THEN** they count toward the threshold and the victory delta is added on top, never replacing them
 
 ### Requirement: Violation sequence runs per archetype threshold with an archetype attempt cap
 For each living winner whose post-victory derived-arousal ordinal is ≥ its
@@ -60,15 +61,11 @@ bookkeeping of its own.
 
 ### Requirement: Violation attempts select victims from the target pool
 The violation target pool SHALL be every non-fled allied participant — the
-defeated player plus each companion in the battlefield's knocked-out set.
-Companions that fled the session SHALL be excluded; the player SHALL always
-be in the pool. Each attempt's victim SHALL be selected deterministically
-through the state-derived dice helper (session id + violator identity +
-attempt index), and every write SHALL land on the selected victim's own
-records: its `SexualState`, its credited counters, its EventLog entries —
-never proxied through the player. A solo party (player only) SHALL behave
-exactly as the pinned player-only baseline, and a party whose every other
-allied member fled SHALL settle without error.
+defeated player plus each companion in the battlefield's knocked-out set —
+with the player always in the pool. Each attempt's victim SHALL be selected
+deterministically through the state-derived dice helper (session id +
+violator identity + attempt index), and every write SHALL land on the
+selected victim's own records, never proxied through the player.
 
 #### Scenario: Solo party matches the pinned baseline
 - **WHEN** a solo player is defeated by a violator with cap 3 and every attempt lands
@@ -86,16 +83,22 @@ allied member fled SHALL settle without error.
 - **WHEN** every landed attempt of the sequence targeted a companion victim
 - **THEN** the player's `defeat_settle` wake prose stays the PG line and the companion victim's wake observation renders for the companion
 
+#### Scenario: Writes land on the victim's own record kinds
+- **WHEN** an attempt's writes are applied to the selected victim
+- **THEN** they land on its `SexualState`, its credited counters, and its EventLog entries
+
+#### Scenario: A fully-fled allied party settles without error
+- **WHEN** a party's every allied member besides the player fled the session
+- **THEN** the defeat settles without error and only the player is in the pool
+
 ### Requirement: Each attempt rolls the shipped resist contest with the victim defending
 Each attempt SHALL roll exactly one resist contest by calling the existing
 pure `resist_verdict(actor, resister, *, rng)`
 (`world/rules/sexual_resist.py`) with the selected victim as `resister` and
 the state-derived roll injected through its `rng` parameter — no formula is
 extracted, copied, or re-tuned. A landed attempt applies the row's full
-declared state deltas and credits the declared lifetime counters
-symmetrically (victim and aggressor each credited per the shared
-`participant` crediting convention). A resisted attempt applies only the
-row's declared resisted-shrink deltas and its duration.
+declared state deltas; a resisted attempt applies only the row's declared
+resisted-shrink deltas and its duration.
 
 #### Scenario: A landed attempt writes deltas and credits both bodies
 - **WHEN** a landed attempt declares pleasure/arousal deltas and `interspecies_act_count`
@@ -104,6 +107,10 @@ row's declared resisted-shrink deltas and its duration.
 #### Scenario: A resisted attempt shrinks the deltas
 - **WHEN** the victim wins the resist roll
 - **THEN** only the resisted-shrink deltas apply and one `violation_resisted` EventLog entry records the contest outcome
+
+#### Scenario: Landed attempts credit lifetime counters symmetrically
+- **WHEN** an attempt lands and its row declares lifetime counters
+- **THEN** the declared lifetime counters are credited symmetrically — victim and aggressor each credited per the shared `participant` crediting convention
 
 ### Requirement: First successful resistance cancels that violator's remaining attempts
 When one of a violator's attempts is resisted, that violator SHALL stop:
@@ -132,33 +139,41 @@ declares, before the next attempt begins.
 ### Requirement: The sequence registers into the core's guarded hook and emits declared EventLog kinds
 The violation body SHALL register as the body of the
 `DEFEAT_ADULT_SCENES`-guarded hook the core change declares — this change
-adds no settings flag and no second guard — and SHALL be read once at hook
-entry (no mid-sequence toggle semantics). It SHALL emit the new
+adds no settings flag and no second guard. It SHALL emit the new
 open-vocabulary EventLog kinds `violation_attempt`, `violation_resisted`,
 and `violation_act` between the core's `defeat_settle` and
-`violator_depart` entries, authoring each kind's zh-tw offline template
-line in this change. With the flag off, the settled state SHALL be exactly
-the `defeat-aftermath-core` behavior.
+`violator_depart` entries. With the flag off, the settled state SHALL be
+exactly the `defeat-aftermath-core` behavior.
 
 #### Scenario: Switch off reproduces the core settlement exactly
 - **WHEN** the same defeat settles with the switch true and with the switch false
 - **THEN** the false-run state equals the core-only settlement (no violation EventLog entries, no act deltas) and the core's declared writes are otherwise identical
 
+#### Scenario: The guard is read once at hook entry
+- **WHEN** the sequence begins executing
+- **THEN** the guard is read once at hook entry, with no mid-sequence toggle semantics
+
+#### Scenario: Each new EventLog kind ships a zh-tw template
+- **WHEN** the new violation EventLog kinds are authored in this change
+- **THEN** each kind's zh-tw offline template line is authored in this change
+
 ### Requirement: The sequence hands digest-ready outcomes to the same settlement call
 At sequence end, the sequence engine SHALL return, in memory only (never
 persisted), one immutable outcome per selected participant — selected
 count, landed count, resisted count, climax delta, and a zero-landed
-flag — to the settlement call graph for the digest phase's use. The
-outcome is a pure derivation of the state-derived dice and declared rows,
-so a settlement replay reproduces it without storage.
-The climax delta counts climax onsets: one per `violation_act` entry
-whose victim-side application pushed the victim's climax phase into
-進行中, which keeps the outcome's counts equal to the EventLog's entry
-counts by construction.
+flag — to the settlement call graph for the digest phase's use.
 
 #### Scenario: The digest input object matches the emitted EventLog
 - **WHEN** a sequence of mixed landed/resisted attempts completes
 - **THEN** the returned per-participant outcome's landed/resisted/climax counts equal the violation EventLog entries' counts for that participant, and no new persisted record exists for the outcome
+
+#### Scenario: Outcomes are pure derivations reproducible on replay
+- **WHEN** a settlement is replayed
+- **THEN** the outcome is reproduced without storage, being a pure derivation of the state-derived dice and declared rows
+
+#### Scenario: The climax delta counts climax onsets
+- **WHEN** the outcome's climax delta is computed
+- **THEN** it counts one per `violation_act` entry whose victim-side application pushed the victim's climax phase into 進行中, which keeps the outcome's counts equal to the EventLog's entry counts by construction
 
 ### Requirement: Knocked-out companions wake with their own digest observation
 At sequence end each non-fled companion victim SHALL carry its own

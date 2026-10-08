@@ -8,14 +8,8 @@ Define the deterministic order and execution rules for world-clock settlement st
 daily resets, then the seven declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
-`npc_schedules`, `correspondence_delivery`, `instance_reclamation`, `monster_site_lifecycle` — matching
-design doc §6.5's four built stages plus
-`practice_settlement` (the declared-practice writer owned directly by
-`world/rules/clock.py`, inserted between `sexual_decay` and
-`daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement),
-`instance_reclamation` (change 14's `reclaim_due_instances()`), and `monster_site_lifecycle`
-(monster-site-placement's `settle_monster_sites()` in `world/maps/monster_sites.py`, appended after
-`instance_reclamation` as the final stage), and SHALL execute every `advance()` call's stages in this order
+`npc_schedules`, `correspondence_delivery`, `instance_reclamation`, `monster_site_lifecycle` — and
+SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
 
 #### Scenario: The stage order is exactly the fixed sequence, including practice_settlement and instance_reclamation
@@ -86,12 +80,20 @@ and this is a stated, not silent, limitation
   transaction, and no earlier stage's settlement can observe the site's post-advance state, because this
   stage is the last entry of the fixed sequence
 
+#### Scenario: The fixed sequence matches design doc §6.5's composition
+- **WHEN** the sequence's provenance is inspected
+- **THEN** it is design doc §6.5's four built stages plus
+  `practice_settlement` (the declared-practice writer owned directly by
+  `world/rules/clock.py`, inserted between `sexual_decay` and
+  `daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement),
+  `instance_reclamation` (change 14's `reclaim_due_instances()`), and `monster_site_lifecycle`
+  (monster-site-placement's `settle_monster_sites()` in `world/maps/monster_sites.py`, appended after
+  `instance_reclamation` as the final stage)
+
 ### Requirement: buff_ticks, sexual_decay, and practice settlement are skipped for combat-sourced advances
 `world/rules/clock.py`'s settlement stage runner SHALL skip the `buff_ticks`, `sexual_decay`, and
-`practice_settlement` stages entirely when `advance()` is called with `AdvanceSource.COMBAT`: `buff_ticks` and
-`sexual_decay` because change 9's `run_round()` already applies both once per round as part of combat's
-own per-round upkeep; `practice_settlement` because declared practice is a downtime concept that must
-never settle during a fight. Every other stage (`gauge_regen`, `daily_resets`, and all declared world-event stages including correspondence_delivery) SHALL run regardless of `AdvanceSource`.
+`practice_settlement` stages entirely when `advance()` is called with `AdvanceSource.COMBAT`.
+Every other stage (`gauge_regen`, `daily_resets`, and all declared world-event stages including correspondence_delivery) SHALL run regardless of `AdvanceSource`.
 
 #### Scenario: A combat-sourced advance does not double-tick an active buff
 - **WHEN** a `poisoned` combatant's fight is resolved via `run_round()` for `N` rounds (each round
@@ -116,22 +118,22 @@ never settle during a fight. Every other stage (`gauge_regen`, `daily_resets`, a
 - **THEN** `buff_ticks` and `sexual_decay` both run for every entity in `entities`, unlike the
   `AdvanceSource.COMBAT` case
 
+#### Scenario: The buff/decay skip avoids double-ticking combat upkeep
+- **WHEN** the rationale for skipping `buff_ticks` and `sexual_decay` under `AdvanceSource.COMBAT` is inspected
+- **THEN** it is that change 9's `run_round()` already applies both once per round as part of combat's
+  own per-round upkeep
+
+#### Scenario: The practice skip keeps practice a downtime concept
+- **WHEN** the rationale for skipping `practice_settlement` under `AdvanceSource.COMBAT` is inspected
+- **THEN** it is that declared practice is a downtime concept that must never settle during a fight
+
 ### Requirement: Long jumps settle in quanta, not per-second steps, with an early exit once nothing
 remains to settle
-`world/rules/clock.py` SHALL derive `SETTLEMENT_QUANTUM_SECONDS` as the greatest common divisor of
-every currently-configured buff `tick_interval` (change 6's `buffs.yaml`) and sexual-decay
-`interval_seconds` (change 7's `DECAY_CONFIG`), and SHALL invoke `tick_buffs()`/`decay_tick()` once per
-quantum rather than once per second. Immediately after each `decay_tick()` call within this loop, the
-settlement SHALL also call `world.rules.sexual_state.climax_settlement_action(entity)` and, when it
-returns `"extend"` or `"end"`, SHALL emit the correspondingly named event through
-`world.rules.sexual_transitions.apply_event()`. The settlement loop SHALL stop iterating quanta, for a
-given `advance()` call, the moment no entity in scope has an active buff, a sexual field above its
-configured floor, **or a `climax_phase` of `進行中`** — an entity mid-climax always counts as needing
-further settlement regardless of every other field's floor state — and SHALL additionally stop at a
-configured defensive cap (`MAX_SETTLEMENT_QUANTA`) regardless of remaining work.
-
-Any final partial quantum from a command or combat-adjacent duration SHALL still be passed to the
-per-entity accumulators once. It is never discarded merely because it is smaller than the quantum.
+`world/rules/clock.py` SHALL derive `SETTLEMENT_QUANTUM_SECONDS` as the GCD of every configured buff
+`tick_interval` and sexual-decay `interval_seconds`, and SHALL invoke `tick_buffs()`/`decay_tick()`
+once per quantum, not once per second. The loop SHALL stop early once no entity in scope has an
+active buff, a sexual field above its floor, **or a `climax_phase` of `進行中`**, and SHALL stop at
+the defensive cap `MAX_SETTLEMENT_QUANTA` regardless of remaining work.
 
 #### Scenario: An 8-hour skip with no active buffs or elevated sexual state exits before a quantum
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called for an entity with no active buffs
@@ -169,6 +171,32 @@ per-entity accumulators once. It is never discarded merely because it is smaller
   `climax_phase` is `進行中` and whose every other field is at its floor
 - **THEN** the remainder branch still calls `decay_tick()` and `climax_settlement_action()` for that
   entity, because `climax_phase == 進行中` alone satisfies the settlement-work check gating that branch
+
+#### Scenario: The quantum's inputs are change 6's buffs.yaml and change 7's DECAY_CONFIG
+- **WHEN** `SETTLEMENT_QUANTUM_SECONDS`'s inputs are inspected
+- **THEN** the quantum is their greatest common divisor, taken over every currently-configured buff
+  `tick_interval` (change 6's `buffs.yaml`) and sexual-decay `interval_seconds` (change 7's
+  `DECAY_CONFIG`)
+
+#### Scenario: Climax settlement rides every decay_tick in the loop
+- **WHEN** each `decay_tick()` call within the quantum loop completes
+- **THEN** the settlement immediately after it calls `world.rules.sexual_state.climax_settlement_action(entity)`
+  and, when that returns `"extend"` or `"end"`, emits the correspondingly named event through
+  `world.rules.sexual_transitions.apply_event()`
+
+#### Scenario: Mid-climax always counts as pending settlement work
+- **WHEN** the early-exit check evaluates an entity mid-climax
+- **THEN** that entity always counts as needing further settlement regardless of every other field's
+  floor state
+
+#### Scenario: The early exit is scoped to one advance() call
+- **WHEN** the settlement loop decides to stop iterating quanta
+- **THEN** the stop applies for the given `advance()` call
+
+#### Scenario: A final partial quantum reaches the accumulators once
+- **WHEN** a command or combat-adjacent duration leaves a final partial quantum
+- **THEN** it is still passed to the per-entity accumulators once, and is never discarded merely
+  because it is smaller than the quantum
 
 ### Requirement: Gauge and buff elapsed time is deterministic
 The clock change SHALL disable the stock GaugeTrait wall-clock timer and SHALL make rulebook buff
@@ -234,8 +262,7 @@ registrable, no-op seams
 way to attach a boundary-crossing event query for `caravan_arrivals`, `shop_hours`,
 `quest_deadlines`, `npc_schedules`, or `correspondence_delivery`. When no source is registered for a given `kind`, `advance()`
 SHALL treat that stage as producing zero events — never raising, never blocking the rest of
-settlement. As of the `npc-schedule-runtime` change, `npc_schedules` SHALL have exactly one
-registered source, `settle_npc_schedules`, supplied by `world/rules/npc_schedules.py`.
+settlement.
 
 #### Scenario: An unregistered world-event stage produces no events and does not fail
 - **WHEN** `advance()` is called with no source registered for `caravan_arrivals`,
@@ -253,6 +280,11 @@ registered source, `settle_npc_schedules`, supplied by `world/rules/npc_schedule
   `advance()` across a boundary that source reports an event for
 - **THEN** the returned `ScheduledEvent` list includes that source's event, proving the registry
   mechanism works without real scheduling data
+
+#### Scenario: npc_schedules has exactly one registered source
+- **WHEN** the shipped registration set is inspected as of the `npc-schedule-runtime` change
+- **THEN** `npc_schedules` has exactly one registered source, `settle_npc_schedules`, supplied by
+  `world/rules/npc_schedules.py`
 
 The correspondence_delivery source SHALL be registered by deterministic startup and remain generation-free. Its table writes SHALL participate in the outer clock transaction and its surface contract SHALL invalidate or refresh touched cached row values on rollback.
 

@@ -6,7 +6,7 @@ Define the compact NPC character card every NPC carries, the plain-text and rend
 ## Requirements
 
 ### Requirement: A compact NPC card has exactly seven fields of fixed shape
-A compact NPC card SHALL be a mapping with exactly the top-level keys `identity`, `appearance`, `personality`, `speech_style`, `life_story`, `habit`, and `social_connection`. `identity` SHALL be a mapping with exactly the keys `public` and `hidden`; every other field SHALL be text. `identity.public`, `appearance`, `personality`, `speech_style`, `life_story`, and `habit` SHALL be required and non-empty after normalization; `identity.hidden` and `social_connection` MAY be empty and SHALL persist as empty strings when cleared, never as absent keys or `null`. Any unknown key at either level, any missing key, and any non-text leaf (number, boolean, null, list, or nested object) SHALL be rejected with a stable reason naming the offending leaf. The card shape SHALL constrain only NPCs; player character, monster, and other persona records SHALL remain unconstrained.
+A compact NPC card SHALL be a mapping with exactly the top-level keys `identity`, `appearance`, `personality`, `speech_style`, `life_story`, `habit`, and `social_connection`. `identity` SHALL be a mapping with exactly the keys `public` and `hidden`; every other field SHALL be text. `identity.public`, `appearance`, `personality`, `speech_style`, `life_story`, and `habit` SHALL be required and non-empty after normalization; `identity.hidden` and `social_connection` MAY be empty.
 
 #### Scenario: A complete card is accepted
 - **WHEN** a card carrying all seven fields with non-empty required leaves and an empty `identity.hidden` and `social_connection` is validated
@@ -28,8 +28,20 @@ A compact NPC card SHALL be a mapping with exactly the top-level keys `identity`
 - **WHEN** a player character's persona record carries structured appearance or a `background` key
 - **THEN** the player's persona reading, rendering, and editing behave exactly as before
 
+#### Scenario: Any malformed leaf shape rejects with a stable reason
+- **WHEN** a card carries an unknown key at either level, a missing key, or a non-text leaf — a number, boolean, null, list, or nested object
+- **THEN** validation rejects it with a stable reason naming the offending leaf
+
+#### Scenario: A cleared optional leaf persists as an empty string
+- **WHEN** `identity.hidden` or `social_connection` is cleared
+- **THEN** it persists as an empty string, never as an absent key or `null`
+
+#### Scenario: Only NPC records are constrained by the card shape
+- **WHEN** a monster's or other non-NPC persona record carries an arbitrary record shape
+- **THEN** the card shape does not constrain it
+
 ### Requirement: Card text is normalized plain text
-Every NPC card leaf SHALL first replace each CRLF pair with exactly one LF and every remaining CR with LF, then trim the maximal outer runs of exactly these boundary code points: U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF. All interior text and all code points outside this finite set SHALL remain verbatim; no Unicode composition normalization or other line-separator conversion SHALL occur. Required emptiness and code-point/rendered budgets SHALL be evaluated after normalization. The same rule SHALL apply to editable offline greetings before the existing 300-code-point/no-LF/empty-allowed validation. Generic player persona normalization SHALL remain unaffected. Card text SHALL never be interpreted as markup, a template, a command, or an executable instruction; every output surface SHALL escape it for that surface.
+Every NPC card leaf SHALL first replace each CRLF pair with exactly one LF and every remaining CR with LF, then trim the maximal outer runs of exactly these boundary code points: U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF. All interior text and all code points outside this finite set SHALL remain verbatim; no Unicode composition normalization or other line-separator conversion SHALL occur.
 
 #### Scenario: Line endings and outer whitespace normalize
 - **WHEN** a leaf is submitted as `"  first\r\nsecond\r  "`
@@ -55,8 +67,24 @@ Every NPC card leaf SHALL first replace each CRLF pair with exactly one LF and e
 - **WHEN** a greeting contains an interior CRLF or lone CR between words
 - **THEN** it becomes an interior LF and rejects as greeting-invalid, whereas a trailing CRLF is trimmed and does not create a second paragraph
 
+#### Scenario: Emptiness and budgets evaluate after normalization
+- **WHEN** required emptiness and code-point/rendered budgets are evaluated for a card
+- **THEN** they are evaluated after normalization
+
+#### Scenario: Greetings normalize before their existing validation
+- **WHEN** an editable offline greeting is submitted
+- **THEN** the same normalization rule applies before the existing 300-code-point/no-LF/empty-allowed validation
+
+#### Scenario: Player persona normalization is untouched
+- **WHEN** a generic player persona record is normalized
+- **THEN** its normalization behavior remains unaffected
+
+#### Scenario: Card text is never interpreted and is escaped per surface
+- **WHEN** card text reaches any output surface
+- **THEN** it is never interpreted as markup, a template, a command, or an executable instruction, and every output surface escapes it for that surface
+
 ### Requirement: Card bounds count rendered labels and are never satisfied by truncation
-Each text leaf SHALL be at most 600 Unicode code points after normalization, counting an astral character as one code point. The rendered identity section, including its `身分` header and the `公開身分`/`隱秘身分` line labels, SHALL be at most 600 code points. The complete labeled card block, including every label and line separator, SHALL be at most 2,000 code points. An over-bound card SHALL be rejected with `leaf_too_long` naming the leaf, `identity_section_too_long`, or `card_too_long`; it SHALL never be shortened. A card whose every leaf is at its individual maximum simultaneously is invalid under the total bound and SHALL be rejected.
+Each text leaf SHALL be at most 600 Unicode code points after normalization, counting an astral character as one code point. The rendered identity section, including its `身分` header and the `公開身分`/`隱秘身分` line labels, SHALL be at most 600 code points. The complete labeled card block, including every label and line separator, SHALL be at most 2,000 code points. An over-bound card SHALL be rejected with a stable reason; it SHALL never be shortened.
 
 #### Scenario: A 600-code-point leaf of astral characters passes
 - **WHEN** a leaf holds exactly 600 astral characters and the rendered card stays within 2,000 code points
@@ -74,6 +102,14 @@ Each text leaf SHALL be at most 600 Unicode code points after normalization, cou
 - **WHEN** the raw leaf text totals under 2,000 code points but the rendered labeled block exceeds 2,000
 - **THEN** validation rejects it with `card_too_long`
 
+#### Scenario: All leaves at their individual maximums is still invalid
+- **WHEN** a card has every leaf at its individual maximum simultaneously
+- **THEN** it is invalid under the total bound and is rejected
+
+#### Scenario: Each bound violation names its stable reason
+- **WHEN** a card exceeds the leaf, identity-section, or total bound
+- **THEN** validation rejects with `leaf_too_long` naming the leaf, `identity_section_too_long`, or `card_too_long`, respectively
+
 ### Requirement: Validation and prompt rendering share one field order and label policy
 The card SHALL render in the order identity, appearance, personality, speech_style, life_story, habit, social_connection, with `speech_style` labelled `說話風格` immediately after `personality`. An empty optional leaf SHALL contribute no section and no placeholder text. For every valid card, the block the card contract measures SHALL be byte-identical to the block the persona reader produces for that card, and SHALL contain no truncation marker.
 
@@ -86,7 +122,7 @@ The card SHALL render in the order identity, appearance, personality, speech_sty
 - **THEN** the rendered block has no `隱秘身分` line and no `人脈` section
 
 ### Requirement: NPC persona metadata is a separate record
-The effective card SHALL be stored only at the NPC's persona record. A separate NPC persona metadata record SHALL hold the card format version, the content-generation marker, a monotonic positive `persona_version`, and initialization provenance. Provenance SHALL be one of the closed kinds `profile`, `companion`, `import`, or `generated_quest`, carrying identifiers only and never prose. The retired `offline_bundle` kind SHALL be rejected before initialization/update writes; persisted metadata of that kind SHALL be unavailable under the existing read validation without repair, compatibility translation, or replacement characterization. Metadata SHALL never be stored inside the persona record and SHALL never be rendered into any prompt or look output.
+The effective card SHALL be stored only at the NPC's persona record. A separate NPC persona metadata record SHALL hold the card format version, the content-generation marker, a monotonic positive `persona_version`, and initialization provenance. Provenance SHALL be one of the closed kinds `profile`, `companion`, `import`, or `generated_quest`, carrying identifiers only and never prose. Metadata SHALL never be stored inside the persona record.
 
 #### Scenario: Metadata stays out of the persona record
 - **WHEN** an NPC card is initialized from a profile
@@ -99,6 +135,14 @@ The effective card SHALL be stored only at the NPC's persona record. A separate 
 #### Scenario: Retired bundle provenance fails closed
 - **WHEN** initialization supplies `{"kind": "offline_bundle", "pool": "civilian", "bundle": "old_bundle"}` or an editor reads metadata carrying that retired kind
 - **THEN** initialization rejects without persistence and the read returns unavailable without repairing, reselecting, rewriting or exposing the card
+
+#### Scenario: Persisted retired-kind metadata is unavailable, not translated
+- **WHEN** metadata persisted with the retired `offline_bundle` kind is read
+- **THEN** it is unavailable under the existing read validation without repair, compatibility translation, or replacement characterization
+
+#### Scenario: Metadata is never rendered into prompts or look output
+- **WHEN** any prompt or look output is rendered for an NPC
+- **THEN** no metadata is rendered into it
 
 ### Requirement: Reading an NPC persona never initializes or repairs it
 Reading an NPC's persona for an editor or any consumer SHALL never write. A non-NPC target, a missing card, missing metadata, or a stored card or metadata that fails validation SHALL yield an explicit unavailable result with a stable reason and an operational warning event, and SHALL leave the stored records unchanged.
@@ -127,7 +171,7 @@ Initializing an NPC persona SHALL validate the card before writing and SHALL wri
 - **THEN** neither the persona record nor the metadata record is written
 
 ### Requirement: Persona updates are compare-and-set on persona_version
-Every persona update SHALL compare the submitted expected version with the persisted version inside the same database transaction as the write, including for a submission whose card equals the stored card. A complete normalized card that differs from the stored card in any leaf, including either identity leaf, SHALL be written with `persona_version` incremented by exactly one in the same transaction. A card exactly equal to the stored normalized card SHALL succeed without advancing the version. A version mismatch SHALL reject without writing and report the current version. Changing a card and later changing it back SHALL advance the version twice. A boolean or non-integer expected version SHALL be rejected.
+Every persona update SHALL compare the submitted expected version with the persisted version inside the same database transaction as the write, including for a submission whose card equals the stored card. A complete normalized card that differs from the stored card in any leaf, including either identity leaf, SHALL be written with `persona_version` incremented by exactly one in the same transaction. A version mismatch SHALL reject without writing and report the current version.
 
 #### Scenario: A changed hidden identity advances the version
 - **WHEN** an update at the current version changes only `identity.hidden`
@@ -145,8 +189,12 @@ Every persona update SHALL compare the submitted expected version with the persi
 - **WHEN** a leaf is changed and then changed back by two successful updates
 - **THEN** the version has advanced by two
 
+#### Scenario: A non-integer expected version is rejected
+- **WHEN** an update submits a boolean or otherwise non-integer expected version
+- **THEN** it is rejected
+
 ### Requirement: Persona writes are atomic, serialized, and restore caches on rollback
-Every NPC persona write SHALL validate before persistence, SHALL perform its version read and its card and metadata writes in one database transaction that is serialized against concurrent writers in other processes by a database-held lock rather than a read-then-assign, SHALL take that lock before reading the persisted version, SHALL read the persisted version from the database rather than from any in-process object cache, and on any failure SHALL restore the in-memory attribute cache of both records to their pre-write values before any other reader can observe them. A database lock or busy failure SHALL surface as a stable storage-unavailable outcome (for an update) or a named storage error that fails the caller's all-or-nothing transaction (for an initialization).
+Every NPC persona write SHALL validate before persistence and SHALL perform its version read and its card and metadata writes in one database transaction serialized against concurrent writers in other processes by a database-held lock rather than a read-then-assign. The lock SHALL be taken before reading the persisted version, and that read SHALL come from the database rather than from any in-process object cache.
 
 #### Scenario: A failure mid-write leaves no partial state
 - **WHEN** the metadata write raises after the card write inside one update
@@ -167,6 +215,14 @@ Every NPC persona write SHALL validate before persistence, SHALL perform its ver
 #### Scenario: Two writers cannot both win the same version
 - **WHEN** two updates submit the same expected version in sequence without re-reading
 - **THEN** exactly one succeeds and the other is rejected as a version conflict
+
+#### Scenario: A failed write restores both attribute caches
+- **WHEN** any persona write fails
+- **THEN** the in-memory attribute cache of both records is restored to its pre-write values before any other reader can observe them
+
+#### Scenario: A lock or busy failure surfaces per operation
+- **WHEN** the database reports a lock or busy failure
+- **THEN** an update surfaces a stable storage-unavailable outcome, and an initialization surfaces a named storage error that fails the caller's all-or-nothing transaction
 
 ### Requirement: Persona writers emit commit-bound events without persona text
 Initialization and update SHALL emit operational events through the observability facade only after commit, carrying the NPC identity, acting character when present, provenance kind and profile key when present, and old and new version. Expected rejections SHALL emit an informational event with a stable reason. No event SHALL carry any card text, hidden identity, or dialogue.

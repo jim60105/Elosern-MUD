@@ -5,7 +5,7 @@ Required Node and Playwright entry points, isolated deterministic server fixture
 ## Requirements
 
 ### Requirement: DOM-independent client behavior has an executable Node test gate
-Protocol validation/reduction, keyboard routing, the narrative markup tokenizer, and the local-map render model SHALL be implemented as DOM-independent, dependency-free UMD/CommonJS pure-model APIs and SHALL have deterministic tests runnable with Node 24's built-in test runner. The suite SHALL cover exact schemas, atomic new-epoch adoption, active-epoch revision ordering, old-epoch rejection, panel replacement, focus movement, Escape stack behavior, command-drawer transition, disabled entries, repeated-Enter suppression, focus-by-key resolution and pointer-sourced confirmation, the narrative allowlist grammar with its degradation and bounds under hostile input, and the minimap lattice with its remembered-node split and its rank-compression fallback — all without adding an npm runtime dependency to these DOM-independent modules, which remain dependency-free UMD/CommonJS pure-model APIs (no `document`/`window` access at load time) imported by the Node gate and reused by the Vue application through Vite's CommonJS interop, and, where browser access to a module requires a global, through the browser-bridge layer (C2) that re-exposes the `window.Elosern.*` façades; where a module carries a DOM builder it is only touched at call time, never at load. The Vue component/view layer is covered by a separate Vitest component gate and is not part of this Node gate.
+Protocol validation/reduction, keyboard routing, the narrative markup tokenizer, and the local-map render model SHALL be implemented as DOM-independent, dependency-free UMD/CommonJS pure-model APIs and SHALL have deterministic tests runnable with Node 24's built-in test runner, without adding an npm runtime dependency.
 
 #### Scenario: Node suite verifies state and keyboard contracts
 - **WHEN** `node --test web/static/webclient/js/tests/*.test.js` runs
@@ -15,12 +15,36 @@ Protocol validation/reduction, keyboard routing, the narrative markup tokenizer,
 - **WHEN** the same Node entry point runs
 - **THEN** the narrative tokenizer's allowlist, degradation, and bounds and the local-map lattice model's placement and fallback are verified with no DOM, browser, or network access
 
+#### Scenario: The suite covers the protocol and keyboard contract list
+- **WHEN** the Node suite's coverage is inspected
+- **THEN** it covers exact schemas, atomic new-epoch adoption, active-epoch revision ordering, old-epoch rejection, panel replacement, focus movement, Escape stack behavior, command-drawer transition, disabled entries, repeated-Enter suppression, focus-by-key resolution and pointer-sourced confirmation
+
+#### Scenario: The suite covers hostile markup and map fallbacks
+- **WHEN** the suite's tokenizer and map coverage is inspected
+- **THEN** it covers the narrative allowlist grammar with its degradation and bounds under hostile input, and the minimap lattice with its remembered-node split and its rank-compression fallback
+
+#### Scenario: The pure-model modules stay bridge-served
+- **WHEN** the DOM-independent modules are imported by the Node gate and by the browser build
+- **THEN** they remain dependency-free UMD/CommonJS pure-model APIs with no `document`/`window` access at load time, are reused by the Vue application through Vite's CommonJS interop, and, where browser access to a module requires a global, go through the browser-bridge layer (C2) that re-exposes the `window.Elosern.*` façades
+
+#### Scenario: DOM builders are call-time only
+- **WHEN** a pure-model module carries a DOM builder
+- **THEN** the builder is only touched at call time, never at load
+
+#### Scenario: The Vue layer is a separate gate
+- **WHEN** the Vue component/view layer is tested
+- **THEN** it is covered by a separate Vitest component gate and is not part of this Node gate
+
 ### Requirement: Browser acceptance uses an isolated managed Evennia runtime
-The browser-test harness SHALL create a temporary SQLite database and temporary runtime/log paths, allocate dynamic loopback Telnet, HTTP, and WebSocket ports per harness instance, seed deterministic account and character fixtures, start Evennia non-interactively with browser-test-only settings, poll its allocated localhost WebClient with a bounded readiness timeout, and always stop only its owned server process after success, failure, or timeout. It SHALL NOT assume port 4001 or read or write the developer database. Each invocation SHALL use fresh ports and temporary roots without shared process state. The explicit managed browser command SHALL be the sole quality-gate owner of `web/tests/browser/`; the non-browser Evennia command SHALL retain `web.webclient` tests but SHALL NOT collect browser tests again.
+The browser-test harness SHALL create a temporary SQLite database and temporary runtime/log paths, allocate dynamic loopback Telnet, HTTP, and WebSocket ports per harness instance, seed deterministic account and character fixtures, start Evennia non-interactively with browser-test-only settings, poll its allocated localhost WebClient with a bounded readiness timeout, and always stop only its owned server process after success, failure, or timeout.
 
 #### Scenario: Browser test uses isolated persistence
 - **WHEN** a Playwright test creates or changes game state
 - **THEN** all persisted effects are confined to the harness temporary directory and the configured developer database is byte-for-byte untouched
+
+#### Scenario: No fixed port or developer-database access
+- **WHEN** the harness picks ports and persistence targets
+- **THEN** it SHALL NOT assume port 4001 or read or write the developer database
 
 #### Scenario: Failed readiness still cleans up
 - **WHEN** the managed server fails to become ready within its timeout
@@ -34,6 +58,14 @@ The browser-test harness SHALL create a temporary SQLite database and temporary 
 - **WHEN** the quality workflow runs both managed browser and non-browser Evennia entry points
 - **THEN** every browser test executes through the managed browser entry point exactly once
 
+#### Scenario: Invocations share no process state
+- **WHEN** the harness runs any invocation
+- **THEN** it uses fresh ports and temporary roots without shared process state
+
+#### Scenario: One command owns the browser suite
+- **WHEN** the managed browser command and the non-browser Evennia command are compared
+- **THEN** the explicit managed browser command is the sole quality-gate owner of `web/tests/browser/`, and the non-browser Evennia command retains `web.webclient` tests but SHALL NOT collect browser tests again
+
 ### Requirement: Browser tests are localhost-only and deterministic
 Playwright acceptance SHALL use Chromium installed through the locked uv environment, SHALL block or fail every non-local network request, and SHALL use deterministic placeholders without invoking an LLM, image generator, or other external service.
 
@@ -42,7 +74,7 @@ Playwright acceptance SHALL use Chromium installed through the locked uv environ
 - **THEN** every successful HTTP and WebSocket request targets localhost and no test result depends on remote availability
 
 ### Requirement: Browser acceptance covers foundation recovery and layout behavior
-Playwright SHALL verify required surface visibility at 1451x790 and 2560x1440; that no stage anchor's rendered box intersects another stage anchor's rendered box at either acceptance viewport; that mode-gated surfaces are hidden with `display:none` (never dimmed) in the modes that hide them — so they leave the accessibility tree and the tab order — and are present again in the modes that show them; command-line expand, send, and cancel behavior — the command line collapsed on load with its ⌨ toggle visible, `/` expanding it and moving focus into the input field without inserting a literal slash, an ordinary send clearing the field, collapsing the line, and restoring action-dock focus, a rejected send keeping the text and the open line, and Escape sending nothing, collapsing the line, and restoring action-dock focus; the dialogue stage — at the 1451x790 reference viewport, a keyboard-only journey that opens a conversation from the scene overview, reads the paged line, activates a choice from the choice list over the stage, sends free-form speech through the borrowed command line, opens `↦ 移動…` and returns with Escape, ends the conversation, and moves with an exit chip of the restored overview, with the command region collapsed and both stage actors present throughout the conversation and focus never on the document body; the full-overlay contract — a labelled trigger opening exactly one overlay, a second trigger closing the first, and Escape closing the open overlay and restoring focus to its trigger; pointer activation parity on the action dock; narrative rendering of converted server markup; that the complete narrative log is reachable in one action from the message window's `日誌` control; minimap containment within its HUD island; transport interruption and control locking; lower-revision adoption in a new epoch; rejection of delayed prior-epoch messages; known layout migration; unknown layout reset; presenter degradation; and protocol mismatch with preserved text input.
+Playwright SHALL verify required surface visibility at 1451x790 and 2560x1440; that no stage anchor's rendered box intersects another stage anchor's rendered box at either acceptance viewport; and that mode-gated surfaces are hidden with `display:none` (never dimmed) in the modes that hide them — so they leave the accessibility tree and the tab order — and are present again in the modes that show them.
 
 #### Scenario: Supported viewports pass the shell journey
 - **WHEN** the acceptance journey runs at each supported desktop viewport
@@ -80,8 +112,24 @@ Playwright SHALL verify required surface visibility at 1451x790 and 2560x1440; t
 - **WHEN** the acceptance journey at 1451x790 opens a scripted host's conversation with 交談 from the scene overview, reads every page with Enter, presses `1`, reads the reply, activates `⌨ 自由對話` and sends a line, activates `↦ 移動…` and presses Escape, activates `✕ 結束對話`, and then moves with an exit chip
 - **THEN** the browser submits exactly `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, and `explore.move` in that order, the command region is hidden and both stage actors are rendered from the conversation's first commit to its end, the choice list is absent whenever a page is typing or unread, `document.activeElement` is never the body during the conversation, and focus is on the action dock once it ends
 
+#### Scenario: Command-line expand, send, and cancel are exercised
+- **WHEN** the acceptance journey drives the command line
+- **THEN** it verifies the line collapsed on load with its ⌨ toggle visible, `/` expanding it and moving focus into the input field without inserting a literal slash, an ordinary send clearing the field, collapsing the line, and restoring action-dock focus, a rejected send keeping the text and the open line, and Escape sending nothing, collapsing the line, and restoring action-dock focus
+
+#### Scenario: Pointer activation parity on the action dock is verified
+- **WHEN** the acceptance journey exercises the action dock
+- **THEN** pointer activation parity with the keyboard path is verified
+
+#### Scenario: Layout migration and degradation are verified
+- **WHEN** the acceptance journey replays persisted client state
+- **THEN** known layout migration, unknown layout reset, and presenter degradation are verified
+
+#### Scenario: Protocol mismatch keeps text input working
+- **WHEN** the acceptance journey faces a protocol mismatch
+- **THEN** text input is preserved
+
 ### Requirement: Node and Playwright checks are mandatory quality-gate steps
-Playwright SHALL be added to the synchronized uv development dependency group. The pnpm frontend toolchain is a dev/CI-time dependency only and introduces no runtime npm or pnpm dependency. The required quality workflow SHALL install Chromium with `uv run --locked playwright install --with-deps chromium` before the browser runner, run `node --test web/static/webclient/js/tests/*.test.js`, build the Vue application with the locked pnpm toolchain (`pnpm install --frozen-lockfile` and the Vite production build), run the Vue component (Vitest) test suite (`pnpm test`), build the Storybook component showcase with its component-coverage check against the frozen required set (`pnpm run build-storybook` and `pnpm run showcase-coverage`), and run the explicit `web/tests/browser/` discovery once, under coverage, with the enumerated test files executed serially within each browser workspace; concurrent browser workspaces SHALL own isolated server lifecycles (unique ephemeral ports, a private SQLite database, and dedicated log/media/static roots). The Vue `dist` artifact SHALL be built in the browser test workspaces and in the container image. The managed browser acceptance SHALL assert against the preserved DOM contract hooks (`#action-dock`, the `action-`/`target-` keys, `#combat-row-0`, panel ids) and the re-mapped `data-testid` hooks, and SHALL include the offline-degradation regression (bundle blocked → text playable via the console; incompatible OOB → graphical locked with text round-tripping). Browser tests carrying requirement annotations SHALL write to the same `OPENSPEC_TEST_EVIDENCE` path before execution evidence is verified. Browser coverage SHALL be combined with non-browser Evennia and top-level coverage before exact-root and aggregate threshold verification. Managed browser acceptance MUST NOT be included in a generic parallel Evennia profile. Existing strict OpenSpec, Python suite, traceability, coverage-root, aggregate 80% branch-coverage, and Codecov gates SHALL remain enabled. The built page makes no remote runtime request.
+Playwright SHALL be added to the synchronized uv development dependency group. The required quality workflow SHALL install Chromium with `uv run --locked playwright install --with-deps chromium` before the browser runner, run `node --test web/static/webclient/js/tests/*.test.js`, and build the Vue application with the locked pnpm toolchain (`pnpm install --frozen-lockfile` and the Vite production build).
 
 #### Scenario: The final quality workflow contains every required gate
 - **WHEN** the committed quality workflow is inspected after the shell swap
@@ -91,9 +139,49 @@ Playwright SHALL be added to the synchronized uv development dependency group. T
 - **WHEN** `uv sync --locked` and `pnpm install --frozen-lockfile` run from the committed project files
 - **THEN** the development environment includes the pinned Playwright resolution and the locked pnpm toolchain without modifying `uv.lock` or `pnpm-lock.yaml`
 
+#### Scenario: The frontend toolchain never becomes runtime
+- **WHEN** the pnpm frontend toolchain's dependency scope is checked
+- **THEN** it is a dev/CI-time dependency only and introduces no runtime npm or pnpm dependency
+
 #### Scenario: Generic parallel profile excludes managed browser acceptance
 - **WHEN** a local or quality-gate Evennia profile enables multiple test workers
 - **THEN** the managed Playwright suite continues through its separate serial command with isolated server lifecycle ownership
+
+#### Scenario: Component and showcase suites run as gates
+- **WHEN** the required quality workflow runs after the Vue build
+- **THEN** it runs the Vue component (Vitest) test suite (`pnpm test`) and builds the Storybook component showcase with its component-coverage check against the frozen required set (`pnpm run build-storybook` and `pnpm run showcase-coverage`)
+
+#### Scenario: Browser discovery runs once, serially, under coverage
+- **WHEN** the quality workflow reaches the browser runner
+- **THEN** it runs the explicit `web/tests/browser/` discovery once, under coverage, with the enumerated test files executed serially within each browser workspace
+
+#### Scenario: Concurrent browser workspaces are isolated
+- **WHEN** browser workspaces run concurrently
+- **THEN** each owns an isolated server lifecycle with unique ephemeral ports, a private SQLite database, and dedicated log/media/static roots
+
+#### Scenario: The Vue dist artifact is built where it runs
+- **WHEN** the browser test workspaces and the container image are prepared
+- **THEN** the Vue `dist` artifact is built in both
+
+#### Scenario: Acceptance asserts the frozen hooks and offline regression
+- **WHEN** the managed browser acceptance runs
+- **THEN** it asserts against the preserved DOM contract hooks (`#action-dock`, the `action-`/`target-` keys, `#combat-row-0`, panel ids) and the re-mapped `data-testid` hooks, and includes the offline-degradation regression (bundle blocked → text playable via the console; incompatible OOB → graphical locked with text round-tripping)
+
+#### Scenario: Annotated browser tests write shared evidence
+- **WHEN** browser tests carrying requirement annotations run
+- **THEN** they write to the same `OPENSPEC_TEST_EVIDENCE` path before execution evidence is verified
+
+#### Scenario: Coverage is combined before threshold verification
+- **WHEN** coverage thresholds are verified
+- **THEN** browser coverage is combined with non-browser Evennia and top-level coverage before exact-root and aggregate threshold verification
+
+#### Scenario: Managed acceptance never rides a parallel profile
+- **WHEN** a generic parallel Evennia profile is considered for browser acceptance
+- **THEN** managed browser acceptance MUST NOT be included in it
+
+#### Scenario: Existing gates and offline page behavior hold
+- **WHEN** the workflow is finalized
+- **THEN** the existing strict OpenSpec, Python suite, traceability, coverage-root, aggregate 80% branch-coverage, and Codecov gates remain enabled, and the built page makes no remote runtime request
 
 ### Requirement: Art-panel portrait keyboard journeys establish dock focus before key presses
 A Playwright acceptance journey that asserts the client-local portrait focus
@@ -102,9 +190,7 @@ switching SHALL focus the action dock
 dock's mounted router frame (the first combat row `#combat-row-0`) before the
 first key press, and SHALL wait for the basic-attack target menu frame
 (`#combat-row-0` carrying a `target-` data-item-key) before asserting that the
-portrait switched to the focused target. This guarantees the key event reaches
-the KeyboardRouter — never the command-drawer field or an unfocused editable
-target — and turns a swallowed key press into a precise diagnostic.
+portrait switched to the focused target.
 
 #### Scenario: Art-panel combat journey presses Enter with the dock focused
 - **WHEN** an art-panel acceptance test engages combat, presses Enter to open
@@ -121,16 +207,16 @@ target — and turns a swallowed key press into a precise diagnostic.
   target's key, so a swallowed key press fails with a precise diagnostic
   instead of a bare timeout
 
+#### Scenario: Dock focus guarantees the key reaches the router
+- **WHEN** the journey establishes dock focus before its key presses
+- **THEN** the guarantee is that the key event reaches the KeyboardRouter — never the command-drawer field or an unfocused editable target — and a swallowed key press turns into a precise diagnostic
+
 ### Requirement: The implementation-bound public contract is frozen before the shell is swapped
 Before any change that relocates a browser-targeted identifier — a shell swap, a layout restructure, or
 a surface migration — the implementation-bound client contract SHALL be enumerated and frozen: the
 `window.Elosern.*` public façades, the keyboard / plugin key-event path, the DOM identifiers the managed
 browser tests target, and the versioned layout-persistence keys. The freeze SHALL be a committed,
-reviewed deliverable that is the binding input to the change that performs the relocation, and every
-identifier the browser tests currently target SHALL be either preserved unchanged or re-mapped to a
-stable `data-testid` hook per that frozen list. The deliverable SHALL be renewed — not superseded by a
-second parallel document — whenever a later change relocates identifiers again, so exactly one frozen
-list describes the current client.
+reviewed deliverable that is the binding input to the change that performs the relocation.
 
 #### Scenario: A frozen contract list exists before wiring
 - **WHEN** the contract audit for a pending shell or layout change is complete
@@ -149,25 +235,8 @@ The managed Playwright acceptance journeys SHALL gate every test wait by polling
 store view and, where an assertion is genuinely DOM-bound, the surface DOM, within a single
 bounded monotonic deadline. Waits SHALL NOT depend on a single raw DOM-visibility wait that a
 delayed server publish or client render would exhaust under a loaded CI runner. The shared wait
-helper in `web/tests/browser/browser_helpers.py` SHALL expose one bounded polling loop that
-reads the committed store view (via `store_state_or_none`, tolerating a one-shot recovery reload),
-SHALL accept an optional DOM-readiness descriptor (a structured `{selector, predicate, description}`)
-whose predicate is evaluated within the same polling loop under the same monotonic deadline (so the
-store gate and the DOM gate share one bounded window). A DOM-readiness `page.evaluate` that races an
-in-flight navigation SHALL be routed through the same navigation-tolerating path as the store read: a
-recoverable "execution context was destroyed" error is recorded as the last evaluation error and the
-wait continues to the deadline; a non-navigation JavaScript/selector error SHALL be surfaced in the
-timeout diagnostic. The helper SHALL treat a `None` store read (mid-reload) as "not ready yet" without
-invoking the store predicate on `None`, and SHALL raise an `AssertionError` on timeout carrying the
-last non-`None` store state, whether any `None` reads occurred, the last evaluation error, and — where
-a DOM-readiness descriptor is supplied — the selector's connected/visible/enabled state and the current
-`activeElement`. Focus operations (e.g. `focus_action_dock`) SHALL gate on the store state first, then
-poll the target element's DOM readiness in the same loop, focus it using the remaining deadline, and
-verify `document.activeElement` is the target itself or a focusable descendant (or an explicitly allowed
-delegated-focus target). DOM-bound acceptance assertions that count or check visibility of a surface
-(e.g. a placeholder node) SHALL be gated by this bounded helper with a scoped selector and a DOM-
-readiness descriptor, rather than a single raw `.count()` or visibility sample that a delayed render
-under a loaded CI runner would race.
+helper in `web/tests/browser/browser_helpers.py` SHALL expose one bounded polling loop that reads
+the committed store view.
 
 #### Scenario: A journey wait is gated on the store state
 - **WHEN** a browser journey waits for a gameplay surface to become available or a mode to change
@@ -199,3 +268,27 @@ under a loaded CI runner would race.
 - **THEN** it gates the count through the bounded wait helper with a scoped selector (the surface's
   container) and a DOM-readiness predicate, polling until the expected count is stable, so a transient
   double-node window during a snapshot refresh no longer fails the shard under a loaded CI runner
+
+#### Scenario: The store read tolerates a recovery reload
+- **WHEN** the helper reads the committed store view
+- **THEN** it reads via `store_state_or_none`, tolerating a one-shot recovery reload
+
+#### Scenario: The DOM gate shares the store window
+- **WHEN** a caller supplies an optional DOM-readiness descriptor (a structured `{selector, predicate, description}`)
+- **THEN** the helper evaluates that predicate within the same polling loop under the same monotonic deadline, so the store gate and the DOM gate share one bounded window
+
+#### Scenario: A navigation race during a DOM read is tolerated
+- **WHEN** a DOM-readiness `page.evaluate` races an in-flight navigation
+- **THEN** it is routed through the same navigation-tolerating path as the store read: a recoverable "execution context was destroyed" error is recorded as the last evaluation error and the wait continues to the deadline, while a non-navigation JavaScript/selector error is surfaced in the timeout diagnostic
+
+#### Scenario: A mid-reload None read never reaches the predicate
+- **WHEN** a store read returns `None` because a reload is in flight
+- **THEN** the helper treats it as "not ready yet" without invoking the store predicate on `None`
+
+#### Scenario: The timeout diagnostic carries the last observed evidence
+- **WHEN** the helper's bounded wait times out
+- **THEN** it raises an `AssertionError` carrying the last non-`None` store state, whether any `None` reads occurred, the last evaluation error, and — where a DOM-readiness descriptor is supplied — the selector's connected/visible/enabled state and the current `activeElement`
+
+#### Scenario: Focus accepts a delegated-focus target
+- **WHEN** a focus operation verifies its result
+- **THEN** the operation focuses the target using the remaining deadline and accepts `document.activeElement` being the target itself, a focusable descendant, or an explicitly allowed delegated-focus target

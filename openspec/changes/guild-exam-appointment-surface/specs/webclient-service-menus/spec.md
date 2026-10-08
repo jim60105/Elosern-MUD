@@ -32,6 +32,47 @@ The production presentation registry SHALL register `services` schema version 5.
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
 
+#### Scenario: Host metadata shape is bounded and display-only
+- **WHEN** the `host` field is present on an available payload
+- **THEN** it contains exactly `identity` (1..64 opaque ASCII characters) and `display_name` (1..256 Unicode code
+  points), and host metadata is display-only reconciliation metadata that never enters a `ui_action` payload
+
+#### Scenario: Pagination totals are exact safe integers of shipped rows
+- **WHEN** any surface ships rows or is null
+- **THEN** `pagination` contains exactly `board_total`, `quest_total`, `stock_total`, `sellable_total`, and
+  `inventory_total`, each a non-negative JavaScript-safe integer no greater than its surface's row ceiling and
+  equal to the number of rows shipped in that surface (zero when the surface is null)
+
+#### Scenario: Player summary carries its exact six fields
+- **WHEN** the `player` section is built
+- **THEN** it contains exactly `wallet`, `guild_registered`, `guild_rank`, `guild_merit`, `next_rank`, and
+  `next_threshold`: `wallet` is a non-negative JavaScript-safe integer, `guild_registered` a boolean,
+  `guild_rank` null or a 1..8-character rank key, and `guild_merit` a non-negative safe integer
+
+#### Scenario: Top rank reports no next threshold
+- **WHEN** the actor holds the top rank
+- **THEN** `next_rank` and `next_threshold` are null, and otherwise they carry the next rank key and its positive
+  catalog merit threshold
+
+#### Scenario: Section fields are null or exact objects
+- **WHEN** an available services payload is built in exploration mode
+- **THEN** `guild`, `shop`, and `inventory` are each null or an exact section object, and all sections retain
+  their ordinary availability
+
+#### Scenario: Combat keeps personal data with no remote service
+- **WHEN** the actor is in active combat
+- **THEN** canonical `player` plus `inventory` remain available so personal item actions expose no remote service
+
+#### Scenario: Presenter output leaks no internals
+- **WHEN** the presenter serializes any services payload
+- **THEN** it emits no live object reference and no filesystem path, and does not mutate registration, quests,
+  wallet, inventory, equipment, merchant stock, rank, merit, traits, location, combat, or world time
+
+#### Scenario: Unreadable summary triggers the common unavailable form
+- **WHEN** the actor/player/inventory summary cannot be read without mutation
+- **THEN** the whole panel uses the registered common unavailable form, which is reserved for such global
+  prerequisite failures
+
 ### Requirement: Service presentation resolves hosts per service class and a stable player summary
 Guild and shop SHALL retain independent local GuildStaff/Merchant resolution through resolve_local_service_host. Rank requests SHALL resolve canonical branch/target qualification through the functioning local counter or qualified direct-host access; an absent target examiner SHALL NOT make request service unavailable. Several differently qualified local examiners SHALL NOT create generic-host ambiguity. Different host classes present in the same room SHALL NOT create cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` SHALL make both the guild and rank surfaces available. The top-level `host` SHALL be the display-only reconciliation identity of the resolved single local `GuildStaff` host when exactly one exists, else the resolved single local `Merchant` host when exactly one exists, else null; it SHALL NOT be the availability authority for any surface and SHALL NEVER be submitted in an action payload. The `player` summary SHALL derive from canonical wallet, parsed guild registration, canonical `guild_rank`, the true `guild_merit` counter, and the catalog's merit thresholds; it SHALL NEVER read `disguised_stats` or registration snapshot values for wallet, rank, merit, or eligibility.
 
@@ -63,6 +104,27 @@ Guild and shop SHALL retain independent local GuildStaff/Merchant resolution thr
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
+
+#### Scenario: Different host classes never create cross-class ambiguity
+- **WHEN** different host classes are present in the same room
+- **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` makes
+  both the guild and rank surfaces available
+
+#### Scenario: Top-level host follows the guild-then-merchant preference
+- **WHEN** the top-level `host` field is computed
+- **THEN** it is the display-only reconciliation identity of the resolved single local `GuildStaff` host when
+  exactly one exists, else the resolved single local `Merchant` host when exactly one exists, else null
+
+#### Scenario: Host is metadata, never authority or payload field
+- **WHEN** any surface availability is computed or any action is dispatched
+- **THEN** the top-level `host` is not the availability authority for any surface and is never submitted in an
+  action payload
+
+#### Scenario: Player summary derives only from canonical sources
+- **WHEN** the `player` summary is built
+- **THEN** it derives from canonical wallet, parsed guild registration, canonical `guild_rank`, the true
+  `guild_merit` counter, and the catalog's merit thresholds, and never reads `disguised_stats` or registration
+  snapshot values for wallet, rank, merit, or eligibility
 
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
 The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and `rank` and SHALL be present only when exactly one local `GuildStaff` host resolves. `registration` SHALL contain exactly `registered` (boolean) and `register` (an action descriptor); `register` SHALL be enabled only for an unregistered actor with one local `GuildStaff` host and otherwise carry a stable disabled reason. `board` SHALL be a bounded list of at most 12 offer rows in the deterministic rank/key order returned by the board API, each containing exactly `definition_key`, `display_name`, `objective_summary`, `reward_summary`, `rank`, and `accept`; each `objective_summary`/`reward_summary` SHALL be server-rendered from immutable quest values, and `accept` SHALL be enabled only while that offer is board-eligible and the actor has no active record for it. `quests` SHALL be a bounded list of at most 12 quest-log rows in deterministic record order, each containing exactly `quest_id`, `definition_key`, `display_name`, `state`, `stage_index`, `stage_progress`, `objective_summary`, `deadline_line`, `detail`, `abandon`, and `turnin`; `state` SHALL be one of `in_progress`, `completed`, or `failed`; `detail` SHALL be the server-rendered full quest detail; `abandon` SHALL be enabled only for an `in_progress` record with one local `GuildStaff` host; and `turnin` SHALL be enabled only for a `completed` record with one local `GuildStaff` host and the quest ID absent from the actor's reward claims. `rank` SHALL contain exactly `rank`, `merit`, `next_rank`, `next_threshold`, `merit_qualified`, and `exam_request`. True-merit qualification SHALL be independent of attendance. `exam_request.enabled` SHALL require valid registered next target and local functioning request service, independent of merit and host presence. No equality constraint between merit_qualified and enabled SHALL remain. The action SHALL be `guild.exam_request`, label 「預約升等考核」 and payload exactly target_rank. Unregistered/S actors SHALL receive stable registration/no-next-target reasons. Unrelated board/quest fields and bounds SHALL remain unchanged.
@@ -99,6 +161,48 @@ The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
+
+#### Scenario: Registration section shape and enablement gate
+- **WHEN** the `registration` section is built
+- **THEN** it contains exactly `registered` (boolean) and `register` (an action descriptor), and `register` is
+  enabled only for an unregistered actor with one local `GuildStaff` host and otherwise carries a stable disabled
+  reason
+
+#### Scenario: Board rows carry their exact fields in board API order
+- **WHEN** the `board` list ships
+- **THEN** it holds at most 12 offer rows in the deterministic rank/key order returned by the board API, each
+  containing exactly `definition_key`, `display_name`, `objective_summary`, `reward_summary`, `rank`, and `accept`
+
+#### Scenario: Board accept gates on eligibility and no active record
+- **WHEN** a board offer row's `accept` descriptor is computed
+- **THEN** it is enabled only while that offer is board-eligible and the actor has no active record for it
+
+#### Scenario: Quest rows carry their exact fields in record order
+- **WHEN** the `quests` list ships
+- **THEN** it holds at most 12 quest-log rows in deterministic record order, each containing exactly `quest_id`,
+  `definition_key`, `display_name`, `state`, `stage_index`, `stage_progress`, `objective_summary`, `deadline_line`,
+  `detail`, `abandon`, and `turnin`; `state` is one of `in_progress`, `completed`, or `failed`, and `detail` is the
+  server-rendered full quest detail
+
+#### Scenario: Abandon enables only for an in-progress record at a staff host
+- **WHEN** a quest row's `abandon` descriptor is computed
+- **THEN** it is enabled only for an `in_progress` record with one local `GuildStaff` host
+
+#### Scenario: Turn-in requires an unclaimed completed record at a staff host
+- **WHEN** a quest row's `turnin` descriptor is computed
+- **THEN** it is enabled only for a `completed` record with one local `GuildStaff` host and the quest ID absent
+  from the actor's reward claims
+
+#### Scenario: Rank section presence and exact fields
+- **WHEN** the `rank` section is computed
+- **THEN** it is present only when exactly one local `GuildExaminer` host resolves and contains exactly `rank`,
+  `merit`, `next_rank`, `next_threshold`, `eligible`, and `exam_start`
+
+#### Scenario: Exam start requires every condition and the next-rank payload
+- **WHEN** `exam_start` is computed
+- **THEN** it is enabled only when the actor is registered, a local `GuildExaminer` host exists, an exact next
+  rank exists, true merit meets its threshold, and no active combat or examination exists, and its action payload
+  carries exactly the next-rank key
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
 The production action registry SHALL retain every existing combat, service, creation, exploration, and options action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, and `inventory.toggle_equip`. `guild.register` SHALL accept exactly an empty payload and retain its current idempotency. Guild quest and exam actions SHALL retain their exact bounded identifiers; `guild.quest_track` SHALL accept exactly `quest_id` (the shared bounded quest identifier) and boolean `tracked`; `shop.buy` and `shop.sell` SHALL retain exactly bounded `item_key` and integer `quantity`. Each inventory action SHALL accept exactly `item_key` as a 1..64-character non-empty string. Every adapter SHALL obtain the actor from the authenticated session, re-resolve every local host and referenced quest, definition, item, rank, mechanic, and current condition, and invoke only its listed public deterministic API. No inventory payload SHALL accept actor, host, branch, session, effect, consumable, quantity, target, slot, HP, combat, price, stock, or wallet fields. No adapter SHALL assign `.db`, traits, registration, rank, merit, quest log, wallet, inventory, equipment, merchant stock, location, combat, or clock state directly. No action SHALL route an action ID or payload through the text command parser.
@@ -148,6 +252,39 @@ The production action registry SHALL retain every existing combat, service, crea
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
 
+#### Scenario: Payload schemas are exact and bounded
+- **WHEN** any service action payload is validated
+- **THEN** `guild.register` accepts exactly an empty payload, guild quest and exam actions retain their exact
+  bounded identifiers, `guild.quest_track` accepts exactly `quest_id` (the shared bounded quest identifier) and
+  boolean `tracked`, and `shop.buy` and `shop.sell` retain exactly bounded `item_key` and integer `quantity`
+
+#### Scenario: Registration idempotency is retained
+- **WHEN** registration is submitted again after the actor is already registered
+- **THEN** `guild.register` retains its current idempotency
+
+#### Scenario: Inventory actions carry only a bounded item key
+- **WHEN** an `inventory.use` or `inventory.toggle_equip` payload is validated
+- **THEN** it accepts exactly `item_key` as a 1..64-character non-empty string
+
+#### Scenario: Adapters are session-scoped and re-resolve everything
+- **WHEN** any service adapter runs
+- **THEN** it obtains the actor from the authenticated session, re-resolves every local host and referenced quest,
+  definition, item, rank, mechanic, and current condition, and invokes only its listed public deterministic API
+
+#### Scenario: Inventory payloads reject every authority field
+- **WHEN** an inventory payload carries any of actor, host, branch, session, effect, consumable, quantity, target,
+  slot, HP, combat, price, stock, or wallet fields
+- **THEN** exact-schema validation rejects it
+
+#### Scenario: Adapters never write canonical state directly
+- **WHEN** any adapter settles
+- **THEN** no adapter assigns `.db`, traits, registration, rank, merit, quest log, wallet, inventory, equipment,
+  merchant stock, location, combat, or clock state directly
+
+#### Scenario: Actions never route through the text parser
+- **WHEN** any service or inventory action is dispatched
+- **THEN** no action routes an action ID or payload through the text command parser
+
 ### Requirement: Service action completion updates canonical panels and preserves narrative
 After an admitted service or inventory action settles, the server SHALL emit every returned message through the ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before sending the matching safe `ui_action_result`. Existing guild, quest, and shop actions SHALL retain their established affected-panel sets. `inventory.use` and `inventory.toggle_equip` SHALL publish a full snapshot because they may change inventory, contained mirrors, status, character equipment, clock-derived state, combat/context state, terminal mode, and art. Entering combat SHALL unload exploration service menus and their local forms, but services v5 SHALL retain personal player/inventory data and the combat UI SHALL own a separate inventory affordance; guild and shop actions SHALL remain absent in combat. Every success or domain-rejection message SHALL be emitted as text and never parsed by the browser to update panel state.
 
@@ -178,4 +315,19 @@ After an admitted service or inventory action settles, the server SHALL emit eve
 #### Scenario: Schedule information does not enter combat
 - **WHEN** guild.exam_request returns exam_schedule
 - **THEN** exploration mode/services remain available, planned attendance renders and no combat panel/session is created
+
+#### Scenario: Inventory actions publish a full snapshot
+- **WHEN** `inventory.use` or `inventory.toggle_equip` settles
+- **THEN** a full snapshot is published because the action may change inventory, contained mirrors, status,
+  character equipment, clock-derived state, combat/context state, terminal mode, and art
+
+#### Scenario: Combat retains services v3 personal data and its own affordance
+- **WHEN** the actor enters combat
+- **THEN** exploration service menus and their local forms are unloaded, services v3 retains personal
+  player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
+  absent in combat
+
+#### Scenario: Prose never drives panel state
+- **WHEN** any success or domain-rejection message is produced
+- **THEN** it is emitted as text and never parsed by the browser to update panel state
 

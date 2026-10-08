@@ -83,17 +83,11 @@ support a baseline, waiver, or allowlist that converts a gap into success.
 ### Requirement: Continuous integration enforces both quality dimensions
 GitHub Actions MUST run strict OpenSpec validation, complete requirement
 traceability verification, the observability lint gate, the full project test
-suite, and aggregate
-first-party code coverage on pushes and pull requests. Package-local project
-tests and top-level repository contract tests MUST have disjoint discovery
-ownership and each test MUST execute exactly once. The workflow MUST fail if
-any test fails, any requirement lacks a test association, the observability
-lint check reports any violation, aggregate code coverage is below 80%, or
-publication of a successful aggregate report fails.
-The project SHALL target aggregate branch coverage of at least 90% as a
-documented goal; that target MUST NOT be enforced by CI.
-Workflow enablement MUST be blocked until an initial audit proves zero
-requirement gaps without adding product-behavior tests in this change.
+suite, and aggregate first-party code coverage on pushes and pull requests.
+The workflow MUST fail if any test fails, any requirement lacks a test
+association, the observability lint check reports any violation, aggregate
+code coverage is below 80%, or publication of a successful aggregate report
+fails.
 
 #### Scenario: Requirement traceability regression fails CI
 - **WHEN** a main-spec requirement is added without a valid test association
@@ -123,14 +117,17 @@ requirement gaps without adding product-behavior tests in this change.
 - **WHEN** a contributor reads the documented coverage commands
 - **THEN** the documentation states the 90% coverage target while the workflow and project configuration enforce only the 80% gate
 
+#### Scenario: Workflow enablement waits for the initial audit
+- **WHEN** the quality-gate workflow has not yet had an initial audit prove zero requirement gaps without adding product-behavior tests in this change
+- **THEN** workflow enablement remains blocked
+
 ### Requirement: Coverage configuration is reproducible and project-scoped
 Coverage measurement MUST use the locked project environment, enable branch
 coverage, unconditionally combine data from the disjoint Evennia package suite
 and top-level regression suite, and measure exactly the first-party production
-roots `commands`, `server`, `typeclasses`, `web`, and `world`. Only test
-implementation modules under `*/tests/*` MAY be omitted from those roots for
-the 80% calculation. The combined data MUST be the sole source for the local
-threshold, source-root verification, and externally published XML report.
+roots `commands`, `server`, `typeclasses`, `web`, and `world`. The combined
+data MUST be the sole source for the local threshold, source-root
+verification, and externally published XML report.
 
 #### Scenario: All required test entry points contribute coverage
 - **WHEN** the workflow runs the complete project suite
@@ -150,14 +147,17 @@ threshold, source-root verification, and externally published XML report.
 - **THEN** CI generates the Codecov XML report from that combined data
 - **AND** it does not upload either intermediate coverage data file as an independent report
 
+#### Scenario: Only test implementation modules may be omitted
+- **WHEN** the 80% calculation is configured over the first-party production roots
+- **THEN** only test implementation modules under `*/tests/*` may be omitted from those roots
+
 ### Requirement: Aggregate coverage is published to Codecov
 After all local test, traceability, source-root, and coverage-threshold gates
 succeed, GitHub Actions SHALL upload the explicit combined XML report to the
 `jim60105/Elosern-MUD` Codecov project using an immutable v5 release of the official
 Codecov action and the configured `CODECOV_TOKEN` repository secret.
 The action MUST disable automatic report discovery and MUST fail the CI job when
-the requested upload fails. `README.md` SHALL display a Codecov badge linked to
-that repository's Codecov page and scoped to the configured default branch.
+the requested upload fails.
 
 #### Scenario: Verified aggregate report is uploaded
 - **WHEN** both test entry points and all local quality gates succeed

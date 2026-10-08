@@ -11,6 +11,7 @@ command surface.
 `world/rules/lore_knowledge.py` SHALL define `CODE_CATEGORIES` as a bounded mapping from each
 codex category to exactly one immutable lore registry:
 
+```
 | Category | Registry | Card fields |
 |---|---|---|
 | `race` | `world.lore.races.RACE_REGISTRY` | `display_name_zh`, `description` |
@@ -21,22 +22,26 @@ codex category to exactly one immutable lore registry:
 | `magic` | `world.lore.magic.MAGIC_TIER_REGISTRY` | `display_name_zh`, `description` |
 | `anchor` | `world.lore.anchors.ANCHOR_REGISTRY` | `display_name_zh`, `description` |
 | `guild` | `world.lore.guild.GUILD_RANK_REGISTRY` | `display_name_zh`, `description` |
+```
 
-A category SHALL resolve exactly one registry; a key SHALL be validated against that registry
-(`category:key` such as `race:elf`, never a subrace or tier key). Unknown categories and
-unresolvable keys SHALL reject with named errors.
-
-Every category's first card field SHALL be the entry's player-facing name, so a card never carries an
-opaque registry key as its title or as a field value: a race's `display_name_zh` is a registry field
-(人類 / 獸人 / 精靈), a guild rank's `display_name_zh` is its rank letter followed by 級 (`F 級`),
-and a nation's `capital_name_zh` is the display name of the anchor its `capital_anchor_key` names.
-The opaque keys stay the record and command identifiers (`race:elf`, `lore race elf`), so the `lore`
-listing names each entry with its key in brackets (`精靈（elf）`).
+A category SHALL resolve exactly one registry; a key SHALL be validated
+against that registry (`category:key` such as `race:elf`, never a subrace or tier key). Unknown
+categories and unresolvable keys SHALL reject with named errors.
 
 #### Scenario: Every declared category resolves to exactly one registry
 - **WHEN** the `CODE_CATEGORIES` mapping is inspected
 - **THEN** each of the eight categories maps to exactly the registry named above, with no duplicate
   or missing entry
+
+#### Scenario: Every card's first field is the entry's player-facing name
+
+- **WHEN** any category's card is rendered
+- **THEN** the first card field is the entry's player-facing name, so a card never carries an opaque registry key as its title or as a field value: a race's `display_name_zh` is a registry field (人類 / 獸人 / 精靈), a guild rank's `display_name_zh` is its rank letter followed by 級 (`F 級`), and a nation's `capital_name_zh` is the display name of the anchor its `capital_anchor_key` names
+
+#### Scenario: Opaque keys stay the record and command identifiers
+
+- **WHEN** codex records and the `lore` command surface are inspected
+- **THEN** the opaque keys stay the record and command identifiers (`race:elf`, `lore race elf`), and the `lore` listing names each entry with its key in brackets (`精靈（elf）`)
 
 #### Scenario: A key is validated against its category's registry
 - **WHEN** `record_lore_reveal(player, "race", "elf")` is called with `elf` present in
@@ -209,12 +214,11 @@ nothing rather than rejecting the creation or the registration.
 
 ### Requirement: A reveal never blocks or fails the play that triggered it
 
-A deterministic reveal SHALL be best-effort with respect to the operation that triggered it: a
-rejection from the writer, a corrupt codex record, or any other reveal failure SHALL NOT fail or roll
-back the arrival, the combat settlement, the character creation, or the guild registration. The
-failure SHALL be reported through the observability facade with its exception rather than swallowed
-silently. A reveal SHALL emit no player-facing message by default, so it never interrupts movement or
-combat.
+A deterministic reveal SHALL be best-effort: a rejection from the writer, a corrupt codex record, or
+any other reveal failure SHALL NOT fail or roll back the arrival, the combat settlement, the character
+creation, or the guild registration. The failure SHALL be reported through the observability facade
+with its exception rather than swallowed silently. A reveal SHALL emit no player-facing message by
+default, so it never interrupts movement or combat.
 
 #### Scenario: A corrupt codex record does not break movement
 - **WHEN** a character with a malformed `lore_discovered` record enters a registered anchor

@@ -8,51 +8,51 @@ placeholder.
 ## Requirements
 
 ### Requirement: local_map is a read-only version-1 presentation panel
-The production presentation registry SHALL register panel name `local_map` at schema version 1. Its
-available payload SHALL contain exactly `schema_version`, `available`, `layer`, `current_node`,
-`title`, `nodes`, `edges`, and `legend`; `available` SHALL be true. `layer` SHALL be one of `grid`,
-`wilderness`, `instance`, or `interior`; `current_node` SHALL be a canonical node ID; `title` SHALL be
-a bounded localized map title. `nodes` SHALL be a bounded list where each node contains exactly
-`id`, `label`, `x`, `y`, `visibility`, `current`, `anchor`, `landmark`, and nullable `action`; node
-`x`/`y` are renderer-local presentation geometry, not canonical world coordinates: they place a node in
-the current view (adjacency or visual-range position), and a node's identity NEVER forces its geometry
-to equal its own world coordinates — a gateway node shown on a layer other than its home layer keeps
-the adjacent position of the step that reaches it, and the payload NEVER invents an identity for a
-position. A `remembered` node on a coordinate-bearing layer (`grid`, `wilderness`) is the one node kind
-that has no step to position it, so its `x`/`y` SHALL be that node's own validated coordinates **in the
-layer currently being drawn** — the gateway's wilderness-side approach cell on the `wilderness` layer,
-the gateway's grid-side room coordinates on the `grid` layer — and SHALL NEVER be coordinates read from
-a different coordinate space nor a renderer-local or probed slot, because the current node and every
-remembered node must sit in one coordinate space for the raw-delta direction geometry to mean anything.
-A node whose identity carries no coordinate in the layer being drawn — a registered gateway whose
-grid-side room belongs to a different `z_map_key` than the map the `grid` layer is drawing — SHALL be
-omitted from the payload entirely rather than plotted at a fabricated, probed, cross-space, or
-current-node position; it remains fully presented on the payload of the layer it does have a
-coordinate in. `edges` SHALL be a bounded list where each edge contains exactly `source`, `destination`,
-`label`, `known`, and `traversable`. `legend` SHALL be a bounded list of text label entries. The
-presenter SHALL build the payload only from canonical room/map/knowledge data, SHALL emit no live
-object or filesystem reference, SHALL NOT mutate knowledge, traits, clock, or location, and SHALL use
-the registered common unavailable form when the current room cannot be represented. On the
-wilderness layer, a direction whose neighbor is provider-invalid — outside the continent rectangle or
-an anchor footprint cell — SHALL render no node and no walkable edge for that direction, exactly as
-out-of-bounds directions render today; the payload NEVER presents an anchor footprint cell as a
-walkable `wild:` node.
+The production presentation registry SHALL register panel name `local_map` at schema version 1, whose available payload SHALL contain exactly `schema_version`, `available`, `layer`, `current_node`, `title`, `nodes`, `edges`, and `legend`, with `available` true, and SHALL build it only from canonical room/map/knowledge data without mutating knowledge, traits, clock, or location.
 
-The exact bounds, shared unchanged by the server and client validators, SHALL be: at most 64 `nodes`,
-at most 128 `edges`, at most 16 `legend` entries, node/edge/legend strings of at most 256 Unicode code
-points, `title` of at most 128 code points, node IDs of at most 128 characters, renderer-local `x`/`y`
-integers within `-1024..1024`, `known`/`traversable`/`current`/`anchor`/`landmark` as booleans,
-`visibility` as one of `current`, `visible_unvisited`, `visible_visited`, or `remembered`, and `action`
-as `null` or the exact `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node
-id>}` object. Every conforming serialized payload SHALL fit within the 65,536-byte OOB envelope limit.
-Conformance is enforced on serialized size: both the Python and JavaScript validators compute the
-canonical UTF-8 byte length of the assembled payload and reject a payload that exceeds the envelope,
-because the per-field ceilings are independent and a payload that maximizes every string field at once
-would otherwise serialize beyond the limit. A worst-case serialization test proves a structurally
-maximal realistic payload fits comfortably, and a second test proves a payload at every string ceiling
-at once is rejected. The presenter MAY apply its own tighter internal ceilings — such as the remembered
-gateway cap — without changing any shared bound; no presenter-side ceiling is mirrored in the client
-validator and none alters this table.
+#### Scenario: Node geometry is presentation-only, never invented
+- **WHEN** a node is placed on any layer, including a gateway node shown on a layer other than its home layer
+- **THEN** its `x`/`y` are renderer-local presentation geometry placing it at the adjacent position of the step that reaches it (adjacency or visual-range position), not canonical world coordinates; a node's identity NEVER forces its geometry to equal its own world coordinates, and the payload NEVER invents an identity for a position
+
+#### Scenario: Remembered nodes share the drawn layer's coordinate space
+- **WHEN** a `remembered` node is emitted on a coordinate-bearing layer (`grid`, `wilderness`) — the one node kind with no step to position it
+- **THEN** its `x`/`y` SHALL be that node's own validated coordinates **in the layer currently being drawn** — the gateway's wilderness-side approach cell on the `wilderness` layer, the gateway's grid-side room coordinates on the `grid` layer — and SHALL NEVER be coordinates read from a different coordinate space nor a renderer-local or probed slot, because the current node and every remembered node must sit in one coordinate space for the raw-delta direction geometry to mean anything
+
+#### Scenario: Payload field composition is exact
+- **WHEN** an available payload is serialized
+- **THEN** `layer` SHALL be one of `grid`, `wilderness`, `instance`, or `interior`; `current_node` SHALL be a canonical node ID; `title` SHALL be a bounded localized map title; each node contains exactly `id`, `label`, `x`, `y`, `visibility`, `current`, `anchor`, `landmark`, and nullable `action`; each edge contains exactly `source`, `destination`, `label`, `known`, and `traversable`; and `legend` SHALL be a bounded list of text label entries
+
+#### Scenario: The presenter leaks no live references
+- **WHEN** the presenter emits any payload
+- **THEN** it SHALL emit no live object or filesystem reference
+
+#### Scenario: An unrepresentable room uses the registered unavailable form
+- **WHEN** the current room cannot be represented
+- **THEN** the presenter SHALL use the registered common unavailable form
+
+#### Scenario: A node with no coordinate in the drawn layer is omitted, never plotted
+- **WHEN** a node's identity carries no coordinate in the layer being drawn — a registered gateway whose grid-side room belongs to a different `z_map_key` than the map the `grid` layer is drawing
+- **THEN** the node SHALL be omitted from the payload entirely rather than plotted at a fabricated, probed, cross-space, or current-node position, and it remains fully presented on the payload of the layer it does have a coordinate in
+
+#### Scenario: Provider-invalid wilderness directions render nothing
+- **WHEN** a wilderness direction's neighbor is provider-invalid — outside the continent rectangle or an anchor footprint cell
+- **THEN** that direction renders no node and no walkable edge, exactly as out-of-bounds directions render today, and the payload NEVER presents an anchor footprint cell as a walkable `wild:` node
+
+#### Scenario: Shared bounds are exact on both validators
+- **WHEN** the server and client validators check a payload, sharing the bounds unchanged
+- **THEN** they enforce at most 64 `nodes`, at most 128 `edges`, at most 16 `legend` entries, node/edge/legend strings of at most 256 Unicode code points, `title` of at most 128 code points, node IDs of at most 128 characters, renderer-local `x`/`y` integers within `-1024..1024`, `known`/`traversable`/`current`/`anchor`/`landmark` as booleans, `visibility` as one of `current`, `visible_unvisited`, `visible_visited`, or `remembered`, and `action` as `null` or the exact `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node id>}` object
+
+#### Scenario: Conformance is enforced on serialized size
+- **WHEN** both the Python and JavaScript validators assemble a payload
+- **THEN** each computes the canonical UTF-8 byte length and rejects a payload exceeding the 65,536-byte OOB envelope limit — every conforming serialized payload SHALL fit it — because the per-field ceilings are independent and a payload that maximizes every string field at once would otherwise serialize beyond the limit
+
+#### Scenario: Worst-case serialization is pinned both ways
+- **WHEN** the serialization tests run
+- **THEN** one test proves a structurally maximal realistic payload fits the envelope comfortably, and a second test proves a payload at every string ceiling at once is rejected
+
+#### Scenario: Presenter ceilings stay internal
+- **WHEN** the presenter applies its own tighter internal ceilings — such as the remembered gateway cap
+- **THEN** no shared bound changes, no presenter-side ceiling is mirrored in the client validator, and none alters the shared table
 
 #### Scenario: A grid room produces a grid-layer payload
 - **WHEN** the active puppet is in a `GridRoom`/`AnchorRoom` with knowledge and an adjacent traversable
@@ -121,51 +121,42 @@ validator and none alters this table.
 - **THEN** only `local_map` becomes correlated unavailable and normal text output remains usable
 
 ### Requirement: Visibility states are current, visible_unvisited, visible_visited, and remembered
-Every node in the version-1 payload SHALL carry exactly one `visibility` value. `current` SHALL mark
-the player's current node. `visible_unvisited` SHALL mark a node inside the current field of view
-(visual range for grid, legal adjacency for wilderness, a currently visible one-hop Exit for
-instance/interior) that has not been entered. `visible_visited` SHALL mark a node inside the current
-field of view that was previously entered.
+Every node in the version-1 payload SHALL carry exactly one `visibility` value. `current` SHALL mark the player's current node. `visible_unvisited` SHALL mark a node inside the current field of view (visual range for grid, legal adjacency for wilderness, a currently visible one-hop Exit for instance/interior) that has not been entered. `visible_visited` SHALL mark a node inside the current field of view that was previously entered.
 
-`remembered` is layer-scoped. On the coordinate-free layers (`instance`, `interior`) it SHALL mark a
-previously entered node outside the current field of view. On the coordinate-bearing layers (`grid`,
-`wilderness`) it SHALL mark **a map boundary the player has stood on** — a node outside the current
-field of view whose traversal takes the player onto a different map — and nothing else: a visited node
-that is not such a boundary SHALL NOT be emitted on those layers, so walking a region can never
-accumulate one indistinguishable entry per visited cell.
+#### Scenario: Remembered is layer-scoped
+- **WHEN** a payload is built on any layer
+- **THEN** on the coordinate-free layers (`instance`, `interior`) `remembered` SHALL mark a previously entered node outside the current field of view; on the coordinate-bearing layers (`grid`, `wilderness`) it SHALL mark **a map boundary the player has stood on** — a node outside the current field of view whose traversal takes the player onto a different map — and nothing else: a visited node that is not such a boundary SHALL NOT be emitted on those layers, so walking a region can never accumulate one indistinguishable entry per visited cell
 
-A boundary SHALL be resolved at presentation time against the authored wilderness entry registry
-(`world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY`) — the same registry the traversal code and
-the in-view gateway nodes read — and never against a flag in the stored knowledge record, which carries
-only node identity and ticks. On the `wilderness` layer a visited `wild:` node SHALL be a boundary when
-its coordinates equal `entry.approach_cell(gate)` for some registered entry and gate; on the `grid`
-layer a visited `grid:` node SHALL be a boundary when its coordinates and map key equal some registered
-gate's `grid_xy` and `z_map_key`. Being an `AnchorRoom`, a landmark, or a node of any other in-map
-significance SHALL NOT by itself make a node a boundary; a place inside the same map is not a way out
-of it.
+#### Scenario: Boundaries resolve against the authored registry
+- **WHEN** the presenter decides whether a visited node outside the field of view is a boundary
+- **THEN** it SHALL resolve against the authored wilderness entry registry (`world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY`) — the same registry the traversal code and the in-view gateway nodes read — and never against a flag in the stored knowledge record, which carries only node identity and ticks: on the `wilderness` layer a visited `wild:` node SHALL be a boundary when its coordinates equal `entry.approach_cell(gate)` for some registered entry and gate; on the `grid` layer a visited `grid:` node SHALL be a boundary when its coordinates and map key equal some registered gate's `grid_xy` and `z_map_key`
+- **AND** being an `AnchorRoom`, a landmark, or a node of any other in-map significance SHALL NOT by itself make a node a boundary; a place inside the same map is not a way out of it
 
-A boundary SHALL be `remembered` only when the player's stored knowledge record contains **the exact
-canonical node ID the drawn layer carries it as** — the approach cell's `wild:` ID on the `wilderness`
-layer, the gate room's `grid:` ID on the `grid` layer. A boundary the player has never entered on the
-side being drawn SHALL be absent from the payload.
+#### Scenario: A boundary is remembered only under its drawn-layer identity
+- **WHEN** a boundary is considered for `remembered`
+- **THEN** it SHALL be `remembered` only when the player's stored knowledge record contains **the exact canonical node ID the drawn layer carries it as** — the approach cell's `wild:` ID on the `wilderness` layer, the gate room's `grid:` ID on the `grid` layer — and a boundary the player has never entered on the side being drawn SHALL be absent from the payload
 
-A remembered boundary SHALL be labelled with the authored name of the place its traversal reaches,
-never with the terrain or region the boundary itself stands on: on the `wilderness` layer the entry's
-anchor display name from the anchor registry, and on the `grid` layer the display name of the
-wilderness region the gate's approach cell lies in. Remembered boundary labels within one payload SHALL
-be distinct; where two boundaries would carry the same far-side name, each SHALL be qualified with the
-canonical name of the boundary node it carries. A remembered boundary SHALL carry `landmark: true`,
-`anchor: false`, and `action: null`.
+#### Scenario: Remembered boundary labels and flags
+- **WHEN** a remembered boundary is emitted
+- **THEN** it SHALL be labelled with the authored name of the place its traversal reaches, never with the terrain or region the boundary itself stands on: on the `wilderness` layer the entry's anchor display name from the anchor registry, and on the `grid` layer the display name of the wilderness region the gate's approach cell lies in
+- **AND** remembered boundary labels within one payload SHALL be distinct; where two boundaries would carry the same far-side name, each SHALL be qualified with the canonical name of the boundary node it carries
+- **AND** it SHALL carry `landmark: true`, `anchor: false`, and `action: null`
 
-Visibility SHALL be keyed on the node's canonical identity — the same ID
-the resolver and the knowledge record use — including for a gateway node rendered on a layer other
-than its home layer, so a gate the player has walked through reads `visible_visited` wherever it is
-drawn. Unknown nodes SHALL be omitted entirely — never sent as hidden records. The payload SHALL
-remain within the OOB envelope limits, with remembered nodes bounded by most-recent `last_seen` and
-current/visible nodes always included first. Remembered nodes SHALL additionally be bounded by a
-declared presenter ceiling of at most 16 remembered nodes, and SHALL be ordered by descending
-most-recent `last_seen` tick then ascending canonical node ID, so the same knowledge record and world
-state always produce the same nodes in the same order.
+#### Scenario: Visibility keys on canonical identity
+- **WHEN** visibility is resolved for any node, including a gateway node rendered on a layer other than its home layer
+- **THEN** it SHALL be keyed on the node's canonical identity — the same ID the resolver and the knowledge record use — so a gate the player has walked through reads `visible_visited` wherever it is drawn
+
+#### Scenario: Unknown nodes are omitted, never hidden
+- **WHEN** a node is unknown to the player's knowledge and outside the field of view
+- **THEN** it SHALL be omitted entirely — never sent as a hidden record
+
+#### Scenario: The payload stays inside the envelope with in-view nodes first
+- **WHEN** a payload is assembled with remembered nodes
+- **THEN** it SHALL remain within the OOB envelope limits, with remembered nodes bounded by most-recent `last_seen` and current/visible nodes always included first
+
+#### Scenario: Remembered nodes are capped and ordered deterministically
+- **WHEN** remembered nodes are collected
+- **THEN** they SHALL be bounded by a declared presenter ceiling of at most 16 remembered nodes, and SHALL be ordered by descending most-recent `last_seen` tick then ascending canonical node ID, so the same knowledge record and world state always produce the same nodes in the same order
 
 #### Scenario: Visited interior nodes retain their visited visibility
 - **WHEN** a node inside an interior/instance local graph has been entered before
@@ -240,23 +231,28 @@ state always produce the same nodes in the same order.
   exceeds the shared node bound, and never displaces a current or in-view node
 
 ### Requirement: The map surfaces state a place name only where it adds information
-The in-view neighbourhood SHALL NOT repeat one place name across every cell it draws. On the
-`wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach
-cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead
-of the display name of the region the cell lies in; its node ID, `action`, edges, visibility, and every
-other field SHALL be unchanged, so the payload states a better name for the same position and never
-invents an identity for it. Every other in-view cell SHALL keep the region display name it carries
-today, and every emitted node label SHALL remain a non-empty string.
+On the `wilderness` layer, an in-view `wild:` neighbour whose coordinates are a registered gate's approach cell SHALL be labelled with that entry's anchor display name — the place the gateway leads to — instead of the display name of the region the cell lies in, so the in-view neighbourhood does not repeat one place name across every cell it draws.
 
-On a payload whose `layer` is `wilderness`, the shared map renderer SHALL NOT draw visible label text
-for an in-view node whose label string is identical to the `current` node's label string; that node
-SHALL keep its full label as its accessible name, and its marker, shape ladder, landmark treatment, and
-activation SHALL be unaffected. The `current` node SHALL always draw its own label. The suppression is
-scoped to the `wilderness` layer because that layer's labels are shared region names, where a repeat is
-the reported defect; on `grid`, `instance`, and `interior` layers a label is an individual room name,
-where two distinct rooms sharing a name are still two distinct places and SHALL both draw their label.
-This suppression is a drawing rule about the set on the canvas, not a payload rule: no payload field
-changes, and both validators keep their existing bounds and their non-empty label rules unchanged.
+#### Scenario: The gate approach cell keeps every other field
+- **WHEN** a gate approach cell is relabelled with its entry's anchor display name
+- **THEN** its node ID, `action`, edges, visibility, and every other field SHALL be unchanged, so the payload states a better name for the same position and never invents an identity for it
+
+#### Scenario: Every other cell keeps its region name and labels stay non-empty
+- **WHEN** an in-view cell is not a registered gate's approach cell
+- **THEN** it SHALL keep the region display name it carries today, and every emitted node label SHALL remain a non-empty string
+
+#### Scenario: Duplicate region labels draw no visible text
+- **WHEN** a payload whose `layer` is `wilderness` is rendered and an in-view node's label string is identical to the `current` node's label string
+- **THEN** the shared map renderer SHALL NOT draw visible label text for that node; that node SHALL keep its full label as its accessible name, and its marker, shape ladder, landmark treatment, and activation SHALL be unaffected
+- **AND** the `current` node SHALL always draw its own label
+
+#### Scenario: Suppression is scoped to shared region names
+- **WHEN** labels are suppressed on any layer
+- **THEN** the suppression is scoped to the `wilderness` layer because that layer's labels are shared region names, where a repeat is the reported defect; on `grid`, `instance`, and `interior` layers a label is an individual room name, where two distinct rooms sharing a name are still two distinct places and SHALL both draw their label
+
+#### Scenario: Suppression touches no payload field
+- **WHEN** label suppression is in effect
+- **THEN** it is a drawing rule about the set on the canvas, not a payload rule: no payload field changes, and both validators keep their existing bounds and their non-empty label rules unchanged
 
 #### Scenario: The wilderness neighbourhood stops repeating one region name
 - **WHEN** the island renders a wilderness payload whose current cell and all eight in-view neighbours
@@ -282,18 +278,19 @@ changes, and both validators keep their existing bounds and their non-empty labe
   are all unchanged, and the four visibility states remain distinguishable without colour
 
 ### Requirement: Only currently traversable Exits receive movement descriptors
-A node's `action` SHALL be null unless that node is associated with a currently present, traversable
-`Exit` from the actor's current room. The association SHALL follow the arrival the step actually
-performs: for a wilderness direction and for a registered wilderness gate exit — whose stored
-`destination` is a self-loop and never names the arrival — the associated node is the canonical node
-the traversal resolver derives from the step, not the exit's stored destination. For such a node,
-`action` SHALL be exactly `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node
-id>}` where `exit_ref` is an opaque server-authored identifier and `destination` is the canonical
-destination node ID and equals the ID of the node carrying it. Remembered remote nodes SHALL carry
-`action: null` and SHALL provide no travel descriptor. The browser SHALL NOT be able to submit
-movement through a node with `action: null`, and an `action` with an unknown `kind`, an oversized or
-non-ASCII `exit_ref`, or a missing/invalid `destination` SHALL be rejected by the exact schema
-validator.
+A node's `action` SHALL be null unless that node is associated with a currently present, traversable `Exit` from the actor's current room, and for such a node `action` SHALL be exactly `{"kind": "move", "exit_ref": <1..64 ASCII characters>, "destination": <node id>}` where `exit_ref` is an opaque server-authored identifier and `destination` is the canonical destination node ID and equals the ID of the node carrying it.
+
+#### Scenario: The association follows the arrival the step performs
+- **WHEN** a wilderness direction or a registered wilderness gate exit — whose stored `destination` is a self-loop and never names the arrival — is associated with a node
+- **THEN** the association SHALL follow the arrival the step actually performs: the associated node is the canonical node the traversal resolver derives from the step, not the exit's stored destination
+
+#### Scenario: Remembered remote nodes offer no travel descriptor
+- **WHEN** a remembered remote node is presented
+- **THEN** it SHALL carry `action: null`, SHALL provide no travel descriptor, and the browser SHALL NOT be able to submit movement through a node with `action: null`
+
+#### Scenario: The exact validator rejects malformed descriptors
+- **WHEN** an `action` has an unknown `kind`, an oversized or non-ASCII `exit_ref`, or a missing/invalid `destination`
+- **THEN** the exact schema validator SHALL reject it
 
 #### Scenario: Adjacent traversable exits carry a movement descriptor
 - **WHEN** the current room has a traversable exit leading to an adjacent node
@@ -317,50 +314,329 @@ validator.
   with the single-sync recovery path
 
 ### Requirement: The browser minimap renders states without relying on color alone
-The WebClient `local-map` component SHALL render the validated `local_map` panel, replacing the foundation placeholder. It SHALL distinguish `current`, `visible_*`, and `remembered` states by label/shape/border in addition to color, SHALL render the legend's text labels on the full-map overlay, inside that surface's legend popover (the minimap island mounts no state legend), SHALL make every `remembered` remote node's name readable without any travel action and without any activation — as visible text on a map surface (the island's named edge marker on the lattice variant, the full-map surface's remembered list on the graph variant) and, wherever the island does not draw that name as visible text, wherever that visible text can be truncated, or wherever it is drawn inside a graphic, as an assistive-technology text alternative on the island carrying the untruncated name — and SHALL omit unknown nodes. On reconnect it SHALL rebuild the map from the server-persisted knowledge in the new epoch's snapshot; no client map cache is authoritative.
+The WebClient `local-map` component SHALL render the validated `local_map` panel, replacing the foundation placeholder, SHALL distinguish `current`, `visible_*`, and `remembered` states by label/shape/border in addition to color, SHALL render the legend's text labels only on the full-map overlay's legend popover (the minimap island mounts no state legend), SHALL make every `remembered` remote node's name readable without any travel action and without any activation, and SHALL omit unknown nodes.
 
-The component SHALL render as a bounded HUD island anchored on the stage, not as a card inside a scrolling layout column. The island SHALL have a constant size that no payload changes: a single 1px hairline frame, a padding no larger than the shared spacing scale's smallest step, a single-row header, a square map canvas of 240 CSS px on each side at the 1451x790 reference scale, multiplied once by the desktop chrome factor above the reference height, and a readout row that always reserves its one line. The island SHALL NOT stretch to its anchor's width, SHALL NOT measure its anchor or any other surface to size itself, and SHALL NOT draw a second frame around its canvas inside its own frame. Its root element SHALL keep the stable `local-map` component identifier that the shell's mode-gated visibility rules and its focus-rescue path both select on, so re-chroming the surface never silently un-hides it in a mode whose matrix hides it.
+#### Scenario: Remembered names stay readable across truncation and graphics
+- **WHEN** a remembered remote node's name is not drawn as visible text on the island, wherever that visible text can be truncated, or wherever it is drawn inside a graphic
+- **THEN** the name is readable as visible text on a map surface — the island's named edge marker on the lattice variant, the full-map surface's remembered list on the graph variant — and, in the cases named in the condition, as an assistive-technology text alternative on the island carrying the untruncated name
 
-The island and the full-map overlay SHALL present the redesign draft's map visual language: every marker, edge, label, and legend colour SHALL come from a design token (including the draft seal pair and map label-tier tokens), and no component SHALL hardcode a draft hex value. On either placement's canvas the `current` node SHALL render as a seal-deep filled circle with a seal-light stroke, strictly larger than the other on-canvas markers; `visible_visited` SHALL render as a small ink-filled circle; `visible_unvisited` SHALL render as a small hollow circle keeping the `未探索` rule; a landmark node SHALL additionally carry the gold landmark treatment. The resulting shape ladder (large stroked circle / small solid circle / small hollow circle / out-of-canvas diamond for `remembered`) SHALL keep the states distinguishable without colour at both the island and the overlay scale, and the new marker footprints SHALL remain within the geometry guarantee so the non-overlap invariant is unaffected. Node labels SHALL use the draft label-tier tokens (current, landmark-gold, seen, far). Each surface SHALL declare its own node-label type size, and that size SHALL NOT resolve to drawn text larger than the surface's own smallest chrome type step, so a node label can never out-weigh the island's own title at any payload. The island declares a 16-unit node-label step — equal to its 16px chrome step — and a 16-unit marker-name step; the full-map overlay declares 16 and 16. A fitted drawing SHALL never render a node label or marker name below its surface's declared step at the reference scale: where the fitted uniform scale would carry a label below the step, the drawing holds the label at the step rather than shrinking it, and pitch/footprint clearing accounts for the labels actually drawn.
+#### Scenario: Reconnect rebuilds from server-persisted knowledge
+- **WHEN** the WebSocket reconnects and the new epoch's snapshot arrives
+- **THEN** the component rebuilds the map from the server-persisted knowledge in that snapshot, and no client map cache is authoritative
 
-The lattice variant SHALL additionally draw the redesign draft's coordinate-field layers, which are pure decoration: each SHALL be non-interactive, SHALL be excluded from the accessibility tree, SHALL carry neither the node-marker nor the node-label component class that the geometry audit pairs every box of, SHALL introduce no tab stop, activation, or `data-node` identity, SHALL be static so the reduced-motion preference has nothing to disable, and SHALL encode no visibility state — the four-state shape ladder, its non-colour redundancy, the colourblind override, and every focus treatment SHALL be unaffected by their presence. Every colour they use SHALL resolve to a design token and no draft hex value SHALL be hardcoded for any of them. The three layers are:
+#### Scenario: The island is a bounded constant-size HUD anchored on the stage
+- **WHEN** the component renders
+- **THEN** it renders as a bounded HUD island anchored on the stage, not as a card inside a scrolling layout column
+- **AND** the island SHALL have a constant size that no payload changes: a single 1px hairline frame, a padding no larger than the shared spacing scale's smallest step, a single-row header, a square map canvas of 240 CSS px on each side at the 1451x790 reference scale, multiplied once by the desktop chrome factor above the reference height, and a readout row that always reserves its one line
 
-1. **The coordinate dot field.** The lattice SHALL paint one dot per coordinate cell across its whole canvas, beneath every connector edge, node marker, node label, and axis line. The field's horizontal and vertical dot pitch SHALL equal the drawn column and row pitch, so one dot spacing is exactly one coordinate cell on each axis and the field states the coordinate space the lattice claims rather than a decorative texture; the field SHALL be registered to the exported placement, so for every drawn node a dot position coincides with that node's centre. Because the field is painted beneath the markers, an occupied cell SHALL show its node marker and never a marker and a dot together. The dot SHALL NOT read as a fifth node state: its radius SHALL scale with the marker ladder and SHALL remain strictly and materially smaller than the smallest node marker's radius, it SHALL carry no stroke, no label, and no state class, and the state legend SHALL gain no entry for it, so the legend's four states stay closed exactly as the beyond-state note rule requires.
-2. **The knowledge-edge vignette.** Each map surface SHALL paint exactly ONE vignette treatment that darkens the canvas toward its edges, and that treatment SHALL be the knowledge edge — the limit of what the payload knows — and SHALL NOT be, or be styled as, terrain. It SHALL be a single full-canvas gradient wash with no fabricated geometry: no per-cell fill, no per-region fill, and no drawn shape tracing any terrain feature. The vignette SHALL NOT reduce the coordinate dot field below the presence floor below at any point of the canvas, so the far-field dots it is meant to make faint stay visible rather than being erased.
-3. **The axis cross.** A surface SHALL draw a full-width and full-height axis line through the `current` node's drawn position ONLY where that same surface states the axis convention in words; a surface that states no orientation marks SHALL draw no axis, and the radial graph variant SHALL draw none on any surface because a graph asserts no axis. The axis SHALL be drawn beneath every node marker — it necessarily passes through the `current` node's own marker, which is what an origin is, and that crossing SHALL NOT be read as a violation of the non-overlap invariant, whose axis clause governs the edge direction markers in the gutter band.
+#### Scenario: The island never sizes itself from its surroundings
+- **WHEN** the island lays out at any anchor size or payload
+- **THEN** the island SHALL NOT stretch to its anchor's width, SHALL NOT measure its anchor or any other surface to size itself, and SHALL NOT draw a second frame around its canvas inside its own frame
 
-The dot field's and the axis's presence and contrast SHALL be pinned as a band against the canvas ground, so neither an invisible layer nor one that out-shouts the drawing can ship. Each SHALL be present as a painted element whose resolved colour differs from the canvas ground; each SHALL keep a contrast ratio against that ground of at least 1.15:1 at every point of the canvas and at least 1.35:1 within the vignette's un-darkened inner field; and neither SHALL exceed the contrast that the connector-edge ink itself keeps against the same ground, so the coordinate decoration never reads louder than the topology it decorates. These layers are decoration, not information: the coordinate claim they picture is carried redundantly by the node placement itself, by the header's axis orientation marks, and by the readout's coordinate figure, so no reader depends on them — but the lattice's geometry is its claim, so they SHALL NOT be invisible.
+#### Scenario: The island root keeps the identifier the shell selects on
+- **WHEN** the shell's mode-gated visibility rules or its focus-rescue path select the island
+- **THEN** the island's root element SHALL keep the stable `local-map` component identifier both select on, so re-chroming the surface never silently un-hides it in a mode whose matrix hides it
 
-Layout SHALL be computed in the DOM-independent render model, not as a rescaling of payload coordinates into a fixed pixel box, and the model SHALL export two placements for the same committed payload: a bounded integer lattice and a radial connected-graph. The lattice placement SHALL place only current-field-of-view nodes (`current`, `visible_unvisited`, `visible_visited`) on it, deriving each node's column and row from its payload coordinates relative to the minimum in-view coordinate, and SHALL export the lattice's column and row counts; when that span would exceed 64 columns or 64 rows, the model SHALL fall back to rank compression over the distinct sorted coordinate values, which cannot exceed the payload's node bound. The radial placement SHALL place the `current` node at the canvas centre and every other in-view node on a ring at BFS exit-hop distance from current over an UNDIRECTED adjacency built from the payload `edges` in both directions (traversable or not, since edges are topology, not passability, and ring membership SHALL NOT depend on an edge's serialization direction), with in-view nodes unreachable by any edge on the outermost ring and a current-only or entirely edgeless payload rendering the centre node alone on a fixed positive padded canvas; ring members SHALL be ordered by first-discovery order then payload index and slotted at deterministic angles, so the same payload always yields byte-identical coordinates. The radial geometry SHALL follow a declared footprint contract — canonical marker radii, a conservative label bounding box and its offset, a minimum ring-to-ring centre separation covering the stacked marker-plus-label extent, a per-ring minimum radius bounding the angular arc between adjacent slots, and a cumulative radius recurrence with fixed canvas padding — so the non-overlap invariant below is constructible from the model alone; neither placement SHALL infer distances or geometry the payload does not carry: a radial edge length and a lattice cell step are both presentation geometry with no world meaning. The renderer SHALL size the map canvas from the exported placement and from the surface's own declared canvas geometry. A surface MAY declare a **fixed square canvas**; the island SHALL declare one of 240 CSS px, and the full-map surface declares none. A surface MAY instead declare a **fitted view**; the full-map surface SHALL declare one, and the island declares none. A fitted view SHALL show the placement's unchanged drawing — the same user-unit geometry, gutter, pitch, and type sizes the surface declares — through a uniformly scaled, translated window, and its opening fit, zoom bounds, pan, and recentre SHALL follow the full-map fit-view requirement. On a surface that declares a fixed square canvas, the canvas SHALL always render at exactly that size, its drawing SHALL be laid out in a square coordinate extent whose side is the larger of the declared size and the side the drawing requires, and the drawn uniform scale SHALL therefore be the declared size divided by that side: exactly 1 whenever the drawing fits and below 1 only when it does not, and NEVER above 1 — so no payload, however sparse, can inflate the designed marker radii, label size, marker-name size, or gutter offsets above the sizes the surface declares, and no maximum-upscale bound SHALL be needed or declared. Such a surface SHALL fill its square as follows, and SHALL NOT meet the fill by magnification:
+#### Scenario: Map visual language comes from design tokens
+- **WHEN** the island and the full-map overlay present the redesign draft's map visual language
+- **THEN** every marker, edge, label, and legend colour SHALL come from a design token (including the draft seal pair and map label-tier tokens), and no component SHALL hardcode a draft hex value
+- **AND** node labels SHALL use the draft label-tier tokens (current, landmark-gold, seen, far)
 
-- **Lattice variant — pitch before margin.** The drawn square pitch SHALL start from the derived minimum pitch below and SHALL grow, never shrink, toward the largest whole-unit pitch at which the node core — every lattice column and row plus the node-label band beneath the bottom row — fits inside the declared square less an inset: the edge-marker gutter band where the payload draws edge direction markers, and 8 CSS px on each side otherwise. The drawn pitch SHALL NOT exceed one and a half times the surface's declared pitch, so a sparse payload's coordinate cells stay recognisable as cells. Whatever room remains after the pitch is chosen SHALL be taken as **coordinate margin**, padded symmetrically around the node core on both axes up to the square, with the edge-marker band remaining the canvas's outermost band and the padded extent between the core and that band being coordinate space that the dot field paints. Where even the derived minimum pitch does not fit, the drawing SHALL keep that minimum pitch and the square extent SHALL grow to the required side. The island SHALL show a square window of side `canvasSize` over the drawing at scale 1, centred on the current node and clamped inside the drawing, clipped to the fixed canvas. Every drawn label SHALL remain at least 16 CSS px at the reference; the full-map surface SHALL keep the complete drawing reachable through its existing view operations.
-- **Graph variant — readable window.** The fixed square window SHALL be centred on the radial placement's current node at one CSS pixel per user unit, clipping oversized radial drawings rather than shrinking their labels. The complete graph and every full name SHALL remain reachable on the full-map surface.
+#### Scenario: The marker shape ladder holds at both scales
+- **WHEN** either placement's canvas renders the visibility states
+- **THEN** the `current` node SHALL render as a seal-deep filled circle with a seal-light stroke, strictly larger than the other on-canvas markers; `visible_visited` SHALL render as a small ink-filled circle; `visible_unvisited` SHALL render as a small hollow circle keeping the `未探索` rule; a landmark node SHALL additionally carry the gold landmark treatment
+- **AND** the resulting shape ladder (large stroked circle / small solid circle / small hollow circle / out-of-canvas diamond for `remembered`) SHALL keep the states distinguishable without colour at both the island and the overlay scale, and the new marker footprints SHALL remain within the geometry guarantee so the non-overlap invariant is unaffected
 
-A surface that declares neither a fixed square canvas nor a fitted view SHALL draw at the placement's own size. The renderer SHALL accept no maximum-width or maximum-height cap and SHALL NOT resolve any cap into a width bound: no surface sizes its canvas by a cap, so there is no definite width to reconcile against a height cap and no engine-specific replaced-element constraint resolution can letterbox or distort a drawing. The canvas's own natural size SHALL NOT be able to breach the island's square however much the edge-marker gutter grows it: the gutter enlarges the drawing's required side, which the square window absorbs as clipping, never as a larger canvas or smaller text. No island size, pitch, or scale SHALL be derived from a measurement of the island's anchor, of the island's other rows, or of any other surface. The renderer SHALL NOT allow map content to overlap the island's title, its orientation marks, the readout line, or any other island content. Node labels SHALL occupy a single line with an overflow indicator, and each node's full label SHALL remain available as its accessible name.
+#### Scenario: Each surface declares its label type steps
+- **WHEN** a surface draws node labels or marker names
+- **THEN** each surface SHALL declare its own node-label type size, and that size SHALL NOT resolve to drawn text larger than the surface's own smallest chrome type step, so a node label can never out-weigh the island's own title at any payload
+- **AND** the island declares a 16-unit node-label step — equal to its 16px chrome step — and a 16-unit marker-name step; the full-map overlay declares 16 and 16
 
-The renderer's geometry — column pitch, row pitch, and marker sizing on the lattice, and ring radii, angular slots, and marker sizing on the radial graph — SHALL be chosen so that, at every placement the model can produce for either variant, no rendered node marker's visual footprint and no rendered node label's visual footprint intersects the footprint of any other node's marker or label — this holds independently of clipping by the island's fixed square canvas, independently of any uniform scale and translation the full-map surface's fitted view applies at any zoom level it permits, and independently of any pitch the island's fill grows beyond the derived minimum (radial ring radii SHALL grow with ring member count so the angular arc between adjacent slots bounds the label footprint). A connector edge between two node markers SHALL remain visually distinguishable rather than being fully occluded by the markers it connects.
+#### Scenario: A fitted drawing never shrinks text below its declared step
+- **WHEN** a fitted drawing's uniform scale would carry a label below the surface's declared step at the reference scale
+- **THEN** the drawing holds the label at the step rather than shrinking it, and pitch/footprint clearing accounts for the labels actually drawn: a fitted drawing SHALL never render a node label or marker name below its surface's declared step at the reference scale
 
-The lattice's pitch SHALL be **derived from what actually needs clearing at the drawn placement, not asserted as a constant**, and the derivation SHALL be constructible from the model and the drawn label set alone so the invariant above holds at every placement the model can produce. Three clearance terms SHALL be honoured. The **bare term** applies to every adjacent pair: the pitch SHALL clear the widest drawn footprint of each of the two markers — including any decoration drawn over a marker, such as the actionable halo, not merely the marker shape itself — with a strictly positive gap, SHALL leave a strictly positive visible connector segment between them, and SHALL keep each node's own label box clear of its own node's widest drawn footprint. The **vertical term** applies whenever an upper drawn node has a visible label and the cell directly below it contains a marker, even if that lower node has no visible label. The pitch SHALL reserve the label baseline, its descent, the lower marker's widest footprint and a strictly positive gap; it SHALL grow rather than allow the upper label to overprint the lower marker. The **label term** applies only where two horizontally adjacent cells BOTH draw visible label text: there the pitch SHALL additionally clear both label boxes actually drawn side by side with a half-em gap, `(cells(a) + cells(b)) / 2 × CELL_EM × labelFont + labelFont / 2` rounded up to a whole unit, where the visible (truncated) label is measured in monospace cells at the surface's declared label type size — a code point that the bundled monospace face draws one cell wide counts as one cell, and every other code point — East Asian Wide or Fullwidth characters, and characters the face lacks, which fall back to a wider face — counts as two cells, a cell being CELL_EM, the shipped face's Latin cell advance that the font manifest publishes — and the largest such need over every adjacent labelled pair binds. Two truncated labels of `labelMax` wide glyphs plus the narrow overflow indicator therefore need `(2 × labelMax + 1) × CELL_EM × labelFont + labelFont / 2`, never less than the former worst-case term `(labelMax + 1) × labelFont + 3`, while shorter or narrower names ask only for the room they occupy. Where the drawn label set contains no such adjacent pair — which a payload whose neighbouring cells state no place name of their own produces — the label term SHALL NOT bind, and the derived minimum pitch SHALL NOT be inflated to clear labels that are not drawn. The pitch these three terms derive is the **minimum**: a surface that declares a fixed square canvas MAY draw a larger pitch to fill its square, as the canvas-sizing rule above states, and SHALL NEVER draw a smaller one. The renderer SHALL NOT satisfy any term by truncating node labels more aggressively: `labelMax` is a legibility contract, and shortening it to buy pitch was rejected when the pitch was first derived. All applicable terms SHALL be satisfied by the same pitch on both axes, so a drawn lattice cell is **square**: an unequal pitch would draw a node at `(+1, +1)` along a different line than the edge direction marker for the same delta, which is computed from the raw coordinate delta, and the drawing and its bearings SHALL agree.
+#### Scenario: The coordinate-field layers are inert decoration
+- **WHEN** the lattice variant draws the redesign draft's coordinate-field layers
+- **THEN** these layers are pure decoration: each SHALL be non-interactive, SHALL be excluded from the accessibility tree, SHALL carry neither the node-marker nor the node-label component class that the geometry audit pairs every box of, SHALL introduce no tab stop, activation, or `data-node` identity, SHALL be static so the reduced-motion preference has nothing to disable, and SHALL encode no visibility state — the four-state shape ladder, its non-colour redundancy, the colourblind override, and every focus treatment SHALL be unaffected by their presence
+- **AND** every colour they use SHALL resolve to a design token and no draft hex value SHALL be hardcoded for any of them
 
-The map-rendering logic (node/marker placement consumption, connector edges, and per-node labels) SHALL be shared between the minimap island's own rendering and the full-map overlay's rendering, parameterized by scale and by layout variant (`lattice` or `graph`) rather than duplicated: the variant SHALL be resolved once, in the render-model layer, as a pure function of the payload's `layer` — the closed coordinate-bearing set (`grid`, `wilderness`) resolves to the lattice and every other layer resolves to the graph — and both surfaces consume that one resolved value, so island and overlay can never disagree. The state legend SHALL NOT be part of that shared canvas rendering: the full-map surface SHALL be the only surface that renders it, inside a legend popover it opens on request, and no legend element SHALL be mounted on the island for any payload. No map surface SHALL offer a layout switch or any other means for the player to choose a layout, and no layout choice SHALL be kept as a preference or in any client-side storage: the layout follows the data the world ships, not a setting. Both surfaces SHALL render the resolved variant's identical in-view nodes and edges for the same committed payload, the overlay's drawing shown whole through its fitted view within its own available space rather than on the minimap island's fixed small canvas, with the same non-overlap guarantee applying at every zoom level that view permits. The full-map overlay SHALL NOT render the island's coordinate readout line, since it states no coordinate figure at all. On the graph variant the full-map overlay SHALL render the payload's `remembered` nodes as a visible list outside its canvas — each entry pairing the remembered state's non-colour indicator with the node's full payload label as visible text, carrying no travel action, no activation, and no tab stop — and the minimap island SHALL NOT render that list in any visible form. On the lattice variant neither surface renders a remembered-node list.
+#### Scenario: The coordinate dot field states the lattice's coordinate space
+- **WHEN** the lattice variant paints its coordinate dot field
+- **THEN** the lattice SHALL paint one dot per coordinate cell across its whole canvas, beneath every connector edge, node marker, node label, and axis line, with horizontal and vertical dot pitch equal to the drawn column and row pitch, so one dot spacing is exactly one coordinate cell on each axis and the field states the coordinate space the lattice claims rather than a decorative texture
+- **AND** the field SHALL be registered to the exported placement, so for every drawn node a dot position coincides with that node's centre
+- **AND** because the field is painted beneath the markers, an occupied cell SHALL show its node marker and never a marker and a dot together
 
-The full-map overlay's map surface SHALL be framed in the draft `mapcanvas` treatment: a dark radial-gradient background painted with pure CSS (no fabricated terrain geometry), a rounded ink border, and a thin seal-toned ring concentric with the `current` node marker, drawn inside that node's own group at 10.5 units × the marker scale — an ornament of the real marker within its reserved footprint, not a second position claim; no teardrop or other pin is drawn above or beside the marker. That background IS the overlay's one knowledge-edge vignette, so the overlay SHALL NOT paint a second wash over it, and the dot field's contrast against the overlay's own canvas ground SHALL satisfy the same presence band as on the island. The overlay legend SHALL render inside its legend popover as draft dot-chips (a small colour chip paired with its text label); the chip border style SHALL additionally distinguish the remembered entry from the visited entry so the legend's distinctions do not rely on colour alone.
+#### Scenario: A dot never reads as a fifth node state
+- **WHEN** the dot field renders beside the marker ladder
+- **THEN** the dot's radius SHALL scale with the marker ladder and SHALL remain strictly and materially smaller than the smallest node marker's radius, it SHALL carry no stroke, no label, and no state class, and the state legend SHALL gain no entry for it, so the legend's four states stay closed exactly as the beyond-state note rule requires
 
-The island SHALL carry the payload's `title`, and its header SHALL stay a single row at every authored title length. `title` is server-authored and bounded only by the payload's 128-code-point ceiling, so the header SHALL be a localization-safe container: the title SHALL be the row's only elastic item — rendered on one line, truncated with an overflow indicator when it does not fit, and keeping its complete string available as the element's own tooltip/accessible text — while the orientation marks and every other header item SHALL be fixed-size items that neither shrink nor wrap. The header SHALL carry no full-map control of its own: the island's single full-map affordance is the full-bleed element specified below, so the header's fixed-size items are the orientation marks and nothing else unless a later change adds one. No authored or translated title SHALL be able to reflow the header onto a second line, and the island's card SHALL keep its constant width rather than being sized by its widest row, so neither the card's width nor the canvas's is a function of the title's length. On the lattice variant — which exactly the coordinate-bearing layers select — the island SHALL state the renderer's own axis orientation as orientation marks in its header and SHALL omit those marks otherwise rather than assert a direction or an axis the presentation does not support (a radial graph asserts no axis). Node `x`/`y` carry layer-scoped semantics: on the closed coordinate-bearing set (`grid`, `wilderness`) they are validated world coordinates and MAY drive relative-direction geometry; on every other layer they are renderer-local layout values and SHALL NOT be read as direction, distance, or place. The island's readout line SHALL state the `current` node's coordinates as a two-integer figure — that node's payload `x` and `y` exactly as committed, with no unit, delta, or derived quantity — whenever the payload layer is coordinate-bearing, and SHALL state nothing else: it SHALL NOT state the current node's place name, its visibility state, a movement destination, or any other label, because the canvas already marks the current node and the shell's own location surface already names the place. The readout SHALL NOT be driven by pointer hover or by node selection: the island SHALL hold no hovered-node and no selected-node state, and the readout SHALL be a pure function of the committed payload, so it describes where the player is after every move without any re-seeding and cannot go stale when a payload replaces the rendered one. The island SHALL NOT state a coordinate figure for any node other than the `current` node, on any layer, and the full-map overlay SHALL NOT state a coordinate figure at all. No surface SHALL render a compass angle, a bearing angle, a distance, or any coordinate figure beyond the permitted current-node figure; in particular the remembered-node edge markers convey direction only and never gain a coordinate readout. On a coordinate-free layer there is no coordinate figure, so the readout resolves to nothing and the empty-readout rule governs it unchanged: when the readout has nothing to state it SHALL state nothing and SHALL render no framed container, painting no box, rather than presenting an empty bordered widget; its row SHALL keep its one-line height so the island's size does not change with the layer. Removing the readout's label content SHALL NOT make any node's name unreachable: each in-view node's full label SHALL remain available as its on-canvas accessible name, and a remembered node's name SHALL remain readable — as the visible text of its edge marker on the lattice variant and of its entry in the full-map surface's remembered list on the graph variant — with its untruncated form always available to assistive technology on the island.
+#### Scenario: The vignette is the knowledge edge, not terrain
+- **WHEN** a map surface paints its vignette
+- **THEN** each map surface SHALL paint exactly ONE vignette treatment that darkens the canvas toward its edges, and that treatment SHALL be the knowledge edge — the limit of what the payload knows — and SHALL NOT be, or be styled as, terrain: a single full-canvas gradient wash with no fabricated geometry — no per-cell fill, no per-region fill, and no drawn shape tracing any terrain feature
+- **AND** the vignette SHALL NOT reduce the coordinate dot field below the presence floor at any point of the canvas, so the far-field dots it is meant to make faint stay visible rather than being erased
 
-The island's readout SHALL adopt the redesign draft's closing-readout treatment as a token-driven rule rather than as a copy of the draft's declarations: it SHALL render at the island's smallest type step in the shared monospace font token, centred beneath the canvas, at a de-emphasised paper tier whose contrast against the island's panel background is at least 4.5:1, separated from the canvas by a step from the shared spacing scale, with no border, no background fill, and no padded box. No draft hex value and no draft-canvas pixel literal SHALL be hardcoded for it.
+#### Scenario: The axis cross follows the stated convention
+- **WHEN** a surface considers drawing the axis cross
+- **THEN** it SHALL draw a full-width and full-height axis line through the `current` node's drawn position ONLY where that same surface states the axis convention in words; a surface that states no orientation marks SHALL draw no axis, and the radial graph variant SHALL draw none on any surface because a graph asserts no axis
+- **AND** the axis SHALL be drawn beneath every node marker — it necessarily passes through the `current` node's own marker, which is what an origin is, and that crossing SHALL NOT be read as a violation of the non-overlap invariant, whose axis clause governs the edge direction markers in the gutter band
 
-The island SHALL present exactly one full-map affordance, and that affordance SHALL carry no visible button chrome — no labelled control, icon button, or other visible trigger anywhere on the island. The affordance SHALL be a real `<button>` element spanning the island's whole box, transparent and layered beneath the island's visual content so the button element itself contains no focusable descendant, carrying 展開全地圖 as its accessible name. Activating it by pointer, by Enter, or by Space SHALL open the full-map surface through the platform's own button behaviour; no key handler on a non-button element SHALL stand in for it. The affordance SHALL be reachable in the island's tab order without the island's root element gaining a role or a tab stop of its own, and its focus-visible indication SHALL delineate the whole island rather than a small region of it. The affordance element SHALL be stable across committed payloads, so the full-map surface's opener — the focused element captured when that surface opens — still exists when it closes and focus is restored to it. The island's existing pointer convenience SHALL be unchanged: a click on the island's body SHALL open the full-map surface, a click that originates in an interactive descendant — an actionable lattice node or the affordance itself — SHALL run only that descendant's own behaviour, and every activation path SHALL open the full-map surface exactly once. The island SHALL carry no other tab stop and no other interactive descendant: neither an edge direction marker, nor a marker name, nor an entry of either text alternative SHALL be focusable or activatable, so the affordance remains the island's single keyboard path on every layout variant.
+#### Scenario: Decoration contrast is pinned in a band against the ground
+- **WHEN** the dot field and the axis render against the canvas ground
+- **THEN** each SHALL be present as a painted element whose resolved colour differs from the canvas ground; each SHALL keep a contrast ratio against that ground of at least 1.15:1 at every point of the canvas and at least 1.35:1 within the vignette's un-darkened inner field; and neither SHALL exceed the contrast that the connector-edge ink itself keeps against the same ground, so the coordinate decoration never reads louder than the topology it decorates
+- **AND** these layers are decoration, not information: the coordinate claim they picture is carried redundantly by the node placement itself, by the header's axis orientation marks, and by the readout's coordinate figure, so no reader depends on them — but the lattice's geometry is its claim, so they SHALL NOT be invisible
 
-The presentation of `remembered` nodes SHALL follow the resolved layout variant, and each such node SHALL be presented exactly once on a given surface. Their payload coordinates SHALL NOT influence either exported node placement.
+#### Scenario: The render model exports two placements
+- **WHEN** a payload is committed
+- **THEN** layout SHALL be computed in the DOM-independent render model, not as a rescaling of payload coordinates into a fixed pixel box, and the model SHALL export two placements for the same committed payload: a bounded integer lattice and a radial connected-graph
+- **AND** the renderer SHALL size the map canvas from the exported placement and from the surface's own declared canvas geometry
 
-On the lattice variant, the named edge direction marker SHALL BE the presentation: each remembered node whose coordinates fall outside the drawn extent SHALL render as the remembered-node diamond ornament (carrying the gold landmark treatment when flagged) placed where the ray from the current node through that node's **raw payload coordinate delta** crosses the canvas's marker-safe border, with the direction computed by a pure helper over the raw delta (`+y = 北`, eight octants with deterministic sector bounds) and never from rank-compressed columns or rows, since compression preserves order, not ratios. The marker SHALL convey direction only — no distance figure, angle, or coordinate readout — and SHALL carry no activation of its own. The island SHALL NOT render a remembered-node list on this variant: the list is removed outright, and no surface SHALL present a remembered node both as a marker and as a list entry.
+#### Scenario: The lattice placement is bounded and rank-compresses on overflow
+- **WHEN** the model computes the lattice placement
+- **THEN** it SHALL place only current-field-of-view nodes (`current`, `visible_unvisited`, `visible_visited`) on it, deriving each node's column and row from its payload coordinates relative to the minimum in-view coordinate, and SHALL export the lattice's column and row counts
+- **AND** when that span would exceed 64 columns or 64 rows, the model SHALL fall back to rank compression over the distinct sorted coordinate values, which cannot exceed the payload's node bound
 
-On every surface that draws edge direction markers — the island as well as the full-map overlay — each marker SHALL carry its place name as visible text beside it. The name SHALL be drawn wholly inside the marker gutter band that lies outside the canvas rect containing every node marker, every node label, the coordinate dot field's registered cells, and the axis — the rect the surface's coordinate-field padding grows, so the band stays the canvas's outermost band however much margin is taken — so a marker name can never intersect a node marker, a node label, or the axis line that surface now draws. Markers and their names SHALL be positioned deterministically so that no marker overlaps another marker and no name overlaps another name. The room a name may occupy SHALL be declared in the terms the placement helper consumes — the band depth every surface reserves, and, on a surface that draws its names OUTWARD across that band rather than along it, an outward name box — so the room is reserved before the names are drawn rather than discovered afterwards. **Each name SHALL then be fitted to what that same declared geometry reserved for it, and no surface SHALL draw a name longer than the room its own declaration set aside.** The fit budget SHALL be the lesser of two terms measured in the same monospace cells (one for a code point the bundled monospace face draws one cell wide, two for every other code point, each CELL_EM of the shipped face's Latin cell advance) at the surface's declared name type size: the free span the marker holds along its own edge, and — only where that marker's name is drawn outward across the band — the declared outward name box, which SHALL be declared wide enough for `labelMax + 1` wide glyphs. A surface that declares band depth alone, drawing its names along the band, has no outward term and is bound by its span alone. The number that budgets the fit SHALL be the same number that sizes the drawn glyph, so a surface cannot size its text by one measure and reserve room by another. Where a name does not fit that budget it SHALL be truncated with an overflow indicator, and **no surface SHALL draw two equal marker names while the payload labels behind them differ**: rather than asserting that two distinct places are one place, it SHALL drop the visible name of a marker it cannot distinguish, keeping that marker's position, bearing, and state indicator. That rule binds every surface that fits names, not only the smaller one. A dropped or truncated visible name SHALL NOT reduce what a reader can obtain: every drawn marker's untruncated payload label SHALL remain available through the surface's assistive-technology text alternative.
+#### Scenario: The radial placement is deterministic and edge-honest
+- **WHEN** the model computes the radial placement
+- **THEN** it SHALL place the `current` node at the canvas centre and every other in-view node on a ring at BFS exit-hop distance from current over an UNDIRECTED adjacency built from the payload `edges` in both directions (traversable or not, since edges are topology, not passability, and ring membership SHALL NOT depend on an edge's serialization direction), with in-view nodes unreachable by any edge on the outermost ring and a current-only or entirely edgeless payload rendering the centre node alone on a fixed positive padded canvas
+- **AND** ring members SHALL be ordered by first-discovery order then payload index and slotted at deterministic angles, so the same payload always yields byte-identical coordinates
+- **AND** the radial geometry SHALL follow a declared footprint contract — canonical marker radii, a conservative label bounding box and its offset, a minimum ring-to-ring centre separation covering the stacked marker-plus-label extent, a per-ring minimum radius bounding the angular arc between adjacent slots, and a cumulative radius recurrence with fixed canvas padding — so the non-overlap invariant is constructible from the model alone
+- **AND** neither placement SHALL infer distances or geometry the payload does not carry: a radial edge length and a lattice cell step are both presentation geometry with no world meaning
 
-Because the markers carry no activation and are drawn inside a graphic, the lattice variant's complete reading path SHALL be a text alternative that mirrors the drawn marker set one entry per drawn marker, in a deterministic order, each entry stating that marker's untruncated payload label together with its direction as one of the eight octant names (`北`, `東北`, `東`, `東南`, `南`, `西南`, `西`, `西北`). Naming the octant in words is permitted on that mirror; a numeric bearing, an angle, a distance, and any coordinate figure beyond the permitted current-node figure remain forbidden on every surface. The mirror SHALL be derived from the same marker set the surface draws, so it can neither omit a drawn marker nor invent one, and SHALL introduce no additional tab stop: the island's tab order SHALL remain exactly its single full-map affordance, and neither the markers nor the mirror SHALL be focusable.
+#### Scenario: Surfaces declare a fixed square canvas or a fitted view
+- **WHEN** a surface declares its canvas geometry
+- **THEN** a surface MAY declare a **fixed square canvas** — the island SHALL declare one of 240 CSS px, and the full-map surface declares none — or MAY instead declare a **fitted view** — the full-map surface SHALL declare one, and the island declares none
+- **AND** a fitted view SHALL show the placement's unchanged drawing — the same user-unit geometry, gutter, pitch, and type sizes the surface declares — through a uniformly scaled, translated window, and its opening fit, zoom bounds, pan, and recentre SHALL follow the full-map fit-view requirement
+- **AND** a surface that declares neither SHALL draw at the placement's own size
 
-Coordinate-free payloads SHALL render no edge direction markers, because a radial graph draws no canvas edge for a bearing to cross and its node `x`/`y` are renderer-local layout values. On the graph variant, therefore, the island SHALL present its remembered nodes only through an assistive-technology text alternative: a visually hidden, non-focusable list with one entry per `remembered` node in payload order, each stating that node's untruncated payload label and no direction, no distance, and no coordinate figure. The island SHALL render no visible remembered-node list, chip, or entry on any variant, so the number of places the player has visited can never change the island's size or crowd its canvas. The visible presentation of those nodes is the full-map surface's remembered list, which the island's single full-map affordance opens in one activation, so a sighted reader without assistive technology can always read every remembered place. No remembered node on that variant SHALL be placed on the canvas or on its border, since a position there would assert a bearing the payload does not carry. Edges SHALL be drawn as connector lines between node centers in a non-interactive layer built through element constructors, SHALL NOT intercept node activation, and SHALL carry their label as an accessible name rather than as positioned visible text; an edge with an endpoint that is not on the canvas SHALL be omitted from the drawn layer. The `local_map` payload contract, the visibility states, the `未探索` unvisited-node rule, the remembered-node no-travel rule, and `explore.move` submission SHALL all remain unchanged.
+#### Scenario: A fixed square canvas never magnifies
+- **WHEN** a surface declares a fixed square canvas
+- **THEN** the canvas SHALL always render at exactly that size, its drawing SHALL be laid out in a square coordinate extent whose side is the larger of the declared size and the side the drawing requires, and the drawn uniform scale SHALL therefore be the declared size divided by that side: exactly 1 whenever the drawing fits and below 1 only when it does not, and NEVER above 1 — so no payload, however sparse, can inflate the designed marker radii, label size, marker-name size, or gutter offsets above the sizes the surface declares, and no maximum-upscale bound SHALL be needed or declared
+- **AND** such a surface SHALL fill its square by the pitch-before-margin and readable-window rules below, and SHALL NOT meet the fill by magnification
+
+#### Scenario: The lattice fill grows pitch before taking margin
+- **WHEN** a fixed-square lattice fills its square
+- **THEN** the drawn square pitch SHALL start from the derived minimum pitch and SHALL grow, never shrink, toward the largest whole-unit pitch at which the node core — every lattice column and row plus the node-label band beneath the bottom row — fits inside the declared square less an inset: the edge-marker gutter band where the payload draws edge direction markers, and 8 CSS px on each side otherwise
+- **AND** the drawn pitch SHALL NOT exceed one and a half times the surface's declared pitch, so a sparse payload's coordinate cells stay recognisable as cells
+- **AND** whatever room remains after the pitch is chosen SHALL be taken as **coordinate margin**, padded symmetrically around the node core on both axes up to the square, with the edge-marker band remaining the canvas's outermost band and the padded extent between the core and that band being coordinate space that the dot field paints
+- **AND** where even the derived minimum pitch does not fit, the drawing SHALL keep that minimum pitch and the square extent SHALL grow to the required side
+- **AND** the island SHALL show a square window of side `canvasSize` over the drawing at scale 1, centred on the current node and clamped inside the drawing, clipped to the fixed canvas; every drawn label SHALL remain at least 16 CSS px at the reference, and the full-map surface SHALL keep the complete drawing reachable through its existing view operations
+
+#### Scenario: The graph fill is a readable window
+- **WHEN** a fixed-square graph variant fills its square
+- **THEN** the fixed square window SHALL be centred on the radial placement's current node at one CSS pixel per user unit, clipping oversized radial drawings rather than shrinking their labels, and the complete graph and every full name SHALL remain reachable on the full-map surface
+
+#### Scenario: No cap ever sizes a canvas
+- **WHEN** the renderer resolves canvas dimensions
+- **THEN** it SHALL accept no maximum-width or maximum-height cap and SHALL NOT resolve any cap into a width bound: no surface sizes its canvas by a cap, so there is no definite width to reconcile against a height cap and no engine-specific replaced-element constraint resolution can letterbox or distort a drawing
+- **AND** the canvas's own natural size SHALL NOT be able to breach the island's square however much the edge-marker gutter grows it: the gutter enlarges the drawing's required side, which the square window absorbs as clipping, never as a larger canvas or smaller text
+
+#### Scenario: The island measures nothing and overlaps nothing of its own
+- **WHEN** the island renders map content
+- **THEN** no island size, pitch, or scale SHALL be derived from a measurement of the island's anchor, of the island's other rows, or of any other surface, and the renderer SHALL NOT allow map content to overlap the island's title, its orientation marks, the readout line, or any other island content
+- **AND** node labels SHALL occupy a single line with an overflow indicator, and each node's full label SHALL remain available as its accessible name
+
+#### Scenario: No marker or label footprint ever intersects another
+- **WHEN** the renderer chooses geometry — column pitch, row pitch, and marker sizing on the lattice, and ring radii, angular slots, and marker sizing on the radial graph
+- **THEN** at every placement the model can produce for either variant, no rendered node marker's visual footprint and no rendered node label's visual footprint intersects the footprint of any other node's marker or label
+- **AND** this holds independently of clipping by the island's fixed square canvas, independently of any uniform scale and translation the full-map surface's fitted view applies at any zoom level it permits, and independently of any pitch the island's fill grows beyond the derived minimum (radial ring radii SHALL grow with ring member count so the angular arc between adjacent slots bounds the label footprint)
+- **AND** a connector edge between two node markers SHALL remain visually distinguishable rather than being fully occluded by the markers it connects
+
+#### Scenario: The pitch is derived from what needs clearing
+- **WHEN** the lattice's minimum pitch is derived
+- **THEN** it SHALL be **derived from what actually needs clearing at the drawn placement, not asserted as a constant**, and the derivation SHALL be constructible from the model and the drawn label set alone so the non-overlap invariant holds at every placement the model can produce; three clearance terms SHALL be honoured
+
+#### Scenario: The bare clearance term binds every adjacent pair
+- **WHEN** two lattice cells are adjacent
+- **THEN** the pitch SHALL clear the widest drawn footprint of each of the two markers — including any decoration drawn over a marker, such as the actionable halo, not merely the marker shape itself — with a strictly positive gap, SHALL leave a strictly positive visible connector segment between them, and SHALL keep each node's own label box clear of its own node's widest drawn footprint
+
+#### Scenario: The vertical term clears labels above markers
+- **WHEN** an upper drawn node has a visible label and the cell directly below it contains a marker, even if that lower node has no visible label
+- **THEN** the pitch SHALL reserve the label baseline, its descent, the lower marker's widest footprint and a strictly positive gap; it SHALL grow rather than allow the upper label to overprint the lower marker
+
+#### Scenario: The label term measures visible names in monospace cells
+- **WHEN** two horizontally adjacent cells BOTH draw visible label text
+- **THEN** the pitch SHALL additionally clear both label boxes actually drawn side by side with a half-em gap, `(cells(a) + cells(b)) / 2 × CELL_EM × labelFont + labelFont / 2` rounded up to a whole unit, where the visible (truncated) label is measured in monospace cells at the surface's declared label type size — a code point that the bundled monospace face draws one cell wide counts as one cell, and every other code point — East Asian Wide or Fullwidth characters, and characters the face lacks, which fall back to a wider face — counts as two cells, a cell being CELL_EM, the shipped face's Latin cell advance that the font manifest publishes — and the largest such need over every adjacent labelled pair binds
+- **AND** two truncated labels of `labelMax` wide glyphs plus the narrow overflow indicator therefore need `(2 × labelMax + 1) × CELL_EM × labelFont + labelFont / 2`, never less than the former worst-case term `(labelMax + 1) × labelFont + 3`, while shorter or narrower names ask only for the room they occupy
+
+#### Scenario: The label term never binds on undrawn labels
+- **WHEN** the drawn label set contains no such adjacent pair — which a payload whose neighbouring cells state no place name of their own produces
+- **THEN** the label term SHALL NOT bind, and the derived minimum pitch SHALL NOT be inflated to clear labels that are not drawn
+
+#### Scenario: The derived pitch is a floor, bought without truncation
+- **WHEN** the three terms have derived the minimum pitch
+- **THEN** a surface that declares a fixed square canvas MAY draw a larger pitch to fill its square, as the canvas-sizing rule states, and SHALL NEVER draw a smaller one, and the renderer SHALL NOT satisfy any term by truncating node labels more aggressively: `labelMax` is a legibility contract, and shortening it to buy pitch was rejected when the pitch was first derived
+
+#### Scenario: The square cell keeps drawing and bearings in agreement
+- **WHEN** the clearance terms apply to a drawn lattice
+- **THEN** all applicable terms SHALL be satisfied by the same pitch on both axes, so a drawn lattice cell is **square**: an unequal pitch would draw a node at `(+1, +1)` along a different line than the edge direction marker for the same delta, which is computed from the raw coordinate delta, and the drawing and its bearings SHALL agree
+
+#### Scenario: Map rendering logic is shared and variant-resolved
+- **WHEN** the minimap island and the full-map overlay render a committed payload
+- **THEN** the map-rendering logic (node/marker placement consumption, connector edges, and per-node labels) SHALL be shared between them, parameterized by scale and by layout variant (`lattice` or `graph`) rather than duplicated
+- **AND** the variant SHALL be resolved once, in the render-model layer, as a pure function of the payload's `layer` — the closed coordinate-bearing set (`grid`, `wilderness`) resolves to the lattice and every other layer resolves to the graph — and both surfaces consume that one resolved value, so island and overlay can never disagree
+
+#### Scenario: Only the full-map surface renders the state legend
+- **WHEN** either surface renders
+- **THEN** the state legend SHALL NOT be part of the shared canvas rendering: the full-map surface SHALL be the only surface that renders it, inside a legend popover it opens on request, and no legend element SHALL be mounted on the island for any payload
+
+#### Scenario: The layout follows the data, never a setting
+- **WHEN** a map surface presents its layout
+- **THEN** no map surface SHALL offer a layout switch or any other means for the player to choose a layout, and no layout choice SHALL be kept as a preference or in any client-side storage: the layout follows the data the world ships, not a setting
+
+#### Scenario: Both surfaces render the identical resolved variant
+- **WHEN** island and overlay render the same committed payload
+- **THEN** both surfaces SHALL render the resolved variant's identical in-view nodes and edges, the overlay's drawing shown whole through its fitted view within its own available space rather than on the minimap island's fixed small canvas, with the same non-overlap guarantee applying at every zoom level that view permits
+- **AND** the full-map overlay SHALL NOT render the island's coordinate readout line, since it states no coordinate figure at all
+
+#### Scenario: The graph variant's remembered list is overlay-only
+- **WHEN** a graph-variant payload with remembered nodes renders
+- **THEN** the full-map overlay SHALL render the payload's `remembered` nodes as a visible list outside its canvas — each entry pairing the remembered state's non-colour indicator with the node's full payload label as visible text, carrying no travel action, no activation, and no tab stop — and the minimap island SHALL NOT render that list in any visible form
+- **AND** on the lattice variant neither surface renders a remembered-node list
+
+#### Scenario: The overlay surface wears the draft mapcanvas treatment
+- **WHEN** the full-map overlay renders its map surface
+- **THEN** it SHALL be framed in the draft `mapcanvas` treatment: a dark radial-gradient background painted with pure CSS (no fabricated terrain geometry), a rounded ink border, and a thin seal-toned ring concentric with the `current` node marker, drawn inside that node's own group at 10.5 units × the marker scale — an ornament of the real marker within its reserved footprint, not a second position claim; no teardrop or other pin is drawn above or beside the marker
+
+#### Scenario: The overlay background is its one vignette
+- **WHEN** the overlay's canvas ground is painted
+- **THEN** that background IS the overlay's one knowledge-edge vignette, so the overlay SHALL NOT paint a second wash over it, and the dot field's contrast against the overlay's own canvas ground SHALL satisfy the same presence band as on the island
+
+#### Scenario: Overlay legend chips pair colour with text
+- **WHEN** the overlay legend renders inside its legend popover
+- **THEN** it SHALL render as draft dot-chips (a small colour chip paired with its text label); the chip border style SHALL additionally distinguish the remembered entry from the visited entry so the legend's distinctions do not rely on colour alone
+
+#### Scenario: The header stays one row at every title length
+- **WHEN** the island carries the payload's `title`, server-authored and bounded only by the payload's 128-code-point ceiling
+- **THEN** its header SHALL stay a single row at every authored title length as a localization-safe container: the title SHALL be the row's only elastic item — rendered on one line, truncated with an overflow indicator when it does not fit, and keeping its complete string available as the element's own tooltip/accessible text — while the orientation marks and every other header item SHALL be fixed-size items that neither shrink nor wrap
+- **AND** no authored or translated title SHALL be able to reflow the header onto a second line, and the island's card SHALL keep its constant width rather than being sized by its widest row, so neither the card's width nor the canvas's is a function of the title's length
+
+#### Scenario: The header carries no full-map control
+- **WHEN** the island's header is composed
+- **THEN** it SHALL carry no full-map control of its own: the island's single full-map affordance is the full-bleed element specified below, so the header's fixed-size items are the orientation marks and nothing else unless a later change adds one
+
+#### Scenario: Orientation marks appear only on the lattice variant
+- **WHEN** the island renders a payload
+- **THEN** on the lattice variant — which exactly the coordinate-bearing layers select — the island SHALL state the renderer's own axis orientation as orientation marks in its header and SHALL omit those marks otherwise rather than assert a direction or an axis the presentation does not support (a radial graph asserts no axis)
+
+#### Scenario: Node coordinates carry layer-scoped semantics
+- **WHEN** a consumer reads a node's `x`/`y`
+- **THEN** on the closed coordinate-bearing set (`grid`, `wilderness`) they are validated world coordinates and MAY drive relative-direction geometry; on every other layer they are renderer-local layout values and SHALL NOT be read as direction, distance, or place
+
+#### Scenario: The readout states the current coordinate figure and nothing else
+- **WHEN** the island's readout line renders on a coordinate-bearing layer
+- **THEN** it SHALL state the `current` node's coordinates as a two-integer figure — that node's payload `x` and `y` exactly as committed, with no unit, delta, or derived quantity — and SHALL state nothing else: it SHALL NOT state the current node's place name, its visibility state, a movement destination, or any other label, because the canvas already marks the current node and the shell's own location surface already names the place
+
+#### Scenario: The readout ignores hover and selection
+- **WHEN** the player hovers or selects a node
+- **THEN** the readout SHALL NOT be driven by pointer hover or by node selection: the island SHALL hold no hovered-node and no selected-node state, and the readout SHALL be a pure function of the committed payload, so it describes where the player is after every move without any re-seeding and cannot go stale when a payload replaces the rendered one
+
+#### Scenario: No surface states a forbidden figure
+- **WHEN** any surface renders figures
+- **THEN** the island SHALL NOT state a coordinate figure for any node other than the `current` node, on any layer, and the full-map overlay SHALL NOT state a coordinate figure at all
+- **AND** no surface SHALL render a compass angle, a bearing angle, a distance, or any coordinate figure beyond the permitted current-node figure; in particular the remembered-node edge markers convey direction only and never gain a coordinate readout
+
+#### Scenario: A coordinate-free layer resolves the readout to nothing
+- **WHEN** the payload layer is coordinate-free
+- **THEN** there is no coordinate figure, so the readout resolves to nothing and the empty-readout rule governs it unchanged: when the readout has nothing to state it SHALL state nothing and SHALL render no framed container, painting no box, rather than presenting an empty bordered widget; its row SHALL keep its one-line height so the island's size does not change with the layer
+
+#### Scenario: No node's name depends on the readout
+- **WHEN** the readout's label content is removed
+- **THEN** no node's name becomes unreachable: each in-view node's full label SHALL remain available as its on-canvas accessible name, and a remembered node's name SHALL remain readable — as the visible text of its edge marker on the lattice variant and of its entry in the full-map surface's remembered list on the graph variant — with its untruncated form always available to assistive technology on the island
+
+#### Scenario: The readout treatment is token-driven, not copied
+- **WHEN** the island renders its readout
+- **THEN** it SHALL adopt the redesign draft's closing-readout treatment as a token-driven rule rather than as a copy of the draft's declarations: it SHALL render at the island's smallest type step in the shared monospace font token, centred beneath the canvas, at a de-emphasised paper tier whose contrast against the island's panel background is at least 4.5:1, separated from the canvas by a step from the shared spacing scale, with no border, no background fill, and no padded box
+- **AND** no draft hex value and no draft-canvas pixel literal SHALL be hardcoded for it
+
+#### Scenario: The single full-map affordance is an invisible real button
+- **WHEN** the island presents its full-map affordance
+- **THEN** it SHALL present exactly one, carrying no visible button chrome — no labelled control, icon button, or other visible trigger anywhere on the island
+- **AND** the affordance SHALL be a real `<button>` element spanning the island's whole box, transparent and layered beneath the island's visual content so the button element itself contains no focusable descendant, carrying 展開全地圖 as its accessible name
+
+#### Scenario: Activation runs through the platform's button behaviour
+- **WHEN** the affordance is activated by pointer, by Enter, or by Space
+- **THEN** it SHALL open the full-map surface through the platform's own button behaviour, and no key handler on a non-button element SHALL stand in for it
+
+#### Scenario: The affordance is the island's tab order and focus ring
+- **WHEN** a keyboard user reaches the affordance
+- **THEN** it SHALL be reachable in the island's tab order without the island's root element gaining a role or a tab stop of its own, and its focus-visible indication SHALL delineate the whole island rather than a small region of it
+
+#### Scenario: The affordance survives payloads so focus returns
+- **WHEN** payloads commit while the full-map surface is open
+- **THEN** the affordance element SHALL be stable across committed payloads, so the full-map surface's opener — the focused element captured when that surface opens — still exists when it closes and focus is restored to it
+
+#### Scenario: Body clicks open the map; descendants keep their own behaviour
+- **WHEN** the island's pointer convenience is exercised
+- **THEN** it SHALL be unchanged: a click on the island's body SHALL open the full-map surface, a click that originates in an interactive descendant — an actionable lattice node or the affordance itself — SHALL run only that descendant's own behaviour, and every activation path SHALL open the full-map surface exactly once
+
+#### Scenario: The island carries no other interactive descendant
+- **WHEN** the island is rendered on any layout variant
+- **THEN** it SHALL carry no other tab stop and no other interactive descendant: neither an edge direction marker, nor a marker name, nor an entry of either text alternative SHALL be focusable or activatable, so the affordance remains the island's single keyboard path on every layout variant
+
+#### Scenario: Remembered presentation follows the variant, once per surface
+- **WHEN** remembered nodes are presented on a surface
+- **THEN** their presentation SHALL follow the resolved layout variant, and each such node SHALL be presented exactly once on a given surface
+- **AND** their payload coordinates SHALL NOT influence either exported node placement
+
+#### Scenario: The lattice names its remembered places by edge direction marker
+- **WHEN** a remembered node's coordinates fall outside the drawn extent on the lattice variant
+- **THEN** the named edge direction marker SHALL BE the presentation: it SHALL render as the remembered-node diamond ornament (carrying the gold landmark treatment when flagged) placed where the ray from the current node through that node's **raw payload coordinate delta** crosses the canvas's marker-safe border, with the direction computed by a pure helper over the raw delta (`+y = 北`, eight octants with deterministic sector bounds) and never from rank-compressed columns or rows, since compression preserves order, not ratios
+- **AND** the marker SHALL convey direction only — no distance figure, angle, or coordinate readout — and SHALL carry no activation of its own
+- **AND** the island SHALL NOT render a remembered-node list on this variant: the list is removed outright, and no surface SHALL present a remembered node both as a marker and as a list entry
+
+#### Scenario: Marker names stay inside the outermost gutter band
+- **WHEN** a surface draws edge direction markers — the island as well as the full-map overlay
+- **THEN** each marker SHALL carry its place name as visible text beside it, drawn wholly inside the marker gutter band that lies outside the canvas rect containing every node marker, every node label, the coordinate dot field's registered cells, and the axis — the rect the surface's coordinate-field padding grows, so the band stays the canvas's outermost band however much margin is taken — so a marker name can never intersect a node marker, a node label, or the axis line that surface now draws
+- **AND** markers and their names SHALL be positioned deterministically so that no marker overlaps another marker and no name overlaps another name
+
+#### Scenario: A name's room is declared before it is drawn
+- **WHEN** a surface prepares to draw marker names
+- **THEN** the room a name may occupy SHALL be declared in the terms the placement helper consumes — the band depth every surface reserves, and, on a surface that draws its names OUTWARD across that band rather than along it, an outward name box — so the room is reserved before the names are drawn rather than discovered afterwards
+- **AND** each name SHALL then be fitted to what that same declared geometry reserved for it, and no surface SHALL draw a name longer than the room its own declaration set aside
+
+#### Scenario: The fit budget is measured in monospace cells
+- **WHEN** a marker name is fitted to its room
+- **THEN** the fit budget SHALL be the lesser of two terms measured in the same monospace cells (one for a code point the bundled monospace face draws one cell wide, two for every other code point, each CELL_EM of the shipped face's Latin cell advance) at the surface's declared name type size: the free span the marker holds along its own edge, and — only where that marker's name is drawn outward across the band — the declared outward name box, which SHALL be declared wide enough for `labelMax + 1` wide glyphs
+- **AND** a surface that declares band depth alone, drawing its names along the band, has no outward term and is bound by its span alone
+- **AND** the number that budgets the fit SHALL be the same number that sizes the drawn glyph, so a surface cannot size its text by one measure and reserve room by another
+
+#### Scenario: Ambiguous names are dropped, never equalled
+- **WHEN** a name does not fit its budget
+- **THEN** it SHALL be truncated with an overflow indicator, and no surface SHALL draw two equal marker names while the payload labels behind them differ: rather than asserting that two distinct places are one place, it SHALL drop the visible name of a marker it cannot distinguish, keeping that marker's position, bearing, and state indicator
+- **AND** that rule binds every surface that fits names, not only the smaller one
+- **AND** a dropped or truncated visible name SHALL NOT reduce what a reader can obtain: every drawn marker's untruncated payload label SHALL remain available through the surface's assistive-technology text alternative
+
+#### Scenario: The text alternative mirrors the drawn marker set
+- **WHEN** the lattice variant's markers carry no activation and are drawn inside a graphic
+- **THEN** the variant's complete reading path SHALL be a text alternative that mirrors the drawn marker set one entry per drawn marker, in a deterministic order, each entry stating that marker's untruncated payload label together with its direction as one of the eight octant names (`北`, `東北`, `東`, `東南`, `南`, `西南`, `西`, `西北`)
+- **AND** naming the octant in words is permitted on that mirror; a numeric bearing, an angle, a distance, and any coordinate figure beyond the permitted current-node figure remain forbidden on every surface
+
+#### Scenario: The mirror omits nothing, invents nothing, adds no tab stop
+- **WHEN** the surface derives its text alternative
+- **THEN** the mirror SHALL be derived from the same marker set the surface draws, so it can neither omit a drawn marker nor invent one, and SHALL introduce no additional tab stop: the island's tab order SHALL remain exactly its single full-map affordance, and neither the markers nor the mirror SHALL be focusable
+
+#### Scenario: Coordinate-free payloads render no edge direction markers
+- **WHEN** a coordinate-free payload renders
+- **THEN** it SHALL render no edge direction markers, because a radial graph draws no canvas edge for a bearing to cross and its node `x`/`y` are renderer-local layout values
+
+#### Scenario: The graph variant presents remembered nodes through a hidden list
+- **WHEN** the graph variant renders remembered nodes on the island
+- **THEN** the island SHALL present them only through an assistive-technology text alternative: a visually hidden, non-focusable list with one entry per `remembered` node in payload order, each stating that node's untruncated payload label and no direction, no distance, and no coordinate figure
+- **AND** no remembered node on that variant SHALL be placed on the canvas or on its border, since a position there would assert a bearing the payload does not carry
+
+#### Scenario: The island never shows a visible remembered list
+- **WHEN** any variant renders on the island
+- **THEN** the island SHALL render no visible remembered-node list, chip, or entry, so the number of places the player has visited can never change the island's size or crowd its canvas
+- **AND** the visible presentation of those nodes is the full-map surface's remembered list, which the island's single full-map affordance opens in one activation, so a sighted reader without assistive technology can always read every remembered place
+
+#### Scenario: Edges are inert connector lines
+- **WHEN** a surface draws edges
+- **THEN** they SHALL be drawn as connector lines between node centers in a non-interactive layer built through element constructors, SHALL NOT intercept node activation, and SHALL carry their label as an accessible name rather than as positioned visible text; an edge with an endpoint that is not on the canvas SHALL be omitted from the drawn layer
+
+#### Scenario: The minimap change leaves the payload rules untouched
+- **WHEN** the browser minimap renders
+- **THEN** the `local_map` payload contract, the visibility states, the `未探索` unvisited-node rule, the remembered-node no-travel rule, and `explore.move` submission SHALL all remain unchanged
 
 #### Scenario: The island mounts no state legend
 - **WHEN** an available `local_map` payload renders on both the minimap island and the full-map overlay
@@ -689,7 +965,27 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 - **THEN** the pitch clears `(8 + 5) / 2 × CELL_EM × labelFont + labelFont / 2`, where `CELL_EM` is the shipped face's Latin cell advance in em, each CJK code point counting as two cells and each ASCII code point as one, and the marker name is fitted to its span and outward box by the same cell measure, so a monospace face whose wide glyphs are two Latin cells wide stays inside every reserved box
 
 ### Requirement: Adjacent traversable map nodes submit explore.move through their move descriptor
-The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity. A node with `action: null`, a remembered remote node, or a node whose `visibility` is not a current-field-of-view state SHALL NOT submit any travel action and SHALL remain inert or focus-only exactly as before. The component SHALL derive the submitted `exit_ref` and `current_node` only from the validated `local_map` payload, SHALL NOT construct an exit reference, destination, or room identity from entity data or prose, and SHALL leave the `local_map` panel payload contract, the `未探索` unvisited-node rule, and the remembered-node no-travel rule unchanged. On a successful or rejected submission the refreshed `local_map` payload at the newer revision SHALL replace the rendered minimap; the component SHALL NOT keep a client-side canonical map cache. The corrected node-pitch geometry (this change) SHALL NOT alter which node an activation targets: the enlarged marker's clickable/focusable area SHALL remain centered on the same lattice coordinate the payload assigned it. This activation behavior SHALL be identical whether the lattice renders inside the minimap island or inside the full-map overlay, since both consume the same shared lattice-rendering logic.
+The WebClient `local-map` component SHALL make a currently traversable adjacent node with an exact `move` action descriptor actionable: activating it (click or Enter on the focused node) SHALL submit the `explore.move` UI action carrying that node's opaque `exit_ref` and the canonical `current_node` identity.
+
+#### Scenario: Ineligible nodes stay inert or focus-only
+- **WHEN** a node has `action: null`, is a remembered remote node, or its `visibility` is not a current-field-of-view state
+- **THEN** it SHALL NOT submit any travel action and SHALL remain inert or focus-only exactly as before
+
+#### Scenario: Submissions derive only from the validated payload
+- **WHEN** the component submits a move
+- **THEN** it SHALL derive the submitted `exit_ref` and `current_node` only from the validated `local_map` payload, SHALL NOT construct an exit reference, destination, or room identity from entity data or prose, and SHALL leave the `local_map` panel payload contract, the `未探索` unvisited-node rule, and the remembered-node no-travel rule unchanged
+
+#### Scenario: The refreshed payload replaces the rendered minimap
+- **WHEN** a submission succeeds or is rejected
+- **THEN** the refreshed `local_map` payload at the newer revision SHALL replace the rendered minimap, and the component SHALL NOT keep a client-side canonical map cache
+
+#### Scenario: The pitch fix never retargets an activation
+- **WHEN** the corrected node-pitch geometry of this change is applied
+- **THEN** it SHALL NOT alter which node an activation targets: the enlarged marker's clickable/focusable area SHALL remain centered on the same lattice coordinate the payload assigned it
+
+#### Scenario: Island and overlay activate identically
+- **WHEN** a lattice renders inside the minimap island or inside the full-map overlay
+- **THEN** the activation behavior SHALL be identical in both, since both consume the same shared lattice-rendering logic
 
 #### Scenario: Activating an adjacent traversable node submits explore.move
 - **WHEN** the player focuses an adjacent traversable node whose `action` is the exact `move` object and confirms it
@@ -733,34 +1029,47 @@ gate node, and no geometric `wild:` cell stands in for it.
 - **THEN** the node carries no move action
 
 ### Requirement: The minimap gate nodes match traversal in both directions
-For every gate of every entry in the wilderness entry registry, the minimap SHALL present the gateway
-as a matched pair of edges on both sides: standing at the gate's approach cell, the gateway direction
-(`return_direction`) SHALL render the gate's grid node (canonical `grid:` id, gate room label,
-resolver-derived visibility, move descriptor with that id as destination); standing at the gate room,
-the grid layer SHALL render that gate's approach cell's `wild:` node (canonical `wild:` id for the
-approach cell, the region's display name, knowledge-derived visibility, move descriptor whose
-`exit_ref` is that gate's exit and whose destination is that `wild:` id). The rendered destination
-SHALL always equal the node carrying it, SHALL always equal what `resolve_wilderness_destination`
-derives from the same registration the traversal code reads, and a pinning test SHALL move a
-character through each real gateway exit in both directions and compare the committed node against
-the actual arrival. Node identity and direction deltas for these nodes SHALL come from that same
-single resolver source, never from a duplicated table. The gate node SHALL NEVER be silently
-omitted: registered-gate capacity SHALL be reserved before ordinary visible nodes are collected
-(excess visible nodes trimmed farthest-first in deterministic order), and when the gate's preferred
-renderer-local slot is occupied the gate node SHALL take the nearest free slot in deterministic probe
-order instead of being dropped.
-On the grid layer specifically, the gate candidate's `wild:` identity and label SHALL derive from
-the provisioned exit's `db.gate_direction` resolved through the registry to that gate's
-`approach_cell`, and the candidate's slot direction SHALL be the direction of the exit connecting
-the gate room — never from parsing the gate exit's key or aliases (all wilderness-side gate exits
-share the key `荒野`, and key aliases are display affordances, not identity), and never from the
-entry's anchor cell as a stand-in for a per-gate approach cell.
+For every gate of every entry in the wilderness entry registry, the minimap SHALL present the gateway as a matched pair of edges on both sides, and the rendered destination SHALL always equal the node carrying it and always equal what `resolve_wilderness_destination` derives from the same registration the traversal code reads.
 
-Both deterministic orders are part of this contract: the capacity trim SHALL drop visible nodes in
-descending Chebyshev distance from the current node, then descending Y, then descending X (the current
-node never dropped), and the slot probe SHALL scan the preferred slot first when it is free and inside
-the payload coordinate bounds, then rings of ascending Manhattan distance from it in ascending Y-offset
-then ascending X-offset order, taking the first slot that is inside the coordinate bounds and free.
+#### Scenario: The approach cell renders the gate's grid node
+- **WHEN** the puppet stands at the gate's approach cell
+- **THEN** the gateway direction (`return_direction`) SHALL render the gate's grid node — canonical `grid:` id, gate room label, resolver-derived visibility, and a move descriptor with that id as destination
+
+#### Scenario: The gate room renders the approach cell's wild node
+- **WHEN** the puppet stands at the gate room
+- **THEN** the grid layer SHALL render that gate's approach cell's `wild:` node — canonical `wild:` id for the approach cell, the region's display name, knowledge-derived visibility, and a move descriptor whose `exit_ref` is that gate's exit and whose destination is that `wild:` id
+
+#### Scenario: A pinning test walks every gateway both ways
+- **WHEN** the pinning test runs
+- **THEN** it SHALL move a character through each real gateway exit in both directions and compare the committed node against the actual arrival
+
+#### Scenario: One resolver source, never a duplicated table
+- **WHEN** node identity and direction deltas are computed for these nodes
+- **THEN** they SHALL come from that same single resolver source, never from a duplicated table
+
+#### Scenario: Gate capacity is reserved before ordinary nodes
+- **WHEN** registered gates compete with ordinary visible nodes
+- **THEN** the gate node SHALL NEVER be silently omitted: registered-gate capacity SHALL be reserved before ordinary visible nodes are collected, excess visible nodes trimmed farthest-first in deterministic order
+
+#### Scenario: An occupied preferred slot takes the nearest free one
+- **WHEN** the gate's preferred renderer-local slot is occupied
+- **THEN** the gate node SHALL take the nearest free slot in deterministic probe order instead of being dropped
+
+#### Scenario: Grid-layer gate identity derives from the provisioned exit
+- **WHEN** the grid layer builds a gate candidate
+- **THEN** the candidate's `wild:` identity and label SHALL derive from the provisioned exit's `db.gate_direction` resolved through the registry to that gate's `approach_cell`, and the candidate's slot direction SHALL be the direction of the exit connecting the gate room
+
+#### Scenario: Identity never parses keys, aliases, or anchor cells
+- **WHEN** a grid-layer gate candidate's identity is resolved
+- **THEN** it SHALL never come from parsing the gate exit's key or aliases (all wilderness-side gate exits share the key `荒野`, and key aliases are display affordances, not identity), and never from the entry's anchor cell as a stand-in for a per-gate approach cell
+
+#### Scenario: The capacity trim order is part of the contract
+- **WHEN** the capacity trim drops visible nodes
+- **THEN** it SHALL drop them in descending Chebyshev distance from the current node, then descending Y, then descending X (the current node never dropped)
+
+#### Scenario: The slot probe order is part of the contract
+- **WHEN** the slot probe searches for a free slot
+- **THEN** it SHALL scan the preferred slot first when it is free and inside the payload coordinate bounds, then rings of ascending Manhattan distance from it in ascending Y-offset then ascending X-offset order, taking the first slot that is inside the coordinate bounds and free
 
 #### Scenario: Wilderness side shows the gate room
 - **WHEN** the puppet stands at a registered gate approach cell (e.g. `(60, 103)` for the north
@@ -812,18 +1121,23 @@ then ascending X-offset order, taking the first slot that is inside the coordina
   trim removes only farthest visible nodes in deterministic order
 
 ### Requirement: The wilderness payload legend states the cell scale from the provider constant
-The `local_map` presenter SHALL, for the `wilderness` layer only, append one localized scale note
-to the payload `legend` after the four visibility-state labels, whose text states the wilderness
-cell size in kilometres derived at build time from
-`world.maps.wilderness_provider.WILDERNESS_KM_PER_CELL` — no module or client code SHALL
-duplicate the constant or the conversion. The four state labels SHALL keep their existing order
-and positions, so the scale note is the fifth entry. Payloads for the `grid`, `instance`, and
-`interior` layers SHALL keep their legend exactly as before (the four state labels). The extended
-legend SHALL remain within the existing bounds (at most 16 entries, 256 code points each) and
-SHALL pass both validators unchanged — no payload schema field is added or altered.
-The presenter SHALL read the constant as an attribute of its owning module at legend-assembly
-time (never a value imported into the presenter's own namespace), so patching the provider
-module attribute is observed by the presenter.
+The `local_map` presenter SHALL, for the `wilderness` layer only, append one localized scale note to the payload `legend` after the four visibility-state labels, whose text states the wilderness cell size in kilometres derived at build time from `world.maps.wilderness_provider.WILDERNESS_KM_PER_CELL` — no module or client code SHALL duplicate the constant or the conversion.
+
+#### Scenario: The scale note is the fifth entry
+- **WHEN** the scale note is appended
+- **THEN** the four state labels SHALL keep their existing order and positions, so the scale note is the fifth entry
+
+#### Scenario: Other layers keep their legend exactly as before
+- **WHEN** payloads for the `grid`, `instance`, and `interior` layers are built
+- **THEN** they SHALL keep their legend exactly as before (the four state labels)
+
+#### Scenario: The extended legend stays inside the existing bounds
+- **WHEN** the extended legend is validated
+- **THEN** it SHALL remain within the existing bounds (at most 16 entries, 256 code points each) and SHALL pass both validators unchanged — no payload schema field is added or altered
+
+#### Scenario: The constant is read from its owning module
+- **WHEN** the presenter assembles the legend
+- **THEN** it SHALL read the constant as an attribute of its owning module at legend-assembly time (never a value imported into the presenter's own namespace), so patching the provider module attribute is observed by the presenter
 
 #### Scenario: A wilderness payload legend carries the scale note
 - **WHEN** the `local_map` presenter builds an available payload for a `TerrainRoom`
@@ -842,13 +1156,19 @@ module attribute is observed by the presenter.
   derived from the provider constant rather than a duplicated literal
 
 ### Requirement: The legend renders beyond-state entries as neutral info chips
-The full-map surface's legend SHALL render each legend entry beyond the four visibility-state labels
-with a dedicated neutral info-chip treatment — design-token colors only, text as the primary
-carrier — and SHALL NOT style it by cycling the four state chip styles. The first four entries
-SHALL keep their state chip treatments and order exactly as before, the full-map surface's legend
-popover SHALL remain the only legend surface (the minimap island renders no legend element for any
-payload, and the shared canvas renderer renders none on either surface), and the info entry's
-distinction from state entries SHALL NOT rely on colour alone.
+The full-map surface's legend SHALL render each legend entry beyond the four visibility-state labels with a dedicated neutral info-chip treatment — design-token colors only, text as the primary carrier — and SHALL NOT style it by cycling the four state chip styles.
+
+#### Scenario: The first four entries keep their state treatments
+- **WHEN** the legend renders
+- **THEN** the first four entries SHALL keep their state chip treatments and order exactly as before
+
+#### Scenario: The legend popover remains the only legend surface
+- **WHEN** any payload renders
+- **THEN** the full-map surface's legend popover SHALL remain the only legend surface (the minimap island renders no legend element for any payload, and the shared canvas renderer renders none on either surface)
+
+#### Scenario: The info chip is distinguishable without colour
+- **WHEN** an info entry is shown beside state entries
+- **THEN** the info entry's distinction from state entries SHALL NOT rely on colour alone
 
 #### Scenario: The overlay shows four state chips and one info chip
 - **WHEN** the full-map overlay renders a wilderness payload whose legend carries the scale note and
@@ -868,53 +1188,65 @@ distinction from state entries SHALL NOT rely on colour alone.
   payload
 
 ### Requirement: The full-map surface opens fitted to its body and offers zoom, pan, and recentre
-The full-map overlay SHALL present its map through a clipped viewport that takes the overlay body's
-height left after its one-line guide row and, on the graph variant, its remembered list, so neither
-row can push the map out of the body and the body needs no scrolling to show the map. The map SHALL
-be drawn inside that viewport through a window onto the unchanged drawing: zooming and panning SHALL
-change only a uniform scale and a translation of the whole drawing, never the placement, the pitch,
-the edge-marker gutter, the marker radii, the label and marker-name type sizes, the name fitting, or
-any other geometry the surface declares, so every rule the shared renderer states about that
-geometry — including the non-overlap invariant — holds at every zoom level.
+The full-map overlay SHALL present its map through a clipped viewport that takes the overlay body's height left after its one-line guide row and, on the graph variant, its remembered list, so neither row can push the map out of the body and the body needs no scrolling to show the map.
 
-Each time the overlay opens, the view SHALL open at one CSS pixel per user unit, so every declared 16-unit label remains at least 16 CSS px. A drawing smaller than the viewport SHALL be centred on each non-overflowing axis; an oversized drawing SHALL open around the current node, clamped to the drawing's edges, rather than shrinking text to show all nodes at once. The zoom level SHALL be bounded below by one and above by two CSS pixels per user unit. The complete drawing SHALL remain reachable by the existing pan, zoom, focus-reveal and remembered-list paths without dropping topology.
-While the reader has not zoomed, panned, or recentred, a viewport resize or moved-current payload SHALL recreate that default readable view. Once touched, a resize SHALL preserve the viewport's center point subject to bounds, a moved-current payload SHALL center the new current node at the reader's scale, and any other replacement SHALL only re-clamp the view. No zoom, window position or popover state SHALL persist between openings; each opening SHALL restore the default readable view and close the legend popover.
+#### Scenario: Zooming and panning never change declared geometry
+- **WHEN** the map is drawn inside the viewport through a window onto the unchanged drawing
+- **THEN** zooming and panning SHALL change only a uniform scale and a translation of the whole drawing, never the placement, the pitch, the edge-marker gutter, the marker radii, the label and marker-name type sizes, the name fitting, or any other geometry the surface declares, so every rule the shared renderer states about that geometry — including the non-overlap invariant — holds at every zoom level
 
-The surface SHALL offer these view operations:
+#### Scenario: The view opens readable at scale one
+- **WHEN** the overlay opens
+- **THEN** the view SHALL open at one CSS pixel per user unit, so every declared 16-unit label remains at least 16 CSS px
+- **AND** a drawing smaller than the viewport SHALL be centred on each non-overflowing axis, and an oversized drawing SHALL open around the current node, clamped to the drawing's edges, rather than shrinking text to show all nodes at once
 
-- **Zoom.** A mouse wheel over the viewport SHALL zoom about the pointer, keeping the drawing point
-  under the pointer fixed, and SHALL NOT scroll the body or the page. The `+` key (and `=`) and the
-  `-` key SHALL zoom in and out by a fixed step about the viewport's centre while focus is inside
-  the overlay; a key pressed with Ctrl, Meta, or Alt SHALL be left to the browser. Labelled
-  `放大` and `縮小` buttons in the view-control group floating over the map's top-right corner SHALL do the same.
-- **Pan.** Dragging with the primary pointer button SHALL move the window with the pointer, and SHALL
-  stop at the drawing's edges so no empty space opens beyond a canvas edge on an axis where the
-  drawing is larger than the viewport. A press that moves more than a small threshold is a drag: it
-  SHALL NOT activate the node it started or ended on, so a drag never submits a move. A press that
-  stays within the threshold is an ordinary click, so pointer travel on an actionable node is
-  unchanged.
-- **Recentre.** A labelled `置中` button in that view-control group SHALL centre the `current` node in the
-  viewport at the current zoom level, clamped to the drawing's edges.
+#### Scenario: Zoom bounds and full reachability
+- **WHEN** the reader zooms the drawing
+- **THEN** the zoom level SHALL be bounded below by one and above by two CSS pixels per user unit, and the complete drawing SHALL remain reachable by the existing pan, zoom, focus-reveal and remembered-list paths without dropping topology
 
-Each view control SHALL be a real `<button>` with an accessible name. A control whose operation
-cannot apply — zoom in at the upper bound, zoom out at the readable bound, `置中` on a payload with no
-current node — SHALL state that it is unavailable to assistive technology and SHALL do nothing when
-activated, and SHALL stay focusable so focus never falls out of the overlay's focus trap. The
-keyboard path SHALL remain: every actionable node stays a tab stop in the overlay's focus order and
-still moves on Enter or Space, and when a node receives focus outside the visible window the view
-SHALL pan — at the current zoom level, only as far as needed — so that node's marker and label are
-visible with a margin. The guide row SHALL name the gestures in words. No view operation SHALL
-animate, so the reduced-motion preference has nothing to disable and a reduced-motion reader sees
-exactly the same frames.
+#### Scenario: Untouched views re-fit; touched views persist within the opening
+- **WHEN** a viewport resize or moved-current payload arrives
+- **THEN** while the reader has not zoomed, panned, or recentred, it SHALL recreate that default readable view
+- **AND** once touched, a resize SHALL preserve the viewport's center point subject to bounds, a moved-current payload SHALL center the new current node at the reader's scale, and any other replacement SHALL only re-clamp the view
 
-The state legend SHALL NOT occupy the overlay body's layout. It SHALL open from a `?` disclosure
-button in that view-control group named 圖例, which states whether the popover is expanded; the popover SHALL
-float above the top-right of the map viewport, SHALL hold the payload's full legend with its
-dot-chips and text labels and no focusable content, and SHALL be absent from the DOM while closed.
-It SHALL close on a second activation of its button, on a pointer press inside the overlay outside
-the popover and its button — without consuming that press, so a drag or a node activation still
-proceeds — and on Escape. Escape while the popover is open SHALL close only the popover and SHALL
-NOT close the overlay; the next Escape closes the overlay.
+#### Scenario: No view state persists between openings
+- **WHEN** the overlay closes and opens again
+- **THEN** no zoom, window position or popover state SHALL persist between openings, and each opening SHALL restore the default readable view and close the legend popover
+
+#### Scenario: Wheel and keys zoom the view
+- **WHEN** the reader uses the view's zoom operations
+- **THEN** a mouse wheel over the viewport SHALL zoom about the pointer, keeping the drawing point under the pointer fixed, and SHALL NOT scroll the body or the page
+- **AND** the `+` key (and `=`) and the `-` key SHALL zoom in and out by a fixed step about the viewport's centre while focus is inside the overlay; a key pressed with Ctrl, Meta, or Alt SHALL be left to the browser
+- **AND** labelled `放大` and `縮小` buttons in the view-control group floating over the map's top-right corner SHALL do the same
+
+#### Scenario: Dragging pans and never activates
+- **WHEN** the reader drags with the primary pointer button
+- **THEN** the window SHALL move with the pointer and SHALL stop at the drawing's edges so no empty space opens beyond a canvas edge on an axis where the drawing is larger than the viewport
+- **AND** a press that moves more than a small threshold is a drag: it SHALL NOT activate the node it started or ended on, so a drag never submits a move, and a press that stays within the threshold is an ordinary click, so pointer travel on an actionable node is unchanged
+
+#### Scenario: The recentre button centres the current node
+- **WHEN** the reader activates the labelled `置中` button in that view-control group
+- **THEN** it SHALL centre the `current` node in the viewport at the current zoom level, clamped to the drawing's edges
+
+#### Scenario: Inapplicable controls state unavailability without losing focus
+- **WHEN** a view control's operation cannot apply — zoom in at the upper bound, zoom out at the readable bound, `置中` on a payload with no current node
+- **THEN** each control SHALL be a real `<button>` with an accessible name; an inapplicable control SHALL state that it is unavailable to assistive technology and SHALL do nothing when activated, and SHALL stay focusable so focus never falls out of the overlay's focus trap
+
+#### Scenario: The keyboard path moves and reveals
+- **WHEN** a keyboard user travels the overlay
+- **THEN** the path SHALL remain: every actionable node stays a tab stop in the overlay's focus order and still moves on Enter or Space, and when a node receives focus outside the visible window the view SHALL pan — at the current zoom level, only as far as needed — so that node's marker and label are visible with a margin
+
+#### Scenario: Gestures are named and nothing animates
+- **WHEN** the overlay presents its view operations
+- **THEN** the guide row SHALL name the gestures in words, and no view operation SHALL animate, so the reduced-motion preference has nothing to disable and a reduced-motion reader sees exactly the same frames
+
+#### Scenario: The legend lives in a popover off the body layout
+- **WHEN** the reader opens the state legend
+- **THEN** it SHALL NOT occupy the overlay body's layout; it SHALL open from a `?` disclosure button in that view-control group named 圖例, which states whether the popover is expanded; the popover SHALL float above the top-right of the map viewport, SHALL hold the payload's full legend with its dot-chips and text labels and no focusable content, and SHALL be absent from the DOM while closed
+
+#### Scenario: The popover closes without stealing presses or the overlay
+- **WHEN** the popover is open and the reader dismisses it
+- **THEN** it SHALL close on a second activation of its button, on a pointer press inside the overlay outside the popover and its button — without consuming that press, so a drag or a node activation still proceeds — and on Escape
+- **AND** Escape while the popover is open SHALL close only the popover and SHALL NOT close the overlay; the next Escape closes the overlay
 
 #### Scenario: A tall map opens readable around the current node
 - **WHEN** the player opens an oversized tall lattice or wilderness map with named edge markers at 1451x790
@@ -983,7 +1315,19 @@ NOT close the overlay; the next Escape closes the overlay.
   operation animates
 
 ### Requirement: Map chrome and ordinary node labels are legible without dropping topology
-The minimap island's title, orientation marks and readout SHALL render at the shared `--text-xs` step (16 CSS px at the reference scale), which is the island's one and smallest chrome step, and the full-map overlay's guide, input hint, view controls, legend and remembered list SHALL render at 16 CSS px or more through the shared type tokens; neither surface SHALL hardcode a map chrome type size below that step. The island SHALL draw every node label and marker name at its declared 16-unit step with an effective rendered size of at least 16 CSS px at reference, and at least 22.4 CSS px at the desktop chrome cap. Oversized lattice and graph drawings SHALL be clipped through a current-centered scale-1 window rather than shrinking labels; all nodes and edges SHALL remain in the model, every node SHALL retain its full text alternative, and the full map SHALL make every full name and remembered gateway reachable at its readable scale floor through existing view controls. The derived lattice pitch SHALL satisfy horizontal and vertical footprint clearance for the actual drawn label set.
+The minimap island's title, orientation marks and readout SHALL render at the shared `--text-xs` step (16 CSS px at the reference scale), which is the island's one and smallest chrome step, and the full-map overlay's guide, input hint, view controls, legend and remembered list SHALL render at 16 CSS px or more through the shared type tokens; neither surface SHALL hardcode a map chrome type size below that step.
+
+#### Scenario: Node text keeps its declared floor at every scale
+- **WHEN** the island draws node labels and marker names
+- **THEN** each SHALL render at its declared 16-unit step with an effective rendered size of at least 16 CSS px at reference, and at least 22.4 CSS px at the desktop chrome cap
+
+#### Scenario: Oversized drawings clip instead of shrinking
+- **WHEN** a lattice or graph drawing exceeds the island's canvas
+- **THEN** it SHALL be clipped through a current-centered scale-1 window rather than shrinking labels; all nodes and edges SHALL remain in the model, every node SHALL retain its full text alternative, and the full map SHALL make every full name and remembered gateway reachable at its readable scale floor through existing view controls
+
+#### Scenario: The derived pitch clears the drawn label set
+- **WHEN** the lattice pitch is derived
+- **THEN** it SHALL satisfy horizontal and vertical footprint clearance for the actual drawn label set
 
 #### Scenario: Ordinary neighbourhood is readable
 - **WHEN** a three-by-three grid lattice of distinct two- and four-glyph room names with no remembered gateway renders on the island at 1451x790 and at 2560x1440
@@ -994,14 +1338,34 @@ The minimap island's title, orientation marks and readout SHALL render at the sh
 - **THEN** the island stays a 240 × 240 CSS px canvas retaining every in-view node with its full label as its text alternative and every remembered gateway; its drawn labels are at least 16 CSS px, and the overlay makes every full name reachable at 16 CSS px or more at every permitted zoom level
 
 ### Requirement: Current map location has one unambiguous footprint
-On the full-map overlay the current-location decoration SHALL be a ring concentric with the true current marker, drawn inside the current node's own group at 10.5 units × the marker scale with a hairline seal-toned stroke that does not scale with the drawing, so it can never read as another location. It SHALL stay inside the current node's footprint — its outer edge at least 1 CSS px clear of every node label box, including its own, at the fitted view — and SHALL leave every connector incident to the current node a visible segment between the ring's outer edge and the neighbour's footprint. It SHALL be decoration only: not a node marker for the geometry audit, no accessible name, no pointer target, no activation. The island draws no ornament beyond its current marker. Decorative map material — the canvas corner brackets both surfaces paint outside the drawing, the dot field and the single vignette — SHALL encode no place, terrain or visibility state.
+On the full-map overlay the current-location decoration SHALL be a ring concentric with the true current marker, drawn inside the current node's own group at 10.5 units × the marker scale with a hairline seal-toned stroke that does not scale with the drawing, so it can never read as another location.
+
+#### Scenario: The ring stays clear of labels and connectors
+- **WHEN** the ring renders at the fitted view
+- **THEN** it SHALL stay inside the current node's footprint — its outer edge at least 1 CSS px clear of every node label box, including its own — and SHALL leave every connector incident to the current node a visible segment between the ring's outer edge and the neighbour's footprint
+
+#### Scenario: The ring is decoration only
+- **WHEN** the geometry audit or assistive technology encounters the ring
+- **THEN** it SHALL be decoration only: not a node marker for the geometry audit, no accessible name, no pointer target, no activation
+
+#### Scenario: The island adds no ornament and decoration encodes no state
+- **WHEN** either surface decorates its map
+- **THEN** the island draws no ornament beyond its current marker, and decorative map material — the canvas corner brackets both surfaces paint outside the drawing, the dot field and the single vignette — SHALL encode no place, terrain or visibility state
 
 #### Scenario: Current pin meets a path
 - **WHEN** the full-map overlay renders a current node with connectors to its north, east, south and west neighbours
 - **THEN** exactly one current-location ring renders, its centre coincides with the current marker's centre, no teardrop pin renders, the ring's outer edge keeps at least 1 CSS px from every node label box, each of the four connectors runs from the current marker's centre and keeps a visible segment between the ring's outer edge and the neighbour's actionable halo, and the frame's corner brackets are pointer-inert
 
 ### Requirement: The shipped font manifest is the single source of the map cell measure
-The client cell measure used to fit drawn map text — the Latin cell advance of the bundled monospace face, in em — SHALL have exactly one authored source: the Latin `cell_advance` (advance and units-per-em) the font importer records in the shipped code-point manifest when it pins a release of the bundled face. The cell-table generator SHALL export that measure into the client cell module from the manifest, and every map surface that budgets a drawn label or marker name SHALL consume the exported value rather than a hand-written copy. Re-pinning the bundled face to a new upstream release SHALL change only the importer release pin, the importer advance pin, and regenerated artifacts; no specification, hand-written source constant, or test assertion SHALL need an edit that is not itself derived from the exported measure.
+The client cell measure used to fit drawn map text — the Latin cell advance of the bundled monospace face, in em — SHALL have exactly one authored source: the Latin `cell_advance` (advance and units-per-em) the font importer records in the shipped code-point manifest when it pins a release of the bundled face.
+
+#### Scenario: The generator exports, the surfaces consume
+- **WHEN** the cell-table generator runs and a map surface budgets a drawn label or marker name
+- **THEN** the generator SHALL export that measure into the client cell module from the manifest, and every map surface SHALL consume the exported value rather than a hand-written copy
+
+#### Scenario: Re-pinning touches only pins and artifacts
+- **WHEN** the bundled face is re-pinned to a new upstream release
+- **THEN** only the importer release pin, the importer advance pin, and regenerated artifacts SHALL change; no specification, hand-written source constant, or test assertion SHALL need an edit that is not itself derived from the exported measure
 
 #### Scenario: The exported cell measure equals the manifest
 - **WHEN** the shipped code-point manifest and the client cell module are inspected together

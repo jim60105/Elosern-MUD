@@ -5,7 +5,7 @@ Define implement reducing-only exam accessories and shared skill/stat restrictio
 ## ADDED Requirements
 
 ### Requirement: Guild accessories persist reversible execution and effect restrictions
-Registered non-tradeable guild accessories SHALL occupy valid normal accessory slots and persist exam_id/host identity restriction state under rules-core ownership. Learned bases/ownership/proficiency SHALL remain intact. Every active availability/direct action/passive/stat/gauge/initiative/equipment/hit/modifier/view consumer SHALL interpret one policy. Sealed actions SHALL reject before costs/effects; sealed passives SHALL contribute nothing. Purchase/sale/transfer/loot/reward acquisition SHALL be prohibited.
+Registered non-tradeable guild accessories SHALL occupy valid normal accessory slots and persist exam_id/host identity restriction state under rules-core ownership. Learned bases/ownership/proficiency SHALL remain intact. Every availability/action/passive/stat/gauge/initiative/equipment/hit/modifier/view consumer SHALL interpret one policy. Sealed actions SHALL reject before costs/effects; sealed passives SHALL contribute nothing. Purchase/sale/transfer/loot/reward SHALL be prohibited.
 
 #### Scenario: Direct sealed action
 - **WHEN** a restricted host directly submits heal

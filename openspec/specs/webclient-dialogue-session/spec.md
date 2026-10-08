@@ -11,18 +11,8 @@ consume, with the only-writers boundary and stale-host rules pinned here.
 The dialogue session SHALL be persistent JSON-safe state on the character (`db.dialogue_session`)
 naming the host NPC's database identity, the latest server-authored line, and an update marker.
 Its ONLY writers SHALL be the deterministic dialogue-session helpers: the `explore.talk_open`,
-`explore.talk_scripted`, and `explore.talk_freeform` adapter success paths, the `talk` text-command
-path, the `explore.dialogue_leave` adapter success path, and the clear seams — a successful
-`settle_movement` of the character, an `engage` involving the actor, and
-NPC leave-room, despawn, or leave-party cleanup naming the session NPC. The `explore.talk_open`
-success path SHALL open the session with the host's authored greeting or, for a host without one,
-the fixed server-authored fallback line, and SHALL write nothing else. No presenter, AI layer,
-client payload, or `ui_action` other than these adapters SHALL open,
-refresh, or clear a session directly. A session whose
-NPC identity no longer resolves to a present, interactable NPC in the character's location SHALL
-be treated as not live: the panel degrades to the unavailable form and the next clear seam or
-talk retires it, and the stale dbid SHALL NOT reach the wire. With every AI profile disabled,
-the scripted table path SHALL fully drive open, refresh, line, and choices.
+`explore.talk_scripted`, and `explore.talk_freeform` adapter success paths, the `talk`
+text-command path, the `explore.dialogue_leave` adapter success path, and the clear seams.
 
 #### Scenario: Talking through any surface opens the session
 - **WHEN** the same scripted exchange is delivered via the WS action and via the `talk` command
@@ -54,35 +44,34 @@ the scripted table path SHALL fully drive open, refresh, line, and choices.
 - **THEN** the character holds a session naming that host whose line is the host's greeting (or
   the fixed fallback line), a live session naming another host is replaced by it, and no state
   other than `db.dialogue_session` changes
+
+#### Scenario: The clear seams are exactly the movement, engage, and NPC cleanup paths
+- **WHEN** a clear seam fires
+- **THEN** it is one of: a successful `settle_movement` of the character, an `engage` involving the actor, and NPC leave-room, despawn, or leave-party cleanup naming the session NPC
+
+#### Scenario: The talk_open success path writes only the session opening
+- **WHEN** `explore.talk_open` succeeds
+- **THEN** it SHALL open the session with the host's authored greeting or, for a host without one, the fixed server-authored fallback line, and SHALL write nothing else
+
+#### Scenario: No other layer touches a session directly
+- **WHEN** a presenter, AI layer, client payload, or any `ui_action` other than these adapters encounters a session
+- **THEN** none SHALL open, refresh, or clear a session directly
+
+#### Scenario: A session whose host no longer resolves is treated as not live
+- **WHEN** a session's NPC identity no longer resolves to a present, interactable NPC in the character's location
+- **THEN** the session SHALL be treated as not live: the panel degrades to the unavailable form, the next clear seam or talk retires it, and the stale dbid SHALL NOT reach the wire
+
+#### Scenario: The scripted table path drives the session fully offline
+- **WHEN** every AI profile is disabled
+- **THEN** the scripted table path SHALL fully drive open, refresh, line, and choices
+
 ### Requirement: The dialogue panel is an exact read-only version-2 presentation panel
 The presentation registry SHALL register a `dialogue` panel at schema version 2. Its available
 form SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `bond_stage`, `line`,
-and `choices`: `host` SHALL contain exactly `identity` (the present NPC's positive database
-identity), `display_name` (bounded by the shared display-name bound), and `portrait_ref`;
-`bond_stage` SHALL be the affinity stage NAME from the rulebook stage table when the host NPC has
-a relationship with the viewer and `null` otherwise, and the raw affinity number SHALL NOT appear
-anywhere in the payload; `line` SHALL be the session's latest server-authored reply line bounded
-by the shared narrative-line bound; and `choices` SHALL be an ordered list of at most four
-`{keyword_id, label}` descriptors — the panel-owned presentation bound, independent of the
-interact target descriptor's own sixteen-keyword keyword-pool bound — derived from the host's
-dialogue table in table order (the same prefix the interact affordance truncation takes), the
-same vocabulary owner the interact target descriptor uses, empty when the host's table is empty.
-
-`portrait_ref` SHALL be the opaque `webclient-art-panel` portrait-catalog key for the host when the
-host is present in the art view the `art` panel is built from for the same viewer — including an
-entry that resolves to a placeholder card — and SHALL be `null` only when the host is absent from
-that view or the art view cannot be built. The server SHALL derive the key with the same single
-catalog-key mapper the art panel and the combat participants use, so a non-null `portrait_ref`
-equals a key of the committed catalog in the same snapshot; the client SHALL NOT construct a
-catalog key from the host identity. On the wire `portrait_ref` SHALL be `null` or a decimal-digit
-string of at most 32 characters, the same vocabulary as a combat participant's `portrait_ref`.
-
-The registered
-unavailable form SHALL carry reason `dialogue_unavailable` with the player message
-`對話目前無法顯示` and the shared field set and semantics. The panel SHALL be available exactly
-when the viewer's live dialogue session resolves; the presenter SHALL be read-only — it SHALL NOT
-open, refresh, clear, or mutate any session, affinity, memory, art, or world state — and SHALL
-emit no live object or filesystem reference.
+and `choices`. The panel SHALL be available exactly when the viewer's live dialogue session
+resolves; the presenter SHALL be read-only — it SHALL NOT open, refresh, clear, or mutate any
+session, affinity, memory, art, or world state — and SHALL emit no live object or filesystem
+reference.
 
 #### Scenario: A live scripted session serializes the host triple and table choices
 - **WHEN** a viewer with a live dialogue session against a bonded table host receives a snapshot
@@ -123,16 +112,51 @@ emit no live object or filesystem reference.
 - **THEN** the server validator rejects it and the client mirror rejects it identically, while
   the same payload with `portrait_ref` `"42"` or `null` validates on both sides
 
+#### Scenario: The host triple carries its exact fields
+- **WHEN** a dialogue payload is validated
+- **THEN** `host` SHALL contain exactly `identity` (the present NPC's positive database identity), `display_name` (bounded by the shared display-name bound), and `portrait_ref`
+
+#### Scenario: The bond stage discloses only the stage name
+- **WHEN** a dialogue payload renders `bond_stage`
+- **THEN** it SHALL be the affinity stage NAME from the rulebook stage table when the host NPC has a relationship with the viewer and `null` otherwise, and the raw affinity number SHALL NOT appear anywhere in the payload
+
+#### Scenario: The line carries the bounded latest reply
+- **WHEN** a dialogue payload renders `line`
+- **THEN** it SHALL be the session's latest server-authored reply line bounded by the shared narrative-line bound
+
+#### Scenario: Choices follow the panel-owned four-descriptor table bound
+- **WHEN** a dialogue payload renders `choices`
+- **THEN** they SHALL be an ordered list of at most four `{keyword_id, label}` descriptors — the panel-owned presentation bound, independent of the interact target descriptor's own sixteen-keyword keyword-pool bound — derived from the host's dialogue table in table order (the same prefix the interact affordance truncation takes), the same vocabulary owner the interact target descriptor uses, empty when the host's table is empty
+
+#### Scenario: The portrait reference is the shared catalog key or null
+- **WHEN** a dialogue payload renders `portrait_ref`
+- **THEN** it SHALL be the opaque `webclient-art-panel` portrait-catalog key for the host when the host is present in the art view the `art` panel is built from for the same viewer — including an entry that resolves to a placeholder card — and SHALL be `null` only when the host is absent from that view or the art view cannot be built
+
+#### Scenario: Only the server derives the catalog key and the wire form is bounded
+- **WHEN** `portrait_ref` is produced and serialized
+- **THEN** the server SHALL derive the key with the same single catalog-key mapper the art panel and the combat participants use, so a non-null `portrait_ref` equals a key of the committed catalog in the same snapshot; the client SHALL NOT construct a catalog key from the host identity; and on the wire `portrait_ref` SHALL be `null` or a decimal-digit string of at most 32 characters, the same vocabulary as a combat participant's `portrait_ref`
+
+#### Scenario: The unavailable form carries the stable reason and player message
+- **WHEN** the registered unavailable form is used
+- **THEN** it SHALL carry reason `dialogue_unavailable` with the player message `對話目前無法顯示` and the shared field set and semantics
+
 ### Requirement: Dialogue mode resolves after combat and before exploration
 The coordinator SHALL resolve the committed presentation mode in the order creation-pending →
 `creation`, active combat → `combat`, live dialogue session → `dialogue`, else `exploration`.
-While mode is `dialogue`, the `exploration` and `character` panels SHALL keep shipping their
-ordinary exploration-mode payloads unchanged. Every session open, refresh, and clear SHALL mark
-the viewer's presentation dirty so the mode and `dialogue` panel commit atomically with the
-underlying state change, and a refresh SHALL keep the recorded line and choices current without
-re-opening ceremony. The client-side protocol mirrors (UMD and Vue store) SHALL accept mode
-`dialogue` and name the `dialogue` panel in lockstep with the server registry under the
-panel/mode agreement contract.
+Every session open, refresh, and clear SHALL mark the viewer's presentation dirty so the mode and
+`dialogue` panel commit atomically with the underlying state change.
+
+#### Scenario: Exploration panels keep shipping unchanged during dialogue mode
+- **WHEN** the committed mode is `dialogue`
+- **THEN** the `exploration` and `character` panels SHALL keep shipping their ordinary exploration-mode payloads unchanged
+
+#### Scenario: A refresh keeps the recorded line and choices current
+- **WHEN** a session refresh occurs
+- **THEN** it SHALL keep the recorded line and choices current without re-opening ceremony
+
+#### Scenario: The client protocol mirrors accept dialogue mode in lockstep
+- **WHEN** the client-side protocol mirrors (UMD and Vue store) handle the committed mode
+- **THEN** they SHALL accept mode `dialogue` and name the `dialogue` panel in lockstep with the server registry under the panel/mode agreement contract
 
 #### Scenario: A reply commits dialogue mode atomically
 - **WHEN** a scripted reply is recorded for a connected viewer
@@ -150,16 +174,10 @@ panel/mode agreement contract.
 
 ### Requirement: explore.dialogue_leave ends the live session through the sole writer
 The production action registry SHALL register `explore.dialogue_leave` with a payload accepting
-exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated
-session and re-read the actor's LIVE session through
-`world.rules.dialogue.live_dialogue_session`; with no live session, or a live session naming an
-NPC other than `npc_id`, the adapter SHALL reject with stable code `dialogue_inactive` before
-writing anything. On its success path the adapter SHALL clear the session through the sole-writer
+exactly `npc_id` (a positive integer). On its success path the adapter SHALL clear the session
+through the sole-writer
 `clear_dialogue_session` helper, mark the viewer's presentation dirty through the same push seam
-the other clear seams use, and return a deterministic success result; it SHALL NOT change
-affinity, memory, party membership, or any other world state. The clear SHALL commit through the
-normal presentation path, so the next committed presentation carries mode `exploration` and the
-unavailable `dialogue` panel atomically.
+the other clear seams use, and return a deterministic success result.
 
 #### Scenario: Leaving ends the session and restores exploration mode
 - **WHEN** a viewer with a live session against NPC 41 submits `explore.dialogue_leave` with
@@ -177,3 +195,19 @@ unavailable `dialogue` panel atomically.
 - **WHEN** a successful `explore.dialogue_leave` settles
 - **THEN** affinity, memories, party bindings, and room state are byte-identical to before the
   action, and only `db.dialogue_session` changed
+
+#### Scenario: An inactive or mismatched target rejects before any write
+- **WHEN** there is no live session, or the live session names an NPC other than `npc_id`
+- **THEN** the adapter SHALL reject with stable code `dialogue_inactive` before writing anything
+
+#### Scenario: The adapter re-reads the actor's live session before deciding
+- **WHEN** `explore.dialogue_leave` runs
+- **THEN** the adapter SHALL obtain the actor from the authenticated session and re-read the actor's LIVE session through `world.rules.dialogue.live_dialogue_session`
+
+#### Scenario: The leave changes no affinity, memory, party, or world state
+- **WHEN** `explore.dialogue_leave` succeeds
+- **THEN** the adapter SHALL NOT change affinity, memory, party membership, or any other world state
+
+#### Scenario: The leave clear commits through the normal presentation path
+- **WHEN** the clear settles
+- **THEN** it SHALL commit through the normal presentation path, so the next committed presentation carries mode `exploration` and the unavailable `dialogue` panel atomically

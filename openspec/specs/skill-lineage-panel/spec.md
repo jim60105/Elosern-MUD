@@ -11,15 +11,7 @@ xp_to_next_level, capped, prereq_text_zh)`, `LineageChainView(root_skill_key,
 element_or_style_zh, nodes, consumed, meter)`, and `LineageView(chains,
 completed_count, total_count)`, derived solely from `entity.db.skill_proficiency`
 and `SKILL_REGISTRY` prerequisite data (plus the cached reverse-edge map and the
-shared `can_use_skill` predicate). `nodes` SHALL be in topological order;
-`consumed` SHALL be true exactly when every node is capped; `meter` SHALL be the
-0..1 shallowest-uncapped progress; `prereq_text_zh` SHALL render the unsatisfied
-edge as 「需「X Lv.N」」 from registry data and be empty for roots and unlocked
-nodes. Chains SHALL be generated exactly from the roots that at least one
-prerequisite edge consumes — a prerequisite-less skill nobody consumes is not a
-系譜樹 and starts no chain — each chain the reverse-edge closure from its root,
-chains in registry order. Building any view SHALL NOT create, mutate, or
-persist any entity or world state.
+shared `can_use_skill` predicate).
 
 #### Scenario: A capped mid-tree node reports saturation
 - **WHEN** the view is built for an entity whose `fire_arrow` practice has saturated at its derived cap
@@ -33,6 +25,30 @@ persist any entity or world state.
 - **WHEN** the view is built twice for one entity with no state change in between
 - **THEN** the two `LineageView` instances are equal and entity/world state is unchanged
 
+#### Scenario: Nodes are topologically ordered
+- **WHEN** a chain view is built
+- **THEN** `nodes` SHALL be in topological order
+
+#### Scenario: Consumed means every node capped
+- **WHEN** a chain view is built
+- **THEN** `consumed` SHALL be true exactly when every node is capped
+
+#### Scenario: Meter is shallowest-uncapped progress
+- **WHEN** a chain view is built
+- **THEN** `meter` SHALL be the 0..1 shallowest-uncapped progress
+
+#### Scenario: Prereq text renders the unsatisfied edge
+- **WHEN** a node has an unsatisfied prerequisite edge
+- **THEN** `prereq_text_zh` SHALL render it as 「需「X Lv.N」」 from registry data and be empty for roots and unlocked nodes
+
+#### Scenario: Chains come only from consumed roots
+- **WHEN** chains are generated
+- **THEN** they SHALL be generated exactly from the roots that at least one prerequisite edge consumes — a prerequisite-less skill nobody consumes is not a 系譜樹 and starts no chain — each chain the reverse-edge closure from its root, chains in registry order
+
+#### Scenario: Building a view has no side effects
+- **WHEN** any view is built
+- **THEN** it SHALL NOT create, mutate, or persist any entity or world state
+
 ### Requirement: The lineage panel ships as one bounded versioned OOB contract
 The presentation registry SHALL register panel name `lineage` at schema version 1
 with the standard availability discriminator and a `kind` of `lineage` in the
@@ -40,10 +56,7 @@ available form. The payload SHALL serialize the
 `LineageView` under the conventional caps `LINEAGE_MAX_CHAINS`,
 `LINEAGE_MAX_NODES_PER_CHAIN`, and bounded text lengths, truncating in a fixed
 declared order (trailing chains, then trailing nodes, then further trailing
-chains until the payload fits the envelope limit), while `completed_count` and
-`total_count` always describe the full, untruncated view. The four contract
-mirrors — protocol validator, panel view, JS validator, and boundary tests —
-SHALL ship in lockstep, and boundary tests SHALL pin every cap.
+chains until the payload fits the envelope limit).
 
 #### Scenario: Oversized content truncates deterministically
 - **WHEN** an entity's registry lineage exceeds `LINEAGE_MAX_CHAINS`
@@ -52,6 +65,14 @@ SHALL ship in lockstep, and boundary tests SHALL pin every cap.
 #### Scenario: A malformed source fails the panel closed
 - **WHEN** `db.skill_proficiency` carries a structurally invalid entry for a registry skill
 - **THEN** the `lineage` panel becomes unavailable through the common unavailable form with no fabricated node values
+
+#### Scenario: Counts survive truncation
+- **WHEN** the payload truncates
+- **THEN** `completed_count` and `total_count` always describe the full, untruncated view
+
+#### Scenario: Contract mirrors ship in lockstep
+- **WHEN** the lineage contract changes
+- **THEN** the four contract mirrors — protocol validator, panel view, JS validator, and boundary tests — SHALL ship in lockstep, and boundary tests SHALL pin every cap
 
 ### Requirement: The WebClient renders the lineage window from the view alone
 The stage SHALL carry an icon opening a big-window lineage view. An expanded tree
@@ -87,12 +108,7 @@ available in and out of combat and SHALL mutate nothing.
 When a practice grant makes `can_use_skill` flip from false to true for any skill
 whose prerequisite edges consume the granted skill (reverse-edge map), the system
 SHALL stage exactly one Traditional-Chinese unlock line (e.g. 「新法術可用：火焰風暴」)
-through the existing post-commit notification channel (the same one title-grant
-toasts ride: `ActionResult.notifications`, delivered by the owning settlement
-boundary to every client type as a text line). Unlock state SHALL be recomputed
-from proficiency, never persisted, SHALL be staged only after the transaction
-that applied the grant commits, and SHALL NOT fire during import or scene-build
-auto-seed.
+through the existing post-commit notification channel.
 
 #### Scenario: Meeting an edge announces the child node
 - **WHEN** practice on `scorching_wave` reaches level 3 for an entity owning `firestorm`
@@ -101,3 +117,19 @@ auto-seed.
 #### Scenario: Auto-seed notifies nobody
 - **WHEN** an import auto-seed satisfies deep prerequisite edges
 - **THEN** no unlock toast is produced
+
+#### Scenario: The channel is the title-grant toast channel
+- **WHEN** an unlock line is staged
+- **THEN** it rides the same one title-grant toasts ride: `ActionResult.notifications`, delivered by the owning settlement boundary to every client type as a text line
+
+#### Scenario: Unlock state is derived, never persisted
+- **WHEN** unlock state is computed
+- **THEN** it SHALL be recomputed from proficiency, never persisted
+
+#### Scenario: Staging waits for commit
+- **WHEN** a grant's transaction has not yet committed
+- **THEN** the unlock line SHALL be staged only after the transaction that applied the grant commits
+
+#### Scenario: Scene-build auto-seed notifies nobody
+- **WHEN** a scene-build auto-seed grants practices
+- **THEN** the unlock line SHALL NOT fire

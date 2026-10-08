@@ -11,11 +11,7 @@ instance-reclamation transaction, and the deterministic read parser presenters c
 `world/rules/map_knowledge.py` SHALL be the only module that writes the player's map-knowledge
 attribute. The record SHALL be a JSON-safe dict of exactly `{"schema_version": 1, "visited": {...}}`,
 where `visited` maps canonical node IDs to `{"first_seen_tick": int, "last_seen_tick": int}` with
-non-negative integer ticks. `world/rules/map_knowledge.py` SHALL expose `record_arrival(character)`,
-`prune_reclaimed_room(room_id)`, `parse_knowledge(character)`, and node-ID `encode`/`decode`/`validate`
-helpers. No presenter, command, adapter, or other module SHALL assign the knowledge attribute directly.
-Startup and reconnect SHALL change neither `first_seen_tick` nor `last_seen_tick`; only a successful
-arrival records an observation.
+non-negative integer ticks.
 
 #### Scenario: record_arrival creates a first observation
 - **WHEN** `record_arrival(character)` is called for a character at a canonical node at world tick 30
@@ -45,15 +41,26 @@ arrival records an observation.
 - **THEN** it contains only node IDs and observation ticks — no room names, descriptions, glyphs,
   exit keys, or coordinates as independent fields
 
+#### Scenario: The module exposes the full knowledge API
+- **WHEN** the public surface of `world/rules/map_knowledge.py` is inspected
+- **THEN** it exposes `record_arrival(character)`, `prune_reclaimed_room(room_id)`,
+  `parse_knowledge(character)`, and node-ID `encode`/`decode`/`validate` helpers
+
+#### Scenario: No other module assigns the knowledge attribute directly
+- **WHEN** a presenter, command, adapter, or other module touches map knowledge
+- **THEN** it goes through `world/rules/map_knowledge.py` and never assigns the knowledge attribute directly
+
+#### Scenario: Server startup does not re-observe
+- **WHEN** the server starts and no arrival occurs
+- **THEN** every node's `first_seen_tick` and `last_seen_tick` are unchanged, because only a
+  successful arrival records an observation
+
 ### Requirement: Node IDs use strict per-layer grammar with registered, bounded components
 Node IDs SHALL follow exactly one of these forms: `grid:<z-map-key>:<x>:<y>` for the Grid/Anchor
 layer, `wild:<wilderness-name>:<x>:<y>` for the Wilderness layer, and `room:<dbref>` for Instance and
 ordinary interior rooms. Grid/wilderness X and Y SHALL be integers within the provider/map bounds;
 `z-map-key` and `wilderness-name` SHALL be registered bounded strings; `room:<dbref>` SHALL be a
-positive integer dbref. Component values SHALL be escaped or restricted so delimiters cannot produce
-an ambiguous ID. `decode`/`validate` SHALL reject missing, extra, unknown, non-integer, out-of-bounds,
-or malformed components. A `room:<dbref>` whose object no longer exists SHALL resolve as unavailable
-and SHALL be eligible for pruning.
+positive integer dbref.
 
 #### Scenario: A valid grid node ID round-trips
 - **WHEN** a canonical node ID of the form `grid:capital_altoria:2:0` is decoded and re-encoded
@@ -75,16 +82,20 @@ and SHALL be eligible for pruning.
   zero/negative/boolean dbref
 - **THEN** parsing rejects the ID and no node is produced
 
+#### Scenario: Delimiter characters cannot forge node structure
+- **WHEN** a component value would contain a `:` delimiter
+- **THEN** component values are escaped or restricted so the encoded ID cannot become ambiguous
+
+#### Scenario: A dangling room node resolves as unavailable
+- **WHEN** a `room:<dbref>` node ID references an object that no longer exists
+- **THEN** the node resolves as unavailable and is eligible for pruning
+
 ### Requirement: Arrival recording happens only at existing successful-arrival seams
 `world/rules/map_knowledge.py`'s `record_arrival` SHALL be invoked only from the project's existing
 successful-arrival seams: the shared movement-completion helper
-`typeclasses.exits.after_successful_movement` — which the `MovementCostMixin.at_post_traverse`, the
+`typeclasses.exits.after_successful_movement` — which `MovementCostMixin.at_post_traverse`, the
 success branch of `WildernessGateExit.at_traverse`, and both success branches of
-`WildernessReturnExit.at_traverse` all call after `charge_movement`. Failed traversal, locked exits, vetoed
-`at_pre_move`, rolled-back movement, teleport-style `move_to` calls, quiet reclamation relocations,
-search, map rendering, and remote inspection SHALL NOT record discovery. The derived node SHALL be
-computed from the character's current location at recording time, so grid, wilderness, instance, and
-interior each yield their canonical identity without per-seam node computation.
+`WildernessReturnExit.at_traverse` all call after `charge_movement`.
 
 #### Scenario: Grid traversal records the destination after success
 - **WHEN** a `PlayerCharacter` successfully traverses a `CostedXYZExit` or an ordinary `Exit`
@@ -106,22 +117,24 @@ interior each yield their canonical identity without per-seam node computation.
 - **WHEN** an unowned occupant is relocated to `settings.DEFAULT_HOME` during instance reclamation
 - **THEN** no map knowledge is recorded for that relocation
 
+#### Scenario: Teleport-style moves record nothing
+- **WHEN** a character is relocated via a teleport-style `move_to` call
+- **THEN** no discovery is recorded
+
+#### Scenario: Read-only operations record nothing
+- **WHEN** search, map rendering, or remote inspection touches map data
+- **THEN** no discovery is recorded
+
+#### Scenario: The node is derived from the current location at recording time
+- **WHEN** `record_arrival` runs for a character anywhere in the world
+- **THEN** the derived node is computed from the character's current location, so grid, wilderness,
+  instance, and interior each yield their canonical identity without per-seam node computation
+
 ### Requirement: Reclaimed room knowledge is pruned transactionally with the room deletion
 `world/rules/map_knowledge.py::prune_reclaimed_room(room_id)` SHALL remove `room:<room_id>` from every
 player's knowledge record. It SHALL select only `PlayerCharacter`s that already carry the knowledge
 attribute, SHALL strictly parse each selected record, and SHALL write back only records that actually
 contain the target node — never creating the attribute for a character that does not already have it.
-It SHALL snapshot each affected character's knowledge value before mutation and restore every snapshot
-on any write failure, logging a diagnostic. It SHALL return a boolean success indicator and SHALL raise
-a dedicated `KnowledgePruneError` only on a genuine persistence failure. `world/maps/instance.py::
-reclaim_due_instances` SHALL call it inside the reclaim `transaction.atomic()` block, **before**
-`_clear_non_player_entities(room)` and `room.delete()` run, so a knowledge failure never occurs after
-room/entity caches have already been mutated. A `KnowledgePruneError` SHALL cause the reclaim branch to
-mark the transaction for rollback (`transaction.set_rollback(True)`) and SHALL result in a deferred
-`ScheduledEvent` appended only after leaving the atomic block; `reclaim_due_instances` SHALL NOT emit
-`"instance_reclaimed"` for a rolled-back transaction. A pruning or deletion failure SHALL leave the
-room eligible for a later reclamation attempt and SHALL NOT raise out of `reclaim_due_instances`. A
-promoted room SHALL NOT be pruned.
 
 #### Scenario: Reclaiming an instance room removes its node from affected players
 - **WHEN** `reclaim_due_instances()` reclaims (deletes) an `InstanceRoom` whose `room:<dbref>` appears
@@ -152,6 +165,36 @@ promoted room SHALL NOT be pruned.
 - **WHEN** `reclaim_due_instances()` inspects the reclaim branch's statement order
 - **THEN** the `prune_reclaimed_room` call appears before `_clear_non_player_entities` and
   `room.delete()`, so no rollback ever has to restore mutated room/entity caches
+
+#### Scenario: Pruning snapshots records before mutating them
+- **WHEN** `prune_reclaimed_room(room_id)` is about to mutate an affected character's knowledge value
+- **THEN** it snapshots that value first, and on any write failure it restores every snapshot and
+  logs a diagnostic
+
+#### Scenario: Pruning reports success and raises only on persistence failure
+- **WHEN** `prune_reclaimed_room(room_id)` completes or hits a genuine persistence failure
+- **THEN** it returns a boolean success indicator, and it raises the dedicated `KnowledgePruneError`
+  only on a genuine persistence failure
+
+#### Scenario: Pruning runs inside the reclaim transaction
+- **WHEN** `world/maps/instance.py::reclaim_due_instances` calls `prune_reclaimed_room`
+- **THEN** the call runs inside the reclaim `transaction.atomic()` block, **before**
+  `_clear_non_player_entities(room)` and `room.delete()` run, so a knowledge failure never occurs
+  after room/entity caches have already been mutated
+
+#### Scenario: A KnowledgePruneError marks the reclaim for rollback
+- **WHEN** `prune_reclaimed_room` raises `KnowledgePruneError` inside the reclaim branch
+- **THEN** the branch marks the transaction for rollback (`transaction.set_rollback(True)`) and the
+  deferred `ScheduledEvent` is appended only after leaving the atomic block
+
+#### Scenario: No reclaimed event is emitted for a rolled-back transaction
+- **WHEN** the reclaim transaction is rolled back due to a knowledge pruning failure
+- **THEN** `reclaim_due_instances` does not emit `"instance_reclaimed"` for that transaction
+
+#### Scenario: A failed reclaim leaves the room eligible for retry
+- **WHEN** a pruning or deletion failure occurs during reclamation
+- **THEN** the room remains eligible for a later reclamation attempt and nothing raises out of
+  `reclaim_due_instances`
 
 ### Requirement: parse_knowledge isolates corrupt records without resetting them
 `world/rules/map_knowledge.py::parse_knowledge(character)` SHALL return a normalized, deterministically

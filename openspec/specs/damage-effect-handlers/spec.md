@@ -26,10 +26,7 @@ change performs, and it SHALL use change 8's public registration function — no
 registry, where `school` is either `"physical"` (reading `atk_phys`) or `"magic"` (reading
 `magic_power`) as the attacking stat, and `element` either references
 `world.lore.elements.ELEMENT_REGISTRY` or is the reserved token `none`, which denotes the absence of
-an element rather than a registry lookup. The reserved token SHALL change nothing about settlement:
-the school segment alone selects the attacking stat, and an elementless damage effect resolves
-through the same to-hit roll, defense subtraction, policy application and projection as an
-element-bearing one.
+an element rather than a registry lookup. The reserved token SHALL change nothing about settlement.
 
 #### Scenario: A physical damage effect reads atk_phys
 - **WHEN** `_handle_damage` processes an effect ID of `"damage:dark:physical"`
@@ -46,6 +43,10 @@ element-bearing one.
 - **THEN** both attacks read `atk_phys`, subtract the same defense, apply the same policy terms and
   commit the same hp delta, and neither the attacker's nor the target's elemental affinity changes
   either result
+
+#### Scenario: The school segment alone selects the attacking stat
+- **WHEN** an elementless (`none`) damage effect settles
+- **THEN** the school segment alone selects the attacking stat, and the effect resolves through the same to-hit roll, defense subtraction, policy application and projection as an element-bearing one
 
 ### Requirement: The to-hit roll and damage number are computed during effect resolution, never inside
 apply()

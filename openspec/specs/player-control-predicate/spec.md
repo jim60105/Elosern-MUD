@@ -4,7 +4,7 @@ The single predicate deciding who counts as a player actor for world clock advan
 ## Requirements
 
 ### Requirement: One predicate decides player-driven entity status
-`world/rules/player_control.py` SHALL provide `is_player_driven(entity) -> bool`, true exactly when the entity is a puppeted `PlayerCharacter` (the existing check, unchanged) OR an `NPC` whose `db.possessed_by` is non-null and which is currently puppeted (`entity.sessions.count() > 0`). It SHALL be the project's ONLY such predicate: movement charging, the room-entry action-options trigger, and any future player-actor gate SHALL import it rather than re-implementing the OR. An NPC whose `db.possessed_by` is stale (attribute set, no session puppet — the disconnect window before release lands) SHALL read NOT player-driven.
+`world/rules/player_control.py` SHALL provide `is_player_driven(entity) -> bool`, true exactly when the entity is a puppeted `PlayerCharacter` (the existing check, unchanged) OR an `NPC` whose `db.possessed_by` is non-null and which is currently puppeted (`entity.sessions.count() > 0`). It SHALL be the project's ONLY such predicate, and any future player-actor gate SHALL import it rather than re-implementing the OR.
 
 #### Scenario: A puppeted player character is player-driven
 - **WHEN** `is_player_driven` is called on a session-puppeted `PlayerCharacter`
@@ -21,3 +21,11 @@ The single predicate deciding who counts as a player actor for world clock advan
 #### Scenario: The predicate is the only such gate
 - **WHEN** the repository is searched for inline `isinstance(... PlayerCharacter)` checks in movement or trigger code paths
 - **THEN** only `player_control.py` carries that shape in those paths
+
+#### Scenario: Existing consumer gates route through the predicate
+- **WHEN** movement charging or the room-entry action-options trigger needs to know whether an actor is player-driven
+- **THEN** it imports `is_player_driven` rather than re-implementing the OR
+
+#### Scenario: A stale possession reads NOT player-driven
+- **WHEN** an NPC's `db.possessed_by` attribute is set but no session currently puppets it — the disconnect window before release lands
+- **THEN** `is_player_driven` returns false

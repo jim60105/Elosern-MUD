@@ -5,9 +5,7 @@ Define deterministic entity trait construction from lore-backed race, subrace, a
 ## Requirements
 
 ### Requirement: LivingEntity mounts TraitHandler with the setting's eight-key trait set
-`LivingEntity` SHALL mount `evennia.contrib.rpg.traits.TraitHandler` as `entity.traits`. Before a
-caller's explicit identity-population step, the handler SHALL be empty because `race`, `subrace`,
-or `threat_tier` is not known during generic Evennia object creation. After
+`LivingEntity` SHALL mount `evennia.contrib.rpg.traits.TraitHandler` as `entity.traits`. After
 `apply_race_baseline()` or `apply_monster_tier()` succeeds, it SHALL contain exactly eight traits
 with the trait types design doc §5.2 specifies: `hp`, `mp`, `sp` as
 `GaugeTrait`; `atk_phys`, `agility`, `defense`, and `magic_power` as `StaticTrait`; `guild_merit`
@@ -33,14 +31,17 @@ as `CounterTrait`.
   inspected
 - **THEN** its value is computed from a `base` plus a `mod`, per `StaticTrait` semantics
 
+#### Scenario: The handler stays empty pre-population because identity is unknown at creation
+- **WHEN** a `LivingEntity` goes through generic Evennia object creation, before a caller's
+  explicit identity-population step
+- **THEN** `entity.traits` is empty because `race`, `subrace`, or `threat_tier` is not known
+  during generic Evennia object creation
+
 ### Requirement: Race-driven gauge and counter initial values come from RaceProfile, never a hardcoded per-race number
 `world/rules/traits.py` SHALL derive a `PlayerCharacter` or `NPC`'s race-baseline `hp`/`mp`/`sp`
-gauge maxima from `RaceProfile.vital_baseline`, and its race-baseline `magic_power` static base
-from `RaceProfile.static_baseline.magic_power[0]`, reading both from change 2's
-`world.lore.races.RACE_REGISTRY`. No
-module added by this change SHALL contain a hardcoded HP, MP, SP, or magic-band number for any
-specific race. Race-baseline construction SHALL set `magic_power` to the fourth band's floor
-exactly like the other three static axes; no separate starting-magic assignment step exists.
+gauge maxima from `RaceProfile.vital_baseline`, reading it from change 2's
+`world.lore.races.RACE_REGISTRY`. No module added by this change SHALL contain a hardcoded HP, MP,
+SP, or magic-band number for any specific race.
 
 #### Scenario: Elf HP gauge reflects the race's vital baseline
 - **WHEN** a `PlayerCharacter` or `NPC` is initialized with `race="elf"`
@@ -64,14 +65,19 @@ exactly like the other three static axes; no separate starting-magic assignment 
 - **THEN** the elf value is at least 50 times the human value, matching the same magnitude
   assertion change 2 makes directly on `RaceProfile.vital_baseline`
 
+#### Scenario: Race-baseline magic_power comes from the fourth static band with no extra step
+- **WHEN** race-baseline construction sets a `PlayerCharacter` or `NPC`'s `magic_power` static
+  base
+- **THEN** it is read from `RaceProfile.static_baseline.magic_power[0]` — the fourth band's floor,
+  exactly like the other three static axes
+- **AND** no separate starting-magic assignment step exists
+
 ### Requirement: Static combat trait bases are read directly from RaceProfile.static_baseline, never derived from vital_baseline
 `world/rules/traits.py` SHALL derive a `PlayerCharacter` or `NPC`'s initial `atk_phys`/`agility`/
 `defense` static bases directly from `RaceProfile.static_baseline` (the species-wide floor-to-
 ceiling band for those three stats), reading `world.lore.races.RACE_REGISTRY`. No module added by
 this change SHALL compute a static trait value as a function of `vital_baseline` or
-any other field that is not itself a static-stat field — vital pools and static combat stats scale
-by different, independently documented factors between races, and neither is derivable from the
-other.
+any other field that is not itself a static-stat field.
 
 #### Scenario: Elf static trait bases reflect the race's static_baseline, not a vital-pool ratio
 - **WHEN** an elf `PlayerCharacter`'s `entity.traits.atk_phys`, `agility`, and `defense` bases are
@@ -92,13 +98,23 @@ other.
 - **THEN** the ratio is roughly 8-10x, not the roughly 100x ratio that would result from any
   vital-pool-derived formula
 
+#### Scenario: Vital pools and static combat stats are independently documented, not derivable
+- **WHEN** a module attempted to compute a static combat stat from `vital_baseline` or any other
+  non-static-stat field
+- **THEN** it would be unsound: vital pools and static combat stats scale by different,
+  independently documented factors between races, and neither is derivable from the other
+
 ### Requirement: Subrace static_modifiers and vital_overrides apply in a fixed order: race baseline, then static_modifiers, then vital_overrides
 When a `PlayerCharacter` or `NPC` has a `subrace` set, `world/rules/traits.py` SHALL apply
-`Subrace.static_modifiers` (fractional deltas over `atk_phys`/`agility`/`defense`) to the race
-baseline second, and `Subrace.vital_overrides` (absolute band replacements for named vital stats)
+`Subrace.static_modifiers` to the race baseline second, and `Subrace.vital_overrides`
 third, always in that order relative to the race baseline computed first. `vital_overrides`, where
 present for a stat, SHALL replace that stat's `RaceProfile.vital_baseline`-derived value outright,
 never blend or average with it.
+
+#### Scenario: The two subrace adjustment kinds are fractional deltas and absolute band swaps
+- **WHEN** a `Subrace`'s adjustments are applied to a race baseline
+- **THEN** `static_modifiers` are fractional deltas over `atk_phys`/`agility`/`defense`
+- **AND** `vital_overrides` are absolute band replacements for named vital stats
 
 #### Scenario: A beastfolk subspecies' static_modifiers adjust the race baseline proportionally
 - **WHEN** a beastfolk `NPC` with `subrace="catkin"` is initialized (catkin: atk_phys -0.10,
@@ -121,15 +137,10 @@ never blend or average with it.
 
 ### Requirement: A caller may name a STATIC_TIER_REGISTRY tier to land inside a specific power band instead of the species floor
 `world/rules/traits.py`'s trait-construction function SHALL accept an optional `tier` argument
-naming a key in `world.lore.races.STATIC_TIER_REGISTRY`. When `tier` is omitted, construction SHALL
-behave exactly as it does with no `tier` support (species floor). When `tier` is supplied, the
+naming a key in `world.lore.races.STATIC_TIER_REGISTRY`. When `tier` is supplied, the
 resulting `atk_phys`/`agility`/`defense` bases SHALL be read from that tier's own `.band` (its floor
 value) rather than from `RaceProfile.static_baseline`'s species floor, and the `magic_power` base
-SHALL be read from that tier's own `.magic_band` floor; `hp`/`mp`/`sp`
-SHALL remain driven by `RaceProfile.vital_baseline` regardless of `tier`, since
-`STATIC_TIER_REGISTRY` carries no vital dimension. This mechanism SHALL introduce no
-randomization, stat-point allocation, or level-up curve — one named tier always produces one
-deterministic value.
+SHALL be read from that tier's own `.magic_band` floor.
 
 #### Scenario: A named tier places static traits inside that tier's own band
 - **WHEN** a human `PlayerCharacter` is constructed with `tier="human_swordmaster"`
@@ -154,6 +165,16 @@ deterministic value.
 - **WHEN** a `PlayerCharacter` or `NPC` is constructed with no `tier` argument
 - **THEN** its static trait bases equal `RaceProfile.static_baseline`'s floor values, identical to
   construction before this tier-aware mechanism existed
+
+#### Scenario: Vitals ignore the tier because the registry carries no vital dimension
+- **WHEN** a `PlayerCharacter` or `NPC` is constructed with any `tier`
+- **THEN** `hp`/`mp`/`sp` remain driven by `RaceProfile.vital_baseline` regardless of `tier`, since
+  `STATIC_TIER_REGISTRY` carries no vital dimension
+
+#### Scenario: Tier selection is purely deterministic
+- **WHEN** the tier mechanism is exercised across any constructions
+- **THEN** it introduces no randomization, stat-point allocation, or level-up curve — one named
+  tier always produces one deterministic value
 
 ### Requirement: Monster trait baselines read MonsterTier.static_band and hp_band directly, never a derived multiplier
 `world/rules/traits.py` SHALL derive a `Monster`'s initial `atk_phys`/`agility`/`defense` static
@@ -193,9 +214,7 @@ band.
 `world/rules/traits.py`'s monster trait-construction function SHALL accept an optional `position`
 argument (`"floor"`, `"mid"`, or `"ceiling"`; default `"floor"`), resolving each of
 `MonsterTier.hp_band` and `MonsterTier.static_band`'s three axes to the corresponding point within
-that band. This mechanism SHALL introduce no randomization or distribution — one named position
-always produces one deterministic value per band, and requesting `"mid"` or `"ceiling"` on an
-open-ended band (`None` ceiling) SHALL fail loudly rather than silently substituting a value.
+that band.
 
 #### Scenario: The default position reproduces the unchanged floor behavior
 - **WHEN** a `Monster` is constructed with no `position` argument
@@ -216,6 +235,16 @@ open-ended band (`None` ceiling) SHALL fail loudly rather than silently substitu
   `"ceiling"`)
 - **THEN** construction raises an error rather than silently defaulting to a value
 
+#### Scenario: Position selection is deterministic, never a distribution
+- **WHEN** the position mechanism is exercised across any constructions
+- **THEN** it introduces no randomization or distribution — one named position always produces
+  one deterministic value per band
+
+#### Scenario: Mid or ceiling on an open-ended band fails loudly
+- **WHEN** `position="mid"` or `position="ceiling"` is requested on an open-ended band
+  (`None` ceiling)
+- **THEN** construction fails loudly rather than silently substituting a value
+
 ### Requirement: guild_merit starts at zero with no upper bound
 `world/rules/traits.py` SHALL initialize every `LivingEntity`'s `guild_merit` counter at `0` with
 no maximum, since no lore source specifies a merit cap.
@@ -226,11 +255,15 @@ no maximum, since no lore source specifies a merit cap.
 
 ### Requirement: Every stored static trait value is a base value, never a skill-multiplied value
 Every `atk_phys`/`agility`/`defense` value `world/rules/traits.py` derives or `TraitHandler` stores
-SHALL be a base value. Its pre-subrace baseline SHALL fall within the constructing race's or
-monster tier's documented `StaticBand`/`static_band` range. Post-subrace values SHALL equal the
+SHALL be a base value. Post-subrace values SHALL equal the
 documented fractional adjustment exactly; they MAY cross the original band edge and SHALL NOT be
 clamped. This change SHALL NOT apply, and SHALL NOT provide any mechanism
 that applies, a skill multiplier (×10/×100/×1000) to a value before it is stored in `entity.traits`.
+
+#### Scenario: Pre-subrace baselines fall inside the documented band
+- **WHEN** a race's or monster tier's pre-subrace baseline is derived
+- **THEN** it falls within the constructing race's or monster tier's documented
+  `StaticBand`/`static_band` range
 
 #### Scenario: Baselines stay in-band and subrace adjustments remain auditable
 - **WHEN** any `PlayerCharacter`, `NPC`, or `Monster` is constructed via this change's derivation

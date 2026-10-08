@@ -12,36 +12,11 @@ causes no state change.
 ### Requirement: Scripted dialogue hosts answer authored talk lines
 
 An NPC carrying a `ScriptedDialogue` component SHALL answer known keywords with
-the authored response and unknown keywords with the no-understanding line, where the
-no-understanding line SHALL be the misunderstanding reply authored by the NPC profile named in the
-host's persona provenance when that profile authors one, and the shared no-understanding line
-otherwise (no profile provenance, or a profile without a misunderstanding reply); a provenance
-profile key that does not resolve SHALL emit an operational integrity error naming the NPC and key
-and SHALL use the shared line, never a fabricated personalized line. Editing the host's runtime card
-SHALL NOT change any authored greeting, response, or misunderstanding reply,
-without causing state change except that a known-keyword answer SHALL grant +1 affinity
+the authored response and unknown keywords with the no-understanding line. Answering causes
+no state change except that a known-keyword answer SHALL grant +1 affinity
 (`talk` source) with the host through the sole-writer affinity API (`world/rules/affinity.py`),
 applied by the deterministic talk writer in the same transaction as the answer; unknown keywords
 and no-keyword paths SHALL NOT write any state.
-`talk <npc>` without a keyword SHALL present the NPC's own non-empty offline-greeting field first,
-then the host's authored table greeting when one is configured, then the greeting authored by
-the profile named in its persona provenance, and the no-response line only when every applicable
-source is absent. The instance override SHALL display literally at the text-output boundary;
-trusted authored defaults SHALL retain their existing formatting. A known-keyword response and
-the no-understanding line SHALL NEVER consult the offline-greeting field. An NPC without any
-dialogue component SHALL use the same instance-then-profile greeting precedence on the no-keyword
-path and SHALL yield no-response only when both are absent; this SHALL NOT add keyword
-conversation capability to a componentless NPC. The
-`guild_staff` host SHALL be the dialogue action exception: the keyword `回報`
-SHALL resolve the read-only reportable-quest listing through the deterministic
-guild service without granting the talk affinity, and `talk <guild-staff> 回報 <quest_id>` SHALL
-turn in exactly that quest through `turn_in_quest` with the same atomic exactly-once
-settlement and rejection semantics as `guild turnin`. Every other `guild_staff`
-keyword SHALL grant the same +1 affinity as any other known-keyword answer.
-Before answering, the scripted-talk entry path SHALL consult
-`world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
-that stable rejection line and SHALL write no state — the +1 affinity and
-turn-in paths are both bypassed for the blocked interaction.
 
 #### Scenario: Guild staff answers a known keyword
 - **WHEN** the player talks to the guild master with a keyword such as 公會 or 任務
@@ -125,8 +100,53 @@ turn-in paths are both bypassed for the blocked interaction.
 - **WHEN** a profiled scripted host's runtime card is edited and the player then uses a known keyword, no keyword, and an unknown keyword
 - **THEN** the authored response, table greeting, and profile misunderstanding reply are returned unchanged
 
+#### Scenario: The no-understanding line resolves through persona provenance
+- **WHEN** the no-understanding line is needed for a scripted host
+- **THEN** it is the misunderstanding reply authored by the NPC profile named in the host's persona
+  provenance when that profile authors one, and the shared no-understanding line otherwise (no
+  profile provenance, or a profile without a misunderstanding reply)
+
+#### Scenario: An unresolved provenance key never fabricates a line
+- **WHEN** a provenance profile key does not resolve
+- **THEN** an operational integrity error naming the NPC and key is emitted and the shared line is
+  used, never a fabricated personalized line
+
+#### Scenario: No-keyword talk follows the full greeting precedence
+- **WHEN** `talk <npc>` runs without a keyword
+- **THEN** the NPC's own non-empty offline-greeting field is presented first, then the host's authored
+  table greeting when one is configured, then the greeting authored by the profile named in its
+  persona provenance, and the no-response line only when every applicable source is absent
+
+#### Scenario: Instance overrides are literal; trusted defaults keep formatting
+- **WHEN** an instance greeting override reaches the text-output boundary
+- **THEN** it displays literally, while trusted authored defaults retain their existing formatting
+
+#### Scenario: Authored answers never consult the offline-greeting field
+- **WHEN** a known-keyword response or the no-understanding line is produced
+- **THEN** the offline-greeting field is never consulted
+
+#### Scenario: Componentless NPCs keep the precedence but gain no keywords
+- **WHEN** an NPC without any dialogue component is talked to
+- **THEN** it uses the same instance-then-profile greeting precedence on the no-keyword path and
+  yields no-response only when both are absent, and this does not add keyword conversation
+  capability to a componentless NPC
+
+#### Scenario: guild_staff is the dialogue action exception
+- **WHEN** the `guild_staff` host is talked to with the keyword `回報`
+- **THEN** it resolves the read-only reportable-quest listing through the deterministic guild service
+  without granting the talk affinity, `talk <guild-staff> 回報 <quest_id>` turns in exactly that
+  quest through `turn_in_quest` with the same atomic exactly-once settlement and rejection semantics
+  as `guild turnin`, and every other `guild_staff` keyword grants the same +1 affinity as any other
+  known-keyword answer
+
+#### Scenario: The entry path consults schedule state before answering
+- **WHEN** the scripted-talk entry path is invoked on a host
+- **THEN** it first consults `world/rules/npc_schedules.py::interaction_reason(npc, "talk")`, and a
+  non-`None` result presents that stable rejection line and writes no state — the +1 affinity and
+  turn-in paths are both bypassed for the blocked interaction
+
 ### Requirement: Editable offline greeting text is literal at every speech output boundary
-A non-empty per-instance offline greeting SHALL be plain text on all no-keyword and degraded speech surfaces: scripted and componentless text commands, browser conversation-open narrative/action messages, and degraded generative-NPC speech. Its literal tokens, including color, newline and MXP command/URL markers and repeated pipes, SHALL NOT create formatting, extra lines or interactive links. Escaping SHALL occur only for the text-output surface, exactly once; storage, private editor fields, dialogue-session/OOB lines and settled-line observer values SHALL retain the normalized raw text. An editable override SHALL remain literal even if its text equals an authored default. Clearing the override SHALL restore the trusted authored table/profile default with its existing formatting. Known keywords and misunderstanding replies SHALL remain authored-only.
+A non-empty per-instance offline greeting SHALL be plain text on all no-keyword and degraded speech surfaces: scripted and componentless text commands, browser conversation-open narrative/action messages, and degraded generative-NPC speech. Its literal tokens, including color, newline and MXP command/URL markers and repeated pipes, SHALL NOT create formatting, extra lines or interactive links.
 
 #### Scenario: Markup-like override displays as literal speech
 - **WHEN** an author saves a valid greeting containing `|/`, `|r`, repeated pipes, an MXP command link and an MXP URL link, then uses each no-keyword or degraded speech surface
@@ -144,21 +164,25 @@ A non-empty per-instance offline greeting SHALL be plain text on all no-keyword 
 - **WHEN** conversation-open stores a markup-like override and the dialogue panel is refreshed or restored after reconnect
 - **THEN** the raw OOB line displays as literal text without adding extra escape characters or interactive markup
 
+#### Scenario: Escaping happens once, at the text-output surface only
+- **WHEN** an override is stored, edited, sent over dialogue-session/OOB lines, or settled for observers
+- **THEN** escaping occurs only for the text-output surface, exactly once, and storage, private editor fields, dialogue-session/OOB lines and settled-line observer values retain the normalized raw text
+
+#### Scenario: Equal-to-default override stays literal, clearing restores formatting
+- **WHEN** an editable override's text equals an authored default, and when the override is later cleared
+- **THEN** the override remains literal while equal, and clearing restores the trusted authored table/profile default with its existing formatting
+
+#### Scenario: Keywords and misunderstandings are never overridden
+- **WHEN** an offline-greeting override is set on a host
+- **THEN** known keywords and misunderstanding replies remain authored-only
+
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
 The dialogue-table registry SHALL be keyed by `dialogue_key` and SHALL hold only
 frozen `DialogueDefinition` values composed of an optional `greeting` and a
-tuple of frozen `KeywordResponse` values. The registry SHALL be read-only at
-runtime. A `dialogue_key` with no registered table SHALL resolve to the
+tuple of frozen `KeywordResponse` values. A `dialogue_key` with no registered table SHALL resolve to the
 no-understanding line for keywords and to no greeting. The `guild_staff`
 definition SHALL include the `回報` keyword, whose authored response serves as
-the register-first fallback for unregistered players. The `guild_staff` greeting
-and keyword responses SHALL be spoken in character: they SHALL tell, in the
-host's own in-world voice, what the guild counter is for (registering as an
-adventurer, taking commissions from the board, reporting finished work back at
-the counter with the commission's number, giving up a commission, and asking
-where one stands in rank), and SHALL NOT name a command, a game mechanic, or an
-interface element. Command discoverability belongs to help, documentation and
-the interface.
+the register-first fallback for unregistered players.
 
 #### Scenario: guild_staff definition registers and answers command guidance
 - **WHEN** the `guild_staff` dialogue definition is registered and queried
@@ -175,3 +199,20 @@ the interface.
 - **WHEN** a dialogue lookup references a `dialogue_key` absent from the registry
 - **THEN** the no-understanding line is returned for keywords and no greeting is
   resolved, and nothing is written
+
+#### Scenario: The registry is read-only at runtime
+- **WHEN** the dialogue-table registry is consulted during gameplay
+- **THEN** it is read-only at runtime
+
+#### Scenario: guild_staff prose is in-world only
+- **WHEN** the `guild_staff` greeting and keyword responses are authored
+- **THEN** they are spoken in character, telling in the host's own in-world voice what the guild
+  counter is for — registering as an adventurer, taking commissions from the board, reporting
+  finished work back at the counter with the commission's number, giving up a commission, and
+  asking where one stands in rank — and never name a command, a game mechanic, or an interface
+  element
+
+#### Scenario: Command discoverability lives outside the dialogue table
+- **WHEN** players need to discover guild commands
+- **THEN** command discoverability belongs to help, documentation and the interface, not to the
+  dialogue table's prose

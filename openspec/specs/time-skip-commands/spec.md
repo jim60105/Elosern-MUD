@@ -10,22 +10,7 @@ Define deterministic player commands that advance game time through the world cl
 into a concrete number of seconds, cap that value at `MAX_SKIP_SECONDS`
 (`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`,
 call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities=[caller])` with exactly the capped
-value. The syntax SHALL accept the optional declared-practice clause
-`rest <duration> practice <skill>` (the design's `skip <hours> [practice <skill>]` surface on the
-mounted duration command): an accepted booking is recorded on the caller before the advance, and
-the clock's `practice_settlement` stage is its sole writer (see `settlement-stage-order`). An
-unlabeled duration and `rest` without the clause are explicit rest: clock advance with zero
-growth. The clause SHALL be preflighted BEFORE any clock advance: the skill must be ACTIVE, be in
-the caller's `owned_keys()`, and not be saturated at its derived tip cap, rejecting with the
-stable reason codes `PRACTICE_SKILL_UNKNOWN` (unknown key, non-ACTIVE, or unowned) or
-`PRACTICE_SKILL_CAPPED` with zero clock advance and no booking recorded — a skip never
-half-applies. After the safety gate passes, the command owns the booking state outright: an
-accepted clause records its skill, a clause-less rest clears any stale prior booking (so plain
-rest grows nothing even after a rollback-restored booking), and a rejected clause leaves no
-booking — new or stale — standing to settle on a later advance. Every other accepted unlabeled
-skip — `sleep`, `wait until`, and the `advance_skip()` helper behind the WebClient
-`explore.wait` adapter — SHALL likewise clear any stale booking before its SKIP advance, so
-the accepted `rest` practice clause is the only way a booking can ever settle.
+value.
 
 #### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
 - **WHEN** a rolled-back advance has restored a stale `practice_booking` and the accepted
@@ -74,6 +59,36 @@ the accepted `rest` practice clause is the only way a booking can ever settle.
 - **WHEN** a safe-check-failing actor issues `rest 1h`
 - **THEN** `evaluate_skip_safety()`'s reason is reported to the player and `WorldClock.advance()` is
   never called
+
+#### Scenario: The syntax accepts the optional declared-practice clause
+- **WHEN** the `rest` syntax is parsed
+- **THEN** it SHALL accept the optional declared-practice clause
+  `rest <duration> practice <skill>` (the design's `skip <hours> [practice <skill>]` surface on the
+  mounted duration command), an accepted booking is recorded on the caller before the advance, and
+  the clock's `practice_settlement` stage is its sole writer (see `settlement-stage-order`)
+
+#### Scenario: An unlabeled duration or clause-less rest is explicit rest
+- **WHEN** a duration is unlabeled, or `rest` is issued without the practice clause
+- **THEN** the result is explicit rest: clock advance with zero growth
+
+#### Scenario: The practice clause is preflighted before any clock advance
+- **WHEN** a `rest <duration> practice <skill>` clause is submitted
+- **THEN** the skill must be ACTIVE, be in the caller's `owned_keys()`, and not be saturated at its
+  derived tip cap, checked BEFORE any clock advance; rejection reports the stable reason codes
+  `PRACTICE_SKILL_UNKNOWN` (unknown key, non-ACTIVE, or unowned) or `PRACTICE_SKILL_CAPPED` with
+  zero clock advance and no booking recorded — a skip never half-applies
+
+#### Scenario: After the safety gate passes, the command owns the booking state outright
+- **WHEN** the safety gate has passed for a `rest` invocation
+- **THEN** an accepted clause records its skill, a clause-less rest clears any stale prior booking
+  (so plain rest grows nothing even after a rollback-restored booking), and a rejected clause leaves
+  no booking — new or stale — standing to settle on a later advance
+
+#### Scenario: Every accepted unlabeled skip clears stale bookings before advancing
+- **WHEN** `sleep`, `wait until`, or the `advance_skip()` helper behind the WebClient `explore.wait`
+  adapter performs an accepted unlabeled SKIP advance
+- **THEN** any stale booking is cleared before that advance, so the accepted `rest` practice clause
+  is the only way a booking can ever settle
 
 ### Requirement: sleep computes its own duration from gauge regen, capped at a configured maximum
 `commands/skip.py::CmdSleep` SHALL take no duration argument. When `evaluate_skip_safety()` returns

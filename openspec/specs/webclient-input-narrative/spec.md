@@ -10,39 +10,7 @@ transport.
 
 ### Requirement: The command-line catalog resolves a display line deterministically
 
-The browser SHALL resolve, for every button-triggered mutation submission,
-exactly one readable display command line from `(actionId, payload, display)`
-where `display` is a bounded descriptor of server-authored labels (exit label,
-NPC display name, keyword label, skill label, item key, quantity,
-seconds/daypart) attached to the item at menu-build time — through a single
-DOM-independent catalog function
-(`commandLine(actionId, payload, display)`): the catalog SHALL be pure and
-deterministic (no `document`/`window`, no storage, no transport, no network),
-and every registered mutation action SHALL be a supported mutation action: the
-catalog SHALL return a non-empty bounded string for every registered mutation
-action except the explicitly declared silent presentation controls, and SHALL
-return `null` for the silent presentation control `options.dismiss` (a UI
-visibility control with no game action and no typed equivalent) and for every
-non-mutation item (menu navigation, back rows, submenu opens, scripted-keyword
-category entries, disabled rows) so no inner menu step produces a log line.
-Where the server exposes a canonical typed command, the line SHALL be that
-command with the descriptor values filled in (such as `talk <NPC> <話題>`,
-`engage <目標>`, `cast <技能>[=<目標>]`, `wait <時段>`, `rest <秒數>`, `sleep`,
-`buy <物品> <數量>`, `sell <物品> <數量>`, `use <item_key>`,
-`equip <item_key>`, and the guild/creation forms). For the inventory surface
-the line SHALL be built from the payload's own `item_key` — the literal
-argument the typed `use`/`use` alias `使用` and `equip` alias `裝備` commands
-accept — and the equipment toggle SHALL echo `equip <item_key>` for both the
-equip and the unequip direction, because the typed command is itself the
-toggle. Where no typed command exists — exit traversal (no `move` command),
-`combat.flee`, and the `creation.reset` control — the catalog SHALL emit a
-bounded action label of the activating control as a documented action
-description (the server-authored exit label where the panel carries one, a
-verbatim-pinned client-owned control label where it does not) and SHALL NOT
-invent a command. The catalog
-SHALL be fully unit-testable in Node and SHALL NOT read or duplicate any
-availability rule — enabled/disabled, cost, and target set SHALL continue to
-come only from the server.
+The browser SHALL resolve, for every button-triggered mutation submission, exactly one readable display command line from `(actionId, payload, display)` — `display` a bounded descriptor of server-authored labels attached at menu-build time — through a single pure, deterministic, DOM-independent catalog function `commandLine(actionId, payload, display)` that touches no `document`/`window`, storage, transport, or network.
 
 #### Scenario: A talk button resolves to its typed command
 
@@ -89,47 +57,59 @@ come only from the server.
 - **WHEN** the catalog is asked for `options.dismiss`
 - **THEN** it returns `null` and no narrative line is appended
 
+#### Scenario: The silent control is a pure visibility control
+
+- **WHEN** the declared silent presentation control `options.dismiss` is examined
+- **THEN** it is a UI visibility control with no game action and no typed equivalent
+
+#### Scenario: The display descriptor is a bounded label bundle from menu-build time
+
+- **WHEN** the catalog composes a line from the `display` descriptor
+- **THEN** the descriptor carries only server-authored labels attached to the item at menu-build time — exit label, NPC display name, keyword label, skill label, item key, quantity, seconds/daypart — and nothing else
+
+#### Scenario: The catalog is pure and deterministic
+
+- **WHEN** the catalog function runs
+- **THEN** it is pure and deterministic — no `document`/`window`, no storage, no transport, no network
+
+#### Scenario: Every registered mutation action is a supported action
+- **WHEN** the catalog is asked for any registered mutation action other than the explicitly declared silent presentation controls
+- **THEN** it returns a non-empty bounded string
+
+#### Scenario: Non-mutation menu items never log
+
+- **WHEN** the catalog is asked for a non-mutation item — menu navigation, a back row, a submenu open, a scripted-keyword category entry, or a disabled row
+- **THEN** it returns `null` so no inner menu step produces a log line
+
+#### Scenario: Canonical typed commands carry descriptor values
+
+- **WHEN** the server exposes a canonical typed command for the action
+- **THEN** the line is that command with the descriptor values filled in — such as `talk <NPC> <話題>`, `engage <目標>`, `cast <技能>[=<目標>]`, `wait <時段>`, `rest <秒數>`, `sleep`, `buy <物品> <數量>`, `sell <物品> <數量>`, `use <item_key>`, `equip <item_key>`, and the guild/creation forms
+
+#### Scenario: Inventory lines come from the payload's own item_key
+
+- **WHEN** the catalog builds an inventory line
+- **THEN** it is built from the payload's own `item_key` — the literal argument the typed `use`/`use` alias `使用` and `equip` alias `裝備` commands accept
+- **AND** the equipment toggle echoes `equip <item_key>` for both the equip and the unequip direction, because the typed command is itself the toggle
+
+#### Scenario: Exit traversal emits the server-authored exit label
+
+- **WHEN** the player traverses an exit and the panel carries a server-authored exit label
+- **THEN** the catalog emits that label as a documented action description, because no `move` command exists, and SHALL NOT invent a command
+
+#### Scenario: Labelless controls emit a pinned client-owned label
+
+- **WHEN** an action with no typed command (`combat.flee`, `creation.reset`, an exit traversal) activates on a panel that carries no server-authored label
+- **THEN** the catalog emits a bounded action label of the activating control, verbatim-pinned and client-owned, and SHALL NOT invent a command
+
+#### Scenario: The catalog never reads availability
+
+- **WHEN** the catalog composes any line
+- **THEN** it reads and duplicates no availability rule — enabled/disabled, cost, and target set continue to come only from the server — and the module is fully unit-testable in Node
+
 ### Requirement: A deliberate mutation echo appears exactly once at dispatch
 
-The browser SHALL append the resolved display line to the narrative exactly once
-per deliberate mutation in the single submit path: the echo fires at the moment
-the `ui_action` request is dispatched (a request id is returned), never on
-retry, resync, reconnect-replay, or a second client-local toggle, and never
-when submission is blocked (offline, mutations locked, not initialized, or a
-duplicate/in-flight request). A button click and the identical keyboard
-activation SHALL each echo exactly once. Every surface that dispatches a
-mutation SHALL hand the catalog the labels it already holds — forwarded row
-descriptors (including the chosen non-default cast magnitude's label and the
-explicit target labels on combat rows, and the descriptor on creation
-confirmation items), fields read verbatim from committed state at dispatch
-time (shop row display names, the uniquely matching local-map edge label or
-the destination node label, NPC display names, the committed creation
-confirmation descriptor), or the payload itself — so a deliberate activation
-from any surface (backpack row, shop drawer row, minimap
-move, combat row with or without a non-default magnitude, services row,
-creation activate/reset confirmation) produces its line instead of silently
-resolving to `null`; an ambiguous local-map edge match MUST NOT pick an
-arbitrary edge and instead degrades to the destination-node label. A surface
-that genuinely has no label for the line stays silent rather than fabricating
-one, and any such silence SHALL be an explicit, reviewed expectation of the
-test suite covering the surfaces — no dispatch path may fall silent
-unannounced. A borrowed free-form dialogue SHALL be owned by the action
-path: the command field's borrowed branch SHALL not append its own line, so a
-single free-form send yields exactly one line (`talk <NPC> <speech>`), and when
-submission is blocked the typed speech SHALL remain in the field and the field
-SHALL keep focus (the borrowed interaction is not complete and nothing is
-lost), and the command line SHALL stay expanded. The completion of a borrowed
-dialogue SHALL be signalled by collapsing the command line and returning focus
-to the action dock. Text written into the command field without
-sending (typing, a history walk, or Tab completion) SHALL NOT echo: it dispatches
-nothing, so no line exists to append until the player sends. The echo line SHALL be inserted as literal text via the same
-narrative append path used by server output — it heads the response it begins,
-is presented in the full-log surface, and is never one of that response's
-pages — SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a
-submitted command, and SHALL have no effect on the validated action payload
-(`U9` intact: dispatch stays allowlist + exact). A later rejection of the
-action SHALL NOT remove the line, because the line records what the player
-acted.
+The browser SHALL append the resolved display line to the narrative exactly once per deliberate mutation in the single submit path: the echo fires at the moment the `ui_action` request is dispatched (a request id is returned), never on retry, resync, reconnect-replay, or a second client-local toggle, and never when submission is blocked (offline, mutations locked, not initialized, or a duplicate/in-flight request).
 
 #### Scenario: A staged submit echoes at dispatch
 
@@ -212,15 +192,49 @@ acted.
   `character create`), or the reset row's bounded action label (the pinned
   no-typed-command form) — is appended at dispatch
 
+#### Scenario: A button click and its keyboard activation each echo once
+
+- **WHEN** a player activates a mutation by a button click, and separately by the identical keyboard activation
+- **THEN** each of the two SHALL echo exactly once
+
+#### Scenario: Every dispatch surface hands the catalog its labels
+
+- **WHEN** a deliberate activation comes from any dispatch surface — backpack row, shop drawer row, minimap move, combat row with or without a non-default magnitude, services row, creation activate/reset confirmation
+- **THEN** the surface SHALL hand the catalog the labels it already holds — forwarded row descriptors (including the chosen non-default cast magnitude's label and the explicit target labels on combat rows, and the descriptor on creation confirmation items), fields read verbatim from committed state at dispatch time (shop row display names, the uniquely matching local-map edge label or the destination node label, NPC display names, the committed creation confirmation descriptor), or the payload itself — so the activation produces its line instead of silently resolving to `null`
+
+#### Scenario: An ambiguous local-map edge degrades to the destination node
+
+- **WHEN** a minimap move's local-map edge match is ambiguous
+- **THEN** the echo MUST NOT pick an arbitrary edge and instead degrades to the destination-node label
+
+#### Scenario: A label-less surface stays silent only by reviewed expectation
+
+- **WHEN** a surface genuinely has no label for the line
+- **THEN** it stays silent rather than fabricating one, and any such silence SHALL be an explicit, reviewed expectation of the test suite covering the surfaces — no dispatch path may fall silent unannounced
+
+#### Scenario: The action path owns the borrowed free-form dialogue
+
+- **WHEN** a free-form send dispatches through the borrowed command field
+- **THEN** the command field's borrowed branch SHALL not append its own line, so the single free-form send yields exactly one line (`talk <NPC> <speech>`)
+
+#### Scenario: The echo line is positioned as literal narrative text
+
+- **WHEN** the echo line is appended
+- **THEN** it is inserted as literal text via the same narrative append path used by server output, it heads the response it begins, is presented in the full-log surface, and is never one of that response's pages
+
+#### Scenario: The echo line is inert to markup and dispatch
+
+- **WHEN** an echo line exists
+- **THEN** it SHALL NOT enter the markup pipeline, SHALL NOT be sent or reused as a submitted command, and SHALL have no effect on the validated action payload (`U9` intact: dispatch stays allowlist + exact)
+
+#### Scenario: Rejection keeps the record of the act
+
+- **WHEN** the server later rejects the action whose echo line was appended
+- **THEN** the line is not removed, because the line records what the player acted
+
 ### Requirement: Echoed command lines never affect state
 
-The display command line SHALL be strictly input-side and presentation-only. It SHALL never be
-evaluated, parsed, held for re-execution, or sent as a `text` message; it SHALL NOT write to
-localStorage, session state, transport, epoch, or revision, and it SHALL degrade gracefully: an
-unknown `actionId`, a missing payload, or a descriptor missing a required label SHALL produce `null`
-(silent) rather than a guessed command, and an oversized or non-string server label SHALL be truncated
-to a bounded length with literal-text rendering. The catalog module SHALL keep no stored state and be
-safe to instantiate per page.
+The display command line SHALL be strictly input-side and presentation-only. It SHALL never be evaluated, parsed, held for re-execution, or sent as a `text` message, and it SHALL NOT write to localStorage, session state, transport, epoch, or revision. The catalog module SHALL keep no stored state and be safe to instantiate per page.
 
 #### Scenario: Unknown action stays silent
 - **WHEN** the catalog is asked for an unregistered `actionId`
@@ -234,20 +248,21 @@ safe to instantiate per page.
 - **WHEN** a server label used by the catalog exceeds the bound
 - **THEN** the emitted line is truncated to the bounded length and rendered as literal text
 
+#### Scenario: A missing payload stays silent
+- **WHEN** the catalog is asked for a valid `actionId` with a missing payload
+- **THEN** it returns `null` (silent) rather than a guessed command
+
+#### Scenario: A descriptor missing a required label stays silent
+- **WHEN** a display descriptor lacks a label the command line needs
+- **THEN** the catalog returns `null` (silent) rather than a guessed command
+
+#### Scenario: A non-string server label degrades to bounded literal text
+- **WHEN** a server label used by the catalog is not a string
+- **THEN** it is handled as an oversized label: truncated to a bounded length with literal-text rendering
+
 ### Requirement: Catalog coverage is pinned against the action registry
 
-The test suites SHALL pin the command-line catalog's coverage of the action
-registry: the Node catalog suite SHALL enumerate every registered mutation
-action id and assert each one either resolves to a non-empty bounded line from
-a pinned fixture or appears on the declared silent presentation-control list,
-and a Python test SHALL assert the production action registry's action ids
-equal the same enumerated set, so a newly registered action cannot ship with a
-silent catalog gap. The pinned lists SHALL be deterministic literals (no live
-services, no parsing of the other language's source at runtime). These pins
-complement — and never replace — the per-surface behavioral test table of the
-dispatch requirement, where every dispatch surface (and every intentional
-silence) is a reviewed row and the set of action ids exercised by that table
-covers every registered mutation id except the silent presentation controls.
+The test suites SHALL pin the command-line catalog's coverage of the action registry: the Node catalog suite SHALL enumerate every registered mutation action id and assert each one either resolves to a non-empty bounded line from a pinned fixture or appears on the declared silent presentation-control list, so a newly registered action cannot ship with a silent catalog gap.
 
 #### Scenario: A new registered action without catalog coverage fails the gate
 
@@ -264,16 +279,23 @@ covers every registered mutation id except the silent presentation controls.
   resolves to `null`, and any other registered mutation action is required to
   resolve non-null
 
+#### Scenario: The registry mirrors the enumerated set
+
+- **WHEN** the Python test runs against the production action registry
+- **THEN** it asserts the registry's action ids equal the same enumerated set the Node catalog suite pins
+
+#### Scenario: The pinned lists are deterministic literals
+
+- **WHEN** either coverage pin executes
+- **THEN** it reads deterministic literals only — no live services, and no parsing of the other language's source at runtime
+
+#### Scenario: The pins complement the per-surface test table
+
+- **WHEN** the dispatch requirement's per-surface behavioral test table is considered
+- **THEN** these pins complement — and never replace — that table, where every dispatch surface (and every intentional silence) is a reviewed row and the set of action ids exercised by that table covers every registered mutation id except the silent presentation controls
+
 ### Requirement: The full-log surface opens at its latest line
-Whenever the full-log surface opens, it SHALL present the most recent retained narrative line in
-view, with its scroll region scrolled to the end of its content, so the player sees the latest one or
-two replies without scrolling. The scroll region is the log's one scrolling box inside its frame; it
-SHALL take the initial focus, so the reading keys scroll it at once. The surface SHALL reach that
-position after it takes focus and before the player can interact with it, and it SHALL NOT first flash its opening lines. Older lines SHALL stay reachable by
-scrolling up, and the surface SHALL keep presenting the complete retained narrative through the same
-markup renderer as before. While the surface is open, a newly retained line SHALL NOT change the
-scroll region's offset, including once retention trimming removes the oldest line. Only opening the surface places the reader at the latest line. The surface
-SHALL keep its focus trap, its Escape close, and its focus restore to the opening control unchanged.
+Whenever the full-log surface opens, it SHALL present the most recent retained narrative line in view, with its scroll region scrolled to the end of its content, so the player sees the latest one or two replies without scrolling. The scroll region is the log's one scrolling box inside its frame; it SHALL take the initial focus, so the reading keys scroll it at once.
 
 #### Scenario: A long log opens at the latest reply
 - **WHEN** the narrative retains more lines than the full-log surface can show at once and the player
@@ -296,24 +318,35 @@ SHALL keep its focus trap, its Escape close, and its focus restore to the openin
   player opens it again
 - **THEN** the surface opens at its end again, with the newly retained line in view
 
+#### Scenario: The latest line is reached before any interaction
+- **WHEN** the full-log surface is opening
+- **THEN** it reaches the end-of-content position after it takes focus and before the player can
+  interact with it, and it does NOT first flash its opening lines
+
+#### Scenario: The complete narrative keeps rendering
+- **WHEN** the surface has opened at its latest line
+- **THEN** older lines stay reachable by scrolling up, and the surface keeps presenting the complete
+  retained narrative through the same markup renderer as before
+
+#### Scenario: Open-surface offset survives retention trimming
+- **WHEN** the surface is open and a newly retained line arrives, including once retention trimming
+  removes the oldest line
+- **THEN** the new line does not change the scroll region's offset
+
+#### Scenario: Only opening places the reader at the latest line
+- **WHEN** the reader has moved away from the end of the content after the surface opened
+- **THEN** nothing but opening the surface places the reader back at the latest line
+
+#### Scenario: The surface keeps its modal lifecycle
+- **WHEN** the full-log surface is open
+- **THEN** its focus trap, its Escape close, and its focus restore to the opening control are
+  unchanged
+
 ### Requirement: The narrative log is segmented into responses at each player action
 The browser SHALL derive a sequence of responses from the retained narrative log as a client-local
-presentation view. The view SHALL never mutate the log, SHALL never reach the server, and SHALL never
-change what the full-log surface presents. A response SHALL begin at each retained player input line
-and at each response mark. A response mark SHALL be recorded at the moment a deliberate mutation is
-dispatched (a request id is returned), whether or not that dispatch appends an echo line, so an
-action the echo catalog declares silent still begins a new response. A dispatch that appends its echo
-line SHALL begin exactly one response, not two. A blocked dispatch, or one whose send fails
-synchronously, SHALL record no mark. A response SHALL collect every following server, system, and
-error line until the next response begins. Lines retained before any response begins (connection
-notices, the first output after login) SHALL form a leading response with no input line. A line
-arriving after its action's response has begun and before the next one (a late asynchronous reply)
-SHALL belong to the current response. The input line SHALL be the response's header, SHALL be
-presented only in the full-log surface, and SHALL NOT be one of the response's pageable blocks. A
-response mark with no retained line after it yet SHALL begin no response. Every retained line SHALL
-carry a monotonically increasing ordinal that survives the retention trim, so that trimming the oldest
-lines leaves the segmentation of the lines still retained unchanged. Response marks older than the
-oldest retained line SHALL be discarded with the trim.
+presentation view. A response SHALL begin at each retained player input line and at each response
+mark, and SHALL collect every following server, system, and error line until the next response
+begins.
 
 #### Scenario: A typed command begins a response
 - **WHEN** the player sends `look` from the command line and two server lines follow
@@ -351,37 +384,50 @@ oldest retained line SHALL be discarded with the trim.
 - **THEN** every response whose lines are all still retained has the same header and blocks as
   before the trim, and no response mark refers to a trimmed line
 
+#### Scenario: A response mark is recorded at the dispatch moment
+- **WHEN** a deliberate mutation is dispatched (a request id is returned)
+- **THEN** a response mark is recorded at that moment, whether or not that dispatch appends an echo
+  line, so an action the echo catalog declares silent still begins a new response
+
+#### Scenario: The response view never leaks outward
+- **WHEN** the browser derives the response view
+- **THEN** the view never mutates the log, never reaches the server, and never changes what the
+  full-log surface presents
+
+#### Scenario: A synchronously failed send records no mark
+- **WHEN** a dispatch's send fails synchronously
+- **THEN** no response mark is recorded
+
+#### Scenario: The input header is full-log-only and never pageable
+- **WHEN** a response displays its input line as its header
+- **THEN** that line is presented only in the full-log surface and is not one of the response's
+  pageable blocks
+
+#### Scenario: A fresh mark begins no response yet
+- **WHEN** a response mark has no retained line after it yet
+- **THEN** it begins no response
+
+#### Scenario: Connection notices and first login output lead the leading response
+- **WHEN** lines retained before any response begins include a connection notice or the first
+  output after login
+- **THEN** they form a leading response with no input line
+
+#### Scenario: Retained lines carry ordinals that survive the trim
+- **WHEN** lines are retained and the oldest are later trimmed
+- **THEN** every retained line carries a monotonically increasing ordinal that survives the
+  retention trim, so trimming the oldest lines leaves the segmentation of the lines still retained
+  unchanged
+
+#### Scenario: Marks older than the trim are discarded
+- **WHEN** retention trimming removes the oldest lines
+- **THEN** response marks older than the oldest retained line are discarded with the trim
+
 ### Requirement: A response is cut into pages that fit a measured box and never mid-sentence
 The browser SHALL cut a response's pageable blocks into pages through a pure, deterministic function
-of the blocks and an injected fit test. The fit test SHALL report whether a candidate page's content
-fits the message box. Each server, system, or error line SHALL be one block, in log order. A page
-SHALL hold as many whole blocks as fit. A system or error block SHALL always begin a new page. When a
-block does not fit the room left on the page, it SHALL be split at the last point that fits, trying
-in this order:
-
-1. a hard line break inside the block, or the end of a sentence. A sentence end is `。`, `！`, `？`,
-   `…`, or ASCII `.`, `!`, `?` followed by whitespace, taken together with any directly following run
-   of end marks and closing quotes or brackets (`」`, `』`, `）`, `"`, `'`).
-2. a clause mark: `，`, `、`, `；`, `：`, or ASCII `,`, `;`, `:` followed by whitespace.
-3. a character boundary, which SHALL NOT separate a surrogate pair.
-
-When no split point of the block fits the room left on a non-empty page, the whole block SHALL move
-to a new page first. A continuation SHALL NOT begin with the hard line break it was split at.
-
-Paging SHALL run on the markup pipeline's token stream, never on rendered HTML. A split inside a
-styled span SHALL close the span at the end of the earlier page and SHALL open a span with the same
-classes and style at the start of the later page. Paging SHALL NOT emit any markup the pipeline did
-not produce.
-
-A box-drawing block SHALL never be split. A block that fits no empty page after every split point (a
-box-drawing block taller than the box, or a box too small for one character) SHALL get a page of its
-own marked oversize, which the view SHALL present with internal scrolling. No content SHALL ever be
-truncated or dropped: concatenating a response's pages SHALL reproduce its blocks' text in order, less
-only the line breaks consumed at split points.
-
-For any character offset into a response, the function SHALL identify the page that contains it, so
-that re-paging the same response for a changed box can place the reader on the page holding a given
-character.
+of the blocks and an injected fit test. Each server, system, or error line SHALL be one block, in log
+order. A page SHALL hold as many whole blocks as fit. When a block does not fit the room left on the
+page, it SHALL be split at the last point that fits, trying in this order: a hard line break or the
+end of a sentence, then a clause mark, then a character boundary.
 
 #### Scenario: Whole blocks are packed first
 - **WHEN** a response has three short prose blocks that together fit the box
@@ -416,6 +462,10 @@ character.
 - **THEN** the map is not split, sits alone on a page marked oversize, and every row of it is
   present on that page
 
+#### Scenario: Box-drawing blocks are never split
+- **WHEN** a response's blocks include a box-drawing block and paging runs
+- **THEN** the box-drawing block is never split
+
 #### Scenario: Paging is lossless
 - **WHEN** any response is paged for any box
 - **THEN** the pages' text, concatenated in order, equals the blocks' text less only the line
@@ -426,41 +476,53 @@ character.
 - **THEN** for any character offset, the function names the page of the new paging that holds
   that character
 
+#### Scenario: The fit test answers box containment
+- **WHEN** the paging function consults its injected fit test
+- **THEN** the fit test reports whether a candidate page's content fits the message box
+
+#### Scenario: A sentence end is a defined punctuation run
+- **WHEN** the pager looks for the sentence-end split point
+- **THEN** a sentence end is `。`, `！`, `？`, `…`, or ASCII `.`, `!`, `?` followed by whitespace,
+  taken together with any directly following run of end marks and closing quotes or brackets
+  (`」`, `』`, `）`, `"`, `'`)
+
+#### Scenario: A clause mark is a defined punctuation set
+- **WHEN** the pager looks for the clause-mark split point
+- **THEN** a clause mark is `，`, `、`, `；`, `：`, or ASCII `,`, `;`, `:` followed by whitespace
+
+#### Scenario: A character boundary keeps surrogate pairs whole
+- **WHEN** the pager falls back to a character boundary
+- **THEN** the split SHALL NOT separate a surrogate pair
+
+#### Scenario: An unplaceable block moves whole to a new page
+- **WHEN** no split point of the block fits the room left on a non-empty page
+- **THEN** the whole block moves to a new page first
+
+#### Scenario: A continuation does not repeat its split break
+- **WHEN** a block is split at a hard line break
+- **THEN** the continuation does not begin with the hard line break it was split at
+
+#### Scenario: Paging runs on tokens, not rendered HTML
+- **WHEN** paging executes
+- **THEN** it runs on the markup pipeline's token stream, never on rendered HTML, and emits no
+  markup the pipeline did not produce
+
+#### Scenario: A block too large for any page gets an oversize page
+- **WHEN** a block fits no empty page after every split point (a box-drawing block taller than the
+  box, or a box too small for one character)
+- **THEN** it gets a page of its own marked oversize, which the view presents with internal
+  scrolling
+
+#### Scenario: Nothing is truncated or dropped
+- **WHEN** a response's pages are concatenated
+- **THEN** they reproduce its blocks' text in order, less only the line breaks consumed at split
+  points — no content is ever truncated or dropped
+
 ### Requirement: The message window's reading controls advance pages and a new action flushes unread pages
-A pointer activation on the message window SHALL act on the current page, except when it lands on a
-control inside the window or ends a text selection inside it. While the page is still typing, the
-activation SHALL show the page in full and SHALL NOT advance. Once the page is fully shown, the
-activation SHALL advance to the next page of the current response. The window's page surface SHALL
-be focusable and in the tab order. Enter or Space SHALL act the same way, and only while keyboard
-focus is on that page surface. Such a key SHALL be consumed by the window and SHALL NOT reach the
-action dock's keyboard routing, and a held key's auto-repeat SHALL NOT act. While focus is anywhere
-else (the action dock, a drawer, an overlay, the command line, or a control in the band), Enter and
-Space SHALL keep their existing meaning and SHALL NOT complete or advance a page. Advancing on a fully
-shown last page SHALL do nothing. How a page is revealed is defined by "A page types in at the
-reader's text speed and auto-advance is opt-in". While a combat round plays by itself, as
-`webclient-combat-menu` "A combat round plays beat by beat" defines, the same pointer activation or key
-SHALL instead end the round at once and SHALL NOT complete or advance a page.
-
-The player SHALL be able to act at any time while a page is typing or pages remain. When an action
-records its response mark or appends its input line, the window SHALL stop typing and SHALL stop
-presenting the previous response's unread pages. It SHALL show that response's last page, fully
-shown, until the new response's first line is retained. It SHALL then show the new response's first
-page. The unread pages SHALL remain in the full-log surface. Lines appended to the response being read
-SHALL NOT move the reader off the page on screen. A change of the window's box or of the prose scale
-SHALL re-page the current response and SHALL keep the reader on the page that holds the typing
-position. The typing position is the next character to reveal while a page is typing, or the last
-character shown once the page is complete. On that page, the text before the typing position SHALL
-show at once, and the rest SHALL keep typing.
-
-Paging SHALL wait until the client's fonts have loaded. Until then the window SHALL show the current
-response's first block in full, scrollable. When the window mounts, including after a reconnect, it
-SHALL show the last page of the last response fully shown, and SHALL NOT type or replay earlier pages.
-
-A polite live region SHALL announce each page's full text once, at the moment the page starts to
-show, and never per typed character. It SHALL announce each line later appended to the page on screen
-once. It SHALL announce nothing when typing completes, on a re-page, or on a mount. The page surface
-itself SHALL NOT be a live region. None of this SHALL change the narrative log, the dispatch path, or
-any request.
+A pointer activation on the message window SHALL act on the current page. While the page is still
+typing, the activation SHALL show the page in full and SHALL NOT advance; once the page is fully
+shown, it SHALL advance to the next page of the current response. Enter or Space SHALL act the same
+way as the activation, and only while keyboard focus is on the window's page surface.
 
 #### Scenario: A click advances the page
 - **WHEN** the current response has three pages shown at the `instant` text speed and the player
@@ -542,39 +604,80 @@ any request.
   typing, and page 2's full text once, when page 2 started typing. It announced nothing on the
   typed characters, on the completions, or on the resize.
 
+#### Scenario: A control or a text selection absorbs the activation
+- **WHEN** a pointer activation lands on a control inside the window or ends a text selection
+  inside it
+- **THEN** it does not act on the current page
+
+#### Scenario: Either activation ends a playing round
+- **WHEN** a combat round plays by itself, as `webclient-combat-menu` "A combat round plays beat by
+  beat" defines, and the player uses the same pointer activation or key
+- **THEN** it instead ends the round at once and does not complete or advance a page
+
+#### Scenario: The key is consumed by the window and repeats do not act
+- **WHEN** the page surface has focus and a page-advancing Enter or Space is pressed, or the key is
+  held
+- **THEN** the key is consumed by the window and does not reach the action dock's keyboard routing,
+  and a held key's auto-repeat does not act
+
+#### Scenario: The page surface is focusable and in the tab order
+- **WHEN** the player tabs through the message window's surface
+- **THEN** the window's page surface is focusable and appears in the tab order
+
+#### Scenario: Other focus locations keep Enter and Space
+- **WHEN** focus is on a drawer, an overlay, the command line, or a control in the band
+- **THEN** Enter and Space keep their existing meaning and do not complete or advance a page
+
+#### Scenario: Advancing past the last page does nothing
+- **WHEN** the current response's last page is fully shown and the player activates the window
+- **THEN** advancing does nothing
+
+#### Scenario: Reading is never blocked and the log reveals are separately defined
+- **WHEN** a page is typing or pages remain
+- **THEN** the player can act at any time, and how a page is revealed is defined by "A page types
+  in at the reader's text speed and auto-advance is opt-in"
+
+#### Scenario: A new action flushes the window between responses
+- **WHEN** an action records its response mark or appends its input line while the previous
+  response still has unread pages
+- **THEN** the window stops typing and stops presenting those unread pages, shows the previous
+  response's last page fully shown until the new response's first line is retained, then shows the
+  new response's first page, and the unread pages remain in the full-log surface
+
+#### Scenario: The typing position is well defined
+- **WHEN** the window needs the reader's typing position for a re-page
+- **THEN** it is the next character to reveal while a page is typing, or the last character shown
+  once the page is complete
+
+#### Scenario: Paging waits for fonts
+- **WHEN** the client's fonts have not yet loaded
+- **THEN** paging waits, and until then the window shows the current response's first block in
+  full, scrollable
+
+#### Scenario: Mounting shows the last page without replay
+- **WHEN** the window mounts, including after a reconnect
+- **THEN** it shows the last page of the last response fully shown, and does not type or replay
+  earlier pages
+
+#### Scenario: Appended lines are announced once
+- **WHEN** a line is later appended to the page on screen
+- **THEN** the polite live region announces that line once
+
+#### Scenario: Silence on completion, re-page, and mount
+- **WHEN** typing completes, a re-page happens, or the window mounts
+- **THEN** the polite live region announces nothing
+
+#### Scenario: The page surface is not a live region and nothing else changes
+- **WHEN** the reading controls and announcements operate
+- **THEN** the page surface itself is not a live region, and none of it changes the narrative log,
+  the dispatch path, or any request
+
 ### Requirement: A page types in at the reader's text speed and auto-advance is opt-in
-In every mode, dialogue included, each page the message window starts to show SHALL reveal its text in
-reading order, one character at a time, at the reader's text speed. The speeds are `slow` 20
+In every mode, dialogue included, each page the message window starts to show SHALL reveal its text
+in reading order, one character at a time, at the reader's text speed. The speeds are `slow` 20
 characters per second, `normal` 45, `fast` 90, and `instant`, which shows the page in full at once.
-A hard line break SHALL count as one character. A box-drawing map line SHALL appear whole when the
-reveal reaches it. The reveal SHALL keep every character's final position from the first frame: text
-not yet revealed SHALL occupy its place invisibly, so no line re-wraps and nothing moves while a page
-types. Text not yet revealed SHALL be hidden from assistive technology. The reveal SHALL render the
-same markup, spans, and classes as the fully shown page, SHALL emit no markup the narrative pipeline
-does not produce, and SHALL run that pipeline no more than once per line.
-
-Typing SHALL be instant, whatever the text speed, while the effective motion level is `reduced` or
-`off`, as `webclient-contextual-hud` "The motion level is a client-local preference that governs every
-client animation" resolves it: a stored level, or, while none is stored, `reduced` when the operating
-system requests reduced motion. A stored `full` level SHALL let pages type even when the operating
-system requests reduced motion. A change of text speed or of the effective motion level SHALL apply
-from the next page, except that a change to `instant`, or to a level other than `full`, SHALL also
-complete the page that is typing. The page marker SHALL render only once the page is fully shown. Time the page spends in a
-hidden browser tab SHALL NOT count toward typing.
-
-When auto-advance is on and the page on screen is fully shown, the window SHALL advance to the next
-page after `1.2s + 60ms × the page's characters`. The wait SHALL be counted from the later of the page
-becoming fully shown and a next page existing. Auto-advance SHALL NOT advance past the last page of a
-response. It SHALL NOT advance an oversize page or a page that holds a box-drawing map, which wait for
-the player. The wait SHALL pause while any drawer, overlay, or the full-log surface is open, and while
-the browser tab is hidden. A manual advance, a flush by a new action, or a re-page SHALL restart or
-cancel the wait for the page then on screen. Auto-advance is off by default.
-
-There is no separate dialogue presentation: in dialogue mode the session line is part of the current
-response and SHALL type and auto-advance like any other page, and the conversation's choices appear
-only once the response's last page is fully shown, as `webclient-contextual-hud` "Dialogue choices
-appear centred over the stage after the line is fully read" defines. Auto-advance SHALL NOT advance
-past the last page into the choices: the choices are not a page.
+The reveal SHALL keep every character's final position from the first frame. Auto-advance is off by
+default.
 
 #### Scenario: A page types at the normal speed
 - **WHEN** a one-page response of 90 characters arrives at the `normal` text speed with the effective
@@ -616,6 +719,11 @@ past the last page into the choices: the choices are not a page.
   page behind it
 - **THEN** the window stays on the map page until the player advances
 
+#### Scenario: Auto-advance holds on oversize and map pages
+- **WHEN** auto-advance is on and the page on screen is an oversize page, or a page that holds a
+  box-drawing map
+- **THEN** auto-advance does not advance it; the page waits for the player
+
 #### Scenario: The dialogue variant does not type
 - **WHEN** mode is `dialogue`, the panel is available, and a two-page reply commits at the `slow` text
   speed with auto-advance on
@@ -623,27 +731,68 @@ past the last page into the choices: the choices are not a page.
   choice row visible, the window advances to page 2 after the auto-advance wait, page 2 types, and
   the window stays on page 2 with `■` while the dialogue choice list appears over the stage
 
+#### Scenario: Line breaks and map lines reveal as units
+- **WHEN** the reveal reaches a hard line break or a box-drawing map line
+- **THEN** the hard line break counts as one character and the map line appears whole
+
+#### Scenario: Unrevealed text holds its place invisibly
+- **WHEN** a page is mid-type
+- **THEN** text not yet revealed occupies its place invisibly, so no line re-wraps and nothing
+  moves while the page types, and the unrevealed text is hidden from assistive technology
+
+#### Scenario: The reveal renders the pipeline's own markup
+- **WHEN** a page types
+- **THEN** the reveal renders the same markup, spans, and classes as the fully shown page, emits
+  no markup the narrative pipeline does not produce, and runs that pipeline no more than once per
+  line
+
+#### Scenario: Reduced or off motion forces instant typing
+- **WHEN** the effective motion level is `reduced` or `off`, as `webclient-contextual-hud` "The
+  motion level is a client-local preference that governs every client animation" resolves it: a
+  stored level, or, while none is stored, `reduced` when the operating system requests reduced
+  motion
+- **THEN** typing is instant, whatever the text speed
+
+#### Scenario: Speed and motion changes apply from the next page
+- **WHEN** the text speed or the effective motion level changes
+- **THEN** the change applies from the next page, except that a change to `instant`, or to a level
+  other than `full`, also completes the page that is typing
+
+#### Scenario: The marker waits for the full page
+- **WHEN** a page is typing
+- **THEN** the page marker renders only once the page is fully shown
+
+#### Scenario: Hidden-tab time does not type
+- **WHEN** the page's browser tab is hidden while it types
+- **THEN** the hidden time does not count toward typing
+
+#### Scenario: The auto-advance wait is defined
+- **WHEN** auto-advance is on and the page on screen is fully shown
+- **THEN** the window advances to the next page after `1.2s + 60ms × the page's characters`, with
+  the wait counted from the later of the page becoming fully shown and a next page existing
+
+#### Scenario: The auto-advance wait pauses behind surfaces and hidden tabs
+- **WHEN** any drawer, overlay, or the full-log surface is open, or the browser tab is hidden
+- **THEN** the auto-advance wait pauses
+
+#### Scenario: Player events restart or cancel the wait
+- **WHEN** a manual advance, a flush by a new action, or a re-page happens
+- **THEN** it restarts or cancels the auto-advance wait for the page then on screen
+
+#### Scenario: Dialogue mode has no separate presentation
+- **WHEN** mode is `dialogue` and the session line arrives
+- **THEN** there is no separate dialogue presentation: the session line is part of the current
+  response and types and auto-advances like any other page, the conversation's choices appear only
+  once the response's last page is fully shown, as `webclient-contextual-hud` "Dialogue choices
+  appear centred over the stage after the line is fully read" defines, and auto-advance does not
+  advance past the last page into the choices — the choices are not a page
+
 ### Requirement: The full log is framed without changing retained content
 The full-log surface SHALL present itself in the shared reference workspace used by the drawers and
-utility overlays: one opaque panel under the shared reference header, which draws the log's glyph, the
-title `日誌` labelling the dialog, and one close control. A scrim SHALL cover the whole viewport behind
-the panel, the top navigation included, and SHALL absorb pointer input without closing the log. The
-header SHALL only lend markup: the surface SHALL keep its own focus trap, Escape close and focus restore
-to the opening control, and SHALL NOT nest a second modal host. A pointer press on the frame's
-non-focusable chrome or the scrim SHALL leave focus inside the surface, so Escape still closes it.
-
-The lines SHALL read as one centred column with a 42em measure at the log's reading size — the
-message window's page size, 18px at the 1451x790 reference scale with the same leading, which the
-narrative prose scale multiplies — set in the same bundled monospace reading face the message
-window's page text uses; the header, footer and their controls are chrome and SHALL NOT scale.
-The column SHALL reuse the message window's prose styling — the `sys` aside, the `err` line, the
-progressive CJK spacing — and every line SHALL share the column's edge. A box-drawing map line SHALL keep
-its monospace grid and SHALL scroll horizontally inside its own block rather than widen the column.
-
-Each retained input echo SHALL be styled in place as the heading of the response it begins, after the
-existing divider hairline. The surface SHALL render every retained line exactly once and in its
-original order through the existing safe renderer, and SHALL NOT duplicate, reorder, rewrite or remove
-any line, input echoes included. Opening SHALL still show the latest line before interaction.
+utility overlays: one opaque panel under the shared reference header, which draws the log's glyph,
+the title `日誌` labelling the dialog, and one close control. A scrim SHALL cover the whole viewport
+behind the panel. The header SHALL only lend markup: the surface SHALL keep its own focus trap,
+Escape close and focus restore, and SHALL NOT nest a second modal host.
 
 #### Scenario: Echo is a section heading
 - **WHEN** a retained response begins with a player input echo
@@ -655,20 +804,56 @@ any line, input echoes included. Opening SHALL still show the latest line before
 - **THEN** the click neither closes the log nor moves focus out of it, Escape closes it, and focus
   returns to the control that opened it
 
+#### Scenario: The scrim covers the top navigation too
+- **WHEN** the scrim is drawn behind the panel
+- **THEN** it covers the whole viewport, the top navigation included
+
+#### Scenario: The scrim absorbs pointer input without closing
+- **WHEN** pointer input lands on the scrim
+- **THEN** the scrim absorbs it and the log does not close
+
+#### Scenario: Pressing frame chrome keeps focus inside
+- **WHEN** a pointer press lands on the frame's non-focusable chrome or the scrim
+- **THEN** focus stays inside the surface, so Escape still closes it
+
+#### Scenario: The column's measure, size, and face
+- **WHEN** the log's lines render
+- **THEN** they read as one centred column with a 42em measure at the log's reading size — the
+  message window's page size, 18px at the 1451x790 reference scale with the same leading, which the
+  narrative prose scale multiplies — set in the same bundled monospace reading face the message
+  window's page text uses
+
+#### Scenario: Chrome does not scale
+- **WHEN** the narrative prose scale changes
+- **THEN** the header, footer and their controls are chrome and do not scale
+
+#### Scenario: The column reuses the message window's prose styling
+- **WHEN** retained lines render in the column
+- **THEN** the column reuses the message window's prose styling — the `sys` aside, the `err` line,
+  the progressive CJK spacing — and every line shares the column's edge
+
+#### Scenario: Map lines scroll inside their block
+- **WHEN** a box-drawing map line renders in the column
+- **THEN** it keeps its monospace grid and scrolls horizontally inside its own block rather than
+  widening the column
+
+#### Scenario: Input echoes head their responses
+- **WHEN** a retained input echo renders in place
+- **THEN** it is styled as the heading of the response it begins, after the existing divider
+  hairline
+
+#### Scenario: Every retained line renders exactly once in order
+- **WHEN** the surface presents the retained narrative
+- **THEN** every retained line renders exactly once and in its original order through the existing
+  safe renderer, with no line duplicated, reordered, rewritten or removed, input echoes included,
+  and opening still shows the latest line before interaction
+
 ### Requirement: Log readers can return to latest without losing their place involuntarily
 When the scroll region's visible box ends above the end of its content, the full log SHALL offer a
 labelled `回到最新` control in a footer strip outside the scroll region, so the control never covers a
 line or a text selection; at the end of the content the control SHALL be absent. Arriving lines SHALL
-NOT force-scroll the reader. Once a line has been retained since the reader last saw the end, the
-control SHALL also read `新內容`, until the end is in view again; the arrival SHALL be recognised by the
-newest line's retention ordinal, so it holds when retention trimming keeps the line count constant.
-Activating the control SHALL move focus to the scroll region and reveal the latest retained line —
-smoothly only at the full motion level — and SHALL NOT advance or re-page the message window, dispatch
-any action, or change the log's retention. When the end comes into view while the control holds focus,
-focus SHALL move to the scroll region before the control leaves. The reading keys (arrows, Page Up and
-Page Down, Home and End) pressed on the log's controls SHALL scroll the region as they do when it has
-focus. The message window's own rule of rendering no jump-to-latest control is unchanged; this control
-belongs to the full log only.
+NOT force-scroll the reader. Activating the control SHALL move focus to the scroll region and reveal
+the latest retained line.
 
 #### Scenario: New text arrives during review
 - **WHEN** the player has scrolled upward and a new response arrives
@@ -684,3 +869,35 @@ belongs to the full log only.
   multi-page response
 - **THEN** the scroll region shows its latest line with focus on it, the control is gone, the message
   window still shows the same page, and no action is sent
+
+#### Scenario: New content changes the control's label
+- **WHEN** a line has been retained since the reader last saw the end
+- **THEN** the control also reads `新內容`, until the end is in view again
+
+#### Scenario: Arrival is recognised by the retention ordinal
+- **WHEN** retention trimming keeps the line count constant while a new line arrives
+- **THEN** the arrival is still recognised, because it is recognised by the newest line's retention
+  ordinal
+
+#### Scenario: The smooth reveal obeys the motion level
+- **WHEN** activating the control reveals the latest retained line
+- **THEN** the scroll moves smoothly only at the full motion level
+
+#### Scenario: Returning changes nothing else
+- **WHEN** the player activates the return control
+- **THEN** it does not re-page the message window, dispatch any action, or change the log's
+  retention
+
+#### Scenario: Focus hands off before the control leaves
+- **WHEN** the end comes into view while the control holds focus
+- **THEN** focus moves to the scroll region before the control leaves
+
+#### Scenario: Reading keys scroll from the log's controls
+- **WHEN** the reading keys (arrows, Page Up and Page Down, Home and End) are pressed on the log's
+  controls
+- **THEN** they scroll the region as they do when it has focus
+
+#### Scenario: Only the full log gets the control
+- **WHEN** the message window renders
+- **THEN** its own rule of rendering no jump-to-latest control is unchanged; this control belongs
+  to the full log only

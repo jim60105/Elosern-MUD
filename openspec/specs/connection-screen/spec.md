@@ -22,11 +22,7 @@ When a session logs in and the character it puppets is still pending creation, t
 SHALL show a short world introduction (2–3 lines of prose introducing 伊洛瑟恩大陸 and the journey
 ahead) before the character-creation interface. The subject of this decision SHALL be the
 character the session actually puppets after the login hook completes, never "any pending
-character the account owns": an account owning both an activated character and an abandoned
-pending shell SHALL receive neither screen when it logs in as the activated character. A session
-that ends the login hook with no puppet SHALL receive neither screen. The introduction SHALL be
-shown on every login while the puppeted character remains pending, and SHALL NOT be shown for a
-character that has completed creation.
+character the account owns".
 
 #### Scenario: A pending account sees the introduction
 - **WHEN** a newly registered account logs in and the player character it puppets is still pending
@@ -45,3 +41,11 @@ character that has completed creation.
 #### Scenario: A login that leaves the session unpuppeted shows no introduction
 - **WHEN** a session completes login without acquiring a puppet
 - **THEN** it receives neither the world introduction nor the creation start screen
+
+#### Scenario: The introduction repeats while creation stays pending
+- **WHEN** an account logs in again while its puppeted character remains pending
+- **THEN** the world introduction is shown on every such login
+
+#### Scenario: Completed creation ends the introduction
+- **WHEN** a character that has completed creation logs in
+- **THEN** the introduction is not shown for it

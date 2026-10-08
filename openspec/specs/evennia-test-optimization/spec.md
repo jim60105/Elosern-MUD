@@ -3,7 +3,7 @@
 Measured, isolated, and coverage-preserving execution profiles for the Evennia test suite.
 ## Requirements
 ### Requirement: Optimization is based on reproducible measurements
-The project SHALL capture a pre-change and post-change Evennia test performance report using a recorded baseline commit SHA and optimized revision identity on the same reference machine, with the same Python and Evennia versions, dependency lock, target ownership, migrations, fixtures, warm-up protocol, and coverage state. Before a commit exists, the optimized identity SHALL name the worktree branch, base SHA, and dirty state; its eventual commit SHA supersedes that provisional identity. Each side SHALL use a warm-up followed by at least three measured serial runs and report raw wall times, median wall time, test count, result status, database setup timing, storage and reuse state, coverage state, environment versions, and the slowest tests. Database storage and cross-process reuse MAY differ when they are explicit optimization variables and MUST be disclosed. Performance acceptance SHALL require at least a 20% median wall-time reduction for the full non-browser Evennia profile and SHALL NOT use a hardware-independent seconds threshold.
+The project SHALL capture a pre- and post-change Evennia test performance report comparing a recorded baseline commit SHA to an optimized revision identity on the same reference machine under identical Python/Evennia versions, dependency lock, target ownership, migrations, fixtures, warm-up protocol, and coverage state. Acceptance SHALL require at least a 20% median wall-time reduction for the full non-browser Evennia profile and SHALL NOT use hardware-independent seconds thresholds.
 
 #### Scenario: Baseline identifies measured hot spots
 - **WHEN** the profiling profile completes its baseline runs
@@ -13,8 +13,17 @@ The project SHALL capture a pre-change and post-change Evennia test performance 
 - **WHEN** the implementation claims that the full profile is faster
 - **THEN** the claim compares serial medians for the recorded baseline and optimized revision identities under the same machine, dependency environment, target ownership, migrations, fixtures, warm-up protocol, and coverage state, discloses any database storage or reuse difference, and demonstrates at least a 20% reduction
 
+#### Scenario: Provisional optimized identity is superseded
+- **WHEN** the optimized revision has no commit yet
+- **THEN** the optimized identity names the worktree branch, base SHA, and dirty state, and its eventual commit SHA supersedes that provisional identity
+
+#### Scenario: Measured runs and report fields are recorded
+- **WHEN** either side of the performance comparison is measured
+- **THEN** it uses a warm-up followed by at least three measured serial runs
+- **AND** the report lists raw wall times, median wall time, test count, result status, database setup timing, storage and reuse state, coverage state, environment versions, and the slowest tests
+
 ### Requirement: Test-only settings are explicit and isolated
-The project SHALL provide an explicit Evennia test settings module that uses Django's test-only fast password hasher and sets `DATABASES["default"]["TEST"]["NAME"]` to a unique file-backed SQLite path compatible with `--keepdb`, distinct from both `:memory:` and the developer database. Loading the module MUST require an explicit environment opt-in and the pinned launcher's exact test-command context, MUST reject direct or non-test server use with a documented configuration error, MUST NOT change production or browser-test password hashing or persistence, and MUST confine retained test state to its named test database.
+The project SHALL provide an explicit Evennia test settings module that uses Django's test-only fast password hasher and sets `DATABASES["default"]["TEST"]["NAME"]` to a unique file-backed SQLite path compatible with `--keepdb`, distinct from both `:memory:` and the developer database, and MUST confine retained test state to its named test database.
 
 #### Scenario: Repeated local run reuses only test state
 - **WHEN** a developer runs a supported Evennia profile twice with the test settings and `--keepdb`
@@ -28,8 +37,17 @@ The project SHALL provide an explicit Evennia test settings module that uses Dja
 - **WHEN** the suite runs after the dedicated test database is absent or retention is disabled
 - **THEN** Django creates a fresh test database and the suite passes with the same discovered tests and outcomes
 
+#### Scenario: Settings loading is an explicit opt-in
+- **WHEN** the test settings module load is attempted without an explicit environment opt-in or outside the pinned launcher's exact test-command context
+- **THEN** the load is rejected with a documented configuration error for direct or non-test server use
+
+#### Scenario: Database storage differences and production isolation are disclosed
+- **WHEN** database storage or cross-process reuse differs between compared performance runs
+- **THEN** the difference is an explicit optimization variable and MUST be disclosed
+- **AND** the test settings MUST NOT change production or browser-test password hashing or persistence
+
 ### Requirement: Supported execution profiles preserve suite ownership
-The project SHALL document uv-locked focused, full local, profiling, canonical quality-gate, and managed browser profiles. Focused profiles SHALL accept dotted module, class, or method labels and SHALL be described as development feedback rather than final verification. The non-browser Evennia profile SHALL own package-local tests under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`; the top-level regression command SHALL own `tests/`; and the managed browser command SHALL solely own `web/tests/browser/`. Contract verification MUST prove every current Python test path belongs to exactly one Python entry point.
+The project SHALL document uv-locked focused, full local, profiling, canonical quality-gate, and managed browser profiles, and contract verification MUST prove every current Python test path belongs to exactly one Python entry point.
 
 #### Scenario: Developer runs one affected test
 - **WHEN** a developer follows the focused profile with a dotted test label
@@ -43,8 +61,16 @@ The project SHALL document uv-locked focused, full local, profiling, canonical q
 - **WHEN** migrations change or retained-state failures occur
 - **THEN** the documentation directs removal or rebuilding of only the dedicated test database before rerunning the clean profile
 
+#### Scenario: Focused profiles are development feedback
+- **WHEN** a focused profile is documented or used
+- **THEN** it accepts dotted module, class, or method labels and is described as development feedback rather than final verification
+
+#### Scenario: Suite ownership is partitioned across entry points
+- **WHEN** the test entry points are documented
+- **THEN** the non-browser Evennia profile owns package-local tests under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`, the top-level regression command owns `tests/`, and the managed browser command solely owns `web/tests/browser/`
+
 ### Requirement: Fixture optimization preserves the tested boundary
-The project SHALL optimize only measured or inventoried test hot spots. Pure logic SHALL use standard `unittest.TestCase`; tests needing Django or Evennia setup without default game objects SHALL use `EvenniaTestCase` with minimal fixtures; command tests SHALL retain the command-test lifecycle; and tests asserting default world, typeclass persistence, account, session, room, exit, object, or script integration SHALL retain an integration-capable base. A test class that never references the `EvenniaTestMixin` fixtures (any of `char1`, `char2`, `room1`, `room2`, `account`, `session`, `obj1`, `obj2`, `exit`, `script1`) and needs no command lifecycle SHALL inherit `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`), preserving transaction isolation and cache flushing. Fixture conversions MUST preserve substantive assertions and requirement annotations.
+The project SHALL optimize only measured or inventoried test hot spots. Pure logic SHALL use standard `unittest.TestCase`; tests needing Django or Evennia setup without default game objects SHALL use `EvenniaTestCase` with minimal fixtures; command tests SHALL retain the command-test lifecycle; and tests asserting default world, typeclass persistence, account, session, room, exit, object, or script integration SHALL retain an integration-capable base.
 
 #### Scenario: Pure logic avoids default-world creation
 - **WHEN** a measured hot test exercises deterministic calculation, parsing, or formatting without persistence behavior
@@ -58,8 +84,16 @@ The project SHALL optimize only measured or inventoried test hot spots. Pure log
 - **WHEN** class-level test data is introduced
 - **THEN** isolation, package, order-variation, and full-suite runs demonstrate that one test method cannot affect another method's outcome
 
+#### Scenario: Fixture-free classes inherit the light base
+- **WHEN** a test class never references the `EvenniaTestMixin` fixtures (any of `char1`, `char2`, `room1`, `room2`, `account`, `session`, `obj1`, `obj2`, `exit`, `script1`) and needs no command lifecycle
+- **THEN** it inherits `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`), preserving transaction isolation and cache flushing
+
+#### Scenario: Conversions preserve assertions and annotations
+- **WHEN** a fixture-base conversion is applied to a test
+- **THEN** its substantive assertions and requirement annotations are preserved
+
 ### Requirement: Tests restore process-global registry state
-Any test that mutates a process-global registry shared across the test process SHALL snapshot the registry's contents before mutating and restore them in teardown, preserving whatever the process held before the test rather than clearing state other tests rely on. Registries covered by this contract include at least `QUEST_DEFINITION_REGISTRY`, `GUILD_OFFER_REGISTRY`, and `SCENE_REQUIREMENT_REGISTRY`. The restoration MUST be registered before the mutation (for example via `addCleanup`) so a failing setup cannot leak registry state. A test that reads rulebook-driven state requiring registry entries (for example an affinity-rulebook load that resolves quest keys) SHALL register the required catalog definitions in its own setup instead of depending on an earlier test to have registered them. Synchronization entry points that register offers or definitions (such as `sync_guild_economy()`) used inside tests MUST be paired with the same snapshot/restore discipline.
+Any test that mutates a process-global registry shared across the test process SHALL snapshot the registry's contents before mutating and restore them in teardown, preserving whatever the process held before the test rather than clearing state other tests rely on. The restoration MUST be registered before the mutation (for example via `addCleanup`) so a failing setup cannot leak registry state.
 
 #### Scenario: Leaked offer cannot break a later test
 - **WHEN** a test runs `sync_guild_economy()` (or registers catalog offers) and a later test in the same process registers a differently-shaped offer under the same identity
@@ -77,8 +111,20 @@ Any test that mutates a process-global registry shared across the test process S
 - **WHEN** the full non-browser Evennia suite runs in serial, parallel, shuffled, and reversed order
 - **THEN** every test passes in every ordering with the same discovered test count
 
+#### Scenario: Contract covers the named registries
+- **WHEN** a test mutates a registry covered by this contract
+- **THEN** it applies to at least `QUEST_DEFINITION_REGISTRY`, `GUILD_OFFER_REGISTRY`, and `SCENE_REQUIREMENT_REGISTRY`
+
+#### Scenario: Rulebook-driven reads register their own entries
+- **WHEN** a test reads rulebook-driven state requiring registry entries (for example an affinity-rulebook load that resolves quest keys)
+- **THEN** it registers the required catalog definitions in its own setup instead of depending on an earlier test to have registered them
+
+#### Scenario: Sync entry points follow the same discipline
+- **WHEN** a test uses a synchronization entry point that registers offers or definitions (such as `sync_guild_economy()`)
+- **THEN** that use is paired with the same snapshot/restore discipline
+
 ### Requirement: Parallel execution is gated by equivalence
-Parallel Evennia execution SHALL be adopted for the non-browser Evennia profile only after repeated runs demonstrate identical discovered test counts and outcomes, complete parseable requirement evidence, isolated databases and shared resources, equivalent combined branch coverage and source roots, actionable failures, and at least a 20% median wall-time reduction. Once the equivalence evidence exists, the quality-gate workflow MAY execute the non-browser Evennia profile with the documented parallel worker count and subprocess-aware coverage instrumentation, and the performance report SHALL record the adoption evidence. Managed browser acceptance MUST NOT be included in a generic parallel profile. Serial execution SHALL remain the canonical final-handoff evidence profile.
+Parallel Evennia execution SHALL be adopted for the non-browser Evennia profile only after repeated runs demonstrate identical discovered test counts and outcomes, complete parseable requirement evidence, isolated databases and shared resources, equivalent combined branch coverage and source roots, actionable failures, and at least a 20% median wall-time reduction.
 
 #### Scenario: Unsafe parallel run is rejected
 - **WHEN** parallel evaluation loses coverage or evidence, collides on a file, cache, process, database, or port, produces a flake, or improves median wall time by less than 20%
@@ -92,8 +138,21 @@ Parallel Evennia execution SHALL be adopted for the non-browser Evennia profile 
 - **WHEN** the adopted parallel profile runs under the quality gate with coverage
 - **THEN** every worker's coverage data is written to its own file, combined with the parent data, and the combined report equals the serial profile's source roots and statement/branch totals
 
+#### Scenario: Adoption evidence enables the workflow and is recorded
+- **WHEN** the equivalence evidence exists
+- **THEN** the quality-gate workflow MAY execute the non-browser Evennia profile with the documented parallel worker count and subprocess-aware coverage instrumentation
+- **AND** the performance report SHALL record the adoption evidence
+
+#### Scenario: Managed browser stays out of generic parallel profiles
+- **WHEN** a generic parallel profile is defined
+- **THEN** managed browser acceptance MUST NOT be included in it
+
+#### Scenario: Serial remains the canonical handoff evidence
+- **WHEN** final handoff evidence is produced
+- **THEN** serial execution SHALL remain the canonical final-handoff evidence profile
+
 ### Requirement: Existing quality gates remain authoritative
-The optimized workflow SHALL execute the managed browser suite exactly once across its committed execution jobs and SHALL collect separate coverage data for the non-browser Evennia, managed browser, and top-level entry points. The managed browser suite MAY be distributed across parallel CI jobs by test file, class, or method label as long as each test method has exactly one serial execution owner; a browser job MAY run two isolated test processes from two separate checkouts on the same runner, each process owning its own serial label set, coverage file, and evidence file, with the evidence files concatenated per shard. The non-browser Evennia suite MAY likewise be distributed across parallel CI jobs by manifest-owned dotted labels (package or module) as long as each test module under `commands`, `server`, `typeclasses`, `world`, and `web.webclient` has exactly one serial execution owner and every shard's coverage and requirement-evidence files are aggregated exactly once. The workflow SHALL preserve shared successful requirement evidence across all required Python entry points, combine the coverage files of every entry point into one aggregate, verify exact coverage roots for `commands`, `server`, `typeclasses`, `web`, and `world`, enforce aggregate branch coverage of at least 80%, and generate and upload coverage XML only from the verified aggregate data. Aggregation MUST fail when an expected entry-point artifact is missing or empty rather than silently lowering the combined total. Test performance improvements MUST NOT come from skipped tests, reduced assertions, removed annotations, disabled gates, or failure suppression.
+The optimized workflow SHALL execute the managed browser suite exactly once across its committed execution jobs and SHALL collect separate coverage data for the non-browser Evennia, managed browser, and top-level entry points. Test performance improvements MUST NOT come from skipped tests, reduced assertions, removed annotations, disabled gates, or failure suppression.
 
 #### Scenario: Optimized serial workflow proves equivalence
 - **WHEN** final verification runs from a clean test database
@@ -119,8 +178,27 @@ The optimized workflow SHALL execute the managed browser suite exactly once acro
 - **WHEN** an entry-point job finishes without uploading its coverage data or evidence file
 - **THEN** aggregation fails with a diagnostic naming the missing artifact instead of producing a coverage report from partial data
 
+#### Scenario: Empty artifacts also fail aggregation
+- **WHEN** an expected entry-point coverage or evidence artifact is present but empty
+- **THEN** aggregation MUST fail rather than silently lowering the combined total
+
+#### Scenario: Distributed suites keep one serial owner
+- **WHEN** the managed browser suite is distributed across parallel CI jobs by test file, class, or method label
+- **THEN** each test method has exactly one serial execution owner
+- **AND** the non-browser Evennia suite MAY likewise be distributed across parallel CI jobs by manifest-owned dotted labels (package or module) as long as each test module under `commands`, `server`, `typeclasses`, `world`, and `web.webclient` has exactly one serial execution owner and every shard's coverage and requirement-evidence files are aggregated exactly once
+
+#### Scenario: Shared requirement evidence is preserved
+- **WHEN** the workflow runs across all required Python entry points
+- **THEN** it preserves shared successful requirement evidence across all of them
+
+#### Scenario: Exact coverage roots gate the aggregate and the XML
+- **WHEN** coverage from every entry point is combined into one aggregate
+- **THEN** the aggregate verifies exact coverage roots for `commands`, `server`, `typeclasses`, `web`, and `world`
+- **AND** enforces aggregate branch coverage of at least 80%
+- **AND** coverage XML is generated and uploaded only from the verified aggregate data
+
 ### Requirement: Machine shards preserve exact per-module test ownership
-The committed non-browser Evennia shard manifest SHALL partition every discoverable non-browser test module exactly once: a top-level contract test SHALL enumerate all `test*.py` modules under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`, resolve every manifest label to its module(s) without importing them (a label names either a module file directly or a package directory to walk recursively), and assert that the discovered set and the labeled set are identical with no overlap between shards. Shard indices SHALL be unique and sorted. Every shard SHALL contain at least one label, every label SHALL resolve to at least one test module, and the manifest SHALL declare at least one shard. The preflight job SHALL validate these manifest properties before computing the execution matrix, so a syntactically valid but empty or malformed manifest fails the workflow rather than skipping every shard job and the aggregation gate.
+The committed non-browser Evennia shard manifest SHALL partition every discoverable non-browser test module exactly once: a top-level contract test SHALL enumerate all `test*.py` modules under `commands`, `server`, `typeclasses`, `world`, and `web.webclient`, resolve every manifest label to its module(s) without importing them, and assert that the discovered set and the labeled set are identical with no overlap between shards.
 
 #### Scenario: Every non-browser test module is owned exactly once
 - **WHEN** the evennia shard manifest is inspected by the ownership contract test
@@ -138,8 +216,21 @@ The committed non-browser Evennia shard manifest SHALL partition every discovera
 - **WHEN** a CI run reports one evennia shard dominating the others by a wide margin
 - **THEN** rebalancing is a manifest edit followed by the contract tests, and the measured per-shard durations are recorded in the performance report
 
+#### Scenario: Labels name modules or walkable packages
+- **WHEN** a manifest label is resolved
+- **THEN** it names either a module file directly or a package directory to walk recursively
+
+#### Scenario: Manifest shape is constrained
+- **WHEN** the manifest is declared
+- **THEN** shard indices are unique and sorted
+- **AND** every shard contains at least one label, every label resolves to at least one test module, and the manifest declares at least one shard
+
+#### Scenario: Preflight validates the manifest before the matrix
+- **WHEN** the workflow computes the execution matrix
+- **THEN** the preflight job validates these manifest properties first, so a syntactically valid but empty or malformed manifest fails the workflow rather than skipping every shard job and the aggregation gate
+
 ### Requirement: Browser method labels preserve exact ownership
-The committed browser shard manifest SHALL partition every test method of every `test_*.py` file under `web/tests/browser/` exactly once across its process lists: a top-level contract test SHALL parse each browser test file with `ast` without importing it, collect every `test_*` method per class, resolve each manifest label (module, class, or method) to its (file, class, method) set, and assert that the resolved set equals the discovered set with no overlap. Shard indices SHALL be unique and sorted. Every shard SHALL contain exactly two process lists, each with at least one label, and every label SHALL resolve to at least one test method.
+The committed browser shard manifest SHALL partition every test method of every `test_*.py` file under `web/tests/browser/` exactly once across its process lists: a top-level contract test SHALL parse each browser test file with `ast` without importing it, collect every `test_*` method per class, resolve each manifest label (module, class, or method) to its (file, class, method) set, and assert that the resolved set equals the discovered set with no overlap.
 
 #### Scenario: Every browser test method is owned exactly once
 - **WHEN** the browser shard manifest is inspected by the method-level ownership contract test
@@ -152,6 +243,11 @@ The committed browser shard manifest SHALL partition every test method of every 
 #### Scenario: Two isolated processes per shard stay serial per process
 - **WHEN** a browser shard's two process lists run on the same runner from separate checkouts
 - **THEN** each process executes its own labels serially with its own coverage and evidence files, and the per-shard evidence is the concatenation of both processes' files
+
+#### Scenario: Shard shape is constrained
+- **WHEN** the browser manifest is declared
+- **THEN** shard indices are unique and sorted
+- **AND** every shard contains exactly two process lists, each with at least one label, and every label resolves to at least one test method
 
 ### Requirement: Registry-content assertions use the registry's key domain
 Any test asserting membership or contents of a process-global registry covered
@@ -175,7 +271,7 @@ implements.
   registry's key domain
 
 ### Requirement: AI test modules are split into themed helpers-backed modules
-The `world/ai/tests/test_scenario_director.py` and `world/ai/tests/test_npc_dialogue.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged. Module-level helpers and support classes used by moved classes (including `_raw`, `_reset_all`, `await_result`, `_item`, `_location`, `_stage`, `_blueprint`, `_payload`, `_context`, `_instance_payload`, `_npc_context`, `_player_context`, `_memory`, `_reply_text`, `_HeldDialogueClient`) SHALL move once into dedicated `_director_helpers.py` / `_dialogue_helpers.py` modules that the new modules import, with no duplicated helper code and no import cycles. A test module that guards the scenario-director test sources by reading a fixed module path SHALL be updated to scan the split modules instead. A top-level contract test SHALL verify that every class from the pre-split inventories appears in exactly one test module of `world/ai/tests`. The original modules SHALL be emptied of moved classes and deleted when nothing remains.
+The `world/ai/tests/test_scenario_director.py` and `world/ai/tests/test_npc_dialogue.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged. The original modules SHALL be emptied of moved classes and deleted when nothing remains.
 
 #### Scenario: The AI split lands without behavior change
 - **WHEN** the scenario-director and npc-dialogue modules are split into themed modules
@@ -193,8 +289,20 @@ The `world/ai/tests/test_scenario_director.py` and `world/ai/tests/test_npc_dial
 - **WHEN** the split creates new test modules under `world.ai`
 - **THEN** the ownership contract test still partitions every discovered module exactly once without a manifest edit
 
+#### Scenario: Named helpers move once into dedicated modules
+- **WHEN** module-level helpers and support classes used by moved classes (including `_raw`, `_reset_all`, `await_result`, `_item`, `_location`, `_stage`, `_blueprint`, `_payload`, `_context`, `_instance_payload`, `_npc_context`, `_player_context`, `_memory`, `_reply_text`, `_HeldDialogueClient`) are relocated
+- **THEN** they move once into dedicated `_director_helpers.py` / `_dialogue_helpers.py` modules that the new modules import, with no duplicated helper code and no import cycles
+
+#### Scenario: Fixed-path source guard scans the split modules
+- **WHEN** a test module guards the scenario-director test sources by reading a fixed module path
+- **THEN** it is updated to scan the split modules instead
+
+#### Scenario: Inventory contract verifies one home per class
+- **WHEN** the AI split is complete
+- **THEN** a top-level contract test verifies that every class from the pre-split inventories appears in exactly one test module of `world/ai/tests`
+
 ### Requirement: Scene-builder and compile test modules are split with shared bases kept importable
-The `world/quests/tests/test_scene_builder.py` and `world/quests/tests/test_compile.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged. Shared base classes and mixins (`SceneBuilderTestBase`, `SceneBuilderIsolation`, `CompileRegistryIsolation`) SHALL keep a single fixed home — either the original module or a helpers module — and every new module SHALL import them from that home, with no duplicated base code. Module-level payload helpers SHALL also keep a single fixed home — either the original module or a helpers module — so deleting an emptied original module never orphans an import. A top-level contract test SHALL verify that every class from the pre-split inventories appears in exactly one test module of `world/quests/tests`. The original modules SHALL be emptied of moved classes and deleted only when nothing (including a shared base) still lives in them.
+The `world/quests/tests/test_scene_builder.py` and `world/quests/tests/test_compile.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged. The original modules SHALL be emptied of moved classes and deleted only when nothing (including a shared base) still lives in them.
 
 #### Scenario: The quests split lands without behavior change
 - **WHEN** the scene-builder and compile modules are split into themed modules
@@ -208,8 +316,16 @@ The `world/quests/tests/test_scene_builder.py` and `world/quests/tests/test_comp
 - **WHEN** the split creates new test modules under `world.quests`
 - **THEN** the ownership contract test still partitions every discovered module exactly once without a manifest edit
 
+#### Scenario: Module-level payload helpers keep one fixed home
+- **WHEN** module-level payload helpers are needed after the quests split
+- **THEN** they keep a single fixed home — either the original module or a helpers module — so deleting an emptied original module never orphans an import
+
+#### Scenario: Quests inventory contract verifies one home per class
+- **WHEN** the quests split is complete
+- **THEN** a top-level contract test verifies that every class from the pre-split inventories appears in exactly one test module of `world/quests/tests`
+
 ### Requirement: Fixture-free test classes use the lightest base
-A test class that, after a dependency review covering its base classes, isolation mixins, the code under test, and any `SESSION_HANDLER` or default-session dependence, never references the `EvenniaTestMixin` fixtures and needs no command lifecycle SHALL inherit `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`) rather than `EvenniaTest`, so per-method setup and teardown cost is not paid for a world the test never uses. The conversion SHALL preserve method bodies, names, substantive assertions, and requirement annotations; a class that fails after conversion SHALL be reverted to its prior base and reported, never repaired by adding fixture usage or weakening assertions. The excluded classes and their exclusion reasons SHALL be recorded with the change for reproducibility, and conversion SHALL be verified per package during the change and by the full suite afterward.
+A test class that, after a dependency review covering its base classes, isolation mixins, the code under test, and any `SESSION_HANDLER` or default-session dependence, never references the `EvenniaTestMixin` fixtures and needs no command lifecycle SHALL inherit `EvenniaTestCase` (or an isolation mixin plus `EvenniaTestCase`) rather than `EvenniaTest`, so per-method setup and teardown cost is not paid for a world the test never uses.
 
 #### Scenario: Stateless-entity tests skip the default world
 - **WHEN** a reviewed test class creates its own entities (`create_object`) and never touches the mixin fixtures, its bases, or session-dependent code
@@ -227,8 +343,16 @@ A test class that, after a dependency review covering its base classes, isolatio
 - **WHEN** the fixture-boundary contract test runs
 - **THEN** a representative sample of the newly downgraded classes is asserted to inherit exactly `EvenniaTestCase` (plus any isolation mixin), and the previously pinned classes keep their documented bases
 
+#### Scenario: Conversions preserve content
+- **WHEN** a test class is converted to the lightest base
+- **THEN** its method bodies, names, substantive assertions, and requirement annotations are preserved
+
+#### Scenario: Conversion is verified per package then by the full suite
+- **WHEN** the fixture-free conversion proceeds
+- **THEN** it is verified per package during the change and by the full suite afterward
+
 ### Requirement: Combat-session and skill-registry test modules are split into themed modules
-The `world/rules/tests/test_combat_session.py` and `world/skills/tests/test_registry.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged; module-level helpers used by moved classes SHALL move to a helpers module or the module that owns them; base classes and mixins SHALL stay where they are and be imported by the new modules. The original modules SHALL be emptied of moved classes and deleted when nothing remains. A top-level contract test SHALL verify that every class from the pre-split inventories appears in exactly one test module of the owning package. Any contract test pinning a moved class's file path and the evennia shard manifest SHALL be updated in the same change.
+The `world/rules/tests/test_combat_session.py` and `world/skills/tests/test_registry.py` modules SHALL be split by class into themed `test_*.py` modules: class bodies, method names, substantive assertions, and requirement annotations SHALL be preserved unchanged. The original modules SHALL be emptied of moved classes and deleted when nothing remains.
 
 #### Scenario: The split lands without behavior change
 - **WHEN** the combat-session and skill-registry modules are split into themed modules
@@ -242,3 +366,18 @@ The `world/rules/tests/test_combat_session.py` and `world/skills/tests/test_regi
 - **WHEN** the split creates new test modules under `world.rules`
 - **THEN** the evennia shard manifest replaces the removed module label with the new module labels and the ownership contract test still partitions every discovered module exactly once
 
+#### Scenario: Helpers move to their owning module
+- **WHEN** module-level helpers are used by moved classes
+- **THEN** they move to a helpers module or the module that owns them
+
+#### Scenario: Base classes and mixins stay in place
+- **WHEN** moved classes rely on base classes or mixins
+- **THEN** those bases and mixins stay where they are and are imported by the new modules
+
+#### Scenario: Inventory contract verifies one home per class
+- **WHEN** the combat-session and skill-registry split is complete
+- **THEN** a top-level contract test verifies that every class from the pre-split inventories appears in exactly one test module of the owning package
+
+#### Scenario: Pinned paths and shard manifest update together
+- **WHEN** a class moves to a new module
+- **THEN** any contract test pinning that class's file path and the evennia shard manifest are updated in the same change

@@ -6,7 +6,7 @@ Defines the 聖女容器 (`saintess_vessel`) passive: the church-enrollment-gran
 ## Requirements
 
 ### Requirement: saintess_vessel is a church-enrollment-granted clergy qualifier passive
-`SKILL_REGISTRY` SHALL contain `saintess_vessel`（聖女容器）declared `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, `usable_out_of_combat=True`, `element="light"`, `category=SkillCategory.ENHANCEMENT`, with an EMPTY effects collection (asserted by emptiness, not container type — the shipped builder defaults the omitted field to its shared frozen empty list) and no lineage prerequisites — the same qualifier-row shape as `pain_to_pleasure`, `rapture_renewal`, and `priestly_grace`. The row SHALL NOT appear in any genealogy tree, and the passive kind itself SHALL keep it unearnable: the practice-award entries and the cross-lineage unlock engine SHALL reject it exactly as they already reject PASSIVE skills. It SHALL NOT be conferrable (`validate_conferrable_skill` accepts only stat-multiply/rule-table shaped rows and the vessel carries neither), joining the same non-conferrable qualifier class as the other three clergy passives. The ONLY production path that places it on an entity is the church enrollment transaction of a female `human_royal` character — the enrollment grant replaces the former preset-activation grant (the shipped `violet_altoria` preset's `passive_skills` SHALL NOT include `saintess_vessel`), there is no office uniqueness (every eligible royal who enrolls becomes a saintess; no global office state exists), and the vessel SHALL NEVER be a redemption-catalogue row at any price (negative-set pinned). The PASSIVE guards, the granted-only character, and the granted-event observability are unchanged: the enrollment transaction reuses the same canonical granted-passive write path and the same `saintess_vessel_granted` event.
+`SKILL_REGISTRY` SHALL contain `saintess_vessel`（聖女容器）declared `kind=SkillKind.PASSIVE`, `target_spec=TargetSpec.NONE`, `usable_out_of_combat=True`, `element="light"`, `category=SkillCategory.ENHANCEMENT`, with an EMPTY effects collection and no lineage prerequisites. The ONLY production path that places it on an entity is the church enrollment transaction of a female `human_royal` character, and the vessel SHALL NEVER be a redemption-catalogue row at any price.
 
 #### Scenario: The vessel row exists with the clergy qualifier shape
 - **WHEN** `SKILL_REGISTRY["saintess_vessel"]` is read
@@ -36,15 +36,32 @@ Defines the 聖女容器 (`saintess_vessel`) passive: the church-enrollment-gran
 - **WHEN** the church redemption catalogue is enumerated
 - **THEN** `saintess_vessel` is absent at every price, permanently
 
+#### Scenario: The row carries the clergy qualifier shape with an empty-by-emptiness effects collection
+- **WHEN** the vessel's registered effects collection and row shape are inspected
+- **THEN** effects emptiness is asserted by emptiness, not container type — the shipped builder defaults the omitted field to its shared frozen empty list — and the row is the same qualifier-row shape as `pain_to_pleasure`, `rapture_renewal`, and `priestly_grace`
+
+#### Scenario: The redemption-catalogue absence is negative-set pinned
+- **WHEN** the assertion pinning the vessel out of the church redemption catalogue is inspected
+- **THEN** the absence is pinned as a negative set, permanently at every price
+
+#### Scenario: The vessel appears in no genealogy tree and stays unearnable by kind
+- **WHEN** every shipped genealogy tree is enumerated and the practice-award entries or the cross-lineage unlock engine are offered `saintess_vessel`
+- **THEN** the row appears in no genealogy tree, and the passive kind itself keeps it unearnable: each rejects it exactly as they already reject PASSIVE skills
+
+#### Scenario: The vessel joins the non-conferrable clergy qualifier class
+- **WHEN** `validate_conferrable_skill` evaluates `saintess_vessel`
+- **THEN** it rejects because the validator accepts only stat-multiply/rule-table shaped rows and the vessel carries neither, joining the same non-conferrable qualifier class as the other three clergy passives
+
+#### Scenario: The enrollment grant replaces the preset-activation grant through unchanged machinery
+- **WHEN** the shipped `violet_altoria` preset's `passive_skills` and the enrollment write path are inspected
+- **THEN** the preset's `passive_skills` do not include `saintess_vessel`, and the enrollment transaction reuses the same canonical granted-passive write path and the same `saintess_vessel_granted` event — the PASSIVE guards, the granted-only character, and the granted-event observability are unchanged
+
+#### Scenario: Office uniqueness does not exist
+- **WHEN** every eligible royal completes enrollment
+- **THEN** each becomes a saintess and no global office state exists
+
 ### Requirement: Saintess trickle pins the holder's idle arousal inside the idle band
-For an entity owning `saintess_vessel`, the world-clock settlement SHALL guarantee that after any settlement step the entity's pleasure is never below the 微興奮 floor (15) while the holder sits below the 中等/高度 boundary behavior defined below. Concretely, all writes through the sanctioned `world/rules/` pleasure writers only (never a typeclass, AI, or presentation module):
-
-1. The pleasure decay step's floor for a holder is the 微興奮 floor: `decay_tick` targets `max(15, band_floor − 1)` and a holder at or below 15 with decay due is a no-op.
-2. Once per world-clock `advance()` with `seconds > 0` (NOT per settlement quantum), for every settled non-combat-sourced scope, an entity below 15 is raised to exactly 15 via `apply_pleasure_gain(..., stimulus=False)`.
-3. An entity inside [15, 59] receives exactly one deterministic ±1 step per advance whose direction is a stateless hash of the FULL resulting world tick and the entity identity (a rolled-back, retried advance recomputes the identical direction; no RNG is consumed; raw tick parity is refuted — every shipped non-combat advance duration is even, so the draw would freeze per entity), with the result clamped so the gauge never leaves [15, 59] and a clamped-to-zero delta issuing no writer call.
-4. An entity at or above 60 is left untouched; ordinary decay owns the descent and steps 2–3 re-arm when the gauge re-enters the band.
-
-All trickle writes carry the sanctioned writer's explicit non-stimulus policy: the gauge write and the wetness-on-band-up cascade apply, while the climax-phase edges (接近→進行中, 極限→接近) and extension staging NEVER fire — the idle fluctuation must not autonomously open a climax below the 85 gate for a holder parked at 接近. A holder resting at the floor therefore stays never-below-15 with at most ±1 movement per advance — its arousal level never leaves 微興奮～中等. An entity that does not own `saintess_vessel` SHALL decay and settle byte-for-byte exactly as before this change.
+For an entity owning `saintess_vessel`, the world-clock settlement SHALL guarantee that after any settlement step the entity's pleasure is never below the 微興奮 floor (15) while the holder sits below the 中等/高度 boundary, and all trickle writes go through the sanctioned `world/rules/` pleasure writers only, never a typeclass, AI, or presentation module. The holder's arousal level therefore never leaves 微興奮～中等, and a non-holder SHALL decay and settle byte-for-byte exactly as before this change.
 
 #### Scenario: A completely idle holder at zero is pinned up in one advance
 - **WHEN** a vessel holder with pleasure 0 and no buffs or other pending settlement work is settled by one world-clock advance
@@ -74,8 +91,33 @@ All trickle writes carry the sanctioned writer's explicit non-stimulus policy: t
 - **WHEN** a non-holder with pleasure 20 is settled over the same advances
 - **THEN** she receives no fluctuation, no pin, and her decay follows the unchanged 平靜-floor behavior
 
+#### Scenario: The holder's decay floor is the 微興奮 floor
+- **WHEN** the pleasure decay step runs for a vessel holder
+- **THEN** `decay_tick` targets `max(15, band_floor − 1)` and a holder at or below 15 with decay due is a no-op
+
+#### Scenario: The pin runs once per advance over settled non-combat scopes
+- **WHEN** one world-clock `advance()` with `seconds > 0` settles non-combat-sourced scopes containing entities below 15
+- **THEN** each such entity is raised to exactly 15 via `apply_pleasure_gain(..., stimulus=False)`, once per `advance()` and NOT per settlement quantum
+
+#### Scenario: The band step is a deterministic stateless hash draw
+- **WHEN** a vessel holder inside [15, 59] is settled by one advance
+- **THEN** she receives exactly one ±1 step whose direction is a stateless hash of the FULL resulting world tick and the entity identity — no RNG is consumed, and raw tick parity is refuted as the draw source because every shipped non-combat advance duration is even and the draw would freeze per entity
+- **AND** the result is clamped so the gauge never leaves [15, 59], and a clamped-to-zero delta issues no writer call
+
+#### Scenario: The trickle leaves an entity at or above 60 untouched
+- **WHEN** a vessel holder's gauge reads 60 or above at settlement
+- **THEN** the trickle touches nothing, ordinary decay owns the descent, and the pin and band step re-arm only when the gauge re-enters the band
+
+#### Scenario: Trickle writes carry the writer's explicit non-stimulus policy
+- **WHEN** a trickle write lands on a holder
+- **THEN** the sanctioned writer's explicit non-stimulus policy applies: the gauge write and the wetness-on-band-up cascade apply, while the climax-phase edges (接近→進行中, 極限→接近) and extension staging NEVER fire — the idle fluctuation must not autonomously open a climax below the 85 gate for a holder parked at 接近
+
+#### Scenario: A holder resting at the floor stays pinned with at most ±1 movement
+- **WHEN** a vessel holder rests at the 微興奮 floor across advances
+- **THEN** she stays never-below-15 with at most ±1 movement per advance
+
 ### Requirement: Each named public blessing ceremony reads the holder's excitement tier exactly once
-`world/rules/rulebook/combat_modifiers.yaml` SHALL carry two distinct vessel rows and no others: (a) `blessing_arousal_scale: 0.1` gated on `skill_owned: saintess_vessel` — a key deliberately distinct from `priestly_grace`'s `recovery_arousal_scale` because same-key numerics ADD at merge — and (b) a grace row gated on `skill_owned: saintess_vessel` together with `buff_active: light_blessing` and `field: arousal, gte: 中等`, granting a flat defense +6 (the established arousal-tier 恩典 pattern). The cast-time recovery grace snapshot SHALL fold `1 + max(recovery_arousal_scale, blessing_arousal_scale) × cast-time arousal ordinal`, so the `sanctified_ward` HOT mounted from a vessel-holder cast carries grace exactly `1 + 0.1 × ordinal` whether she holds `saintess_vessel` alone, `priestly_grace` alone, or both — never `1 + 0.2 × ordinal`. The authored `goddess_blessing` numbers (heal coefficient 2.8, `light_blessing` defense +18/60 s) SHALL stay byte-identical; the vessel's second ceremonial read stacks as an independent status-sourced +6 on the live blessing, and `light_blessing` SHALL NOT gain a recovery profile.
+`world/rules/rulebook/combat_modifiers.yaml` SHALL carry two distinct vessel rows and no others: (a) `blessing_arousal_scale: 0.1` gated on `skill_owned: saintess_vessel`, and (b) a grace row gated on `skill_owned: saintess_vessel` together with `buff_active: light_blessing` and `field: arousal, gte: 中等`, granting a flat defense +6. The cast-time recovery grace snapshot SHALL fold `1 + max(recovery_arousal_scale, blessing_arousal_scale) × cast-time arousal ordinal`.
 
 #### Scenario: The vessel alone reads the tier on a ward cast
 - **WHEN** a holder of `saintess_vessel` only, at arousal ordinal 2 (中等), casts `sanctified_ward`
@@ -98,6 +140,26 @@ All trickle writes carry the sanctioned writer's explicit non-stimulus policy: t
 - **WHEN** a caster owning neither clergy passive casts `sanctified_ward` or `goddess_blessing`
 - **THEN** the ward mounts grace 1.0 and the blessing mounts only the authored +18
 
+#### Scenario: The scale key is deliberately distinct from priestly_grace's key
+- **WHEN** the vessel's arousal-scale key is compared against `priestly_grace`'s `recovery_arousal_scale`
+- **THEN** the keys differ deliberately, because same-key numerics ADD at merge
+
+#### Scenario: The +6 grace row follows the established 恩典 pattern
+- **WHEN** the vessel's tier-gated blessing-defense row is authored
+- **THEN** it grants the flat defense +6 in the established arousal-tier 恩典 pattern
+
+#### Scenario: The ward grace stays 0.1-scaled under every clergy holding
+- **WHEN** a vessel holder casts `sanctified_ward` holding `saintess_vessel` alone, `priestly_grace` alone, or both
+- **THEN** the mounted `sanctified_ward` HOT carries grace exactly `1 + 0.1 × ordinal` in all three cases — never `1 + 0.2 × ordinal`
+
+#### Scenario: The authored goddess_blessing numbers stay byte-identical
+- **WHEN** the authored `goddess_blessing` numbers are compared against the pre-change rulebook
+- **THEN** the heal coefficient 2.8 and the `light_blessing` defense +18/60 s are byte-identical
+
+#### Scenario: The second ceremonial read stacks independently and adds no recovery profile
+- **WHEN** the vessel's second ceremonial read lands on a live `light_blessing`
+- **THEN** it stacks as an independent status-sourced +6, and `light_blessing` SHALL NOT gain a recovery profile
+
 ### Requirement: The vessel adds no combat numbers beyond the two ceremonial reads
 The vessel's rulebook rows SHALL carry exactly the `blessing_arousal_scale` value and the tier-gated blessing-defense grace value. Owning the vessel SHALL change the merged combat-modifier bundle ONLY by those two keys, and the grace row SHALL NOT match unless the holder's own `light_blessing` instance is active.
 
@@ -106,7 +168,7 @@ The vessel's rulebook rows SHALL carry exactly the `blessing_arousal_scale` valu
 - **THEN** the merged bundle contains exactly `blessing_arousal_scale` and no numeric combat axis
 
 ### Requirement: The oath flip stays observable through the facade and the office-name title ban holds
-The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` event, for an entity owning `saintess_vessel`, SHALL emit exactly one `saintess_oath_broken` observability event through the `world.observability` facade, registered through the transaction-commit seam so a rolled-back transaction emits nothing, with a plain-data context carrying at least the entity identifier and the event name. A non-holder's flag flip SHALL emit no `saintess_oath_broken` event. The flip SHALL NOT create, bank, remove, or mutate any title state, and the title-system's bank path, removal path, and fixed-title rows SHALL be unchanged by this capability; the 聖女 title remains narrative identity prose read alongside the stored `virgin` flag. The `TitlePredicateFamily` closed set SHALL be extended by at most one member — the church redeemed-count family (a count of redeemed church-catalogue skills which by construction can never reference the vessel, since the vessel never enters the redeemed set), landed by the sibling order-catalogue change; the extension is what this amendment sanctions, and until that change lands the family set stays unchanged — and no predicate family beyond it SHALL be added. The office-name ban is reaffirmed unchanged and stays global: no fixed-title row of ANY category SHALL display or otherwise name the 聖女 office.
+The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` event, for an entity owning `saintess_vessel`, SHALL emit exactly one `saintess_oath_broken` observability event through the `world.observability` facade, registered through the transaction-commit seam so a rolled-back transaction emits nothing. A non-holder's flag flip SHALL emit no `saintess_oath_broken` event, and the flip SHALL NOT create, bank, remove, or mutate any title state.
 
 #### Scenario: A holder's oath flip logs exactly once at commit
 - **WHEN** a vessel holder's `virgin` flag flips via the `first_vaginal_penetration` rulebook event and the enclosing transaction commits
@@ -124,6 +186,22 @@ The irreversible flip of the `virgin` flag by the `first_vaginal_penetration` ev
 - **WHEN** `first_vaginal_penetration` fires again for an entity whose flag is already false
 - **THEN** the rule's irreversibility yields no state change and no further oath event
 
+#### Scenario: The oath event context is plain data
+- **WHEN** a holder's oath event is emitted
+- **THEN** its context is plain data carrying at least the entity identifier and the event name
+
 #### Scenario: The only sanctioned predicate-family extension is the church redemption count
 - **WHEN** `TitlePredicateFamily` members and fixed-title registry rows are enumerated at this capability's landing and after the sibling order-catalogue change lands
 - **THEN** the family set differs from the pre-church set by at most the church redeemed-count family and nothing else, the title bank and removal paths are unchanged, and no fixed-title row — church or otherwise — names the Saintess office
+
+#### Scenario: The title system is untouched and the 聖女 title stays narrative prose
+- **WHEN** the title-system's bank path, removal path, and fixed-title rows are compared against the pre-capability state
+- **THEN** all are unchanged by this capability, and the 聖女 title remains narrative identity prose read alongside the stored `virgin` flag
+
+#### Scenario: The sanctioned predicate-family extension can never reference the vessel
+- **WHEN** the church redeemed-count predicate family landed by the sibling order-catalogue change is considered — a count of redeemed church-catalogue skills
+- **THEN** it by construction can never reference the vessel, since the vessel never enters the redeemed set; the extension is what this amendment sanctions, and until that change lands the `TitlePredicateFamily` closed set stays unchanged with no predicate family beyond it added
+
+#### Scenario: The office-name ban is reaffirmed globally
+- **WHEN** every fixed-title registry row of ANY category is enumerated
+- **THEN** no row displays or otherwise names the 聖女 office, and the office-name ban is reaffirmed unchanged and stays global

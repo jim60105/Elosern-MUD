@@ -6,13 +6,8 @@ Deterministic item-use preflight, atomic settlement, stable event identity, worl
 
 ### Requirement: Item mechanics are immutable and independent from presentation
 Every registered item SHALL declare exactly one of a usable-item definition, an equipment-slot
-definition, or no mechanics. A usable-item definition SHALL contain a boolean consumable flag and a
-combat-use permission, and SHALL NOT name an effect, magnitude, stat, scope, or status: a usable
-item's effects are bound to its own key by the item-effect rulebook. An equipment definition SHALL
-contain exactly one `EquipmentSlot` and exactly one registered `EquipmentModifierKey` binding it to
-the equipment-effect rulebook; an item whose mechanics are not an equipment definition SHALL NOT carry
-a modifier key. The registry SHALL reject an item that declares both forms, a malformed slot, or a
-missing or unknown modifier key on an equipment item, or a modifier key on any non-equipment item.
+definition, or no mechanics. An equipment definition SHALL contain exactly one `EquipmentSlot` and
+exactly one registered `EquipmentModifierKey` binding it to the equipment-effect rulebook.
 Presentation kind, icon, rarity, summary, display name, and price SHALL NOT select or modify
 mechanics.
 
@@ -20,6 +15,12 @@ mechanics.
 - **WHEN** the `healing_potion` definition is inspected
 - **THEN** it is consumable, is allowed in combat, carries no equipment slot, and names no effect —
   its single HP-restoring effect is resolved from the item-effect rulebook by its own key
+
+#### Scenario: A usable-item definition is mechanics-light by contract
+- **WHEN** a usable-item definition is registered
+- **THEN** it contains a boolean consumable flag and a combat-use permission, and does not name an
+  effect, magnitude, stat, scope, or status: a usable item's effects are bound to its own key by
+  the item-effect rulebook
 
 #### Scenario: Visual metadata cannot make an item usable
 - **WHEN** an inspect-only item's presentation kind is changed to `potion` without adding use
@@ -35,16 +36,21 @@ mechanics.
   declares a modifier key while carrying no equipment slot
 - **THEN** registry construction fails before the item can be presented or toggled
 
+#### Scenario: Only equipment mechanics may carry a modifier key
+- **WHEN** an item's registered mechanics are inspected
+- **THEN** an item whose mechanics are not an equipment definition SHALL NOT carry a modifier key
+
+#### Scenario: The registry rejects malformed mechanics
+- **WHEN** the registry is given an item that declares both forms, a malformed slot, or a missing or
+  unknown modifier key on an equipment item, or a modifier key on any non-equipment item
+- **THEN** the registry rejects the item
+
 ### Requirement: Item-use preflight is side-effect-free and revalidates current conditions
 The deterministic item-use service SHALL expose a side-effect-free preflight that resolves the item
-from canonical registry data, verifies that the actor currently holds at least one matching key in
-canonical inventory, verifies the current mode against the item definition, resolves the item's
-ordered effect list from the item-effect rulebook, resolves each effect's targets through the shared
-resolver, and evaluates each effect's condition against each target's current state. The preflight
-SHALL reject only when **no** effect is effective against **any** of its targets. Its reason code SHALL
-be the shared code when every ineffective evaluation names the same one, and a generic no-effect code
-otherwise. It SHALL return stable named rejection reasons and SHALL NOT mutate inventory, traits,
-quest state, equipment, combat state, clock, or presentation for the actor or for any target.
+from canonical registry data and evaluates each effect's condition against each target's current
+state. The preflight SHALL reject only when **no** effect is effective against **any** of its
+targets. Its reason code SHALL be the shared code when every ineffective evaluation names the same
+one, and a generic no-effect code otherwise.
 
 #### Scenario: Full HP rejects a healing potion
 - **WHEN** an actor holds a healing potion and current HP equals maximum HP
@@ -72,20 +78,23 @@ quest state, equipment, combat state, clock, or presentation for the actor or fo
   full HP
 - **THEN** preflight succeeds, and settlement heals only the injured ally
 
+#### Scenario: Preflight revalidates ownership, mode, and the effect list
+- **WHEN** preflight runs
+- **THEN** it has verified that the actor currently holds at least one matching key in canonical
+  inventory and the current mode against the item definition, resolved the item's ordered effect
+  list from the item-effect rulebook, and resolved each effect's targets through the shared resolver
+
+#### Scenario: Rejections are stable and nothing mutates
+- **WHEN** preflight returns for the actor or for any target
+- **THEN** it returns stable named rejection reasons and has mutated no inventory, traits, quest
+  state, equipment, combat state, clock, or presentation
+
 ### Requirement: Item use applies effect and conditional consumption atomically
 The deterministic item-use settlement SHALL repeat preflight against current state, compute the
-complete effect, inventory, and mirror-object plan before writing, and commit them atomically. The
-plan SHALL carry one step per effective effect-and-target pair, each holding the magnitude actually
-applicable to that target's current state, and steps SHALL be applied in the order the rulebook
-declares. Each effect family SHALL apply through the single shared entry point for that family, never
-through a second increment path. A successful consumable use SHALL remove exactly one matching
-inventory key from the **actor** and, when one exists, exactly one matching contained Evennia Object
-mirror — consumption SHALL never scale with target count. A key-only item SHALL require no fabricated
-mirror before consumption. A successful reusable use SHALL apply its effects without changing inventory
-quantity or contained mirrors. A stat adjustment SHALL move the stat by its configured amount up to,
-but never beyond, that stat's bound in the direction of travel. Any rejection or settlement failure
-SHALL restore durable state, idmapper/contents caches, trait and Attribute caches, and every other
-touched surface to its pre-call state, **for every touched entity**, not only the actor.
+complete effect, inventory, and mirror-object plan before writing, and commit them atomically. A
+successful consumable use SHALL remove exactly one matching inventory key from the **actor** and,
+when one exists, exactly one matching contained Evennia Object mirror — consumption SHALL never
+scale with target count.
 
 #### Scenario: Consumable healing removes one unit
 - **WHEN** an injured actor holding two healing potions successfully uses one
@@ -134,6 +143,35 @@ touched surface to its pre-call state, **for every touched entity**, not only th
 - **THEN** it reports the pre-call value, because the rollback dropped that entity's memoized handler
   as well as restoring its stored attributes
 
+#### Scenario: The plan carries one step per effective effect-and-target pair
+- **WHEN** settlement plans a use
+- **THEN** the plan carries one step per effective effect-and-target pair, each holding the magnitude
+  actually applicable to that target's current state, and steps are applied in the order the
+  rulebook declares
+
+#### Scenario: Effect families apply through their single shared entry point
+- **WHEN** settlement applies any effect
+- **THEN** it applies through the single shared entry point for that effect family, never through a
+  second increment path
+
+#### Scenario: A reusable use leaves quantity and mirrors untouched
+- **WHEN** a registered reusable item is used successfully
+- **THEN** its effects apply without changing inventory quantity or contained mirrors
+
+#### Scenario: A key-only item needs no fabricated mirror
+- **WHEN** a key-only consumable settles
+- **THEN** its consumption requires no fabricated mirror
+
+#### Scenario: A stat adjustment stops at its bound
+- **WHEN** an applied stat adjustment would carry a stat past its bound in the direction of travel
+- **THEN** the stat moves by its configured amount up to, but never beyond, that bound
+
+#### Scenario: Failure restores every touched surface on every touched entity
+- **WHEN** a use is rejected or settlement fails
+- **THEN** durable state, idmapper/contents caches, trait and Attribute caches, and every other
+  touched surface are restored to their pre-call state, **for every touched entity**, not only the
+  actor
+
 ### Requirement: Out-of-combat item use advances deterministic time once
 A successful out-of-combat item use SHALL compose its complete item plan and the player-driven world's canonical six-second advance inside one outer transaction and rollback journal. A rejected or failed use SHALL advance no time. A failure in any due clock callback SHALL roll back the item effect, consumption, contained mirror, clock, due-event effects, and all in-process caches together. Combat use SHALL add no command-default time because combat-session round settlement owns elapsed time.
 
@@ -151,15 +189,11 @@ A successful out-of-combat item use SHALL compose its complete item plan and the
 
 ### Requirement: Combat item use occupies one initiative-ordered round
 An active combat session SHALL admit a preflight-valid `ItemUseRequest` as the player's selected
-action, supplying the battlefield action context and the player's chosen target when the item's scope
-requires one. Ordinary and compressed round providers SHALL supply that request exactly once at the
-player's first initiative position, dispatch it only to the deterministic item resolver, and supply
-ordinary policy actions for other capable participants. A preflight rejection SHALL start no round. If
-an earlier initiative action invalidates a preflight-valid item request, the already-started round
-SHALL remain consumed. Combat's outer rollback contract SHALL include inventory, selected mirror
-object, and every item-touched cache **on every touched entity**. A combat item use SHALL contribute
-round-based time and SHALL NOT add separate item-use time. The number of targets an item reaches SHALL
-NOT affect the number of rounds it consumes.
+action. Ordinary and compressed round providers SHALL supply that request exactly once at the
+player's first initiative position. A preflight rejection SHALL start no round. If an earlier
+initiative action invalidates a preflight-valid item request, the already-started round SHALL
+remain consumed. The number of targets an item reaches SHALL NOT affect the number of rounds it
+consumes.
 
 #### Scenario: Valid potion use runs one combat round
 - **WHEN** an injured player in active combat submits a preflight-valid healing potion use
@@ -192,15 +226,33 @@ NOT affect the number of rounds it consumes.
 - **THEN** all four are affected within one initiative position and the session round count increases
   exactly once
 
+#### Scenario: The item request carries battlefield context and a chosen target
+- **WHEN** combat admits a preflight-valid `ItemUseRequest`
+- **THEN** it supplies the battlefield action context and the player's chosen target when the item's
+  scope requires one
+
+#### Scenario: The item request dispatches only to the deterministic item resolver
+- **WHEN** a round provider executes the supplied item request
+- **THEN** it dispatches only to the deterministic item resolver
+
+#### Scenario: Other participants keep ordinary policy actions
+- **WHEN** a round provider supplies the player's item request
+- **THEN** it supplies ordinary policy actions for other capable participants
+
+#### Scenario: Combat rollback covers every item surface on every touched entity
+- **WHEN** a combat item use must be rolled back
+- **THEN** combat's outer rollback contract includes inventory, selected mirror object, and every
+  item-touched cache **on every touched entity**
+
+#### Scenario: A combat item use contributes only round-based time
+- **WHEN** an item use resolves during a combat round
+- **THEN** it contributes round-based time and adds no separate item-use time
+
 ### Requirement: Successful item use emits a stable EventLog entry
 Every successful item use SHALL emit one EventLog carrying one `item_used` entry per **effective**
 effect-and-target pair. Each entry's data SHALL carry `item_key`, `consumable`, and the target it
-applied to, plus the per-family payload: a stat adjustment SHALL carry the stat name and the signed
-amount actually applied; a status effect SHALL carry the status keys involved and the count actually
-applied or removed. No entry SHALL carry an effect-key field, because effects are no longer identified
-by a closed key. The EventLog's target list SHALL be the deduplicated set of entities actually
-touched. Rejected preflight SHALL emit no item-use EventLog. A compressed commanded-action marker
-SHALL identify the selected item separately and SHALL NOT replace the item-use entries.
+applied to, plus the per-family payload. No entry SHALL carry an effect-key field, because effects
+are no longer identified by a closed key. Rejected preflight SHALL emit no item-use EventLog.
 
 #### Scenario: Healing log records actual restoration
 - **WHEN** a potion configured for more healing than the actor's missing HP succeeds
@@ -221,15 +273,25 @@ SHALL identify the selected item separately and SHALL NOT replace the item-use e
 - **THEN** the EventLog carries three `item_used` entries, each naming its own target and its own
   restored amount, and the log's target list contains exactly those three entities
 
+#### Scenario: The per-family payload carries what was actually applied
+- **WHEN** an `item_used` entry logs a stat adjustment or a status effect
+- **THEN** a stat adjustment entry carries the stat name and the signed amount actually applied,
+  and a status effect entry carries the status keys involved and the count actually applied or
+  removed
+
+#### Scenario: The log's target list is the deduplicated touched set
+- **WHEN** a use touches the same entity through several effects
+- **THEN** the EventLog's target list is the deduplicated set of entities actually touched
+
+#### Scenario: A compressed commanded-action marker is additive
+- **WHEN** a compressed commanded-action marker accompanies an item use
+- **THEN** it identifies the selected item separately and does not replace the item-use entries
+
 ### Requirement: 受洗聖水 purges debuffs through an ordinary status-removal effect
 受洗聖水 SHALL declare a single status-removal effect selecting every debuff-polarity status. Using a
 held 受洗聖水 SHALL remove every active debuff-polarity status from the actor through the shared
 selector-driven removal, consume exactly one item key (with its contained mirror when present), emit
-its stable EventLog entry, and commit atomically with the existing item-use settlement. It SHALL carry
-no special case anywhere in preflight, planning, settlement, or logging: it SHALL be resolved by the
-same code path as every other status-removal effect. The item-use touched-journal SHALL snapshot and
-restore the buff storage surface so a post-cleanse failure rolls back persistence and live buff reads
-together.
+its stable EventLog entry, and commit atomically with the existing item-use settlement.
 
 #### Scenario: Holy water cleanses the actor
 - **WHEN** an actor afflicted with `poisoned` and `fear` uses 受洗聖水
@@ -254,13 +316,20 @@ together.
 - **WHEN** the item-use resolver is inspected
 - **THEN** it contains no branch keyed to 受洗聖水, to cleansing, or to any individual item identity
 
+#### Scenario: Holy water resolves through the generic status-removal path
+- **WHEN** preflight, planning, settlement, or logging handles 受洗聖水
+- **THEN** none of them carries a special case for it; it is resolved by the same code path as every
+  other status-removal effect
+
+#### Scenario: The touched journal snapshots the buff storage surface
+- **WHEN** the item-use touched journal records a cleanse
+- **THEN** it snapshots and restores the buff storage surface so a post-cleanse failure rolls back
+  persistence and live buff reads together
+
 ### Requirement: An ineffective effect is skipped silently rather than failing the use
 Within a use that has at least one effective effect, any effect that can change nothing against
 current state SHALL be skipped: it SHALL write nothing, SHALL emit no event entry, and SHALL NOT
-reject the use. Effectiveness SHALL be evaluated per effect against current state: a positive stat
-adjustment requires headroom below the maximum, a negative one requires a value above zero, a status
-application requires that the target is not immune to it, and a status removal requires a non-empty
-selected set.
+reject the use. Effectiveness SHALL be evaluated per effect against current state.
 
 #### Scenario: A composite item applies only its effective half
 - **WHEN** an actor at full HP but missing MP uses an item declaring both an HP restore and an MP
@@ -273,14 +342,16 @@ selected set.
 - **THEN** exactly one item key is consumed, exactly as it would be if the item declared only the
   effective one
 
+#### Scenario: Effectiveness criteria per effect family
+- **WHEN** effectiveness is evaluated per effect against current state
+- **THEN** a positive stat adjustment requires headroom below the maximum, a negative one requires a
+  value above zero, a status application requires that the target is not immune to it, and a status
+  removal requires a non-empty selected set
+
 ### Requirement: Every effect family names its own ineffective reason
 Each effect family SHALL have a stable rejection reason for the case where it can change nothing, so
 the single-effect fallback reports a specific reason rather than a generic one regardless of which
-verb the item declares. A stat adjustment SHALL report that stat's own bound-reached reason. A status
-application blocked by the target's equipment immunity SHALL report a blocked-status reason. A status
-removal whose selector matches nothing SHALL report a nothing-to-remove reason, except the
-debuff-polarity selector, which SHALL keep the shipped `no_debuffs` reason so 受洗聖水's behavior is
-unchanged. Every reason SHALL render a Traditional Chinese message through the shared reason surface.
+verb the item declares. A stat adjustment SHALL report that stat's own bound-reached reason.
 
 #### Scenario: A blocked status application reports its own reason
 - **WHEN** an item whose only effect applies a debuff the target's worn equipment immunizes against is
@@ -302,15 +373,29 @@ unchanged. Every reason SHALL render a Traditional Chinese message through the s
   surface
 - **THEN** each produces a non-empty Traditional Chinese message
 
+#### Scenario: An immunity-blocked application names a blocked-status reason
+- **WHEN** the single-effect fallback evaluates a status application blocked by the target's
+  equipment immunity
+- **THEN** it reports a blocked-status reason
+
+#### Scenario: An unmatched removal names a nothing-to-remove reason
+- **WHEN** the single-effect fallback evaluates a status removal whose selector matches nothing
+- **THEN** it reports a nothing-to-remove reason
+
+#### Scenario: The debuff-polarity selector is the nothing-to-remove exception
+- **WHEN** a debuff-polarity selector matches nothing
+- **THEN** it keeps the shipped `no_debuffs` reason so 受洗聖水's behavior is unchanged
+
+#### Scenario: Every family reason renders in Traditional Chinese
+- **WHEN** any effect family's ineffective reason is surfaced
+- **THEN** it renders a Traditional Chinese message through the shared reason surface
+
 ### Requirement: Item preflight resolves each effect's targets through the shared resolver
 Item-use preflight SHALL accept an action context — the battlefield context inside an active combat
 session, a room-backed context outside one — and SHALL resolve every effect's target set through the
 shared target resolver, supplying the targeting requirement that effect's scope maps to. It SHALL
 accept at most one caller-supplied explicit target for the whole use, consumed only by single-entity
-scopes; self scopes SHALL bind the actor and group scopes SHALL expand through the context. A
-single-entity effect with no supplied target SHALL reject with a stable no-target reason; a supplied
-target the resolver refuses SHALL reject with a stable invalid-target reason carrying the resolver's
-own reason as detail. Preflight SHALL remain side-effect-free.
+scopes. Preflight SHALL remain side-effect-free.
 
 #### Scenario: A single-scope item with no target rejects before writing
 - **WHEN** an actor uses an item whose only effect is scoped to a single entity, supplying no target
@@ -333,3 +418,7 @@ own reason as detail. Preflight SHALL remain side-effect-free.
 #### Scenario: A group scope with no eligible member rejects
 - **WHEN** an opposing-side item is used with no living opposing entity resolvable
 - **THEN** preflight rejects and nothing is consumed
+
+#### Scenario: Self and group scopes bind without a caller target
+- **WHEN** preflight resolves effect scopes
+- **THEN** self scopes bind the actor and group scopes expand through the context

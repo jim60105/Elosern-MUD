@@ -15,23 +15,10 @@ flag that establishes the named policy without requesting anything.
 
 ### Requirement: Automatic character portraits produce exactly one unbound default card
 Every automatic portrait path — player creation, validated import, named-NPC spawn, startup recovery,
-and generic-monster startup synchronization — SHALL route through the gallery generation request
-rather than the subject-keyed asset `ensure`, and SHALL request exactly one image built from the
-subject's standard deterministic description with no free text, no binding, and no explicit face
-rectangle (`face_rect=None`), so the resulting card takes the fitted default square computed from
-the settled image's recorded pixel size. For a kind that declares field-selection support, that
-description is the authored appearance contribution and nothing else, expressed as the `appearance`
-field alone; for a kind that declares no field selection, it is that kind's registry-driven
-description with no selection supplied at all. The requirement is on the resulting description, not
-on the request's argument shape.
-
-The resulting card SHALL be unbound, so it is displayed only as the subject's default — which, being
-the subject's first card, it becomes automatically. NO gallery-bearing subject SHALL produce a classic
-fixed-identity asset record on any of these paths. Each path SHALL keep its existing guarantees
-unchanged: the canonical-age check at schedule time and again immediately before the queue write for
-every kind that declares the age precondition, the `transaction.on_commit` registration on the paths
-that have one, and the total failure isolation in which an art failure never rolls back creation,
-import, spawn, movement, or startup.
+and generic-monster startup synchronization — SHALL route through the gallery generation request,
+not the subject-keyed asset `ensure`, requesting exactly one image from the subject's standard
+deterministic description with no free text, no binding, and `face_rect=None`.
+The resulting card SHALL be unbound, displayed only as the subject's default.
 
 #### Scenario: A committed creation produces one unbound default card
 - **WHEN** player creation commits and its post-commit job is drained
@@ -57,20 +44,45 @@ import, spawn, movement, or startup.
 - **WHEN** the gallery request or its job fails on an automatic path
 - **THEN** the creation, import, spawn, move, or startup is still reported as successful and a bounded diagnostic is logged
 
+#### Scenario: The description is authored appearance only, for field-selecting kinds
+- **WHEN** the automatic request targets a kind that declares field-selection support
+- **THEN** the description is the authored appearance contribution and nothing else, expressed as the
+  `appearance` field alone
+
+#### Scenario: The description is registry-driven, for non-selecting kinds
+- **WHEN** the automatic request targets a kind that declares no field selection
+- **THEN** the description is that kind's registry-driven description with no selection supplied at all
+
+#### Scenario: The requirement binds the description, not the argument shape
+- **WHEN** compliance with this requirement is judged
+- **THEN** the requirement is on the resulting description, not on the request's argument shape
+
+#### Scenario: The first card is the default automatically
+- **WHEN** the unbound card is the subject's first card
+- **THEN** it becomes the subject's default automatically
+
+#### Scenario: Each path keeps its existing guarantees unchanged
+- **WHEN** an automatic path is wired to the gallery request
+- **THEN** it keeps the canonical-age check at schedule time and again immediately before the queue
+  write for every kind that declares the age precondition, the `transaction.on_commit` registration on
+  the paths that have one, and the total failure isolation in which an art failure never rolls back
+  creation, import, spawn, movement, or startup
+
+#### Scenario: The unbound card takes the fitted default square
+- **WHEN** the automatic request settles
+- **THEN** the resulting card takes the fitted default square computed from the settled image's
+  recorded pixel size
+
+#### Scenario: No classic fixed-identity asset record on any path
+- **WHEN** any gallery-bearing subject goes through these automatic paths
+- **THEN** no classic fixed-identity asset record is produced
+
 ### Requirement: Automatic generation is idempotent against the subject's gallery
 An automatic path SHALL request a generation only when the subject's gallery holds no card AND no
 gallery job for that subject is in flight AND — for an entity whose official content reference is
 eligible and already satisfied by a valid catalog entry in the startup official snapshot (see the
 `official-art-resolution` capability) — no official default resolves for it. A subject that already
-holds any card — generated, seed-synced, or player-kept — SHALL be left alone. This SHALL hold across
-restarts, so repeated startup recovery and repeated startup synchronization never stack duplicate
-cards, and across quests, so a `stable_key` shared by several scenes yields exactly one
-auto-generated card. The guard SHALL be the
-same one for every gallery-bearing kind, so a monster tier is protected by exactly the rule a character
-subject is — which is also what keeps a capped kind from replacing its one card on every restart. A
-suppressed automatic request SHALL leave no record and enqueue nothing; the entity presents the
-official default through the presentation chain, and updating the official directory later does not
-retroactively enqueue the suppressed subject.
+holds any card SHALL be left alone. The guard SHALL be the same one for every gallery-bearing kind.
 
 #### Scenario: Repeated recovery appends nothing
 - **WHEN** startup recovery runs on consecutive restarts for a subject that already holds one card
@@ -100,13 +112,34 @@ retroactively enqueue the suppressed subject.
 - **WHEN** an entity whose automatic generation was official-suppressed is later requested through the manual gallery generation seam
 - **THEN** the request is served through the existing seam and settles a runtime card that then outranks the official default
 
+#### Scenario: Any existing card kind counts as held
+- **WHEN** the idempotency guard finds the subject's only card
+- **THEN** a generated, seed-synced, or player-kept card all count, and the subject is left alone
+
+#### Scenario: The guard holds across restarts
+- **WHEN** startup recovery and startup synchronization repeat across restarts
+- **THEN** they never stack duplicate cards
+
+#### Scenario: The guard holds across quests
+- **WHEN** several scenes share one `stable_key`
+- **THEN** they yield exactly one auto-generated card
+
+#### Scenario: One rule protects every gallery-bearing kind
+- **WHEN** the guard is applied per kind
+- **THEN** a monster tier is protected by exactly the rule a character subject is — which is also what
+  keeps a capped kind from replacing its one card on every restart
+
+#### Scenario: A suppressed request leaves nothing and is not revived later
+- **WHEN** an automatic request is suppressed
+- **THEN** it leaves no record and enqueues nothing; the entity presents the official default through
+  the presentation chain, and updating the official directory later does not retroactively enqueue the
+  suppressed subject
+
 ### Requirement: Player creation may skip the automatic portrait
 `world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag,
 defaulting to generating. It SHALL establish the explicit named `portrait_policy` on every path,
-including the skipped one, so the character stays eligible for a later request. A skipped creation
-SHALL enqueue nothing and SHALL leave the character with an empty gallery, which resolves through the
-standard chain's terminal fallback seam (inert until the gallery-fallback capability fills it — today
-the honest outcome is the truthful placeholder, owned by ``gallery-builtin-fallbacks``). The flag SHALL
+including the skipped one. A skipped creation
+SHALL enqueue nothing and SHALL leave the character with an empty gallery. The flag SHALL
 be read inside the activation transaction like
 the rest of the finalization, so a rollback leaves no portrait state either way.
 
@@ -121,3 +154,10 @@ the rest of the finalization, so a rollback leaves no portrait state either way.
 #### Scenario: A rolled-back skipped activation leaves nothing
 - **WHEN** an activation with the skip flag set rolls back
 - **THEN** no portrait policy and no gallery state remain on the character
+
+#### Scenario: The empty gallery resolves through the terminal fallback seam
+- **WHEN** a skipped character's empty gallery is presented
+- **THEN** it resolves through the standard chain's terminal fallback seam (inert until the
+  gallery-fallback capability fills it — today the honest outcome is the truthful placeholder, owned
+  by ``gallery-builtin-fallbacks``)
+- **AND** establishing the policy on every path keeps the character eligible for a later request

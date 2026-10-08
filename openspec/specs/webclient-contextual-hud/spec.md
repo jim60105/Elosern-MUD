@@ -11,81 +11,15 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 ## Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-This requirement carries the `place-card-relocation` and `vitals-bar-redesign` amendments; the party-line wording below replaces the solo-portrait wording of the `actor-left` anchor.
-Fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 790px tall or 1451px wide, the 1451x790 reference viewport. Above both, chrome dimensions scale once under the desktop proportional-scaling contract; viewport-relative band/prose/portrait dimensions are not multiplied again. The named acceptance-size non-overlap rules remain.
-The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
-the lowest layer, the portrait anchors above it, the HUD islands above those, the bottom band above
-those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by
-named stage anchors — the lower-left `vitals` anchor, the top-right `map` anchor, the portrait anchors
-`actor-left` and `actor-right`, the bottom band's two regions `band-message` and `band-command`, the dialogue `choices` anchor, and
-the `command-line` row — and SHALL NOT be placed inside a page-scrolling container that can push a
-required surface out of view. The stage SHALL carry no separate `place` anchor: the place card is an
-island of the `map` anchor.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
-The top band SHALL be 48px tall at every supported viewport and SHALL carry only the brand, the top
-navigation bar, the possession banner when present, the character switcher, and the connection
-state; it SHALL carry no location label and no time label. The `vitals` anchor is the stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band"
-defines: bottom-anchored on the band's upper edge in the left gutter, at the left column's fixed width that does not depend on the
-content it holds. The `map` anchor SHALL sit at the stage
-box's top-right corner, below the top band; its content column (the place card, then the
-minimap island, then the objective line, then any other island this capability places there) SHALL be right-aligned to the
-stage's right gutter and bounded above the bottom band.
+#### Scenario: The requirement carries its amendments
+- **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
+- **THEN** the party-line wording below replaces the solo-portrait wording of the `actor-left` anchor
 
-The bottom band SHALL span the full stage width along the stage's bottom edge at one fixed height,
-`clamp(190px, 27.85vh, 400px)` with its two px bounds multiplied once by the desktop chrome factor (220px at the 1451x790 reference viewport, 401px at 2560x1440), taken from a single
-shared band-height token. The band's height SHALL NOT depend on its content, on the dock frame, on
-the committed mode, or on any measurement: no frame, pane, line count, dialogue exchange, or mode
-change SHALL grow or shrink it. The band SHALL be divided into the message region `band-message`,
-covering the left two thirds of the band's width, and the command region `band-command`, covering
-the remaining right third; in creation mode, where the message region is hidden, the command region
-SHALL span the whole band, and in dialogue mode, where the command region is collapsed, the message
-region SHALL span the whole band. The band SHALL carry the reference's band chrome (the upward gradient,
-the hairline top border, and the upward shadow) on the band itself, not on the content inside it.
-The stage box — the region between the top band's lower edge and the bottom band's upper edge — is
-where the scene is seen, and at the 1451x790 reference viewport it SHALL be at least 65% of the
-viewport's height — at least 513.5px of 790; the 48px top band and the 220px bottom band leave 522px. Every surface other than the band SHALL be positioned relative to the
-band-height token so that none of them overlaps the band.
-
-The portrait anchors SHALL stand on the band: each SHALL be bottom-aligned to the band's upper edge,
-SHALL be `min(62vh, 680px)` tall but never taller than the stage box, SHALL be inset at least 6% of the
-stage width from its own side, and SHALL never cover the band. Where 6% would place the figure's face
-(the anchor's horizontal centre) under the island column on its side — the vitals stack on
-the left, the place card and the minimap card on the right — the inset SHALL grow just enough to clear that column; at
-the 1451x790 reference viewport both insets take their column-clearance value and only that value
-acts as a floor where no column reaches the portrait's face height. The `actor-left` anchor SHALL carry the
-controlled character's stage actor — the current roster character's portrait, or the possessed
-companion's while the possession banner is available — with the committed party's companion stage
-actors lined up behind it as "Companion standing portraits line up behind the controlled character in
-the actor-left anchor" defines, each with the truthful placeholder when no image exists, in
-exploration, dialogue, and combat mode. The `actor-right` anchor SHALL carry the dialogue host's stage
-actor while the committed mode is `dialogue`, the committed `dialogue` panel is available, and its host identity does not already join to a committed party or controlled lineup figure, SHALL carry
-the foe line-up that "Foes stand opposite the player during combat" defines while the committed mode is
-`combat` and at least one foe is active, or while a round that ended the fight still plays as "Combat
-beats are choreographed on the stage at the motion level" defines, and SHALL carry no content in every
-other state. The foe
-line-up MAY extend leftward beyond the `actor-right` anchor's own box, within the bounds that
-requirement sets, and SHALL NOT cross the stage's horizontal centre, which the companion line-up's
-figures also never cross. Every stage actor follows "Stage actors present the player and the dialogue host with
-a speaking state". The portrait anchors are non-interactive art: they SHALL carry no
-focusable element and SHALL NOT intercept pointer events, and they MAY sit behind the HUD islands, the
-`choices` anchor, and the command-line row.
-
-The `choices` anchor SHALL render only in dialogue mode. It SHALL be horizontally centred on the stage
-box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, and its content
-SHALL be vertically centred in, and bounded by, the part of the stage box between the top band and the
-scene caption row that stands on the command-line row, so it never meets the scene caption or the
-expanded command line; when its content is taller
-than that span allows it SHALL scroll internally, and it SHALL NOT grow into the top band, the
-command-line row, or the bottom band.
-
-At 1451x790, and at every larger viewport up to the chrome factor's cap, no interactive stage anchor (`vitals`, `map`,
-`band-message`, `band-command`, `choices`, `command-line`) SHALL overlap another interactive anchor's content,
-and the top band's own elements SHALL neither overlap one another nor extend into the HUD island
-anchor region: a band element whose content is variable-width SHALL be bounded and truncated rather
-than sized by its content. A transient popover opened from a top-band element MAY overlay the
-island anchors while open, provided it does not change the band's own rendered box and closes on
-Escape and on outside activation; a surface that permanently occupies vertical space SHALL NOT be
-introduced into the band this way.
+#### Scenario: Fixed chrome dimensions are reference dimensions
+- **WHEN** the shell renders at viewports above 790px tall or 1451px wide, the 1451x790 reference viewport
+- **THEN** the fixed CSS-pixel chrome dimensions in this requirement are reference dimensions at viewports up to 790px tall or 1451px wide, above both chrome dimensions scale once under the desktop proportional-scaling contract, viewport-relative band/prose/portrait dimensions are not multiplied again, and the named acceptance-size non-overlap rules remain
 
 #### Scenario: The stage fills the viewport with layered surfaces
 - **WHEN** the shell mounts at 1451x790
@@ -147,25 +81,62 @@ introduced into the band this way.
 - **WHEN** the dialogue choice list renders four picks and its three trailing rows at 1451x790 and at 2560x1440 with the minimap island present and the command line expanded
 - **THEN** the `choices` anchor and the list are horizontally centred on the stage box (±1px), lie entirely inside the stage box above the command-line row, intersect no `vitals`, `map`, band, or command-line anchor, and every row is reachable
 
-### Requirement: Surface visibility is gated by the committed game mode
-This requirement carries the amendments from `place-card-relocation` (place card in the `map` anchor), `vitals-bar-redesign` (the vitals dock at the lower left), and `companion-portrait-lineup` (the party quickbar row removed, the portrait row naming the companion line). Dialogue mode now hides the cockpit and navigation surfaces: the place card, the minimap island, and the vitals dock are hidden while the committed mode is `dialogue`.
-The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface
-visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be
-removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves
-the accessibility tree and the tab order. The one exception is the band's command region in dialogue
-mode, which animates out as "The command region collapses in dialogue mode and the message window spans
-the band" defines: it leaves the accessibility tree, the tab order, and pointer hit-testing at the
-commit, and is `visibility: hidden` once its slide ends. The second exception is the combat stage
-hold: while a round whose publication already committed another mode still plays, as "Combat beats are
-choreographed on the stage at the motion level" defines, the decorative combat veil and the foe line-up
-MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, and the
-scene backdrop SHALL keep presenting the combat stage (its combat gradient and, where a bundled sample
-wash accompanies a degraded scene, the combat sample), until the round ends; every other surface
-follows the committed mode at the commit. Dialogue's `vitals` and `map` anchors MAY retain exit paint
-over the existing reveal duration while inert, outside the accessibility tree and pointer hit-testing
-from commit, and SHALL settle at `display:none`. Mount, reconnect, motion-off, and browsers without
-discrete display transitions SHALL hide them immediately. The matrix SHALL be:
+#### Scenario: The top band carries only the navigation chrome
+- **WHEN** the shell renders with the possession banner present, a character switcher, a connection state, a committed location label, and world time
+- **THEN** the top band is 48px tall at every supported viewport and carries only the brand, the top navigation bar, the possession banner when present, the character switcher, and the connection state, and it carries no location label and no time label
 
+#### Scenario: The vitals and map anchors stand at their stage gutters
+- **WHEN** the shell renders in exploration mode with every island present
+- **THEN** the `vitals` anchor is the stage's lower-left vitals dock that "The vitals dock stands at the stage's lower-left above the band" defines — bottom-anchored on the band's upper edge in the left gutter, at the left column's fixed width that does not depend on the content it holds — and the `map` anchor sits at the stage box's top-right corner below the top band, its content column (the place card, then the minimap island, then the objective line, then any other island this capability places there) right-aligned to the stage's right gutter and bounded above the bottom band
+
+#### Scenario: The band's height comes from one shared token
+- **WHEN** the shell renders at 1451x790 and at 2560x1440
+- **THEN** the bottom band spans the full stage width along the stage's bottom edge at one fixed height, `clamp(190px, 27.85vh, 400px)` with its two px bounds multiplied once by the desktop chrome factor (220px at the 1451x790 reference viewport, 401px at 2560x1440), taken from a single shared band-height token, and the band carries the reference's band chrome (the upward gradient, the hairline top border, and the upward shadow) on the band itself, not on the content inside it
+
+#### Scenario: Nothing grows or shrinks the band
+- **WHEN** frames, panes, line counts, dialogue exchanges, and mode changes come and go
+- **THEN** the band's height depends on none of its content, the dock frame, the committed mode, or any measurement, and none of them grows or shrinks it
+
+#### Scenario: The band splits message and command regions per mode
+- **WHEN** the shell renders in exploration mode, in creation mode, and in dialogue mode
+- **THEN** the band is divided into the message region `band-message`, covering the left two thirds of the band's width, and the command region `band-command`, covering the remaining right third; in creation mode, where the message region is hidden, the command region spans the whole band, and in dialogue mode, where the command region is collapsed, the message region spans the whole band
+
+#### Scenario: Every surface avoids the band through the band-height token
+- **WHEN** the shell renders in exploration mode at the 1451x790 reference viewport
+- **THEN** the stage box — the region between the top band's lower edge and the bottom band's upper edge, where the scene is seen — is at least 65% of the viewport's height (at least 513.5px of 790; the 48px top band and the 220px bottom band leave 522px), and every surface other than the band is positioned relative to the band-height token so that none of them overlaps the band
+
+#### Scenario: The portrait anchors stand on the band and clear the island columns
+- **WHEN** the shell renders with the vitals stack on the left and the place card and minimap card on the right
+- **THEN** each portrait anchor is bottom-aligned to the band's upper edge, `min(62vh, 680px)` tall but never taller than the stage box, inset at least 6% of the stage width from its own side, and never covering the band; where 6% would place the figure's face (the anchor's horizontal centre) under the island column on its side, the inset grows just enough to clear that column; at the 1451x790 reference viewport both insets take their column-clearance value, and only that value acts as a floor where no column reaches the portrait's face height
+
+#### Scenario: The actor-left anchor carries the controlled figure and the party line
+- **WHEN** the shell renders in exploration, dialogue, and combat mode
+- **THEN** the `actor-left` anchor carries the controlled character's stage actor — the current roster character's portrait, or the possessed companion's while the possession banner is available — with the committed party's companion stage actors lined up behind it as "Companion standing portraits line up behind the controlled character in the actor-left anchor" defines, each with the truthful placeholder when no image exists
+
+#### Scenario: The actor-right anchor's content follows the committed mode
+- **WHEN** the committed mode is `dialogue` with an available `dialogue` panel whose host identity does not already join to a committed party or controlled lineup figure, and later `combat` with at least one foe active or while a round that ended the fight still plays as "Combat beats are choreographed on the stage at the motion level" defines, and later any other state
+- **THEN** the `actor-right` anchor carries the dialogue host's stage actor in the first state, the foe line-up that "Foes stand opposite the player during combat" defines in the second, and no content in every other state; the foe line-up MAY extend leftward beyond the anchor's own box, within the bounds that requirement sets, and SHALL NOT cross the stage's horizontal centre, which the companion line-up's figures also never cross; every stage actor follows "Stage actors present the player and the dialogue host with a speaking state"
+
+#### Scenario: The portrait anchors are non-interactive art
+- **WHEN** any stage actor renders
+- **THEN** the portrait anchors carry no focusable element and intercept no pointer events, and they MAY sit behind the HUD islands, the `choices` anchor, and the command-line row
+
+#### Scenario: The choices anchor is bounded by the stage box
+- **WHEN** dialogue mode renders the choice content, taller than the available span allows
+- **THEN** the `choices` anchor renders only in dialogue mode, horizontally centred on the stage box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, its content vertically centred in and bounded by the part of the stage box between the top band and the scene caption row that stands on the command-line row so it never meets the scene caption or the expanded command line, scrolling internally when its content is taller than that span allows, and it never grows into the top band, the command-line row, or the bottom band
+
+#### Scenario: Interactive anchors never overlap at or above the reference viewport
+- **WHEN** the shell renders at 1451x790, and at every larger viewport up to the chrome factor's cap
+- **THEN** no interactive stage anchor (`vitals`, `map`, `band-message`, `band-command`, `choices`, `command-line`) overlaps another interactive anchor's content, and the top band's own elements neither overlap one another nor extend into the HUD island anchor region: a band element whose content is variable-width is bounded and truncated rather than sized by its content
+
+#### Scenario: Only transient popovers may enter the band region
+- **WHEN** a transient popover is opened from a top-band element, and when a surface that permanently occupies vertical space is proposed for the band
+- **THEN** the transient popover MAY overlay the island anchors while open, provided it does not change the band's own rendered box and closes on Escape and on outside activation, and a surface that permanently occupies vertical space is not introduced into the band this way
+
+### Requirement: Surface visibility is gated by the committed game mode
+The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves the accessibility tree and the tab order, excepting only the two hold states defined in the scenarios below. The matrix SHALL be:
+
+```text
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | place card (location, world time; `map` anchor, above the minimap) | visible | visible | **hidden** | hidden |
@@ -182,32 +153,7 @@ discrete display transitions SHALL hide them immediately. The matrix SHALL be:
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
 | command line (row on the message region's top edge) | while expanded | while expanded | while expanded | hidden |
 | scene backdrop | visible (exploration stage; the combat stage while a round that ended the fight still plays) | visible (combat stage) | visible (unchanged art) | visible |
-
-While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
-exploration art truthfully — the dialogue's focus is carried by the stage actors, the name plate, and
-the message window, and the choice list, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
-sets SHALL stay consistent with this matrix. A cell that names a data rule instead of `visible` means
-the surface is shown in that mode only while its own requirement's rule holds for the committed state,
-and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement
-says so). The command line's `while expanded` cell is such a rule: its own requirement defines when the
-row is expanded, and a collapsed row is hidden with `display:none` exactly like a mode-hidden surface.
-The place card's visibility SHALL follow this matrix exactly: it is shown in exploration and combat,
-hidden in dialogue and creation; hiding the `map` anchor in dialogue hides the place card with the
-minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change.
-The vitals dock SHALL be hidden in dialogue mode through the mode gate regardless of its data rule:
-a committed revision while dialogue holds — a vital dropping below its maximum, a new condition —
-SHALL NOT reveal the dock, and the dock's reveal transition SHALL NOT play until the mode leaves
-dialogue. The dialogue's attention surface is the message window and the name plate; the dock returns
-through its normal reveal when the mode commits back to exploration or combat. The low-HP stage
-vignette is not mode-gated and keeps rendering in dialogue, so a critical HP state is still conveyed
-through the stage frame.
-Each playing mode has one focus home: the action dock in exploration, combat, and creation mode, and
-the message window's focus target in dialogue mode, as "The command region collapses in dialogue mode
-and the message window spans the band" defines. When a mode change, a committed revision that turns a
-surface's data rule false, or a collapse of the command line hides the surface that currently holds
-focus, the shell SHALL move focus to the focus home of the mode being entered or kept before the
-surface is removed, using the existing focus-restore path. A mode change into creation SHALL also
-collapse the command line, so leaving creation never reveals an expanded row.
+```
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
@@ -271,53 +217,80 @@ collapse the command line, so leaving creation never reveals an expanded row.
 - **WHEN** the command line is expanded with focus in its field and the committed mode changes to creation, and later back to exploration
 - **THEN** focus moves to the action dock before the row is hidden, and on the return to exploration the command line is collapsed
 
-### Requirement: The scene backdrop renders the art payload truthfully behind the stage
-The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with
-cover-style cropping when the scene status is `done`; the previously rendered image visibly dimmed and
-labelled `目前場景圖片生成中` when the scene is pending and a prior image exists; and the mode's
-gradient stage otherwise — for a missing, failed, or invalid asset, for a pending scene with no prior
-image, and when the `art` panel is unavailable. A bundled decorative sample MAY accompany this
-fallback only with a visible caption distinguishing it from an actual scene image, while retaining
-the authoritative missing/pending/unavailable label; the sample caption and that label SHALL share one
-status badge, so the stage shows at most one status badge at a time, and the badge SHALL NOT show a
-raw placeholder kind code or an error-styled (dashed seal-red) frame. Samples SHALL NOT enter the art catalog or
-change its status, and SHALL disappear when an actual or labelled prior scene renders.
-Decorative portrait samples SHALL likewise be labelled separately from the current subject;
-an available committed player-roster portrait takes precedence, and a load failure returns to
-an explicitly labelled sample instead of attributing that sample to the player.
-While the combat hold of "Surface visibility is gated by the committed game mode" is playing, the
-backdrop MAY keep presenting the combat gradient stage (and the combat sample wash where a degraded
-scene carries one), yet it SHALL NOT hold the pre-terminal scene's identity: a newer committed scene
-image, pending state, or truthful degradation follows the rules above beneath the held decoration at
-its commit, and the scene caption row names the newly committed scene, never the held combat one.
-The backdrop SHALL NOT present an invented image as authoritative and
-SHALL NOT present a stale image as current. The scene label, its alternative text, and any truthful
-placeholder label SHALL be rendered as text outside the bitmap, so no required information exists only
-inside an image. The gradient stage SHALL differ per mode (exploration, dialogue, combat) and SHALL
-carry an inset vignette. The backdrop's image SHALL be cover-cropped to the stage box (from the top
-band's lower edge to the bottom band's upper edge), so no part of the scene the crop keeps is hidden
-behind the bottom band.
+#### Scenario: The command region animates out in dialogue
+- **WHEN** the committed mode changes to `dialogue`
+- **THEN** the band's command region is the one exception to `display:none` hiding: it animates out as "The command region collapses in dialogue mode and the message window spans the band" defines — it leaves the accessibility tree, the tab order, and pointer hit-testing at the commit, and is `visibility: hidden` once its slide ends
 
-The backdrop's own floating caption elements (the status badge, the `目前場景圖片生成中`
-pending notice, the scene label and alternative-text captions, and the full-view control) SHALL be
-positioned so that none of them overlaps the bottom band, the action dock's, or the command line's
-rendered content, at 1451x790 and at every larger viewport up to the chrome cap — extending the sibling stage requirement's
-general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named
-stage anchors but are absolutely positioned within the same full-bleed stage.
-The scene caption row SHALL render only while an actual scene image is on the stage — a `done` scene
-image, or the dimmed prior image of a pending scene — and SHALL NOT render for a missing, failed,
-invalid, or unavailable scene, whose truthful label the status badge already states. Within the row the
-alternative text SHALL be omitted when it is identical to the scene label, and the full-view control
-SHALL be an icon button whose accessible name is `開啟場景全圖`.
-The scene label, the alternative text, the pending notice, and the full-view control SHALL render as
-one caption row on the stage box's lower edge, standing just above the command-line row docked on the
-band's top edge, and centred in the open stage between the `actor-left` and `actor-right` anchor boxes —
-or, while the foe line-up stands in combat, between the `actor-left` anchor box and the line-up's
-leftmost foe, until a leaving line-up has faded — so no portrait anchor (which paints above the
-backdrop), no foe, and no other HUD surface covers any part of it in any mode. The alternative text SHALL
-give way before the scene label when the row is too narrow for both. The row SHALL stay one line tall: a label or alternative text longer than the row SHALL end
-in an ellipsis on screen while its full text stays in the DOM, and the dialogue choice list SHALL stop
-above the row.
+#### Scenario: The combat stage hold is the second exception
+- **WHEN** a round whose publication already committed another mode still plays, as "Combat beats are choreographed on the stage at the motion level" defines
+- **THEN** the decorative combat veil and the foe line-up MAY remain on the stage, outside the accessibility tree, the tab order, and pointer hit-testing, and the scene backdrop SHALL keep presenting the combat stage (its combat gradient and, where a bundled sample wash accompanies a degraded scene, the combat sample) until the round ends, while every other surface follows the committed mode at the commit
+
+#### Scenario: Dialogue exits settle to display:none
+- **WHEN** the mode commits to `dialogue`, and separately when the client mounts, reconnects, runs at motion-off, or lacks discrete display transitions
+- **THEN** dialogue's `vitals` and `map` anchors MAY retain exit paint over the existing reveal duration while inert, outside the accessibility tree and pointer hit-testing from commit, and settle at `display:none`; in the mount, reconnect, motion-off, and no-discrete-transition cases they are hidden immediately
+
+#### Scenario: Dialogue focus is carried off the backdrop
+- **WHEN** the committed mode is `dialogue`
+- **THEN** the scene backdrop keeps rendering its committed exploration art truthfully — the dialogue's focus is carried by the stage actors, the name plate, and the message window, and the choice list, not by mutating the backdrop
+
+#### Scenario: Data-rule cells hide like mode-hidden surfaces
+- **WHEN** a matrix cell names a data rule instead of `visible`, such as the command line's `while expanded` cell
+- **THEN** the surface is shown in that mode only while its own requirement's rule holds for the committed state, and is otherwise hidden the same way (`display:none`, or not rendered at all where that requirement says so); the command line's own requirement defines when the row is expanded, and a collapsed row is hidden with `display:none` exactly like a mode-hidden surface
+
+#### Scenario: Per-surface requirements stay consistent with the matrix
+- **WHEN** a per-surface requirement names its own visible-mode set
+- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration and combat, hidden in dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
+
+#### Scenario: The mode gate outranks the dock's data rule
+- **WHEN** the committed mode is `dialogue` and a committed revision drops a vital below its maximum or adds a new condition
+- **THEN** the vitals dock stays hidden through the mode gate regardless of its data rule, its reveal transition does not play until the mode leaves dialogue — the dialogue's attention surface is the message window and the name plate, and the dock returns through its normal reveal when the mode commits back to exploration or combat — while the low-HP stage vignette, not mode-gated, keeps rendering in dialogue so a critical HP state is still conveyed through the stage frame
+
+#### Scenario: Every playing mode names one focus home
+- **WHEN** a mode change, a committed revision that turns a surface's data rule false, or a collapse of the command line hides the surface that currently holds focus
+- **THEN** the shell moves focus to the focus home of the mode being entered or kept before the surface is removed, using the existing focus-restore path — the action dock in exploration, combat, and creation mode, and the message window's focus target in dialogue mode, as "The command region collapses in dialogue mode and the message window spans the band" defines — and a mode change into creation also collapses the command line, so leaving creation never reveals an expanded row
+
+#### Scenario: The visibility matrix carries its amendments
+- **WHEN** the `place-card-relocation` (place card in the `map` anchor), `vitals-bar-redesign` (the vitals dock at the lower left), and `companion-portrait-lineup` (the party quickbar row removed, the portrait row naming the companion line) amendments apply to this requirement
+- **THEN** dialogue mode hides the cockpit and navigation surfaces: the place card, the minimap island, and the vitals dock are hidden while the committed mode is `dialogue`
+
+### Requirement: The scene backdrop renders the art payload truthfully behind the stage
+The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with cover-style cropping when the scene status is `done`; the previously rendered image visibly dimmed and labelled `目前場景圖片生成中` when the scene is pending and a prior image exists; and the mode's gradient stage otherwise — for a missing, failed, or invalid asset, a pending scene with no prior image, or an unavailable `art` panel.
+
+#### Scenario: The backdrop never lies about the scene
+- **WHEN** any scene renders on the backdrop
+- **THEN** the backdrop presents no invented image as authoritative and no stale image as current
+
+#### Scenario: A bundled sample is captioned inside one status badge
+- **WHEN** a bundled decorative sample accompanies a missing, pending, or unavailable fallback
+- **THEN** it appears only with a visible caption distinguishing it from an actual scene image, while retaining the authoritative missing/pending/unavailable label; the sample caption and that label share one status badge, so the stage shows at most one status badge at a time, and the badge shows no raw placeholder kind code and no error-styled (dashed seal-red) frame; samples never enter the art catalog or change its status, and disappear when an actual or labelled prior scene renders
+
+#### Scenario: Portrait samples stay labelled and subordinate
+- **WHEN** a decorative portrait sample renders, an available committed player-roster portrait exists, or a portrait image fails to load
+- **THEN** the sample is labelled separately from the current subject, the available committed player-roster portrait takes precedence, and a load failure returns to an explicitly labelled sample instead of attributing that sample to the player
+
+#### Scenario: The combat hold never holds scene identity
+- **WHEN** the combat hold of "Surface visibility is gated by the committed game mode" is playing
+- **THEN** the backdrop MAY keep presenting the combat gradient stage (and the combat sample wash where a degraded scene carries one), yet it does not hold the pre-terminal scene's identity: a newer committed scene image, pending state, or truthful degradation follows the rules above beneath the held decoration at its commit, and the scene caption row names the newly committed scene, never the held combat one
+
+#### Scenario: All required labels exist as text outside the bitmap
+- **WHEN** any scene renders
+- **THEN** the scene label, its alternative text, and any truthful placeholder label are rendered as text outside the bitmap, so no required information exists only inside an image; the gradient stage differs per mode (exploration, dialogue, combat) and carries an inset vignette
+
+#### Scenario: Backdrop captions never meet the band or dock
+- **WHEN** the backdrop's own floating caption elements — the status badge, the `目前場景圖片生成中` pending notice, the scene label and alternative-text captions, and the full-view control — render at 1451x790 and at every larger viewport up to the chrome cap
+- **THEN** none of them overlaps the bottom band's, the action dock's, or the command line's rendered content, extending the sibling stage requirement's general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named stage anchors but are absolutely positioned within the same full-bleed stage
+
+#### Scenario: The caption row stands only for a real scene image
+- **WHEN** a `done` scene image or the dimmed prior image of a pending scene is on the stage, and when the scene is missing, failed, invalid, or unavailable
+- **THEN** the scene caption row renders only in the first case and not in the second, whose truthful label the status badge already states; within the row the alternative text is omitted when it is identical to the scene label, and the full-view control is an icon button whose accessible name is `開啟場景全圖`
+
+#### Scenario: The caption row sits centred on the stage's lower edge
+- **WHEN** the scene label, the alternative text, the pending notice, and the full-view control render, with or without the foe line-up standing in combat
+- **THEN** they render as one caption row on the stage box's lower edge, standing just above the command-line row docked on the band's top edge, centred in the open stage between the `actor-left` and `actor-right` anchor boxes — or, while the foe line-up stands in combat, between the `actor-left` anchor box and the line-up's leftmost foe, until a leaving line-up has faded — so no portrait anchor (which paints above the backdrop), no foe, and no other HUD surface covers any part of it in any mode
+
+#### Scenario: The caption row stays one line tall
+- **WHEN** the row is too narrow for both the alternative text and the label, or a label or alternative text is longer than the row
+- **THEN** the alternative text gives way before the scene label, the long text ends in an ellipsis on screen while its full text stays in the DOM, the row stays one line tall, and the dialogue choice list stops above the row
 
 #### Scenario: A done scene paints the stage
 - **WHEN** the committed art panel carries a `done` scene with a same-origin URL
@@ -375,51 +348,51 @@ above the row.
   centred between them (±1.5px), with no foe painted over any of its parts
 
 ### Requirement: The message window presents the current response one page at a time in the band's message region
-The narrative SHALL render as a message window that fills the bottom band's message region — the left
-two thirds of the band, or the whole band in dialogue mode, at the band's fixed height — drawn with the
-reference's caption panel
-treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The window
-SHALL never grow into the stage and SHALL never change size with its content. In every mode, dialogue
-included, the window SHALL present exactly one page of the current response at a time, paged as
-`webclient-input-narrative` defines and revealed as its typing requirement defines — or, while the
-current response carries a combat round the client presents, as that round's beat pages followed by the
-response's remaining lines, as `webclient-combat-menu` "A combat round plays beat by beat" defines — and
-SHALL NOT present earlier responses: they remain readable in the full-log surface. The one exception is the clear
-transition: when a new response replaces the previous one, the previous page MAY remain only as an
-opaque layer over the new page that fades out within the clear duration of the client's motion level
-(at most 150ms, and none at `off`), carries no focusable element, and is outside the accessibility
-tree and pointer hit-testing from the moment the new response starts. Page text SHALL be set in the bundled
-monospace reading face — the same Jim Mono TC family the monospace type role ships — at
-18px at the 1451x790 reference size and the default prose scale, SHALL scale once with the
-desktop chrome factor and with the client's prose scale, and SHALL hold at most 42 CJK characters
-per line in every mode, including the whole-band width of dialogue mode.
+The narrative SHALL render as a message window filling the bottom band's message region — the left two thirds of the band, or the whole band in dialogue mode, at the band's fixed height — drawn with the reference's caption panel treatment. The window SHALL never grow into the stage or change size with its content, SHALL present exactly one page of the current response at a time in every mode, and SHALL NOT present earlier responses.
 
-The window's lower edge SHALL keep a control strip in which no page text renders. The strip SHALL
-hold a page marker and, at its right end, a labelled `日誌` control beside the command-line toggle.
-The page marker SHALL render only while the page on screen is fully shown, and SHALL be absent while
-the page is typing and while a combat round plays by itself. When rendered, it SHALL read `▼` while the current response has further pages and
-`■` on its last page. It SHALL be decorative (hidden from assistive technology), and it SHALL blink
-only through the client's motion tokens, so reduced motion stops the blink. An oversize page SHALL
-scroll inside the window's text area; it SHALL never be truncated and SHALL never grow the window.
+#### Scenario: The window wears the reference caption panel chrome
+- **WHEN** the message window renders
+- **THEN** it is drawn with the reference's caption panel treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow
 
-The `日誌` control SHALL open the full-log surface in one action. Scrolling up over a page that has
-nothing left to scroll up SHALL also open it. The full-log surface's content, markup renderer, focus
-trap, Escape close, focus restore to the opening control, and opening at its latest line are
-unchanged. The window SHALL render no unread indicator and no jump-to-latest control, and no head row
-other than the dialogue name plate. In creation mode the window, its marker, and the `日誌` control are
-hidden with the message region.
+#### Scenario: Paging follows the narrative and combat contracts
+- **WHEN** the window presents the current response, including while that response carries a combat round the client presents
+- **THEN** pages follow `webclient-input-narrative` and are revealed as its typing requirement defines — or, for a presented combat round, as that round's beat pages followed by the response's remaining lines, as `webclient-combat-menu` "A combat round plays beat by beat" defines — and earlier responses are not presented: they remain readable in the full-log surface
 
-While the committed mode is `dialogue` and the committed `dialogue` panel is available, the window SHALL
-carry a name plate above its text area, naming the host with the panel's `display_name` plus
-` ‧ 羈絆 <stage>` only when `bond_stage` is non-null; the window's text area below the plate SHALL
-present the current response's pages — the session line as the narrative delivered it, paged and typed
-like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten
-from the narrative lines. The window SHALL carry no choice, free-dialogue, or exit row: those are the
-dialogue choice list's. While mode is `dialogue` but the panel is unavailable (the transient window
-between a clear seam and its commit), the window SHALL render no name plate. The window SHALL make known
-to the shell, from its own reader state and never from narrative prose, whether the current response's
-last page is on screen, fully shown, with no pending action mark — the moment the dialogue choice list
-waits for.
+#### Scenario: The clear layer is the one paging exception
+- **WHEN** a new response replaces the previous one
+- **THEN** the previous page MAY remain only as an opaque layer over the new page that fades out within the clear duration of the client's motion level (at most 150ms, and none at `off`), carries no focusable element, and is outside the accessibility tree and pointer hit-testing from the moment the new response starts
+
+#### Scenario: Page typography is bounded at the reference size
+- **WHEN** page text renders at the 1451x790 reference size and the default prose scale
+- **THEN** it is set in the bundled monospace reading face — the same Jim Mono TC family the monospace type role ships — at 18px, scales once with the desktop chrome factor and with the client's prose scale, and holds at most 42 CJK characters per line in every mode, including the whole-band width of dialogue mode
+
+#### Scenario: The control strip carries the marker and the log control
+- **WHEN** any page renders
+- **THEN** the window's lower edge keeps a control strip in which no page text renders, holding a page marker and, at its right end, a labelled `日誌` control beside the command-line toggle
+
+#### Scenario: The marker names the page state decoratively
+- **WHEN** the on-screen page is fully shown, typing, or a combat round plays by itself
+- **THEN** the marker renders only while the page is fully shown and is absent while it types and while a combat round plays by itself; when rendered it reads `▼` while the current response has further pages and `■` on its last page; it is decorative (hidden from assistive technology) and blinks only through the client's motion tokens, so reduced motion stops the blink
+
+#### Scenario: An oversize page scrolls without growing the window
+- **WHEN** a page is taller than the window's text area
+- **THEN** it scrolls inside the text area; it is never truncated and never grows the window
+
+#### Scenario: The log control and scroll-up open the full log
+- **WHEN** the player activates the `日誌` control, or scrolls up over a page that has nothing left to scroll up
+- **THEN** the full-log surface opens in one action; its content, markup renderer, focus trap, Escape close, focus restore to the opening control, and opening at its latest line are unchanged
+
+#### Scenario: The window carries no reading chrome beyond the plate
+- **WHEN** the window renders in any mode
+- **THEN** it renders no unread indicator, no jump-to-latest control, and no head row other than the dialogue name plate; in creation mode the window, its marker, and the `日誌` control are hidden with the message region
+
+#### Scenario: The dialogue name plate names the host truthfully
+- **WHEN** the committed mode is `dialogue` and the committed `dialogue` panel is available
+- **THEN** the window carries a name plate above its text area, naming the host with the panel's `display_name` plus ` ‧ 羈絆 <stage>` only when `bond_stage` is non-null; below the plate the text area presents the current response's pages — the session line as the narrative delivered it, paged and typed like any response, with no separate reply box, no rows, no avatar, and no text removed or rewritten from the narrative lines; the window carries no choice, free-dialogue, or exit row: those are the dialogue choice list's
+
+#### Scenario: A transient panel shows no plate, and reader state drives the choice list
+- **WHEN** mode is `dialogue` but the panel is unavailable (the transient window between a clear seam and its commit)
+- **THEN** the window renders no name plate, and the window makes known to the shell, from its own reader state and never from narrative prose, whether the current response's last page is on screen, fully shown, with no pending action mark — the moment the dialogue choice list waits for
 
 #### Scenario: The window keeps the message region's box
 - **WHEN** the current response holds more text than one page and new lines keep arriving
@@ -489,21 +462,23 @@ the recessed state itself still applies.
 - **THEN** the stage stays recessed until the last open surface closes
 
 ### Requirement: The HUD island stack renders as bounded floating islands, not column cards
-This requirement carries the `place-card-relocation` and `vitals-bar-redesign` amendments; the party quickbar is removed with this change.
-The surfaces placed in the stage's island anchors SHALL render as floating HUD
-islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and
-the shared drop shadow, each island a separate box separated by the anchor's gap — never a single
-boxed column card and never an opaque `<aside>` stacked in a layout column. The `vitals` anchor, at the
-stage box's lower left, is the vitals dock that "The vitals dock stands at the stage's lower-left above the band"
-defines: it carries the condition icon row and the vitals bars as one dock, and SHALL carry
-neither a character head card nor a portrait catalog strip nor a party quickbar. The `map` anchor SHALL carry, in this order, the
-place card, the
-minimap island, the objective line, the combat participant frame while it is mounted, and the title
-ballot menu while it is mounted, each present only while its own requirement renders it; no reference
-panel and no portrait anchor content SHALL be placed in either island anchor. The stack's rendered height SHALL fit within its anchor at the 1451x790 reference viewport and at 2560x1440 with
-every island populated, so no required island depends on scrolling the anchor to be seen. Every
-island's chrome SHALL be expressed through the shared design tokens, so a token change or the
-reduced-motion block reaches all of them at once.
+The surfaces placed in the stage's island anchors SHALL render as floating HUD islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and the shared drop shadow, each island a separate box separated by the anchor's gap — never a single boxed column card and never an opaque `<aside>` stacked in a layout column. No reference panel and no portrait anchor content SHALL be placed in either island anchor.
+
+#### Scenario: The vitals anchor is one dock
+- **WHEN** the shell renders the stage box's lower left
+- **THEN** it is the vitals dock that "The vitals dock stands at the stage's lower-left above the band" defines: it carries the condition icon row and the vitals bars as one dock, and carries neither a character head card nor a portrait catalog strip nor a party quickbar
+
+#### Scenario: The map anchor stacks its islands in one order
+- **WHEN** the shell renders the `map` anchor
+- **THEN** it carries, in this order, the place card, the minimap island, the objective line, the combat participant frame while it is mounted, and the title ballot menu while it is mounted, each present only while its own requirement renders it
+
+#### Scenario: The populated stack never needs anchor scrolling
+- **WHEN** the shell renders at the 1451x790 reference viewport and at 2560x1440 with every island populated
+- **THEN** the stack's rendered height fits within its anchor, so no required island depends on scrolling the anchor to be seen
+
+#### Scenario: One token change reaches every island
+- **WHEN** a design token changes or the reduced-motion block applies
+- **THEN** every island's chrome, expressed through the shared design tokens, is reached at once
 
 #### Scenario: The left anchor renders separate islands
 - **WHEN** the shell renders in exploration mode with a vital below its maximum, a committed `harmful` condition, and a non-empty party
@@ -521,12 +496,44 @@ reduced-motion block reaches all of them at once.
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel, a non-empty `objectives` panel, and title-ballot candidates, and later in combat mode
 - **THEN** exploration renders the place card, the minimap island, the objective line, and the title ballot menu in that order in the `map` anchor, and combat renders the place card above the participant frame there with no minimap and no objective line
 
+#### Scenario: The island stack carries its amendments
+- **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
+- **THEN** the party quickbar is removed with this change
+
 ### Requirement: The vitals island is shown only in combat or while a vital or a condition needs attention
-Subject to the existing committed-mode visibility matrix and status availability gate, the HUD SHALL show the vitals dock, comprising the condition icon row and vitals bars, only while at least one of these holds for the committed state: the committed mode is `combat`; the derived low-HP presentation state is true; any `status.resources` vital (hp, mp, sp) carries a numeric `current` below its numeric `maximum`; or `status.conditions` carries an entry whose `severity` is `warning`, `harmful`, or `critical` and whose `provenance.kind` is `non_equipment`, `mixed`, or `unknown`. A proven equipment-only condition SHALL NOT independently reveal the dock, regardless of adverse severity. A beneficial or informational condition, including a passive skill-owned combat modifier, SHALL NOT independently reveal it. An entry with a missing or unknown severity SHALL NOT independently reveal it. Missing or malformed required provenance SHALL be rejected under the status protocol contract rather than interpreted as an equipment exemption.
+The HUD SHALL show the vitals dock, comprising the condition icon row and vitals bars, only while at least one of these holds for the committed state: the committed mode is `combat`; the derived low-HP presentation state is true; any `status.resources` vital (hp, mp, sp) carries a numeric `current` below its numeric `maximum`; or `status.conditions` carries an entry whose `severity` is `warning`, `harmful`, or `critical` and whose `provenance.kind` is `non_equipment`, `mixed`, or `unknown`.
 
-While the dock is visible its condition icons SHALL render every committed condition, regardless of severity or provenance. Otherwise the dock SHALL be hidden: from the moment the committed revision turns the rule false it SHALL leave the accessibility tree, the tab order, and pointer hit-testing, and once its exit transition has finished it SHALL be `display:none` and contribute no visible box. The dock SHALL enter and leave with the existing fade and 12px slide at the client's motion level; at `off` it SHALL show and hide in the same frame as the commit. The overall rule SHALL be derived client-side from the committed mode and status panel, including server-authored condition provenance; it SHALL NOT use narrative text, action-result predictions, local equipment inference, an extra server request, or a timer. A vital absent from the payload or carrying non-numeric fields SHALL NOT count as below its maximum.
+#### Scenario: Benign or unreadable entries never reveal the dock
+- **WHEN** a beneficial or informational condition (including a passive skill-owned combat modifier), or an entry with a missing or unknown severity, is committed at full vitals
+- **THEN** it does not independently reveal the dock, and missing or malformed required provenance is rejected under the status protocol contract rather than interpreted as an equipment exemption
 
-The existing visibility matrix SHALL keep the dock hidden in dialogue and creation, even with depleted resources or independently adverse conditions. An unavailable `status` panel SHALL render no dock, including in combat. Leaving dialogue SHALL reapply the data rule to then-committed state. While hidden, the dock SHALL keep its trailing-bar memory, so the first committed revision that lowers a vital from full shows the dock with the trailing bar lagging from the previously committed ratio exactly as an always-visible dock would. When a committed revision turns the rule false while focus is inside the dock, focus SHALL move to the action dock before hiding through the existing focus-restore path; mode changes SHALL retain their existing mode-specific focus home.
+#### Scenario: An equipment-only condition never reveals the dock on its own
+- **WHEN** a proven equipment-only condition is committed at full vitals outside combat
+- **THEN** it does not independently reveal the dock, regardless of adverse severity
+
+#### Scenario: A visible dock renders every condition
+- **WHEN** the dock is visible
+- **THEN** its condition icons render every committed condition, regardless of severity or provenance
+
+#### Scenario: A false rule hides the dock completely
+- **WHEN** the committed revision turns the rule false
+- **THEN** from that moment the dock leaves the accessibility tree, the tab order, and pointer hit-testing, and once its exit transition has finished it is `display:none` and contributes no visible box; the dock enters and leaves with the existing fade and 12px slide at the client's motion level, and at `off` it shows and hides in the same frame as the commit
+
+#### Scenario: The rule is derived client-side from committed data only
+- **WHEN** the dock's visibility rule is evaluated
+- **THEN** it is derived client-side from the committed mode and status panel, including server-authored condition provenance, and never uses narrative text, action-result predictions, local equipment inference, an extra server request, or a timer; a vital absent from the payload or carrying non-numeric fields does not count as below its maximum
+
+#### Scenario: Mode gates and panel availability outrank the data rule
+- **WHEN** the mode is dialogue or creation with depleted resources or independently adverse conditions, the `status` panel is unavailable (including in combat), or the mode leaves dialogue
+- **THEN** the existing visibility matrix keeps the dock hidden in dialogue and creation, an unavailable `status` panel renders no dock, and leaving dialogue reapplies the data rule to the then-committed state
+
+#### Scenario: The hidden dock keeps trailing-bar memory
+- **WHEN** the dock has been hidden and the first committed revision lowers a vital from full
+- **THEN** the dock shows with the trailing bar lagging from the previously committed ratio exactly as an always-visible dock would
+
+#### Scenario: Hiding the dock rescues focus per its trigger
+- **WHEN** a committed revision turns the rule false while focus is inside the dock, or a mode change hides it
+- **THEN** focus moves to the action dock before hiding through the existing focus-restore path, and mode changes retain their existing mode-specific focus home
 
 #### Scenario: Full health outside combat hides the island
 - **WHEN** the committed mode is exploration, every committed vital's `current` equals its `maximum`, and `status.conditions` is empty
@@ -593,11 +600,27 @@ The existing visibility matrix SHALL keep the dock hidden in dialogue and creati
 - **THEN** no vitals dock, old condition icon, or fabricated resource is rendered, while other registered presentation remains usable
 
 ### Requirement: Vitals read as one numeral readout over three thin trailing-bar lines
-Each of hp, mp, and sp SHALL render as one thin trailing-bar line, the three laid almost edge to edge — parted by a hairline seam, in hp, mp, sp order from the top — under one numeral readout row that states, in the same order, each gauge's icon and its `current / maximum` numerals — or, for hp while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines. The icons SHALL be three distinct shapes in their gauge's hue, so the readings are told apart without colour; each gauge's Traditional Chinese label (生命, 魔力, 耐力) SHALL be its reading's accessible name and SHALL NOT be rendered as visible text. The 危險 low marker SHALL render with the hp reading. The current value SHALL lead in the brightest paper ink at tabular figures and the maximum SHALL recede a step, every value in a contrast that keeps it legible over the dock, so no vital state is conveyed by the coloured fill alone. The lines SHALL NOT read as square boxes: each SHALL taper to a point at its far end, and each line SHALL run a little shorter than the one above it, so the set fans out rather than ending on one hard edge. The readout and the three lines together SHALL occupy well under half the previous vitals island's row block. The sp fill SHALL carry a non-colour texture distinguishing it from the hp and mp fills.
+Each of hp, mp, and sp SHALL render as one thin trailing-bar line, the three laid almost edge to edge — parted by a hairline seam, in hp, mp, sp order from the top — under one numeral readout row that states, in the same order, each gauge's icon and its `current / maximum` numerals — or, for hp while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines.
 
-The trailing bar SHALL exist to make damage taken visible: it SHALL lag the fill when the ratio falls and SHALL be overtaken by the fill when the ratio rises. It SHALL be decorative — hidden from the accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already carry on the same revision. It SHALL NOT render any value that was not a previously displayed ratio of that same gauge, where a displayed ratio comes only from the committed `status` or from a committed beat's `hp_after` during a round's playback, SHALL NOT be interpolated or extrapolated from narrative text or an action result, and SHALL reset to the current ratio when the epoch changes, so no trail is drawn across a reconnect. Its motion SHALL be token-gated so the reduced-motion block disables it. At the `full` motion level the trailing bar SHALL start following a drop 300ms after the fill moves.
+#### Scenario: Icons, labels, and numerals carry the readings
+- **WHEN** the readout renders
+- **THEN** the icons are three distinct shapes in their gauge's hue, so the readings are told apart without colour; each gauge's Traditional Chinese label (生命, 魔力, 耐力) is its reading's accessible name and is not rendered as visible text; the 危險 low marker renders with the hp reading; the current value leads in the brightest paper ink at tabular figures and the maximum recedes a step, every value in a contrast that keeps it legible over the dock, so no vital state is conveyed by the coloured fill alone
 
-A vital at or below the client's display threshold SHALL be marked by both a recolour and an explicit text marker, never by the recolour alone.
+#### Scenario: The three lines fan out as one instrument
+- **WHEN** the three lines render
+- **THEN** they do not read as square boxes: each tapers to a point at its far end and runs a little shorter than the one above it, so the set fans out rather than ending on one hard edge; the readout and the three lines together occupy well under half the previous vitals island's row block; and the sp fill carries a non-colour texture distinguishing it from the hp and mp fills
+
+#### Scenario: The trailing bar is decorative and truthful
+- **WHEN** the trailing bar renders
+- **THEN** it is decorative — hidden from the accessibility tree, carrying no accessible name, and conveying nothing the numerals do not already carry on the same revision; it renders no value that was not a previously displayed ratio of that same gauge, where a displayed ratio comes only from the committed `status` or from a committed beat's `hp_after` during a round's playback; it is not interpolated or extrapolated from narrative text or an action result
+
+#### Scenario: The trailing bar's motion is token-gated
+- **WHEN** the epoch changes, the reduced-motion block applies, or the motion level is `full`
+- **THEN** the bar resets to the current ratio when the epoch changes, so no trail is drawn across a reconnect; its motion is token-gated so the reduced-motion block disables it; and at `full` it starts following a drop 300ms after the fill moves
+
+#### Scenario: A low vital is marked twice
+- **WHEN** a vital falls to or below the client's display threshold
+- **THEN** it is marked by both a recolour and an explicit text marker, never by the recolour alone
 
 #### Scenario: Each vital is legible without colour
 - **WHEN** the vitals dock renders with the `status` panel committed
@@ -632,17 +655,23 @@ A vital at or below the client's display threshold SHALL be marked by both a rec
 - **THEN** the three lines are parted by a 1px seam, each tapers to a point at its far end and runs shorter than the one above it, and the readout plus the three lines render in a height no greater than half of the previous island's three header-plus-track rows
 
 ### Requirement: The low-HP presentation state is derived client-side and drives the stage hook
-The client SHALL derive a low-HP presentation state from the committed `status.resources.hp` ratio
-alone, against a single display-only threshold, and SHALL expose it on the stage root through the
-shell's existing low-HP hook so the stage renders its red vignette and the hp fill renders its pulse.
+The client SHALL derive a low-HP presentation state from the committed `status.resources.hp` ratio alone, against a single display-only threshold, and SHALL expose it on the stage root through the shell's existing low-HP hook so the stage renders its red vignette and the hp fill renders its pulse.
 
-The threshold SHALL be a presentation constant: no server field, trait, or condition expresses "low
-health", and the client SHALL NOT request one, invent one on the wire, or treat the derived state as
-canonical. The state SHALL NOT be load-bearing — the numerals and the low text marker SHALL convey the
-same information at every value, so a viewer who perceives neither the vignette nor the pulse loses
-nothing. When the `status` panel is unavailable the state SHALL be false rather than true by default.
-The pulse and the vignette transition SHALL be token-gated so the reduced-motion block disables the
-motion while the marker and the numerals still apply.
+#### Scenario: No server field expresses low health
+- **WHEN** the client evaluates or exposes the low-HP state
+- **THEN** the threshold is a presentation constant: no server field, trait, or condition expresses "low health", and the client requests none, invents none on the wire, and never treats the derived state as canonical
+
+#### Scenario: The state is never load-bearing
+- **WHEN** any hp value renders
+- **THEN** the numerals and the low text marker convey the same information at every value, so a viewer who perceives neither the vignette nor the pulse loses nothing
+
+#### Scenario: An unavailable panel is not low HP by default
+- **WHEN** the `status` panel is unavailable
+- **THEN** the state is false rather than true by default
+
+#### Scenario: The stage hook's motion is token-gated
+- **WHEN** the reduced-motion block applies while the state is true
+- **THEN** the pulse and the vignette transition are token-gated so the block disables the motion while the marker and the numerals still apply
 
 #### Scenario: Crossing the threshold lights the stage
 - **WHEN** a committed revision takes the hp ratio to or below the display threshold
@@ -661,11 +690,31 @@ motion while the marker and the numerals still apply.
 - **THEN** the pulse animation is disabled while the low text marker, the numerals, and the recoloured row still render
 
 ### Requirement: Condition icons float without a window and disclose their detail in a tooltip
-The active conditions SHALL NOT render as a chipped island with a background window, header, or border. Each entry in `status.conditions` SHALL instead render as a standalone small icon in a row directly above the vitals readout, carrying only its per-severity shape glyph — the five severities each mapping to a distinct glyph so no two are separated by colour alone, with the beneficial and harmful directions readable from the glyph itself. The row SHALL carry no panel fill, no backdrop blur, and no `狀態` label.
+The active conditions SHALL NOT render as a chipped island with a background window, header, or border. Each entry in `status.conditions` SHALL instead render as a standalone small icon in a row directly above the vitals readout, carrying only its per-severity shape glyph. The row SHALL carry no panel fill, no backdrop blur, and no `狀態` label.
 
-The condition's readable name — its label, or its code only when no label is supplied — its remaining duration, and every derived modifier SHALL NOT be shown on the icon; they SHALL appear in a tooltip opened when the icon is hovered or when keyboard focus reaches it, and closed on pointer leave, blur, or Escape. The tooltip SHALL state the full label, the duration when the payload supplies one, and every derived modifier the payload provides, each modifier named in the game's stat vocabulary (for example 攻擊, 敏捷, 防禦, 準度, 每回合行動, 魔力消耗) rather than by its raw adjustment key, with its value verbatim — no sign, unit or digit added or dropped — and a key outside that vocabulary SHALL be named by the neutral 其他修正 and keep its value. The icon SHALL also carry this content as its accessible name, so the information is reachable by assistive technology without the pointer. The duration the tooltip states is the payload's `remaining_seconds` value as committed; the client SHALL run no countdown and SHALL NOT re-render the tooltip between commits.
+#### Scenario: Severity glyphs carry direction without colour
+- **WHEN** condition icons render
+- **THEN** the five severities each map to a distinct glyph so no two are separated by colour alone, with the beneficial and harmful directions readable from the glyph itself
 
-Icons SHALL be bounded to the row's width, and the remainder SHALL stay reachable in one action through a trailing `+N` icon stating how many are hidden, which discloses the hidden conditions as the same tooltip content for each. An empty condition list SHALL render no icon row at all — no placeholder, no `無條件` text — consistent with the contextual-hiding rule that an absent surface is not a dimmed or emptied surface.
+#### Scenario: Detail lives in the tooltip, not the icon
+- **WHEN** an icon is hovered or keyboard focus reaches it, and when the pointer leaves, focus blurs, or Escape is pressed
+- **THEN** the condition's readable name — its label, or its code only when no label is supplied — its remaining duration, and every derived modifier are not shown on the icon but appear in a tooltip opened by hover or focus and closed on pointer leave, blur, or Escape
+
+#### Scenario: The tooltip names modifiers in the stat vocabulary
+- **WHEN** the tooltip states a condition's content
+- **THEN** it states the full label, the duration when the payload supplies one, and every derived modifier the payload provides, each modifier named in the game's stat vocabulary (for example 攻擊, 敏捷, 防禦, 準度, 每回合行動, 魔力消耗) rather than by its raw adjustment key, with its value verbatim — no sign, unit or digit added or dropped — and a key outside that vocabulary is named by the neutral 其他修正 and keeps its value
+
+#### Scenario: Assistive technology reads the icon itself
+- **WHEN** a condition icon renders with no pointer available
+- **THEN** the icon carries the tooltip's content as its accessible name, so the information is reachable by assistive technology without the pointer
+
+#### Scenario: The tooltip never counts down
+- **WHEN** a tooltip states a duration
+- **THEN** it states the payload's `remaining_seconds` value as committed; the client runs no countdown and does not re-render the tooltip between commits
+
+#### Scenario: Overflow and emptiness stay honest
+- **WHEN** more conditions are committed than the row's width fits, and when the condition list is empty
+- **THEN** icons are bounded to the row's width and the remainder stays reachable in one action through a trailing `+N` icon stating how many are hidden, which discloses the hidden conditions as the same tooltip content for each; an empty list renders no icon row at all — no placeholder, no `無條件` text — consistent with the contextual-hiding rule that an absent surface is not a dimmed or emptied surface
 
 #### Scenario: A chip carries its label, duration, and modifiers
 - **WHEN** a beneficial and a harmful condition are committed
@@ -708,71 +757,63 @@ Icons SHALL be bounded to the row's width, and the remainder SHALL stay reachabl
 - **THEN** the tooltip names the known key in the stat vocabulary, names the unknown key 其他修正, and keeps both original values verbatim with their signs and units
 
 ### Requirement: The minimap island states only its own drawing convention
-The minimap SHALL render as a bounded HUD island in the stage's `map` anchor, directly
-below the place card and above the objective line, carrying the committed `local_map` payload's title. The island SHALL share the anchor's content-column width with the place card above it, so the two read as one column. Where the resolved layout variant is the
-coordinate lattice — which exactly the coordinate-bearing layers (`grid`, `wilderness`) select — the
-island SHALL state the renderer's own axis convention as orientation marks in its header following the
-redesign draft's header treatment (the letterspaced title style and the `北↑ 東→` marks the draft's
-lattice header draws); on the radial graph variant it SHALL omit those marks rather than assert an axis
-the presentation does not draw (a radial graph draws no axis). Those marks and the axis cross the
-lattice draws are ONE claim stated twice — once in words, once as geometry — so the two SHALL travel
-together: a map surface SHALL draw the axis cross only where that same surface states the axis
-convention in words, and the island's marks are what license the axis its lattice draws. The island
-SHALL therefore draw the axis cross through the `current` node on the coordinate lattice and SHALL draw
-none on the radial graph, and a surface that states no orientation marks — the full-map surface as it
-stands — SHALL draw no axis at all. The lattice's coordinate dot field and its knowledge-edge vignette
-are decoration that states nothing in words and SHALL NOT be read as a position, a bearing, a distance,
-or a terrain claim: the dot field pictures the coordinate cell step the lattice already claims, and the
-vignette pictures the limit of what the payload knows. On a coordinate-bearing layer the island SHALL additionally state the
-`current` node's own coordinates as a two-integer figure — the payload `x` and `y` exactly as
-committed, with no unit, delta, or derived quantity — as the entire content of its readout line, so
-the island's position statement is the drawing convention plus the current cell's world coordinates
-and nothing else. The readout SHALL NOT restate the current node's place name, its visibility state,
-or a movement destination: the place name belongs to the stage's place card, which stands directly
-above this island in the same column, and a
-minimap shows the current position by definition. The readout SHALL NOT be driven by hover or by
-selection, and the island SHALL keep no hovered-node or selected-node state; a node's own name stays
-available as its on-canvas accessible name and, for a remembered node, as visible text on the surface
-its layout variant presents it on — the name drawn beside the island's edge direction marker on the
-coordinate lattice, and its entry in the full-map surface's remembered list on the radial graph, where
-the island draws no visible remembered-node list at all — with the untruncated name always available
-to assistive technology on the island, so no remembered place is readable by sight alone. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
-angle, a distance, or any other coordinate figure: coordinate readouts for non-current nodes,
-differences between node coordinates, and every spatial figure on the graph variant remain forbidden,
-because on coordinate-bearing layers node coordinates are validated world coordinates whose only
-permitted visual uses are relative-direction geometry and the current-node figure, and on every other
-layer they are renderer-local layout values that carry no spatial meaning at all. The one direction
-statement the island MAY make in words is the octant name an edge direction marker already draws — one
-of `北`, `東北`, `東`, `東南`, `南`, `西南`, `西`, `西北` — and only on the island's assistive-technology
-text alternative for those markers, where it names the bearing the drawing already asserts to a reader
-who cannot see it; a numeric angle, a degree figure, and a distance remain forbidden everywhere.
+The minimap SHALL render as a bounded HUD island in the `map` anchor, below the place card and above the objective line, carrying the committed `local_map` payload's title, sharing the anchor's content-column width with the place card so the two read as one column. On the coordinate lattice — selected exactly by the coordinate-bearing layers (`grid`, `wilderness`) — it SHALL state the renderer's axis convention as orientation marks in its header; on the radial graph variant it SHALL omit them.
 
-The island SHALL NOT present any map layout control — no segmented switch, button, menu item, or other
-affordance selecting between the coordinate lattice and the radial graph — on the island or on the
-full-map surface: the layout is resolved once from the committed payload's `layer` in the render model
-and both surfaces consume that one value, so there is nothing for a control to change. No layout choice
-SHALL be persisted in a client-local preference or any storage, and nothing about layout selection SHALL
-travel to the server, because no selection exists to persist.
+#### Scenario: Omitted marks never assert an undrawn axis
+- **WHEN** the resolved layout variant is the radial graph
+- **THEN** the island omits the orientation marks rather than assert an axis the presentation does not draw (a radial graph draws no axis)
 
-The island SHALL present no control for a surface the application does not mount: a full-map
-affordance SHALL exist only once the full-map surface it opens is reachable. The island SHALL present
-exactly ONE full-map affordance, and it SHALL carry no visible button chrome — no labelled control,
-icon button, or other visible trigger occupies the island's header or any other part of the island,
-because the island itself is the affordance. That affordance SHALL be a real `<button>` element
-spanning the island's whole box, transparent and layered beneath the island's visual content so the
-button element contains no focusable descendant, carrying 展開全地圖 as its accessible name and opening
-the full-map surface through the platform's own Enter/Space button behaviour rather than a key handler
-on a non-button element. Its focus-visible indication SHALL delineate the whole island rather than a
-small region of it. Clicking anywhere on the island's non-interactive body SHALL still open the
-full-map surface as a pointer convenience, provided the click did not originate in an interactive
-descendant, and every activation path SHALL open the surface exactly once. The island root SHALL NOT
-gain a button role or tab-stop of its own — the full-bleed button, not the root, is the keyboard path
-— and `role="button"` on the island root is forbidden outright: a `role="button"` element must contain
-no focusable descendant and must not flatten a composite surface into one accessible name, and the
-island is a composite surface whose content the root would swallow. The full-bleed button SHALL remain
-the island's only tab stop whatever its content becomes: a remembered place's presentation SHALL NOT
-be a tab stop, on either layout variant, and SHALL be readable without being focusable. The minimap's
-existing per-node movement submission SHALL be unchanged.
+#### Scenario: The worded marks and the drawn axis travel together
+- **WHEN** the island draws its lattice
+- **THEN** those marks and the axis cross the lattice draws are ONE claim stated twice — once in words, once as geometry — so the two travel together: a map surface draws the axis cross only where that same surface states the axis convention in words, and the island's marks are what license the axis its lattice draws; the island therefore draws the axis cross through the `current` node on the coordinate lattice and draws none on the radial graph, and a surface that states no orientation marks — the full-map surface as it stands — draws no axis at all
+
+#### Scenario: The header follows the redesign draft's treatment
+- **WHEN** the island renders on the coordinate lattice
+- **THEN** it states the orientation marks following the redesign draft's header treatment — the letterspaced title style and the `北↑ 東→` marks the draft's lattice header draws
+
+#### Scenario: Decoration states nothing in words
+- **WHEN** the lattice draws its coordinate dot field and its knowledge-edge vignette
+- **THEN** they are decoration that states nothing in words and are not read as a position, a bearing, a distance, or a terrain claim: the dot field pictures the coordinate cell step the lattice already claims, and the vignette pictures the limit of what the payload knows
+
+#### Scenario: The readout states the current cell's world coordinates alone
+- **WHEN** the island renders on a coordinate-bearing layer
+- **THEN** it states the `current` node's own coordinates as a two-integer figure — the payload `x` and `y` exactly as committed, with no unit, delta, or derived quantity — as the entire content of its readout line, so the island's position statement is the drawing convention plus the current cell's world coordinates and nothing else
+
+#### Scenario: The readout never restates what other surfaces own
+- **WHEN** the readout line renders
+- **THEN** it does not restate the current node's place name, its visibility state, or a movement destination: the place name belongs to the stage's place card, which stands directly above this island in the same column, and a minimap shows the current position by definition
+
+#### Scenario: Node names stay available without island selection state
+- **WHEN** the player hovers or selects, or a remembered node renders
+- **THEN** the readout is not driven by hover or by selection and the island keeps no hovered-node or selected-node state; a node's own name stays available as its on-canvas accessible name and, for a remembered node, as visible text on the surface its layout variant presents it on — the name drawn beside the island's edge direction marker on the coordinate lattice, and its entry in the full-map surface's remembered list on the radial graph, where the island draws no visible remembered-node list at all — with the untruncated name always available to assistive technology on the island, so no remembered place is readable by sight alone
+
+#### Scenario: No spatial figure beyond the single coordinate pair
+- **WHEN** any layer renders on the island
+- **THEN** apart from that single figure the island renders no bearing angle, compass angle, distance, or other coordinate figure: coordinate readouts for non-current nodes, differences between node coordinates, and every spatial figure on the graph variant remain forbidden, because on coordinate-bearing layers node coordinates are validated world coordinates whose only permitted visual uses are relative-direction geometry and the current-node figure, and on every other layer they are renderer-local layout values that carry no spatial meaning at all
+
+#### Scenario: Octant words exist only in the markers' text alternative
+- **WHEN** the island exposes its edge direction markers to assistive technology
+- **THEN** the one direction statement the island MAY make in words is the octant name an edge direction marker already draws — one of `北`, `東北`, `東`, `東南`, `南`, `西南`, `西`, `西北` — and only on the island's assistive-technology text alternative for those markers, where it names the bearing the drawing already asserts to a reader who cannot see it; a numeric angle, a degree figure, and a distance remain forbidden everywhere
+
+#### Scenario: No layout control exists to persist
+- **WHEN** either layout variant renders on the island or the full-map surface
+- **THEN** neither presents any map layout control — no segmented switch, button, menu item, or other affordance selecting between the coordinate lattice and the radial graph — because the layout is resolved once from the committed payload's `layer` in the render model and both surfaces consume that one value, so there is nothing for a control to change; no layout choice is persisted in a client-local preference or any storage, and nothing about layout selection travels to the server, because no selection exists to persist
+
+#### Scenario: The single full-map affordance wears no chrome
+- **WHEN** the full-map surface the island opens is reachable
+- **THEN** the island presents no control for a surface the application does not mount — a full-map affordance exists only once that surface is reachable — and otherwise exactly ONE full-map affordance with no visible button chrome: no labelled control, icon button, or other visible trigger occupies the island's header or any other part of the island, because the island itself is the affordance
+
+#### Scenario: The affordance is a real full-bleed button
+- **WHEN** the full-map affordance renders
+- **THEN** it is a real `<button>` element spanning the island's whole box, transparent and layered beneath the island's visual content so the button element contains no focusable descendant, carrying 展開全地圖 as its accessible name and opening the full-map surface through the platform's own Enter/Space button behaviour rather than a key handler on a non-button element; its focus-visible indication delineates the whole island rather than a small region of it
+
+#### Scenario: Every activation path opens the map exactly once
+- **WHEN** the player clicks anywhere on the island's non-interactive body
+- **THEN** the full-map surface still opens as a pointer convenience, provided the click did not originate in an interactive descendant, and every activation path opens the surface exactly once
+
+#### Scenario: The island root never becomes a button
+- **WHEN** the island's content changes
+- **THEN** the island root gains no button role or tab-stop of its own — the full-bleed button, not the root, is the keyboard path — and `role="button"` on the island root is forbidden outright: a `role="button"` element must contain no focusable descendant and must not flatten a composite surface into one accessible name, and the island is a composite surface whose content the root would swallow; the full-bleed button remains the island's only tab stop whatever its content becomes — a remembered place's presentation is not a tab stop, on either layout variant, and is readable without being focusable — and the minimap's existing per-node movement submission is unchanged
 
 #### Scenario: The island states the axis convention on a coordinate-bearing layer
 - **WHEN** the committed payload's layer places nodes on coordinates and the resolved variant is the lattice
@@ -860,7 +901,19 @@ existing per-node movement submission SHALL be unchanged.
   anchor's gap, and the two islands' left and right edges coincide
 
 ### Requirement: The combat dock root renders as a vertical command window with a truthful skills count
-In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. It SHALL preserve the existing resolver item order, identities, availability and confirmation routes. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. Up/Down SHALL traverse and wrap in rendered order; Left/Right SHALL be no-ops at root. At deeper levels the root list SHALL be replaced by the current frame, with the existing breadcrumb/back path and only one active row container. No other mode SHALL render this combat root. Glyphs SHALL retain the existing concept mapping.
+In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. No other mode SHALL render this combat root.
+
+#### Scenario: The root preserves the resolver's contract
+- **WHEN** the combat root renders
+- **THEN** it preserves the existing resolver item order, identities, availability and confirmation routes, and glyphs retain the existing concept mapping
+
+#### Scenario: Deeper frames keep one active row container
+- **WHEN** the player opens a frame deeper than the combat root
+- **THEN** the root list is replaced by the current frame, the existing breadcrumb/back path remains, and only one active row container exists
+
+#### Scenario: Vertical arrows traverse and wrap; horizontal arrows rest
+- **WHEN** the player presses Up/Down at the combat root, and separately Left/Right
+- **THEN** Up/Down traverse and wrap in rendered order, and Left/Right are no-ops at root
 
 #### Scenario: The combat root renders as a vertical list and owns the listbox
 - **WHEN** the dock is at the combat root frame
@@ -891,38 +944,23 @@ In combat mode the root SHALL render one vertical icon-and-label command list wi
 - **THEN** one root row renders and still requires its existing explicit confirmation
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
-The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the
-scrolling region, in exploration and combat mode (never in creation mode, and never visibly in
-dialogue mode, where the strip is hidden with the collapsed command region), matching
-`docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text
-`數字鍵 1–9 ‧ ` followed by an `<kbd>` element naming `Enter`
-and the verb `執行`, the separator `‧`, and an `<kbd>` element naming `Esc` and the verb `返回`.
-The legend renders
-with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
-The legend SHALL render exactly once as visible content and SHALL be the only element carrying the
-legend's test hook; no root command list or pane SHALL carry a second copy. The dock SHALL NOT carry a dialogue-mode
-legend variant.
+The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the scrolling region, in exploration and combat mode (never in creation mode, and never visibly in dialogue mode, where the strip is hidden with the collapsed command region). The legend SHALL render exactly once as visible content and SHALL be the only element carrying the legend's test hook; no root command list or pane SHALL carry a second copy.
 
-The legend SHALL NOT name a key, gesture, or affordance this client does not implement or that no
-longer behaves as named, and it SHALL NOT advertise implemented affordances the reference's legend
-does not name. When a named affordance's behaviour changes (for example, a control that used to
-open a surface and now only moves focus into an always-present one), the legend's wording SHALL be
-updated in the same change that alters the behaviour.
+#### Scenario: The legend matches the reference dock hint
+- **WHEN** the legend strip renders
+- **THEN** it matches `docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: the text `數字鍵 1–9 ‧ ` followed by an `<kbd>` element naming `Enter` and the verb `執行`, the separator `‧`, and an `<kbd>` element naming `Esc` and the verb `返回`; the legend renders with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border); and the dock carries no dialogue-mode legend variant
 
-The digits the legend names SHALL be bound: while the dock owns keyboard focus (the key target is
-not editable), pressing
-`1`–`9` moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order —
-for the scene overview, its first nine chips in reading order: exits, then people, then objects, then
-the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the
-same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an
-in-flight entry stays locked, and a held repeat is suppressed.
-The slots address the frame's rendered entries, disabled ones included. In dialogue mode neither the
-dock's entries nor the keyboard router claim any digit: the digits `1`–`N` belong to the dialogue choice
-list while it holds focus, which handles them itself as "Dialogue choices appear centred over the stage
-after the line is fully read" defines.
-A digit whose entry does not exist (a frame with fewer rendered entries, dialogue mode, or
-the pre-session empty stack) is not claimed and falls
-through to the text / command-history path.
+#### Scenario: The legend never lies
+- **WHEN** a key, gesture, or affordance is named in the legend, or when a named affordance's behaviour changes
+- **THEN** the legend names no key, gesture, or affordance this client does not implement or that no longer behaves as named, and advertises no implemented affordance the reference's legend does not name; when a named affordance's behaviour changes (for example, a control that used to open a surface and now only moves focus into an always-present one), the legend's wording is updated in the same change that alters the behaviour
+
+#### Scenario: Digits pick and confirm the frame's first nine entries
+- **WHEN** the dock owns keyboard focus (the key target is not editable) and the player presses `1`–`9`
+- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order — for the scene overview, its first nine chips in reading order: exits, then people, then objects, then the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
+
+#### Scenario: Digits outside the dock's claim fall through
+- **WHEN** dialogue mode holds — or a digit's entry does not exist (a frame with fewer rendered entries, dialogue mode, or the pre-session empty stack)
+- **THEN** in dialogue mode neither the dock's entries nor the keyboard router claims any digit: the digits `1`–`N` belong to the dialogue choice list while it holds focus, which handles them itself as "Dialogue choices appear centred over the stage after the line is fully read" defines; and an unclaimed digit falls through to the text / command-history path
 
 #### Scenario: The legend renders once
 - **WHEN** the dock renders in exploration or combat mode, at the overview, in a child frame, or at the combat root, and later the mode changes to dialogue
@@ -956,27 +994,27 @@ through to the text / command-history path.
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 
-The dock SHALL render a breadcrumb line whenever the router's menu stack is deeper than its root
-frame, and SHALL hide it entirely at the root frame. The one exception is a target's verb popover
-(the scene overview's person-target frame): the popover's own heading already names the target, so
-while that frame is current the breadcrumb SHALL NOT render and the target SHALL be stated exactly
-once; the popover's `back` row, Escape, and a pointer press outside the popover card remain its back
-paths. Every other submenu keeps the breadcrumb. The breadcrumb SHALL name the parent frame and
-the current frame, with the current frame visually distinguished, and SHALL carry a back control.
-Activating the back control SHALL perform exactly the same operation the Escape key performs — it
-SHALL pop exactly one menu level and SHALL NOT dispatch any action.
+The dock SHALL render a breadcrumb line whenever the router's menu stack is deeper than its root frame, and SHALL hide it entirely at the root frame. The breadcrumb SHALL name the parent frame and the current frame, with the current frame visually distinguished, and SHALL carry a back control. Activating the back control SHALL perform exactly the same operation the Escape key performs — it SHALL pop exactly one menu level and SHALL NOT dispatch any action.
 
-The breadcrumb's contents and its visibility SHALL be derived from the keyboard router's own frame
-stack and depth, published through the committed view in the same pass as the frame's rows. The
-client SHALL NOT maintain a second navigation state — no local pane selection, no locally accumulated
-crumb stack — so the breadcrumb can never disagree with what Escape will do. A frame's breadcrumb
-label SHALL come from the frame itself; for a frame scoped to one target, that label SHALL be the
-target's server-authored display name. Every frame's `back` item SHALL render as a row of that frame, so
-a focused `back` item carries the same focused treatment as any other row (a background fill and
-border change together); the breadcrumb's back control SHALL carry no focus state of its own that
-mirrors the router's focus. Activating the back row with Enter or the pointer, or activating the
-breadcrumb's back control, SHALL pop exactly one level, restore the parent frame's previously
-focused entry, and dispatch no action.
+#### Scenario: The verb popover names its target once
+- **WHEN** a target's verb popover (the scene overview's person-target frame) is current
+- **THEN** the breadcrumb does not render and the target is stated exactly once, because the popover's own heading already names the target; the popover's `back` row, Escape, and a pointer press outside the popover card remain its back paths, and every other submenu keeps the breadcrumb
+
+#### Scenario: The breadcrumb cannot disagree with Escape
+- **WHEN** the breadcrumb's contents and visibility are computed
+- **THEN** they are derived from the keyboard router's own frame stack and depth, published through the committed view in the same pass as the frame's rows; the client maintains no second navigation state — no local pane selection, no locally accumulated crumb stack — so the breadcrumb can never disagree with what Escape will do
+
+#### Scenario: Frame labels come from the frames themselves
+- **WHEN** a frame's breadcrumb label is rendered, including a frame scoped to one target
+- **THEN** the label comes from the frame itself, and for a frame scoped to one target it is the target's server-authored display name
+
+#### Scenario: The `back` row owns the focus treatment
+- **WHEN** any frame renders and its `back` item takes focus
+- **THEN** every frame's `back` item renders as a row of that frame, so a focused `back` item carries the same focused treatment as any other row (a background fill and border change together), and the breadcrumb's back control carries no focus state of its own that mirrors the router's focus
+
+#### Scenario: Back activation pops exactly one level
+- **WHEN** the player activates the back row with Enter or the pointer, or activates the breadcrumb's back control
+- **THEN** exactly one level pops, the parent frame's previously focused entry is restored, and no action is dispatched
 
 #### Scenario: The breadcrumb appears only below the root
 - **WHEN** the dock is at its root frame
@@ -1006,45 +1044,51 @@ focused entry, and dispatch no action.
 
 ### Requirement: Dock panes render a per-kind vocabulary from backed fields only
 
-The dock's row region SHALL render the current frame in a form chosen for what that frame contains,
-using one shared row renderer for every form so the focused marker, the disabled marker and its
-`（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined
-in exactly one place. The forms SHALL be: exit, person, object, and footer chips for the scene
-overview; the verb popover's rows under a target head; the waiting cards; suggestion cards for the
-suggestions frame; and the combat forms specified elsewhere in this capability. No exploration frame
-SHALL render an exit-outlet grid or a navigation-row list: exits are chips of the scene overview, and
-a host's conversation topics are the dialogue surface's choices, never a dock frame.
+The dock's row region SHALL render the current frame in a form chosen for what that frame contains, using one shared row renderer for every form so the focused marker, the disabled marker and its `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined in exactly one place.
 
-An exit chip SHALL render the exit's direction as a leading glyph, and, while the chip is enabled, its
-primary text SHALL be the destination's display name — never a repetition of the direction word or the
-exit's own label once a glyph already carries that meaning. The glyph SHALL be resolved from a fixed
-client-side table of canonical direction words; an exit label outside that table SHALL render verbatim
-as the chip's primary text (there being no glyph to carry it) rather than being mapped to a guessed
-direction. The destination's display name SHALL be resolved by matching the exit's server-authored
-destination node against the committed local-map nodes; when that node is not present in the committed
-lattice, an enabled canonical-direction chip SHALL fall back to its own exit label as its primary text
-rather than rendering blank — but SHALL NOT render both the destination name and the exit's own label
-at once. A disabled exit chip SHALL always render its own exit label as its primary text, never the
-destination name, followed by the shared disabled marker. An exit chip's focused state SHALL be
-conveyed by its background and border fill together and SHALL NOT additionally render a focus-only
-glyph beside its persistent direction glyph. A disabled exit chip's server-authored explanation SHALL
-remain reachable by assistive technology directly from the chip and SHALL be shown in the overview's
-reason strip while the chip is focused. The submitted move payload SHALL be unchanged.
+#### Scenario: The form set is fixed
+- **WHEN** the row region selects a form
+- **THEN** the forms are: exit, person, object, and footer chips for the scene overview; the verb popover's rows under a target head; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
 
-A chip or row SHALL render only fields the committed payload carries: its server-authored name and,
-where its form has one, an optional sub-line composed of such fields. No chip or row SHALL
-render a statistics line, a portrait, or any other element for which the payload has no field; where
-the design draft shows such an element it SHALL be absent rather than emptied or mocked. Icons and
-glyphs SHALL be decorative, SHALL be hidden from assistive technology, SHALL always accompany a real
-text label, and SHALL be selected only from stable server-authored keys or the direction table — never
-from free text such as a display name.
+#### Scenario: Exploration frames never regress to grids or nav lists
+- **WHEN** any exploration frame renders
+- **THEN** it renders no exit-outlet grid and no navigation-row list: exits are chips of the scene overview, and a host's conversation topics are the dialogue surface's choices, never a dock frame
 
-A target's verb popover SHALL render a head naming the target it is scoped to, taken from the frame's
-own server-authored display name, above that target's rows.
+#### Scenario: An enabled exit chip names direction by glyph and destination by text
+- **WHEN** an exit chip is enabled
+- **THEN** it renders the exit's direction as a leading glyph and its primary text is the destination's display name — never a repetition of the direction word or the exit's own label once a glyph already carries that meaning
 
-Every row and chip in every form SHALL keep the existing disabled contract: a disabled entry SHALL
-remain focusable by arrow keys and by pointer, SHALL keep its accessible disabled state and its
-server-authored explanation, and SHALL submit nothing.
+#### Scenario: Direction glyphs come only from the canonical table
+- **WHEN** an exit label falls outside the fixed client-side table of canonical direction words
+- **THEN** the glyph is resolved from that table, and an out-of-table label renders verbatim as the chip's primary text (there being no glyph to carry it) rather than being mapped to a guessed direction
+
+#### Scenario: An unknown destination falls back without doubling labels
+- **WHEN** the destination's display name — resolved by matching the exit's server-authored destination node against the committed local-map nodes — finds that node absent from the committed lattice
+- **THEN** an enabled canonical-direction chip falls back to its own exit label as its primary text rather than rendering blank, and never renders both the destination name and the exit's own label at once
+
+#### Scenario: A disabled exit chip keeps its own label and marker
+- **WHEN** an exit chip is disabled
+- **THEN** it always renders its own exit label as its primary text, never the destination name, followed by the shared disabled marker
+
+#### Scenario: Exit chip focus and disabled reasons stay honest
+- **WHEN** an exit chip is focused, or a disabled chip's explanation is sought
+- **THEN** the focused state is conveyed by the chip's background and border fill together with no additional focus-only glyph beside its persistent direction glyph; the disabled chip's server-authored explanation remains reachable by assistive technology directly from the chip and is shown in the overview's reason strip while the chip is focused; and the submitted move payload is unchanged
+
+#### Scenario: Chips and rows render only backed fields
+- **WHEN** any chip or row renders
+- **THEN** it renders only fields the committed payload carries: its server-authored name and, where its form has one, an optional sub-line composed of such fields; none renders a statistics line, a portrait, or any other element for which the payload has no field — where the design draft shows such an element it is absent rather than emptied or mocked
+
+#### Scenario: Icons are decorative and key-selected
+- **WHEN** a chip or row shows an icon or glyph
+- **THEN** it is decorative, hidden from assistive technology, always accompanies a real text label, and is selected only from stable server-authored keys or the direction table — never from free text such as a display name
+
+#### Scenario: The verb popover heads with its target
+- **WHEN** a target's verb popover renders
+- **THEN** it renders a head naming the target it is scoped to, taken from the frame's own server-authored display name, above that target's rows
+
+#### Scenario: The disabled contract holds in every form
+- **WHEN** a disabled entry renders in any row or chip form
+- **THEN** it keeps the existing disabled contract: it remains focusable by arrow keys and by pointer, keeps its accessible disabled state and its server-authored explanation, and submits nothing
 
 #### Scenario: A move row names where it goes
 - **WHEN** the scene overview renders an enabled exit chip whose label is a canonical direction and whose destination node is present in the committed local map
@@ -1083,30 +1127,35 @@ server-authored explanation, and SHALL submit nothing.
 - **THEN** it keeps focus, exposes its accessible disabled state and its server-authored explanation, and no action is submitted
 
 ### Requirement: The combat participant frame presents the session's participants and their portraits
-In combat the shell SHALL render a participant frame as a HUD island in the stage's top-right `map`
-anchor, where the minimap is hidden in combat, and SHALL NOT place it in either portrait anchor, grouped into the
-player's side and the opposing side using the committed participants' server-authored team values, in
-the presenter's order. Each participant SHALL render its session token, its display name, its current
-and maximum hit points as numerals — the current value being, while a combat round plays, the displayed
-value that `webclient-combat-menu` "A combat round plays beat by beat" defines — and its state; a non-active state SHALL be conveyed by an explicit
-text marker in addition to any colour. The frame SHALL NOT invent a field the participant descriptor
-does not carry. The frame SHALL list every participant of both sides, including the foes the foe line-up
-does not stand on the stage, and it SHALL remain the only surface that states participant tokens, hit
-points, and states: the foe line-up in `actor-right` carries decorative portraits, names, non-colour
-acting/target cues and hit-point gauges without numerals. A display name longer than the frame's width SHALL end in an
-ellipsis on screen while its full text stays in the DOM, and the frame's rows SHALL be compact enough
-that a frame of six participants ends above the foe line-up's gauges at 1451x790 and 2560x1440; at both acceptance sizes its visible content SHALL NOT cover a standing foe head.
+In combat the shell SHALL render a participant frame as a HUD island in the stage's top-right `map` anchor, where the minimap is hidden in combat, and SHALL NOT place it in either portrait anchor, grouped into the player's side and the opposing side using the committed participants' server-authored team values, in the presenter's order. The frame SHALL NOT invent a field the participant descriptor does not carry.
 
-Each participant's portrait SHALL be resolved only by looking its server-authored portrait reference
-up in the committed art panel's portrait catalog: a resolvable entry SHALL render that entry, an
-entry that resolves to a placeholder SHALL render a compact initial with its truthful availability state accessible outside the bitmap; an entry whose image URL fails to load SHALL render a compact initial with a localized load-failure state accessible outside the bitmap; and a null reference or an
-unavailable art panel SHALL render no portrait at all. The client SHALL NOT construct a portrait
-subject key or URL. While the participant frame is mounted, the frame and the stage actors SHALL be the
-only presenters of the portrait catalog, so no separate portrait strip is rendered alongside them.
+#### Scenario: Each participant row states its backed values
+- **WHEN** a participant renders in the frame
+- **THEN** it renders its session token, its display name, its current and maximum hit points as numerals — the current value being, while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines — and its state
 
-The participant frame SHALL be display-only: it SHALL NOT be a row container, SHALL NOT be part of
-the dock's composite widget, and SHALL NOT be a second tab stop. Target selection happens in the
-dock's target frame.
+#### Scenario: Non-active states carry an explicit text marker
+- **WHEN** a participant's state is not active
+- **THEN** it is conveyed by an explicit text marker in addition to any colour
+
+#### Scenario: The frame is the sole numeral surface
+- **WHEN** the frame and the foe line-up render together
+- **THEN** the frame lists every participant of both sides, including the foes the foe line-up does not stand on the stage, and remains the only surface that states participant tokens, hit points, and states: the foe line-up in `actor-right` carries decorative portraits, names, non-colour acting/target cues and hit-point gauges without numerals
+
+#### Scenario: Long names bound; six rows clear the foe heads
+- **WHEN** a display name exceeds the frame's width, or the frame holds six participants at 1451x790 and 2560x1440
+- **THEN** the name ends in an ellipsis on screen while its full text stays in the DOM, and the frame's rows are compact enough that a frame of six participants ends above the foe line-up's gauges; at both acceptance sizes its visible content does not cover a standing foe head
+
+#### Scenario: Portraits resolve only through the committed catalog
+- **WHEN** a participant's server-authored portrait reference is looked up in the committed art panel's portrait catalog
+- **THEN** a resolvable entry renders that entry; an entry that resolves to a placeholder renders a compact initial with its truthful availability state accessible outside the bitmap; an entry whose image URL fails to load renders a compact initial with a localized load-failure state accessible outside the bitmap; and a null reference or an unavailable art panel renders no portrait at all — the client constructs no portrait subject key or URL
+
+#### Scenario: The frame and stage actors alone present the catalog
+- **WHEN** the participant frame is mounted
+- **THEN** the frame and the stage actors are the only presenters of the portrait catalog, so no separate portrait strip is rendered alongside them
+
+#### Scenario: The frame never competes for focus
+- **WHEN** the participant frame renders
+- **THEN** it is display-only: it is not a row container, not part of the dock's composite widget, and not a second tab stop — target selection happens in the dock's target frame
 
 #### Scenario: Both sides render from the payload
 - **WHEN** a combat session commits participants on both teams
@@ -1133,48 +1182,43 @@ dock's target frame.
 - **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and gauges and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
 
 ### Requirement: Foes stand opposite the player during combat
-While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor
-for each committed combat participant whose team is the opposing side and whose state is active, in the
-presenter's order, at most three. Foes beyond the third SHALL NOT stand on the stage; the participant
-frame lists them, and no "+N" count is drawn. Party members other than the player SHALL NOT stand on the
-stage; the player alone stands in `actor-left`. When no foe is active the line-up SHALL render nothing.
+While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor for each committed combat participant whose team is the opposing side and whose state is active, in the presenter's order, at most three. When no foe is active the line-up SHALL render nothing.
 
-The line-up SHALL be a depth-staged row that grows leftward. The first foe SHALL stand in front, nearest
-the stage's right edge, and each later foe SHALL stand behind the one before it: further toward the
-stage's centre, overlapping that foe and drawn behind it, smaller, and standing a little higher (up-stage)
-than it. With one, two, or three foes shown, the foes' heights SHALL be, front to back, 100%; 90% and 78%;
-or 80%, 70%, and 61% of the player's stage actor's height, and every later foe SHALL show 46% of its width
-past the foe in front of it. The front foe SHALL stand on the band's upper edge, and each foe behind SHALL
-stand 3.5% of the portrait anchor's height higher than the one in front of it. The row's right inset SHALL
-be the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face)
-lies at least 24px left of the participant frame's column, within the `map` anchor in combat.
-At 1451x790 and at every larger viewport up to the chrome cap, no foe's stage actor SHALL cross the stage's vertical centre line or
-intersect the player's stage actor.
+#### Scenario: Only foes of the opposing side stand on the stage
+- **WHEN** more than three foes are active, or party members other than the player are committed
+- **THEN** foes beyond the third do not stand on the stage — the participant frame lists them, and no "+N" count is drawn — party members other than the player do not stand on the stage, and the player alone stands in `actor-left`
 
-Each foe's stage actor SHALL expose that participant's portrait reference as a data attribute for tests
-and for the beat presentation. Each foe SHALL show its display name above its decorative hit-point gauge
-and distinguish acting or focused-target presentation with a non-colour cue. Names SHALL ellipsize within
-their plate while retaining full DOM text. Each gauge SHALL be a slim track centred
-under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current
-hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so
-the damage shows as a gap. The line-up is decorative art: it SHALL be hidden from assistive technology,
-SHALL carry no focusable element, SHALL NOT intercept pointer events, and SHALL NOT state tokens, hit-point
-numerals, or participant states, which remain the participant frame's.
+#### Scenario: The line-up is a depth-staged row that grows leftward
+- **WHEN** one, two, or three foes stand
+- **THEN** the first foe stands in front, nearest the stage's right edge, and each later foe stands behind the one before it: further toward the stage's centre, overlapping that foe and drawn behind it, smaller, and standing a little higher (up-stage) than it
 
-While a combat round plays by itself, the line-up SHALL stand the foes that were active before the round,
-in the presenter's order, and a foe SHALL leave it only when its own defeat beat plays; when the round
-ends, by itself or because the player ended it, the line-up SHALL stand the committed active foes.
+#### Scenario: Staged sizes follow the reference ratios
+- **WHEN** one, two, or three foes are shown
+- **THEN** the foes' heights are, front to back, 100%; 90% and 78%; or 80%, 70%, and 61% of the player's stage actor's height, and every later foe shows 46% of its width past the foe in front of it; the front foe stands on the band's upper edge, and each foe behind stands 3.5% of the portrait anchor's height higher than the one in front of it
 
-A live change of the committed mode into `combat` SHALL bring the line-up in: after half the flash's
-duration it SHALL fade in over the actor duration of the client's motion level (350ms at `full`) while
-each foe slides in from the right, the front foe furthest. A live change out of `combat` SHALL fade it out
-while the foes drift a step to the right. Within combat, a foe that leaves the active set SHALL fade out
-where it stands, a foe that joins SHALL slide and fade in, and the remaining foes SHALL glide to their new
-places and sizes. Every leaving copy SHALL be out of reach as "A leaving element is out of reach while it
-animates out" requires. Mounting the client in combat, a reload, and a reconnect SHALL play no entrance.
-At `reduced` the line-up SHALL only fade, within 150ms, and nothing in it SHALL move or glide; at `off`
-every change SHALL render its final state in the commit's frame. No change SHALL scroll the stage or any
-element that contains it.
+#### Scenario: The row's inset clears the participant frame
+- **WHEN** the line-up renders at 1451x790 and at every larger viewport up to the chrome cap
+- **THEN** the row's right inset is the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face) lies at least 24px left of the participant frame's column, within the `map` anchor in combat, and no foe's stage actor crosses the stage's vertical centre line or intersects the player's stage actor
+
+#### Scenario: Each foe plate names, gauges, and cues
+- **WHEN** a foe stage actor renders
+- **THEN** it exposes that participant's portrait reference as a data attribute for tests and for the beat presentation; it shows its display name above its decorative hit-point gauge and distinguishes acting or focused-target presentation with a non-colour cue; names ellipsize within their plate while retaining full DOM text; and its gauge is a slim track centred under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so the damage shows as a gap
+
+#### Scenario: The line-up is decorative art
+- **WHEN** the line-up renders
+- **THEN** it is hidden from assistive technology, carries no focusable element, intercepts no pointer events, and states no tokens, hit-point numerals, or participant states, which remain the participant frame's
+
+#### Scenario: A playing round holds the line-up to its beats
+- **WHEN** a combat round plays by itself, and later ends — by itself or because the player ended it
+- **THEN** during the round the line-up stands the foes that were active before the round, in the presenter's order, and a foe leaves it only when its own defeat beat plays; when the round ends the line-up stands the committed active foes
+
+#### Scenario: Mode changes and set changes animate the line-up
+- **WHEN** the committed mode live-changes into or out of `combat`, or a foe joins or leaves the active set within combat
+- **THEN** entering brings the line-up in — after half the flash's duration it fades in over the actor duration of the client's motion level (350ms at `full`) while each foe slides in from the right, the front foe furthest; leaving fades it out while the foes drift a step to the right; within combat a leaving foe fades out where it stands, a joining foe slides and fades in, and the remaining foes glide to their new places and sizes; every leaving copy is out of reach as "A leaving element is out of reach while it animates out" requires
+
+#### Scenario: Entrances never replay and motion levels hold
+- **WHEN** the client mounts in combat, reloads, or reconnects, or the motion level is `reduced` or `off`
+- **THEN** mount, reload, and reconnect play no entrance; at `reduced` the line-up only fades, within 150ms, and nothing in it moves or glides; at `off` every change renders its final state in the commit's frame; and no change scrolls the stage or any element that contains it
 
 #### Scenario: One foe stands opposite the player
 - **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1451x790
@@ -1242,26 +1286,23 @@ The combat presentation SHALL show each standing foe name with its decorative ga
 - **THEN** the thumbnail has one initial with accessible state, not clipped multiline microcopy; its visible session token remains
 
 ### Requirement: Combat skills are chosen through a bounded master-detail
-In combat, opening Skills SHALL present the committed skill categories as a bounded frame of category
-entries, each carrying its server-authored label and the count of its own skill descriptors. Opening a
-category SHALL present that category's sub-groups as a frame when the category carries more than one
-sub-group, and SHALL open the skill frame directly when it carries exactly one — so no menu level ever
-offers a single choice. The skill frame SHALL list that group's descriptors in the server's order,
-each row carrying the skill's label and its resource cost, beside a detail region naming the focused
-skill, its description, its cost, its target requirement and, when it is unavailable, its
-server-authored reason.
+In combat, opening Skills SHALL present the committed skill categories as a bounded frame of category entries, each carrying its server-authored label and the count of its own skill descriptors. Opening a category SHALL present that category's sub-groups as a frame when the category carries more than one sub-group, and SHALL open the skill frame directly when it carries exactly one — so no menu level ever offers a single choice.
 
-Category, group and skill ordering SHALL be exactly the committed panel's order at every level. The
-frames SHALL NOT reorder, filter or merge the server's grouping, and SHALL NOT render any badge or
-field the skill descriptor does not carry. The subsequent power-scale step and target step SHALL be
-unchanged in behaviour and payload: the scale frame SHALL render each advertised scale with its
-server-computed cost in ascending order, and the target frame SHALL render the valid participants as
-selectable tokens distinguishing the player's side from the opposing side, preserving the existing
-multi-select marker. Every submitted cast payload SHALL be byte-identical to the payload the same
-choices produce today.
+#### Scenario: The skill frame lists descriptors beside a detail region
+- **WHEN** a skill frame renders
+- **THEN** it lists that group's descriptors in the server's order, each row carrying the skill's label and its resource cost, beside a detail region naming the focused skill, its description, its cost, its target requirement and, when it is unavailable, its server-authored reason
 
-The focused row SHALL be scrolled into view within the bounded row region on every frame render and
-every focus change, so arrow navigation never leaves the focused row off-screen.
+#### Scenario: Server grouping is never reshaped
+- **WHEN** any skill level renders
+- **THEN** category, group and skill ordering is exactly the committed panel's order at every level; the frames do not reorder, filter or merge the server's grouping, and render no badge or field the skill descriptor does not carry
+
+#### Scenario: Scale and target steps keep behaviour and payload
+- **WHEN** the player proceeds through the power-scale step and the target step
+- **THEN** both are unchanged in behaviour and payload: the scale frame renders each advertised scale with its server-computed cost in ascending order, the target frame renders the valid participants as selectable tokens distinguishing the player's side from the opposing side and preserving the existing multi-select marker, and every submitted cast payload is byte-identical to the payload the same choices produce today
+
+#### Scenario: Arrow navigation keeps the focused row in view
+- **WHEN** a frame renders or focus changes
+- **THEN** the focused row is scrolled into view within the bounded row region, so arrow navigation never leaves the focused row off-screen
 
 #### Scenario: Skills opens categories, not one flat list
 - **WHEN** the player opens Skills in combat
@@ -1307,39 +1348,35 @@ without ending the session.
 - **THEN** exactly one forfeit action is emitted carrying the current session identifier
 
 ### Requirement: Reference surfaces render in a bounded workspace drawer with one modal contract
-The client's reference surfaces SHALL render in a wide workspace 12px below the top navigation's
-bottom edge, 16px inside each side of the viewport, and one command-line row height plus 12px above the
-viewport bottom, so the workspace covers the stage, the bottom band, and the command-line row whether or
-not that row is expanded, and only the band's lowest control strip stays exposed beneath it. A fine
-border and a fully opaque charcoal ink panel SHALL distinguish the workspace from the stage. The existing
-modal drawer lifecycle and shared motion tokens SHALL be retained over a dimmed scrim covering the whole
-viewport behind the drawer. Between its header and optional footer, a decorative art column MAY
-accompany the scrolling content body; only the content body scrolls. The head SHALL be the shared
-reference-surface header: the title in the serif heading face at the shared workspace scale with slight
-tracking, and the subtitle as the small muted line beside it. Every reference drawer SHALL declare one
-leading head icon (a decorative, `aria-hidden` glyph from the shared glyph registry rendered before its
-title). The drawer's close control SHALL carry an accessible name (e.g. an `aria-label`) but MAY be
-rendered icon-only, with no visible text node; "labelled" in this requirement means an accessible name,
-not necessarily visible text.
+The client's reference surfaces SHALL render in a wide workspace 12px below the top navigation's bottom edge, 16px inside each side of the viewport, and one command-line row height plus 12px above the viewport bottom, so only the band's lowest control strip stays exposed beneath it. A fine border and a fully opaque charcoal ink panel SHALL distinguish the workspace from the stage.
 
-At most one drawer SHALL be open at any time; opening a second SHALL close the first. While a drawer
-is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation.
-It SHALL close on Escape, on activation of its labelled close control, and on activation of the scrim,
-and every one of those paths SHALL restore focus to the control that opened it. An open drawer SHALL
-register itself as an open surface so the stage recession this capability already requires applies
-without a second mechanism.
+#### Scenario: The workspace covers the stage and keeps the modal lifecycle
+- **WHEN** a reference drawer opens
+- **THEN** the workspace covers the stage, the bottom band, and the command-line row whether or not that row is expanded, and the existing modal drawer lifecycle and shared motion tokens are retained over a dimmed scrim covering the whole viewport behind the drawer
 
-The skill-book drawer specifically SHALL carry, whenever the `character` panel is available, a
-subtitle stating its owner's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that
-same payload `SkillBook` renders) in the drawer head; when the panel is unavailable the subtitle is
-empty, matching the drawer's existing degrade-without-inventing-data contract. The skill-book drawer
-SHALL provide discoverable graphical skill-use and practice affordances under the
-`webclient-skillbook-casting` contract, without requiring a cast-syntax footer or memorized skill/target
-keys. The prescribed static `施放入口：cast <技法>[@威力]=<代號>` footer SHALL be removed. While the
-declared-practice sub-screen replaces the book body, the head title SHALL read 修煉 and book-use
-guidance SHALL be absent. Explicitly transferring from book use to dock-owned casting SHALL close
-the modal book and transfer focus to that flow without leaving a drawer trap active; ordinary drawer
-close paths SHALL retain their existing opener restoration.
+#### Scenario: The workspace body and art column
+- **WHEN** a reference drawer renders between its header and optional footer
+- **THEN** a decorative art column MAY accompany the scrolling content body, and only the content body scrolls
+
+#### Scenario: The shared reference-surface head
+- **WHEN** a reference drawer renders its head
+- **THEN** it is the shared reference-surface header: the title in the serif heading face at the shared workspace scale with slight tracking, and the subtitle as the small muted line beside it; every reference drawer declares one leading head icon (a decorative, `aria-hidden` glyph from the shared glyph registry rendered before its title); and the drawer's close control carries an accessible name (e.g. an `aria-label`) but MAY be rendered icon-only, with no visible text node — "labelled" in this requirement means an accessible name, not necessarily visible text
+
+#### Scenario: One drawer, focus-trapped and restorative
+- **WHEN** a second drawer is opened while one is open, or the open drawer is closed by Escape, its labelled close control, or the scrim
+- **THEN** at most one drawer is open at any time and opening a second closes the first; while open the drawer traps keyboard focus, so no surface behind it is reachable by sequential navigation; every close path restores focus to the control that opened it; and an open drawer registers itself as an open surface so the stage recession this capability already requires applies without a second mechanism
+
+#### Scenario: The skill-book drawer states its counts honestly
+- **WHEN** the skill-book drawer renders while the `character` panel is available, and when it is unavailable
+- **THEN** the head carries a subtitle stating its owner's active and passive skill counts (`主動 {n} ‧ 被動 {m}`, computed from that same payload `SkillBook` renders); when the panel is unavailable the subtitle is empty, matching the drawer's existing degrade-without-inventing-data contract
+
+#### Scenario: Skill use is graphical and practice retitles the head
+- **WHEN** the skill-book drawer offers skill use, and while the declared-practice sub-screen replaces the book body
+- **THEN** the drawer provides discoverable graphical skill-use and practice affordances under the `webclient-skillbook-casting` contract, without requiring a cast-syntax footer or memorized skill/target keys, and the prescribed static `施放入口：cast <技法>[@威力]=<代號>` footer is removed; while the practice sub-screen is up the head title reads 修煉 and book-use guidance is absent
+
+#### Scenario: Book use hands the modal focus owner over
+- **WHEN** the player explicitly transfers from book use to dock-owned casting
+- **THEN** the modal book closes and focus transfers to that flow without leaving a drawer trap active, while ordinary drawer close paths retain their existing opener restoration
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
@@ -1378,9 +1415,27 @@ close paths SHALL retain their existing opener restoration.
 - **THEN** the book closes, its scrim/trap retires, and focus moves to the sole dock-owned casting flow without a behind-drawer control becoming interactive
 
 ### Requirement: Reference drawers present no router frame and never host a dock row region
-No reference drawer SHALL present a keyboard router frame. Opening any reference drawer — including the 背包 ‧ 裝備 drawer from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, and the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row — SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer. No reference drawer body SHALL render the dock's row renderer (`dock-menu`) or detail pane (`dock-detail`) in any state. Closing a reference drawer — by Escape, its close control, or the scrim — SHALL leave the router alone, popping no menu level, and SHALL restore focus to the control that opened it. Committed rows inside a reference drawer SHALL remain reachable by keyboard without a hosted router frame.
+No reference drawer SHALL present a keyboard router frame. Opening any reference drawer SHALL push no frame, switch no sub-dock, and record no drawer-hosted service surface; an opener that is itself a top-navigation entry MAY first return the dock to its root frame exactly as every top-navigation entry does, and the drawer open SHALL add nothing to the stack after that. The client SHALL NOT maintain a second frame stack, a second focus model, or a second set of menu keys for a drawer.
 
-A drawer SHALL be openable only while its backing payload is present. When the committed mode changes so that a drawer's payload is no longer available, when the presentation epoch resets, or when the transport is lost, every open drawer SHALL close and every local selection, quantity and confirmation state inside it SHALL be discarded.
+#### Scenario: Every drawer opener pushes nothing
+- **WHEN** the 背包 ‧ 裝備 drawer opens from the top navigation's 背包 entry, the 商店 drawer from a merchant's `navigate` affordance row, or the 任務 drawer from the top navigation's 任務 entry or from a guild clerk's `navigate` affordance row
+- **THEN** the opening pushes no frame, switches no sub-dock, and records no drawer-hosted service surface
+
+#### Scenario: No drawer body hosts dock chrome
+- **WHEN** any reference drawer body renders in any state
+- **THEN** it renders neither the dock's row renderer (`dock-menu`) nor its detail pane (`dock-detail`)
+
+#### Scenario: Closing leaves the router alone and returns focus
+- **WHEN** a reference drawer closes — by Escape, its close control, or the scrim
+- **THEN** the router is left alone, no menu level is popped, and focus is restored to the control that opened it
+
+#### Scenario: Drawer rows stay keyboard reachable
+- **WHEN** a committed row inside a reference drawer takes the keyboard
+- **THEN** it remains reachable without a hosted router frame
+
+#### Scenario: Lost payloads close their drawers
+- **WHEN** a drawer's backing payload is absent, the committed mode changes so it is no longer available, the presentation epoch resets, or the transport is lost
+- **THEN** the drawer is openable only while its backing payload is present, every open drawer closes, and every local selection, quantity and confirmation state inside it is discarded
 
 #### Scenario: Opening the quest drawer from the guild clerk pushes no frame
 - **WHEN** the player activates the guild clerk's `navigate` affordance row inside an open target frame
@@ -1411,13 +1466,47 @@ A drawer SHALL be openable only while its backing payload is present. When the c
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
 
 ### Requirement: The bag renders the bounded inventory rows without inventing a total or a rarity
-The bag workspace SHALL use shared chrome for the `背包 ‧ 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section. The available body SHALL present an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
+The bag workspace SHALL use shared chrome for the `背包 ‧ 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section.
 
-Each registered row's non-null `presentation` SHALL select one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment. Its tile SHALL show committed held count and a non-colour equipped marker. A null presentation SHALL render only the neutral unknown-item SVG and visible unknown marker; the browser SHALL NOT derive type, icon, rarity, summary, or mechanics from item key or display name. The grid SHALL use native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths SHALL expose identical committed name, kind, rarity, count, equipped state, and summary, and the focused tile SHALL reference the stable inspector through `aria-describedby`.
+#### Scenario: The available body keeps its authoritative sections
+- **WHEN** the bag body renders with available payloads
+- **THEN** it presents an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection
 
-Each tile SHALL follow only its committed nullable action descriptor. Inspect-only and unknown tiles SHALL dispatch nothing. Disabled tiles SHALL remain keyboard reachable, expose `aria-disabled`, and show the committed reason on activation without dispatch. Enabled usable items SHALL open a labelled, focus-trapped inventory-use confirmation; enabled equipment SHALL dispatch its toggle immediately. Selection and dialog state SHALL remain client-local and reset on panel replacement, drawer close, mode/epoch change, or transport loss. The bag SHALL NOT render or infer numeric item statistics, recovery amounts, conditions, effects, consumable flags, slots, set bonuses, comparisons, sorting, filtering, search, drag, or drop behavior, and SHALL render no static sort/filter/search pill.
+#### Scenario: The listing never claims completeness
+- **WHEN** the shipped inventory nears or reaches the server row ceiling
+- **THEN** the listing remains bounded by that ceiling and states it in words when reached, and no shipped count claims to be the player's untruncated holdings
 
-The drawer SHALL remain available from its combat affordance when services v3 inventory is available. When services commits its unavailable form or inventory is absent, the bag SHALL render only the registered reason and fabricate no wallet, equipment, row, count, action, or dialog. When services inventory is available but character is unavailable, the grid SHALL remain available, the doll SHALL render its registered unavailable state, and no wallet subtitle, wallet body value, or zero balance SHALL be invented. All inspector, confirmation, and warning transitions SHALL use existing motion tokens so reduced motion makes them effectively instant.
+#### Scenario: Registered rows render only their presentation
+- **WHEN** a registered row's non-null `presentation` renders
+- **THEN** it selects one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment, and its tile shows committed held count and a non-colour equipped marker
+
+#### Scenario: A null presentation stays neutral
+- **WHEN** a row carries a null presentation
+- **THEN** it renders only the neutral unknown-item SVG and visible unknown marker, and the browser derives no type, icon, rarity, summary, or mechanics from item key or display name
+
+#### Scenario: One inspector serves pointer and keyboard
+- **WHEN** the grid renders its tiles
+- **THEN** it uses native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths expose identical committed name, kind, rarity, count, equipped state, and summary; and the focused tile references the stable inspector through `aria-describedby`
+
+#### Scenario: Tiles follow only their action descriptor
+- **WHEN** a tile is inspect-only, unknown, disabled, an enabled usable item, or enabled equipment
+- **THEN** inspect-only and unknown tiles dispatch nothing; disabled tiles remain keyboard reachable, expose `aria-disabled`, and show the committed reason on activation without dispatch; enabled usable items open a labelled, focus-trapped inventory-use confirmation; and enabled equipment dispatches its toggle immediately
+
+#### Scenario: Selection state is client-local and resets
+- **WHEN** the panel is replaced, the drawer closes, the mode or epoch changes, or the transport is lost
+- **THEN** selection and dialog state — client-local — reset
+
+#### Scenario: The bag infers no mechanics or tools
+- **WHEN** the bag renders
+- **THEN** it renders or infers no numeric item statistics, recovery amounts, conditions, effects, consumable flags, slots, set bonuses, comparisons, sorting, filtering, search, drag, or drop behavior, and renders no static sort/filter/search pill
+
+#### Scenario: Availability degrades section by section
+- **WHEN** services v3 inventory is available in combat, when services commits its unavailable form or inventory is absent, or when inventory is available but character is unavailable
+- **THEN** the drawer remains available from its combat affordance while inventory is available; on unavailable services or absent inventory it renders only the registered reason and fabricates no wallet, equipment, row, count, action, or dialog; and with inventory available but character unavailable the grid remains available, the doll renders its registered unavailable state, and no wallet subtitle, wallet body value, or zero balance is invented
+
+#### Scenario: Bag transitions use the motion tokens
+- **WHEN** inspector, confirmation, or warning state changes under reduced motion
+- **THEN** all transitions use existing motion tokens so reduced motion makes them effectively instant
 
 #### Scenario: A registered actionable row preserves truthful inspection
 - **WHEN** a committed registered inventory row carries presentation and an enabled action descriptor
@@ -1473,9 +1562,27 @@ The drawer SHALL remain available from its combat affordance when services v3 in
 - **THEN** transitions are effectively instant while labels, reasons, focus, and committed item information remain available
 
 ### Requirement: The equipment doll renders only server-authored slots and drops nothing
-The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 ‧ 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title. The doll SHALL lay out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels. The doll SHALL render the server's three singleton slots and one accessory summary as four named positions in the square grid. The main-hand, armor, and accessory-summary positions SHALL each render a fixed local SVG selected by its server-authored slot role; the off-hand position SHALL be the iconless position. The doll SHALL NOT select an item icon from an item key or display name. A singleton slot with no row SHALL render a visible named empty state with a dashed outline. An occupied singleton slot SHALL render its visible slot label in the grid and its committed display name in the 裝備描述 column; when the committed rows carry more than one row for a recognised singleton slot, the square position consumes only the first row and every further row for that slot SHALL render as a labelled overflow row, so no committed row is lost. The accessory summary SHALL render its visible label and committed item count, while every repeatable accessory row SHALL render in the 裝備描述 column's accessory group. Any slot key outside the recognised set SHALL render as a labelled fallback row rather than being discarded, so no row the payload sends is lost. When the committed rows carry no equipment at all the doll SHALL render only its visible empty statement.
+The equipment presentation SHALL be built from the committed `character` panel's equipment rows, each of which carries a slot, an item key and a display name and nothing more. The section SHALL be introduced by the bag's small tracked section heading `裝備` carrying the right-aligned tag `真值 ‧ 偽裝不影響`, and SHALL NOT be introduced by a standalone `裝備人偶` title.
 
-The doll SHALL NOT render an item statistic, attack or defence value, rarity, item icon, summary, or comparison against another item: the equipment rows carry none of those. Equipment SHALL be presented as true values that a disguise does not affect, and the section tag SHALL state exactly that.
+#### Scenario: The doll lays out as the redesign's equipment row
+- **WHEN** the equipment section renders
+- **THEN** the doll lays out as the redesign's equipment row: a compact two-column square slot grid beside a 裝備描述 column that lists the committed rows grouped under their slot labels
+
+#### Scenario: Four named positions, fixed slot SVGs
+- **WHEN** the square grid renders
+- **THEN** the doll renders the server's three singleton slots and one accessory summary as four named positions; the main-hand, armor, and accessory-summary positions each render a fixed local SVG selected by its server-authored slot role; the off-hand position is the iconless position; and the doll selects no item icon from an item key or display name
+
+#### Scenario: Empty and occupied singleton slots
+- **WHEN** a singleton slot carries no row, or carries rows
+- **THEN** an empty singleton slot renders a visible named empty state with a dashed outline; an occupied one renders its visible slot label in the grid and its committed display name in the 裝備描述 column
+
+#### Scenario: Duplicate, accessory, and unknown rows are never lost
+- **WHEN** committed rows carry more than one row for a recognised singleton slot, repeatable accessories, a slot key outside the recognised set, or no equipment at all
+- **THEN** the square position consumes only the first row of a duplicated singleton slot and every further row for that slot renders as a labelled overflow row; the accessory summary renders its visible label and committed item count while every repeatable accessory row renders in the 裝備描述 column's accessory group; an unrecognised slot key renders as a labelled fallback row rather than being discarded, so no row the payload sends is lost; and with no equipment at all the doll renders only its visible empty statement
+
+#### Scenario: The doll states true values only
+- **WHEN** the doll renders equipped items
+- **THEN** it renders no item statistic, attack or defence value, rarity, item icon, summary, or comparison against another item — the equipment rows carry none of those — and equipment is presented as true values that a disguise does not affect, which the section tag states exactly
 
 #### Scenario: The equipment section is titled 裝備 with the true-value tag
 - **WHEN** the bag renders its equipment section
@@ -1514,15 +1621,47 @@ The doll SHALL NOT render an item statistic, attack or defence value, rarity, it
 - **THEN** it shows its display name and its slot only, with no attack, defence, rarity, item icon, summary, or comparison value
 
 ### Requirement: The character-status drawer degrades section by section and never substitutes a disguise
-The character-status drawer SHALL present the committed `status` panel's resources and its complete condition roster in every mode, because that panel is available in every mode; each condition SHALL pair a non-colour severity glyph with its label and every numeric or derived-modifier value the payload provides. It SHALL present the committed `character` panel's true traits, guild standing, and persona background, and SHALL mark each of those sections with the registry-owned reason when the `character` panel is unavailable — as it is outside exploration mode — rather than hiding the drawer or inventing a value. Equipment and wallet presentation belong exclusively to the inventory drawer and SHALL NOT render in character status.
+The character-status drawer SHALL present the committed `status` panel's resources and its complete condition roster in every mode, because that panel is available in every mode. It SHALL present the committed `character` panel's true traits, guild standing, and persona background, and SHALL mark each of those sections with the registry-owned reason when the `character` panel is unavailable — as it is outside exploration mode — rather than hiding the drawer or inventing a value.
 
-Where a disguise is active the drawer SHALL render the displayed values beside the true trait rows they describe, distinctly labelled, together with the statement that a disguise affects display, registration and identification only and that combat always resolves against true values. A displayed value SHALL NEVER replace a true trait row.
+#### Scenario: Equipment and wallet belong to the inventory drawer
+- **WHEN** the character-status drawer renders
+- **THEN** equipment and wallet presentation, which belong exclusively to the inventory drawer, do not render in character status
 
-The character-status drawer SHALL preserve the 親密狀態 disclosure section added by the archived intimate-status change: when the committed `character` panel's `intimate` field is present the drawer renders its collapsed-by-default disclosure widget immediately after the 偽裝 (disguise) section and before the 背景 (persona) section, and no change SHALL remove it, reorder it, or alter its disclosure widget, content, or collapsed default; like the persona area it spans the full row of the section grid. When `intimate` is `null` or the `character` panel is unavailable, the section is absent from the DOM, exactly as the merged main spec requires. This change removes only the equipment and wallet sections.
+#### Scenario: Conditions pair a glyph with every backed value
+- **WHEN** the condition roster renders a committed condition
+- **THEN** the condition pairs a non-colour severity glyph with its label and every numeric or derived-modifier value the payload provides
 
-Each of the drawer's sections (vitals, traits, conditions, guild counters, disguise, intimate status, persona) SHALL carry a labelled, small-caps section heading naming what it presents, using the same heading treatment the HUD's other islands use. The vitals, traits, and guild-counter sections SHALL render each value as its own bordered card tile in an auto-fill grid of equal-width tracks rather than a plain text row, each tile only as tall as its own content, with the tile's label at the left and its `current`/`current / maximum` value in the shared numeral treatment at the right; a tile carrying more than two breakdown chips SHALL span its grid's full row so its chips wrap in one wide line; no value not already present in the committed payload (such as an effective-vs-base delta) SHALL be invented to fill the tile. The sections themselves SHALL be content-sized cards in an auto-fit grid of equal-width tracks in their DOM order, with the persona area, the intimate disclosure, and a panel-wide unavailable reason spanning the full row, so no section's height depends on another's.
+#### Scenario: A disguise compares, never substitutes
+- **WHEN** a disguise is active
+- **THEN** the drawer renders the displayed values beside the true trait rows they describe, distinctly labelled, together with the statement that a disguise affects display, registration and identification only and that combat always resolves against true values; a displayed value never replaces a true trait row
 
-The drawer body SHALL open with a hero naming the committed character: the `status` panel's actor name, its composed full title (`status` actor `full_title`), and the `character` panel's guild rank, each rendered only when the payload supplies a non-blank value and omitted — never guessed — otherwise; the name and title therefore stay in every mode, and the rank is absent while the `character` panel is unavailable. The hero SHALL carry the drawer's existing secondary openers (技能書, and 同伴 ‧ 隊伍 while the party panel is available) in one wrapping action row, with their existing behavior. The body SHALL NOT repeat the drawer title the shared header already renders. The condition roster SHALL render as a wrapped row of rounded pill badges, one per condition, each carrying that condition's label, its visible severity word, its non-colour severity glyph, and its duration/modifier text — the same content the roster shows today, none of it dropped — coloured per severity using the same severity-to-colour mapping the capped status-island condition chips use elsewhere in the HUD. These presentation rules apply identically whether a section is fully populated or marked with a registry-owned unavailable reason.
+#### Scenario: The 親密狀態 disclosure is preserved in place
+- **WHEN** the committed `character` panel's `intimate` field is present, and when it is `null` or the panel is unavailable
+- **THEN** the drawer renders the collapsed-by-default 親密狀態 disclosure widget — added by the archived intimate-status change — immediately after the 偽裝 (disguise) section and before the 背景 (persona) section, and no change removes it, reorders it, or alters its disclosure widget, content, or collapsed default; like the persona area it spans the full row of the section grid; with `intimate` null or the panel unavailable the section is absent from the DOM, exactly as the merged main spec requires; this change removes only the equipment and wallet sections
+
+#### Scenario: Every section names itself in the shared treatment
+- **WHEN** any of the drawer's sections renders (vitals, traits, conditions, guild counters, disguise, intimate status, persona)
+- **THEN** each carries a labelled, small-caps section heading naming what it presents, using the same heading treatment the HUD's other islands use
+
+#### Scenario: Value rows render as bordered card tiles
+- **WHEN** the vitals, traits, or guild-counter sections render their values
+- **THEN** each value is its own bordered card tile in an auto-fill grid of equal-width tracks rather than a plain text row, each tile only as tall as its own content, with the tile's label at the left and its `current`/`current / maximum` value in the shared numeral treatment at the right; a tile carrying more than two breakdown chips spans its grid's full row so its chips wrap in one wide line; and no value not already present in the committed payload (such as an effective-vs-base delta) is invented to fill the tile
+
+#### Scenario: Sections size themselves independently
+- **WHEN** the section grid renders
+- **THEN** the sections are content-sized cards in an auto-fit grid of equal-width tracks in their DOM order, with the persona area, the intimate disclosure, and a panel-wide unavailable reason spanning the full row, so no section's height depends on another's
+
+#### Scenario: The hero names only supplied values
+- **WHEN** the drawer body opens
+- **THEN** it opens with a hero naming the committed character — the `status` panel's actor name, its composed full title (`status` actor `full_title`), and the `character` panel's guild rank, each rendered only when the payload supplies a non-blank value and omitted — never guessed — otherwise; the name and title therefore stay in every mode, and the rank is absent while the `character` panel is unavailable
+
+#### Scenario: The hero carries the openers, the header carries the title
+- **WHEN** the hero renders
+- **THEN** it carries the drawer's existing secondary openers (技能書, and 同伴 ‧ 隊伍 while the party panel is available) in one wrapping action row, with their existing behavior, and the body does not repeat the drawer title the shared header already renders
+
+#### Scenario: The roster renders as coloured pills with nothing dropped
+- **WHEN** the condition roster renders
+- **THEN** it renders as a wrapped row of rounded pill badges, one per condition, each carrying that condition's label, its visible severity word, its non-colour severity glyph, and its duration/modifier text — the same content the roster shows today, none of it dropped — coloured per severity using the same severity-to-colour mapping the capped status-island condition chips use elsewhere in the HUD; these presentation rules apply identically whether a section is fully populated or marked with a registry-owned unavailable reason
 
 #### Scenario: The drawer is useful in combat
 - **WHEN** the committed mode is combat, so the `character` panel is unavailable
@@ -1557,7 +1696,19 @@ The drawer body SHALL open with a hero naming the committed character: the `stat
 - **THEN** the hero shows that name, that title and `公會階級 <rank>` above one row holding the 技能書 and 同伴 ‧ 隊伍 openers, and the drawer title appears only in the shared header
 
 ### Requirement: The drawer layer renders the wallet exactly once
-Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer. The shop, the lore reference, the character-status drawer, and every other body element of the inventory drawer SHALL NOT render a balance of their own. A drawer whose available character panel does not carry a committed non-negative integer wallet SHALL render no balance at all rather than a zero; the `金錢` body row is additionally gated on the bag's available inventory section, because it renders only inside the bag's three-section stack and the two renderings must never disagree.
+Across every drawer, the player's wallet SHALL be rendered exactly once per opening of the inventory drawer — once in its shared header subtitle and once as the single row of its `金錢` body section, both read from the committed available panel that owns the value — and nowhere else in the drawer layer.
+
+#### Scenario: No other drawer or body element carries a balance
+- **WHEN** the shop, the lore reference, the character-status drawer, or any other body element of the inventory drawer renders
+- **THEN** none of them renders a balance of its own
+
+#### Scenario: An unreadable wallet renders nothing rather than zero
+- **WHEN** a drawer's available character panel does not carry a committed non-negative integer wallet
+- **THEN** it renders no balance at all rather than a zero
+
+#### Scenario: The body row is gated with the inventory section
+- **WHEN** the bag's inventory section availability changes
+- **THEN** the `金錢` body row is additionally gated on the bag's available inventory section, because it renders only inside the bag's three-section stack and the two renderings must never disagree
 
 #### Scenario: One wallet per drawer-layer opening
 - **WHEN** every drawer is opened in turn with the `services` and `character` panels available
@@ -1572,16 +1723,15 @@ Across every drawer, the player's wallet SHALL be rendered exactly once per open
 - **THEN** the `金錢` section renders no balance row and the header subtitle renders no balance either, since both read the same validated character-panel figure; neither renders a zero
 
 ### Requirement: Mutations issued from a drawer keep the dispatch and confirmation contract
-Every affordance inside a drawer SHALL emit exactly the server-authored action identifier and payload
-its descriptor carries, through the client's single dispatch entry, and SHALL be governed by the same
-in-flight, epoch and revision gates as the same action issued from the dock. A disabled affordance
-SHALL remain readable for its server-authored reason and SHALL submit nothing. While mutations are
-locked — a submission in flight, an unaccepted revision, or a lost transport — every drawer affordance
-SHALL be locked with them.
+Every affordance inside a drawer SHALL emit exactly the server-authored action identifier and payload its descriptor carries, through the client's single dispatch entry, and SHALL be governed by the same in-flight, epoch and revision gates as the same action issued from the dock.
 
-A destructive service action issued from a drawer SHALL sit behind an explicit confirmation step that
-names what it does, with a cancel path that submits nothing. A quantity form inside a drawer SHALL
-keep the server-advertised minimum and maximum and SHALL NOT permit a value outside them.
+#### Scenario: Disabled and locked affordances submit nothing
+- **WHEN** an affordance inside a drawer is disabled, or mutations are locked — a submission in flight, an unaccepted revision, or a lost transport
+- **THEN** a disabled affordance remains readable for its server-authored reason and submits nothing, and while mutations are locked every drawer affordance is locked with them
+
+#### Scenario: Destructive actions confirm; quantity forms keep server bounds
+- **WHEN** a destructive service action is issued from a drawer, or a quantity form inside a drawer is filled
+- **THEN** the destructive action sits behind an explicit confirmation step that names what it does, with a cancel path that submits nothing, and the quantity form keeps the server-advertised minimum and maximum and permits no value outside them
 
 #### Scenario: A drawer affordance dispatches the exact server intent
 - **WHEN** the player activates an enabled affordance inside a drawer
@@ -1600,45 +1750,43 @@ keep the server-advertised minimum and maximum and SHALL NOT permit a value outs
 - **THEN** the value is clamped to that maximum and no request can authorise a larger quantity
 
 ### Requirement: The command line is a collapsible row docked on the message region's top edge
-The client's text control SHALL render as a single bar filling the stage's `command-line` anchor,
-containing — in this order — a prompt chevron, the command input field with its send control, a hint
-cluster, and the command-history controls. The bar SHALL carry no quick-word chip, no control that only
-writes a fixed command word into the field, and no overlay or drawer opener: those openers live in the
-top navigation bar's tool group. The `command-line` anchor SHALL be one row 44px tall docked to the top
-edge of the bottom band's message region: its lower edge SHALL coincide with the band's upper edge, it
-SHALL extend from the left HUD island column's right edge to the right edge of the band's left two
-thirds in every mode — so in dialogue mode, where the message region spans the whole band, it stops
-short of the dialogue host's portrait — and it SHALL overlay the lowest strip of the stage box, never
-the band and never the message text.
+The client's text control SHALL render as a single bar filling the stage's `command-line` anchor, containing — in this order — a prompt chevron, the command input field with its send control, a hint cluster, and the command-history controls. The bar SHALL carry no quick-word chip, no control that only writes a fixed command word into the field, and no overlay or drawer opener: those openers live in the top navigation bar's tool group.
 
-The command line SHALL be collapsed by default. It SHALL start collapsed on every mount of the shell,
-and its expanded state SHALL be client-local and never persisted, so no stored presentation state can
-open it or keep it open. While collapsed, the row SHALL be hidden with `display:none`, so the bar and
-its input field leave the layout, the accessibility tree, and the tab order, while the input field stays
-in the DOM with its preserved identifier and keeps any unsent draft and history-walk state. The
-message region SHALL carry, at its bottom-right corner, a labelled ⌨ toggle control that reports the
-row's state through `aria-expanded` and names the row through `aria-controls`. The toggle SHALL be
-rendered in every mode that renders the message region, SHALL NOT cover the message text (the text's
-scroll region SHALL keep its last line clear of the toggle), and SHALL NOT be affected by the committed
-narrative, the dialogue choice list, or the dock frame.
+#### Scenario: The anchor is a 44px row on the message region's top edge
+- **WHEN** the `command-line` anchor renders in any mode
+- **THEN** it is one row 44px tall docked to the top edge of the bottom band's message region: its lower edge coincides with the band's upper edge, it extends from the left HUD island column's right edge to the right edge of the band's left two thirds in every mode — so in dialogue mode, where the message region spans the whole band, it stops short of the dialogue host's portrait — and it overlays the lowest strip of the stage box, never the band and never the message text
 
-The command line SHALL expand, and focus SHALL move into its input field only after the row is
-rendered, on exactly three paths: `/` pressed while no editable control is focused, activation of the ⌨
-toggle while the row is collapsed, and the free-form dialogue borrow. It SHALL collapse, with focus
-moved to the current mode's focus home (the action dock, or in dialogue mode the dialogue choice list
-while it is rendered and the message window's page surface otherwise) before the row is hidden, on exactly two paths: Escape in the input field, and
-a send the field accepts (the field clears). Activating the ⌨ toggle while the row is expanded SHALL
-collapse it and leave focus on the toggle. A send the field rejects — offline, mutations locked, a
-mutation in flight, or, for a borrowed free-form send, a presentation phase other than active — SHALL
-leave the row expanded with the typed text and focus in the field. Losing
-focus by any other means (a pointer activation elsewhere, a drawer or overlay opening) SHALL NOT
-collapse the row.
+#### Scenario: The line is collapsed by default and never persisted
+- **WHEN** the shell mounts, and when the player expands and reloads
+- **THEN** the command line starts collapsed on every mount, its expanded state is client-local and never persisted, and no stored presentation state can open it or keep it open
 
-The expanded bar SHALL NOT overlap the action dock, the narrative caption, the bottom band, or any HUD
-island anchor at 1451x790 or at any larger viewport up to the chrome cap. When horizontal space is insufficient, the hint
-cluster SHALL be dropped first; the input field, its send control, and the history controls SHALL
-never be dropped. (The command line and its toggle are absent from the layout in creation mode, per the
-visibility matrix.)
+#### Scenario: Collapsed hides the row but keeps the field's state
+- **WHEN** the row is collapsed
+- **THEN** it is hidden with `display:none`, so the bar and its input field leave the layout, the accessibility tree, and the tab order, while the input field stays in the DOM with its preserved identifier and keeps any unsent draft and history-walk state
+
+#### Scenario: The ⌨ toggle reports the row's state
+- **WHEN** the message region renders in any mode
+- **THEN** it carries, at its bottom-right corner, a labelled ⌨ toggle control that reports the row's state through `aria-expanded` and names the row through `aria-controls`; the toggle is rendered in every mode that renders the message region, never covers the message text (the text's scroll region keeps its last line clear of the toggle), and is unaffected by the committed narrative, the dialogue choice list, or the dock frame
+
+#### Scenario: Exactly three paths expand the line
+- **WHEN** the player presses `/` while no editable control is focused, activates the ⌨ toggle while the row is collapsed, or borrows the line for free-form dialogue
+- **THEN** the command line expands and focus moves into its input field only after the row is rendered, on exactly these three paths
+
+#### Scenario: Exactly two paths collapse the line
+- **WHEN** Escape is pressed in the input field, or a send the field accepts clears it
+- **THEN** the line collapses on exactly these two paths, with focus moved to the current mode's focus home (the action dock, or in dialogue mode the dialogue choice list while it is rendered and the message window's page surface otherwise) before the row is hidden
+
+#### Scenario: Toggle-close keeps focus; rejected sends stay open
+- **WHEN** the ⌨ toggle is activated while the row is expanded, or a send is rejected — offline, mutations locked, a mutation in flight, or, for a borrowed free-form send, a presentation phase other than active
+- **THEN** the toggle collapses the row and leaves focus on the toggle, and a rejected send leaves the row expanded with the typed text and focus in the field
+
+#### Scenario: Losing focus never collapses the row
+- **WHEN** the field loses focus by any other means (a pointer activation elsewhere, a drawer or overlay opening)
+- **THEN** the row does not collapse
+
+#### Scenario: The expanded bar keeps its clearances and drops only hints
+- **WHEN** the bar is expanded at 1451x790 or at any larger viewport up to the chrome cap, and when horizontal space is insufficient
+- **THEN** the expanded bar does not overlap the action dock, the narrative caption, the bottom band, or any HUD island anchor; the hint cluster is dropped first; and the input field, its send control, and the history controls are never dropped (the command line and its toggle are absent from the layout in creation mode, per the visibility matrix)
 
 #### Scenario: The field is one action away
 - **WHEN** the shell mounts in exploration mode
@@ -1685,20 +1833,23 @@ visibility matrix.)
 - **THEN** nothing is sent, the row is hidden, and focus is on the dialogue's focus home — the choice list while it is shown, else the message window's page surface — never on the hidden action dock or the document body
 
 ### Requirement: The command line advertises only affordances this client implements
-The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history
-recall keys and the Tab-completion affordance — matching the draft's `↑↓ 歷史 ‧ Tab 補全` — and
-Tab completion SHALL behave as named: pressing Tab inside the input field completes the current
-draft against the client's candidate set (session command history and the committed exploration panel's exit names and interact-target display names, deduplicated). With exactly one matching candidate the field SHALL hold the full completion with
-the caret at its end; with several the field SHALL hold the longest common prefix and successive
-Tab presses SHALL cycle the matching candidates, with Shift+Tab reversing the cycle. A draft that
-matches no candidate SHALL leave the field untouched, and Tab SHALL never move focus away from the
-field at all (the release path is Escape, which the dock's shortcut legend names). The completion
-cycle SHALL reset when the draft text is edited manually, and a change to the committed candidate
-sources SHALL drop any in-flight cycle.
+The hint cluster SHALL name only behaviour the client implements. It SHALL state the command-history recall keys and the Tab-completion affordance — matching the draft's `↑↓ 歷史 ‧ Tab 補全`. No surface of the command line SHALL name a key, gesture or affordance that has no implementation behind it.
 
-The history controls SHALL be labelled controls that drive the same history-walk state the recall
-keys drive — one walk reached by two input paths — and SHALL NOT submit. No surface of the command
-line SHALL name a key, gesture or affordance that has no implementation behind it.
+#### Scenario: Tab completes against the deduplicated candidate set
+- **WHEN** the player presses Tab inside the input field
+- **THEN** completion behaves as named: the current draft is completed against the client's candidate set (session command history and the committed exploration panel's exit names and interact-target display names, deduplicated)
+
+#### Scenario: Unique, ambiguous, and unmatched drafts
+- **WHEN** exactly one candidate matches, several match, or none matches
+- **THEN** with one match the field holds the full completion with the caret at its end; with several the field holds the longest common prefix and successive Tab presses cycle the matching candidates, with Shift+Tab reversing the cycle; and a draft that matches no candidate leaves the field untouched
+
+#### Scenario: Tab never steals focus and the cycle resets honestly
+- **WHEN** Tab is pressed, the draft text is edited manually, or the committed candidate sources change
+- **THEN** Tab never moves focus away from the field at all (the release path is Escape, which the dock's shortcut legend names); the completion cycle resets when the draft text is edited manually; and a change to the committed candidate sources drops any in-flight cycle
+
+#### Scenario: History controls share the keys' walk
+- **WHEN** the history controls are used
+- **THEN** they are labelled controls that drive the same history-walk state the recall keys drive — one walk reached by two input paths — and they never submit
 
 #### Scenario: The hint names history and completion
 - **WHEN** the hint cluster renders
@@ -1726,38 +1877,39 @@ line SHALL name a key, gesture or affordance that has no implementation behind i
 - **THEN** both move through the same command-history walk in the same order, the draft is preserved across the walk, and neither submits
 
 ### Requirement: A full-screen overlay is one focus-trapped surface, and only one is open at a time
-A full-screen overlay SHALL render as one shared surface laid over the stage, carrying the shared
-reference-surface header naming the surface and a labelled close control, with its body as its only
-scrolling region. Utility overlays SHALL use the same opaque reference workspace as the reference
-drawers: 12px below the top navigation's bottom edge, 16px inside each side of the viewport, and one
-command-line row height plus 12px above the viewport bottom, so the workspace covers the stage, the
-bottom band, and the command-line row whether or not that row is expanded, and only the band's lowest
-control strip stays exposed beneath it. A scrim SHALL cover everything below the top navigation behind
-the overlay, recessing that exposed strip, and SHALL absorb pointer activation without closing the
-overlay, so no command control behind the overlay is reachable by pointer; the scrim starts at the top
-navigation's bottom edge and does not cover it, so the navigation stays operable and activating another
-overlay or drawer trigger replaces the open overlay as below. The mode-owned creation workspace is excluded from these utility-frame bounds. While an overlay
-is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation. It
-SHALL close on Escape and on activation of its close control, and both paths SHALL restore focus to the
-control that opened it. It SHALL use the shared focus trap the client already owns rather than a second
-implementation.
+A full-screen overlay SHALL render as one shared surface laid over the stage, carrying the shared reference-surface header naming the surface and a labelled close control, with its body as its only scrolling region. While an overlay is open it SHALL trap keyboard focus, so no surface behind it is reachable by sequential navigation. It SHALL close on Escape and on activation of its close control, and both paths SHALL restore focus to the control that opened it.
 
-At most one overlay SHALL be open at any time; opening a second SHALL close the first, and the opener
-recorded for the replacement is the control that opened it, so closing restores focus to the most recent
-trigger, never to the trigger of the closed overlay. An overlay and a
-reference drawer SHALL NOT be open together: opening either SHALL close the other, so at most one
-focus-trapped surface exists at any moment. An open overlay SHALL register itself as an open surface so
-the stage recession this capability already requires applies without a second mechanism.
+#### Scenario: Utility overlays share the reference workspace bounds
+- **WHEN** a utility overlay renders
+- **THEN** it uses the same opaque reference workspace as the reference drawers: 12px below the top navigation's bottom edge, 16px inside each side of the viewport, and one command-line row height plus 12px above the viewport bottom, so the workspace covers the stage, the bottom band, and the command-line row whether or not that row is expanded, and only the band's lowest control strip stays exposed beneath it
 
-Escape SHALL be resolved by a single precedence order, topmost first — a popover open inside the open
-overlay, then the open overlay, then an open drawer, then the focused command field, then the dock's
-current menu level — with each level consuming the key and stopping. A popover open inside an overlay
-SHALL close on Escape without closing the overlay, keeping focus inside the overlay, and the next
-Escape SHALL close the overlay; while no such popover is open, Escape closes the overlay as above.
+#### Scenario: The scrim recesses and absorbs but never closes
+- **WHEN** an overlay is open
+- **THEN** a scrim covers everything below the top navigation behind the overlay, recessing that exposed strip, and absorbs pointer activation without closing the overlay, so no command control behind the overlay is reachable by pointer; the scrim starts at the top navigation's bottom edge and does not cover it, so the navigation stays operable and activating another overlay or drawer trigger replaces the open overlay as below; and the mode-owned creation workspace is excluded from these utility-frame bounds
 
-A mode change into creation, a presentation-epoch reset and a loss of the transport SHALL each close
-every open overlay. The mode-driven character-creation surface SHALL NOT be part of this single-open
-stack, because it is not opened by the player and a utility control must never dismiss it.
+#### Scenario: The shared focus trap is reused
+- **WHEN** an overlay implements its focus trap
+- **THEN** it uses the shared focus trap the client already owns rather than a second implementation
+
+#### Scenario: One overlay replaces another and inherits its opener
+- **WHEN** an overlay is open and a second overlay opens
+- **THEN** at most one overlay is open at any time, opening a second closes the first, and the opener recorded for the replacement is the control that opened it, so closing restores focus to the most recent trigger, never to the trigger of the closed overlay
+
+#### Scenario: Overlays and drawers never coexist
+- **WHEN** an overlay would open while a reference drawer is open, or vice versa
+- **THEN** opening either closes the other, so at most one focus-trapped surface exists at any moment, and an open overlay registers itself as an open surface so the stage recession this capability already requires applies without a second mechanism
+
+#### Scenario: Escape resolves topmost-first through one order
+- **WHEN** Escape is pressed with several dismissable levels present
+- **THEN** it is resolved by a single precedence order, topmost first — a popover open inside the open overlay, then the open overlay, then an open drawer, then the focused command field, then the dock's current menu level — with each level consuming the key and stopping
+
+#### Scenario: An overlay's popover takes Escape first
+- **WHEN** a popover is open inside an overlay, and later no such popover is open
+- **THEN** Escape closes the popover without closing the overlay, keeping focus inside the overlay, and the next Escape closes the overlay; while no such popover is open, Escape closes the overlay directly
+
+#### Scenario: Client resets close every overlay
+- **WHEN** the mode changes into creation, the presentation epoch resets, or the transport is lost
+- **THEN** each closes every open overlay, and the mode-driven character-creation surface is not part of this single-open stack, because it is not opened by the player and a utility control must never dismiss it
 
 #### Scenario: An overlay opens, traps focus, and returns it
 - **WHEN** the player activates an overlay trigger, cycles focus forward past the overlay's last control and backward past its first, and then presses Escape
@@ -1788,38 +1940,35 @@ stack, because it is not opened by the player and a utility control must never d
 - **THEN** the first Escape closes only the popover and focus stays inside the overlay, and the second Escape closes the overlay and returns focus to the trigger that opened it
 
 ### Requirement: The map, settings, and help surfaces are reachable from the live client
-The map, settings and help surfaces SHALL each be reachable from the running client by a labelled
-control, not only from the component showcase. The minimap island SHALL carry a labelled control that
-opens the map surface, rendered as a sibling of its map canvas rather than as a wrapper around its
-actionable nodes; the island's non-interactive body MAY additionally open the same surface on pointer
-click, which SHALL NOT replace or wrap the labelled control. The top navigation bar's labelled 設定
-control and the 說明 control in its tool group SHALL open the settings and help surfaces, in every mode
-that renders the top navigation bar, whether the command line is expanded or collapsed.
+The map, settings and help surfaces SHALL each be reachable from the running client by a labelled control, not only from the component showcase.
 
-The map surface SHALL render the committed `local_map` payload through the same component the minimap
-island renders, and SHALL re-render its available and unavailable branches whenever that read model is
-replaced, so a superseded payload never leaves a stale map or a stale reason on screen; when a newly
-committed payload resolves to the other layout variant, the surface follows the resolved value with no
-control of its own. It SHALL open fitted, showing the whole drawing inside its body, and SHALL offer
-exactly the view affordances the full-map fit-view requirement of the local-map capability defines —
-wheel and `+` / `-` zoom within that requirement's bounds, labelled 放大 and 縮小 buttons, drag-pan, a
-labelled 置中 button that recentres the current node, and a `?` disclosure button named 圖例 that opens
-the state legend in a popover — and it SHALL name those gestures in words in its guide row. Those
-affordances change only the view of the drawing: none of them SHALL change the committed payload, the
-resolved layout variant, or any geometry the surface declares, and none SHALL be persisted. It SHALL
-render no bearing, compass angle, distance, or coordinate figure, on any layer, and no zoom level,
-scale ratio, or other figure describing the view.
+#### Scenario: Live triggers open each surface
+- **WHEN** the client renders the minimap island and the top navigation bar
+- **THEN** the minimap island carries a labelled control that opens the map surface, rendered as a sibling of its map canvas rather than as a wrapper around its actionable nodes — the island's non-interactive body MAY additionally open the same surface on pointer click, which never replaces or wraps the labelled control — and the top navigation bar's labelled 設定 control and the 說明 control in its tool group open the settings and help surfaces, in every mode that renders the top navigation bar, whether the command line is expanded or collapsed
 
-The map surface's body SHALL carry the redesign draft's map-canvas framing (the radial-gradient dark
-terrain background painted as pure CSS inside a rounded ink border), and SHALL NOT fabricate terrain
-geometry the payload does not claim.
+#### Scenario: The map surface tracks read-model replacement
+- **WHEN** the committed `local_map` read model is replaced
+- **THEN** the map surface renders the payload through the same component the minimap island renders and re-renders its available and unavailable branches whenever that read model is replaced, so a superseded payload never leaves a stale map or a stale reason on screen; when a newly committed payload resolves to the other layout variant, the surface follows the resolved value with no control of its own
 
-The help surface SHALL render the client's own control reference — the keys this client binds, the dock's
-navigation model and the close paths — from a single client-owned source, and SHALL
-state how the game's own help output is reached. It SHALL name no key binding
-or control the client does not implement, SHALL describe `/` and the ⌨ toggle as expanding the command
-line and Escape and a successful send as collapsing it, and SHALL NOT render authored game-help content for which
-no committed panel exists, and SHALL NOT stand a placeholder in for it.
+#### Scenario: The map opens fitted with exactly its view affordances
+- **WHEN** the map surface opens
+- **THEN** it opens fitted, showing the whole drawing inside its body, and offers exactly the view affordances the full-map fit-view requirement of the local-map capability defines — wheel and `+` / `-` zoom within that requirement's bounds, labelled 放大 and 縮小 buttons, drag-pan, a labelled 置中 button that recentres the current node, and a `?` disclosure button named 圖例 that opens the state legend in a popover — naming those gestures in words in its guide row
+
+#### Scenario: View affordances change nothing committed
+- **WHEN** any map view affordance is used
+- **THEN** it changes only the view of the drawing: none changes the committed payload, the resolved layout variant, or any geometry the surface declares, and none is persisted
+
+#### Scenario: The map states no figures
+- **WHEN** the map surface renders on any layer
+- **THEN** it renders no bearing, compass angle, distance, or coordinate figure, and no zoom level, scale ratio, or other figure describing the view
+
+#### Scenario: The canvas framing is pure CSS
+- **WHEN** the map surface's body renders
+- **THEN** it carries the redesign draft's map-canvas framing (the radial-gradient dark terrain background painted as pure CSS inside a rounded ink border) and fabricates no terrain geometry the payload does not claim
+
+#### Scenario: The help surface is the client's own truth
+- **WHEN** the help surface renders
+- **THEN** it renders the client's own control reference — the keys this client binds, the dock's navigation model and the close paths — from a single client-owned source, and states how the game's own help output is reached; it names no key binding or control the client does not implement, describes `/` and the ⌨ toggle as expanding the command line and Escape and a successful send as collapsing it, renders no authored game-help content for which no committed panel exists, and stands no placeholder in for it
 
 #### Scenario: Each surface has a live trigger
 - **WHEN** the client renders in exploration mode with the `local_map` panel committed and the command line collapsed
@@ -1845,29 +1994,39 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 - **THEN** it renders the client's own control reference, including `/` and the ⌨ toggle expanding the command line and Escape collapsing it, and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
 
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
-The client SHALL expose a narrative prose scale with three steps — `A−` 16px, `A` 18px, and
-`A+` 20px at the 1451x790 reference scale, multiplied once by the desktop chrome factor —
-selectable from the settings surface, whose current step is marked by an indicator that does not
-rely on colour alone. `A−` is the reading floor: at the reference scale it renders the prose the
-client shows at exactly 16 CSS px, and no step renders it smaller. The scale SHALL apply
-to narrative and dialogue prose only — the message window's page text, the complete-log surface's lines,
-the prompt line and the settings surface's reading sample, which previews the page text — and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text, so the
-stage's measured anchor geometry is unaffected at the reference viewport or any larger one.
+The client SHALL expose a narrative prose scale with three steps — `A−` 16px, `A` 18px, and `A+` 20px at the 1451x790 reference scale, multiplied once by the desktop chrome factor — selectable from the settings surface, whose current step is marked by an indicator that does not rely on colour alone. The scale SHALL apply to narrative and dialogue prose only and SHALL NOT alter HUD, dock, drawer, overlay or any other interface text.
 
-The prose scale and every other setting the surface offers SHALL be client-local presentation state. No
-settings control SHALL dispatch an action: the client's action allowlist carries exactly one `options.*`
-action, the suggestions dismissal, and this capability adds none. Each setting SHALL be applied
-immediately to the presentation it governs — the document's presentation tokens for the prose scale,
-the motion level, the text-to-HTML toggle and the colourblind palette, and the message window for the
-reading preferences and the motion level — and SHALL be persisted through the client's versioned,
-presentation-only browser store as a harmless display preference. Each setting SHALL be re-applied at
-load, and SHALL be reset to its default — fully applied, never half-applied — whenever that store
-resets. A stored prose-scale value that matches none of the re-stepped values SHALL load as the
-default `A` step rather than as a clamped legacy multiplier. The motion level SHALL follow "The motion level is a client-local preference that governs every
-client animation": a stored level overrides the operating system's reduced-motion preference, which
-SHALL continue to apply while no level is stored.
+#### Scenario: A− is the reading floor
+- **WHEN** the `A−` step renders at the reference scale
+- **THEN** it renders the prose the client shows at exactly 16 CSS px, and no step renders it smaller
 
-The settings surface SHALL offer no control it does not implement.
+#### Scenario: The scale touches only prose
+- **WHEN** any prose scale step is selected
+- **THEN** it governs the message window's page text, the complete-log surface's lines, the prompt line and the settings surface's reading sample, which previews the page text — and the stage's measured anchor geometry is unaffected at the reference viewport or any larger one
+
+#### Scenario: Settings are client-local and dispatch nothing
+- **WHEN** any setting the surface offers changes
+- **THEN** it is client-local presentation state; no settings control dispatches an action — the client's action allowlist carries exactly one `options.*` action, the suggestions dismissal, and this capability adds none
+
+#### Scenario: Settings apply immediately and persist versioned
+- **WHEN** a setting changes
+- **THEN** it is applied immediately to the presentation it governs — the document's presentation tokens for the prose scale, the motion level, the text-to-HTML toggle and the colourblind palette, and the message window for the reading preferences and the motion level — and is persisted through the client's versioned, presentation-only browser store as a harmless display preference
+
+#### Scenario: Reload re-applies; store reset restores defaults
+- **WHEN** the client loads, or the presentation store resets
+- **THEN** each setting is re-applied at load, and reset to its default — fully applied, never half-applied — whenever that store resets
+
+#### Scenario: A legacy stored scale loads as the default step
+- **WHEN** a stored prose-scale value matches none of the re-stepped values
+- **THEN** it loads as the default `A` step rather than as a clamped legacy multiplier
+
+#### Scenario: The motion level follows its own requirement
+- **WHEN** a motion level is stored, and when none is stored
+- **THEN** the motion level follows "The motion level is a client-local preference that governs every client animation": a stored level overrides the operating system's reduced-motion preference, which continues to apply while no level is stored
+
+#### Scenario: No inert control is offered
+- **WHEN** the settings surface enumerates its controls
+- **THEN** it offers no control it does not implement
 
 #### Scenario: The prose scale moves prose and nothing else
 - **WHEN** the player selects the largest prose scale
@@ -1890,19 +2049,19 @@ The settings surface SHALL offer no control it does not implement.
 - **THEN** every control changes an outcome the client actually implements, and no control is rendered that has no effect
 
 ### Requirement: Narrative lines carry the reference's semantic classes
-Committed narrative lines SHALL render with the reference draft's semantic presentation: a line of
-committed `sys` kind SHALL render in the sans face at the reference's secondary size and colour with
-a leading `◈` seal-colour marker contributed by the line's own class, not by invented text;
-emphasis inside prose lines SHALL render in the reference's gold accent; plain prose lines SHALL
-render in the bundled monospace reading face, the face the message window's page text uses. The classes SHALL be mounted by the existing markup pipeline at
-render time from committed line kinds only — the tokenizer, the player-echo divider lines, and the
-box-drawing art path SHALL be unchanged, and no markup class SHALL be mounted for a kind the store
-does not carry. The markup pipeline SHALL run exactly once for each retained server, system, or error
-line, when the line is retained. Every surface that renders the line SHALL render from that one token
-stream, never from a second tokenization or a second markup path. A player input line SHALL never
-enter the pipeline. A fragment of a line that paging has split SHALL render with the same kind class,
-and the same box-drawing class where it applies, as the whole line would. Only the first fragment
-of a `sys` line SHALL show the leading `◈` marker.
+Committed narrative lines SHALL render with the reference draft's semantic presentation: a line of committed `sys` kind SHALL render in the sans face at the reference's secondary size and colour with a leading `◈` seal-colour marker contributed by the line's own class, not by invented text; emphasis inside prose lines SHALL render in the reference's gold accent; plain prose lines SHALL render in the bundled monospace reading face, the face the message window's page text uses.
+
+#### Scenario: Classes mount only from committed kinds
+- **WHEN** markup classes are mounted at render time
+- **THEN** the existing markup pipeline mounts them from committed line kinds only — the tokenizer, the player-echo divider lines, and the box-drawing art path are unchanged, and no markup class is mounted for a kind the store does not carry
+
+#### Scenario: Each retained line is tokenized exactly once
+- **WHEN** a retained server, system, or error line renders on any surface
+- **THEN** the markup pipeline has run exactly once for that line, when the line is retained; every surface that renders the line renders from that one token stream, never from a second tokenization or a second markup path; and a player input line never enters the pipeline
+
+#### Scenario: Fragments keep the whole line's classes
+- **WHEN** paging splits a line into fragments
+- **THEN** a fragment renders with the same kind class, and the same box-drawing class where it applies, as the whole line would, and only the first fragment of a `sys` line shows the leading `◈` marker
 
 #### Scenario: A sys line renders with the seal marker
 - **WHEN** a committed narrative line of kind `sys` renders
@@ -1933,20 +2092,27 @@ of a `sys` line SHALL show the leading `◈` marker.
   line render in the monospace reading face with the emphasis still gold in whichever fragment holds it
 
 ### Requirement: The party drawer presents compbig rows and the fixed follow rules
-The 同伴 ‧ 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count
-`N / 4`, one compbig row per committed party slot (initial-letter/gold avatar with the same
-portrait fallback, display name, bond stage line, HP bar with numerals, the joined 參戰 token
-when the companion fights, and a 請其離隊 control), and one 空位 row stating the invite rule in
-stage-name words — the raw affinity threshold number SHALL NOT be shown. The 空位 row's
-`邀請當前 NPC…` control SHALL dispatch `explore.party_invite` with the exact existing payload
-`{npc_id: <the committed invite-capable interact target's identity>, message: ""}` — the fixed
-empty message, since the drawer invents no freeform invitation input — under the existing
-dispatch and confirmation contract, enabled only when the committed exploration context names
-an invite-capable interact target, and SHALL be disabled with its rule line as the reason
-otherwise — it SHALL never fabricate a target. Activating 請其離隊 SHALL dispatch `explore.party_leave` for that identity
-under the same contract. The drawer SHALL close the party section with three fixed follow-rule
-statements matching the reference draft verbatim, and SHALL render no companion detail control
-that has no backing read model.
+The 同伴 ‧ 隊伍 drawer SHALL render on the shared reference drawer contract with the sub-count `N / 4`, one compbig row per committed party slot (initial-letter/gold avatar with the same portrait fallback, display name, bond stage line, HP bar with numerals, the joined 參戰 token when the companion fights, and a 請其離隊 control), and one 空位 row stating the invite rule in stage-name words.
+
+#### Scenario: The empty slot never shows the raw threshold
+- **WHEN** the 空位 row states the invite rule
+- **THEN** it names the rule in stage-name words — the raw affinity threshold number is not shown
+
+#### Scenario: The invite control dispatches the exact existing payload
+- **WHEN** the 空位 row's `邀請當前 NPC…` control is activated
+- **THEN** it dispatches `explore.party_invite` with the exact existing payload `{npc_id: <the committed invite-capable interact target's identity>, message: ""}` — the fixed empty message, since the drawer invents no freeform invitation input — under the existing dispatch and confirmation contract
+
+#### Scenario: The invite control never fabricates a target
+- **WHEN** the committed exploration context names an invite-capable interact target, and when it does not
+- **THEN** the control is enabled only in the first case and otherwise disabled with its rule line as the reason — it never fabricates a target
+
+#### Scenario: Leaving dispatches under the same contract
+- **WHEN** the player activates 請其離隊
+- **THEN** it dispatches `explore.party_leave` for that identity under the same contract
+
+#### Scenario: The section closes with the reference's fixed rules
+- **WHEN** the drawer closes the party section
+- **THEN** it states three fixed follow-rule statements matching the reference draft verbatim, and renders no companion detail control that has no backing read model
 
 #### Scenario: Rows follow the committed party
 - **WHEN** the drawer is open and a party mutation commits a third companion
@@ -1968,22 +2134,19 @@ that has no backing read model.
   rules
 
 ### Requirement: The objective tracker island presents the committed objectives only
-The HUD SHALL carry the objective tracker as one line in the stage's `map` anchor, directly beneath
-the minimap island, while the committed mode is exploration and the committed `objectives` panel is
-available with a non-empty `rows` list; it SHALL be hidden with `display:none` in combat and dialogue
-mode and SHALL render nothing when `rows` is empty, when the panel is unavailable, or in creation mode.
-The line SHALL have one fixed row height whatever the payload holds and SHALL carry, in order: a
-`目標` label; a stage box for the first row of `objectives.rows` showing a completion check when that
-row's `stage_progress >= objective_quantity` and an empty box otherwise; that first row's
-`objective_line`, truncated on one line with an overflow indicator while its full text stays the line's
-accessible text and tooltip; a mono-gold slot carrying `stage_progress / objective_quantity` when the
-first row's `objective_quantity` is greater than one and its `+reward_copper` when `objective_quantity`
-is one and `reward_copper` is non-null, and carrying nothing otherwise; and, when more than one row is
-committed, a mono-gold `+N` count where `N` is the number of further rows. Rows after the first, and
-every row's `deadline_line`, SHALL NOT be rendered on the stage; the quest drawer presents them. The
-tracker is display-only: it SHALL render no accept, abandon, turn-in, or tracking control and SHALL
-dispatch no action. It SHALL present no objective prose the panel does not carry and no invented
-optional or previous-stage rows.
+The HUD SHALL carry the objective tracker as one line in the stage's `map` anchor, directly beneath the minimap island, while the committed mode is exploration and the committed `objectives` panel is available with a non-empty `rows` list; it SHALL be hidden with `display:none` in combat and dialogue mode and SHALL render nothing when `rows` is empty, when the panel is unavailable, or in creation mode. The line SHALL have one fixed row height whatever the payload holds.
+
+#### Scenario: The line's contents follow one fixed order
+- **WHEN** the tracker line renders
+- **THEN** it carries, in order: a `目標` label; a stage box for the first row of `objectives.rows` showing a completion check when that row's `stage_progress >= objective_quantity` and an empty box otherwise; that first row's `objective_line`, truncated on one line with an overflow indicator while its full text stays the line's accessible text and tooltip; a mono-gold slot carrying `stage_progress / objective_quantity` when the first row's `objective_quantity` is greater than one and its `+reward_copper` when `objective_quantity` is one and `reward_copper` is non-null, and carrying nothing otherwise; and, when more than one row is committed, a mono-gold `+N` count where `N` is the number of further rows
+
+#### Scenario: Later rows and deadlines belong to the quest drawer
+- **WHEN** rows after the first, or any row's `deadline_line`, exist
+- **THEN** they are not rendered on the stage; the quest drawer presents them
+
+#### Scenario: The tracker is display-only and never invents
+- **WHEN** the tracker renders
+- **THEN** it renders no accept, abandon, turn-in, or tracking control and dispatches no action, and presents no objective prose the panel does not carry and no invented optional or previous-stage rows
 
 #### Scenario: Active objectives list in payload order
 - **WHEN** a snapshot commits two objective rows in exploration mode, the first with progress 2 of quantity 5 and the
@@ -2009,19 +2172,27 @@ optional or previous-stage rows.
 - **THEN** the text is truncated with an overflow indicator, the line keeps its single-row height, and the full `objective_line` is the line's accessible text
 
 ### Requirement: The skill book offers a bounded declared-practice sub-screen
-The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed
-`character` panel supports, and activating it SHALL replace the book body with a practice
-sub-screen inside the same drawer: the drawer title becomes 修煉, the body lists the panel's
-active skills for selection, and one bounded-duration control starts the practice. The browser
-SHALL compute nothing about eligibility, duration outcome, or progression: every row state comes
-from the committed panel, the duration control reuses the waiting surface's bounded hours form, and
-confirmation SHALL submit exactly one `explore.practice` with the selected `skill` and the
-converted whole `seconds` through the shared dispatch/confirmation lock. While a submission is in
-flight or its declared presentation revision is pending, the control SHALL be disabled. The
-server-authored result line (success summary or rejection message) SHALL render as escaped text
-inside the sub-screen and nowhere else, and closing the sub-screen SHALL restore the book body,
-the original drawer title, and the book's graphical use/practice guidance without restoring the
-removed cast-syntax footer. Casting SHALL NOT replace or bypass this practice workflow.
+The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed `character` panel supports, and activating it SHALL replace the book body with a practice sub-screen inside the same drawer: the drawer title becomes 修煉, the body lists the panel's active skills for selection, and one bounded-duration control starts the practice.
+
+#### Scenario: The browser computes nothing about practice
+- **WHEN** the practice sub-screen renders and submits
+- **THEN** the browser computes nothing about eligibility, duration outcome, or progression: every row state comes from the committed panel, the duration control reuses the waiting surface's bounded hours form, and confirmation submits exactly one `explore.practice` with the selected `skill` and the converted whole `seconds` through the shared dispatch/confirmation lock
+
+#### Scenario: In-flight submissions lock the control
+- **WHEN** a submission is in flight or its declared presentation revision is pending
+- **THEN** the control is disabled
+
+#### Scenario: The result line is escaped and local
+- **WHEN** a server-authored result line (success summary or rejection message) arrives
+- **THEN** it renders as escaped text inside the sub-screen and nowhere else
+
+#### Scenario: Closing restores the book, not the footer
+- **WHEN** the sub-screen closes
+- **THEN** the book body, the original drawer title, and the book's graphical use/practice guidance are restored without restoring the removed cast-syntax footer
+
+#### Scenario: Casting leaves practice intact
+- **WHEN** the player casts
+- **THEN** casting does not replace or bypass this practice workflow
 
 #### Scenario: Practice dispatches one server-trusted intent
 - **WHEN** the player opens 修煉 from an active skill row, selects the skill, enters `2` hours, and confirms
@@ -2040,15 +2211,15 @@ removed cast-syntax footer. Casting SHALL NOT replace or bypass this practice wo
 - **THEN** the drawer shows the skill book again with its original title and graphical use/practice guidance, no cast-syntax footer and no second drawer
 
 ### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
-The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character
-status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while
-that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
+The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
 
-Each drawer SHALL be opened either by the dock frame that owns its surface, or by a single labelled
-control inside a drawer that already presents the same read model, or by a surface this capability
-names elsewhere as an opener for it. No reference surface SHALL require more than two actions from
-the top navigation bar or the dock's root frame to reach. Opening a drawer SHALL NOT change any dock root item, any menu frame, any
-menu key, or the meaning of Escape.
+#### Scenario: Every reference surface is reachable in two actions
+- **WHEN** a player seeks a reference surface from the top navigation bar or the dock's root frame
+- **THEN** each drawer is opened either by the dock frame that owns its surface, or by a single labelled control inside a drawer that already presents the same read model, or by a surface this capability names elsewhere as an opener for it, and no reference surface requires more than two actions to reach
+
+#### Scenario: Opening a drawer disturbs no dock contract
+- **WHEN** a drawer opens
+- **THEN** no dock root item, menu frame, menu key, or the meaning of Escape changes
 
 #### Scenario: No reference surface is mounted while the drawers are closed
 - **WHEN** the stage renders in exploration mode with every drawer closed
@@ -2063,31 +2234,31 @@ menu key, or the meaning of Escape.
 - **THEN** the top-right `map` anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
 
 ### Requirement: The action dock fills the band's command region at a fixed size
-The action dock SHALL fill the bottom band's command region — the right third of the band, or the
-whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed
-elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation
-mode and for every frame: no frame (the scene overview, a target's verb popover, the waiting frame, the
-combat frames, the skill master-detail, the destructive confirmation, or an empty pane host) SHALL
-widen, heighten, shorten, or move it, and
-no surface outside the band SHALL be positioned from the frame the dock currently carries. In dialogue
-mode the command region is collapsed and the dock SHALL be hidden with `display:none` together with it,
-as "The command region collapses in dialogue mode and the message window spans the band" states; it
-SHALL NOT be rendered anywhere else in that mode. The
-content column SHALL be laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar
-in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the
-bottom — around one remaining region that holds the current frame's rows or chips; that region SHALL
-be the surface's only scrolling area, so no dock content is ever pushed outside the command region.
-A target's verb popover SHALL render as a card laid over that region's visible box, inside the command
-region, and SHALL scroll inside its own card when its rows exceed it. A frame whose content
-does not fit the region's width SHALL wrap or collapse its own columns inside the region, never
-overflow it horizontally. The panel SHALL be the same single `#action-dock` element in every mode,
-carrying its existing tab index, its `data-mode` attribute and its role as the documented focus home
-of every mode except dialogue, and SHALL NOT be remounted when the mode changes, including a change
-into or out of dialogue.
+The action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation mode and for every frame, and no surface outside the band SHALL be positioned from the frame the dock currently carries.
 
-The command region SHALL use the current charcoal-and-gold presentation, and the band that contains
-it SHALL paint the reference's band chrome. Selected actions remain distinguishable by text and shape
-as well as their gold or warm-red emphasis.
+#### Scenario: No frame moves or resizes the dock
+- **WHEN** the dock carries the scene overview, a target's verb popover, the waiting frame, the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
+- **THEN** no frame widens, heightens, shortens, or moves its box
+
+#### Scenario: Dialogue hides the dock with the region
+- **WHEN** the committed mode is dialogue
+- **THEN** the command region is collapsed and the dock is hidden with `display:none` together with it, as "The command region collapses in dialogue mode and the message window spans the band" states; it is not rendered anywhere else in that mode
+
+#### Scenario: Fixed chrome surrounds one scrolling region
+- **WHEN** the dock's content column lays out
+- **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
+
+#### Scenario: Popovers and wide frames stay inside the region
+- **WHEN** a target's verb popover renders, or a frame's content does not fit the region's width
+- **THEN** the popover renders as a card laid over the region's visible box, inside the command region, scrolling inside its own card when its rows exceed it, and the wide frame wraps or collapses its own columns inside the region, never overflowing it horizontally
+
+#### Scenario: One dock element persists across every mode
+- **WHEN** the committed mode changes, including into or out of dialogue
+- **THEN** the panel is the same single `#action-dock` element in every mode, carrying its existing tab index, its `data-mode` attribute and its role as the documented focus home of every mode except dialogue, and it is not remounted
+
+#### Scenario: The presentation stays readable beyond colour
+- **WHEN** the command region and its band render
+- **THEN** the command region uses the current charcoal-and-gold presentation, the band that contains it paints the reference's band chrome, and selected actions remain distinguishable by text and shape as well as their gold or warm-red emphasis
 
 #### Scenario: The command region is the band's right third
 - **WHEN** the shell renders in exploration mode at 1451x790 and at 2560x1440
@@ -2121,41 +2292,39 @@ as well as their gold or warm-red emphasis.
   itself paints no background, border, or shadow
 
 ### Requirement: The place card names the current location and the world time
-This requirement carries the `place-card-relocation` amendment; the visible-mode set below narrows to exploration and combat with this change, matching the visibility matrix's dialogue `hidden` cells.
-The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's
-top-right corner directly below the top band and directly above the minimap island, while the
-committed mode is exploration or combat, and SHALL NOT render it in
-creation mode or settled dialogue mode. During live dialogue entry it MAY retain only the inert exit
-paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility
-tree and tab order from commit, and SHALL become `display:none` when the anchor's fade ends.
-The card SHALL state the current location as its heading and the world date/time
-beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
-The location SHALL be the best server-authored place name the client already holds, resolved in a
-fixed order: the committed `local_map` panel's `current_node` label when that panel is available,
-names a current node, that node is present in the panel's nodes, and its label is a non-empty string;
-otherwise the committed status panel's actor location label; otherwise the card's own unavailable
-placeholder `位置：--`. The world date/time SHALL be the committed world-time label, and the card's own
-unavailable placeholder `時間：--` when none is committed. The card SHALL NOT compose a third string
-from the two location candidates, SHALL NOT derive a name from any node or room identifier, SHALL NOT
-render a raw room key while a committed panel carries the authored place name for the same room, and
-SHALL render no raw mode label in place of the location.
+The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's top-right corner directly below the top band and directly above the minimap island, while the committed mode is exploration or combat, and SHALL NOT render it in creation mode or settled dialogue mode. The card SHALL state the current location as its heading and the world date/time beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
 
-The card SHALL wear the HUD island chrome (the translucent panel fill, the backdrop blur, the
-hairline border, the shared radius and shadow, all from the shared design tokens), SHALL span the same
-content-column width as the minimap island beneath it, SHALL keep a fixed
-height whatever the label lengths, and SHALL truncate a label that exceeds its width with an overflow
-indicator while keeping the full label as its accessible text. It SHALL be display-only: no control,
-no tab stop, and no dispatch.
+#### Scenario: Dialogue entry leaves only inert exit paint
+- **WHEN** the mode live-enters dialogue
+- **THEN** the card MAY retain only the inert exit paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility tree and tab order from commit, and becomes `display:none` when the anchor's fade ends
 
-The card SHALL set its two values on two levels: the location heading in the serif face at the
-`--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the
-world-time line. The world-time line SHALL carry no leading separator glyph or rule before its first
-value, SHALL use the
-numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 16px chrome
-floor), and SHALL render the committed world-time label (or its placeholder) verbatim, with every
-date and time value intact: all time values SHALL remain server-authored, and the card SHALL NOT
-reformat, abbreviate, or derive them. The heading, the rule, and the time line SHALL fit the card's
-fixed height.
+#### Scenario: The location resolves in a fixed order
+- **WHEN** the card resolves its location
+- **THEN** it uses the best server-authored place name the client already holds: the committed `local_map` panel's `current_node` label when that panel is available, names a current node, that node is present in the panel's nodes, and its label is a non-empty string; otherwise the committed status panel's actor location label; otherwise the card's own unavailable placeholder `位置：--`
+
+#### Scenario: The world time is committed or placeholdered
+- **WHEN** the card renders its world date/time
+- **THEN** it is the committed world-time label, and the card's own unavailable placeholder `時間：--` when none is committed
+
+#### Scenario: The card composes and guesses nothing
+- **WHEN** location candidates exist or identifiers are available
+- **THEN** the card composes no third string from the two location candidates, derives no name from any node or room identifier, renders no raw room key while a committed panel carries the authored place name for the same room, and renders no raw mode label in place of the location
+
+#### Scenario: The card wears island chrome at a fixed size
+- **WHEN** the card renders
+- **THEN** it wears the HUD island chrome (the translucent panel fill, the backdrop blur, the hairline border, the shared radius and shadow, all from the shared design tokens), spans the same content-column width as the minimap island beneath it, keeps a fixed height whatever the label lengths, and truncates a label that exceeds its width with an overflow indicator while keeping the full label as its accessible text
+
+#### Scenario: The card is display-only
+- **WHEN** the card renders
+- **THEN** it carries no control, no tab stop, and no dispatch
+
+#### Scenario: The two values read on two levels
+- **WHEN** the card renders heading and time
+- **THEN** it sets them on two levels: the location heading in the serif face at the `--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the world-time line; the heading, the rule, and the time line fit the card's fixed height
+
+#### Scenario: The time line keeps every server value intact
+- **WHEN** the world-time line renders
+- **THEN** it carries no leading separator glyph or rule before its first value, uses the numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 16px chrome floor), and renders the committed world-time label (or its placeholder) verbatim, with every date and time value intact: all time values remain server-authored, and the card reformats, abbreviates, or derives none of them
 
 #### Scenario: The card names the location and the time
 - **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 ‧ 12:00`, and no `local_map` panel
@@ -2187,19 +2356,28 @@ fixed height.
   step below the display size the stage's island chrome uses at `--text-lg`, the time line's numerals
   are tabular lining figures in the numeral face, and the card keeps its fixed height
 
+#### Scenario: The place card carries its amendment
+- **WHEN** the `place-card-relocation` amendment applies to this requirement
+- **THEN** the visible-mode set narrows to exploration and combat with this change, matching the visibility matrix's dialogue `hidden` cells
+
 ### Requirement: Text speed and auto-advance are client-local reading preferences the settings surface owns
-The settings surface's reading section SHALL offer a text-speed control with the four steps `慢`
-(`slow`), `標準` (`normal`), `快` (`fast`), and `瞬間` (`instant`), and an auto-advance toggle
-(`自動翻頁`). The text speed SHALL default to `normal` and auto-advance SHALL default to off. The
-current text-speed step SHALL be marked by an indicator that does not rely on colour alone, and SHALL
-be exposed as the pressed state of its button. The text-speed control SHALL say that the `減少` and
-`關閉` motion levels show pages at once, because an effective motion level other than `full`
-overrides the chosen speed as `webclient-input-narrative` defines. Both preferences SHALL follow the
-settings rules of "Narrative prose scale is a client-local preference the settings surface owns":
-client-local, dispatching nothing, applied to the message window immediately, persisted through the
-versioned presentation-only browser store, re-applied at load, and reset to their defaults when that
-store resets. A stored value outside the defined steps SHALL be discarded, and the default SHALL
-apply.
+The settings surface's reading section SHALL offer a text-speed control with the four steps `慢` (`slow`), `標準` (`normal`), `快` (`fast`), and `瞬間` (`instant`), and an auto-advance toggle (`自動翻頁`). The text speed SHALL default to `normal` and auto-advance SHALL default to off.
+
+#### Scenario: The speed step is marked without colour
+- **WHEN** a text-speed step is current
+- **THEN** it is marked by an indicator that does not rely on colour alone and is exposed as the pressed state of its button
+
+#### Scenario: The control names the motion override
+- **WHEN** the text-speed control renders
+- **THEN** it says that the `減少` and `關閉` motion levels show pages at once, because an effective motion level other than `full` overrides the chosen speed as `webclient-input-narrative` defines
+
+#### Scenario: Both preferences follow the settings rules
+- **WHEN** either reading preference changes
+- **THEN** it follows the settings rules of "Narrative prose scale is a client-local preference the settings surface owns": client-local, dispatching nothing, applied to the message window immediately, persisted through the versioned presentation-only browser store, re-applied at load, and reset to its defaults when that store resets
+
+#### Scenario: An out-of-range stored value falls back
+- **WHEN** a stored value lies outside the defined steps
+- **THEN** it is discarded and the default applies
 
 #### Scenario: Choosing a text speed applies and persists it
 - **WHEN** the player opens the settings surface and selects `快`
@@ -2218,15 +2396,19 @@ apply.
 - **THEN** the client loads with the `normal` speed, and the other stored preferences still apply
 
 ### Requirement: A fixed-column dock pane stays inside the command region
-When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count
-SHALL govern only which cell each row occupies. This requirement SHALL NOT prescribe how wide a column
-or row renders: each pane form (the combat skill list, the target tokens, the scale chips) lays out its
-rows with its own styles, and whether a form fills the pane's width or leaves width empty is a visual
-decision of that form. Whatever the form, every row SHALL render inside the pane's box without
-horizontal overflow: when the pane's available width is narrower than the rows' natural width, the rows
-SHALL wrap or compress, and long content SHALL wrap within its row. Changing a row's rendered width
-SHALL NOT change which row occupies which cell. The scene overview is not a fixed-column pane (its chips
-wrap by width under the section geometry the exploration dock requirement defines).
+When a dock pane's row region uses a fixed column count for keyboard row/col geometry, that fixed count SHALL govern only which cell each row occupies. Changing a row's rendered width SHALL NOT change which row occupies which cell.
+
+#### Scenario: Pane forms own their own layout
+- **WHEN** a pane form (the combat skill list, the target tokens, the scale chips) lays out its rows
+- **THEN** this requirement prescribes not how wide a column or row renders: each form uses its own styles, and whether a form fills the pane's width or leaves width empty is a visual decision of that form
+
+#### Scenario: Rows never overflow the pane horizontally
+- **WHEN** the pane's available width is narrower than the rows' natural width
+- **THEN** whatever the form, every row renders inside the pane's box without horizontal overflow: the rows wrap or compress, and long content wraps within its row
+
+#### Scenario: The scene overview is not a fixed-column pane
+- **WHEN** the scene overview renders its chips
+- **THEN** they wrap by width under the section geometry the exploration dock requirement defines — the scene overview is not a fixed-column pane
 
 #### Scenario: A narrow command region keeps every row inside the pane
 - **WHEN** a combat skill, target, or scale pane renders in the command region at the 1451x790 reference viewport
@@ -2237,33 +2419,27 @@ wrap by width under the section geometry the exploration dock requirement define
 - **THEN** focus reaches the row that the fixed column count places in the second column, whatever width each row renders at
 
 ### Requirement: The command region collapses in dialogue mode and the message window spans the band
-While the committed mode is `dialogue`, the bottom band's command region SHALL be collapsed and the
-message region SHALL span the band's whole width at the band's fixed height from the commit's frame. The
-collapsed region and the action dock inside it SHALL leave the accessibility tree, the tab order, and
-pointer hit-testing from the commit's frame; the region SHALL then slide out to the right and fade over
-the panel duration of the client's motion level, drawn over the widened message region, and SHALL be
-`visibility: hidden` once that slide ends, so it contributes nothing visible. Leaving dialogue SHALL
-bring the region back into reach in the commit's frame and slide it back in from the right. At
-`reduced` the region only fades, within 150ms, and at `off` it hides and returns in the commit's
-frame. The dock SHALL stay the same mounted `#action-dock` element, its router SHALL keep the exploration scene overview as its only frame (the reset on entering
-dialogue that `webclient-exploration-menu` defines), and leaving dialogue SHALL show that overview
-again with no remount. The dialogue SHALL NOT present any dock frame, and no exploration affordance
-SHALL be removed from the committed `exploration` panel: movement stays reachable through the minimap
-and the conversation's own controls.
+While the committed mode is `dialogue`, the bottom band's command region SHALL be collapsed and the message region SHALL span the band's whole width at the band's fixed height from the commit's frame. The collapsed region and the action dock inside it SHALL leave the accessibility tree, the tab order, and pointer hit-testing from the commit's frame.
 
-In dialogue mode the shell's focus home SHALL be the dialogue choice list while it is rendered, and
-otherwise the message window's page surface. Every path that returns
-focus to the focus home — the command line's Escape and accepted send, the mode-change rescue, and the
-return after a completed or rejected action — SHALL land there, never on the hidden dock and never on
-the document body. On entering dialogue, focus held inside the command region SHALL move to the
-message window's page surface before the region is hidden. On leaving dialogue for exploration, focus
-held inside the message region, inside the `choices` anchor, or on the document body SHALL move to the
-action dock once the region is rendered again.
+#### Scenario: The region slides out and back with the motion level
+- **WHEN** the mode enters dialogue, and later leaves it, at each motion level
+- **THEN** the region slides out to the right and fades over the panel duration of the client's motion level, drawn over the widened message region, and is `visibility: hidden` once that slide ends, contributing nothing visible; leaving dialogue brings it back into reach in the commit's frame and slides it back in from the right; at `reduced` it only fades, within 150ms, and at `off` it hides and returns in the commit's frame
 
-While the mode is `dialogue`, the keyboard router SHALL claim only `/` (the command-line opener); every
-other key SHALL be unclaimed by the dock router, so no key moves the hidden dock's focus, pushes or pops
-a frame, or activates a hidden entry. The keys the dialogue choice list handles never reach the router,
-and Enter and Space on the focused page surface keep their reading meaning.
+#### Scenario: The dock survives dialogue unmounted-free
+- **WHEN** the mode enters and leaves dialogue
+- **THEN** the dock stays the same mounted `#action-dock` element, its router keeps the exploration scene overview as its only frame (the reset on entering dialogue that `webclient-exploration-menu` defines), leaving dialogue shows that overview again with no remount, dialogue presents no dock frame, and no exploration affordance is removed from the committed `exploration` panel: movement stays reachable through the minimap and the conversation's own controls
+
+#### Scenario: Dialogue's focus home is the choice list or the page surface
+- **WHEN** the mode is dialogue
+- **THEN** the shell's focus home is the dialogue choice list while it is rendered and otherwise the message window's page surface, and every path that returns focus to the focus home — the command line's Escape and accepted send, the mode-change rescue, and the return after a completed or rejected action — lands there, never on the hidden dock and never on the document body
+
+#### Scenario: Mode boundaries move focus deliberately
+- **WHEN** the mode enters dialogue with focus held inside the command region, or leaves dialogue for exploration with focus held inside the message region, inside the `choices` anchor, or on the document body
+- **THEN** on entering, focus moves to the message window's page surface before the region is hidden; on leaving, focus moves to the action dock once the region is rendered again
+
+#### Scenario: The router claims only the slash in dialogue
+- **WHEN** the mode is `dialogue`
+- **THEN** the keyboard router claims only `/` (the command-line opener); every other key is unclaimed by the dock router, so no key moves the hidden dock's focus, pushes or pops a frame, or activates a hidden entry; the keys the dialogue choice list handles never reach the router, and Enter and Space on the focused page surface keep their reading meaning
 
 #### Scenario: Entering dialogue collapses the command region
 - **WHEN** the player activates 交談 in a host's verb popover at 1451x790 and the commit makes the mode `dialogue`
@@ -2286,31 +2462,31 @@ and Enter and Space on the focused page surface keep their reading meaning.
 - **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the session through the existing seam, the committed mode returns to `exploration`, and the command region renders the new room's overview
 
 ### Requirement: Stage actors present the player and the dialogue host with a speaking state
-Each standing portrait on the stage SHALL be rendered by one stage-actor component. The controlled
-figure and companions in `actor-left` SHALL follow the companion-lineup rule. The dialogue host SHALL
-render once: when its committed identity joins to a committed party slot or controlled lineup figure,
-its existing lineup StageActor is the host and no duplicate renders in `actor-right`; otherwise the
-host's stage actor in `actor-right` SHALL present the committed `art` panel's `portrait_catalog` entry
-named by `dialogue.host.portrait_ref` — the complete image bottom-aligned with contain fit, and a
-grounded silhouette with host identity and authoritative availability when the entry is a placeholder.
-When `portrait_ref` is null or names no catalog entry, the host's stage actor SHALL render the truthful
-placeholder: the display name's initial and display name, never a stock or guessed image. The client
-SHALL NOT construct a catalog key from host identity or any other field. Each foe's stage actor SHALL
-present its committed catalog entry under the same complete-image, grounded-silhouette and
-display-name-placeholder rule.
+Each standing portrait on the stage SHALL be rendered by one stage-actor component. The controlled figure and companions in `actor-left` SHALL follow the companion-lineup rule. The dialogue host SHALL render once: when its committed identity joins to a committed party slot or controlled lineup figure, its existing lineup StageActor is the host and no duplicate renders in `actor-right`.
 
-While committed mode is dialogue and the available host renders, stage actors SHALL carry a speaking
-state. The speaker SHALL be at full brightness and listeners dimmed to 60% through the shared dim token.
-The host SHALL speak except while an `explore.talk_scripted` or `explore.talk_freeform` action submitted
-by the player is in flight — from dispatch until its result is handled and declared presentation revision
-accepted, or until rejection — when the player SHALL speak. Derive this state from dispatch state,
-committed mode and panel availability, never prose. Companions SHALL remain listeners unless their
-identity matches that active host; a speaking companion temporarily receives the highest z without
-moving, then restores baseline z. Outside dialogue, or while its panel is unavailable, the controlled
-figure SHALL remain lit; foes SHALL never be dimmed. No other dialogue behavior changes: the name plate,
-pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts.
-The dim SHALL NOT be the only speaking cue: the name plate names the host and each actor exposes its
-speaking data attribute. Actors remain decorative, with no focusable element; motion owns transitions.
+#### Scenario: The host actor presents its catalog entry truthfully
+- **WHEN** a non-party host's stage actor renders in `actor-right`
+- **THEN** it presents the committed `art` panel's `portrait_catalog` entry named by `dialogue.host.portrait_ref` — the complete image bottom-aligned with contain fit, and a grounded silhouette with host identity and authoritative availability when the entry is a placeholder; when `portrait_ref` is null or names no catalog entry it renders the truthful placeholder: the display name's initial and display name, never a stock or guessed image; and the client constructs no catalog key from host identity or any other field
+
+#### Scenario: Foes follow the same presentation rule
+- **WHEN** a foe's stage actor renders
+- **THEN** it presents its committed catalog entry under the same complete-image, grounded-silhouette and display-name-placeholder rule
+
+#### Scenario: Speaking follows dispatch state, never prose
+- **WHEN** the committed mode is dialogue and the available host renders
+- **THEN** stage actors carry a speaking state — the speaker at full brightness, listeners dimmed to 60% through the shared dim token; the host speaks except while an `explore.talk_scripted` or `explore.talk_freeform` action submitted by the player is in flight (from dispatch until its result is handled and declared presentation revision accepted, or until rejection), when the player speaks; the state derives from dispatch state, committed mode and panel availability, never prose
+
+#### Scenario: Companions listen unless they are the host
+- **WHEN** a companion's identity does, or does not, match the active host
+- **THEN** companions remain listeners unless their identity matches that active host; a speaking companion temporarily receives the highest z without moving, then restores baseline z
+
+#### Scenario: Nothing dims outside dialogue
+- **WHEN** the mode is outside dialogue, or its panel is unavailable
+- **THEN** the controlled figure remains lit and foes are never dimmed
+
+#### Scenario: The speaking cue is never colour-only or disruptive
+- **WHEN** a speaking state is active
+- **THEN** the dim is not the only speaking cue — the name plate names the host and each actor exposes its speaking data attribute; actors remain decorative, with no focusable element; motion owns transitions; and no other dialogue behavior changes: the name plate, pagination, choices, focus, keyboard paths and non-party host mode-transition motion retain their contracts
 
 #### Scenario: The host portrait comes from the art catalog
 - **WHEN** a non-party host's dialogue panel names ref `"41"` and its catalog entry carries an image and face rectangle
@@ -2341,47 +2517,55 @@ speaking data attribute. Actors remain decorative, with no focusable element; mo
 - **THEN** that identity has exactly one standing figure in actor-left, actor-right has no duplicate host, and the name plate, pagination and focus retain their existing behavior
 
 ### Requirement: Dialogue choices appear centred over the stage after the line is fully read
-While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL
-present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere
-else. The list SHALL render only while the message window reports that the current response's last
-page is on screen, fully shown, with no pending action mark, and while no action the player dispatched
-is in flight; at every other moment — a page still typing, a further page not yet read, a pick or
-free-form speech awaiting its reply — it SHALL NOT be rendered. Its rows SHALL be, in order: one pick
-row per `dialogue.choices` entry in payload order, each carrying the digit badge of its 1-based position
-and its bounded label; a `⌨ 自由對話` row; a `↦ 移動…` row; and a `✕ 結束對話` row. It SHALL render no
-row the panel does not back, no reason tag, and no disabled pick.
+While the committed mode is `dialogue` and the committed `dialogue` panel is available, the client SHALL present the conversation's choices as one choice list in the stage's `choices` anchor, and nowhere else. The list SHALL render only while the message window reports that the current response's last page is on screen, fully shown, with no pending action mark, and while no action the player dispatched is in flight.
 
-Activating a pick row SHALL dispatch `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}`
-through the single dispatch entry. Activating `⌨ 自由對話` SHALL expand the command line and focus its
-field through the free-form borrow path, bound to the host, and SHALL dispatch nothing itself.
-Activating `✕ 結束對話` SHALL dispatch `explore.dialogue_leave` with `{npc_id: host.identity}` and nothing
-else. Activating `↦ 移動…` SHALL dispatch nothing and SHALL replace the rows with the exit rows of the
-committed exploration scene overview, in its order, each carrying the exit's direction glyph and, while
-enabled, the destination's display name under the scene overview's exit-chip rules, and ending with a
-back row; activating an enabled exit row SHALL dispatch the same `explore.move` payload the overview's
-exit chip dispatches, and a disabled exit row SHALL stay focusable with its server-authored reason and
-dispatch nothing. Escape or the back row in the exit rows SHALL return to the choice rows with the
-`↦ 移動…` row focused. A committed room without exits SHALL still show the back row alone.
+#### Scenario: Any unread or in-flight moment hides the list
+- **WHEN** a page is still typing, a further page is not yet read, or a pick or free-form speech awaits its reply
+- **THEN** the list is not rendered
 
-The list SHALL be one keyboard composite and one tab stop: DOM focus SHALL rest on the list container,
-which names its focused row through an active-descendant reference. ArrowUp and ArrowDown SHALL move to
-the previous and next row, wrapping; Home and End SHALL move to the first and last row; Enter and Space
-SHALL activate the focused row; while the choice rows are shown, digit `1`–`N` SHALL activate pick N
-directly; a held key's auto-repeat SHALL NOT activate. While the list holds focus its active row SHALL be
-shown by shape and fill — a leading `▸` and the dock's muted-gold fill — never by colour alone, and an
-active disabled exit row SHALL keep a quiet treatment that promises no action. Every key the list handles SHALL be consumed by it and SHALL NOT reach the keyboard
-router or the page surface; `/` and every key the list does not handle SHALL pass on unchanged. A pointer
-activation of a row SHALL focus that row and activate it through the same path as Enter. When the list
-appears while focus is on the message window, inside the message region, or on the document body, focus
-SHALL move to the list with its first row focused. Before an activation dispatches, focus SHALL move to
-the message window's page surface, so the list's removal never leaves focus on a removed element or the
-document body. Every activation is suppressed while a mutation is in flight or awaiting its declared
-presentation revision, exactly like a dock entry, and no combination of key and pointer input SHALL
-emit more than one request per deliberate activation.
+#### Scenario: The rows follow the payload exactly
+- **WHEN** the choice list renders
+- **THEN** its rows are, in order: one pick row per `dialogue.choices` entry in payload order, each carrying the digit badge of its 1-based position and its bounded label; a `⌨ 自由對話` row; a `↦ 移動…` row; and a `✕ 結束對話` row — and it renders no row the panel does not back, no reason tag, and no disabled pick
 
-The list's rows derive from the committed `dialogue` and `exploration` panels alone and SHALL NOT depend
-on any dock frame or router descriptor. Its presence SHALL be derived from the window's reader state and
-the dispatch state, never from narrative prose.
+#### Scenario: Picks and exits dispatch their exact intents
+- **WHEN** the player activates a pick row, or an enabled exit row
+- **THEN** a pick dispatches `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` through the single dispatch entry, and an enabled exit row dispatches the same `explore.move` payload the overview's exit chip dispatches
+
+#### Scenario: The free-form and exit rows dispatch nothing themselves
+- **WHEN** the player activates `⌨ 自由對話`, or `✕ 結束對話`
+- **THEN** `⌨ 自由對話` expands the command line and focuses its field through the free-form borrow path, bound to the host, and dispatches nothing itself; `✕ 結束對話` dispatches `explore.dialogue_leave` with `{npc_id: host.identity}` and nothing else
+
+#### Scenario: The move row borrows the scene overview's exits
+- **WHEN** the player activates `↦ 移動…`
+- **THEN** it dispatches nothing and replaces the rows with the exit rows of the committed exploration scene overview, in its order, each carrying the exit's direction glyph and, while enabled, the destination's display name under the scene overview's exit-chip rules, ending with a back row; a disabled exit row stays focusable with its server-authored reason and dispatches nothing
+
+#### Scenario: The exit rows return to the choices
+- **WHEN** Escape or the back row is activated in the exit rows, or the committed room has no exits
+- **THEN** the choice rows return with the `↦ 移動…` row focused, and a room without exits still shows the back row alone
+
+#### Scenario: One composite, one tab stop, full keyboard
+- **WHEN** the choice list holds focus
+- **THEN** it is one keyboard composite and one tab stop: DOM focus rests on the list container, which names its focused row through an active-descendant reference; ArrowUp and ArrowDown move to the previous and next row, wrapping; Home and End move to the first and last row; Enter and Space activate the focused row; while the choice rows are shown, digit `1`–`N` activates pick N directly; and a held key's auto-repeat does not activate
+
+#### Scenario: The active row is shown by shape and fill
+- **WHEN** the list holds focus on its rows, including a disabled exit row
+- **THEN** the active row is shown by shape and fill — a leading `▸` and the dock's muted-gold fill — never by colour alone, and an active disabled exit row keeps a quiet treatment that promises no action
+
+#### Scenario: Handled keys stop at the list
+- **WHEN** the list handles a key, and when `/` or an unhandled key is pressed
+- **THEN** every key the list handles is consumed by it and does not reach the keyboard router or the page surface, while `/` and every key the list does not handle passes on unchanged
+
+#### Scenario: Focus arrives, leaves, and never dangles
+- **WHEN** the list appears while focus is on the message window, inside the message region, or on the document body, and when an activation is about to dispatch
+- **THEN** focus moves to the list with its first row focused, and before an activation dispatches focus moves to the message window's page surface, so the list's removal never leaves focus on a removed element or the document body; a pointer activation of a row focuses that row and activates it through the same path as Enter
+
+#### Scenario: Activations obey the dispatch lock once each
+- **WHEN** a mutation is in flight or awaiting its declared presentation revision, and when key and pointer input combine
+- **THEN** every activation is suppressed exactly like a dock entry, and no combination of key and pointer input emits more than one request per deliberate activation
+
+#### Scenario: The list derives only from committed panels
+- **WHEN** the list's rows and presence are computed
+- **THEN** rows derive from the committed `dialogue` and `exploration` panels alone and depend on no dock frame or router descriptor, and presence derives from the window's reader state and the dispatch state, never from narrative prose
 
 #### Scenario: The choices wait for the last page
 - **WHEN** a greeting of two pages commits with three choices at the `normal` text speed
@@ -2420,27 +2604,31 @@ the dispatch state, never from narrative prose.
 - **THEN** the list stays unrendered until the response's last page is fully shown
 
 ### Requirement: The motion level is a client-local preference that governs every client animation
-The client SHALL have exactly three motion levels: `full`, `reduced`, and `off`. The settings surface
-SHALL offer them as one `動態效果` control with the three buttons `完整`, `減少`, and `關閉`. The pressed
-button SHALL be the effective level, marked by an indicator that does not rely on colour alone. Selecting
-a button SHALL store that level. The effective level SHALL be the stored level when one is stored.
-While no level is stored, it SHALL be `reduced` when the operating system requests reduced motion and
-`full` otherwise, and it SHALL follow a change of the operating system's preference without a reload.
-A stored value that is not one of the three levels SHALL be discarded, as if nothing were stored.
+The client SHALL have exactly three motion levels: `full`, `reduced`, and `off`. The settings surface SHALL offer them as one `動態效果` control with the three buttons `完整`, `減少`, and `關閉`. The pressed button SHALL be the effective level, marked by an indicator that does not rely on colour alone. Selecting a button SHALL store that level.
 
-The effective level SHALL be applied to the whole document at once, the moment it changes, and every
-client animation and transition SHALL read it through the client's motion tokens:
-- **`full`** plays every animation and transition the client defines.
-- **`reduced`** plays no translation, no shake, no flash, and no looping animation (pulses, blinking,
-  spinners). The stage and mode transitions the client defines play only as opacity fades of at most
-  150ms. Every other transition, drawers and control feedback included, is instant. Message pages
-  appear in full at once.
-- **`off`** makes every visual change instant, fades included.
+#### Scenario: The effective level follows the store, then the operating system
+- **WHEN** a level is stored, and when none is stored
+- **THEN** the effective level is the stored level when one is stored; while none is stored it is `reduced` when the operating system requests reduced motion and `full` otherwise, and it follows a change of the operating system's preference without a reload
 
-Every animation and transition duration, delay, and travel distance SHALL come from the client's motion
-tokens. No component SHALL declare a literal duration. The motion level SHALL never withhold
-information: at every level each transition ends in the same rendered state, and every state it
-conveys is also conveyed without motion.
+#### Scenario: An invalid stored level is discarded
+- **WHEN** a stored value is not one of the three levels
+- **THEN** it is discarded, as if nothing were stored
+
+#### Scenario: The level applies document-wide at once
+- **WHEN** the effective level changes
+- **THEN** it is applied to the whole document at once, the moment it changes, and every client animation and transition reads it through the client's motion tokens
+
+#### Scenario: Each level's behaviour is fixed
+- **WHEN** the effective level is `full`, `reduced`, or `off`
+- **THEN** `full` plays every animation and transition the client defines; `reduced` plays no translation, no shake, no flash, and no looping animation (pulses, blinking, spinners), its stage and mode transitions play only as opacity fades of at most 150ms, every other transition — drawers and control feedback included — is instant, and message pages appear in full at once; `off` makes every visual change instant, fades included
+
+#### Scenario: Tokens own every duration
+- **WHEN** any animation or transition declares a duration, delay, or travel distance
+- **THEN** it comes from the client's motion tokens and no component declares a literal duration
+
+#### Scenario: The level never withholds information
+- **WHEN** a transition plays at any level
+- **THEN** at every level each transition ends in the same rendered state, and every state it conveys is also conveyed without motion
 
 #### Scenario: The operating system is followed while nothing is stored
 - **WHEN** the client loads with no stored motion level and the operating system requests reduced
@@ -2474,24 +2662,23 @@ conveys is also conveyed without motion.
   accessibility tree, and the same focus
 
 ### Requirement: Presentation timing never gates committed state or input
-The client SHALL apply every committed change to its state and to the document immediately; motion
-SHALL only decide how the view moves between two committed states. A transition SHALL NOT delay a
-committed value, a mode or visibility attribute, the accessibility tree, or the tab order beyond the
-moment the change commits, and SHALL NOT delay the player's ability to act beyond its own duration at
-the current motion level. A transition interrupted by a newer committed change SHALL run toward the
-newer state, and SHALL NOT first finish the older one.
+The client SHALL apply every committed change to its state and to the document immediately; motion SHALL only decide how the view moves between two committed states. A transition SHALL NOT delay a committed value, a mode or visibility attribute, the accessibility tree, or the tab order beyond the moment the change commits, and SHALL NOT delay the player's ability to act beyond its own duration at the current motion level.
 
-Presentation that plays in steps — message pages, and a combat round's beats as `webclient-combat-menu`
-"A combat round plays beat by beat" defines — SHALL follow three rules. Steps play in the order their
-data committed, and a step never reorders, drops, or alters committed data. A player click or press that
-advances the presentation shows the current step's end state at once; for a playing combat round it
-shows the whole round's end state. A new player action shows every queued step's end state, a playing
-combat round's included, before its own response starts. Nothing is lost: every stepped text stays in
-the full log. Any pause a stepped presentation waits for SHALL come from the motion tokens, read by the
-client's script from the same tokens the styles use, and SHALL resolve to zero at `off`; revealing text
-follows the reader's text speed. The one presentation that holds the player's input is a playing combat
-round: it keeps the command panel locked until it ends, and the player can end it at once with a click
-or press on the message window or a typed command.
+#### Scenario: An interrupted transition runs toward the newer state
+- **WHEN** a transition is interrupted by a newer committed change
+- **THEN** it runs toward the newer state and does not first finish the older one
+
+#### Scenario: Stepped presentation follows three rules
+- **WHEN** presentation plays in steps — message pages, and a combat round's beats as `webclient-combat-menu` "A combat round plays beat by beat" defines
+- **THEN** steps play in the order their data committed, and a step never reorders, drops, or alters committed data; a player click or press that advances the presentation shows the current step's end state at once — for a playing combat round it shows the whole round's end state; a new player action shows every queued step's end state, a playing combat round's included, before its own response starts; and nothing is lost: every stepped text stays in the full log
+
+#### Scenario: Stepped pauses come from the tokens
+- **WHEN** a stepped presentation waits for a pause
+- **THEN** the pause comes from the motion tokens, read by the client's script from the same tokens the styles use, and resolves to zero at `off`; revealing text follows the reader's text speed
+
+#### Scenario: Only a playing round holds input
+- **WHEN** a combat round is playing
+- **THEN** it is the one presentation that holds the player's input: it keeps the command panel locked until it ends, and the player can end it at once with a click or press on the message window or a typed command
 
 #### Scenario: A mode change commits before its transition ends
 - **WHEN** the effective level is `full` and a committed revision changes the mode
@@ -2517,39 +2704,35 @@ or press on the message window or a typed command.
   log
 
 ### Requirement: Location, appearance, and vitals changes transition at the motion level
-The stage SHALL animate the following committed changes, taking every duration and distance from the
-client's motion tokens, so they follow the effective motion level of "The motion level is a client-local
-preference that governs every client animation":
-- **A new scene image** SHALL crossfade from the previous image to the new one over the scene duration
-  (500ms at `full`). The new image SHALL start its fade only once it is decoded. Until then, the previous
-  image SHALL stay visible with the dimmed treatment the backdrop already uses for a prior image, so the
-  fade never passes through an empty frame and a previous scene is never presented undimmed as the
-  current one. The new image SHALL fade in above the previous one, and the pair SHALL NOT dip through
-  the stage behind them mid-fade. The scene label, the alternative text, and the placeholder SHALL
-  update at commit.
-- **A new location label** SHALL slide the place card's heading in from the left and fade it in, while
-  the previous heading fades out. A change of the world time alone SHALL NOT animate.
-- **A new current map node** SHALL pan the minimap: the drawing SHALL start where the previous current
-  node stood on screen and ease to its committed placement, and the current-node marker SHALL travel
-  the step from the node the player left to the new current node, so a move reads even when the drawing
-  itself does not shift. When the previous current node is absent from the new placement, the minimap
-  SHALL show the new placement at once. The full-map surface SHALL NOT pan.
-- **A new response** SHALL clear the message window as "The message window presents the current
-  response one page at a time in the band's message region" allows: the previous page fades out over
-  the clear duration (150ms at `full` and at `reduced`) while the new page starts at once and surfaces
-  beneath it within the same duration, so the two pages never read through each other.
-- **A new portrait source** on a stage actor (a new image URL, or a switch between an image and a
-  placeholder) SHALL crossfade over the portrait duration (400ms at `full`), and a change of the speaking
-  state SHALL ease the dim.
-- **The vitals dock** — the condition icon row and the vitals bars as one surface — SHALL fade in while
-  rising 12px into its bottom-anchored resting position (entering from 12px below it, so it reads as
-  rising out of the band's edge), and SHALL fade out while sinking 12px back toward the band when it
-  hides.
+The stage SHALL animate the committed changes below, taking every duration and distance from the client's motion tokens, so they follow the effective motion level of "The motion level is a client-local preference that governs every client animation". No transition SHALL delay a committed value or the player's input beyond its own duration, as "Presentation timing never gates committed state or input" requires.
 
-At `reduced`, each of these SHALL play as an opacity fade of at most 150ms with no slide, no pan, and no
-marker travel, and the dim SHALL change instantly. At `off`, each SHALL render its final state in the commit's frame. No
-transition SHALL delay a committed value or the player's input beyond its own duration, as "Presentation
-timing never gates committed state or input" requires.
+#### Scenario: A new scene image crossfades above the previous one
+- **WHEN** a new scene image commits
+- **THEN** it crossfades from the previous image to the new one over the scene duration (500ms at `full`); the new image starts its fade only once it is decoded; until then the previous image stays visible with the dimmed treatment the backdrop already uses for a prior image, so the fade never passes through an empty frame and a previous scene is never presented undimmed as the current one; the new image fades in above the previous one and the pair does not dip through the stage behind them mid-fade; and the scene label, the alternative text, and the placeholder update at commit
+
+#### Scenario: A new location label slides in
+- **WHEN** a new location label commits, and when the world time alone changes
+- **THEN** the place card's heading slides in from the left and fades in while the previous heading fades out, and a world-time-only change does not animate
+
+#### Scenario: A new current node pans the minimap
+- **WHEN** a new current map node commits, and when the previous current node is absent from the new placement
+- **THEN** the minimap pans: the drawing starts where the previous current node stood on screen and eases to its committed placement, and the current-node marker travels the step from the node the player left to the new current node, so a move reads even when the drawing itself does not shift; an absent previous node shows the new placement at once; and the full-map surface does not pan
+
+#### Scenario: A new response clears the message window
+- **WHEN** a new response commits
+- **THEN** the message window clears as "The message window presents the current response one page at a time in the band's message region" allows: the previous page fades out over the clear duration (150ms at `full` and at `reduced`) while the new page starts at once and surfaces beneath it within the same duration, so the two pages never read through each other
+
+#### Scenario: A new portrait source crossfades
+- **WHEN** a stage actor's portrait source changes (a new image URL, or a switch between an image and a placeholder), or the speaking state changes
+- **THEN** the source crossfades over the portrait duration (400ms at `full`), and the speaking change eases the dim
+
+#### Scenario: The vitals dock rises and sinks
+- **WHEN** the vitals dock — the condition icon row and the vitals bars as one surface — shows or hides
+- **THEN** it fades in while rising 12px into its bottom-anchored resting position (entering from 12px below it, so it reads as rising out of the band's edge), and fades out while sinking 12px back toward the band when it hides
+
+#### Scenario: Reduced and off compress every transition
+- **WHEN** any transition above plays at `reduced`, and at `off`
+- **THEN** at `reduced` it plays as an opacity fade of at most 150ms with no slide, no pan, and no marker travel, and the dim changes instantly; at `off` it renders its final state in the commit's frame
 
 #### Scenario: A new scene crossfades once decoded
 - **WHEN** the effective level is `full`, the backdrop shows a done scene, and a committed revision names
@@ -2600,14 +2783,15 @@ timing never gates committed state or input" requires.
   state
 
 ### Requirement: A leaving element is out of reach while it animates out
-Every stage element that animates out — a crossfading image or portrait, a previous place-card heading,
-the message window's clearing layer, the vitals island, and every later leaving element the client
-animates — SHALL leave the accessibility tree, the tab order, and pointer hit-testing at the moment the
-change that removes it commits, and SHALL stay out of reach until it is removed or re-enters. Focus SHALL
-never move onto a leaving element. When focus is inside an element that is about to leave, the client
-SHALL move focus to its current focus home before the element leaves, so focus never falls to the
-document body. An element that is entering MAY receive focus from its first frame. An element that
-re-enters while it is still leaving SHALL be in reach again from that moment.
+Every stage element that animates out — a crossfading image or portrait, a previous place-card heading, the message window's clearing layer, the vitals island, and every later leaving element the client animates — SHALL leave the accessibility tree, the tab order, and pointer hit-testing at the moment the change that removes it commits, and SHALL stay out of reach until it is removed or re-enters.
+
+#### Scenario: Focus never lands on a leaving element
+- **WHEN** focus would move onto a leaving element, or already sits inside one about to leave
+- **THEN** focus never moves onto it, and the client moves focus to its current focus home before the element leaves, so focus never falls to the document body
+
+#### Scenario: Entering and re-entering elements are in reach
+- **WHEN** an element is entering, or re-enters while it is still leaving
+- **THEN** an entering element MAY receive focus from its first frame, and a re-entering element is in reach again from that moment
 
 #### Scenario: A leaving layer cannot be reached
 - **WHEN** the effective level is `full` and a scene crossfade, a place-card change, or a message clear
@@ -2626,37 +2810,35 @@ re-enters while it is still leaving SHALL be in reach again from that moment.
 - **THEN** the island is no longer inert from that revision on, and its condition chips are focusable
 
 ### Requirement: Mode changes transition at the motion level
-The stage SHALL animate live mode changes, taking every duration, delay, and distance from the client's
-motion tokens, so they follow the effective motion level of "The motion level is a client-local
-preference that governs every client animation":
-- **Exploration → dialogue:** the command region slides out to the right over the panel duration (250ms
-  at `full`) while the message window spans the band from the commit's frame. The dialogue host's stage
-  actor slides in from the right and fades in over the actor duration (350ms at `full`). The name plate
-  fades in. The greeting pages and types as `webclient-input-narrative` defines.
-- **Dialogue → exploration:** the reverse. The host's stage actor slides out to the right and fades, the
-  name plate fades out, the message window returns to two thirds of the band in the commit's frame, and
-  the command region slides back in.
-- **Exploration → combat:** a white flash lasting the flash duration (120ms at `full`) plays once over
-  the stage and under every island, the combat veil fades in, and the command region's content flips
-  to the combat root.
-- **Combat → exploration:** the veil fades out and the command region's content flips back. No flash
-  plays.
-- **Dialogue choices:** each row of the dialogue choice list fades in and rises into place, delayed by
-  the stagger step (40ms at `full`) times its position, and the list's card fades in. Rows swapped in by
-  `↦ 移動…` or by its return stagger the same way.
+The stage SHALL animate live mode changes, taking every duration, delay, and distance from the client's motion tokens, so they follow the effective motion level of "The motion level is a client-local preference that governs every client animation".
 
-Only a live mode change animates: mounting the client, reconnecting, and a resync that commits the same
-mode SHALL play none of these transitions. Every leaving element SHALL be out of reach as "A leaving
-element is out of reach while it animates out" requires. No transition SHALL delay a committed value or
-the player's input beyond its own duration: the choice list takes focus and handles keys and pointer from
-its first frame, and the dock is focusable from the first frame of its return. A mode change SHALL NOT
-scroll the stage or any element that contains it: a surface that slides past the stage's edge SHALL be
-clipped without widening any ancestor's scrollable area, and no focus move during a mode change SHALL
-scroll an ancestor toward its target, so the stage never shifts sideways. The flash, the veil, and
-the flip SHALL be decorative, absent from the accessibility tree, and SHALL never intercept a pointer.
-At `reduced`, the slides, the flip's rotation, and the rise SHALL NOT move anything, the fades SHALL last
-at most 150ms, the flash SHALL NOT be visible, and the stagger SHALL be zero. At `off`, every mode change
-SHALL render its final state in the commit's frame.
+#### Scenario: Dialogue entry and exit animate as reverses
+- **WHEN** the mode changes exploration → dialogue, and dialogue → exploration
+- **THEN** entering: the command region slides out to the right over the panel duration (250ms at `full`) while the message window spans the band from the commit's frame, the dialogue host's stage actor slides in from the right and fades in over the actor duration (350ms at `full`), the name plate fades in, and the greeting pages and types as `webclient-input-narrative` defines; leaving: the reverse — the host's stage actor slides out to the right and fades, the name plate fades out, the message window returns to two thirds of the band in the commit's frame, and the command region slides back in
+
+#### Scenario: Combat entry flashes; exit plays no flash
+- **WHEN** the mode changes exploration → combat, and combat → exploration
+- **THEN** entering: a white flash lasting the flash duration (120ms at `full`) plays once over the stage and under every island, the combat veil fades in, and the command region's content flips to the combat root; leaving: the veil fades out and the content flips back, and no flash plays
+
+#### Scenario: Choice rows stagger in
+- **WHEN** the dialogue choice list appears, or rows are swapped in by `↦ 移動…` or by its return
+- **THEN** each row fades in and rises into place, delayed by the stagger step (40ms at `full`) times its position, and the list's card fades in; swapped rows stagger the same way
+
+#### Scenario: Only live changes animate
+- **WHEN** the client mounts, reconnects, or a resync commits the same mode
+- **THEN** none of these transitions plays
+
+#### Scenario: Transitions never delay state, input, or scroll
+- **WHEN** any mode transition plays
+- **THEN** every leaving element is out of reach as "A leaving element is out of reach while it animates out" requires; no transition delays a committed value or the player's input beyond its own duration — the choice list takes focus and handles keys and pointer from its first frame, and the dock is focusable from the first frame of its return; and the mode change scrolls nothing — a surface that slides past the stage's edge is clipped without widening any ancestor's scrollable area, no focus move during a mode change scrolls an ancestor toward its target, and the stage never shifts sideways
+
+#### Scenario: Decorations stay out of the tree and off the pointer
+- **WHEN** the flash, the veil, or the flip plays
+- **THEN** each is decorative, absent from the accessibility tree, and never intercepts a pointer
+
+#### Scenario: Reduced and off settle every mode change
+- **WHEN** a mode change plays at `reduced`, and at `off`
+- **THEN** at `reduced` the slides, the flip's rotation, and the rise move nothing, the fades last at most 150ms, the flash is not visible, and the stagger is zero; at `off` every mode change renders its final state in the commit's frame
 
 #### Scenario: Entering dialogue slides the panel out and the host in
 - **WHEN** the effective level is `full` at 1451x790 and the player opens a conversation
@@ -2712,37 +2894,27 @@ SHALL render its final state in the commit's frame.
   choice row fully shown
 
 ### Requirement: Combat beats are choreographed on the stage at the motion level
-While a combat round plays by itself, as `webclient-combat-menu` "A combat round plays beat by beat"
-defines, each beat SHALL play one stage gesture once its page is fully shown, on the stage actors that the
-beat names and that stand on the stage (the player in `actor-left`, a foe in the foe line-up), taking every
-duration and distance from the client's motion tokens:
-- **The first beat of each action:** the acting stage actor steps 24px toward the stage's centre and back
-  within 240ms.
-- **`damage`:** the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a
-  decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points
-  move to the beat's `hp_after` as the gesture starts, in the vitals or the foe's gauge and in the
-  participant frame, with the trailing bar following.
-- **`target_defeated`:** a foe's stage actor fades and drops out of the line-up. The player's stage actor
-  never leaves the stage.
-- **`roll` and `other`:** no gesture.
+While a combat round plays by itself, as `webclient-combat-menu` "A combat round plays beat by beat" defines, each beat SHALL play one stage gesture once its page is fully shown, on the stage actors that the beat names and that stand on the stage (the player in `actor-left`, a foe in the foe line-up), taking every duration and distance from the client's motion tokens.
 
-The next beat's pause SHALL start when the gesture has played. A beat that names a participant with no
-stage actor (a party member other than the player, or a foe beyond the third) SHALL play no gesture. The
-gestures, the rising number, and the flash SHALL be decorative: absent from the accessibility tree,
-never intercepting a pointer, and never the only carrier of any value, which the beat's page and the
-numerals already state.
+#### Scenario: Each beat kind plays its gesture
+- **WHEN** a beat's page is fully shown
+- **THEN** the first beat of each action: the acting stage actor steps 24px toward the stage's centre and back within 240ms; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or the foe's gauge and in the participant frame, with the trailing bar following; `target_defeated`: a foe's stage actor fades and drops out of the line-up — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
 
-When the round's publication has already committed a mode other than `combat` (the round that ends the
-fight), the combat veil SHALL stay at its combat opacity and the foe line-up SHALL stay on the stage,
-inert, while the round plays by itself; when the round ends, by itself or because the player ended it,
-the veil SHALL fade out and the line-up SHALL leave as a live change out of combat does. The mode
-attribute, every mode-gated surface, the command region's content, focus, and the accessibility tree
-SHALL follow the committed mode at the commit, and the committed flash and flip SHALL play at the commit
-as "Mode changes transition at the motion level" defines.
+#### Scenario: Pauses and actorless beats follow the gesture
+- **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the third)
+- **THEN** the next beat's pause starts when the gesture has played, and an actorless beat plays no gesture
 
-At `reduced`, no step, shake, flash, rise, or drop SHALL move or brighten anything; a defeated foe SHALL
-only fade, within 150ms, and the pauses SHALL be kept. At `off`, no round plays by itself, so no gesture
-and no stage hold SHALL occur.
+#### Scenario: Choreography is decorative
+- **WHEN** gestures, rising numbers, or flashes play
+- **THEN** they are absent from the accessibility tree, never intercept a pointer, and are never the only carrier of any value, which the beat's page and the numerals already state
+
+#### Scenario: The round that ends the fight holds decoration only
+- **WHEN** the round's publication has already committed a mode other than `combat`, and later the round ends — by itself or because the player ended it
+- **THEN** while the round plays the combat veil stays at its combat opacity and the foe line-up stays on the stage, inert; when it ends the veil fades out and the line-up leaves as a live change out of combat does; and the mode attribute, every mode-gated surface, the command region's content, focus, and the accessibility tree follow the committed mode at the commit, with the committed flash and flip playing at the commit as "Mode changes transition at the motion level" defines
+
+#### Scenario: Reduced and off release the stage
+- **WHEN** beats play at `reduced`, and at `off`
+- **THEN** at `reduced` no step, shake, flash, rise, or drop moves or brightens anything, a defeated foe only fades within 150ms, and the pauses are kept; at `off` no round plays by itself, so no gesture and no stage hold occur
 
 #### Scenario: The actor steps and the target reacts
 - **WHEN** the effective level is `full` and a playing round shows the player's roll beat and then its
@@ -2793,7 +2965,15 @@ A terminal combat hold SHALL retain combat gradient, sample selection and veil o
 - **THEN** combat decoration is released and no held foe/veil remains after the existing lifecycle clears it
 
 ### Requirement: Standing portraits retain contours and truthful grounded fallbacks
-Standing portraits SHALL retain their supplied image contours and align their feet or silhouette base with the stage floor. Missing artwork SHALL use the server-selected built-in silhouette — the committed attribute-selected image rendered as its own alpha mask (see `webclient-art-panel`'s reference-artwork requirement) — carrying the subject name and truthful availability state, without inventing generation or a URL; when no fallback media identity is carried (e.g. a scene-kind actor), the existing grounded standing-silhouette treatment SHALL apply unchanged. Repeated visual image captions SHALL be suppressed only on the stage; accessible identity and state SHALL remain available.
+Standing portraits SHALL retain their supplied image contours and align their feet or silhouette base with the stage floor. Repeated visual image captions SHALL be suppressed only on the stage; accessible identity and state SHALL remain available.
+
+#### Scenario: Missing artwork uses the server-selected silhouette
+- **WHEN** a standing portrait's artwork is missing
+- **THEN** it uses the server-selected built-in silhouette — the committed attribute-selected image rendered as its own alpha mask (see `webclient-art-panel`'s reference-artwork requirement) — carrying the subject name and truthful availability state, without inventing generation or a URL
+
+#### Scenario: Actors without a fallback identity keep the old treatment
+- **WHEN** no fallback media identity is carried (e.g. a scene-kind actor)
+- **THEN** the existing grounded standing-silhouette treatment applies unchanged
 
 #### Scenario: Unavailable portrait is not generating
 - **WHEN** an actor has missing or failed art
@@ -2827,7 +3007,19 @@ The fixed bottom band SHALL provide a continuous ink-and-gold reading surface wi
 - **THEN** reduced uses no 3D rotation or wipe and off commits immediately without losing focus
 
 ### Requirement: CJK reading furniture follows the measured prose column
-Prose SHALL have readable CJK line and paragraph spacing while preserving exact narrative content, the contracted reference font size, sentence-safe paging and map alignment. Page text SHALL use a line height of 1.5 times its font size and SHALL separate consecutive narrative lines by a gap of about half a line. Any CJK spacing treatment SHALL be presentation only (the rendered text content is unchanged) and SHALL NOT apply to box-drawing map lines, whose whitespace and alignment stay exact. Page measurement SHALL match displayed typography, so no page line is clipped at any viewport or prose scale. The page marker SHALL end at the prose column's right edge, or as close to it as the control strip's own controls allow, and SHALL stay inside the control strip. The dialogue name plate's underline SHALL start at the name's left edge. The message window's reading rule SHALL show only while the page surface holds keyboard focus. Decorative motion SHALL stop at the reduced and off motion levels.
+Prose SHALL have readable CJK line and paragraph spacing while preserving exact narrative content, the contracted reference font size, sentence-safe paging and map alignment. Page text SHALL use a line height of 1.5 times its font size and SHALL separate consecutive narrative lines by a gap of about half a line. Page measurement SHALL match displayed typography, so no page line is clipped at any viewport or prose scale.
+
+#### Scenario: Spacing never touches content or maps
+- **WHEN** CJK spacing treatment applies to prose
+- **THEN** it is presentation only (the rendered text content is unchanged) and does not apply to box-drawing map lines, whose whitespace and alignment stay exact
+
+#### Scenario: The marker and plate align to the prose column
+- **WHEN** a page and a dialogue name plate render
+- **THEN** the page marker ends at the prose column's right edge, or as close to it as the control strip's own controls allow, and stays inside the control strip; and the dialogue name plate's underline starts at the name's left edge
+
+#### Scenario: The reading rule and its motion are conditional
+- **WHEN** the page surface holds keyboard focus, and when the motion level is reduced or off
+- **THEN** the message window's reading rule shows only while the page surface holds keyboard focus, and decorative motion stops at the reduced and off motion levels
 
 #### Scenario: Resize preserves complete narrative
 - **WHEN** mixed CJK and Latin prose is paged, then the viewport or reader scale changes
@@ -2846,7 +3038,11 @@ Prose SHALL have readable CJK line and paragraph spacing while preserving exact 
 - **THEN** the marker neither bobs nor fades
 
 ### Requirement: Pointer-open dialogue choices expose a local initial highlight
-When an eligible dialogue choice list first opens through pointer interaction, it SHALL expose a non-activating initial highlight on its first enabled choice using the same active-descendant state as keyboard navigation. The highlight SHALL be visible even while the list does not hold focus; showing it SHALL NOT itself move focus (where focus goes when the list appears is unchanged) and SHALL NOT dispatch. When the list swaps to its exits, the first enabled exit SHALL be active; when no exit is enabled, the first exit SHALL stay active with its explanation reachable.
+When an eligible dialogue choice list first opens through pointer interaction, it SHALL expose a non-activating initial highlight on its first enabled choice using the same active-descendant state as keyboard navigation. The highlight SHALL be visible even while the list does not hold focus; showing it SHALL NOT itself move focus (where focus goes when the list appears is unchanged) and SHALL NOT dispatch.
+
+#### Scenario: The exit swap keeps an active row
+- **WHEN** the list swaps to its exits, with and without an enabled exit
+- **THEN** the first enabled exit is active; when no exit is enabled, the first exit stays active with its explanation reachable
 
 #### Scenario: Opening does not answer
 - **WHEN** a pointer action leads to a fully-read response with enabled choices
@@ -2857,7 +3053,11 @@ When an eligible dialogue choice list first opens through pointer interaction, i
 - **THEN** the first enabled exit is active and nothing is dispatched
 
 ### Requirement: Combat details follow the active command frame
-The combat command window SHALL show detail for the currently highlighted root command, category, group or skill, never a stale previously selected skill. Root detail MAY be client-local explanatory copy of what the command opens or does, never a gameplay value; category and group detail SHALL name that row's committed label and descriptor count. Command rows SHALL scroll inside a bounded region above the persistent legend. The Skills count SHALL remain the exact committed descriptor count rendered as neutral secondary text.
+The combat command window SHALL show detail for the currently highlighted root command, category, group or skill, never a stale previously selected skill. Command rows SHALL scroll inside a bounded region above the persistent legend. The Skills count SHALL remain the exact committed descriptor count rendered as neutral secondary text.
+
+#### Scenario: Detail copy names only backed things
+- **WHEN** root, category, or group detail renders
+- **THEN** root detail MAY be client-local explanatory copy of what the command opens or does, never a gameplay value, and category and group detail name that row's committed label and descriptor count
 
 #### Scenario: Category does not show an old attack
 - **WHEN** the player backs out of a skill and highlights a category
@@ -2894,23 +3094,19 @@ While combat playback locks mutation controls, the command region SHALL communic
 - **THEN** the cue clears with playback and the existing canonical command state becomes available
 
 ### Requirement: Reference surfaces share an opaque accessible frame
-Reference drawers and full-screen overlays SHALL present one shared header: a decorative leading glyph,
-the surface title, an optional subtitle, and one icon-only close control of at least 36x36px carrying an
-accessible name, in the same order and position on every surface. The header SHALL be presentational
-only: it SHALL emit a close request and own no focus trap, Escape handling, opener record, or
-open-surface registration, all of which stay with the drawer or overlay host that renders it. The
-header glyph SHALL come from the same glyph registry the top navigation draws its entries from, so a
-surface opened from a navigation control shows that control's glyph, and every reference drawer and
-every utility overlay SHALL declare one; no surface SHALL fall back to a generic placeholder glyph. A
-surface whose body used to render its own title and close control SHALL render them only through the
-shared header, so each surface carries exactly one title and one close control.
+Reference drawers and full-screen overlays SHALL present one shared header: a decorative leading glyph, the surface title, an optional subtitle, and one icon-only close control of at least 36x36px carrying an accessible name, in the same order and position on every surface. The body of every reference drawer and utility overlay SHALL be a fully opaque ink panel over a stage-dimming scrim, so no stage, band, or command-line text shows through it.
 
-The body of every reference drawer and utility overlay SHALL be a fully opaque ink panel over a
-stage-dimming scrim, so no stage, band, or command-line text shows through it; a backdrop blur MAY
-decorate the scrim, but opacity SHALL NOT depend on `backdrop-filter` support. The recession and the
-scrim SHALL dim only what lies behind the panel, never the panel itself. Existing modal focus, close,
-and restore behavior SHALL remain unchanged, and the workspace bounds SHALL remain those of the
-reference drawer and overlay requirements.
+#### Scenario: The header owns nothing but appearance
+- **WHEN** the shared header renders in a drawer or overlay host
+- **THEN** it is presentational only: it emits a close request and owns no focus trap, Escape handling, opener record, or open-surface registration, all of which stay with the drawer or overlay host that renders it
+
+#### Scenario: Every header glyph comes from the registry
+- **WHEN** a reference drawer or utility overlay declares its header glyph
+- **THEN** it comes from the same glyph registry the top navigation draws its entries from, so a surface opened from a navigation control shows that control's glyph; every reference drawer and every utility overlay declares one; no surface falls back to a generic placeholder glyph; and a surface whose body used to render its own title and close control renders them only through the shared header, so each surface carries exactly one title and one close control
+
+#### Scenario: Opacity never rides on blur support
+- **WHEN** a reference surface renders over the scrim
+- **THEN** a backdrop blur MAY decorate the scrim, but opacity does not depend on `backdrop-filter` support; the recession and the scrim dim only what lies behind the panel, never the panel itself; existing modal focus, close, and restore behavior remain unchanged; and the workspace bounds remain those of the reference drawer and overlay requirements
 
 #### Scenario: Blur is unavailable
 - **WHEN** a reference surface opens in a browser without backdrop-filter
@@ -2925,7 +3121,15 @@ reference drawer and overlay requirements.
 - **THEN** the header uses the matching glyph and has one named close control in the shared position
 
 ### Requirement: Drawer art and identity match the subject
-A reference drawer SHALL show the current character's portrait column only when that character is the drawer's subject: the character-status, inventory, and party drawers. The skill book, shop, quest, and world-codex drawers SHALL render no art column and no stand-in illustration, so their content takes the whole workspace width. The art column SHALL be bounded to `min(360px, 28%)` of the workspace width on a plain ink ground with no scene illustration behind the portrait; the content body keeps `min-width: 0` and remains the only scrolling region. The portrait frame SHALL show exactly one visible state line: a shown image carries its alternative-text caption, and a placeholder carries only its own label — the entry's placeholder label, else `肖像生成中` for a pending entry, `肖像生成失敗` for a failed one, `肖像載入失敗` after a failed load, and otherwise `無肖像` — so it never claims a pending portrait the payload does not carry; the placeholder initial is the character's name initial. The character-status hero SHALL name the committed character and supplied title and rank without inventing missing values.
+A reference drawer SHALL show the current character's portrait column only when that character is the drawer's subject: the character-status, inventory, and party drawers. The skill book, shop, quest, and world-codex drawers SHALL render no art column and no stand-in illustration, so their content takes the whole workspace width. The character-status hero SHALL name the committed character and supplied title and rank without inventing missing values.
+
+#### Scenario: The art column is bounded over plain ink
+- **WHEN** a subject drawer renders its art column
+- **THEN** it is bounded to `min(360px, 28%)` of the workspace width on a plain ink ground with no scene illustration behind the portrait, and the content body keeps `min-width: 0` and remains the only scrolling region
+
+#### Scenario: The portrait frame shows exactly one state line
+- **WHEN** a portrait frame renders an image or a placeholder
+- **THEN** a shown image carries its alternative-text caption, and a placeholder carries only its own label — the entry's placeholder label, else `肖像生成中` for a pending entry, `肖像生成失敗` for a failed one, `肖像載入失敗` after a failed load, and otherwise `無肖像` — so it never claims a pending portrait the payload does not carry; the placeholder initial is the character's name initial
 
 #### Scenario: Codex is not the player
 - **WHEN** the world codex or quest log opens
@@ -2944,7 +3148,15 @@ A reference drawer SHALL show the current character's portrait column only when 
 - **THEN** the frame's single label reads `無肖像`, not `肖像生成中`
 
 ### Requirement: Empty drawer guidance preserves unavailable reasons
-An available but empty drawer list — the quest book with no rows, the world codex with nothing discovered, the bag's item section with no rows, and the party with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own. The empty party guidance SHALL sit above the unchanged 空位 row, which keeps the only invite control. An unavailable panel SHALL retain its authoritative registry reason and SHALL NOT be presented as merely empty, and an absent section keeps its own absence line.
+An available but empty drawer list — the quest book with no rows, the world codex with nothing discovered, the bag's item section with no rows, and the party with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own.
+
+#### Scenario: The party keeps its invite row
+- **WHEN** the party list is available and empty
+- **THEN** the empty guidance sits above the unchanged 空位 row, which keeps the only invite control
+
+#### Scenario: Unavailable is never merely empty
+- **WHEN** a panel is unavailable, or a section is absent
+- **THEN** an unavailable panel retains its authoritative registry reason and is not presented as merely empty, and an absent section keeps its own absence line
 
 #### Scenario: Empty becomes unavailable
 - **WHEN** an empty quest panel is replaced by an unavailable panel
@@ -2955,7 +3167,15 @@ An available but empty drawer list — the quest book with no rows, the world co
 - **THEN** each renders the shared glyph, headline, and guidance card, and the empty party additionally keeps its 空位 row
 
 ### Requirement: Lineage identity and inventory rarity use backed fields
-Lineage rows with the same element/style name SHALL be distinguished using their supplied root-node display names and keep progress beside that identity: a collapsed chain row is about 56px tall and places its progress meter, at most 320px wide, immediately after an identity column shared by every row, followed by its percentage or 已全數見頂; the root-node subtitle is the first node's supplied `display_name_zh`, omitted when absent or equal to the label, and no name is derived from a skill key. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label: each rarity draws a distinct border pattern at a width where the pattern is visible (uncommon dotted and rare dashed at 2px, epic double and legendary ridge at 3px) with a faint tint, and common and unknown items SHALL remain neutral.
+Lineage rows with the same element/style name SHALL be distinguished using their supplied root-node display names and keep progress beside that identity. Inventory rarity framing SHALL use committed presentation metadata and retain a non-colour label.
+
+#### Scenario: The collapsed chain row lays out its identity and meter
+- **WHEN** a collapsed chain row renders
+- **THEN** it is about 56px tall and places its progress meter, at most 320px wide, immediately after an identity column shared by every row, followed by its percentage or 已全數見頂; the root-node subtitle is the first node's supplied `display_name_zh`, omitted when absent or equal to the label, and no name is derived from a skill key
+
+#### Scenario: Rarity borders stay visible without colour
+- **WHEN** an item's rarity frame renders
+- **THEN** each rarity draws a distinct border pattern at a width where the pattern is visible (uncommon dotted and rare dashed at 2px, epic double and legendary ridge at 3px) with a faint tint, and common and unknown items remain neutral
 
 #### Scenario: Same element has two lineages
 - **WHEN** two chains share an element label but have distinct root-node display names
@@ -2967,21 +3187,23 @@ Lineage rows with the same element/style name SHALL be distinguished using their
 
 ### Requirement: Client help and finite display vocabularies are localized
 
-The client-owned help reference, the combat detail's skill target type and element, and the party
-drawer's guidance SHALL read in Traditional Chinese rather than English prose or raw identifiers.
-Literal key names (Enter, Esc, Tab, Space, Shift, PageUp, PageDown, Home, End, arrows, digits) and
-literal command syntax (`help`) SHALL stay verbatim, rendered as key caps and code; protocol
-identifiers, payloads and user-authored content SHALL NOT change.
+The client-owned help reference, the combat detail's skill target type and element, and the party drawer's guidance SHALL read in Traditional Chinese rather than English prose or raw identifiers.
 
-The help reference SHALL group its rows by where the keys act (指令列, 指令面板, 閱讀與對話) and SHALL
-name only bindings the client implements, including the ⌨ toggle and the dock's positional picks
-1–9 (never a stale range). The help overlay's header subtitle SHALL describe its content (按鍵、指令列與閱讀操作),
-never another surface's navigation.
+#### Scenario: Literal keys and syntax stay verbatim
+- **WHEN** localized content renders literal key names or command syntax
+- **THEN** key names (Enter, Esc, Tab, Space, Shift, PageUp, PageDown, Home, End, arrows, digits) and command syntax (`help`) stay verbatim, rendered as key caps and code, and protocol identifiers, payloads and user-authored content do not change
 
-A skill's `target_spec` SHALL be shown by the closed name set 無目標 / 自身 / 單一目標 / 範圍, and its
-`element` by the element registry's own name followed by 屬性 (火屬性); an identifier outside either
-set SHALL read 未知目標類型 or 未知屬性, never the raw key and never a guessed mechanic. The party
-drawer's follow rules SHALL name affinity by the established term 羈絆.
+#### Scenario: The help reference groups real bindings under a truthful subtitle
+- **WHEN** the help reference renders
+- **THEN** its rows are grouped by where the keys act (指令列, 指令面板, 閱讀與對話), it names only bindings the client implements — including the ⌨ toggle and the dock's positional picks 1–9 (never a stale range) — and the overlay's header subtitle describes its content (按鍵、指令列與閱讀操作), never another surface's navigation
+
+#### Scenario: Closed sets name skills; unknowns read neutrally
+- **WHEN** a skill's `target_spec` or `element` renders, or an identifier falls outside either set
+- **THEN** `target_spec` shows by the closed name set 無目標 / 自身 / 單一目標 / 範圍, `element` by the element registry's own name followed by 屬性 (火屬性), and an outside identifier reads 未知目標類型 or 未知屬性, never the raw key and never a guessed mechanic
+
+#### Scenario: The party drawer uses the established term
+- **WHEN** the party drawer's follow rules name affinity
+- **THEN** they use the established term 羈絆
 
 #### Scenario: Help describes real keys
 - **WHEN** the help overlay opens
@@ -2993,7 +3215,31 @@ drawer's follow rules SHALL name affinity by the established term 羈絆.
 - **THEN** it reads 未知目標類型 or 未知屬性 and shows no raw identifier
 
 ### Requirement: The vitals dock stands at the stage's lower-left above the band
-The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide (a viewport-relative width, not multiplied by the chrome factor), and at whatever compact height its content takes. The dock SHALL NOT be top-anchored and SHALL NOT claim the stage's upper-left corner: at the top of the left column the stage shows only the standing portrait line. The condition icon row SHALL be the dock's topmost content, directly above the bars. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge. The dock MAY overlap the lowest strip of the `actor-left` standing portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them. The dock SHALL NOT read as a rectangular box: its ground is the shared panel ink with the backdrop blur, feathered out towards its right and top edges so the scene reads through them, and it is mounted on a hairline brass spine down its left side capped by the band's lozenge ornament, with a hairline brass crown fading out along its top; it carries no full border and no square corners. Every island chrome the dock carries SHALL come from the shared design tokens. The command-line row docked on the same band edge SHALL begin past the dock's right edge, so the two never intersect. Until `companion-portrait-lineup` removes it, the interim party quickbar island stands in the `vitals` anchor between the dock and the band.
+The stage SHALL render the vitals surfaces — the condition icon row and the vitals bars — as one bottom-anchored dock in the `vitals` anchor: a left-gutter column standing on the bottom band's upper edge, inset from the stage's left edge by the stage gutter, a quarter of the viewport's width wide, and at whatever compact height its content takes. The dock SHALL be bounded above the band and SHALL scroll internally rather than grow past the band's edge.
+
+#### Scenario: The dock's width stays viewport-relative
+- **WHEN** the dock's width resolves at any viewport
+- **THEN** it is a viewport-relative width, not multiplied by the chrome factor
+
+#### Scenario: The dock never claims the upper-left corner
+- **WHEN** the left column renders
+- **THEN** the dock is not top-anchored and claims no stage upper-left corner: at the top of the left column the stage shows only the standing portrait line, and the condition icon row is the dock's topmost content, directly above the bars
+
+#### Scenario: The dock may overlap the portraits' feet
+- **WHEN** the dock and the `actor-left` standing portraits render together
+- **THEN** the dock MAY overlap the lowest strip of the portraits (the party line's feet); the portraits keep their full standing height and the dock paints above them
+
+#### Scenario: The dock is feathered ink on a brass spine, not a box
+- **WHEN** the dock's chrome renders
+- **THEN** it does not read as a rectangular box: its ground is the shared panel ink with the backdrop blur, feathered out towards its right and top edges so the scene reads through them; it is mounted on a hairline brass spine down its left side capped by the band's lozenge ornament, with a hairline brass crown fading out along its top; it carries no full border and no square corners; and every island chrome it carries comes from the shared design tokens
+
+#### Scenario: The command line starts past the dock
+- **WHEN** the command-line row docks on the same band edge
+- **THEN** it begins past the dock's right edge, so the two never intersect
+
+#### Scenario: The interim quickbar holds its place until removed
+- **WHEN** the dock renders before `companion-portrait-lineup` removes the interim party quickbar
+- **THEN** the quickbar island stands in the `vitals` anchor between the dock and the band
 
 #### Scenario: The dock stands on the band's edge
 - **WHEN** the shell renders in exploration mode with the vitals dock visible at 1451x790
@@ -3008,11 +3254,31 @@ The stage SHALL render the vitals surfaces — the condition icon row and the vi
 - **THEN** the dock's box stays inside the left gutter between the top band and the band's top edge, its content scrolls within that bound, and it intersects no other interactive anchor's content
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each companion portrait SHALL resolve from `portrait_ref` through `art.portrait_catalog`, falling back to its display name's initial-letter placeholder when null or unresolved. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
+The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
 
-Every figure, including the controlled character, SHALL have the same full anchor size and ground line: no progressively smaller scale, lift ramp or depth dimming. Horizontal overlap SHALL compress as necessary to keep the row inside the stage's left half at 1451x790, 1741x948 and 2560x1440, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half. In dialogue the group SHALL compress overlap to clear the choice list without resizing figures. Zero companions SHALL render the existing solo portrait at its standard anchor position. The anchor SHALL have `overflow: visible`; the vitals dock MAY cover the lowest strip of feet, never face or torso.
+#### Scenario: Portraits resolve through the catalog
+- **WHEN** a companion portrait renders
+- **THEN** it resolves from `portrait_ref` through `art.portrait_catalog`, falling back to its display name's initial-letter placeholder when null or unresolved
 
-The lineup SHALL be visible in exploration, combat and dialogue, hidden in creation. Companions SHALL use the existing StageActor listener dim unless their committed dialogue host identity is the active host speaker in dialogue mode. That speaking companion SHALL temporarily receive z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes. Speaking focus SHALL change only dim and z, never position, lift or size, and SHALL remain correct at off/reduced motion. The controlled figure SHALL retain its existing speaking and beat behavior. No figure box SHALL cross the stage's horizontal centre; the foe lineup is unchanged.
+#### Scenario: Every figure shares one size and ground line
+- **WHEN** the lineup renders any number of figures
+- **THEN** every figure, including the controlled character, has the same full anchor size and ground line — no progressively smaller scale, lift ramp or depth dimming
+
+#### Scenario: The row compresses to stay in the left half
+- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in any mode
+- **THEN** horizontal overlap compresses as necessary to keep the row inside the stage's left half, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half; in dialogue the group compresses overlap to clear the choice list without resizing figures; zero companions render the existing solo portrait at its standard anchor position; the anchor has `overflow: visible`; and the vitals dock MAY cover the lowest strip of feet, never face or torso
+
+#### Scenario: Visibility follows the mode
+- **WHEN** the committed mode is exploration, combat, dialogue, or creation
+- **THEN** the lineup is visible in exploration, combat and dialogue, and hidden in creation
+
+#### Scenario: A speaking companion rises in z only
+- **WHEN** a companion's committed dialogue host identity is the active host speaker in dialogue mode, and when speaking changes or ends
+- **THEN** companions use the existing StageActor listener dim otherwise; the speaking companion temporarily receives z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes; speaking focus changes only dim and z, never position, lift or size, and remains correct at off/reduced motion; and the controlled figure retains its existing speaking and beat behavior
+
+#### Scenario: No figure crosses the stage's centre
+- **WHEN** the lineup and the foe lineup render together
+- **THEN** no figure box crosses the stage's horizontal centre, and the foe lineup is unchanged
 
 #### Scenario: A two-companion party renders a three-figure group
 - **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in exploration mode
@@ -3039,7 +3305,11 @@ The lineup SHALL be visible in exploration, combat and dialogue, hidden in creat
 - **THEN** no companion figure's rendered box intersects any foe figure's rendered box
 
 ### Requirement: Possession moves the possessed companion to the group's front
-While the possession banner is available, the possessed companion SHALL occupy the rightmost slot and A SHALL occupy exactly that companion's former slot, without moving the remaining companions. Release SHALL restore both original positions. Join the committed bounded-string `status.actor.identity` (the controlled session actor, not the hybrid resource owner) to decimal-string-normalized integer party identities. Resolve only committed catalog references and the roster portrait. When no party row matches, the controlled front SHALL use a truthful null-art placeholder labelled by the committed banner's host name, never A's portrait or an invented catalog key.
+While the possession banner is available, the possessed companion SHALL occupy the rightmost slot and A SHALL occupy exactly that companion's former slot, without moving the remaining companions. Release SHALL restore both original positions.
+
+#### Scenario: Identity joins and art resolve stay committed-only
+- **WHEN** the front figure's identity is joined and its art resolved
+- **THEN** the committed bounded-string `status.actor.identity` (the controlled session actor, not the hybrid resource owner) joins to decimal-string-normalized integer party identities, and only committed catalog references and the roster portrait resolve; when no party row matches, the controlled front uses a truthful null-art placeholder labelled by the committed banner's host name, never A's portrait or an invented catalog key
 
 #### Scenario: Possessing a companion moves it to the front
 - **WHEN** the possession banner becomes available for the party's second companion 蕾娜 while the party has two slots
@@ -3054,7 +3324,15 @@ While the possession banner is available, the possessed companion SHALL occupy t
 - **THEN** the front figure renders the truthful initial-letter placeholder rather than the player's portrait
 
 ### Requirement: Condition detail preserves equipment provenance without hiding gameplay conditions
-The dock's existing tooltip, overflow detail, and accessible condition names, and the complete character-status condition roster SHALL preserve the label, severity, supplied duration and exact modifier values of every committed condition. These surfaces SHALL disclose all equipment source labels supplied by `provenance.equipment_sources`, without guessing a label from an item key or requiring another panel. Mixed provenance SHALL identify that an independent source also applies; unknown provenance SHALL state neutrally that the source is unavailable. Non-equipment provenance SHALL NOT claim an equipment source. Equipment-only conditions SHALL remain available in the full status surface when the contextual dock is hidden. Distinct committed buff instances sharing a code SHALL remain individually readable with their own source and duration in normal and overflow detail paths.
+The dock's existing tooltip, overflow detail, and accessible condition names, and the complete character-status condition roster SHALL preserve the label, severity, supplied duration and exact modifier values of every committed condition. These surfaces SHALL disclose all equipment source labels supplied by `provenance.equipment_sources`, without guessing a label from an item key or requiring another panel.
+
+#### Scenario: Provenance is stated as committed
+- **WHEN** a condition's detail discloses its provenance
+- **THEN** mixed provenance identifies that an independent source also applies, unknown provenance states neutrally that the source is unavailable, and non-equipment provenance claims no equipment source
+
+#### Scenario: Hidden and shared instances stay readable
+- **WHEN** the contextual dock is hidden with an equipment-only condition committed, or distinct committed buff instances share a code
+- **THEN** equipment-only conditions remain available in the full status surface, and shared-code instances remain individually readable with their own source and duration in normal and overflow detail paths
 
 #### Scenario: Hidden equipment condition remains inspectable
 - **WHEN** full-health exploration has only a synthetic equipment-origin warning and the player opens character status

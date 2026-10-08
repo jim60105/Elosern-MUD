@@ -13,16 +13,9 @@ through their `pair_events` tables, selected from the participants' `sex` fields
 
 ### Requirement: Sixteen Tier 1-4 partner acts are registered, gated by duo_act_count and/or group_act_count and/or climax_count thresholds
 `world/skills/sexual_acts/partner.py`'s `PARTNER_ACTS` tuple SHALL contain, in addition to
-`sexual-act-seeds`'s two seed rows: four acts each declaring `unlock={"duo_act_count": 5}`
-(`partner_kiss`, `partner_neck_caress`, `partner_breast_play`, `partner_ear_whisper`); five acts each
-declaring `unlock={"duo_act_count": 15}` (`partner_deep_caress`, `partner_oral_service`,
-`partner_breast_sex`, `partner_thigh_rub`, `partner_foot_service`); four acts each declaring the
-compound gate `unlock={"duo_act_count": 30, "climax_count": 10}` (`partner_anal_sex`,
-`partner_mutual_masturbation`, `partner_vaginal_sex`, `partner_deep_vaginal_sex`); one act declaring
-`unlock={"duo_act_count": 30}` (`partner_group_caress`); one act declaring
-`unlock={"group_act_count": 15}` (`partner_group_orgy`); and one act declaring
-`unlock={"group_act_count": 30}` (`partner_group_service`). Every one of these sixteen acts SHALL
-declare `resistible=True`.
+`sexual-act-seeds`'s two seed rows, sixteen counter-gated acts across four tiers, each declaring
+the unlock gate enumerated for its tier group in the scenarios below. Every one of these sixteen
+acts SHALL declare `resistible=True`.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `duo_act_count == 4`
@@ -42,14 +35,32 @@ declare `resistible=True`.
   `duo_act_count == 0`
 - **THEN** `partner_group_orgy` is present in the returned set
 
+#### Scenario: The four Tier 1 acts declare the duo_act_count 5 gate
+- **WHEN** the unlock gates of `partner_kiss`, `partner_neck_caress`, `partner_breast_play`, and
+  `partner_ear_whisper` are read
+- **THEN** each declares `unlock={"duo_act_count": 5}`
+
+#### Scenario: The five Tier 2 acts declare the duo_act_count 15 gate
+- **WHEN** the unlock gates of `partner_deep_caress`, `partner_oral_service`, `partner_breast_sex`,
+  `partner_thigh_rub`, and `partner_foot_service` are read
+- **THEN** each declares `unlock={"duo_act_count": 15}`
+
+#### Scenario: The four Tier 3 acts declare the compound duo and climax gate
+- **WHEN** the unlock gates of `partner_anal_sex`, `partner_mutual_masturbation`,
+  `partner_vaginal_sex`, and `partner_deep_vaginal_sex` are read
+- **THEN** each declares the compound gate `unlock={"duo_act_count": 30, "climax_count": 10}`
+
+#### Scenario: The three Tier 4 acts declare their group-tier gates
+- **WHEN** the unlock gates of the three Tier 4 AREA acts are read
+- **THEN** `partner_group_caress` declares `unlock={"duo_act_count": 30}`, `partner_group_orgy`
+  declares `unlock={"group_act_count": 15}`, and `partner_group_service` declares
+  `unlock={"group_act_count": 30}`
+
 ### Requirement: Every Tier 1-3 act credits duo_act_count on both the actor and the target; every Tier 4 act credits group_act_count on both
-Each of `partner_kiss`, `partner_neck_caress`, `partner_breast_play`, `partner_ear_whisper`,
-`partner_deep_caress`, `partner_oral_service`, `partner_breast_sex`, `partner_thigh_rub`,
-`partner_foot_service`, `partner_anal_sex`, `partner_mutual_masturbation`, `partner_vaginal_sex`,
-and `partner_deep_vaginal_sex` SHALL declare
-`actor_counters=("duo_act_count",)` and `participant_counters=("duo_act_count",)`. Each of
-`partner_group_caress`, `partner_group_orgy`, and `partner_group_service` SHALL declare
-`actor_counters=("group_act_count",)` and `participant_counters=("group_act_count",)`.
+Each Tier 1-3 partner act SHALL declare `actor_counters=("duo_act_count",)` and
+`participant_counters=("duo_act_count",)`; each Tier 4 act SHALL declare
+`actor_counters=("group_act_count",)` and `participant_counters=("group_act_count",)`. The full
+act membership of each group is enumerated in the scenarios below.
 
 #### Scenario: Casting a Tier 1 act increments duo_act_count on both participants
 - **WHEN** entity A casts `partner_kiss` targeting entity B, both starting at `duo_act_count == 0`
@@ -66,6 +77,17 @@ and `partner_deep_vaginal_sex` SHALL declare
   `duo_act_count == 0`
 - **THEN** afterward both `A.sexual.duo_act_count` and `B.sexual.duo_act_count` equal `1`
 
+#### Scenario: The thirteen duo-crediting acts are enumerated
+- **WHEN** the Tier 1-3 duo-crediting group is read
+- **THEN** it is exactly `partner_kiss`, `partner_neck_caress`, `partner_breast_play`,
+  `partner_ear_whisper`, `partner_deep_caress`, `partner_oral_service`, `partner_breast_sex`,
+  `partner_thigh_rub`, `partner_foot_service`, `partner_anal_sex`, `partner_mutual_masturbation`,
+  `partner_vaginal_sex`, and `partner_deep_vaginal_sex`
+
+#### Scenario: The three group-crediting acts are enumerated
+- **WHEN** the Tier 4 group-crediting group is read
+- **THEN** it is exactly `partner_group_caress`, `partner_group_orgy`, and `partner_group_service`
+
 ### Requirement: partner_breast_sex is the sole emitter of breast_sex_performed
 `partner_breast_sex` SHALL declare `sexual_events=("breast_sex_performed",)`. Every other act added
 by this change SHALL declare `sexual_events=()`, with the two intercourse acts declaring
@@ -81,9 +103,6 @@ by this change SHALL declare `sexual_events=()`, with the two intercourse acts d
 `partner_mutual_masturbation` SHALL declare `base_pleasure=18` and `actor_pleasure_ratio=1.0`.
 `partner_vaginal_sex` SHALL declare `base_pleasure=28` and `actor_pleasure_ratio=0.6`.
 `partner_deep_vaginal_sex` SHALL declare `base_pleasure=34` and `actor_pleasure_ratio=0.9`.
-These baseline trade-offs are not a claim that any act dominates another for every character: per
-design.md D-4, `sensitivity_mult` is a per-body-part trait (後庭 vs 私處) that can diverge with play
-history and is not pinned by this requirement.
 
 #### Scenario: partner_anal_sex grants the target strictly more than partner_mutual_masturbation does at baseline
 - **WHEN** `compute_pleasure_gain` is evaluated for a target entity at baseline (`普通` sensitivity,
@@ -103,6 +122,12 @@ history and is not pinned by this requirement.
 - **THEN** `partner_deep_vaginal_sex`'s target-side gain exceeds `partner_vaginal_sex`'s, and the
   actor-side gain gap between the two acts is strictly larger than the target-side gain gap (the
   deeper act costs the actor disproportionately more)
+
+#### Scenario: Baseline trade-offs do not claim per-character dominance
+- **WHEN** the baseline trade-offs are interpreted
+- **THEN** they are not a claim that any act dominates another for every character: per design.md
+  D-4, `sensitivity_mult` is a per-body-part trait (後庭 vs 私處) that can diverge with play
+  history and is not pinned by this requirement
 
 ### Requirement: All sixteen acts declare resistible=True
 Every one of the sixteen acts this change adds SHALL declare `resistible=True`.
@@ -136,12 +161,7 @@ Every `key` this change adds to `PARTNER_ACTS` SHALL be distinct from every key 
 `(("female", "female"), "penetrative_sex_with_female")`, and
 `(("male", "male"), "penetrative_sex_with_male")`. A cast whose participants are opposite-sex SHALL
 emit `first_vaginal_penetration` for **both** participants, breaking each one's `virgin` flag
-through the shipped one-way setter and adding the `陰道性交` experience type to both. A cast whose
-participants are both female SHALL emit `penetrative_sex_with_female` (adding `女女性愛`, never
-touching `virgin`); both male SHALL emit `penetrative_sex_with_male` (adding `男男性愛`, never
-touching `virgin`). A cast in which either participant's sex is `"other"` or unknown — including
-every `Monster` target, which defaults to `"other"` — SHALL emit no penetration event and SHALL
-never break `virgin`.
+through the shipped one-way setter and adding the `陰道性交` experience type to both.
 
 #### Scenario: An opposite-sex cast breaks virgin on both parties
 - **WHEN** entity A (`sex="female"`, `virgin=True`) casts `partner_vaginal_sex` targeting entity B
@@ -165,3 +185,16 @@ never break `virgin`.
 - **WHEN** entity A (`sex="female"`) casts `partner_vaginal_sex` targeting a `Monster` (which reads
   `sex` as the default `"other"`)
 - **THEN** `A.sexual.virgin` remains `True` and the monster's `virgin` remains `True`
+
+#### Scenario: A both-female cast emits penetrative_sex_with_female only
+- **WHEN** a cast's participants are both female
+- **THEN** it emits `penetrative_sex_with_female`, adding `女女性愛` and never touching `virgin`
+
+#### Scenario: A both-male cast emits penetrative_sex_with_male only
+- **WHEN** a cast's participants are both male
+- **THEN** it emits `penetrative_sex_with_male`, adding `男男性愛` and never touching `virgin`
+
+#### Scenario: An other/unknown-sex cast emits nothing and never breaks virgin
+- **WHEN** either participant's sex is `"other"` or unknown — including every `Monster` target,
+  which defaults to `"other"`
+- **THEN** the cast emits no penetration event and never breaks `virgin`

@@ -23,6 +23,24 @@ start_guild_exam(actor, examiner, target_rank, requested_by=...) SHALL be the on
 - **WHEN** a qualified place-bound examiner is away from its service anchor
 - **THEN** service_available refuses the start before resources, affinity or records change
 
+#### Scenario: Gate verdicts refuse before eligibility
+- **WHEN** the gate returns a `remote` verdict (actor and examiner not co-located) or an
+  `off_anchor` verdict (place-bound examiner away from its anchor room)
+- **THEN** both are refused before any eligibility check, and a `malformed_binding` verdict fails
+  closed
+
+#### Scenario: A started exam grants +1 affinity atomically
+- **WHEN** an examination starts successfully
+- **THEN** it additionally grants +1 affinity (`guild` source) with the examiner through the
+  sole-writer affinity API (`world/rules/affinity.py`), applied inside the same atomic block that
+  creates the exam record and combat session (the temporary opponent is pre-spawned before any
+  mutation)
+
+#### Scenario: The affinity record joins the restore surfaces
+- **WHEN** an exam start fails after the affinity grant would have been staged
+- **THEN** the examiner's affinity record, joined to the existing exam snapshot/restore surfaces,
+  is restored, and a rejected start grants nothing
+
 ### Requirement: Examination start is all-or-nothing across opponent, record, and session
 The opponent SHALL be the existing persistent qualified host. Preflight SHALL validate profile, usable permitted lineage, equipment and accessory slots before mutation. Start SHALL snapshot normal outfit and exam-owned state, then atomically activate kit/restriction, restore applicable full pools and publish exam/session/affinity. Failure SHALL restore persistent attributes, inventory mirrors, ORM and handler caches and skip-safety registration without deleting the host.
 Start SHALL activate the predecessor schedule hold in the same transaction. Every terminal/recovery closure SHALL restore normal host state before invoking recoverable held-occurrence release; valid resume SHALL retain hold. No schedule departure/state change SHALL interrupt an active exam and no release SHALL advance world time a second time.
@@ -81,6 +99,25 @@ Pre-exam description SHALL state simulated battle and full HP/MP/SP restoration 
 - **WHEN** examination rounds resolve
 - **THEN** ordinary initiative/modifiers/costs/upkeep and HP-to-zero logic apply without an HP1 floor
 
+#### Scenario: Both sides are restored to full regardless of outcome
+- **WHEN** an examination begins and later settles, win or lose
+- **THEN** the candidate's and the examiner's HP, MP, and SP are restored to full before the exam
+  starts and after it settles, regardless of outcome
+
+#### Scenario: The simulation emits no ordinary kill rewards
+- **WHEN** an examination fight ends lethally
+- **THEN** it emits no ordinary kill rewards — no kill loot, no DEFEAT quest progress, and no
+  protected-entity failure
+
+#### Scenario: The simulated marker skips all growth
+- **WHEN** an examination resolves
+- **THEN** it carries the `simulated` event-context marker, so lineage practice accrual is skipped
+  for every skill used — no growth of any kind
+
+#### Scenario: Costs and upkeep still commit during the exam
+- **WHEN** exam rounds resolve
+- **THEN** MP/SP costs and ordinary upkeep remain committed during the battle
+
 ### Requirement: Exam settlement is idempotent and promotes only a passing candidate
 Attempt identity SHALL remain <character-id>:<target-rank>:<attempt-number>. PASS SHALL atomically advance one rank and bank paired title (autoequip only empty slot), with merit unchanged. Fail/flee/forfeit/invalid recovery/round cap SHALL not promote. Settlement SHALL close once, remove exam-owned effects/restriction and restore host normal outfit and both full normal pools without deleting the host. Rollback SHALL restore storage/caches for retry. Cold recovery SHALL resume coherent persisted identity/kit/restriction/session or close invalid simulation and restore host; deletion SHALL NOT repair it.
 
@@ -111,6 +148,11 @@ Attempt identity SHALL remain <character-id>:<target-rank>:<attempt-number>. PAS
 #### Scenario: Valid resume
 - **WHEN** coherent active simulation reloads
 - **THEN** same host, restriction and session continue
+
+#### Scenario: A PASS grants the rank's paired fixed title
+- **WHEN** a PASS settlement promotes a candidate
+- **THEN** the new rank's paired fixed title is granted into `db.title_collection` within the same
+  promotion transaction, auto-equipping the fixed slot only when empty
 
 ### Requirement: Guild exam opponents carry canonical age
 Qualified persistent hosts SHALL carry canonical authored age/apparent_age integers in 0..10000 before any exam start. Start SHALL validate existing identity without respawning/reinitializing age or card. Invalid age SHALL reject without attempt/resource/affinity change.
@@ -160,4 +202,12 @@ Persistent host assembly SHALL initialize each person once from its authored pro
 #### Scenario: Spawns do not share edits
 - **WHEN** one persistent person's card is edited and another person's exam starts
 - **THEN** each retains its own independent card and no rank factory copies or resets either
+
+#### Scenario: A persona failure deletes the partial opponent
+- **WHEN** persona card initialization fails during an examination start
+- **THEN** the partially built opponent is deleted and the whole start rolls back
+
+#### Scenario: Each spawn gets its own card instance
+- **WHEN** examination opponents spawn repeatedly for one rank
+- **THEN** each spawn receives its own card instance at version 1, so editing one opponent's card never changes another opponent or a later spawn
 

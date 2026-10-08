@@ -12,11 +12,7 @@ local issuer branch and registered offer, and a quest ID absent from the actor's
 `guild_reward_claims` list. Success SHALL append that exact ID. A different acceptance number for the
 same definition SHALL remain independently claimable after completion.
 
-The `guild_reward_claims` list SHALL be the single exactly-once ledger for BOTH settlement modes:
-automatic settlement SHALL append to the same list under the same rule, and neither mode SHALL pay a
-quest ID already present in it. The counter path SHALL therefore refuse to pay a quest already
-settled automatically, and automatic settlement SHALL skip a quest already claimed at a counter,
-without either treating the other's claim as an error condition to be repaired.
+The `guild_reward_claims` list SHALL be the single exactly-once ledger for BOTH settlement modes.
 
 #### Scenario: First completed acceptance is paid once
 - **WHEN** a completed `<definition>:1` record is turned in at its issuer
@@ -40,17 +36,21 @@ without either treating the other's claim as an error condition to be repaired.
 - **WHEN** one quest is settled automatically and another is claimed at a counter
 - **THEN** both quest IDs appear exactly once in the same `guild_reward_claims` list
 
+#### Scenario: Automatic settlement appends to the same ledger under the same rule
+- **WHEN** a quest settles automatically
+- **THEN** settlement appends its quest ID to the same `guild_reward_claims` list under the same
+  exactly-once rule, and neither mode pays a quest ID already present in it
+
+#### Scenario: Automatic settlement skips a counter-claimed quest without repair
+- **WHEN** automatic settlement encounters a quest already claimed at a counter
+- **THEN** it skips that quest, without either mode treating the other's claim as an error condition
+  to be repaired
+
 ### Requirement: Reward payout is one atomic copper, item, merit, acquisition, claim, and affinity transaction
-Turn-in SHALL precompute non-negative integer wallet and merit values, repeated-key item additions,
-ACQUIRE progress for other active quests, the replacement claims list, and +2 affinity
-(`quest_completion` source, exempt from the daily cap) for every companion in the player's party at
-turn-in through the sole-writer affinity API (`world/rules/affinity.py`). When the completed quest
-has a `cap_breaks` entry, turn-in SHALL also precompute `raise_affinity_cap` calls for every
-then-in-party companion matching the entry's `npc_key` or role and SHALL apply them before the
-`quest_completion` gains, so a record at the old cap cannot clamp the +2. It SHALL commit wallet,
-inventory, `guild_merit`, quest log, claims, and every affected companion's affinity record (values
-and caps) in one database transaction and restore every Evennia cache — including the affinity
-records — if any write fails. The completed quest record itself SHALL remain `COMPLETED` history.
+Turn-in SHALL commit wallet, inventory, `guild_merit`, quest log, claims, and every affected
+companion's affinity record (values and caps) in one database transaction and restore every
+Evennia cache — including the affinity records — if any write fails. The completed quest record
+itself SHALL remain `COMPLETED` history.
 
 #### Scenario: Reward grants all configured surfaces
 - **WHEN** a reward has copper 50, two healing potions, and merit 25
@@ -80,6 +80,19 @@ records — if any write fails. The completed quest record itself SHALL remain `
   writes
 - **THEN** database and in-process wallet, inventory, merit, quest log, claims, and every
   companion's affinity record (values and caps) all equal their pre-turn-in values
+
+#### Scenario: Turn-in precomputes every settlement value before committing
+- **WHEN** turn-in prepares the settlement
+- **THEN** it precomputes non-negative integer wallet and merit values, repeated-key item
+  additions, ACQUIRE progress for other active quests, the replacement claims list, and +2
+  affinity (`quest_completion` source, exempt from the daily cap) for every companion in the
+  player's party at turn-in through the sole-writer affinity API (`world/rules/affinity.py`)
+
+#### Scenario: A cap_breaks entry precomputes cap raises applied before the +2 gains
+- **WHEN** the completed quest has a `cap_breaks` entry
+- **THEN** turn-in also precomputes `raise_affinity_cap` calls for every then-in-party companion
+  matching the entry's `npc_key` or role and applies them before the `quest_completion` gains, so
+  a record at the old cap cannot clamp the +2
 
 ### Requirement: ACQUIRE is a closed inventory-backed quest objective
 Change 16 SHALL add `ObjectiveKind.ACQUIRE`. An ACQUIRE objective SHALL declare exactly one known
@@ -117,16 +130,7 @@ inventory planning boundary.
 actor's `guild_reward_claims` list is empty — the actor's first-ever reward
 claim for any quest definition (never keyed to a particular `definition_key`) —
 and inside that same all-or-nothing claim transaction call
-`world/rules/titles.py::grant_first_quest_epithet`, which banks the starter
-epithet 「南門新客」 (`origin_quote` from `world/lore/titles.py`'s
-`STARTER_EPITHET`) through the regular `bank_epithet` writer, auto-equipping an
-empty epithet slot. The grant notification 「獲得異名：南門新客」 SHALL merge
-into the claim response payload (`title_notifications`) and every claim surface
-(CLI turn-in, the turn-in dialogue keyword, the webclient claim action) SHALL
-echo those lines with the reward summary. The title attributes SHALL join the
-claim transaction's snapshot set: a rolled-back claim removes the epithet.
-`bank_epithet` display dedupe is the second guard — any later claim, replay, or
-repeated invocation is an inert no-op granting nothing and notifying nothing.
+`world/rules/titles.py::grant_first_quest_epithet`.
 
 #### Scenario: First completed claim grants the epithet
 - **WHEN** a registered member with an empty claims list turns in any completed quest for the first time
@@ -143,3 +147,23 @@ repeated invocation is an inert no-op granting nothing and notifying nothing.
 #### Scenario: The grant is definition-independent
 - **WHEN** the first-ever claim completes a quest whose `definition_key` is not `introductory_hunt`
 - **THEN** the epithet grants exactly as for any other first claim
+
+#### Scenario: The grant banks the starter epithet through the regular writer
+- **WHEN** `grant_first_quest_epithet` runs inside the claim transaction
+- **THEN** it banks the starter epithet 「南門新客」 (`origin_quote` from `world/lore/titles.py`'s
+  `STARTER_EPITHET`) through the regular `bank_epithet` writer, auto-equipping an empty epithet slot
+
+#### Scenario: The grant notification merges into the claim response and echoes everywhere
+- **WHEN** the first-ever claim succeeds
+- **THEN** the grant notification 「獲得異名：南門新客」 merges into the claim response payload
+  (`title_notifications`) and every claim surface (CLI turn-in, the turn-in dialogue keyword, the
+  webclient claim action) echoes those lines with the reward summary
+
+#### Scenario: Title attributes join the claim transaction's snapshot set
+- **WHEN** the claim transaction takes its snapshot set
+- **THEN** the title attributes join it, so a rolled-back claim removes the epithet
+
+#### Scenario: Display dedupe is the second guard against re-grants
+- **WHEN** a later claim, replay, or repeated invocation reaches the grant path
+- **THEN** `bank_epithet` display dedupe makes it an inert no-op granting nothing and notifying
+  nothing

@@ -44,12 +44,8 @@ but permanently unreachable.
 `world/maps/instance.py::spawn_instance_room(origin_room, prototype, *, exit_key, return_key,
 ttl_seconds=None, named=False, caller=None)` SHALL raise `ValueError` and SHALL NOT call
 `evennia.prototypes.spawner.spawn()` when `prototype.get("prototype_parent")` is not a member of
-`INSTANCE_PROTOTYPE_WHITELIST`, or when the prototype declares an explicit `typeclass` that is not
-exactly `"typeclasses.rooms.InstanceRoom"`. The raiser: a `prototype_parent` whitelist alone does not
-bind the object `spawner.spawn()` actually creates — a prototype may chain from `"instance_room"` while
-also overriding `typeclass` — and a reclaimed-by-exact-typeclass query
-(`InstanceRoom.objects.all()`) would silently skip anything spawned that is not exactly an
-`InstanceRoom`. This was found by rubber-duck review after the original whitelist-only check.
+`INSTANCE_PROTOTYPE_WHITELIST`, or when the prototype declares an explicit `typeclass` that is
+not exactly `"typeclasses.rooms.InstanceRoom"`.
 
 #### Scenario: A whitelisted prototype_parent is accepted
 - **WHEN** `spawn_instance_room()` is called with a prototype whose `prototype_parent` is
@@ -72,21 +68,21 @@ also overriding `typeclass` — and a reclaimed-by-exact-typeclass query
 - **THEN** `spawn_instance_room()` raises `ValueError`, no `Exit` is created, and the stray object is
   rolled back so it does not linger in the database
 
+#### Scenario: Typeclass validation closes the whitelist chaining hole
+- **WHEN** a prototype chains from a whitelisted `prototype_parent` while overriding `typeclass`
+- **THEN** the extra explicit-typeclass check rejects it, because a `prototype_parent` whitelist
+  alone does not bind the object `spawner.spawn()` actually creates and the
+  reclaimed-by-exact-typeclass query (`InstanceRoom.objects.all()`) would silently skip anything
+  spawned that is not exactly an `InstanceRoom` (found by rubber-duck review after the original
+  whitelist-only check)
+
 ### Requirement: spawn_instance_room sets expire_tick, named, and origin_room, and creates a bidirectional attach exit
 On success, `spawn_instance_room()` SHALL set the new room's `expire_tick` to
-`get_world_clock().tick + ttl_seconds` (using `ttl_seconds` if given, otherwise
-`INSTANCE_YAML["default_ttl_seconds"]`), set `named` to the caller-supplied value, set `origin_room` to
-the caller-supplied `origin_room`, and create exactly two ordinary `Exit` objects: one at `origin_room`
-keyed `exit_key` leading to the new room, and one at the new room keyed `return_key` leading back to
-`origin_room`. Neither `Exit` SHALL be a subclass with a custom `at_traverse` override.
-
-The spawn, attribute assignment, and both `Exit.create()` calls SHALL compose one atomic
-all-or-nothing operation: if the second exit (or anything after the first) fails, the first exit and the
-newly spawned room SHALL both be rolled back. Absent this, a partial attach would leave a room
-reachable only one-way, or a room nobody can ever reach again, for the full TTL (rubber-duck review).
-
-`ttl_seconds` SHALL, when provided, be a non-negative `int` (not a `bool`); any other value SHALL raise
-`ValueError` before spawn.
+`get_world_clock().tick + ttl_seconds` (`ttl_seconds` if given, otherwise
+`INSTANCE_YAML["default_ttl_seconds"]`), set `named` to the caller-supplied value, set
+`origin_room` to the caller-supplied `origin_room`, and create the bidirectional attach exit
+pair specified below. `ttl_seconds` SHALL, when provided, be a non-negative `int` (not a
+`bool`); any other value SHALL raise `ValueError` before spawn.
 
 #### Scenario: expire_tick is set from the default TTL when ttl_seconds is omitted
 - **WHEN** `spawn_instance_room(origin_room, prototype, exit_key="in", return_key="out")` is called
@@ -125,3 +121,16 @@ reachable only one-way, or a room nobody can ever reach again, for the full TTL 
   succeeded) during an otherwise valid `spawn_instance_room()` call
 - **THEN** the call raises, and neither the newly spawned `InstanceRoom` nor either half of the attach
   exit pair exists in the database afterward
+
+#### Scenario: The attach exit pair is exactly two plain Exits
+- **WHEN** `spawn_instance_room()` succeeds
+- **THEN** exactly two ordinary `Exit` objects exist: one at `origin_room` keyed `exit_key` leading
+  to the new room, and one at the new room keyed `return_key` leading back to `origin_room`, and
+  neither `Exit` is a subclass with a custom `at_traverse` override
+
+#### Scenario: Spawn and attach compose one atomic all-or-nothing operation
+- **WHEN** the spawn, attribute assignment, and both `Exit.create()` calls are executed
+- **THEN** they compose one atomic all-or-nothing operation: if the second exit (or anything
+  after the first) fails, the first exit and the newly spawned room are both rolled back —
+  absent this, a partial attach would leave a room reachable only one-way, or a room nobody
+  can ever reach again, for the full TTL (rubber-duck review)

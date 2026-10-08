@@ -9,8 +9,6 @@ Define resolver-driven combat fleeing and its deterministic battlefield outcome.
 key into `world.skills.registry.SKILL_REGISTRY` with `kind=SkillKind.ACTIVE`,
 `target_spec=TargetSpec.SELF`, `faction_constraint=
 FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`, and `effects=["disengage:self"]`.
-Casting it SHALL go through `ActionResolver.resolve()`'s complete eight-step pipeline with no new
-pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and no dedicated command.
 
 #### Scenario: Downstream policy imports the canonical key and registration owner
 - **WHEN** change 10d imports `FLEE_SKILL_KEY` from `world.rules.disengage`
@@ -60,16 +58,18 @@ pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and 
 - **THEN** `ActionResult.success().time_cost_seconds` equals `DEFAULT_CAST_SECONDS` (6), since `flee` has
   no entry in `SKILL_TIME_OVERRIDES`
 
+#### Scenario: Casting flee rides the complete eight-step pipeline unchanged
+- **WHEN** `flee` is cast
+- **THEN** it goes through `ActionResolver.resolve()`'s complete eight-step pipeline with no new
+  pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and no dedicated
+  command
+
 ### Requirement: The disengage effect handler computes flee success from the same agility-difference
 formula and the same recalibrated constant dice-combat's own to-hit check uses
 `world/rules/disengage.py` SHALL register a `disengage` effect handler via
 `register_effect_handler("disengage", ..., surfaces=frozenset({"battlefield"}))`. The handler SHALL
 compute success as `roll_d100() + fleeing_entity_adjusted_agility >= combat.COMBAT_YAML["to_hit"]
-["defender_constant"] + fastest_pursuer_adjusted_agility`, using `world.rules.combat.COMBAT_YAML`'s
-existing constant verbatim — no new constant is declared for this check. `fastest_pursuer_adjusted_
-agility` SHALL be the greatest `effective_value("agility")` (adjusted by `evaluate_combat_modifiers()`'s
-`agility` percentage, never its `accuracy` value) among every living, non-fled member of the opposing
-team.
+["defender_constant"] + fastest_pursuer_adjusted_agility`.
 
 #### Scenario: Exact agility parity yields a 50% escape rate
 - **WHEN** a flee attempt is evaluated where the fleeing entity's adjusted agility exactly equals the
@@ -111,6 +111,21 @@ player-chosen target
 #### Scenario: No living, non-fled opposing combatant makes escape automatic
 - **WHEN** a flee attempt is evaluated and every member of the opposing team is dead or already fled
 - **THEN** the attempt succeeds unconditionally, without calling `roll_d100()`
+
+#### Scenario: The threshold constant is combat's own, reused verbatim
+- **WHEN** the success check's `defender_constant` is sourced
+- **THEN** it uses `world.rules.combat.COMBAT_YAML`'s existing constant verbatim — no new constant
+  is declared for this check
+
+#### Scenario: Agility adjustment uses the agility percentage only
+- **WHEN** the adjusted-agility inputs to the success check are computed
+- **THEN** they are adjusted by `evaluate_combat_modifiers()`'s `agility` percentage, never its
+  `accuracy` value
+
+#### Scenario: The pursuer term is the greatest effective_value("agility")
+- **WHEN** `fastest_pursuer_adjusted_agility` is computed
+- **THEN** it is the greatest `effective_value("agility")` among every living, non-fled member of
+  the opposing team
 
 ### Requirement: A successful flee adds the fleeing entity's key to Battlefield.fled; a failed attempt
 mutates nothing

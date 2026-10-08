@@ -7,23 +7,7 @@ Establishes the component-showcase contract for the Vue migration: every UI comp
 ### Requirement: Every required UI component is a Vue SFC with a documented Storybook story
 Every UI component named in the required-component manifest SHALL be implemented as a Vue
 single-file component and SHALL have at least one Storybook story that documents its props, the
-events/actions it emits, and its primary states. At the completion of the contextual HUD
-redesign the required manifest SHALL enumerate at minimum: the header; the place card; the message window; the command line; the action dock with its menu,
-submenu, and choice-card frames, its scene overview, and the scene overview's verb popover; the status panel with its gauges and conditions; the character status drawer (including the equipment doll); the skill book; the
-local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
-panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
-only data sourced from the OOB panel allowlist (art, status, context_actions, local_map, services,
-creation, exploration, character, dialogue) or the transport text stream; a surface with no backing read
-model is out of scope and MUST NOT invent data.
-
-A story of a component that consumes a derived render model (a view model the
-application builds from a committed payload through a DOM-independent reducer)
-SHALL be bound to that same derived shape, not to the raw payload: story args
-MUST reproduce the exact prop shape the live wiring passes, so a story that
-renders a degenerate or partial surface because it skipped the application's
-derivation step is a contract violation and not a presentation choice. The
-derived-shape binding SHALL come from one shared story fixture helper reused by
-every story of that component family.
+events/actions it emits, and its primary states.
 
 #### Scenario: A required component always has a story
 - **WHEN** the required-component manifest is enumerated
@@ -50,6 +34,37 @@ every story of that component family.
 - **THEN** the showcase contract is violated: the story renders a partial
   surface, and the fix is to bind the story args through the shared derived-shape
   helper the application's derivation produces
+
+#### Scenario: The manifest enumerates the contextual HUD redesign set
+- **WHEN** the contextual HUD redesign completes
+- **THEN** the required manifest SHALL enumerate at minimum: the header; the place card; the
+  message window; the command line; the action dock with its menu, submenu, and choice-card frames,
+  its scene overview, and the scene overview's verb popover; the status panel with its gauges and
+  conditions; the character status drawer (including the equipment doll); the skill book; the
+  local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait
+  on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice
+  list over the stage; the shop, quest board, and lore drawer (each backed by the `services`
+  panel); and each full overlay (map, settings, help, and creation)
+
+#### Scenario: Components source only allowlisted panels or the text stream
+- **WHEN** any required component renders
+- **THEN** it renders only data sourced from the OOB panel allowlist (art, status,
+  context_actions, local_map, services, creation, exploration, character, dialogue) or the
+  transport text stream, and a surface with no backing read model is out of scope and MUST NOT
+  invent data
+
+#### Scenario: Model-binding stories reproduce the live prop shape
+- **WHEN** a component consumes a derived render model — a view model the application builds
+  from a committed payload through a DOM-independent reducer
+- **THEN** that component's stories SHALL be bound to that same derived shape, not to the raw
+  payload: story args MUST reproduce the exact prop shape the live wiring passes, and a story that
+  renders a degenerate or partial surface because it skipped the application's derivation step is a
+  contract violation and not a presentation choice
+
+#### Scenario: One shared fixture helper carries the derived-shape binding
+- **WHEN** several stories of one component family bind to a derived render model
+- **THEN** the derived-shape binding SHALL come from one shared story fixture helper reused by
+  every story of that component family
 
 ### Requirement: The component showcase is completed before live wiring and is a mandatory CI gate
 The component showcase SHALL be completed before the application is wired to the live WebSocket
@@ -80,26 +95,10 @@ non-local network requests blocked.
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`,
-`SceneOverview`, and `DockVerbPopover`)
-SHALL present the `context_actions` v5 menus and the `exploration` panel's scene overview as a finite
-set of framed rows or chips with a guidance line and focused/disabled states, and SHALL render the
-option and choice cards in the exact server-authored shape. The action dock SHALL expose the preserved
-`action-` and `target-` item keys and the
-focusable action-dock target, and SHALL expose a stable `data-testid` on every interactive cell. Every card, row, and chip SHALL be
-backed only by the `context_actions` or `exploration` panel and SHALL emit, on activation, the exact OOB action intent — the
-`action_id` and `payload` fields of the `ui_action` envelope (the transport-level fields are owned by the
-C1 store) — or the local frame-opening intent its row carries, so no action or target SHALL be invented.
-
-The scene overview SHALL render its chips in the rows the overview menu names (出口, 人物, 物件, and a
-label-less footer) in the menu's reading order, SHALL render no row whose section is absent, and SHALL
-let the chips of a row wrap onto further lines inside the command panel rather than overflow it
-horizontally. An exit chip SHALL carry the exit's direction glyph and, while enabled, the destination's
-display name, under the same glyph, destination, and disabled-label rules as the move row form. A
-disabled chip SHALL stay focusable, SHALL carry its disabled marker in text, and SHALL expose its
-server-authored reason to assistive technology and, while focused, in the overview's reason strip. The
-verb popover SHALL render a head naming its target and that target's rows in the menu's order, and
-SHALL request the parent frame (emit its back intent) when the pointer presses outside the popover
-card inside its host.
+`SceneOverview`, and `DockVerbPopover`) SHALL present the `context_actions` v5 menus and the
+`exploration` panel's scene overview as a finite set of framed rows or chips with a guidance line
+and focused/disabled states, and SHALL render the option and choice cards in the exact
+server-authored shape.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell
@@ -121,66 +120,43 @@ card inside its host.
 - **WHEN** the verb popover is open inside its host and the pointer presses inside the host but outside the popover card
 - **THEN** the popover emits its back intent once and emits no activation
 
+#### Scenario: The dock exposes its keys, target, and test ids
+- **WHEN** the action dock renders
+- **THEN** it exposes the preserved `action-` and `target-` item keys and the focusable
+  action-dock target, and a stable `data-testid` on every interactive cell
+
+#### Scenario: Every cell is panel-backed and emits only real intents
+- **WHEN** any action-dock card, row, or chip activates
+- **THEN** it is backed only by the `context_actions` or `exploration` panel and emits, on
+  activation, the exact OOB action intent — the `action_id` and `payload` fields of the
+  `ui_action` envelope (the transport-level fields are owned by the C1 store) — or the local
+  frame-opening intent its row carries, so no action or target is invented
+
+#### Scenario: Overview chips wrap inside the command panel
+- **WHEN** a scene-overview row's chips exceed its width
+- **THEN** they wrap onto further lines inside the command panel rather than overflow it
+  horizontally
+
+#### Scenario: An exit chip follows the move row form's rules
+- **WHEN** the scene overview renders an exit chip
+- **THEN** it carries the exit's direction glyph and, while enabled, the destination's display
+  name, under the same glyph, destination, and disabled-label rules as the move row form
+
+#### Scenario: The verb popover names its target and its rows
+- **WHEN** the verb popover renders for a target
+- **THEN** it renders a head naming its target and that target's rows in the menu's order
+
+#### Scenario: A disabled chip exposes its reason to assistive technology
+- **WHEN** the scene overview renders a disabled chip
+- **THEN** the chip stays focusable, carries its disabled marker in text, and exposes its
+  server-authored reason to assistive technology and, while focused, in the overview's reason
+  strip
+
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`
 components SHALL present the `status` panel payload (schema version 1), the `character` panel
-payload (schema version 3), and the character's skill data: gauges (hp/mp/sp), the counter (guild_merit),
-static traits (atk_phys/agility/defense/magic_power), wallet, and conditions with their derived modifiers; character
-details, the equipment doll's equipped items, disguise, guild rank/merit, and persona; and a skill
-book with active/passive tabs, categories, search, and per-skill cost/target/cast/availability detail. The gauges and conditions come from the `status` payload; the counters,
-static traits, wallet, character details, equipment, disguise, guild, and persona come from the
-`character` payload. Per-skill cost, target, cast, and out-of-combat-availability detail fields are rendered only when the
-character's skill data provides them (a row the data gives without detail renders without detail
-cells, so nothing is invented); where the slice carries them they are the display subset of the
-`context_actions` v5 skill descriptor (a `cost` object — the empty object is the free form —,
-`target_spec`, the optional `freeform_scales`, and the boolean `usable_out_of_combat`). `shorthands`
-is a combat-only field: the character panel's skill data SHALL NOT carry it, because the shorthand set
-depends on a live battlefield/participant roster that does not exist outside combat. The character
-panel's presenter SHALL populate `cost`, `target_spec`, `usable_out_of_combat`, and (for a freeform-
-eligible skill the actor has mastery to scale) `freeform_scales` for every **active** skill row it can
-resolve against the skill registry; a passive skill row SHALL carry only `key` and `label`, and an
-active row whose key the registry cannot resolve SHALL carry only `key` and `label` as well (nothing is
-invented for an unregistered key).
-
-The skill book's category summaries, group labels, and per-skill rows SHALL NOT convey their meaning by
-colour alone: a category summary pairs its skill count with the visible digit text and its
-expand/collapse state with a rotating chevron shape (not a colour change); a cost cell's resource
-colour-coding (MP/SP/free) always pairs with the resource unit or the word "免費" already present in
-the cost text; the out-of-combat `combat` pill and the passive `被動` badge each carry their own visible
-text, never a bare colour swatch. An elemental group's colour dot is decorative and SHALL be present
-only for an element the binding visual reference (`docs/design/elosern-redesign/index.html`) itself
-colour-codes; a group for any other element renders its text label with no dot — no dot colour is
-invented for an element the reference never colour-codes. A skill row that carries target or cast detail
-renders that detail on the name side of the row, with the cost cell as the row's rightmost column
-(matching the reference's `.srow .cost` right-alignment via `margin-left:auto`). A group without a
-label SHALL keep the pre-change 8px top spacing, so removing the group-container margin does not regress
-ungrouped content.
-
-`StatusPanel` SHALL present its share of that data — the `status` payload's gauges and conditions —
-as the stage's left HUD island stack rather than as a single boxed column card: a vitals island and a
-conditions island, composed from the `VitalsTrack` and `ConditionChips` components, shown and hidden
-by `webclient-contextual-hud`'s vitals visibility rule. It SHALL render no identity card: the display
-name, full title, true traits, guild rank and merit, and disguise are presented by the character
-status drawer, the wallet only by the inventory drawer, and no race, subrace, class, or faction line
-is rendered anywhere, because no such field exists in either payload. No persistently visible HUD
-surface SHALL render the wallet.
-
-Status and health information SHALL never be conveyed by color alone: gauges SHALL pair an icon and a
-text label with an explicit current/maximum numeric value, each counter and static trait SHALL render
-its numeric value, and each condition SHALL pair a non-color severity glyph — one distinct glyph shape
-per severity, so two severities are never separated by color alone — with its label plus every numeric
-or derived-modifier value the payload provides. A condition chip SHALL show the condition's
-readable name (whole or ellipsised at the island width) beside its glyph and duration badge; its full
-label, duration, and modifier text SHALL be carried in the chip's accessible name and SHALL also be
-presented visibly when the chip is focused or hovered, and any bounded overflow SHALL keep every
-committed condition reachable in one action. A gauge's trailing damage indicator SHALL be decorative,
-absent from the accessibility tree, and SHALL never display a value that was not previously committed
-for that same gauge. Disguised statistics are display-only and SHALL be shown distinct from true
-traits, and a disguised displayed value SHALL NOT be substituted for a true trait row.
-The character status drawer SHALL present the `character` payload's character details, the equipment
-doll's equipped items, disguise, guild rank/merit, and persona, and SHALL NOT present a field the
-payload does not carry. Each surface renders only its OOB-backed payload and SHALL NOT invent any
-field (the intimate/adult block has no backing field and is not built).
+payload (schema version 3), and the character's skill data, each surface rendering only its
+OOB-backed payload and inventing no field.
 
 #### Scenario: Status is never color-only
 - **WHEN** a gauge, counter, or condition is displayed
@@ -234,12 +210,75 @@ field (the intimate/adult block has no backing field and is not built).
 - **WHEN** the skill book's active tab renders its category list
 - **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend
 
+#### Scenario: Per-skill detail comes only from the v5 skill descriptor
+- **WHEN** the skill book renders per-skill cost, target, cast, and out-of-combat-availability
+  detail
+- **THEN** those fields render only when the character's skill data provides them (a row the data
+  gives without detail renders without detail cells, so nothing is invented), and where the slice
+  carries them they are the display subset of the `context_actions` v5 skill descriptor: a `cost`
+  object — the empty object is the free form —, `target_spec`, the optional `freeform_scales`, and
+  the boolean `usable_out_of_combat`
+
+#### Scenario: The character panel's skill data never carries shorthands
+- **WHEN** the character panel serializes skill data
+- **THEN** it carries no `shorthands` field, because `shorthands` is a combat-only field whose set
+  depends on a live battlefield/participant roster that does not exist outside combat
+
+#### Scenario: The out-of-combat pill carries its own visible text
+- **WHEN** a skill row renders its out-of-combat `combat` pill
+- **THEN** the pill carries its own visible text, never a bare colour swatch
+
+#### Scenario: Target and cast detail sits on the name side
+- **WHEN** a skill row carries target or cast detail
+- **THEN** that detail renders on the name side of the row, with the cost cell as the row's
+  rightmost column (matching the reference's `.srow .cost` right-alignment via `margin-left:auto`)
+
+#### Scenario: An unlabeled group keeps its top spacing
+- **WHEN** a skill-book group without a label renders after the group-container margin was removed
+- **THEN** it keeps the pre-change 8px top spacing, so removing the group-container margin does not
+  regress ungrouped content
+
+#### Scenario: The island stack follows the vitals visibility rule
+- **WHEN** the stage renders its left HUD island stack
+- **THEN** the vitals island and the conditions island are shown and hidden by
+  `webclient-contextual-hud`'s vitals visibility rule
+
+#### Scenario: Identity fields belong to the drawers, not the HUD
+- **WHEN** identity information is presented
+- **THEN** the display name, full title, true traits, guild rank and merit, and disguise are
+  presented by the character status drawer and the wallet only by the inventory drawer, and no
+  race, subrace, class, or faction line is rendered anywhere, because no such field exists in
+  either payload
+
+#### Scenario: No persistent HUD surface renders the wallet
+- **WHEN** any persistently visible HUD surface renders
+- **THEN** none of them renders the wallet
+
+#### Scenario: The presented payload fields are the enumerated set
+- **WHEN** the status, character, and skill surfaces present their data
+- **THEN** the `status` payload contributes its gauges (hp/mp/sp) and conditions with their
+  derived modifiers, the `character` payload contributes its counter (guild_merit), static traits
+  (atk_phys/agility/defense/magic_power), wallet, character details, the equipment doll's
+  equipped items, disguise, guild rank/merit, and persona, and the skill book presents
+  active/passive tabs, categories, search, and per-skill cost/target/cast/availability detail
+
+#### Scenario: The intimate/adult block is not built
+- **WHEN** the status, character, and skill surfaces render
+- **THEN** the intimate/adult block is not built, because it has no backing field
+
+#### Scenario: Severity glyphs are distinct per severity
+- **WHEN** conditions of different severities render
+- **THEN** each condition's non-color severity glyph uses one distinct glyph shape per severity,
+  so two severities are never separated by color alone
+
+#### Scenario: The binding visual reference for group dots is named
+- **WHEN** the skill book decides whether an elemental group's colour dot may render
+- **THEN** the binding visual reference consulted is `docs/design/elosern-redesign/index.html`,
+  and only an element that reference itself colour-codes may carry the dot
+
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
-The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 payload with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding, in the placement variant (coordinate lattice or radial connected graph) that the payload's `layer` resolves to — the showcase stories pass the renderer's explicit variant parameter and SHALL NOT present a layout control — and SHALL invent no distance, bearing, or terrain geometry in either variant. Art SHALL render the committed scene as a cover-style 16:9 stage backdrop with its label and alternative text outside the bitmap, SHALL render portrait catalog entries only inside the framed-portrait surfaces that consume them (never as a standalone catalog strip), and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
-
-`InventoryPanel` SHALL render committed inventory display name, held count, equipped flag, nullable presentation, and nullable action descriptor together with committed character equipment rows. A non-null presentation SHALL supply only committed kind, icon key, rarity, and summary; a null presentation SHALL remain an explicit unknown-item state. The inventory SHALL use its local icon map only from committed icon keys and action behavior only from committed action descriptors. It SHALL provide keyboard-equivalent inspection and activation, confirmation for usable items, direct equipment toggle, and committed disabled-reason states without inventing an effect, recovery amount, condition, consumable flag, equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or drop behavior. Unknown rows SHALL remain visibly inspect-only. No surface SHALL invent data, including a dedicated party panel.
-
-The showcase required-set manifest SHALL include deterministic offline stories and tests for actionable use, use confirmation, full-HP rejection, direct equipment toggle, equipped state, five accessories, accessory-cap warning, unknown items, and services unavailability.
+The `LocalMap`, `SceneBackdrop`, `ReferenceArtwork`, and services-backed panels (`ShopPanel`,
+`QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data.
 
 #### Scenario: Art degrades to a truthful placeholder
 - **WHEN** the art asset is missing, pending without a prior image, failed, invalid, or unavailable
@@ -277,67 +316,58 @@ The showcase required-set manifest SHALL include deterministic offline stories a
 - **WHEN** the services OOB channel is unavailable
 - **THEN** shop, quest, lore, and inventory stories render only the registered reason with no fabricated values or controls
 
+#### Scenario: Local map stories pass the explicit variant and show no layout control
+- **WHEN** the local map's showcase stories render
+- **THEN** they pass the renderer's explicit variant parameter and SHALL NOT present a layout
+  control
+
+#### Scenario: The local map renders the v1 payload in its resolved variant
+- **WHEN** the local map renders
+- **THEN** it renders the `local_map` v1 payload with its states, actionable adjacent nodes,
+  legend and detail line, and not-colour-only encoding, in the placement variant (coordinate
+  lattice or radial connected graph) that the payload's `layer` resolves to, and invents no
+  distance, bearing, or terrain geometry in either variant
+
+#### Scenario: Portrait catalog entries stay inside their framed surfaces
+- **WHEN** portrait catalog entries render
+- **THEN** they render only inside the framed-portrait surfaces that consume them, never as a
+  standalone catalog strip
+
+#### Scenario: Shop, quest, and lore render only their services payload
+- **WHEN** the shop, quest board, or lore drawer renders
+- **THEN** it renders only its services payload
+
+#### Scenario: The inventory renders its committed fields together
+- **WHEN** the `InventoryPanel` renders
+- **THEN** it renders committed inventory display name, held count, equipped flag, nullable
+  presentation, and nullable action descriptor together with committed character equipment rows
+
+#### Scenario: Presentation and action come only from committed descriptors
+- **WHEN** an inventory row renders its icon map usage or action behavior
+- **THEN** the inventory uses its local icon map only from committed icon keys and action behavior
+  only from committed action descriptors
+
+#### Scenario: The inventory interaction set invents no mechanic
+- **WHEN** the inventory provides inspection and activation (keyboard-equivalent), confirmation for
+  usable items, direct equipment toggle, and committed disabled-reason states
+- **THEN** it does so without inventing an effect, recovery amount, condition, consumable flag,
+  equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or
+  drop behavior
+
+#### Scenario: No surface invents data, party panel included
+- **WHEN** any map, art, or services surface renders
+- **THEN** none invents data, including a dedicated party panel
+
+#### Scenario: The manifest includes the inventory story set
+- **WHEN** the showcase required-set manifest is enumerated
+- **THEN** it SHALL include deterministic offline stories and tests for actionable use, use
+  confirmation, full-HP rejection, direct equipment toggle, equipped state, five accessories,
+  accessory-cap warning, unknown items, and services unavailability
+
 ### Requirement: The full overlays are complete, the deferred surfaces are absent, and the manifest is frozen
-The full overlays `MapOverlay`, `SettingsOverlay`, `HelpOverlay`, and `CreationOverlay` SHALL be complete,
-and SHALL each have a live mount path in the running application — a built, tested,
-manifest-listed overlay that nothing imports is not complete. The map, settings, and help overlays SHALL
-each be opened from a real control in the live surface tree; the creation overlay SHALL instead be mounted
-by the running client on the committed `creation` panel's availability predicate, because creation mode is
-entered by the server's snapshot rather than by a player-operated trigger.
-The `Overlays/CreationOverlay` stories mount the same three-region creation
-workspace as the live client. Its `Storyboard` supplies an explicitly labelled,
-offline publication desk for save/confirmation, concept success/rejection and
-draft reconnect; these controls are story-only and never ship as game controls.
-The settings overlay SHALL expose the narrative prose scale, the motion level (`完整` / `減少` / `關閉`),
-the text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local presentation
-state**. It SHALL NOT dispatch a `ui_action` for any of them: `options.dismiss` — the suggestions
-dismissal — is the only allowlisted `options.*` action, and widening the action allowlist is a
-server-side change that no showcase or redesign wave makes. Each setting SHALL be applied to the
-document's presentation tokens immediately, SHALL be persisted through the client's versioned,
-presentation-only browser store as a harmless display preference, and SHALL be re-applied at load and
-reset with that store when its stored version is unrecognised. The motion level SHALL be
-optional in the stored wrapper: when the key is absent the operating system's `prefers-reduced-motion`
-preference SHALL continue to apply (`reduced` when it requests reduced motion, `full` otherwise), and a
-stored level — any of the three — SHALL override it. The surface SHALL offer no control it
-does not implement, so a control with no outcome — a typeface choice the design system's role-assigned
-faces do not support, an audio level with no audio subsystem, an interface-scale slider, or a key
-remapping — SHALL NOT be rendered. The creation overlay SHALL implement a presets/custom/concept wizard
-with the age-range gate applied to BOTH the age and the apparent_age fields and an activate transition, and
-SHALL emit `creation.*`. Because its presence is owned by the committed `creation` panel and creation mode
-presents no surface behind it, the creation overlay SHALL render no client-side dismissal control: no
-close, exit, or hide-the-surface affordance in its header or body, and no such control SHALL be wired to a
-handler that only stops rendering the overlay. This bars the dismissal affordance only — the wizard's own
-in-surface actions (the presets/custom/concept tab switch, the draft reset, the confirmation screen's
-cancel, and the activate transition) each carry a real outcome and are unaffected. The `MapOverlay` SHALL re-render its available/unavailable branch whenever the
-`local_map` OOB read model is updated, so a replaced payload never leaves a stale state; because the
-overlay is mounted in the running client, this SHALL hold against live read-model replacement and not
-only against a story's args. A surface with no backing OOB read model today — the
-event-log Toasts surface and the design draft's category-to-entry
-game-help browser (the `help` command's output reaches the client only as narrative text; no committed
-panel carries it) — MUST NOT be built or mocked to look real, and each
-SHALL be named in the deferred-surface assertion together with the read model it waits on; the help overlay
-SHALL therefore render the client's own control reference, which the client authoritatively knows, and no
-authored game-help content. The held-item bag is
-NOT among them: it is backed by the `services` panel's `inventory` section, which the server builds for
-any actor in exploration mode independently of any service host, so the bag SHALL be built from
-`services.inventory.rows`, bounded by the payload's row cap, with `pagination.inventory_total` surfaced
-only as the count of rows actually shipped and never as a claim about untruncated holdings. The intimate/adult status collapsible is likewise NOT among the deferred surfaces: it is backed by the
-`character` panel's `intimate` field (`webclient-exploration-menu`'s version-4 character-panel
-requirement), and its completeness and absence-when-`null` behaviour are governed by
-`webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. The
-party quickbar and the 同伴 ‧ 隊伍 drawer are likewise NOT among the deferred surfaces: they are backed by
-the `party` panel read model (`webclient-party-panel`), and their rendering and mutation behaviour is
-governed by `webclient-contextual-hud`'s party quickbar and party drawer requirements, not this
-deferred-surface list. The persistent objective tracker is likewise NOT among the deferred surfaces: it is
-backed by the `objectives` panel read model (`webclient-objectives-panel`), and its rendering behaviour is
-governed by `webclient-contextual-hud`'s objective tracker requirement, not this deferred-surface list. The
-client-local action-feedback toast queue (`webclient-action-feedback`) is likewise NOT among the deferred
-surfaces: it presents only client-composed or verbatim server-authored action messages rather than a
-backend read model, so its `ToastQueue` component and `feedback-` test-id family are built and
-manifest-listed, while the deferred event-log Toasts surface remains deferred by its own identity — the
-game-event toast queue bound to a not-yet-existing `event-log` read model, asserted absent by its
-`event-log-`/`toast-` test-id binding — and is distinct from the action-feedback queue. On completion of the contextual HUD redesign the required-component manifest SHALL
-be re-frozen at the complete redesign set and the component-coverage gate SHALL enforce that frozen set.
+The full overlays `MapOverlay`, `SettingsOverlay`, `HelpOverlay`, and `CreationOverlay` SHALL be
+complete, and SHALL each have a live mount path in the running application — a built, tested,
+manifest-listed overlay that nothing imports is not complete.
 
 #### Scenario: Creation gate rejects both out-of-range fields
 - **WHEN** the creation wizard submits an age or an apparent_age outside the 0..10000 range
@@ -391,30 +421,110 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 - **WHEN** the contextual HUD redesign completes
 - **THEN** the required-component manifest is re-frozen at the complete redesign set and the component-coverage gate enforces it
 
+#### Scenario: Overlay triggers follow the surface tree or panel availability
+- **WHEN** the overlays' opening paths are enumerated
+- **THEN** the map, settings, and help overlays each open from a real control in the live surface
+  tree, and the creation overlay is mounted by the running client on the committed `creation`
+  panel's availability predicate
+- **AND** creation mode is entered by the server's snapshot rather than by a player-operated
+  trigger, so no player control opens it
+
+#### Scenario: Creation stories mount the live three-region workspace
+- **WHEN** the `Overlays/CreationOverlay` stories render
+- **THEN** they mount the same three-region creation workspace as the live client
+- **AND** its `Storyboard` supplies an explicitly labelled, offline publication desk for
+  save/confirmation, concept success/rejection and draft reconnect, and these controls are
+  story-only and never ship as game controls
+
+#### Scenario: The settings overlay exposes the client-local presentation settings
+- **WHEN** the settings overlay renders
+- **THEN** it exposes the narrative prose scale, the motion level (`完整` / `減少` / `關閉`),
+  the text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local
+  presentation state**
+
+#### Scenario: Only options.dismiss stays on the action allowlist
+- **WHEN** a settings change is considered for dispatch
+- **THEN** no `ui_action` is dispatched for any setting: `options.dismiss` — the suggestions
+  dismissal — is the only allowlisted `options.*` action, and widening the action allowlist is a
+  server-side change that no showcase or redesign wave makes
+
+#### Scenario: Settings reset with the store on an unrecognised version
+- **WHEN** the client loads and the stored presentation-store version is unrecognised
+- **THEN** each setting — applied to the document's presentation tokens immediately and persisted
+  through the client's versioned, presentation-only browser store as a harmless display
+  preference — is re-applied at load and reset with that store
+
+#### Scenario: An absent motion-level key defers to the operating system
+- **WHEN** the stored wrapper lacks the optional motion-level key
+- **THEN** the operating system's `prefers-reduced-motion` preference continues to apply
+  (`reduced` when it requests reduced motion, `full` otherwise)
+- **AND** a stored level — any of the three — overrides the operating-system preference
+
+#### Scenario: The creation wizard gates ages and emits creation actions
+- **WHEN** the creation overlay runs its presets/custom/concept wizard
+- **THEN** the age-range gate applies to BOTH the age and the apparent_age fields, the wizard has
+  an activate transition, and it emits `creation.*`
+
+#### Scenario: The dismissal bar leaves wizard actions untouched
+- **WHEN** the creation overlay's actions are enumerated
+- **THEN** no close, exit, or hide-the-surface affordance is rendered in its header or body and
+  none is wired to a handler that only stops rendering the overlay
+- **AND** this bars the dismissal affordance because the overlay's presence is owned by the
+  committed `creation` panel and creation mode presents no surface behind it
+- **AND** the wizard's own in-surface actions (the presets/custom/concept tab switch, the draft
+  reset, the confirmation screen's cancel, and the activate transition) each carry a real outcome
+  and are unaffected
+
+#### Scenario: The map overlay holds against live read-model replacement
+- **WHEN** the `local_map` OOB read model is updated while the `MapOverlay` is mounted in the
+  running client
+- **THEN** its available/unavailable branch re-renders so a replaced payload never leaves a stale
+  state, and this holds against live read-model replacement and not only against a story's args
+
+#### Scenario: The help overlay renders the client's own control reference
+- **WHEN** the help overlay renders and the deferred-surface assertion is enumerated
+- **THEN** the help overlay renders the client's own control reference, which the client
+  authoritatively knows, and no authored game-help content
+- **AND** the event-log Toasts surface and the design draft's category-to-entry game-help browser
+  are named in the deferred-surface assertion together with the read model each waits on, and
+  MUST NOT be built or mocked to look real
+- **AND** the `help` command's output reaches the client only as narrative text and no committed
+  panel carries it
+
+#### Scenario: The held-item bag's total never claims untruncated holdings
+- **WHEN** the held-item bag renders from `services.inventory.rows`
+- **THEN** the listing is bounded by the payload's row cap and `pagination.inventory_total` is
+  surfaced only as the count of rows actually shipped and never as a claim about untruncated
+  holdings
+- **AND** the bag's backing is the `services` panel's `inventory` section, which the server builds
+  for any actor in exploration mode independently of any service host
+
+#### Scenario: The deferred list's not-deferred exclusions name their governing specs
+- **WHEN** the deferred-surface assertion excludes the intimate/adult status collapsible, the
+  party quickbar and 同伴 ‧ 隊伍 drawer, the persistent objective tracker, and the client-local
+  action-feedback toast queue
+- **THEN** the intimate collapsible is backed by the `character` panel's `intimate` field
+  (`webclient-exploration-menu`'s version-4 character-panel requirement) with completeness and
+  absence-when-`null` behaviour governed by `webclient-contextual-hud`'s character-status drawer
+  requirement; the party surfaces by the `party` panel (`webclient-party-panel`) with rendering
+  and mutation behaviour governed by `webclient-contextual-hud`'s party quickbar and party drawer
+  requirements; the objective tracker by the `objectives` panel
+  (`webclient-objectives-panel`) with rendering governed by `webclient-contextual-hud`'s
+  objective tracker requirement; and the action-feedback queue (`webclient-action-feedback`)
+  presents only client-composed or verbatim server-authored action messages rather than a backend
+  read model, so its `ToastQueue` component and `feedback-` test-id family are built and
+  manifest-listed
+- **AND** the deferred event-log Toasts surface remains deferred by its own identity — the
+  game-event toast queue bound to a not-yet-existing `event-log` read model, asserted absent by
+  its `event-log-`/`toast-` test-id binding — and is distinct from the action-feedback queue
+
 ### Requirement: The frozen component set grows only through a governed redesign wave
 
 The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
 through a change that names the growth as part of its own scope: a change in the WebClient
-Contextual HUD Redesign roadmap's delivery table, a change in the WebClient AVG stage redesign series
-(`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md`, whose changes are a
-governed redesign wave that MAY both add and delete components), or a feature change that introduces a component
-backed by a committed presentation panel — the portrait-gallery family
-(`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
-`Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) joins the frozen set under
-exactly this route — or a feature change that introduces a component rendered entirely from a
-committed action-result read model whose exact data shape is a main-spec requirement: the NPC
-author editor (`Overlays/NpcPersonaEditor`, backed by the `npc.persona.read`/`npc.persona.update`
-result data) joins the frozen set under exactly this route. A change that adds a component SHALL, in the same change, add its title to
-the manifest, ship its Storybook story with deterministic offline args, and extend this
-capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
-committed backing read model SHALL NOT be added under any route; it belongs on the deferred
-list instead. A component SHALL NOT be wired into the live application before its story exists.
-A governed wave change that deletes a component SHALL, in the same change, delete the component file, remove
-its title from the manifest, delete its Storybook story, delete or re-point every test that mounts it,
-and edit this capability's spec so no requirement names it — never a component deletion that leaves
-a manifest title, a story, or a spec reference behind.
-On completion of the redesign the manifest SHALL be re-frozen at the complete set then current,
-and each later growth SHALL re-freeze it at its new complete set.
+Contextual HUD Redesign roadmap's delivery table, a change in the WebClient AVG stage redesign
+series, or a feature change that introduces a component backed by a committed presentation panel
+or by a committed action-result read model.
 
 #### Scenario: A wave adds a component with its story in the same change
 
@@ -452,6 +562,47 @@ and each later growth SHALL re-freeze it at its new complete set.
 
 - **WHEN** the NPC author-editor window change lands `Overlays/NpcPersonaEditor`
 - **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args for every editor state, and the matching spec entry, the component-coverage gate passes, and the component is not mounted in the live application before its story exists
+
+#### Scenario: The AVG stage redesign series is a governed add-and-delete wave
+- **WHEN** a change in the WebClient AVG stage redesign series
+  (`docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md`) names a component
+  change as part of its own scope
+- **THEN** the change grows or shrinks the frozen set under the governed wave route, since such a
+  wave MAY both add and delete components
+
+#### Scenario: The portrait-gallery family joins through the presentation-panel route
+- **WHEN** a feature change introduces a component backed by a committed presentation panel
+- **THEN** it joins the frozen set under exactly this route, as the portrait-gallery family
+  (`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
+  `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) did
+
+#### Scenario: The NPC author editor route needs a main-spec-shaped action-result model
+- **WHEN** a feature change introduces a component rendered entirely from a committed
+  action-result read model whose exact data shape is a main-spec requirement
+- **THEN** it joins the frozen set under exactly this route, as the NPC author editor
+  (`Overlays/NpcPersonaEditor`, backed by the `npc.persona.read`/`npc.persona.update` result
+  data) did
+
+#### Scenario: An unbacked component belongs on the deferred list
+- **WHEN** a proposed component's surface has no committed backing read model
+- **THEN** it SHALL NOT be added to the frozen set under any route and belongs on the deferred
+  list instead
+
+#### Scenario: No component goes live before its story exists
+- **WHEN** a component is wired into the live application
+- **THEN** its story already exists, since a component SHALL NOT be wired in before then
+
+#### Scenario: A governed deletion leaves nothing behind
+- **WHEN** a governed wave change deletes a component
+- **THEN** the same change deletes the component file, removes its title from the manifest,
+  deletes its Storybook story, deletes or re-points every test that mounts it, and edits this
+  capability's spec so no requirement names it — never a component deletion that leaves a
+  manifest title, a story, or a spec reference behind
+
+#### Scenario: The manifest re-freezes at each complete set
+- **WHEN** the redesign completes, and again at each later growth of the frozen set
+- **THEN** the manifest is re-frozen at the complete set then current, and each later growth
+  re-freezes it at its new complete set
 
 ### Requirement: Breakdown-state stories cover the frozen manifest components
 

@@ -6,7 +6,7 @@ Defines the party core: the bounded, persistent, single-writer membership bindin
 
 ### Requirement: Party membership is bounded, persistent, and single-writer
 
-`world/rules/party.py` SHALL be the sole writer of party membership: `player.db.party` holds the list of companion NPC dbids (at most 4) and each companion's `npc.db.party_member` holds the player's dbid. `join_party(npc, player)` SHALL require an NPC target, co-location (same room), no existing binding, and a party below the 4-companion bound; `leave_party(npc, player, reason)` SHALL remove the binding regardless of the reason. Both SHALL commit the player-side and NPC-side writes atomically, SHALL restore both entities' in-process caches on failure, SHALL be idempotent under re-application, and SHALL survive reloads. `join_party` SHALL have exactly two production callers: the player-initiated invite path, and preset activation binding a declared starting companion. Neither caller SHALL assign `player.db.party` or `npc.db.party_member` itself, and a companion bound at activation SHALL be indistinguishable from an invited one for every later party operation — follow, combat, quest assist, dismissal, and the auto-leave recheck.
+`world/rules/party.py` SHALL be the sole writer of party membership: `player.db.party` holds the list of companion NPC dbids (at most 4) and each companion's `npc.db.party_member` holds the player's dbid. `join_party(npc, player)` SHALL require an NPC target, co-location (same room), no existing binding, and a party below the 4-companion bound; `leave_party(npc, player, reason)` SHALL remove the binding regardless of the reason.
 
 #### Scenario: A valid join binds both sides
 - **WHEN** a player invites a co-located NPC with 2 companions already
@@ -36,9 +36,29 @@ Defines the party core: the bounded, persistent, single-writer membership bindin
 - **WHEN** a starting companion bound at activation is exercised through follow, combat, quest assist, and dismissal
 - **THEN** every operation behaves exactly as it does for an invited companion, with no origin-dependent branch
 
+#### Scenario: Both APIs commit their paired writes atomically
+- **WHEN** `join_party` or `leave_party` commits
+- **THEN** the player-side and NPC-side writes commit atomically, in one operation
+
+#### Scenario: Both APIs are idempotent under re-application
+- **WHEN** an already-committed join or leave is re-applied
+- **THEN** the operation is idempotent and both entities' stored values are unchanged
+
+#### Scenario: Both APIs restore caches on failure and survive reloads
+- **WHEN** a party write fails, or the server reloads with committed membership
+- **THEN** both entities' in-process caches are restored on failure, and committed membership survives reloads unchanged
+
+#### Scenario: join_party has exactly two production callers
+- **WHEN** `join_party`'s production callers are counted
+- **THEN** there are exactly two — the player-initiated invite path and preset activation binding a declared starting companion — and neither caller assigns `player.db.party` or `npc.db.party_member` itself
+
+#### Scenario: An activation-bound companion is indistinguishable to the auto-leave recheck
+- **WHEN** the auto-leave recheck evaluates a companion bound at activation
+- **THEN** it behaves exactly as it does for an invited companion, with no origin-dependent branch
+
 ### Requirement: The invite command proposes a party through the AI-judged dialogue seam
 
-The character cmdset SHALL provide `invite <npc> [訊息]` (aliases 邀請, 組隊) that resolves a local NPC target (absent or ambiguous targets produce Traditional Chinese errors, mirroring `talk`), preflights the deterministic gate (an NPC with an eligible free-form dialogue surface — an `LLMNPC` — not already a companion, party not full), and then sends the player's invitation message through the guarded dialogue seam with the NPC's affinity context; a webclient action SHALL offer the same flow with the injected client. The reply's speech SHALL be shown to the player. A `party_invite {accept: true}` intent SHALL be verified and applied through `join_party` (rechecking co-location, binding, and the 4-companion bound) and the player SHALL be notified of the joined companion; `accept: false` SHALL notify of the refusal and change nothing; any illegal or unverifiable intent SHALL keep the speech and change nothing. When the dialogue layer is disabled, unreachable, or retry-exhausted, the invitation SHALL degrade to a fixed threshold decision (`affinity >= 70`, the 羈絆 stage floor) with deterministic accept/reject lines; the AI, when present, SHALL NOT be bound by that threshold.
+The character cmdset SHALL provide `invite <npc> [訊息]` (aliases 邀請, 組隊) that resolves a local NPC target and, after the deterministic preflight gate passes, sends the player's invitation message through the guarded dialogue seam with the NPC's affinity context. A `party_invite {accept: true}` intent SHALL be verified and applied through `join_party`; `accept: false` SHALL notify of the refusal and change nothing; any illegal or unverifiable intent SHALL keep the speech and change nothing.
 
 #### Scenario: A co-located NPC is invited and joins
 - **WHEN** a player invites a co-located NPC and the dialogue reply carries `party_invite` with `accept: true`
@@ -84,9 +104,33 @@ The character cmdset SHALL provide `invite <npc> [訊息]` (aliases 邀請, 組�
 - **WHEN** the command reference is inspected
 - **THEN** `invite` and its aliases and syntax appear in `docs/game/command-reference.md`
 
+#### Scenario: Target resolution mirrors talk's error contract
+- **WHEN** the invite target is absent or ambiguous
+- **THEN** Traditional Chinese errors are produced, mirroring `talk`
+
+#### Scenario: The deterministic preflight gate admits only eligible invitees
+- **WHEN** the invite preflight gate is evaluated
+- **THEN** it admits only an NPC with an eligible free-form dialogue surface — an `LLMNPC` — that is not already a companion, with the party not full
+
+#### Scenario: The reply's speech reaches the player
+- **WHEN** any invitation dialogue reply arrives
+- **THEN** the reply's speech is shown to the player
+
+#### Scenario: An accepted intent is rechecked and applied through join_party
+- **WHEN** a `party_invite {accept: true}` intent is applied
+- **THEN** `join_party` rechecks co-location, binding, and the 4-companion bound, and the player is notified of the joined companion
+
+#### Scenario: An unavailable dialogue layer degrades to the fixed threshold
+- **WHEN** the dialogue layer is disabled, unreachable, or retry-exhausted
+- **THEN** the invitation degrades to a fixed threshold decision (`affinity >= 70`, the 羈絆 stage floor) with deterministic accept/reject lines
+
+#### Scenario: The webclient offers the same invite flow
+- **WHEN** the invite flow is used from the webclient
+- **THEN** a webclient action offers the same flow with the injected client
+
 ### Requirement: The leave command dismisses a companion without affinity change
 
-The character cmdset SHALL provide `leave <npc>` (alias 解散) that resolves a bound companion (absent, ambiguous, or unbounded targets produce Traditional Chinese errors) and dismisses it through `leave_party(npc, player, reason="dismissed")`. A companion currently possessed by the caller's account SHALL be refused with the fixed handback-first message at the command surface AND inside `leave_party` itself (defense-in-depth for every API caller). Dismissal SHALL NOT change affinity in either direction and SHALL notify the player. A webclient action SHALL offer the same flow.
+The character cmdset SHALL provide `leave <npc>` (alias 解散) that resolves a bound companion (absent, ambiguous, or unbounded targets produce Traditional Chinese errors) and dismisses it through `leave_party(npc, player, reason="dismissed")`. Dismissal SHALL NOT change affinity in either direction and SHALL notify the player. A webclient action SHALL offer the same flow.
 
 #### Scenario: Dismissal removes the binding
 - **WHEN** a player dismisses a bound companion
@@ -109,9 +153,13 @@ The character cmdset SHALL provide `leave <npc>` (alias 解散) that resolves a 
 - **THEN** the fixed handback-first message surfaces and party and possession attributes are
   unchanged
 
+#### Scenario: Possession refusal is enforced at both layers
+- **WHEN** a companion currently possessed by the caller's account is targeted for dismissal
+- **THEN** the fixed handback-first message is enforced at the command surface AND inside `leave_party` itself, defense-in-depth for every API caller
+
 ### Requirement: Companions auto-leave when affinity drops below the invite threshold
 
-The auto-leave recheck hook installed by `affinity-system` SHALL be wired: after every negative affinity delta, when the NPC is a bound companion and the NPC's affinity toward the player drops below the invite threshold (70), the hook SHALL call `leave_party(npc, player, reason="affinity_below_threshold")` as part of the affinity write's transaction — a failed leave SHALL roll back the entire negative-delta operation so "affinity below threshold but still bound" is unreachable — and the write API SHALL return the auto-leave notification line, which the caller SHALL send to the player only after its own transaction commits. The writer SHALL never send the notification itself. A negative delta that leaves affinity at or above the threshold SHALL NOT end the party.
+The auto-leave recheck hook installed by `affinity-system` SHALL be wired: after every negative affinity delta, when the NPC is a bound companion and the NPC's affinity toward the player drops below the invite threshold (70), the hook SHALL call `leave_party(npc, player, reason="affinity_below_threshold")` as part of the affinity write's transaction. The writer SHALL never send the notification itself. A negative delta that leaves affinity at or above the threshold SHALL NOT end the party.
 
 #### Scenario: Below-threshold affinity ends the party
 - **WHEN** a bound companion's affinity drops from 70 to 69 through a negative delta
@@ -137,6 +185,10 @@ The auto-leave recheck hook installed by `affinity-system` SHALL be wired: after
 - **THEN** the possession release commits before the affinity/party atomic opens, and a release
   failure leaves affinity, party binding, and possession all untouched
 
+#### Scenario: A failed leave makes the bound-but-below-threshold state unreachable
+- **WHEN** the leave inside the affinity write's transaction fails
+- **THEN** the failed leave rolls back the entire negative-delta operation, so "affinity below threshold but still bound" is unreachable
+
 
 ### Requirement: Deleting an NPC purges its party bindings
 
@@ -152,7 +204,7 @@ When an NPC is deleted (instance reclamation, scene teardown, or any `delete()`)
 
 ### Requirement: Companions follow the player through every exit traversal
 
-The follow function in the party module SHALL move every companion of the traversing player who is present in the source room to the player's destination, and SHALL be invoked from every exit success path: the shared `MovementCostMixin.at_post_traverse` hook (grid, instance, and base exits), the wilderness gate entry branch (`WildernessGateExit.at_traverse`), the wilderness return branch, and the ordinary wilderness step branch (`WildernessReturnExit.at_traverse`). Companion movement SHALL charge no world clock, SHALL emit no announce messages, SHALL leave the party binding unchanged, and SHALL never raise from any traversal hook. Grid and instance destinations SHALL be reached through quiet `move_to`; wilderness entry and wilderness steps SHALL move companions through the wilderness provider's coordinate API (`enter_wilderness` / `script.move_obj`), never through a plain `move_to` into a wilderness room. A companion whose move fails SHALL remain at its current location and the player SHALL receive one fixed Traditional Chinese 「跟丟了」 notification per traversal naming every companion left behind. Follow SHALL trigger only on the exit paths above; teleports, spawns, and other non-exit relocations SHALL NOT pull companions, and a bound companion in a different room SHALL NOT be teleported to the player.
+The follow function in the party module SHALL move every companion of the traversing player who is present in the source room to the player's destination, and SHALL be invoked from every exit success path. Companion movement SHALL charge no world clock, SHALL emit no announce messages, SHALL leave the party binding unchanged, and SHALL never raise from any traversal hook.
 
 #### Scenario: Companions follow a successful grid traversal
 - **WHEN** a player with two companions in the source room traverses an ordinary or grid exit
@@ -197,18 +249,24 @@ The follow function in the party module SHALL move every companion of the traver
 #### Scenario: A left-behind companion rejoins on a later traversal
 - **WHEN** a companion failed to follow and the player later traverses an exit from the companion's current room
 - **THEN** the companion follows on that traversal and the player receives no repeated notification
+
+#### Scenario: Every exit success path invokes follow
+- **WHEN** an exit traversal succeeds
+- **THEN** follow is invoked from the shared `MovementCostMixin.at_post_traverse` hook (grid, instance, and base exits), the wilderness gate entry branch (`WildernessGateExit.at_traverse`), the wilderness return branch, and the ordinary wilderness step branch (`WildernessReturnExit.at_traverse`)
+
+#### Scenario: Companion moves use the traversal-appropriate move API
+- **WHEN** companions follow through any exit type
+- **THEN** grid and instance destinations are reached through quiet `move_to`, and wilderness entry and wilderness steps move companions through the wilderness provider's coordinate API (`enter_wilderness` / `script.move_obj`), never through a plain `move_to` into a wilderness room
+
+#### Scenario: One fixed left-behind notification names every companion per traversal
+- **WHEN** one or more companions' follow moves fail in a traversal
+- **THEN** each failed companion remains at its current location and the player receives one fixed Traditional Chinese 「跟丟了」 notification per traversal naming every companion left behind
+
+#### Scenario: Follow triggers only on exit paths
+- **WHEN** the player is relocated by a teleport, spawn, or other non-exit move, or a bound companion waits in a different room
+- **THEN** follow does not trigger: companions are not pulled, and a bound companion in a different room is not teleported to the player
 ### Requirement: Companions fight as allies in the player's combat session
-When the player engages a hostile target, `engage` SHALL include every bound companion that is
-co-located, living, and not knocked out in the session's allied team (`player_ids`). The
-battlefield's two-team model SHALL treat companions as allies: `relation_to` returns ALLY for
-them, freely-targetable (ANY) skills and the `all-allies` shorthand may include them, and the
-player SHALL be able to select companions as explicit damage targets — companion hits apply the
-friendly-fire penalty contract (affinity-friendly-fire) rather than being rejected; opposing-team
-combatants SHALL be able to target
-companions. Each companion SHALL receive at most one deterministic policy request per round
-through the session's non-player action provider (the same `monster_behaviour_policy` pipeline
-monsters use, whose target selection is team-relative), and SHALL NOT consume or delay the
-player's queued request.
+When the player engages a hostile target, `engage` SHALL include every bound companion that is co-located, living, and not knocked out in the session's allied team (`player_ids`). Each companion SHALL receive at most one deterministic policy request per round through the session's non-player action provider, and SHALL NOT consume or delay the player's queued request.
 
 #### Scenario: Co-located living companions join the engagement
 - **WHEN** a player with two co-located living bound companions engages a monster
@@ -234,17 +292,20 @@ player's queued request.
 - **WHEN** a companion (which has no monster threat tier) acts through the policy provider
 - **THEN** its request targets an opposing-team combatant and is never a flee request
 
+#### Scenario: The two-team model treats companions as allies
+- **WHEN** the battlefield relates to a companion
+- **THEN** `relation_to` returns ALLY for it, freely-targetable (ANY) skills and the `all-allies` shorthand may include it, and opposing-team combatants are able to target companions
+
+#### Scenario: Companion hits obey the friendly-fire penalty contract
+- **WHEN** the player selects a companion as an explicit damage target
+- **THEN** the hit applies the friendly-fire penalty contract (affinity-friendly-fire) rather than being rejected
+
+#### Scenario: Companions share the monsters' policy pipeline
+- **WHEN** a companion's per-round policy request is produced
+- **THEN** it runs through the same `monster_behaviour_policy` pipeline monsters use, whose target selection is team-relative
+
 ### Requirement: Knocked-out companions are persistent battlefield state and can never die
-A companion whose HP crosses from positive to non-positive SHALL be knocked out nonlethally: HP
-floors at 1, `target_knocked_out` is emitted, `target_defeated` is not, and no kill credit, XP,
-DEFEAT progress, or loot consumer observes a companion death. The knockout SHALL be marked on the
-battlefield at damage-commit time, SHALL be persisted in the session record's `knocked_out_ids`,
-and SHALL be reconstructed on battlefield rebuild. A knocked-out companion SHALL be excluded from
-initiative order, from receiving policy requests, from all target selection (the player's
-`all-allies`, opposing-team enemy selection, and AREA shortcuts), from overwhelm classification,
-and from the terminal living checks. The knockout marker SHALL clear only when the companion's HP
-rises above 1 through the ordinary clock-driven regen; until then the companion SHALL NOT join a
-new engagement. The party binding SHALL remain unchanged throughout.
+A companion whose HP crosses from positive to non-positive SHALL be knocked out nonlethally: HP floors at 1, `target_knocked_out` is emitted, `target_defeated` is not, and no kill credit, XP, DEFEAT progress, or loot consumer observes a companion death. The party binding SHALL remain unchanged throughout.
 
 #### Scenario: A companion's lethal crossing becomes a knockout
 - **WHEN** a monster's damage would cross a companion's HP from positive to non-positive
@@ -273,6 +334,18 @@ new engagement. The party binding SHALL remain unchanged throughout.
 - **WHEN** a knocked-out companion's HP rises above 1 through clock-driven regen
 - **THEN** the companion may join a later engagement as a living participant
 
+#### Scenario: The knockout is marked, persisted, and reconstructed
+- **WHEN** a companion knockout commits
+- **THEN** it is marked on the battlefield at damage-commit time, persisted in the session record's `knocked_out_ids`, and reconstructed on battlefield rebuild
+
+#### Scenario: A knocked-out companion is excluded from every battlefield role
+- **WHEN** a companion is knocked out
+- **THEN** it is excluded from initiative order, from receiving policy requests, from all target selection (the player's `all-allies`, opposing-team enemy selection, and AREA shortcuts), from overwhelm classification, and from the terminal living checks
+
+#### Scenario: The knockout marker clears only through clock-driven regen
+- **WHEN** a companion carries the knockout marker
+- **THEN** the marker clears only when the companion's HP rises above 1 through the ordinary clock-driven regen, and until then the companion does not join a new engagement
+
 ### Requirement: Combat terminal rules are player-centric
 The session SHALL end in defeat when the player (the session owner) is defeated — HP at or below
 zero or marked knocked out — even when companions remain standing; it SHALL end in victory when
@@ -298,21 +371,7 @@ skip-safety registration, and the party binding SHALL be unchanged by companion 
   regen over subsequent world-time advances, clearing the knockout marker above 1 HP
 
 ### Requirement: Companions assist the player's quest objectives
-A bound companion's contributions SHALL count toward the quest owner's active objectives: a
-DEFEAT entry produced by a bound companion's action SHALL advance the owner's matching DEFEAT
-stage through the same commit-time planner rules as the owner's own kills (same aggregation,
-cap, and one-transition rules), only while the binding is valid in both directions (the actor
-appears in the owner's valid party list and the actor's back-reference points to the owner) and
-the actor is not knocked out; a knocked-out companion's, unbound NPC's, or mismatched binding's
-entries SHALL NOT count, and a credit decision without an active battlefield SHALL fail closed.
-A REACH or ESCORT arrival SHALL advance when the player arrives at the destination and at least
-one bound companion is present in the destination room — already there or arriving with the
-player; ESCORT SHALL keep requiring every protected entity alive and present. The arrival
-observation SHALL run again after companions complete their follow moves, so co-presence on the
-first arrival is visible, and the one-transition rule SHALL make the repeated observation
-idempotent. Unbound entities, other players' companions, and monster kills SHALL grant no credit.
-The player's active quest record SHALL be the only record advanced; companions SHALL have no quest
-log of their own.
+A bound companion's contributions SHALL count toward the quest owner's active objectives: a DEFEAT entry produced by a bound companion's action SHALL advance the owner's matching DEFEAT stage, only while the binding is valid in both directions (the actor appears in the owner's valid party list and the actor's back-reference points to the owner) and the actor is not knocked out. The player's active quest record SHALL be the only record advanced; companions SHALL have no quest log of their own.
 
 #### Scenario: A companion's kill advances the owner's DEFEAT objective
 - **WHEN** a bound companion's action lethally defeats a monster matching the owner's active DEFEAT stage, with a valid bidirectional binding and an active battlefield
@@ -338,13 +397,28 @@ log of their own.
 - **WHEN** a companion is present at an ESCORT destination but a protected entity is absent or dead
 - **THEN** the stage remains unchanged
 
+#### Scenario: Companion kills run under the owner's own planner rules
+- **WHEN** a valid companion kill advances the owner's DEFEAT stage
+- **THEN** it advances through the same commit-time planner rules as the owner's own kills (same aggregation, cap, and one-transition rules)
+
+#### Scenario: Non-counting entries and a missing battlefield fail closed
+- **WHEN** the entry comes from a knocked-out companion, an unbound NPC, or a mismatched binding, or the credit decision has no active battlefield
+- **THEN** no credit is granted — the entries do not count and the battlefield-less decision fails closed
+
+#### Scenario: Nothing else grants credit and only the owner's record advances
+- **WHEN** an unbound entity, another player's companion, or a monster produces the contribution
+- **THEN** no credit is granted, and only the player's active quest record is ever advanced
+
+#### Scenario: A REACH or ESCORT arrival advances on co-presence
+- **WHEN** the player arrives at the destination and at least one bound companion is present in the destination room — already there or arriving with the player
+- **THEN** the matching REACH or ESCORT arrival advances; ESCORT keeps requiring every protected entity alive and present
+
+#### Scenario: The arrival observation reruns after follow and stays idempotent
+- **WHEN** the arrival observation runs again after companions complete their follow moves
+- **THEN** co-presence on the first arrival is visible, and the one-transition rule makes the repeated observation idempotent
+
 ### Requirement: Completing a quest rewards each then-in-party companion with affinity
-Quest reward settlement SHALL grant +2 affinity (source `quest_completion`, exempt from the daily
-cap) to every companion in the player's party at turn-in, through the sole-writer affinity API
-(`world/rules/affinity.py`), committed atomically with the reward transaction: wallet, inventory,
-merit, ACQUIRE progress, claims, and every affected companion's affinity record SHALL commit
-together, and a fault at any write position SHALL restore all surfaces including the affinity
-records and their in-process caches. Companions SHALL receive no XP, items, or merit.
+Quest reward settlement SHALL grant +2 affinity (source `quest_completion`, exempt from the daily cap) to every companion in the player's party at turn-in, through the sole-writer affinity API (`world/rules/affinity.py`), committed atomically with the reward transaction. Companions SHALL receive no XP, items, or merit.
 
 #### Scenario: Turn-in rewards the party with affinity
 - **WHEN** a player turns in a completed quest with two bound companions in the party
@@ -363,6 +437,10 @@ records and their in-process caches. Companions SHALL receive no XP, items, or m
 - **WHEN** any reward or affinity write is fault-injected after preceding writes
 - **THEN** wallet, inventory, merit, quest log, claims, and every companion's affinity record — and
   their in-process caches — equal their pre-turn-in values
+
+#### Scenario: Every reward surface commits in one transaction
+- **WHEN** a quest turn-in commits
+- **THEN** wallet, inventory, merit, ACQUIRE progress, claims, and every affected companion's affinity record commit together in the one atomic reward transaction
 
 ### Requirement: Combat settlement includes companions in the regen scope
 

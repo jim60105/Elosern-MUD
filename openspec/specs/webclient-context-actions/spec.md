@@ -11,34 +11,9 @@ unavailable form whose field set is unchanged across versions and which carries 
 ### Requirement: context_actions is an exact read-only version-5 panel
 The production presentation registry SHALL register panel name `context_actions` at schema
 version 5. The panel SHALL expose exactly one available form per mode and the registered common
-unavailable form otherwise:
-- In a valid active combat session the available payload SHALL contain exactly `schema_version`,
-  `available`, `kind`, `session`, `participants`, `root_actions`, `secondary_actions`, `skills`,
-  and `suggestions`, with `available` true, `kind` `"combat"`, and `suggestions` exactly
-  `{"status": "unavailable"}` — the version-3 field contract for the combat fields themselves is
-  preserved (the `webclient-combat-menu` capability owns the combat-field details).
-- In exploration mode the available payload SHALL contain exactly `schema_version`, `available`,
-  `kind`, `affordances`, and `suggestions`, with `available` true, `kind` `"exploration"`,
-  `affordances` following the exploration-affordances capability contract, and `suggestions`
-  following the `webclient-context-actions-suggestions` capability contract (state-backed
-  per-status envelope). The version-4 prohibition on a `suggestions` section in the exploration
-  form is removed.
-- Outside both modes (creation-pending, absent location, unknown) the panel SHALL use the
-  registered common unavailable form with its stable code and safe Traditional Chinese message.
-  The unavailable form's exact field set SHALL remain `schema_version`, `available`, and `reason`
-  — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (5)
-  like every other form.
-
-Every validation SHALL be server-side with a strict closed schema: unknown keys, wrong kinds,
-unpresent fields, underepresent fields, and out-of-bound values SHALL be rejected by the server
-validator, and the production client mirror SHALL enforce the same contract. Affordance
-`params` validation SHALL be a total function over the shared vocabulary's
-`ACTION_CODE_ALLOWLIST`: every code the vocabulary may emit SHALL have a registered payload
-validator (pinned by a test that the registered-key set covers the allowlist), and an
-unregistered code SHALL produce a structured protocol rejection naming the code — never a Python
-`KeyError` escaping into a calling presenter or suggestion validator. The presenter SHALL be
-read-only: it SHALL NOT mutate traits, resources, buffs, sexual state, battlefield, session,
-quest, location, party, or world time, and SHALL emit no live object or filesystem reference.
+unavailable form otherwise. The presenter SHALL be read-only: it SHALL NOT mutate traits,
+resources, buffs, sexual state, battlefield, session, quest, location, party, or world time, and
+SHALL emit no live object or filesystem reference.
 
 #### Scenario: One available form per mode with suggestions
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot, and again when the
@@ -72,38 +47,37 @@ quest, location, party, or world time, and SHALL emit no live object or filesyst
   shape, rejecting anything else structurally) and the panel/suggestion path never raises a
   Python error
 
+#### Scenario: The combat available form carries the version-5 field set
+- **WHEN** a valid active combat session renders the available payload
+- **THEN** it SHALL contain exactly `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`, `secondary_actions`, `skills`, and `suggestions`, with `available` true, `kind` `"combat"`, and `suggestions` exactly `{"status": "unavailable"}` — the version-3 field contract for the combat fields themselves is preserved (the `webclient-combat-menu` capability owns the combat-field details)
+
+#### Scenario: The exploration available form carries suggestions
+- **WHEN** exploration mode renders the available payload
+- **THEN** it SHALL contain exactly `schema_version`, `available`, `kind`, `affordances`, and `suggestions`, with `available` true, `kind` `"exploration"`, `affordances` following the exploration-affordances capability contract, and `suggestions` following the `webclient-context-actions-suggestions` capability contract (state-backed per-status envelope); the version-4 prohibition on a `suggestions` section in the exploration form is removed
+
+#### Scenario: Outside both modes the common unavailable form is used
+- **WHEN** the mode is creation-pending, absent location, or unknown
+- **THEN** the panel SHALL use the registered common unavailable form with its stable code and safe Traditional Chinese message
+
+#### Scenario: The unavailable form field set stays exact at version 5
+- **WHEN** the unavailable form is serialized
+- **THEN** its exact field set SHALL remain `schema_version`, `available`, and `reason` — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (5) like every other form
+
+#### Scenario: Every validation is server-side with a strict closed schema
+- **WHEN** a candidate payload carries unknown keys, wrong kinds, unpresent fields, underepresent fields, or out-of-bound values
+- **THEN** the server validator SHALL reject it, and the production client mirror SHALL enforce the same contract
+
+#### Scenario: Affordance params validation is a total function over the allowlist
+- **WHEN** affordance `params` validation runs over the shared vocabulary's `ACTION_CODE_ALLOWLIST`
+- **THEN** every code the vocabulary may emit SHALL have a registered payload validator (pinned by a test that the registered-key set covers the allowlist), and an unregistered code SHALL produce a structured protocol rejection naming the code — never a Python `KeyError` escaping into a calling presenter or suggestion validator
+
 ### Requirement: The exploration context form enumerates the complete canonical affordance list
 The exploration available form's `affordances` SHALL be a bounded list of exactly the
 `AffordanceView` objects produced by the shared vocabulary (`exploration-affordances`) in
 vocabulary order: at most `MAX_CONTEXT_AFFORDANCES` (320) entries — a bound derived from the
 shared v1 caps (≤ 32 interact targets × ≤ 8 affordances per target, ≤ 16 scripted keywords per
 host, ≤ 12 exits, ≤ 32 look objects, ≤ 2 baseline, ≤ 2 navigation), so a legal room can never
-truncate the list (asserted by a maximal-fixture test). Each action entry SHALL carry `action_id`
-in `ACTION_CODE_ALLOWLIST` (no fabricated or `explore.interact` code), a bounded safe `label`,
-the validator-normalized `params` (or the freeform binding shape), exact `freeform` and
-`navigation` booleans, exact `enabled`, and `disabled_reason` null or an exact object with stable
-code and safe Traditional Chinese message. Each navigation entry SHALL carry `surface`
-(`"guild"` or `"shop"`), a bounded safe `label`, `navigation` true, exact `enabled`,
-`disabled_reason`, and no `action_id`/`params`, and SHALL never be dispatched as a `ui_action`.
-The form SHALL fail closed over the OOB envelope byte limit exactly like the version-1
-exploration panel: the entry-count bound is a ceiling, not a guarantee that any content fits, so
-a form whose canonical serialization exceeds `MAX_CANONICAL_JSON_BYTES` SHALL be rejected by the
-server validator rather than emitted. The client's global envelope gate (list-item ceiling) SHALL
-clear the maximal affordance list so a large room's form is never rejected before panel
-validation. The production client mirror's action-code enumerations (context-action codes,
-exploration action ids) and its affordance `params` validation branches SHALL stay in lockstep
-with the server vocabulary. `CONTEXT_ACTIONS_ACTION_CODES` is the full sequence of every code in
-`ACTION_CODE_ALLOWLIST` (twelve codes, including `explore.talk_open`, which the vocabulary never
-emits but which the shared params gate accepts with exactly `{npc_id}`). `EXPLORATION_ACTION_IDS`
-is intentionally the `exploration` panel's target-scoped subset (affordances that require an NPC
-target identity) — `explore.move`, `explore.look`, and `explore.wait` are absent because they are
-never emitted as per-target affordances, and `explore.talk_scripted` and `explore.talk_freeform`
-are absent because the panel folds a host's talk entries into one `explore.talk_open` affordance;
-the list is exactly `explore.talk_open`, `explore.party_invite`, `explore.party_leave`,
-`explore.engage`, `explore.possess`, `explore.possess_release`, and `explore.deliver`. Every code in each enumeration SHALL have a params branch accepting exactly the
-server validator's accepted shape and rejecting everything else; the parity SHALL be pinned by
-dependency-free Node test fixtures carrying the server's authoritative code lists and accept/reject
-params vectors.
+truncate the list.
 
 #### Scenario: The context form mirrors the vocabulary exactly
 - **WHEN** the exploration form is rendered for a fixture room
@@ -130,3 +104,39 @@ params vectors.
   again with an added `keyword_id`, a missing `npc_id`, or a zero `npc_id`
 - **THEN** the first is accepted and the others are rejected exactly as the server validator does,
   and `CONTEXT_ACTIONS_ACTION_CODES` equals the server's twelve-code allowlist
+
+#### Scenario: Each action entry carries its exact fields
+- **WHEN** an action entry renders
+- **THEN** it SHALL carry `action_id` in `ACTION_CODE_ALLOWLIST` (no fabricated or `explore.interact` code), a bounded safe `label`, the validator-normalized `params` (or the freeform binding shape), exact `freeform` and `navigation` booleans, exact `enabled`, and `disabled_reason` null or an exact object with stable code and safe Traditional Chinese message
+
+#### Scenario: Each navigation entry carries its exact fields and is never dispatched
+- **WHEN** a navigation entry renders
+- **THEN** it SHALL carry `surface` (`"guild"` or `"shop"`), a bounded safe `label`, `navigation` true, exact `enabled`, `disabled_reason`, and no `action_id`/`params`, and SHALL never be dispatched as a `ui_action`
+
+#### Scenario: The form fails closed over the envelope byte limit
+- **WHEN** a form's canonical serialization exceeds `MAX_CANONICAL_JSON_BYTES`
+- **THEN** it SHALL be rejected by the server validator rather than emitted, exactly like the version-1 exploration panel: the entry-count bound is a ceiling, not a guarantee that any content fits
+
+#### Scenario: The client's global envelope gate clears the maximal affordance list
+- **WHEN** a large room's maximal affordance list passes the client's global envelope gate (list-item ceiling)
+- **THEN** the gate SHALL clear the list so the form is never rejected before panel validation
+
+#### Scenario: The client mirror enumerations stay in lockstep with the server vocabulary
+- **WHEN** the production client mirror's action-code enumerations (context-action codes, exploration action ids) and its affordance `params` validation branches are checked
+- **THEN** they SHALL stay in lockstep with the server vocabulary
+
+#### Scenario: CONTEXT_ACTIONS_ACTION_CODES is the full allowlist sequence
+- **WHEN** `CONTEXT_ACTIONS_ACTION_CODES` is enumerated
+- **THEN** it is the full sequence of every code in `ACTION_CODE_ALLOWLIST` (twelve codes, including `explore.talk_open`, which the vocabulary never emits but which the shared params gate accepts with exactly `{npc_id}`)
+
+#### Scenario: EXPLORATION_ACTION_IDS is the intentional target-scoped subset
+- **WHEN** `EXPLORATION_ACTION_IDS` is enumerated
+- **THEN** it is intentionally the `exploration` panel's target-scoped subset (affordances that require an NPC target identity) — `explore.move`, `explore.look`, and `explore.wait` are absent because they are never emitted as per-target affordances, and `explore.talk_scripted` and `explore.talk_freeform` are absent because the panel folds a host's talk entries into one `explore.talk_open` affordance; the list is exactly `explore.talk_open`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.possess`, `explore.possess_release`, and `explore.deliver`
+
+#### Scenario: Enumeration parity is pinned by dependency-free fixtures
+- **WHEN** every code in each client enumeration is validated
+- **THEN** it SHALL have a params branch accepting exactly the server validator's accepted shape and rejecting everything else, and the parity SHALL be pinned by dependency-free Node test fixtures carrying the server's authoritative code lists and accept/reject params vectors
+
+#### Scenario: The maximal-fixture test asserts the never-truncate bound
+- **WHEN** the derived bound is checked against the shared caps
+- **THEN** a maximal-fixture test asserts that a legal room can never truncate the list

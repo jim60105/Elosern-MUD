@@ -10,10 +10,7 @@ Proportional ("freeform") casting for element mastery holders: a closed, load-va
 `world/rules/rulebook/progression.yaml` SHALL define `freeform_cast_scales` as exactly five entries
 scaled `0.25`, `0.5`, `1.0`, `2.0`, `4.0` with canonical labels `1/4`, `1/2`, `1`, `2`, `4` (ascending
 order). Loading SHALL fail closed with a named validation error when the count, scale values, labels,
-or order deviate — a missing or duplicated entry, a non-finite, non-positive, or unsorted scale, a
-missing `1.0` entry, an empty label, or a duplicate label SHALL all be rejected before any use. Every
-consumer (the resolver gate, the preview, the wire validator, and the text command) SHALL read this
-single table; no consumer SHALL hard-code the set.
+or order deviate. Every consumer SHALL read this single table; no consumer SHALL hard-code the set.
 
 #### Scenario: The canonical table loads
 - **WHEN** the rulebook is loaded with the five documented entries
@@ -26,14 +23,19 @@ single table; no consumer SHALL hard-code the set.
   its canonical pair
 - **THEN** loading fails with a named validation error and no consumer reads a partial set
 
+#### Scenario: Every enumerated deviation is rejected before any use
+- **WHEN** the table carries a missing or duplicated entry, a non-finite, non-positive, or unsorted scale, a missing `1.0` entry, an empty label, or a duplicate label
+- **THEN** each deviation is rejected before any use
+
+#### Scenario: Consumers share the single table
+- **WHEN** the resolver gate, the preview, the wire validator, or the text command needs the scale set
+- **THEN** each reads this single table rather than a hard-coded set
+
 ### Requirement: Scaled costs and magnitudes use deterministic round-half-away-from-zero
 `world/rules/progression.py` SHALL define `scaled_mp_cost(base: int, scale: float) -> int` and
 `scaled_magnitude(base: int, scale: float) -> int`, both returning `floor(base * scale + 0.5)` for
 positive base and scale, with `scaled_mp_cost` additionally clamped to a minimum of `1` — a scaled
-MP cost SHALL NEVER be zero, so no scale can ever produce a free cast. A non-positive base or a
-non-finite or non-positive scale SHALL raise `ValueError`. The two helpers SHALL be the only place
-cost and magnitude scaling is computed, so the panel, preview, command echo, and resolution can
-never disagree.
+MP cost SHALL NEVER be zero, so no scale can ever produce a free cast.
 
 #### Scenario: Half-scale of an even cost is exact
 - **WHEN** `scaled_mp_cost(14, 0.5)` and `scaled_magnitude(10, 0.5)` are called
@@ -55,13 +57,19 @@ never disagree.
   base, a NaN/infinite scale, or a zero or negative scale
 - **THEN** the first call returns `52`, and each invalid call raises `ValueError`
 
+#### Scenario: Invalid arguments raise ValueError
+- **WHEN** either helper receives a non-positive base or a non-finite or non-positive scale
+- **THEN** the call raises `ValueError`
+
+#### Scenario: Scaling lives in exactly two helpers
+- **WHEN** the panel, preview, command echo, or resolution needs a scaled cost or magnitude
+- **THEN** the two helpers are the only place cost and magnitude scaling is computed, so the four surfaces can never disagree
+
 ### Requirement: is_freeform_eligible is a pure skill-shape predicate
 `world/skills/cost_tiers.py` SHALL define `is_freeform_eligible(skill) -> bool` returning `True`
 exactly when the skill is `ACTIVE`, carries an element, declares a positive integer `mp` cost, has a
 non-empty `effects` list, and every effect prefix is one of `damage`, `heal`, or `self_heal`. Any
-other shape — PASSIVE skills, non-elemental skills, skills without an `mp` cost, skills with an
-empty `effects` list, or skills carrying a buff, status, cleanse, movement, or conferral effect —
-SHALL return `False`. The predicate SHALL NOT read entity state.
+other shape SHALL return `False`. The predicate SHALL NOT read entity state.
 
 #### Scenario: Pure damage and heal spells are eligible
 - **WHEN** `is_freeform_eligible` is called for `wind_blade` (`damage:wind:magic`),
@@ -81,18 +89,19 @@ SHALL return `False`. The predicate SHALL NOT read entity state.
   empty `effects` list
 - **THEN** it returns `False`
 
+#### Scenario: Every ineligible shape is enumerated
+- **WHEN** the predicate is called for a PASSIVE skill, a non-elemental skill, a skill without an `mp` cost, a skill with an empty `effects` list, or a skill carrying a buff, status, cleanse, movement, or conferral effect
+- **THEN** each returns `False`
+
+#### Scenario: The predicate is pure
+- **WHEN** `is_freeform_eligible` evaluates any skill shape
+- **THEN** it reads no entity state
+
 ### Requirement: The resolver gates scaled casts at the ownership step
 `ActionResolver.preflight` and `resolve` SHALL reject a cast with `RejectReason.SCALED_CAST_FORBIDDEN`
 when `ActionRequest.scale != 1.0` and any of the following holds: the scale is not a member of the
 `freeform_cast_scales` table; `is_freeform_eligible(skill)` is `False`; or the requested scale is not
-a member of the skill-anchored `freeform_scales_for(actor, skill)` ladder set (see
-`element-mastery`; mastery entitlement is anchored to the skill's own proficiency, see
-`use-driven-skill-lineage`). The checks
-SHALL short-circuit in exactly that order, so `skill.element` is never dereferenced for an
-ineligible skill (a non-elemental or cost-less skill can never raise `AttributeError`). A request
-with `scale == 1.0` SHALL bypass the check entirely and can never be rejected by it. The check
-SHALL run inside the existing step-1 ownership validation, before resources or targets, and SHALL
-be side-effect free in preflight.
+a member of the skill-anchored `freeform_scales_for(actor, skill)` ladder set.
 
 #### Scenario: A mastery holder can scale an eligible spell
 - **WHEN** `preflight` is called for `wind_blade` with `scale == 2.0` by an entity whose
@@ -142,21 +151,29 @@ be side-effect free in preflight.
   buff, and mixed-effect spells, by any entity
 - **THEN** the freeform check never rejects (other unrelated checks still apply)
 
+#### Scenario: The gate short-circuits in fixed order
+- **WHEN** the three gate checks run
+- **THEN** they short-circuit in exactly the listed order, so `skill.element` is never dereferenced for an ineligible skill and a non-elemental or cost-less skill can never raise `AttributeError`
+
+#### Scenario: Scale 1.0 bypasses the gate entirely
+- **WHEN** a request carries `scale == 1.0`
+- **THEN** it bypasses the check entirely and can never be rejected by it
+
+#### Scenario: The gate sits in step-1 ownership validation
+- **WHEN** the check runs
+- **THEN** it runs inside the existing step-1 ownership validation, before resources or targets, and is side-effect free in preflight
+
+#### Scenario: The ladder set is defined by the mastery specs
+- **WHEN** the gate consults the skill-anchored `freeform_scales_for(actor, skill)` ladder set
+- **THEN** the ladder is as specified in `element-mastery`, with mastery entitlement anchored to the skill's own proficiency per `use-driven-skill-lineage`
+
 ### Requirement: A scaled cast deducts scaled MP and applies scaled magnitudes atomically
 For a successful cast with `scale != 1.0`, the resource steps SHALL compute the scaled cost in one
-shared read: `_adjusted_costs(actor, skill, scale)` applies the ordinary bundle cost adjustments to
-the unscaled base amounts first, then replaces the `mp` amount with `scaled_mp_cost(base, scale)`
-(other resource keys keep their unscaled amounts), and both step 2 and step 6 SHALL consume that
+shared read via `_adjusted_costs(actor, skill, scale)`, replacing the `mp` amount with
+`scaled_mp_cost(base, scale)`, and both step 2 and step 6 SHALL consume that
 same function with the request's scale so preflight and deduction can never drift. The `damage`,
 `heal`, and `self_heal` handlers SHALL stage magnitudes computed as
-`scaled_magnitude(base_amount, scale)`, with `damage` clamped to at least the existing
-`combat.yaml` damage floor (the floor itself SHALL NOT be scaled). The scaled `mp` cost SHALL
-satisfy the same minimum as the helper contract — never below `1` MP, so no scale combination can
-produce a free cast. A scaled cost that exceeds the
-actor's current MP SHALL reject with the ordinary `RejectReason.INSUFFICIENT_RESOURCE` in both
-preflight and final resolution. Scaled amounts SHALL appear in the ordinary `resource_spend`,
-`damage`, and `heal` EventLog entries — no log schema change. Defeat, knockout, kill-XP, and
-practice staging SHALL observe the scaled amounts exactly as they observe unscaled ones.
+`scaled_magnitude(base_amount, scale)`.
 
 #### Scenario: Half-scale wind blade deducts half MP and deals half damage
 - **WHEN** `resolve()` succeeds for `wind_blade` (`mp == 14`) at `scale == 0.5` against a living
@@ -185,13 +202,35 @@ practice staging SHALL observe the scaled amounts exactly as they observe unscal
 - **THEN** the target is restored to its maximum only, the `heal` entry reports the actually applied
   amount, and an entity at zero HP is not revived
 
+#### Scenario: Damage staging obeys the unscaled floor
+- **WHEN** a scaled `damage` magnitude is staged
+- **THEN** it is clamped to at least the existing `combat.yaml` damage floor, and the floor itself is not scaled
+
+#### Scenario: Cost adjustments apply to unscaled bases first
+- **WHEN** `_adjusted_costs(actor, skill, scale)` computes the scaled cost
+- **THEN** it applies the ordinary bundle cost adjustments to the unscaled base amounts first
+- **AND** other resource keys keep their unscaled amounts
+
+#### Scenario: The scaled MP cost keeps the helper minimum
+- **WHEN** any scale combination is applied to an MP cost
+- **THEN** the scaled `mp` cost satisfies the same minimum as the helper contract — never below `1` MP — so no scale combination can produce a free cast
+
+#### Scenario: An unaffordable scaled cost rejects ordinarily
+- **WHEN** a scaled cost exceeds the actor's current MP
+- **THEN** it rejects with the ordinary `RejectReason.INSUFFICIENT_RESOURCE` in both preflight and final resolution
+
+#### Scenario: Scaled amounts ride ordinary log and staging paths
+- **WHEN** a scaled cast resolves
+- **THEN** scaled amounts appear in the ordinary `resource_spend`, `damage`, and `heal` EventLog entries with no log schema change
+- **AND** defeat, knockout, kill-XP, and practice staging observe the scaled amounts exactly as they observe unscaled ones
+
 ### Requirement: Preview and the combat facade accept and revalidate scale
 `preview_skill(actor, skill_key, context, candidates, scale=1.0)` and
 `revalidate_submission(actor, skill_key, context, targets, scale=1.0)` SHALL apply the same
-step-1 scale gate and the scaled resource check, (the ladder set re-derived from the actor's current proficiency) so a disabled or
-tampered scaled submission reports the matching stable reason before initiative. `submit_player_action(actor, skill_key,
+step-1 scale gate and the scaled resource check, so a disabled or tampered scaled submission
+reports the matching stable reason before initiative. `submit_player_action(actor, skill_key,
 targets_or_shorthand, scale=1.0)` SHALL thread the scale into the preview, preflight, and the
-`ActionRequest` of the resolved round. All three SHALL treat `scale == 1.0` as the current behavior.
+`ActionRequest` of the resolved round.
 
 #### Scenario: Preview reports scaled resource availability
 - **WHEN** `preview_skill` is called for `wind_blade` at `scale == 4.0` by a mastery holder with
@@ -206,14 +245,19 @@ targets_or_shorthand, scale=1.0)` SHALL thread the scale into the preview, prefl
 - **AND** a modified client submitting `scale=3.0` is rejected before initiative with
   `SCALED_CAST_FORBIDDEN` and no round or world time is consumed
 
+#### Scenario: Revalidation re-derives the ladder from current proficiency
+- **WHEN** `preview_skill` or `revalidate_submission` checks a scaled submission
+- **THEN** the ladder set is re-derived from the actor's current proficiency
+
+#### Scenario: Scale 1.0 keeps current behavior
+- **WHEN** any of the three facades is called with `scale == 1.0`
+- **THEN** it behaves exactly as the current, pre-scaling behavior
+
 ### Requirement: The text cast command accepts a scale token
 `cast` SHALL accept the syntax `cast <skill_key>[@<scale>][=<target_key>]` in and out of combat,
 where `<scale>` is one of the canonical table labels (`1/4`, `1/2`, `1`, `2`, `4`) and defaults to
 `1`. The scale SHALL be threaded into the combat-session facade and the out-of-combat settlement
-path. A non-label token or a token applied to a spell the actor cannot scale (no mastery
-entitlement, or a rung above the skill's proficiency ladder) SHALL reject with the stable
-`SCALED_CAST_FORBIDDEN` rejection message (a Traditional Chinese explanation), with no MP change
-and no world-time advance.
+path.
 
 #### Scenario: A scaled combat cast via the text command
 - **WHEN** a `wind_mastery` holder types `cast wind_blade@2=wolf` in an active session
@@ -233,3 +277,7 @@ and no world-time advance.
   proficiency level whose rung tops below 2.0, or `cast gale_step@2` with `wind_mastery`
 - **THEN** each is rejected with the `SCALED_CAST_FORBIDDEN` message, no MP is deducted, no effect
   applies, and no world time advances
+
+#### Scenario: Unauthorized scale tokens reject with the stable message
+- **WHEN** the command receives a non-label token, or a token applied to a spell the actor cannot scale (no mastery entitlement, or a rung above the skill's proficiency ladder)
+- **THEN** it rejects with the stable `SCALED_CAST_FORBIDDEN` rejection message (a Traditional Chinese explanation), with no MP change and no world-time advance

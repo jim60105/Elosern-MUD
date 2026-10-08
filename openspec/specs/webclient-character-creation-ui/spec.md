@@ -33,18 +33,9 @@ Themed creation selects and checkboxes SHALL preserve native keyboard/IME behavi
 ### Requirement: The creation panel is an exact read-only creation-mode panel
 The production presentation registry SHALL register `creation` schema version 6. Its available
 payload SHALL contain exactly `schema_version`, `available`, `kind`, `draft`, `presets`, `custom`,
-and the optional `proposal`; `available` SHALL be true and `kind` SHALL be `creation`.
-`schema_version` SHALL be integer 6. The `proposal` key SHALL be present only while the
-authenticated session holds a transient concept proposal and SHALL carry exactly the shape defined
-by the transient-fill contract (the base `revision`/`race`/`subrace`/`allocations`/`persona` keys
-plus the optional `display_name`, `age`, `apparent_age`, `background`, and `affinity_elements`
-transient-fill keys); the presenter SHALL render it from an immutable session snapshot copy. The
-presenter SHALL derive every finite control and preview from immutable registries and the
-deterministic starting-profile resolver, SHALL emit no live object reference and no filesystem
-path, and SHALL NOT mutate `creation_pending`, the wizard draft, the session proposal slot, traits,
-identity attributes, location, or world time. The whole panel SHALL use the registered common
-unavailable form outside `creation` mode and when the global prerequisite fails; a failure confined
-to one field, preset, or profile SHALL NOT fabricate a value.
+and the optional `proposal`; `available` SHALL be true and `kind` SHALL be `creation`. The whole
+panel SHALL use the registered common unavailable form outside `creation` mode and when the global
+prerequisite fails.
 
 #### Scenario: A pending character receives the creation panel
 - **WHEN** a puppeted WebClient session with `creation_pending` true receives a full snapshot
@@ -69,10 +60,38 @@ to one field, preset, or profile SHALL NOT fabricate a value.
 - **THEN** exact-schema validation rejects it on both the presenter and the mirrored browser
   validator rather than accepting a stale shape
 
-### Requirement: Creation presentation derives finite controls from immutable registries
-The `presets` array SHALL contain at most 8 preset cards, each with exactly `key` (1..64), `display_name` (1..128), `race` (1..64), `race_description` (1..512), nullable `subrace`, `emphasis` (1..256), and `background` (1..256), derived from `PLAYER_PRESET_REGISTRY` and the race registry rather than duplicated literals. The `custom` object SHALL contain exactly `name`, `age`, `races`, `subraces`, `profiles`, `affinity`, and `sex`. `name` SHALL contain exactly `min_length` 1 and `max_length` 64, mirroring the deterministic display-name bound (the shared entity-key contract). `age` SHALL contain exactly `age_minimum` 0, `age_maximum` 10000, `apparent_age_minimum` 0, and `apparent_age_maximum` 10000. `races` SHALL be a list of at most 8 race options, each with exactly `key` (1..64), `display_name_zh` (non-empty 1..128), `description` (1..512), and `subraces` (a list of subrace keys or a single null). `subraces` SHALL map at most 16 subrace keys to exactly `display_name_zh`, `common_name_zh`, and `specialty`, each 1..256 code points. `profiles` SHALL contain at most 16 entries, one per race/subrace combination, each with exactly `race`, `subrace` (null or a key), `budget`, and `axes`; each axis SHALL contain exactly `axis`, `label`, `explanation`, `minimum`, and `maximum`, with `axis` from `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, or `magic_power`, integer `budget`/`minimum`/`maximum` within JavaScript-safe range, and the seven-axis set matching `resolve_starting_profile`. `affinity` SHALL map each race key (`human`, `beastfolk`, `elf`) to exactly `maximum` (integer `2`, `1`, and `0` respectively) and `elements` (exactly the eight lore element choices, each with `key` and `label`, derived from `ELEMENT_REGISTRY`). `sex` SHALL be a nonempty list of at most 8 sex options in `SEX_VALUES` order, each with exactly `key` (1..64 code points, one of the `SEX_VALUES` members) and `label` (1..64 code points of server-owned Traditional Chinese text derived server-side, never duplicated in the browser), covering every `SEX_VALUES` member exactly once. The `custom` descriptor SHALL NOT contain persona, skill, equipment, inventory, starting-magic, or import-only fields merely because a character-card schema defines them; persona prose values appear only inside `draft.persona` and the transient `proposal` payload, never in control metadata.
+#### Scenario: Schema version ships as the integer 6
+- **WHEN** an available `creation` panel payload ships
+- **THEN** `schema_version` carries the integer 6
 
-Every preset race key SHALL resolve to a custom race option; its display name is reused for preset/confirmation display without changing action keys.
+#### Scenario: The proposal key mirrors the transient session proposal
+- **WHEN** the authenticated session holds a transient concept proposal
+- **THEN** the payload carries the `proposal` key with exactly the shape defined by the
+  transient-fill contract — the base `revision`/`race`/`subrace`/`allocations`/`persona` keys plus
+  the optional `display_name`, `age`, `apparent_age`, `background`, and `affinity_elements`
+  transient-fill keys — and the presenter renders it from an immutable session snapshot copy
+- **AND** when the session holds no transient concept proposal, the `proposal` key is absent
+
+#### Scenario: Controls and previews derive from immutable sources
+- **WHEN** the presenter builds the panel
+- **THEN** every finite control and preview is derived from immutable registries and the
+  deterministic starting-profile resolver
+
+#### Scenario: The payload carries no live reference or path
+- **WHEN** the presenter emits the `creation` payload
+- **THEN** it contains no live object reference and no filesystem path
+
+#### Scenario: Presentation mutates no game state
+- **WHEN** the presenter builds and emits the panel
+- **THEN** `creation_pending`, the wizard draft, the session proposal slot, traits, identity
+  attributes, location, and world time are unchanged
+
+#### Scenario: A partial failure fabricates no value
+- **WHEN** a failure is confined to one field, preset, or profile
+- **THEN** the panel does not fabricate a value
+
+### Requirement: Creation presentation derives finite controls from immutable registries
+The `presets` array SHALL contain at most 8 preset cards, each with exactly `key` (1..64), `display_name` (1..128), `race` (1..64), `race_description` (1..512), nullable `subrace`, `emphasis` (1..256), and `background` (1..256), derived from `PLAYER_PRESET_REGISTRY` and the race registry rather than duplicated literals. The `custom` object SHALL contain exactly `name`, `age`, `races`, `subraces`, `profiles`, `affinity`, and `sex`.
 
 #### Scenario: Preset cards render from registry data
 - **WHEN** the creation panel ships for a pending character
@@ -90,8 +109,61 @@ Every preset race key SHALL resolve to a custom race option; its display name is
 - **WHEN** the custom descriptor is inspected
 - **THEN** it contains no persona, skill, equipment, inventory, starting-magic, or import-schema field
 
+#### Scenario: The name descriptor mirrors the display-name bound
+- **WHEN** the `custom.name` descriptor ships
+- **THEN** it contains exactly `min_length` 1 and `max_length` 64, mirroring the deterministic
+  display-name bound (the shared entity-key contract)
+
+#### Scenario: The age descriptor carries the exact range bounds
+- **WHEN** the `custom.age` descriptor ships
+- **THEN** it contains exactly `age_minimum` 0, `age_maximum` 10000, `apparent_age_minimum` 0,
+  and `apparent_age_maximum` 10000
+
+#### Scenario: Race options carry their exact fields
+- **WHEN** the `custom.races` list ships
+- **THEN** it is a list of at most 8 race options, each with exactly `key` (1..64),
+  `display_name_zh` (non-empty 1..128), `description` (1..512), and `subraces` (a list of subrace
+  keys or a single null)
+
+#### Scenario: The subraces map carries bounded localized fields
+- **WHEN** the `custom.subraces` map ships
+- **THEN** it maps at most 16 subrace keys to exactly `display_name_zh`, `common_name_zh`, and
+  `specialty`, each 1..256 code points
+
+#### Scenario: Profiles carry the exact seven-axis shape
+- **WHEN** the `custom.profiles` list ships
+- **THEN** it contains at most 16 entries, one per race/subrace combination, each with exactly
+  `race`, `subrace` (null or a key), `budget`, and `axes`; each axis contains exactly `axis`,
+  `label`, `explanation`, `minimum`, and `maximum`, with `axis` from `hp`, `mp`, `sp`, `atk_phys`,
+  `agility`, `defense`, or `magic_power`, integer `budget`/`minimum`/`maximum` within
+  JavaScript-safe range, and the seven-axis set matching `resolve_starting_profile`
+
+#### Scenario: The affinity map carries race maxima and element choices
+- **WHEN** the `custom.affinity` map ships
+- **THEN** it maps each race key (`human`, `beastfolk`, `elf`) to exactly `maximum` (integer `2`,
+  `1`, and `0` respectively) and `elements` (exactly the eight lore element choices, each with
+  `key` and `label`, derived from `ELEMENT_REGISTRY`)
+
+#### Scenario: The sex descriptor lists every server value once
+- **WHEN** the `custom.sex` list ships
+- **THEN** it is a nonempty list of at most 8 sex options in `SEX_VALUES` order, each with exactly
+  `key` (1..64 code points, one of the `SEX_VALUES` members) and `label` (1..64 code points of
+  server-owned Traditional Chinese text derived server-side, never duplicated in the browser),
+  covering every `SEX_VALUES` member exactly once
+
+#### Scenario: Persona prose never enters control metadata
+- **WHEN** the `custom` descriptor ships for a character-card-capable schema
+- **THEN** it contains no persona, skill, equipment, inventory, starting-magic, or import-only
+  fields merely because a character-card schema defines them, and persona prose values appear only
+  inside `draft.persona` and the transient `proposal` payload, never in control metadata
+
+#### Scenario: Preset race keys resolve to custom race options
+- **WHEN** a preset card's race key is checked against the custom descriptor
+- **THEN** every preset race key resolves to a custom race option and its display name is reused
+  for preset/confirmation display without changing action keys
+
 ### Requirement: The server owns the persisted creation wizard draft
-The deterministic core SHALL provide a creation-wizard draft service that is the sole writer of the pending character's draft. The draft SHALL persist across logout, login, server reload, and WebSocket reconnect and SHALL store exactly the server-accepted mode and values: for `preset` mode, the stage `preset_selected` and the accepted `preset_key`; for `custom` mode, the stage `custom_filled`, `display_name`, `age`, `apparent_age`, `race`, `subrace`, the `allocations` (one entry per `ALLOCATABLE_AXES` axis), the optional `affinity_elements` (bounded by the race-dependent maximum, elf `none`), an optional bounded `background` text, a required nullable `persona` block (`personality`, `life_story`, `habit` bounded text fields) accepted only through the custom-save payload, and the accepted `sex` — a concrete `SEX_VALUES` member normalized at save time from the payload's optional or null `sex` (an absent or null value becomes `DEFAULT_SEX`, an unknown member is rejected). No concept stage exists. Saving a custom draft SHALL validate every accepted value through the existing deterministic preflight before persisting (including a required, registered, race-compatible subrace, a bounded optional background, the nullable persona block, and the sex normalization above) and SHALL store the submitted persona verbatim with no carry-over or comparison against any earlier value. Activation SHALL re-validate the draft and the actor's ownership and pending state inside one deterministic `transaction.atomic()` block, call the existing all-or-nothing activation service (which persists the persona block and any player background into `entity.db.persona` in the import-card shape when present, and persists the accepted `sex` on the character entity), and clear the draft in the same transaction so a completed character never retains a draft and two concurrent activations cannot both apply. A reset SHALL clear the draft idempotently. No value SHALL be accepted from a client control the server did not declare, and an incomplete or skipped draft SHALL NOT activate. The draft SHALL NOT set canonical identity attributes, traits, or `creation_pending` on the character; a rejected or cancelled save SHALL leave the canonical identity attributes, the trait set, and any previously validated draft unchanged.
+The deterministic core SHALL provide a creation-wizard draft service that is the sole writer of the pending character's draft. The draft SHALL persist across logout, login, server reload, and WebSocket reconnect and SHALL store exactly the server-accepted mode and values. Saving a custom draft SHALL validate every accepted value through the existing deterministic preflight before persisting, and an incomplete or skipped draft SHALL NOT activate.
 
 #### Scenario: A saved draft survives reconnect
 - **WHEN** a pending character saves a validated custom draft (including the saved `affinity_elements`, an accepted background, a persona block, and an accepted `sex`), disconnects, and logs in again
@@ -125,8 +197,62 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
 - **WHEN** `creation.reset` succeeds on a pending character with and without a saved draft
 - **THEN** the draft is absent in both cases, the character remains pending, and a repeated reset reports the same success
 
+#### Scenario: The preset-mode draft stores exactly its accepted values
+- **WHEN** a preset draft saves
+- **THEN** it stores the stage `preset_selected` and the accepted `preset_key`
+
+#### Scenario: The custom-mode draft stores exactly its accepted values
+- **WHEN** a custom draft saves
+- **THEN** it stores the stage `custom_filled`, `display_name`, `age`, `apparent_age`, `race`,
+  `subrace`, the `allocations` (one entry per `ALLOCATABLE_AXES` axis), the optional
+  `affinity_elements` (bounded by the race-dependent maximum, elf `none`), an optional bounded
+  `background` text, a required nullable `persona` block (`personality`, `life_story`, `habit`
+  bounded text fields) accepted only through the custom-save payload, and the accepted `sex`
+
+#### Scenario: An unknown sex member is rejected at save time
+- **WHEN** a custom draft saves with a `sex` that names a member outside `SEX_VALUES`
+- **THEN** the save rejects — normalization at save time only maps an absent or null value to
+  `DEFAULT_SEX`, yielding a concrete `SEX_VALUES` member
+
+#### Scenario: No concept stage exists
+- **WHEN** the draft stages are enumerated
+- **THEN** no concept stage exists between preset selection and custom fill
+
+#### Scenario: Preflight covers every accepted custom value
+- **WHEN** a custom draft save runs its preflight validation
+- **THEN** it checks a required, registered, race-compatible subrace, a bounded optional
+  background, the nullable persona block, and the sex normalization before persisting
+
+#### Scenario: The persona is stored verbatim with no carry-over
+- **WHEN** a custom draft saves a persona block after an earlier draft held a different one
+- **THEN** the submitted persona is stored verbatim with no carry-over or comparison against any
+  earlier value
+
+#### Scenario: Activation revalidates inside one atomic transaction
+- **WHEN** activation runs
+- **THEN** the draft and the actor's ownership and pending state are re-validated inside one
+  deterministic `transaction.atomic()` block and the existing all-or-nothing activation service is
+  called, clearing the draft in the same transaction so a completed character never retains a
+  draft and two concurrent activations cannot both apply
+
+#### Scenario: Activation persists persona and sex canonically
+- **WHEN** the activation service commits a draft carrying a persona block, a player background,
+  and an accepted sex
+- **THEN** the persona block and any player background persist into `entity.db.persona` in the
+  import-card shape when present, and the accepted `sex` persists on the character entity
+
+#### Scenario: Undeclared client controls are not accepted
+- **WHEN** a draft write would take a value from a client control the server did not declare
+- **THEN** no value is accepted from it
+
+#### Scenario: The draft service writes no canonical state
+- **WHEN** a draft saves, is rejected, or is cancelled
+- **THEN** the draft sets no canonical identity attributes, traits, or `creation_pending` on the
+  character, and the canonical identity attributes, the trait set, and any previously validated
+  draft remain unchanged
+
 ### Requirement: Creation actions are exact, allowlisted, and server-authoritative
-The production action registry SHALL register exactly `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset` for this delivery unit in addition to the three combat and seven service adapters and no unrelated gameplay adapter. `creation.preset` SHALL accept exactly `preset_key` (a 1..64-character non-empty string that exists in the player-preset registry). `creation.custom` SHALL accept exactly `display_name` (1..64 characters), `age` and `apparent_age` (integers in 0..10000 excluding booleans; the deterministic creation service independently enforces the 0..10000 age range on every submission), `race` (a 1..64-character registry key), `subrace` (a 1..64-character registry key belonging to the race; the deterministic service rejects a missing or incompatible subrace), `allocations` (an object containing exactly `hp`, `mp`, `sp`, `atk_phys`, `agility`, and `defense`, each an integer in 0..10000 excluding booleans), optional `affinity_elements` (an array of at most 8 lowercase element keys, each a lore element; the deterministic creation service enforces the race-dependent maximum and rejects a player-supplied set on an elf), optional `background` (a string of at most the declared persona-field bound; a missing value is treated as an empty background), optional `sex` (null or a `SEX_VALUES` member; a missing value is treated as `DEFAULT_SEX` by the deterministic service), and a required `persona` (null or an object containing exactly `personality`, `life_story`, and `habit`, each a non-empty string of at most the declared persona-field bound; the browser convention ships null when all three fields are empty). `creation.concept` SHALL accept exactly `concept` (a non-empty string of at most the declared bound) and SHALL run the guarded `character_creation` generative layer with the injected client, storing a validated proposal only in the session-scoped transient slot with zero persistent writes. `creation.roll_name` SHALL accept exactly `race` (null or a `RACE_REGISTRY` key), `subrace` (null, or a `SUBRACE_REGISTRY` key whose registry `race_key` equals the submitted race; a null `race` requires a null `subrace`), and `sex` (null or a `SEX_VALUES` member); every value outside those registries SHALL be rejected with a stable validation code through the existing validation-error channel before the roller runs — the roller's bound-pack random fallback SHALL serve only a genuinely unselected race (`race: null`) and SHALL NEVER turn a dirty key into a success — and an admitted payload SHALL draw the name through `roll_name_for_race` using the adapter module's single private unseeded `random.Random()` instance (read only on the roll-name path), SHALL perform zero persistent writes and SHALL NOT refresh any panel, and SHALL return the rolled name as `display_name` inside the result envelope's conditional `data` slot. `creation.activate` and `creation.reset` SHALL each accept exactly an empty payload. Every adapter SHALL obtain the account from the authenticated session's puppet, SHALL reject any actor/account/session/puppet/calculated-stat/unknown field, SHALL validate through the existing deterministic creation service (`preflight_character_creation`, `activate_player_character`, and the creation-wizard draft service) except the read-only `creation.roll_name` roller call, and SHALL NOT assign `.db`, traits, identity attributes, or `creation_pending` directly. No action SHALL route an action ID or payload through the text command parser.
+The production action registry SHALL register exactly `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset` for this delivery unit in addition to the three combat and seven service adapters and no unrelated gameplay adapter. No adapter SHALL assign `.db`, traits, identity attributes, or `creation_pending` directly, and no action SHALL route an action ID or payload through the text command parser.
 
 #### Scenario: Preset selection reaches the deterministic registry
 - **WHEN** a pending character submits `creation.preset` with a shipped preset key
@@ -204,8 +330,72 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 - **WHEN** a client submits `creation.custom` with `race == "elf"` and a non-empty `affinity_elements`
 - **THEN** the deterministic service rejects the request before persistence and no draft or identity value changes
 
+#### Scenario: The preset payload accepts exactly a registry key
+- **WHEN** `creation.preset` validates its payload
+- **THEN** it accepts exactly `preset_key`, a 1..64-character non-empty string that exists in the
+  player-preset registry
+
+#### Scenario: The custom payload carries the exact required fields
+- **WHEN** `creation.custom` validates its payload
+- **THEN** it accepts exactly `display_name` (1..64 characters), `age` and `apparent_age`
+  (integers in 0..10000 excluding booleans; the deterministic creation service independently
+  enforces the 0..10000 age range on every submission), `race` (a 1..64-character registry key),
+  `subrace` (a 1..64-character registry key belonging to the race; the deterministic service
+  rejects a missing or incompatible subrace), and `allocations` (an object containing exactly
+  `hp`, `mp`, `sp`, `atk_phys`, `agility`, and `defense`, each an integer in 0..10000 excluding
+  booleans)
+
+#### Scenario: The custom optional fields carry their exact bounds and defaults
+- **WHEN** `creation.custom` validates its optional fields
+- **THEN** `affinity_elements` is an array of at most 8 lowercase element keys, each a lore
+  element (the deterministic creation service enforces the race-dependent maximum and rejects a
+  player-supplied set on an elf), `background` is a string of at most the declared persona-field
+  bound (a missing value is treated as an empty background), and `sex` is null or a `SEX_VALUES`
+  member (a missing value is treated as `DEFAULT_SEX` by the deterministic service)
+- **AND** the required `persona` is null or an object containing exactly `personality`,
+  `life_story`, and `habit`, each a non-empty string of at most the declared persona-field bound
+  (the browser convention ships null when all three fields are empty)
+
+#### Scenario: The concept payload runs the guarded generative layer
+- **WHEN** `creation.concept` validates and runs
+- **THEN** it accepts exactly `concept` (a non-empty string of at most the declared bound) and
+  runs the guarded `character_creation` generative layer with the injected client, storing a
+  validated proposal only in the session-scoped transient slot with zero persistent writes
+
+#### Scenario: The roll-name payload accepts exactly registry-bound values
+- **WHEN** `creation.roll_name` validates its payload
+- **THEN** it accepts exactly `race` (null or a `RACE_REGISTRY` key), `subrace` (null, or a
+  `SUBRACE_REGISTRY` key whose registry `race_key` equals the submitted race; a null `race`
+  requires a null `subrace`), and `sex` (null or a `SEX_VALUES` member)
+- **AND** every value outside those registries is rejected with a stable validation code through
+  the existing validation-error channel before the roller runs — the roller's bound-pack random
+  fallback serves only a genuinely unselected race (`race: null`) and NEVER turns a dirty key
+  into a success
+
+#### Scenario: The roller draws from one private unseeded source with zero writes
+- **WHEN** a roll-name payload is admitted
+- **THEN** the name is drawn through `roll_name_for_race` using the adapter module's single
+  private unseeded `random.Random()` instance (read only on the roll-name path), zero persistent
+  writes are performed and no panel is refreshed, and the rolled name is returned as
+  `display_name` inside the result envelope's conditional `data` slot
+
+#### Scenario: Activate and reset accept empty payloads only
+- **WHEN** `creation.activate` or `creation.reset` validates its payload
+- **THEN** each accepts exactly an empty payload
+
+#### Scenario: Adapters derive authority from the session puppet
+- **WHEN** any creation adapter runs
+- **THEN** it obtains the account from the authenticated session's puppet and rejects any
+  actor/account/session/puppet/calculated-stat/unknown field
+
+#### Scenario: Adapters validate through the deterministic service
+- **WHEN** any creation adapter processes an admitted payload
+- **THEN** it validates through the existing deterministic creation service
+  (`preflight_character_creation`, `activate_player_character`, and the creation-wizard draft
+  service) except the read-only `creation.roll_name` roller call
+
 ### Requirement: Creation actions reject stale, duplicate, and tampered input without mutation
-Every creation action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` that does not equal the newest values issued for the live session SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter. A duplicate live request ID SHALL return its cached result without re-executing. A tampered `preset_key`, `race`, `subrace`, or allocation that fails current deterministic revalidation SHALL be rejected with a stable code and Traditional Chinese message, and no draft, trait, identity, or `creation_pending` value SHALL change. A pending character that is already activated between render and submit SHALL be rejected as already-complete without opening a second activation.
+Every creation action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` that does not equal the newest values issued for the live session SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter.
 
 #### Scenario: Stale revision cannot double-activate
 - **WHEN** `creation.activate` is rendered at revision N and submitted with an older `base_revision`
@@ -223,8 +413,22 @@ Every creation action SHALL pass the existing dispatcher's epoch, base revision,
 - **WHEN** a creation action is admitted but the character is no longer creation-pending at commit
 - **THEN** the adapter rejects with a stable already-complete reason and performs no write
 
+#### Scenario: Duplicate request IDs serve the cache
+- **WHEN** a live request ID is seen again while still live
+- **THEN** the dispatcher returns its cached result without re-executing
+
+#### Scenario: Tampered values fail revalidation without mutation
+- **WHEN** a tampered `preset_key`, `race`, `subrace`, or allocation fails current deterministic
+  revalidation
+- **THEN** it is rejected with a stable code and Traditional Chinese message, and no draft, trait,
+  identity, or `creation_pending` value changes
+
+#### Scenario: A render-to-submit activation cannot open a second activation
+- **WHEN** a pending character is already activated between render and submit
+- **THEN** the request is rejected as already-complete without opening a second activation
+
 ### Requirement: The age-range gate is server-authoritative for both age fields
-The creation service SHALL reject missing, malformed, and out-of-range (`age < 0`, `age > 10000`, `apparent_age < 0`, or `apparent_age > 10000`) values through the existing deterministic creation validation on every `creation.custom` submission, independently for each field. The creation panel SHALL advertise the 0 minimum and the 10000 maximum to the player, but client-side constraints, hidden or removed age fields, altered HTML constraints, and direct `creation.activate` calls SHALL NOT permit an out-of-range or malformed record to activate. A rejected out-of-range request SHALL leave the character pending with no trait or identity written.
+The creation service SHALL reject missing, malformed, and out-of-range (`age < 0`, `age > 10000`, `apparent_age < 0`, or `apparent_age > 10000`) values through the existing deterministic creation validation on every `creation.custom` submission, independently for each field. A rejected out-of-range request SHALL leave the character pending with no trait or identity written.
 
 #### Scenario: Out-of-range actual age is permanently rejected
 - **WHEN** a client sends `age=-1` with an in-range apparent age through `creation.custom`, including when client-side validation is disabled
@@ -238,8 +442,17 @@ The creation service SHALL reject missing, malformed, and out-of-range (`age < 0
 - **WHEN** `creation.custom` omits either age field or sends a non-integer, boolean-like, or oversized value
 - **THEN** exact-schema validation or the deterministic service rejects before activation and the character remains pending
 
+#### Scenario: The panel advertises the age bounds
+- **WHEN** the creation panel renders the age fields
+- **THEN** it advertises the 0 minimum and the 10000 maximum to the player
+
+#### Scenario: Client-side tampering cannot unlock an invalid record
+- **WHEN** client-side constraints, hidden or removed age fields, altered HTML constraints, or
+  direct `creation.activate` calls are used to bypass the gate
+- **THEN** none of them permits an out-of-range or malformed record to activate
+
 ### Requirement: Activation is all-or-nothing and hands off to exploration
-Successful `creation.activate` SHALL remain all-or-nothing for character state: either the pending gate is removed with the full deterministic initialization committed, or the character stays pending with no partial trait, identity, or progression state. After a committed activation the character SHALL remain in 虛境 (its unchanged default home — activation performs no relocation and no arrival behavior), and the adapter SHALL publish a full `exploration` snapshot so the browser atomically replaces the creation dock. The creation adapters SHALL NOT publish an affected-panel set that leaves the shell in creation mode after a successful activation.
+Successful `creation.activate` SHALL remain all-or-nothing for character state: either the pending gate is removed with the full deterministic initialization committed, or the character stays pending with no partial trait, identity, or progression state. After a committed activation the adapter SHALL publish a full `exploration` snapshot so the browser atomically replaces the creation dock.
 
 #### Scenario: Successful activation moves the shell to exploration
 - **WHEN** `creation.activate` commits
@@ -248,6 +461,15 @@ Successful `creation.activate` SHALL remain all-or-nothing for character state: 
 #### Scenario: A failed activation transaction leaves the character pending
 - **WHEN** a write failure is injected into the activation transaction
 - **THEN** the whole activation rolls back, the character remains pending with its prior draft, and no partial trait, identity, or progression state is persisted
+
+#### Scenario: The activated character stays home in 虛境
+- **WHEN** an activation commits
+- **THEN** the character remains in 虛境 — its unchanged default home; activation performs no
+  relocation and no arrival behavior
+
+#### Scenario: No affected-panel set can strand the shell in creation mode
+- **WHEN** a creation adapter publishes after a successful activation
+- **THEN** it publishes no affected-panel set that leaves the shell in creation mode
 
 ### Requirement: Web activation confirms the exact draft shown
 The system SHALL ensure the `creation.activate` flow activates the draft whose save was confirmed, and SHALL surface a stable error when the stored draft changed between confirmation and activation.
@@ -262,49 +484,10 @@ The system SHALL ensure the `creation.activate` flow activates the draft whose s
 
 ### Requirement: The creation dock is keyboard-first, form-capable, and confirmation-protected
 In `creation` mode the action dock SHALL present preset cards and the custom form rather
-than exploration or service menus. Arrow keys SHALL navigate finite lists and buttons, Tab
-and Shift+Tab SHALL move focus through text/numeric fields, Enter SHALL activate the
-focused control or submit a complete server-declared form, and Escape SHALL pop exactly one
-menu level without discarding the saved server wizard draft. The custom form SHALL require a
-subrace selection (no "無子種族" radio is rendered), SHALL display an allocation briefing
-(total budget, seven-axis count, each axis's 0–span, and the sum-must-equal-budget rule)
-above the allocation fields, SHALL provide a bounded optional background text field, SHALL
-render a sex `<select>` directly below the display-name field whose options come verbatim
-from `custom.sex` (no browser-side label literals, the `DEFAULT_SEX` key preselected for a
-fresh form), and SHALL render a name-roll button carrying test id `creation-roll-name`
-adjacent to the display-name input. While a name roll is in flight the button SHALL be
-disabled through the shared dispatch gate, and a settled success result carrying the
-submitted request id SHALL backfill the display-name input with `data.display_name` (the
-player may then freely edit it; the final value is validated only by `creation.custom`);
-a non-success or non-matching result SHALL settle the in-flight state without touching the
-input. The
-form action buttons (confirm, reset, cancel, and concept-apply) SHALL be operable by
-pointer through the shared focus/disabled/submission gate as well as by keyboard, and SHALL
-pre-empt the keyboard bridge (a capture-phase listener) while the form owns focus, so keys
-the form owns are claimed by the form and none reach the bridge's fall-through text path;
-the capture listener SHALL be removed when the form closes. While a concept apply is in
-flight the concept tab SHALL present a prominent in-progress state — a visible large
-spinner with an explicit waiting message — and SHALL disable the concept input and the
-concept-apply button until a fresh proposal revision is applied, a result carrying the
-submitted request id with a non-success outcome settles the request, or the global
-dispatch gate releases without a matching settlement (the safety net for a synchronous
-transport failure or a lost mutation; the in-progress state SHALL only ever be entered
-after the dispatch was admitted, so a gate-rejected apply never shows it). While a creation
-form's own admitted request is in its in-flight loading state (concept apply or name roll),
-no store publish or draft re-sync SHALL move the presented tab — the tab is pinned while
-that loading state is alive. The browser SHALL present no other completion
-affordance for a settled apply beyond the custom-tab switch (the confirmation toast is
-surfaced through the action-feedback queue by the form's apply path, and the failure toast
-by the action-feedback result slice — not by any form-embedded banner). The final activation and the
-destructive custom reset SHALL each require an explicit confirmation panel. Disabled entries
-SHALL remain focusable with their explanation and SHALL submit nothing. Validation messages
-SHALL be associated with the field they concern and announced through the accessible live
-region. A stale revision SHALL preserve typed unsent values locally where safe, refresh
-server-declared choices, and ask the player to review rather than automatically resubmitting.
-A committed `creation` panel that carries no draft and only a transient proposal SHALL NOT
-reset the creation dock's stage — the panel signature covers presets, races, and the draft
-only, so a proposal delivery alone never navigates the player.
-No canonical service or creation state SHALL be stored in localStorage.
+than exploration or service menus, keyboard-first: Arrow keys SHALL navigate finite lists
+and buttons, Tab and Shift+Tab SHALL move focus through text/numeric fields, Enter SHALL
+activate the focused control or submit a complete server-declared form, and Escape SHALL
+pop exactly one menu level without discarding the saved server wizard draft.
 
 #### Scenario: Custom form completes without typed commands
 - **WHEN** a player uses arrows and Tab/Shift+Tab to choose race and subrace, reviews the
@@ -397,23 +580,91 @@ No canonical service or creation state SHALL be stored in localStorage.
 - **THEN** the creation dock's stage is unchanged (the player is not moved to the preset
   stage), and any tab movement comes solely from the overlay's own completion navigation
 
+#### Scenario: The custom form requires a subrace selection
+- **WHEN** the custom form is rendered
+- **THEN** a subrace selection is required and no "無子種族" radio is rendered
+
+#### Scenario: The custom form fields beyond the keyboard map
+- **WHEN** the custom form renders
+- **THEN** it displays an allocation briefing (total budget, seven-axis count, each axis's
+  0–span, and the sum-must-equal-budget rule) above the allocation fields
+- **AND** it provides a bounded optional background text field
+- **AND** it renders a sex `<select>` directly below the display-name field whose options come
+  verbatim from `custom.sex` (no browser-side label literals, the `DEFAULT_SEX` key preselected
+  for a fresh form)
+- **AND** it renders a name-roll button carrying test id `creation-roll-name` adjacent to the
+  display-name input
+
+#### Scenario: The name-roll button gates in flight and backfills by request id
+- **WHEN** a name roll is in flight
+- **THEN** the button is disabled through the shared dispatch gate
+- **AND** a settled success result carrying the submitted request id backfills the display-name
+  input with `data.display_name` — the player may then freely edit it and the final value is
+  validated only by `creation.custom`
+- **AND** a non-success or non-matching result settles the in-flight state without touching the
+  input
+
+#### Scenario: Form action buttons work by pointer and pre-empt the keyboard bridge
+- **WHEN** the form action buttons (confirm, reset, cancel, and concept-apply) are presented
+- **THEN** they are operable by pointer through the shared focus/disabled/submission gate as
+  well as by keyboard
+- **AND** they pre-empt the keyboard bridge (a capture-phase listener) while the form owns
+  focus, so keys the form owns are claimed by the form and none reach the bridge's fall-through
+  text path
+- **AND** the capture listener is removed when the form closes
+
+#### Scenario: An in-flight concept apply presents the prominent waiting state
+- **WHEN** a concept apply is in flight
+- **THEN** the concept tab presents a prominent in-progress state — a visible large spinner
+  with an explicit waiting message — and disables the concept input and the concept-apply
+  button until a fresh proposal revision is applied, a result carrying the submitted request id
+  with a non-success outcome settles the request, or the global dispatch gate releases without a
+  matching settlement (the safety net for a synchronous transport failure or a lost mutation)
+- **AND** the in-progress state is only ever entered after the dispatch was admitted, so a
+  gate-rejected apply never shows it
+
+#### Scenario: The presented tab is pinned through the form's own in-flight request
+- **WHEN** a creation form's own admitted request is in its in-flight loading state (concept
+  apply or name roll)
+- **THEN** no store publish or draft re-sync moves the presented tab — the tab is pinned while
+  that loading state is alive
+
+#### Scenario: A settled apply has no completion affordance beyond the custom-tab switch
+- **WHEN** a concept apply settles successfully
+- **THEN** the browser presents no other completion affordance beyond the custom-tab switch —
+  the confirmation toast is surfaced through the action-feedback queue by the form's apply path,
+  and the failure toast by the action-feedback result slice, not by any form-embedded banner
+
+#### Scenario: Activation and reset require explicit confirmation panels
+- **WHEN** the player triggers the final activation or the destructive custom reset
+- **THEN** each requires an explicit confirmation panel
+
+#### Scenario: Accessibility of disabled entries and validation messages
+- **WHEN** the dock renders a disabled entry or a field error
+- **THEN** disabled entries remain focusable with their explanation and submit nothing, and
+  validation messages are associated with the field they concern and announced through the
+  accessible live region
+
+#### Scenario: A stale revision preserves typed values without resubmitting
+- **WHEN** the dock observes a stale revision
+- **THEN** typed unsent values are preserved locally where safe, server-declared choices are
+  refreshed, and the player is asked to review rather than the form being automatically resubmitted
+
+#### Scenario: The panel signature ignores proposals for stage navigation
+- **WHEN** a committed `creation` panel carries no draft and only a transient proposal
+- **THEN** it does not reset the creation dock's stage — the panel signature covers presets,
+  races, and the draft only, so a proposal delivery alone never navigates the player
+
+#### Scenario: No creation state lives in localStorage
+- **WHEN** the creation surface runs in the browser
+- **THEN** no canonical service or creation state is stored in localStorage
+
 ### Requirement: Creation browser acceptance is keyboard-only and desktop-bounded
-The managed localhost Playwright suite SHALL exercise, using keyboard controls only at
-1451x790 and 2560x1440: preset selection, confirmation, activation, and the exploration
-snapshot; custom finite controls and free-text field focus; reconnect at each saved draft
-stage; server rejection of both out-of-range age fields despite bypassed client validation; the
-destructive reset confirmation; and stale and duplicate submission behavior. Tests SHALL use
-deterministic fixtures, SHALL make no remote, LLM, or image-generation request, SHALL assert
-the creation dock is the sole action-dock owner in creation mode and re-renders on
-exploration (the shared `#action-dock` node may persist with `data-mode` switching), and SHALL
-assert no persona/import field is rendered. That shared node is the floating dock panel itself, so
-the panel SHALL NOT be remounted at a mode change; in creation mode it SHALL render neither the tab
-bar's tabs nor the breadcrumb, because the creation surface is a modal form rather than a router
-frame, while keeping its own chrome, its `data-mode="creation"` attribute, and its role as the
-surface's documented focus target. Test waits SHALL gate on
-deterministic state — polling the committed store view and the creation-surface DOM with a
-bounded deadline — rather than on the raw `#action-dock` element becoming visible, so the
-suite stays stable under a loaded CI runner.
+The managed localhost Playwright suite SHALL exercise the creation journey using keyboard
+controls only. Tests SHALL use deterministic fixtures and SHALL make no remote, LLM, or
+image-generation request. Test waits SHALL gate on deterministic state — polling the committed
+store view and the creation-surface DOM with a bounded deadline — rather than on the raw
+`#action-dock` element becoming visible, so the suite stays stable under a loaded CI runner.
 
 #### Scenario: Preset journey completes in Chromium
 - **WHEN** a seeded pending character uses arrows and Enter to open a preset card, confirms, and activates
@@ -442,6 +693,26 @@ suite stays stable under a loaded CI runner.
 #### Scenario: Creation mode renders no root command list and no breadcrumb
 - **WHEN** the dock is rendered in creation mode
 - **THEN** it renders the creation surface with no root command list, no count, and no breadcrumb line, and the creation form keeps its own key capture exactly as before
+
+#### Scenario: The suite covers the full journey at both viewports
+- **WHEN** the acceptance suite runs at 1451x790 and 2560x1440
+- **THEN** it exercises preset selection, confirmation, activation, and the exploration
+  snapshot; custom finite controls and free-text field focus; reconnect at each saved draft
+  stage; server rejection of both out-of-range age fields despite bypassed client validation;
+  the destructive reset confirmation; and stale and duplicate submission behavior
+
+#### Scenario: The suite asserts dock ownership and no import fields
+- **WHEN** the acceptance suite asserts on the creation surface
+- **THEN** it asserts the creation dock is the sole action-dock owner in creation mode and
+  re-renders on exploration (the shared `#action-dock` node may persist with `data-mode`
+  switching), and asserts no persona/import field is rendered
+
+#### Scenario: The shared dock panel keeps its chrome across a mode change
+- **WHEN** the dock renders in creation mode on the persistent shared `#action-dock` node
+- **THEN** the floating dock panel itself is never remounted at a mode change; the node renders
+  neither the tab bar's tabs nor the breadcrumb — the creation surface is a modal form rather
+  than a router frame — while keeping its own chrome, its `data-mode="creation"` attribute, and
+  its role as the surface's documented focus target
 
 ### Requirement: Creation race display names travel with opaque keys
 The creation panel SHALL use schema version 6. Each custom.races option SHALL contain exactly key, display_name_zh, description and subraces, with display_name_zh a non-empty string of at most 128 code points sourced from the race registry. Every preset race key SHALL resolve to one such option. Clients SHALL render that display name in race controls, presets and confirmation while preserving keys in actions.

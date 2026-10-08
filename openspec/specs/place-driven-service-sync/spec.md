@@ -14,11 +14,6 @@ its doorways connecting it to its exterior in both directions, its host
 standing in it with the declared profession's components attached, and its
 goods purchasable.
 
-A place record that authors no host SHALL still yield its whole location —
-the tagged, described interior and both doorways — with no NPC created for
-it and no roster row derived from it. The room is the deliverable; the host
-is an optional part of it, not its precondition.
-
 #### Scenario: One record yields a working location
 - **WHEN** a place record is added and synchronization runs
 - **THEN** its interior, both doorways, its host and its purchasable goods
@@ -34,6 +29,10 @@ is an optional part of it, not its precondition.
 - **WHEN** synchronization runs twice over a host-less place record
 - **THEN** the room exists exactly once and no NPC is created on either run
 
+#### Scenario: The room is the deliverable and the host is optional
+- **WHEN** a place record authors no host
+- **THEN** it SHALL still yield its whole location — the tagged, described interior and both doorways — with no NPC created for it and no roster row derived from it; the room is the deliverable and the host is an optional part of it, not its precondition
+
 ### Requirement: Interiors are created by iterating the place registry
 Interior rooms SHALL be created, tagged, described and connected to their
 exteriors by iterating the place registry. No location SHALL be named by a
@@ -42,10 +41,6 @@ code-side constant.
 Synchronization SHALL remain idempotent: a repeated run SHALL reuse the
 tagged room rather than creating a second one, SHALL re-apply the authored
 description in place, and SHALL not duplicate doorways.
-
-When a place's exterior room cannot be resolved, synchronization SHALL warn
-naming the place and skip it, and SHALL continue processing the remaining
-places rather than aborting.
 
 #### Scenario: Adding a place adds an interior with no code change
 - **WHEN** a place record is added to the registry and synchronization runs
@@ -62,17 +57,15 @@ places rather than aborting.
 - **THEN** that place is warned and skipped, and every other place still
   synchronizes
 
+#### Scenario: Unresolvable exterior warns names the place and continues
+- **WHEN** a place's exterior room cannot be resolved
+- **THEN** synchronization SHALL warn naming the place and skip it, and SHALL continue processing the remaining places rather than aborting
+
 ### Requirement: A place authors its host's race, subrace and sex
 A place SHALL declare its host's race, and may declare a subrace and SHALL
 declare a sex. Synchronization SHALL apply them instead of assuming a
 default race, so a settlement whose inhabitants are not human produces hosts
 of the right people.
-
-These SHALL be creation-time authored identity: written once when the host
-is created, alongside the authored title, and never rewritten on a later
-synchronization. Changing an authored value therefore takes effect through
-roster convergence — the host is deleted and recreated — consistent with the
-existing never-rename and never-retitle contract.
 
 Validation SHALL reject an unknown race, an unknown sex, and a subrace whose
 own race disagrees with the place's declared race.
@@ -95,8 +88,16 @@ own race disagrees with the place's declared race.
 - **THEN** the live host is left unchanged, exactly as an edited name or
   title is
 
+#### Scenario: Authored identity is creation-time only
+- **WHEN** a host's race, subrace or sex is authored
+- **THEN** these SHALL be creation-time authored identity: written once when the host is created, alongside the authored title, and never rewritten on a later synchronization
+
+#### Scenario: Changed authored values take effect via roster convergence
+- **WHEN** an authored race, subrace or sex value is changed
+- **THEN** the change takes effect through roster convergence — the host is deleted and recreated — consistent with the existing never-rename and never-retitle contract
+
 ### Requirement: A newly created service host receives its authored card
-When synchronization creates a service host, it SHALL initialize the host's compact NPC card from the place's host profile, with `profile` provenance naming that profile, in the same transaction as the host's creation, before the host is published as usable. A roster row whose profile does not resolve SHALL fail synchronization before any write, naming the service. Synchronization SHALL NOT initialize, rewrite, or repair the card of a reused host: a restart, a registry reload, or an edit to the authored profile SHALL leave every existing host's effective card and persona version unchanged. Two hosts created from equal profiles SHALL carry independent cards.
+When synchronization creates a service host, it SHALL initialize the host's compact NPC card from the place's host profile, with `profile` provenance naming that profile, in the same transaction as the host's creation, before the host is published as usable.
 
 #### Scenario: A created host carries its profile card
 - **WHEN** synchronization creates the host for a place naming a synthetic profile
@@ -113,6 +114,18 @@ When synchronization creates a service host, it SHALL initialize the host's comp
 #### Scenario: A failed initialization leaves no host
 - **WHEN** the card initialization raises while synchronization creates a host
 - **THEN** the startup transaction rolls back and no host for that service exists
+
+#### Scenario: An unresolvable profile fails before any write
+- **WHEN** a roster row's profile does not resolve
+- **THEN** synchronization fails before any write, naming the service
+
+#### Scenario: Reused host cards are never touched
+- **WHEN** synchronization encounters a reused host after a restart, a registry reload, or an edit to the authored profile
+- **THEN** it SHALL NOT initialize, rewrite, or repair the card, and every existing host's effective card and persona version stay unchanged
+
+#### Scenario: Equal profiles yield independent cards
+- **WHEN** two hosts are created from equal profiles
+- **THEN** they SHALL carry independent cards
 
 ### Requirement: Host synchronization uses authored canonical ages without rewriting reused state
 A newly created service host SHALL receive the canonical age pair from its resolved authored profile before publication, within the same creation transaction as its card. Synchronization of a reused host SHALL preserve each present age attribute, the effective edited persona, greeting, persona version, and existing service identity; only an absent age field SHALL be supplied from the corresponding profile value. Invalid age authorship SHALL fail preflight before synchronization writes.

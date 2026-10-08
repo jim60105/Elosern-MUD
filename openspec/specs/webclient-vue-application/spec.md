@@ -5,7 +5,7 @@ Establishes the offline loading contract for the WebClient's Vue 3 single-page a
 ## Requirements
 
 ### Requirement: Chrome type is legible and numerals are stable
-Every visible text in the client — chrome text, the drawn-map text, and the message/log prose — SHALL render at the reference scale at 16 CSS pixels or more using the shared local design faces; no shared type token, and no surface, SHALL carry a reference-scale type step below 16 CSS px, including the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list. The drawn map itself — the node labels and edge-marker names inside the island's and the full map's SVG drawing — meets the same floor through the `webclient-local-map` fitted label contract (island node labels at a 16-unit step drawn at 16 × the drawing's scale at the reference scale, island marker names at the matching 16-unit marker step). Resource values, costs, counts and prices outside the drawn map SHALL use proportional sans tabular lining numerals. Monospace SHALL remain the face of command input, ASCII/box-drawing content, key names and the map's own coordinate and label type, and SHALL additionally be the face of the message window's page text and the full log's lines as `webclient-contextual-hud` and `webclient-input-narrative` define; prose SHALL retain its existing reader sizing contract, including its prose-scale preference. The floor is on every rendered size: a treatment that expresses its size relative to the surrounding prose (an `em` step such as a `sys` line's or the box-drawing art path's) SHALL be re-stepped so its computed size at the reference scale with the default prose scale is at least 16 CSS px, and no reader-selectable step may drive visible text below it; `visibility: hidden` spacing glyphs are not visible text and are exempt.
+Every visible text in the client — chrome text, the drawn-map text, and the message/log prose — SHALL render at the reference scale at 16 CSS pixels or more using the shared local design faces; no shared type token, and no surface, SHALL carry a reference-scale type step below 16 CSS px.
 
 #### Scenario: Dense chrome remains readable
 - **WHEN** exploration, dialogue, combat and reference surfaces, the minimap island and the full-map overlay render at the 1451x790 reference viewport
@@ -15,15 +15,36 @@ Every visible text in the client — chrome text, the drawn-map text, and the me
 - **WHEN** resource/count values change digit widths
 - **THEN** their numeric columns remain aligned using tabular figures without switching the surrounding UI to monospace
 
+#### Scenario: Islands and overlays carry no sub-floor steps
+- **WHEN** the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list render
+- **THEN** each carries a reference-scale type step of at least 16 CSS px
+
+#### Scenario: The drawn map meets the floor through the fitted label contract
+- **WHEN** the node labels and edge-marker names inside the island's and the full map's SVG drawing render
+- **THEN** they meet the 16 CSS px floor through the `webclient-local-map` fitted label contract (island node labels at a 16-unit step drawn at 16 × the drawing's scale at the reference scale, island marker names at the matching 16-unit marker step)
+
+#### Scenario: Values use tabular lining numerals
+- **WHEN** resource values, costs, counts and prices outside the drawn map render
+- **THEN** they use proportional sans tabular lining numerals
+
+#### Scenario: Monospace keeps its role surfaces
+- **WHEN** command input, ASCII/box-drawing content, key names, the map's own coordinate and label type, the message window's page text and the full log's lines render
+- **THEN** monospace remains their face, as `webclient-contextual-hud` and `webclient-input-narrative` define
+
+#### Scenario: Prose keeps its reader sizing contract
+- **WHEN** message and log prose renders
+- **THEN** it retains its existing reader sizing contract, including its prose-scale preference
+
+#### Scenario: Proportional em steps are re-stepped to the floor
+- **WHEN** a treatment expresses its size relative to the surrounding prose (an `em` step such as a `sys` line's or the box-drawing art path's)
+- **THEN** it is re-stepped so its computed size at the reference scale with the default prose scale is at least 16 CSS px
+
+#### Scenario: Reader steps stay above the floor and hidden glyphs are exempt
+- **WHEN** a reader-selectable size step is applied
+- **THEN** no step drives visible text below the 16 CSS px floor, and `visibility: hidden` spacing glyphs are not visible text and are exempt
+
 ### Requirement: The WebClient loads a self-contained offline Vue SPA
-The project WebClient SHALL load a locally built, self-contained Vue 3 single-page application produced
-by a Vite build and served entirely from the project origin. The page SHALL make no remote request for
-a runtime UI dependency (no CDN JavaScript, CSS, or font). The application SHALL target desktop only and
-SHALL NOT claim mobile acceptance; every required surface SHALL be visible and usable at the
-1451x790 reference viewport. When the application mounts into its container, the stock and pre-Js text fallback it
-replaces SHALL be retired so it cannot stack in document flow and push required surfaces below the
-visible viewport. (The live evennia-transport mount and the always-playable text path are established by
-later changes in this migration; this change establishes the offline build and render of the app.)
+The project WebClient SHALL load a locally built, self-contained Vue 3 single-page application produced by a Vite build and served entirely from the project origin. The page SHALL make no remote request for a runtime UI dependency (no CDN JavaScript, CSS, or font). (The live evennia-transport mount and the always-playable text path are established by later changes in this migration; this change establishes the offline build and render of the app.)
 
 #### Scenario: Offline page load has its UI dependencies
 - **WHEN** the Vue application is loaded with all non-local network requests blocked
@@ -37,19 +58,16 @@ later changes in this migration; this change establishes the offline build and r
 - **WHEN** the Vue application mounts into its container
 - **THEN** the stock and pre-Js text fallback it replaces is hidden so it does not stack with the mounted application
 
+#### Scenario: The application is desktop-only
+- **WHEN** the application declares its supported viewports
+- **THEN** it targets desktop only and claims no mobile acceptance
+
+#### Scenario: The retired fallback cannot push surfaces offscreen
+- **WHEN** the application mounts into its container and retires the stock and pre-Js text fallback
+- **THEN** the fallback cannot stack in document flow and push required surfaces below the visible viewport
+
 ### Requirement: The design system carries over from the design draft and stays offline
-The Vue application SHALL render with the approved design system derived from the 設計稿
-(`docs/design/elosern-redesign/`), and that draft SHALL be the binding reference for **both** the visual
-system and the application's layout and information architecture — its palette, typefaces, and tokens,
-and equally its stage composition, surface anchoring, and mode-gated visibility model. The application
-SHALL render with the ink-night palette, its seal-red accent retained for its semantic roles beside a
-muted-gold navigation, focus, and emphasis accent, the self-hosted display, serif,
-and sans typefaces, and the focus, selection, and motion tokens. Status and health information SHALL
-never be conveyed by color alone (an icon or symbol plus a numeric value or an explicit text label is
-required), SHALL honor `prefers-reduced-motion`, and SHALL remain legible for common color-vision
-differences. No design asset or font SHALL be fetched from a remote origin at render time. Where this
-capability and the draft are silent on a visual or navigational detail, the draft governs; a surface in
-the draft that has no backing OOB read model SHALL NOT be built and SHALL NOT be mocked.
+The Vue application SHALL render with the approved design system derived from the 設計稿 (`docs/design/elosern-redesign/`), and that draft SHALL be the binding reference for **both** the visual system and the application's layout and information architecture. No design asset or font SHALL be fetched from a remote origin at render time.
 
 #### Scenario: Self-hosted fonts load offline
 - **WHEN** the application loads with remote requests blocked
@@ -71,16 +89,24 @@ the draft that has no backing OOB read model SHALL NOT be built and SHALL NOT be
 - **WHEN** the draft shows a surface with no backing OOB read model
 - **THEN** the application renders no such surface and presents no placeholder standing in for its data
 
+#### Scenario: The rendered system carries the draft palette and tokens
+- **WHEN** the application renders with the design system
+- **THEN** it uses the ink-night palette, its seal-red accent retained for its semantic roles beside a muted-gold navigation, focus, and emphasis accent, the self-hosted display, serif, and sans typefaces, and the focus, selection, and motion tokens
+
+#### Scenario: The draft binds layout and information architecture
+- **WHEN** the draft is applied as the reference
+- **THEN** it governs the palette, typefaces, and tokens, and equally the stage composition, surface anchoring, and mode-gated visibility model
+
+#### Scenario: Color-vision legibility is preserved
+- **WHEN** status and health information renders
+- **THEN** it remains legible for common color-vision differences
+
+#### Scenario: The draft governs silent details
+- **WHEN** this capability and the draft are silent on a visual or navigational detail
+- **THEN** the draft governs the choice
+
 ### Requirement: The Vue app binds the preserved strict DOM-independent logic to a reactive store
-The Vue application SHALL use a single reactive store (Pinia) as the sole writer of client view state.
-The store SHALL consume the preserved DOM-independent logic — the protocol reducer, the keyboard router,
-the narrative markup pipeline, the local-map model, and the choice-point and option-card logic — through
-ES-module wrappers rather than reimplementing it. The store SHALL publish committed state atomically so
-that no subscriber observes partially applied panel state, and it SHALL hold only data derived from the
-OOB panel allowlist (art, status, context_actions, local_map, services, creation, exploration,
-character) and the transport text stream; it SHALL NOT invent data. Components emit only user-intent
-dispatches, and the store is driven in tests by raw reducer inputs; binding the live transport and the
-components to this store are established by later changes.
+The Vue application SHALL use a single reactive store (Pinia) as the sole writer of client view state. The store SHALL consume the preserved DOM-independent logic through ES-module wrappers rather than reimplementing it, and SHALL publish committed state atomically so that no subscriber observes partially applied panel state. Components emit only user-intent dispatches; binding the live transport and the components to this store are established by later changes.
 
 #### Scenario: Renderers observe only committed state
 - **WHEN** a valid snapshot or update is accepted by the preserved protocol reducer through the store
@@ -94,17 +120,20 @@ components to this store are established by later changes.
 - **WHEN** the store receives panel data
 - **THEN** it holds only data sourced from the OOB allowlist or the transport text stream and holds no invented data
 
+#### Scenario: The consumed preserved logic is enumerated
+- **WHEN** the store binds the preserved DOM-independent logic
+- **THEN** it wraps the protocol reducer, the keyboard router, the narrative markup pipeline, the local-map model, and the choice-point and option-card logic
+
+#### Scenario: The backing data allowlist is fixed
+- **WHEN** the store accepts data
+- **THEN** it holds only data derived from the OOB panel allowlist (art, status, context_actions, local_map, services, creation, exploration, character) and the transport text stream; it holds no invented data
+
+#### Scenario: Tests drive the store with raw reducer inputs
+- **WHEN** the store is exercised in tests
+- **THEN** it is driven by raw reducer inputs
+
 ### Requirement: The app preserves the client DOM contract hooks and exposes stable test hooks
-The Vue application SHALL preserve the DOM contract identifiers that the OOB and browser contract depend
-on: the focusable action-dock target that the keyboard router dispatches into, the `action-` and `target-`
-item keys selected by pointer or keyboard, and the identity of the required panel surfaces. The application
-SHALL expose a stable `data-testid` hook on every remaining interactive surface so behavioral browser
-acceptance targets deterministic hooks rather than styling selectors. The application SHALL also preserve
-the stable public façades that existing OOB and browser contracts reference — the narrative input/append
-path (`window.Elosern.narrativeInput`), the action submission entry point (`window.Elosern.actions.submit`),
-and the keyboard-router consumption contract — implemented as browser-bridge shims over the store and the
-imported logic, so existing behavioral tests and the choice-point/narrative append path keep their single,
-non-duplicated entry points while the DOM is implemented in Vue.
+The Vue application SHALL preserve the DOM contract identifiers that the OOB and browser contract depend on: the focusable action-dock target that the keyboard router dispatches into, the `action-` and `target-` item keys selected by pointer or keyboard, and the identity of the required panel surfaces. The application SHALL expose a stable `data-testid` hook on every remaining interactive surface so behavioral browser acceptance targets deterministic hooks rather than styling selectors.
 
 #### Scenario: Keyboard router reaches the same dock
 - **WHEN** the application renders the active menu frame and the player focuses the preserved action-dock target
@@ -122,12 +151,16 @@ non-duplicated entry points while the DOM is implemented in Vue.
 - **WHEN** an existing browser test or spec references the `window.Elosern.narrativeInput` narrative append path or the `window.Elosern.actions.submit` action entry point
 - **THEN** those contracts resolve and route through the store and the single bridge dispatch path (the live transport round-trip is proven by a later change) with no duplicated append or action path
 
+#### Scenario: Public façades persist as browser-bridge shims
+- **WHEN** existing OOB and browser contracts reference the stable public façades — the narrative input/append path (`window.Elosern.narrativeInput`), the action submission entry point (`window.Elosern.actions.submit`), and the keyboard-router consumption contract
+- **THEN** they are implemented as browser-bridge shims over the store and the imported logic
+
+#### Scenario: Entry points stay single and non-duplicated under Vue
+- **WHEN** the DOM is implemented in Vue
+- **THEN** existing behavioral tests and the choice-point/narrative append path keep their single, non-duplicated entry points
+
 ### Requirement: Degraded text remains playable alongside the Vue shell
-The application SHALL remain fully playable by ordinary text commands when the Vue graphical surfaces are
-unavailable, when the Vite bundle fails to load, or when the OOB channel is incompatible. An incompatible
-or failed OOB presentation SHALL lock the graphical controls while leaving the text path functional.
-Narrative and command output SHALL remain the authoritative text surface and SHALL degrade a message that
-cannot be fully tokenized to readable literal text rather than suppressing the log.
+The application SHALL remain fully playable by ordinary text commands when the Vue graphical surfaces are unavailable, when the Vite bundle fails to load, or when the OOB channel is incompatible. An incompatible or failed OOB presentation SHALL lock the graphical controls while leaving the text path functional.
 
 #### Scenario: Bundle blocked keeps text playable
 - **WHEN** the Vue bundle cannot load
@@ -140,6 +173,10 @@ cannot be fully tokenized to readable literal text rather than suppressing the l
 #### Scenario: Unparseable message degrades to literal text
 - **WHEN** a message cannot be fully tokenized by the markup pipeline
 - **THEN** the narrative shows readable literal text rather than being suppressed
+
+#### Scenario: Text output stays the authoritative surface
+- **WHEN** the Vue shell presents narrative and command output
+- **THEN** narrative and command output remain the authoritative text surface, and a message that cannot be fully tokenized degrades to readable literal text rather than suppressing the log
 
 ### Requirement: The view layer is fully reactive and store-bound with no legacy imperative view plugin
 Every player-facing Vue surface SHALL be a reactive component that renders committed state from the Pinia
@@ -168,14 +205,7 @@ payload's `layers` in payload order with verbatim registry names and
 kind-formatted signed amounts, SHALL render ALL layers without
 truncation, SHALL NOT sort, recompute, regroup, or re-total layer data,
 and layer-free rows SHALL keep their existing value text with no
-breakdown elements rendered. Equipment rows in the doll and inventory
-surfaces SHALL print the server-generated adjustment string verbatim (the
-inventory sources it by joining the server's character equipment rows on
-`item_key`; a bag-only item renders none; empty renders nothing), and the
-intimate view SHALL show the payload's effective exposure value. Only
-schema version 5 SHALL be accepted at every wire validator; an unknown
-layer `source`/`kind` SHALL still be rejected on the wire, and neutral-
-chip fallback exists only as direct-render defense in the component.
+breakdown elements rendered.
 
 #### Scenario: Layer chips mirror the payload exactly
 
@@ -215,8 +245,27 @@ chip fallback exists only as direct-render defense in the component.
   with hand-built props exercises the neutral 其他 chip fallback while the
   value line stays correct
 
+#### Scenario: Equipment adjustment strings print verbatim
+
+- **WHEN** the doll and inventory surfaces render equipment rows
+- **THEN** they print the server-generated adjustment string verbatim, the
+  inventory sourcing it by joining the server's character equipment rows on
+  `item_key`; a bag-only item renders none; empty renders nothing
+
+#### Scenario: The intimate view shows the effective exposure value
+
+- **WHEN** the intimate view renders
+- **THEN** it shows the payload's effective exposure value
+
+#### Scenario: Only schema version 5 is accepted on the wire
+
+- **WHEN** a character payload reaches any wire validator
+- **THEN** only schema version 5 is accepted, an unknown layer
+  `source`/`kind` is still rejected on the wire, and neutral-chip fallback
+  exists only as direct-render defense in the component
+
 ### Requirement: Desktop chrome scales once from the reference viewport
-At the 1451x790 reference viewport the client SHALL use its reference chrome dimensions. Above the reference, comparable chrome text, controls, spacing and bounded islands SHALL render at one desktop chrome factor, `S = clamp(1, min(viewportHeight / 790, viewportWidth / 1451), 1.4)`, times their reference dimensions within rounding tolerance; at 2560x1440, where both raw ratios exceed the cap, they SHALL render at 1.4 times their reference dimensions. Below the reference, or on a viewport narrower than its height would imply at the reference's own aspect ratio, chrome SHALL not shrink below its reference readability floor nor grow beyond the width's own ratio to the 1451px reference. Viewport-responsive prose, stage art and band geometry SHALL NOT be multiplied a second time.
+At the 1451x790 reference viewport the client SHALL use its reference chrome dimensions. Above the reference, comparable chrome text, controls, spacing and bounded islands SHALL render at one desktop chrome factor, `S = clamp(1, min(viewportHeight / 790, viewportWidth / 1451), 1.4)`, times their reference dimensions within rounding tolerance.
 
 #### Scenario: Large desktop is proportional
 - **WHEN** the same scene renders at 1451x790 and at 2560x1440 with the same reader preference
@@ -234,21 +283,24 @@ At the 1451x790 reference viewport the client SHALL use its reference chrome dim
 - **WHEN** a user resizes between acceptance dimensions and then selects a map node or command
 - **THEN** the visible target receives the intended existing action and no stale geometry or duplicate dispatch occurs
 
+#### Scenario: The capped viewport renders at 1.4 times reference
+- **WHEN** the client renders at 2560x1440, where both raw ratios exceed the cap
+- **THEN** comparable chrome renders at 1.4 times its reference dimensions
+
+#### Scenario: Small or narrow viewports hold the readability floor
+- **WHEN** the viewport is below the reference, or narrower than its height would imply at the reference's own aspect ratio
+- **THEN** chrome does not shrink below its reference readability floor and does not grow beyond the width's own ratio to the 1451px reference
+
+#### Scenario: Prose, art and bands scale once
+- **WHEN** chrome multiplies by the desktop chrome factor
+- **THEN** viewport-responsive prose, stage art and band geometry are not multiplied a second time
+
 ### Requirement: The monospace type role is a self-hosted, sliced Jim Mono TC face
-The Vue application SHALL render its monospace type role (the command line, keycaps, option and badge
-numerals, local-map labels, box-drawing map art, and the message window's page text and the full
-log's lines) with the Jim Mono TC typeface served from the
+The Vue application SHALL render its monospace type role with the Jim Mono TC typeface served from the
 project origin, so Latin, digits, box drawing, and CJK in a monospace surface come from one bundled
 family in which every East Asian Wide or Fullwidth character is exactly two Latin cells wide, in both
 the regular and the bold weight. The monospace stack SHALL NOT name any machine-installed font family
-ahead of the bundled faces; the already self-hosted Noto Sans TC MAY follow it only as the fallback for
-CJK outside the shipped coverage. Jim Mono TC SHALL be delivered as unicode-range woff2 slices, each no
-larger than 64 KB, so a page downloads only the slices whose characters it draws, and each weight SHALL
-ship every East Asian Wide or Fullwidth code point of the bundled Noto Sans TC coverage that the font
-provides. Box-drawing glyphs SHALL join across cells so a drawn grid shows continuous strokes. The
-face's contextual programming ligatures SHALL stay enabled, and a ligature SHALL occupy exactly the
-cells of the characters it replaces. The Jim Mono TC licence (SIL Open Font License 1.1), its notice,
-and the upstream licence texts SHALL be shipped next to the font files.
+ahead of the bundled faces.
 
 #### Scenario: Monospace text renders the bundled Jim Mono TC face offline
 - **WHEN** the application loads with remote requests blocked and the command line is opened
@@ -277,3 +329,31 @@ and the upstream licence texts SHALL be shipped next to the font files.
 #### Scenario: Map labels keep their layout under Jim Mono TC
 - **WHEN** the local-map island and the full map overlay render a dense neighbourhood with CJK labels at 1451x790 and 2560x1440
 - **THEN** every drawn node label and edge-marker name stays inside its reserved box, no two labels overlap, and the island keeps its anchored size
+
+#### Scenario: The monospace role surfaces are enumerated
+- **WHEN** the monospace type role renders
+- **THEN** it covers the command line, keycaps, option and badge numerals, local-map labels, box-drawing map art, the message window's page text and the full log's lines
+
+#### Scenario: Noto Sans TC may follow only as the coverage fallback
+- **WHEN** the monospace font stack is declared
+- **THEN** the already self-hosted Noto Sans TC MAY follow the bundled faces only as the fallback for CJK outside the shipped coverage
+
+#### Scenario: The face ships as small unicode-range slices
+- **WHEN** Jim Mono TC is delivered
+- **THEN** it ships as unicode-range woff2 slices, each no larger than 64 KB, so a page downloads only the slices whose characters it draws
+
+#### Scenario: Each weight covers the bundled Noto Sans TC CJK
+- **WHEN** the shipped coverage of each weight is checked
+- **THEN** it ships every East Asian Wide or Fullwidth code point of the bundled Noto Sans TC coverage that the font provides
+
+#### Scenario: Box-drawing strokes join across cells
+- **WHEN** a drawn grid renders with box-drawing glyphs
+- **THEN** the glyphs join across cells so the grid shows continuous strokes
+
+#### Scenario: Programming ligatures stay enabled and keep their cells
+- **WHEN** monospace text draws a contextual programming ligature
+- **THEN** ligatures stay enabled and a ligature occupies exactly the cells of the characters it replaces
+
+#### Scenario: The licence ships beside the font files
+- **WHEN** the Jim Mono TC assets are committed
+- **THEN** the licence (SIL Open Font License 1.1), its notice, and the upstream licence texts are shipped next to the font files

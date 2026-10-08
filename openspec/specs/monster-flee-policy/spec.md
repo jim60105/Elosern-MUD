@@ -91,7 +91,7 @@ After preserving 10b's non-monster delegation and finding living enemies, the mo
 
 ### Requirement: A flee decision is a complete ActionResolver request and never a state mutation
 
-A threshold-triggered decision SHALL import and use 10c's canonical `FLEE_SKILL_KEY` from `world.rules.disengage`, thereby loading 10c's skill and effect-handler registrations, and return one self-targeted `ActionRequest` with actor equal to the monster, targets equal to `[monster]`, and a `BattlefieldActionContext` for the same battlefield whose `event_context["battlefield"]` references that battlefield. The policy SHALL NOT call `ActionResolver.resolve()`, roll flee success, or mutate `Battlefield.fled`, traits, sexual state, buffs, skill grants, inventory, or currency.
+A threshold-triggered decision SHALL import and use 10c's canonical `FLEE_SKILL_KEY` from `world.rules.disengage`, thereby loading 10c's skill and effect-handler registrations, and return one self-targeted `ActionRequest` with actor equal to the monster, targets equal to `[monster]`, and a `BattlefieldActionContext` for the same battlefield whose `event_context["battlefield"]` references that battlefield. The policy SHALL NOT call `ActionResolver.resolve()` nor roll flee success.
 
 #### Scenario: Request carries the disengage handler context
 
@@ -107,6 +107,10 @@ A threshold-triggered decision SHALL import and use 10c's canonical `FLEE_SKILL_
 
 - **WHEN** a complete snapshot is taken before calling the policy for a threshold-triggered monster
 - **THEN** the returned request is a pure proposal and the battlefield and every entity snapshot remain unchanged
+
+#### Scenario: The policy mutates no listed state surface
+- **WHEN** the flee policy runs for a threshold-triggered monster
+- **THEN** it leaves `Battlefield.fled`, traits, sexual state, buffs, skill grants, inventory, and currency unchanged
 
 ### Requirement: Existing combat orchestration resolves monster flee through the sole writer
 

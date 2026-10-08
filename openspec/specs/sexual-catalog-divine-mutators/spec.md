@@ -17,14 +17,8 @@ additionally wires a `submission_marks` short-circuit term into `resist_verdict(
 ### Requirement: Four hand-built acts extend DIVINE_ACTS, gated exclusively by requires_divine_arts, with no counter unlock
 `world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL carry the four 後期 hand-built pairs
 (感度創世 `divine_sensitivity_creation`, 恥辱剝奪 `divine_shame_deprivation`, 絕對從屬
-`divine_absolute_submission`, 無垢回歸 `divine_purity_restoration`) — each a hand-built `(SkillDef,
-SexualActDef)` pair declaring `requires_divine_arts=True`, `unlock={}`, `target_part=None`,
-`resistible=True`, no counters, `actor_pleasure_ratio=0.0`, and exactly one new `divine_` effect
-prefix — extending the tuple to the seven-entry line (the first three pairs unchanged in every
-field). The tuple SHALL reach exactly eight entries only through the `integrate-divine-sexual-arts-
-catalog` integration's eighth pair (`divine_sexual_arts`, `ownership_gated=True`), pinned by the
-`sexual-act-registry` capability's eighth-row requirement: the four 後期 acts' fields and the first
-seven pairs' ordering SHALL NOT change when the eighth pair lands.
+`divine_absolute_submission`, 無垢回歸 `divine_purity_restoration`), extending the tuple to the
+seven-entry line with the first three pairs unchanged in every field.
 
 #### Scenario: A non-divine race cannot cast any of the four acts regardless of counters
 - **WHEN** an actor whose race's `can_use_divine_arts` is `False` attempts to cast any of the four
@@ -48,6 +42,22 @@ seven pairs' ordering SHALL NOT change when the eighth pair lands.
 - **WHEN** each of the four acts' `SexualActDef.unlock` mapping is inspected
 - **THEN** it is empty — counter thresholds do not apply to the 神之秘法 line
 
+#### Scenario: Each 後期 pair declares the line's fixed field set
+- **WHEN** each of the four 後期 pairs is inspected
+- **THEN** each is a hand-built `(SkillDef, SexualActDef)` pair declaring `requires_divine_arts=True`,
+  `unlock={}`, `target_part=None`, `resistible=True`, no counters, `actor_pleasure_ratio=0.0`, and
+  exactly one new `divine_` effect prefix
+
+#### Scenario: The eighth entry arrives only via the integration pair
+- **WHEN** `DIVINE_ACTS` reaches exactly eight entries
+- **THEN** it is only through the `integrate-divine-sexual-arts-catalog` integration's eighth pair
+  (`divine_sexual_arts`, `ownership_gated=True`), pinned by the `sexual-act-registry` capability's
+  eighth-row requirement
+
+#### Scenario: The eighth pair landing perturbs nothing earlier
+- **WHEN** the eighth pair lands
+- **THEN** the four 後期 acts' fields and the first seven pairs' ordering SHALL NOT change
+
 ### Requirement: 感度創世 saturates the target's sensitivity, excluding the actor and tolerating a resisted cast
 `感度創世` SHALL declare one effect, `divine_saturate_sensitivity:感度創世`. Its handler SHALL, for the
 resolved target excluding the actor, call `target.sexual.saturate_sensitivity()`. An empty `targets`
@@ -66,9 +76,8 @@ list (a resisted sole target) SHALL be handled as a no-op, never a rejection.
 `恥辱剝奪` SHALL declare one effect, `divine_clamp_shame:恥辱剝奪`. Its handler SHALL check
 `isinstance(target, Monster)` for the resolved target (excluding the actor) *before* staging any
 `PendingEffect`, and SHALL raise `RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, ...)` directly
-if so, rather than staging a mutation that raises `ValueError` from inside its own `apply()` closure
-(which would surface as `RejectReason.COMMIT_FAILED` instead). For a non-`Monster` target, it SHALL
-stage `target.sexual.clamp_shame_to("成癮")`. An empty `targets` list SHALL be a no-op.
+if so. For a non-`Monster` target, it SHALL stage `target.sexual.clamp_shame_to("成癮")`. An empty
+`targets` list SHALL be a no-op.
 
 #### Scenario: Casting 恥辱剝奪 pins a non-Monster target's shame permanently
 - **WHEN** `恥辱剝奪` is cast at a non-`Monster` target
@@ -79,6 +88,11 @@ stage `target.sexual.clamp_shame_to("成癮")`. An empty `targets` list SHALL be
 - **WHEN** `恥辱剝奪` is cast at a `Monster` target
 - **THEN** the action is rejected via `RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, ...)`
   (never `RejectReason.COMMIT_FAILED`), and that target's `shame` remains pinned at `"無"`
+
+#### Scenario: The eager rejection bypasses a failing apply() closure
+- **WHEN** the Monster-target path rejects
+- **THEN** it rejects directly rather than staging a mutation that raises `ValueError` from inside
+  its own `apply()` closure (which would surface as `RejectReason.COMMIT_FAILED` instead)
 
 ### Requirement: 絕對從屬 marks the target as permanently auto-complying toward the caster, keyed by a guaranteed-unique identity
 `絕對從屬` SHALL declare one effect, `divine_mark_submission:絕對從屬`. Its handler SHALL, for the

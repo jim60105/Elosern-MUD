@@ -56,10 +56,7 @@ four validations retain distinct, reachable rejection reasons.
 ### Requirement: is_in_range checks fled status alone; melee-versus-ranged is structurally unreachable
 `BattlefieldActionContext.is_in_range(actor, target)` SHALL return `False` for any target whose
 key is in `battlefield.fled`, and `True` for every other roster member. The method SHALL NOT receive
-the definition being acted on: a full melee-versus-ranged distinction is explicitly out of scope
-because no dependency this change can edit carries a range/reach classification and no coordinate
-system exists yet, and removing the parameter makes that boundary structural rather than a documented
-promise not to read it.
+the definition being acted on: a full melee-versus-ranged distinction is explicitly out of scope.
 
 #### Scenario: A fled combatant is out of range for every skill
 - **WHEN** `is_in_range(actor, target)` is called for a target whose key is in `battlefield.fled`
@@ -75,6 +72,10 @@ promise not to read it.
   battlefield combatant
 - **THEN** it rejects with `RejectReason.TARGET_OUT_OF_RANGE`, proving `is_in_range()`'s one real rule
   reaches all the way through targeting to a rejection, not merely returning a value nothing consumes
+
+#### Scenario: The absent definition parameter makes the scope boundary structural
+- **WHEN** the melee-versus-ranged exclusion's justification is examined
+- **THEN** no dependency this change can edit carries a range/reach classification and no coordinate system exists yet, so removing the parameter makes that boundary structural rather than a documented promise not to read it
 
 ### Requirement: Combat shortcuts read the two-team roster with no separate expansion path
 `context.battlefield.teams` SHALL be queryable by change 8's `expand_target_shorthand()` for

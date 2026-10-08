@@ -10,20 +10,8 @@ stage binding, completion, and failure — with every multi-attribute write atom
 `world/quests/runtime.py` SHALL define `QuestState` values `IN_PROGRESS`, `COMPLETED`, and `FAILED`, and a
 frozen `QuestRecord` containing `quest_id`, `definition_key`, `issuer_key`, `state`, `stage_index`,
 `stage_progress`, `deadline_tick`, `accepted_tick`, `stage_room_id`, `objective_target_ids`,
-`protected_entity_ids`, `failure_reason`, `tracked`, and `counted_defeat_ids` — a JSON-safe tuple of
-the integer persistent identities this record has already credited for its current DEFEAT objective,
-defaulting to empty and cleared on stage transition together with the existing runtime bindings (a new
-objective therefore counts its own identities from empty, so counted-set residue can never cap later
-stages).
-`issuer_key` SHALL be a required non-empty
-string naming the commission the record was accepted under, and the strict reader SHALL validate it
-against the shared issuer-key grammar and reject a missing or malformed value rather than defaulting
-it — a record must always say which issuance governs its reward and settlement. `tracked` SHALL be a
-boolean defaulting to false — a stored entry whose dict carries no `tracked` key SHALL load as
-`tracked=False` — and accepting a quest SHALL never set it; a stored entry with no
-`counted_defeat_ids` key SHALL likewise load as empty without rewriting the stored entry. Records SHALL be stored as plain
-JSON-safe dicts in `PlayerCharacter.db.quest_log`. Unaccepted SHALL be represented by absence, and
-abandonment SHALL use `FAILED` with reason `abandoned`.
+`protected_entity_ids`, `failure_reason`, `tracked`, and `counted_defeat_ids`. Records SHALL be stored as plain
+JSON-safe dicts in `PlayerCharacter.db.quest_log`.
 
 #### Scenario: A record round-trips through JSON
 - **WHEN** a record containing integer dbrefs and tuple bindings is serialized to its storage dict,
@@ -52,15 +40,36 @@ abandonment SHALL use `FAILED` with reason `abandoned`.
 - **THEN** the strict reader raises `QuestDataError` and the stored value is neither rewritten nor
   coerced
 
+#### Scenario: The counted-identity tuple tracks credited defeats
+- **WHEN** a record credits individuals for its current DEFEAT objective
+- **THEN** `counted_defeat_ids` is a JSON-safe tuple of the integer persistent identities already credited for that objective, defaulting to empty and cleared on stage transition together with the existing runtime bindings
+- **AND** a new objective therefore counts its own identities from empty, so counted-set residue can never cap later stages
+
+#### Scenario: The issuer key is required and grammar-validated
+- **WHEN** a record is created or read
+- **THEN** `issuer_key` is a required non-empty string naming the commission the record was accepted under
+- **AND** the strict reader validates it against the shared issuer-key grammar and rejects a missing or malformed value rather than defaulting it — a record must always say which issuance governs its reward and settlement
+
+#### Scenario: The tracked flag is a boolean defaulting to false
+- **WHEN** a record is created or a stored entry is loaded
+- **THEN** `tracked` is a boolean defaulting to false and accepting a quest never sets it
+- **AND** a stored entry whose dict carries no `tracked` key loads as `tracked=False`
+
+#### Scenario: A legacy entry without counted ids loads empty
+- **WHEN** a stored entry carries no `counted_defeat_ids` key
+- **THEN** it loads as empty without rewriting the stored entry
+
+#### Scenario: Unaccepted and abandoned representations
+- **WHEN** a definition is unaccepted or a quest is abandoned
+- **THEN** unaccepted is represented by absence and abandonment uses `FAILED` with reason `abandoned`
+
 ### Requirement: Tracking state is bounded deterministic quest state
 `world/quests/runtime.py` SHALL provide a tracking operation that sets `tracked` on exactly one
 record of a character's quest log, validating the whole log through the shared validate-before-
 replace lifecycle discipline before any write. Tracking true SHALL be rejected when the target
 record is not `in_progress`, and rejected when the character already carries three tracked
 `in_progress` records and the target is not already tracked; untracking SHALL always be permitted
-for an existing record. A rejected operation SHALL raise the module's transition error and leave
-the quest log byte-for-byte unchanged. No caller outside the quest lifecycle module and the
-deterministic core SHALL assign `tracked`.
+for an existing record.
 
 #### Scenario: Tracking up to the cap succeeds
 - **WHEN** a holder with two tracked active quests tracks a third active record
@@ -78,15 +87,19 @@ deterministic core SHALL assign `tracked`.
 - **WHEN** a holder untracks a tracked record or untracks an already-untracked record
 - **THEN** the operation succeeds idempotently and only that record's state is affected
 
+#### Scenario: A rejected tracking operation changes nothing
+- **WHEN** a tracking operation is rejected
+- **THEN** it raises the module's transition error and leaves the quest log byte-for-byte unchanged
+
+#### Scenario: Only lifecycle writers assign tracked
+- **WHEN** any caller attempts to assign `tracked`
+- **THEN** no caller outside the quest lifecycle module and the deterministic core may assign it
+
 ### Requirement: Every lifecycle operation validates before replacing the quest log
 Every public lifecycle operation SHALL parse and validate every quest-log entry it touches before any
 write. A malformed record, unknown active definition, stale stage, out-of-range stage index, progress
 exceeding the objective quantity, or invalid state transition SHALL raise a named `QuestDataError` or
-`QuestTransitionError` and SHALL leave the complete quest log and all instance pins unchanged. An active
-record SHALL reference a known definition whose stage index is in range and still matches, and SHALL
-carry progress within the current objective's quantity. A terminal record SHALL be final: no runtime
-bindings may remain, and a `FAILED` record SHALL carry its reason. A successful operation SHALL persist
-one replacement quest-log list rather than mutating a nested dict in place.
+`QuestTransitionError` and SHALL leave the complete quest log and all instance pins unchanged.
 
 #### Scenario: Malformed persisted data fails without a partial write
 - **WHEN** a quest log contains one malformed dict and an operation targets a different valid record
@@ -101,39 +114,24 @@ one replacement quest-log list rather than mutating a nested dict in place.
 - **WHEN** a quest log contains two records with the same deterministic quest ID
 - **THEN** every lifecycle operation raises `QuestDataError` before it mutates any record or pin
 
+#### Scenario: An active record is consistent
+- **WHEN** validation inspects an active record
+- **THEN** it must reference a known definition whose stage index is in range and still matches, and carry progress within the current objective's quantity
+
+#### Scenario: A terminal record is final
+- **WHEN** validation inspects a terminal record
+- **THEN** no runtime bindings may remain, and a `FAILED` record must carry its reason
+
+#### Scenario: Success replaces the log list wholesale
+- **WHEN** a lifecycle operation succeeds
+- **THEN** it persists one replacement quest-log list rather than mutating a nested dict in place
+
 ### Requirement: accept_quest creates one deterministic active record
 `accept_quest(actor, definition_key, issuer_key)` SHALL reject an unknown definition, reject when the
 actor already has an active record for that definition, and reject when
 `resolve_issuance(definition_key, issuer_key)` returns no issuance — a record SHALL never be created
 pointing at a commission that does not exist. Otherwise it SHALL create an `IN_PROGRESS` stage-zero
-record carrying the supplied `issuer_key`, whose deterministic `quest_id` uses the definition key and
-that character's next acceptance number, whose `accepted_tick` is the current world tick, and whose
-`deadline_tick` is either `None` or the accepted tick plus the definition's positive hours converted
-with `CLOCK_YAML`.
-When the definition's current stage is a regional species hunt, acceptance SHALL additionally require
-that enough reachable, living, ordinary-eligible target individuals exist within the objective's
-declared region to satisfy the quantity. The deterministic core SHALL obtain that guarantee through the
-existing ambient/site managers — never by creating, moving, or deleting individuals directly — and those
-managers SHALL honor habitat, authored placement capacity, ownership markers, and current site state:
-provisioning SHALL NOT rebuild existing eligible individuals and SHALL NOT early-recover a cleared site.
-When the definition's current stage is a bound clear-out over an authored site, acceptance SHALL
-additionally require that the site currently owns at least the objective's quantity of living
-individuals. That guarantee SHALL be a read of the site owner's own state and population — acceptance
-SHALL NOT create, populate, move, recover, or delete an individual, and a site the world has not yet
-populated SHALL refuse with its own named reason, distinct from both a cleared site and a shortfall. The
-site's durable lifecycle state SHALL be the sole answer — world absent, unknown site, never populated,
-cleared, or short — and no path SHALL early-recover a site. When the guarantee holds, acceptance SHALL
-bind exactly the site's living individuals as the record's stage-zero objective targets through the
-existing binding writer, inside the same all-or-nothing transaction as the record write, and SHALL create
-no instance pin: the site is a permanent wilderness location, not a spawned scene. The record the
-operation returns SHALL be the persisted, bound record rather than the unbound value written a moment
-earlier.
-The refusal vocabulary SHALL be closed and named: `world_unavailable`, `unknown_site`, `site_unpopulated`,
-`site_cleared`, and `site_short`.
-Guarantee, binding, and record creation SHALL form one all-or-nothing transaction: any validation or
-manager failure SHALL roll back all of them, leaving no active record, no binding, and no partial target
-arrangement. When the condition cannot be legally satisfied, acceptance SHALL be refused with a named
-reason before any persistence.
+record carrying the supplied `issuer_key`.
 
 #### Scenario: First acceptance succeeds
 - **WHEN** a character accepts a known definition under a registered issuance with no previous record
@@ -201,6 +199,49 @@ reason before any persistence.
 - **WHEN** a clear-out acceptance succeeds
 - **THEN** the returned record's objective target set equals the site's living individuals that were bound, the same set a fresh read of the quest log returns, and a rollback of an injected failure restores the log to its pre-acceptance value
 
+#### Scenario: The new record carries deterministic acceptance metadata
+- **WHEN** accept_quest creates a record
+- **THEN** its deterministic `quest_id` uses the definition key and that character's next acceptance number
+- **AND** its `accepted_tick` is the current world tick
+- **AND** its `deadline_tick` is either `None` or the accepted tick plus the definition's positive hours converted with `CLOCK_YAML`
+
+#### Scenario: Species-hunt acceptance requires eligible targets in region
+- **WHEN** the definition's current stage is a regional species hunt
+- **THEN** acceptance additionally requires that enough reachable, living, ordinary-eligible target individuals exist within the objective's declared region to satisfy the quantity
+
+#### Scenario: Hunt provisioning flows only through owning managers
+- **WHEN** the deterministic core obtains the species-hunt target guarantee
+- **THEN** it goes through the existing ambient/site managers — never by creating, moving, or deleting individuals directly
+- **AND** those managers honor habitat, authored placement capacity, ownership markers, and current site state
+- **AND** provisioning does not rebuild existing eligible individuals and does not early-recover a cleared site
+
+#### Scenario: Clear-out acceptance reads the site's own population
+- **WHEN** the definition's current stage is a bound clear-out over an authored site
+- **THEN** acceptance additionally requires that the site currently owns at least the objective's quantity of living individuals
+- **AND** that guarantee is a read of the site owner's own state and population — acceptance does not create, populate, move, recover, or delete an individual
+
+#### Scenario: The site's durable state is the sole answer
+- **WHEN** clear-out acceptance consults the site
+- **THEN** the site's durable lifecycle state is the sole answer — world absent, unknown site, never populated, cleared, or short — and no path early-recovers a site
+- **AND** a site the world has not yet populated refuses with its own named reason, distinct from both a cleared site and a shortfall
+
+#### Scenario: A satisfied guarantee binds exactly the site's individuals
+- **WHEN** the clear-out guarantee holds
+- **THEN** acceptance binds exactly the site's living individuals as the record's stage-zero objective targets through the existing binding writer, inside the same all-or-nothing transaction as the record write, and creates no instance pin: the site is a permanent wilderness location, not a spawned scene
+
+#### Scenario: The refusal vocabulary is closed and named
+- **WHEN** clear-out acceptance refuses
+- **THEN** the reason is one of `world_unavailable`, `unknown_site`, `site_unpopulated`, `site_cleared`, and `site_short`
+
+#### Scenario: Acceptance is one all-or-nothing transaction
+- **WHEN** guarantee, binding, and record creation run
+- **THEN** they form one all-or-nothing transaction: any validation or manager failure rolls back all of them, leaving no active record, no binding, and no partial target arrangement
+- **AND** when the condition cannot be legally satisfied, acceptance is refused with a named reason before any persistence
+
+#### Scenario: The returned record is the persisted bound record
+- **WHEN** a binding acceptance completes
+- **THEN** the record the operation returns is the persisted, bound record rather than the unbound value written a moment earlier
+
 ### Requirement: abandon_quest fails only an active quest and releases its runtime binding
 `abandon_quest(actor, quest_id)` SHALL transition an active record to `FAILED` with
 `failure_reason="abandoned"`, clear its runtime bindings, and release its current stage's instance pin.
@@ -220,9 +261,8 @@ unknown quest ID SHALL raise `QuestNotFound` without mutation.
 `bind_stage_runtime(actor, quest_id, *, room=None, objective_targets=(), protected_entities=())` SHALL
 accept only an active current stage. A supplied room SHALL be an existing `InstanceRoom`; supplied
 entities SHALL be live `LivingEntity` objects. It SHALL persist integer dbrefs, keep objective targets
-separate from protected entities, reject any dbref present in both sets, and pin the room with
-`quest:<character-id>:<quest-id>:stage:<stage-index>`. Repeating an identical binding SHALL be
-idempotent; replacing any existing binding SHALL raise before mutation.
+separate from protected entities, and pin the room with
+`quest:<character-id>:<quest-id>:stage:<stage-index>`.
 
 #### Scenario: Runtime binding stores identities and pins the instance
 - **WHEN** a current stage is bound to one instance room, two objective targets, and one protected NPC
@@ -244,6 +284,14 @@ idempotent; replacing any existing binding SHALL raise before mutation.
 #### Scenario: Conflicting rebind is rejected atomically
 - **WHEN** a bound stage is rebound to a different room or entity set
 - **THEN** `QuestTransitionError` is raised and the old record and pin remain unchanged
+
+#### Scenario: A duplicate identity across binding sets is rejected
+- **WHEN** a dbref is present in both the objective-target and protected-entity sets
+- **THEN** the binding rejects it before mutation
+
+#### Scenario: Identical rebinding is idempotent
+- **WHEN** an identical binding is repeated
+- **THEN** the operation is idempotent, while replacing any existing binding raises before mutation
 
 ### Requirement: Multi-attribute lifecycle writes are atomic and cache-consistent
 Operations that update both a quest log and an instance pin SHALL preflight the complete transition,
@@ -287,11 +335,7 @@ registry, each through its own sole writer.
 Every successful quest lifecycle transition (accept, stage transition,
 abandon, complete, fail) SHALL emit one `quest_transition` info event through the `world.observability`
 facade at the transition's durable commit point, with `char`, `quest`, `issuer`, `stage_from`, and
-`stage_to` context. `issuer` SHALL name the governing commission: new and changed records carry the
-record's `issuer_key`, and a removed record carries the `issuer_key` of the pre-write stored entry
-(which the strict diff signature has already validated). Rolled-back lifecycle operations MUST NOT
-emit the event, and best-effort quest-log restore failures SHALL surface as `rollback_restore_failed`
-warn events instead of silent passes. Lifecycle atomicity and validation semantics MUST NOT change.
+`stage_to` context.
 
 #### Scenario: An acceptance event names the governing commission
 - **WHEN** a character accepts a definition under a registered issuance and the write commits
@@ -304,13 +348,27 @@ warn events instead of silent passes. Lifecycle atomicity and validation semanti
 - **THEN** the `quest_transition` event's context carries that record's stored `issuer_key` as
   `issuer`
 
+#### Scenario: The issuer names the governing commission
+- **WHEN** a `quest_transition` event is emitted
+- **THEN** `issuer` names the governing commission: new and changed records carry the record's `issuer_key`, and a removed record carries the `issuer_key` of the pre-write stored entry (which the strict diff signature has already validated)
+
+#### Scenario: Rolled-back operations stay silent
+- **WHEN** a lifecycle operation rolls back
+- **THEN** it MUST NOT emit the `quest_transition` event
+
+#### Scenario: Restore failures surface as warn events
+- **WHEN** a best-effort quest-log restore fails
+- **THEN** it surfaces as a `rollback_restore_failed` warn event instead of a silent pass
+
+#### Scenario: Instrumentation does not alter semantics
+- **WHEN** boundary events are emitted
+- **THEN** lifecycle atomicity and validation semantics MUST NOT change
+
 ### Requirement: Bound-stage bindings survive every substitution attempt
 For a bound-target stage, the record's `objective_target_ids` SHALL be the complete set of individuals
 whose defeat counts. Individuals of the same species at other locations, ordinary ambient respawns, and
 fresh individuals from a recovered site SHALL never satisfy those bindings, regardless of matching
-species or variant identity. A recovered site's newcomers can only ever be referenced by bindings made
-after their creation; site recovery state and quest republish decisions SHALL remain mutually
-consistent.
+species or variant identity.
 
 #### Scenario: A recovered site's newcomers do not clear an old hunt
 - **WHEN** a bound clearing quest is active, its bound individuals were defeated, and its site later recovers fresh individuals
@@ -319,3 +377,7 @@ consistent.
 #### Scenario: Ambient respawns never substitute
 - **WHEN** an ambient individual of the same species and variant dies while a bound stage is active
 - **THEN** the bound stage's progress is unchanged
+
+#### Scenario: Newcomers are bindable only after creation
+- **WHEN** a site recovers fresh individuals
+- **THEN** those newcomers can only ever be referenced by bindings made after their creation, and site recovery state and quest republish decisions remain mutually consistent

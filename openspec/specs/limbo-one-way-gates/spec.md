@@ -8,7 +8,11 @@ back into the starting room, and the hard gate that admits no character into
 ## Requirements
 
 ### Requirement: The city-gate registry is the sole authored source of 虛境 city gates
-`world/maps/city_gates.py` SHALL define a frozen, slotted `CityGateDef` dataclass with the fields `map_id` (str), `gate_xyz` (a `(int, int, str)` grid coordinate), `exit_key` (str), and `exit_aliases` (a tuple of strings), and SHALL expose `CITY_GATE_REGISTRY` as a `MappingProxyType` keyed by map id. Today it SHALL carry exactly two rows — `capital_altoria` with `gate_xyz` `(3, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`, and `village_ciaran` with `gate_xyz` at the village's entrance node, `exit_key` 「隱密小徑」, and its own aliases. A row SHALL NOT be assumed to describe a walled settlement: the registry slot expresses "the authored way in from 虛境", and an entry may name a concealed path where the destination has no gate. `world/maps/bootstrap.py` SHALL author gate exits exclusively from this registry: no gate exit key, alias, or coordinate SHALL be duplicated as a bootstrap constant (the former `EXIT_TO_CITY` / `EXIT_TO_LIMBO` constants SHALL NOT exist), and no reverse-direction gate data SHALL be authored anywhere.
+`world/maps/city_gates.py` SHALL define a frozen, slotted `CityGateDef` dataclass with the fields
+`map_id` (str), `gate_xyz` (a `(int, int, str)` grid coordinate), `exit_key` (str), and
+`exit_aliases` (a tuple of strings), and SHALL expose `CITY_GATE_REGISTRY` as a
+`MappingProxyType` keyed by map id. `world/maps/bootstrap.py` SHALL author gate exits
+exclusively from this registry, with no reverse-direction gate data authored anywhere.
 
 #### Scenario: The registry pins the single capital row
 - **WHEN** `CITY_GATE_REGISTRY` is inspected
@@ -26,8 +30,24 @@ back into the starting room, and the hard gate that admits no character into
 - **WHEN** `world/maps/bootstrap.py` is inspected for gate exit authoring
 - **THEN** no `EXIT_TO_CITY` or `EXIT_TO_LIMBO` constant exists and the only gate keys, aliases, and coordinates it uses are read from `CITY_GATE_REGISTRY` rows
 
+#### Scenario: The registry carries exactly two rows today
+- **WHEN** `CITY_GATE_REGISTRY` is inspected
+- **THEN** it carries exactly two rows today: `capital_altoria` with `gate_xyz`
+  `(3, 0, "capital_altoria")`, `exit_key` 「南門」, and `exit_aliases` `("王都", "城門")`, and
+  `village_ciaran` with `gate_xyz` at the village's entrance node, `exit_key` 「隱密小徑」, and
+  its own aliases
+
+#### Scenario: A row may name a concealed path, not a walled gate
+- **WHEN** a registry row is authored for a destination with no gate
+- **THEN** the row is not assumed to describe a walled settlement: the registry slot expresses
+  "the authored way in from 虛境", and the entry may name a concealed path
+
+#### Scenario: Bootstrap duplicates no gate data
+- **WHEN** gate exit authoring under `world/maps/bootstrap.py` is reviewed
+- **THEN** no gate exit key, alias, or coordinate is duplicated as a bootstrap constant
+
 ### Requirement: sync_grid creates exactly one forward gate exit per registry row and converges it idempotently
-For every row of `CITY_GATE_REGISTRY`, `sync_grid()` SHALL idempotently ensure exactly one ordinary (non-grid) `Exit` from the starting room to that row's `gate_xyz` exists, carrying the row's `exit_key` and `exit_aliases`, without duplicating it on repeated calls. When the exit already exists with a drifted key or aliases, `sync_grid()` SHALL rewrite them in place to the authored row values on every call, not only at creation. `sync_grid()` SHALL NOT create any exit leading from a gate room back to the starting room.
+For every row of `CITY_GATE_REGISTRY`, `sync_grid()` SHALL idempotently ensure exactly one ordinary (non-grid) `Exit` from the starting room to that row's `gate_xyz` exists, carrying the row's `exit_key` and `exit_aliases`, without duplicating it on repeated calls. `sync_grid()` SHALL NOT create any exit leading from a gate room back to the starting room.
 
 #### Scenario: One forward exit per row after sync
 - **WHEN** `sync_grid()` runs against a database containing a room keyed `LIMBO_KEY` and the spawned `capital_altoria` grid
@@ -41,8 +61,13 @@ For every row of `CITY_GATE_REGISTRY`, `sync_grid()` SHALL idempotently ensure e
 - **WHEN** `sync_grid()` runs against a database whose 虛境→South Gate exit already exists but carries legacy English aliases (for example `south gate` or `altoria`)
 - **THEN** that same exit object is rewritten to the registry row's key and alias set, no duplicate exit is created, and a second call is a no-op
 
+#### Scenario: Drift converges on every call, not only at creation
+- **WHEN** an existing gate exit carries a drifted key or aliases
+- **THEN** `sync_grid()` rewrites them in place to the authored row values on every call, not
+  only at creation
+
 ### Requirement: Every sync prunes every exit whose destination is the starting room
-On every call, after the forward gate pass, `sync_grid()` SHALL delete every persisted `Exit` object whose destination is the starting room, regardless of the exit's location, key, or aliases, and SHALL log each deletion as the observability event `bootstrap_grid_exit_pruned` with context naming the deleted exit. This is the synchronizer's declarative convergence of its own exit surface: legacy 「離開王都」/「回虛境」 exits and any later reverse object converge away on the next start, without a migration script. On a converged database the prune pass deletes nothing and logs nothing.
+On every call, after the forward gate pass, `sync_grid()` SHALL delete every persisted `Exit` object whose destination is the starting room, regardless of the exit's location, key, or aliases, and SHALL log each deletion as the observability event `bootstrap_grid_exit_pruned` with context naming the deleted exit.
 
 #### Scenario: A pre-seeded reverse exit is pruned on the next sync
 - **WHEN** a database contains an exit from the South Gate to the starting room (for example the legacy 「離開王都」 with alias 「回虛境」) and `sync_grid()` runs
@@ -51,6 +76,13 @@ On every call, after the forward gate pass, `sync_grid()` SHALL delete every per
 #### Scenario: Pruning is idempotent on a converged database
 - **WHEN** `sync_grid()` runs twice in a row against a database that was already converged by a prior run
 - **THEN** the second run deletes no exit and logs no `bootstrap_grid_exit_pruned` event
+
+#### Scenario: Legacy reverse exits converge without a migration script
+- **WHEN** the prune pass is read as the synchronizer's declarative convergence of its own
+  exit surface
+- **THEN** legacy 「離開王都」/「回虛境」 exits and any later reverse object converge away on the
+  next start, without a migration script, and on a converged database the prune pass deletes
+  nothing and logs nothing
 
 ### Requirement: A registry row whose gate room is missing warns and is skipped without blocking other rows
 When the grid room at a registry row's `gate_xyz` does not exist, `sync_grid()` SHALL log the warning event `bootstrap_grid_gate_missing` with context carrying `map_id`, `xyz`, and `action`, SHALL skip creating that row's forward exit, and SHALL NOT raise. Every other registry row SHALL still be converged, and the rest of `sync_grid()` (grid spawn, the prune pass, wilderness-independent work) SHALL proceed unchanged.
@@ -76,14 +108,11 @@ The gate sync SHALL be registry-driven end to end: supporting an additional city
 
 ### Requirement: 虛境 admits no character by any path
 The starting room SHALL be converged by `sync_limbo()` onto a dedicated `LimboRoom` typeclass
-(`typeclasses/rooms.py`) whose entry hook (`at_pre_object_receive`, the destination-side abort hook
-of Evennia's universal `move_to` pipeline) SHALL abort the move of any non-superuser character into
-the starting room — whichever path attempts the move, including ordinary exit traversal and
-teleport/`moveto`-style `move_to` — leaving the character in its original location and emitting a
-zh-tw localized refusal to it. Superuser-controlled characters SHALL be admitted (builder/debug
-convention). `sync_limbo()` SHALL converge the room's typeclass in place idempotently: an
-already-converged room is not re-swapped, and the room's `LIMBO_KEY` key, `limbo` alias, and
-authored description survive the convergence.
+(`typeclasses/rooms.py`) whose entry hook (`at_pre_object_receive`, Evennia's destination-side
+`move_to` abort hook) SHALL abort the move of any non-superuser character into the starting
+room — whichever path attempts the move, including ordinary exit traversal and
+teleport/`moveto`-style `move_to` — leaving the character in its original location and emitting
+a zh-tw localized refusal to it.
 
 #### Scenario: Ordinary exit traversal into 虛境 is refused
 - **WHEN** a non-superuser `PlayerCharacter` traverses an exit whose destination is the converged
@@ -104,18 +133,16 @@ authored description survive the convergence.
   nothing, and the room still carries the `LIMBO_KEY` key, the `limbo` alias, and the authored
   zh-tw description
 
+#### Scenario: Superuser admission is the builder/debug convention
+- **WHEN** a superuser-controlled character moves into the starting room
+- **THEN** it SHALL be admitted, following the builder/debug convention
+
 ### Requirement: The first city-gate traversal re-anchors a 虛境 home to the arrival gate room
-Because the 虛境 room is the character's creation location (no `DEFAULT_HOME` override exists) and
-the capability's own hard gate refuses every later character entry into 虛境, a persisted 虛境
-`home` would make the `home` command deliver the player into a room that rejects them. The
-shared movement-completion boundary (`after_successful_movement`, `typeclasses/exits.py`) SHALL
-re-anchor `character.home` to the destination gate room when — and only when — all of the
+The shared movement-completion boundary (`after_successful_movement`, `typeclasses/exits.py`)
+SHALL re-anchor `character.home` to the destination gate room when — and only when — all of the
 following hold after a successful traversal: the traverser is a player character, the destination
 room's grid coordinate matches a `CITY_GATE_REGISTRY` row's `gate_xyz`, and the character's
-current `home` IS the 虛境 starting room. The write SHALL be performed by the rules-side gate
-helper (`world/rules/city_gates.py`), never inline in the typeclass. A traversal whose settlement
-failed and was compensated SHALL NOT re-home. Once `home` is no longer the 虛境 room, no later
-traversal of any gate SHALL overwrite it.
+current `home` IS the 虛境 starting room.
 
 #### Scenario: The first gate traversal re-homes a 虛境-born character
 - **WHEN** a player character whose `home` is the 虛境 starting room successfully traverses the
@@ -132,3 +159,15 @@ traversal of any gate SHALL overwrite it.
 - **WHEN** a traversal toward a gate room fails and the movement-settlement boundary compensates
   it (the character is restored to the source room)
 - **THEN** the character's `home` still points at the 虛境 starting room
+
+#### Scenario: A persisted 虛境 home would trap the home command
+- **WHEN** the re-anchor rule's motivation is examined
+- **THEN** it exists because the 虛境 room is the character's creation location (no
+  `DEFAULT_HOME` override exists) and the capability's own hard gate refuses every later
+  character entry into 虛境, so a persisted 虛境 `home` would make the `home` command deliver
+  the player into a room that rejects them
+
+#### Scenario: The home write lives in the rules-side helper
+- **WHEN** the re-anchor write is performed
+- **THEN** it is performed by the rules-side gate helper (`world/rules/city_gates.py`), never
+  inline in the typeclass

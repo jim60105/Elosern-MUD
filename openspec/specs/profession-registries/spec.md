@@ -11,21 +11,7 @@ value is stored here and first read by the service-anchoring gate.
 ### Requirement: Professions are one validated rulebook table with keyed frozen reads
 <!-- This block is written against the text `place-attendant-profession` leaves behind and
      MUST be archived after it. -->
-`world/rules/rulebook/professions.yaml` SHALL declare every authored profession as a list under
-`professions:` with `schema_version: 1`, and `world/rules/profession_config.py` SHALL expose the
-loaded table as frozen dataclasses through keyed reads (`get_profession(key)` returning the
-profession or `None`, and `all_professions()`), following the `guild_config.py` load/cache family.
-Each profession row SHALL carry exactly: a non-empty unique `key`; a `components:` list of
-`{type, default_binding}` pairs; a nullable `schedule_template`; and a nullable `default_tier`.
-The shipped table SHALL contain exactly the `merchant`, `guild_staff`, `guild_examiner`,
-`quest_issuer` and `attendant` professions, each with `schedule_template: null` and
-`default_tier: null`.
-The `merchant` row SHALL carry a place-bound `merchant` component and a place-bound
-`scripted_dialogue` component, so every shopkeeper both trades and answers; `guild_staff`
-SHALL mirror the guild-hall host component tuple that sync attaches; `guild_examiner` is the
-prescribed examiner/dialogue blueprint (a reusable subset; sync attaches no examiner-only host
-today); `quest_issuer` is the person-bound commission blueprint that no roster row may anchor;
-`attendant` is the place-bound talk-only blueprint carrying one `scripted_dialogue` component.
+`world/rules/rulebook/professions.yaml` SHALL declare every authored profession as a list under `professions:` with `schema_version: 1`, and `world/rules/profession_config.py` SHALL expose the loaded table as frozen dataclasses through keyed reads (`get_profession(key)` returning the profession or `None`, and `all_professions()`).
 
 #### Scenario: The shipped table loads and exposes the three replica professions
 <!-- Scenario name retained verbatim: a MODIFIED block may not rename or drop an existing
@@ -41,14 +27,40 @@ today); `quest_issuer` is the person-bound commission blueprint that no roster r
 - **WHEN** a consumer calls `get_profession` twice for one key
 - **THEN** both calls return equal frozen values and no mutation of the cached table is possible
 
+#### Scenario: Loader follows the guild_config family
+- **WHEN** `profession_config.py`'s load and cache code is inspected
+- **THEN** it follows the `guild_config.py` load/cache family
+
+#### Scenario: Each row's exact fields
+- **WHEN** a profession row is validated at load
+- **THEN** it carries exactly: a non-empty unique `key`; a `components:` list of `{type, default_binding}` pairs; a nullable `schedule_template`; and a nullable `default_tier`
+
+#### Scenario: The shipped table's exact membership
+- **WHEN** the shipped table is loaded
+- **THEN** it contains exactly the `merchant`, `guild_staff`, `guild_examiner`, `quest_issuer` and `attendant` professions, each with `schedule_template: null` and `default_tier: null`
+
+#### Scenario: The merchant blueprint trades and answers
+- **WHEN** the `merchant` row is read
+- **THEN** it carries a place-bound `merchant` component and a place-bound `scripted_dialogue` component, so every shopkeeper both trades and answers
+
+#### Scenario: The guild_staff blueprint mirrors the synced host tuple
+- **WHEN** the `guild_staff` row is read
+- **THEN** it mirrors the guild-hall host component tuple that sync attaches
+
+#### Scenario: The guild_examiner blueprint is a prescribed reusable subset
+- **WHEN** the `guild_examiner` row is read
+- **THEN** it is the prescribed examiner/dialogue blueprint (a reusable subset; sync attaches no examiner-only host today)
+
+#### Scenario: The quest_issuer blueprint may not anchor a roster row
+- **WHEN** the `quest_issuer` row is read
+- **THEN** it is the person-bound commission blueprint that no roster row may anchor
+
+#### Scenario: The attendant blueprint is talk-only
+- **WHEN** the `attendant` row is read
+- **THEN** it is the place-bound talk-only blueprint carrying one `scripted_dialogue` component
+
 ### Requirement: Every malformed profession file is rejected by name before anything is cached
-`profession_config.py` SHALL validate the whole file batch-first and raise `ProfessionConfigError`
-with a message naming the offense — and cache nothing — for each of: missing or wrong
-`schema_version`; missing `professions:` list; unknown top-level key; empty or duplicate
-profession `key`; a `components:` entry whose `type` is not in the component-type vocabulary; a
-`default_binding` outside `person|place`; a `schedule_template` that is neither null nor a key of
-the loaded schedule-template rulebook; and a `default_tier` that is neither null nor a key of the
-static-tier registry.
+`profession_config.py` SHALL validate the whole file batch-first and raise `ProfessionConfigError` with a message naming the offense — and cache nothing — for every malformed-file offense enumerated in the scenarios below.
 
 #### Scenario: An unknown component type names the offender
 - **WHEN** a profession file declares `type: blacksmith` with no such component class
@@ -63,6 +75,26 @@ static-tier registry.
 #### Scenario: A tier outside the static-tier registry is rejected
 - **WHEN** a row sets `default_tier: mythic` and `STATIC_TIER_REGISTRY` has no `mythic` key
 - **THEN** loading raises naming the row and the unknown tier key
+
+#### Scenario: A missing or wrong schema_version is rejected
+- **WHEN** a profession file omits `schema_version` or sets it wrong
+- **THEN** loading raises `ProfessionConfigError` naming the offense, and nothing is cached
+
+#### Scenario: A missing professions list is rejected
+- **WHEN** a profession file has no `professions:` list
+- **THEN** loading raises naming the offense, and nothing is cached
+
+#### Scenario: An unknown top-level key is rejected
+- **WHEN** a profession file declares a top-level key the schema does not know
+- **THEN** loading raises naming the offense, and nothing is cached
+
+#### Scenario: An empty or duplicate profession key is rejected
+- **WHEN** a profession file has a row with an empty `key`, or two rows sharing one `key`
+- **THEN** loading raises naming the offense, and nothing is cached
+
+#### Scenario: A binding outside the vocabulary is rejected
+- **WHEN** a component entry's `default_binding` is outside `person|place`
+- **THEN** loading raises naming the offense, and nothing is cached
 
 ### Requirement: default_binding is a validated vocabulary consumed by the anchoring gate
 Each component entry's `default_binding` SHALL be one of `person` or `place`, validated at load;

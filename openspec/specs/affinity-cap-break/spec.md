@@ -8,14 +8,7 @@ rulebook table, the sole cap writer, and the turn-in matching rule.
 ## Requirements
 
 ### Requirement: raise_affinity_cap is the sole cap writer and is monotonic and idempotent
-`world/rules/affinity.py` SHALL expose `raise_affinity_cap(npc, player, new_cap) -> bool` as the
-only function that mutates a record's `cap`. For a player without a record it SHALL create a fresh
-record (value 0, cap 99) and then raise it, so a milestone can never silently fail on a
-recordless companion. It SHALL raise the cap only when `new_cap` is strictly greater than the
-record's current cap, SHALL leave the value and the daily-gain fields unchanged, SHALL run no
-daily-budget logic and no auto-leave hook, and SHALL return whether the cap changed. The ladder
-SHALL continue to map values at or above 100 to the topmost stage (絕對羈絆) with no numeric
-rendering.
+`world/rules/affinity.py` SHALL expose `raise_affinity_cap(npc, player, new_cap) -> bool` as the only function that mutates a record's `cap`. It SHALL raise the cap only when `new_cap` is strictly greater than the record's current cap, SHALL leave the value and the daily-gain fields unchanged, SHALL run no daily-budget logic and no auto-leave hook, and SHALL return whether the cap changed.
 
 #### Scenario: A matching milestone raises the cap once
 - **WHEN** a record's cap is 99 and `raise_affinity_cap` is called with 150
@@ -38,23 +31,16 @@ rendering.
 - **WHEN** a record's cap is 150 and its value is 130
 - **THEN** the displayed stage is 絕對羈絆 and no numeric value or cap is rendered anywhere
 
+#### Scenario: A milestone never silently fails on a recordless companion
+- **WHEN** `raise_affinity_cap` is called for a player without a record
+- **THEN** it creates a fresh record (value 0, cap 99) and then raises it, so a milestone can never silently fail on a recordless companion
+
+#### Scenario: The ladder keeps mapping high values to the topmost stage
+- **WHEN** the stage ladder maps a value at or above 100
+- **THEN** it continues to map it to the topmost stage (絕對羈絆) with no numeric rendering
+
 ### Requirement: The cap_breaks rulebook table drives milestone cap raises at quest turn-in
-`rulebook/affinity.yaml` SHALL define a `cap_breaks` list; each entry SHALL carry a `quest_key`
-that resolves in the quest definition registry, exactly one matching identity (`npc_key` or
-`role`), and an integer `new_cap` strictly above the natural cap 99. Loading SHALL fail closed on
-a missing, non-string, or empty `quest_key`, an unresolvable `quest_key`, an entry with neither
-`npc_key` nor `role`, an entry carrying both `npc_key` and `role` (decided by key presence, so a
-mistyped selector never silently falls back to the other one), a non-integer `new_cap`, a
-`new_cap` at or below 99, or two entries with the same `quest_key` and the same selector
-(`npc_key` and `role` are distinct selectors). When a
-guild quest is turned in, the deterministic reward
-settlement SHALL look up `cap_breaks` by the completed `quest_key` and, for every then-in-party
-companion matching the entry's `npc_key` or role, call `raise_affinity_cap` with the entry's
-`new_cap` inside the same atomic transaction as the reward and the `quest_completion` affinity
-gain, and SHALL apply the cap raise before the `quest_completion` gains so a record sitting at the
-old cap cannot clamp the +2 gain. A companion matching multiple entries of one quest SHALL resolve
-to the highest `new_cap`, independent of entry order. Entries matching no in-party companion
-SHALL be no-ops.
+`rulebook/affinity.yaml` SHALL define a `cap_breaks` list; each entry SHALL carry a `quest_key` that resolves in the quest registry, exactly one matching identity (`npc_key` or `role`), and an integer `new_cap` strictly above the natural cap 99; loading SHALL fail closed on malformed entries. When a guild quest is turned in, the settlement SHALL look up `cap_breaks` by the `quest_key` and, for every then-in-party matching companion, call `raise_affinity_cap` with the entry's `new_cap`.
 
 #### Scenario: Turn-in raises the cap for each matching companion
 - **WHEN** a turn-in completes a quest with a `cap_breaks` entry while two matching companions are
@@ -83,6 +69,22 @@ SHALL be no-ops.
 #### Scenario: Multiple matching entries resolve to the highest new_cap
 - **WHEN** one companion matches two entries of the same quest with different `new_cap` values
 - **THEN** the cap is raised to the highest of the two, regardless of entry order
+
+#### Scenario: The turn-in lookup is the deterministic reward settlement
+- **WHEN** a guild quest is turned in
+- **THEN** it is the deterministic reward settlement that performs the `cap_breaks` lookup for the completed `quest_key`, matching each entry's `npc_key` or role
+
+#### Scenario: The cap raise rides the reward transaction and precedes the gain
+- **WHEN** the turn-in raises a matching companion's cap
+- **THEN** `raise_affinity_cap` runs inside the same atomic transaction as the reward and the `quest_completion` affinity gain, and the cap raise is applied before the `quest_completion` gains so a record sitting at the old cap cannot clamp the +2 gain
+
+#### Scenario: Entry identity validation details
+- **WHEN** a `cap_breaks` entry is loaded
+- **THEN** the exactly-one-identity choice between `npc_key` and `role` is decided by key presence, so a mistyped selector never silently falls back to the other one, and `npc_key` and `role` are distinct selectors for duplicate detection
+
+#### Scenario: The full fail-closed offense list
+- **WHEN** the loader validates the `cap_breaks` table
+- **THEN** it fails closed on a missing, non-string, or empty `quest_key`, a `quest_key` that does not resolve in the quest definition registry, an entry with neither `npc_key` nor `role`, an entry carrying both `npc_key` and `role`, a non-integer `new_cap`, a `new_cap` at or below 99, or two entries with the same `quest_key` and the same selector
 
 #### Scenario: A malformed cap_breaks table is rejected at load
 - **WHEN** an entry omits `quest_key`, references an unknown quest, omits both `npc_key` and

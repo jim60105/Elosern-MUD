@@ -25,23 +25,6 @@ repository deterministic-path contract test passes with no edit.
 `SCENE_ARCHETYPE_REGISTRY` and every entry of `MONSTER_TIER_REGISTRY` (generic monster subjects),
 routing each subject by whether its kind declares a gallery.
 
-A subject whose kind declares NO gallery — the scene kind — SHALL be ensured as a classic asset record
-exactly as today: the sync SHALL be idempotent, an existing `pending`, `in_progress`, or `done` record
-is untouched, a `missing` or `failed` record is made `pending`, records SHALL be created only through
-an atomic find-or-create under the queue lock, and the sync SHALL consolidate any duplicate records
-found for one subject (keeping the most-advanced record) so per-subject uniqueness holds.
-
-A subject whose kind declares a gallery — the generic monster kind — SHALL instead route through the
-gallery generation request under the shared automatic-generation guard, and startup SHALL NOT create a
-classic asset record for it. Pre-existing classic monster records SHALL be left in place: they are not
-deleted, not reset, and keep resolving through the display chain's classic step, so no migration is
-required. Every failure SHALL stay bounded and SHALL never abort startup.
-
-The startup step order SHALL run the gallery orphan prune and the bulk seed synchronization BEFORE
-this synchronization, so a seed card already occupies a subject's gallery — and the prune has already
-swept — before any automatic gallery request is enqueued; an operator seed card is therefore never
-displaced by a startup-time generation.
-
 #### Scenario: Every registered subject has a record after startup sync
 - **WHEN** `art_sync_all()` runs against a fresh database
 - **THEN** every `SCENE_ARCHETYPE_REGISTRY` key has exactly one classic asset record in `missing` or
@@ -70,16 +53,45 @@ displaced by a startup-time generation.
 - **WHEN** a monster tier's gallery request raises during startup synchronization
 - **THEN** a bounded diagnostic is logged, the remaining subjects still synchronize, and startup completes
 
+#### Scenario: A scene-kind subject is ensured as a classic asset record
+- **WHEN** `art_sync_all()` ensures a subject whose kind declares NO gallery — the scene kind
+- **THEN** it is ensured as a classic asset record exactly as today, and the sync is idempotent
+
+#### Scenario: A missing or failed scene record is revived to pending
+- **WHEN** the sync finds a scene subject's record in `missing` or `failed` state
+- **THEN** that record is made `pending`
+
+#### Scenario: Records are created only under the queue lock
+- **WHEN** the sync needs to create a record for a subject that has none
+- **THEN** the record is created only through an atomic find-or-create under the queue lock, so
+  per-subject uniqueness holds
+
+#### Scenario: A gallery-kind subject routes through the gallery request
+- **WHEN** `art_sync_all()` ensures a subject whose kind declares a gallery — the generic monster kind
+- **THEN** it routes through the gallery generation request under the shared automatic-generation
+  guard, and startup does not create a classic asset record for it
+
+#### Scenario: Pre-existing classic monster records require no migration
+- **WHEN** startup synchronization encounters classic monster records that predate gallery routing
+- **THEN** they are left in place and keep resolving through the display chain's classic step, so no
+  migration is required
+
+#### Scenario: Any startup synchronization failure stays bounded
+- **WHEN** any failure occurs during startup synchronization
+- **THEN** it stays bounded and never aborts startup
+
+#### Scenario: Seed synchronization and the orphan prune run first
+- **WHEN** the startup steps run in order
+- **THEN** the gallery orphan prune and the bulk seed synchronization run BEFORE this
+  synchronization, so a seed card already occupies a subject's gallery — and the prune has already
+  swept — before any automatic gallery request is enqueued; an operator seed card is therefore never
+  displaced by a startup-time generation
+
 ### Requirement: Startup recovery rescans explicit unique portrait policies
 `art_sync_all()` SHALL also scan living characters that carry an explicit `{"mode": "named",
 "stable_key": ...}` portrait policy and ensure each subject, recovering an enqueue that failed after an
 earlier gameplay commit. A subject whose canonical ages fail the age check SHALL be skipped with a named
 diagnostic and never retried by a later recovery pass for the same policy.
-
-The recovery SHALL be satisfied by the subject's GALLERY: a subject whose gallery already holds at
-least one card, or whose gallery generation is already in flight, SHALL be left alone, and only a
-subject with an empty gallery and no in-flight job SHALL be requested. The requested image SHALL be
-one unbound auto-generated card, never a classic asset record.
 
 #### Scenario: A named policy with an empty gallery is recovered at startup
 - **WHEN** a character has an explicit named portrait policy, an empty gallery, and no in-flight job after a restart
@@ -93,6 +105,16 @@ one unbound auto-generated card, never a classic asset record.
 - **WHEN** a character with an explicit named policy fails the canonical-age check during recovery
 - **THEN** no record is created, a named diagnostic is logged, and the same policy is not retried by a
   later recovery pass without re-running the gate
+
+#### Scenario: The gallery satisfies recovery
+- **WHEN** recovery evaluates a subject whose gallery already holds at least one card, or whose
+  gallery generation is already in flight
+- **THEN** the subject is left alone — the gallery satisfies the recovery
+
+#### Scenario: A recovery request is one unbound auto-generated card
+- **WHEN** recovery proceeds for a subject, which happens only for an empty gallery with no
+  in-flight job
+- **THEN** the requested image is one unbound auto-generated card, never a classic asset record
 
 ### Requirement: Successful player creation and validated import schedule an eligible unique portrait through transaction.on_commit
 The player-creation activation path (after `world.rules.character_creation.activate_player_character`
@@ -171,9 +193,7 @@ added after startup. A room with a `None` or unresolvable archetype SHALL be a s
 Any art failure in a lifecycle seam — startup sync, recovery, creation, import, spawn, or room entry —
 SHALL log a bounded diagnostic and SHALL NOT roll back or otherwise alter the gameplay transaction it
 accompanies. The asset simply remains `missing`/`failed` for the next idempotent ensure. Every
-`transaction.on_commit` art callback SHALL be an exception-safe wrapper: an art exception raised
-inside it SHALL be caught and logged, never propagated to the owning creation/import workflow, so a
-committed gameplay transaction is always reported as success even when the art hook fails.
+`transaction.on_commit` art callback SHALL be an exception-safe wrapper.
 
 #### Scenario: An art failure during creation leaves the creation committed
 - **WHEN** the post-commit portrait ensure fails while player creation already committed
@@ -189,14 +209,16 @@ committed gameplay transaction is always reported as success even when the art h
 - **WHEN** `ensure_scene_asset()` fails during room entry
 - **THEN** the player's move completes normally and only a bounded diagnostic is logged
 
+#### Scenario: An art exception inside an on-commit wrapper is swallowed
+- **WHEN** an art exception is raised inside a `transaction.on_commit` art callback
+- **THEN** it is caught and logged, never propagated to the owning creation/import workflow, so a
+  committed gameplay transaction is always reported as success even when the art hook fails
+
 ### Requirement: Portrait-character enqueue validates canonical age attributes immediately before enqueue
 `world/art/subjects.py` SHALL expose `character_ages(entity)` that reads `age` and `apparent_age`
 from the character's canonical attributes and raises a named `ArtSubjectError` diagnostic identifying
 the failing field when either value is missing or non-integer. `world/art/service.py` SHALL run this
-check for every `portrait:character` subject immediately before any queue record is written, in
-addition to the schema/creation validation that already checked the same fields. A rejection SHALL
-produce no queue record and no prompt text, SHALL never reach a worker fixture, and SHALL be logged
-with the named diagnostic for staff review.
+check for every `portrait:character` subject immediately before any queue record is written.
 
 #### Scenario: A valid integer record reaches the worker fixture
 - **WHEN** a character with `age = 22` and `apparent_age = 22` and an explicit named portrait policy is
@@ -219,15 +241,21 @@ with the named diagnostic for staff review.
 - **THEN** a named `ArtSubjectError` is raised with the failing field identified, no queue record is
   created, no prompt text is produced, and the worker fixture is never invoked
 
+#### Scenario: The enqueue check supplements the schema validation
+- **WHEN** the enqueue-time age check runs for a `portrait:character` subject
+- **THEN** it runs in addition to the schema/creation validation that already checked the same
+  fields
+
+#### Scenario: A rejection is logged for staff review
+- **WHEN** the enqueue-time age check rejects a subject
+- **THEN** the rejection is logged with the named diagnostic for staff review
+
 ### Requirement: The age check runs on every lifecycle path and rejects deterministically without a persisted marker
 `world/art/service.py` SHALL apply the canonical-age check at schedule time and again before the queue
 write for every lifecycle path that can produce a `portrait:character` subject — player creation,
 validated import, named-NPC spawn, staff retry, staff requeue, and startup recovery. Because the check
 is a pure function of the canonical age attributes, every attempt against the same bad data SHALL
-reject with the same named diagnostic; no separate persisted rejection marker is required, and no
-attempt SHALL be retried periodically (attempts occur only on lifecycle events). A subject that failed
-the check SHALL be eligible again once its canonical age data is corrected, at which point the next
-lifecycle attempt passes.
+reject with the same named diagnostic.
 
 #### Scenario: An import with malformed ages never enqueues
 - **WHEN** an import path is forced to schedule a portrait subject for a character whose canonical age
@@ -244,6 +272,19 @@ lifecycle attempt passes.
   non-integer canonical ages
 - **THEN** the check rejects with the named diagnostic, the record is unchanged, and no worker call
   occurs
+
+#### Scenario: No persisted rejection marker is required
+- **WHEN** a subject is rejected by the canonical-age check
+- **THEN** no separate persisted rejection marker is required, because the check is a pure function of
+  the canonical age attributes
+
+#### Scenario: Rejected subjects are not retried periodically
+- **WHEN** a subject keeps failing the canonical-age check
+- **THEN** no attempt is retried periodically — attempts occur only on lifecycle events
+
+#### Scenario: Corrected age data restores eligibility
+- **WHEN** a subject that failed the check has its canonical age data corrected
+- **THEN** it is eligible again and the next lifecycle attempt passes
 
 ### Requirement: Rejected prompt content never reaches the presenter or browser
 The presenter-facing surface SHALL never contain a rejected prompt or an ineligible character's

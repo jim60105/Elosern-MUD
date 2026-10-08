@@ -12,9 +12,7 @@ Every test file that intentionally asserts against shipped game content SHALL de
 its class in the source: the first non-blank line of its module docstring (or a leading
 `//` comment for JavaScript/TypeScript test files) begins with the exact tag
 `Data-contract test:` followed by a one-line rationale, and the file is registered in
-the exemption ledger `tools/test_data_freeze.json` with that reason. A test file that is
-not so tagged and registered SHALL NOT be treated as a data-contract test by any tool or
-document.
+the exemption ledger `tools/test_data_freeze.json` with that reason.
 
 #### Scenario: Tag and ledger agree
 - **WHEN** the lint gate evaluates a test file registered as a data-contract exemption
@@ -28,23 +26,17 @@ document.
 - **THEN** every data-contract test file is listed with its rationale, with no behavior
   test appearing in the result
 
+#### Scenario: Untagged files are never data-contract tests
+- **WHEN** a test file lacks the `Data-contract test:` tag or its ledger registration
+- **THEN** no tool and no document treats it as a data-contract test
+
 ### Requirement: The test-data lint gate blocks shipped-content references
 `tools.test_data_lint check` SHALL scan every versioned test source (Python test files
 by AST over statically resolvable string expressions — constants, literal-only
 concatenation, and all-literal f-strings — plus catalog-symbol references, and
 JavaScript/TypeScript test files by string/template-literal scan including literal-only
-`+` concatenation) and exit non-zero listing, with stable violation codes,
-any flagged test file that is not registered as `contract` or `debt` in the exemption
-ledger. The shipped-content token universe SHALL be derived at lint time by importing the
-locked content catalogs (`world/lore`, `world/skills`, `world/quests`, `world/maps`
-registries, rulebook YAML keys, and their display-prose fields) rather than a hand-edited
-list. Display-prose tokens SHALL be complete harvested label/name field values, never
-sub-string fragments. Deny-list admission is rule-bound: a token qualifies only as a
-schema/structural field name colliding with a catalog key, or a token the scanner proves
-present in the non-test production corpus independent of any catalog lookup; every entry
-carries a reason and a scanner regression pinning that shipped-key references remain
-caught. A separate `quantity-pin` finding class SHALL report assertions that pin
-data-derived counts.
+`+` concatenation) and exit non-zero, listing with stable violation codes any flagged
+test file not registered as `contract` or `debt` in the exemption ledger.
 
 #### Scenario: New behavior test hardcodes shipped content
 - **WHEN** an unregistered test file contains `healing_potion`, `治療藥水`, or a
@@ -67,16 +59,37 @@ data-derived counts.
   such as `"healing" + "_potion"` or an all-literal f-string
 - **THEN** the gate still flags the file
 
+#### Scenario: Token universe derives from the locked catalogs
+- **WHEN** the gate builds its shipped-content token universe at lint time
+- **THEN** it derives the universe by importing the locked content catalogs
+  (`world/lore`, `world/skills`, `world/quests`, `world/maps` registries, rulebook YAML
+  keys, and their display-prose fields) rather than a hand-edited list
+
+#### Scenario: Display-prose tokens are complete field values
+- **WHEN** the gate harvests display-prose tokens from the catalogs
+- **THEN** each token is a complete harvested label/name field value, never a
+  sub-string fragment
+
+#### Scenario: Deny-list admission is rule-bound
+- **WHEN** a token is proposed for the deny list
+- **THEN** it qualifies only as a schema/structural field name colliding with a catalog
+  key, or a token the scanner proves present in the non-test production corpus
+  independent of any catalog lookup
+
+#### Scenario: Every deny-list entry is justified and pinned
+- **WHEN** a deny-list entry is added
+- **THEN** it carries a reason and a scanner regression pinning that shipped-key
+  references remain caught
+
+#### Scenario: Quantity pins are reported as their own finding class
+- **WHEN** a test asserts a pin on a data-derived count
+- **THEN** the separate `quantity-pin` finding class reports it
+
 ### Requirement: The exemption ledger is provably shrink-only
 The ledger SHALL carry the frozen seed list `seedDebtPaths` (the pre-existing debt
 corpus), a `contract` list, and a `debt` list. The gate SHALL fail on any `debt` entry
 absent from `seedDebtPaths` (any new debt is a violation), on ledger paths that no
-longer exist, and on duplicates or same-path entries under both kinds. Removing a `debt`
-entry SHALL be valid only for a file the gate no longer flags, and migration changes
-SHALL remove entries in the same commit that makes the file clean. A seeded debt file
-legitimately reclassified as a data-contract test SHALL be converted atomically:
-removed from `debt` and added once to `contract` (tag + reason) in the same commit;
-conversion of a path outside `seedDebtPaths` SHALL be rejected as `new-debt`.
+longer exist, and on duplicates or same-path entries under both kinds.
 
 #### Scenario: Re-adding a migrated file fails
 - **WHEN** a branch adds a `debt` entry for a file that was not part of the seeded debt
@@ -87,15 +100,30 @@ conversion of a path outside `seedDebtPaths` SHALL be rejected as `new-debt`.
 - **WHEN** a ledger path no longer exists on disk
 - **THEN** the gate exits non-zero with a `stale-path` violation
 
+#### Scenario: Debt removal requires a clean file
+- **WHEN** a branch removes a `debt` entry from the ledger
+- **THEN** the removal is valid only for a file the gate no longer flags
+
+#### Scenario: Migration removes entries in the same commit
+- **WHEN** a migration change makes a flagged file clean
+- **THEN** the same commit removes that file's ledger entry
+
+#### Scenario: Seeded debt converts atomically to contract
+- **WHEN** a seeded debt file is legitimately reclassified as a data-contract test
+- **THEN** the conversion is atomic: removed from `debt` and added once to `contract`
+  (tag + reason) in the same commit
+
+#### Scenario: Conversion outside the seed is rejected
+- **WHEN** a conversion is attempted for a path outside `seedDebtPaths`
+- **THEN** the gate rejects it as `new-debt`
+
 ### Requirement: The gate is wired into CI and the authoring rules are documented
 The repository CI quality-gate workflow SHALL run
 `uv run --locked python -m tools.test_data_lint check` on every branch, and
 `AGENTS.md` and `docs/development/evennia-testing-guide.md` SHALL state the authoring
 rule: behavior tests resolve game data through the synthetic test-data kit or
 file-local synthetic fixtures; only tagged data-contract tests may name shipped
-content; assertions SHALL establish mechanics rather than echo fixture or registry
-content, and tests that only echo data are replaced rather than multiplied (the
-aggregate coverage gate stays a floor, not a target).
+content.
 
 #### Scenario: CI blocks a regression
 - **WHEN** a pull request adds a behavior test that hardcodes a shipped identifier
@@ -107,22 +135,42 @@ aggregate coverage gate stays a floor, not a target).
 - **THEN** the guide directs them to the synthetic kit (or a local synthetic fixture)
   and explains the `Data-contract test:` tag for content-validating tests
 
+#### Scenario: Guide mandates mechanics over echoes
+- **WHEN** a contributor reads the documented authoring rule
+- **THEN** the guide states that assertions SHALL establish mechanics rather than echo
+  fixture or registry content
+
+#### Scenario: Echo-only tests are replaced, not multiplied
+- **WHEN** the documented authoring rule is applied to tests that only echo data
+- **THEN** the guide states such tests are replaced rather than multiplied, and that the
+  aggregate coverage gate stays a floor, not a target
+
 ### Requirement: The synthetic test-data kit provides registry-compatible catalogs
 The repository SHALL provide a shared synthetic game-data kit at
 `world/tests/synthetic_data.py`: per-catalog dicts built from the real definition
-dataclasses, covering at least items, skills, races/subraces, player presets, NPC and
-monster tiers, anchors, wilderness regions, city gates, scene archetypes, shops/economy,
-quests, titles, dialogue, buffs, and sexual acts, whose keys carry the reserved `t_`
-prefix and whose display fields are invented Traditional-Chinese prose that occurs
-nowhere in shipped data. The kit SHALL only carry catalog entries that at least one
-test consumes; migration changes add exotic shapes through the kit's `make_*` factories
-with local registration rather than growing shared catalogs with unused entries. The kit
-itself and its mirrors SHALL be clean under the test-data lint gate.
+dataclasses, whose keys carry the reserved `t_` prefix and whose display fields are
+invented Traditional-Chinese prose that occurs nowhere in shipped data. The kit itself
+and its mirrors SHALL be clean under the test-data lint gate.
 
 #### Scenario: Kit content is gate-clean
 - **WHEN** the test-data lint scanner evaluates `world/tests/synthetic_data.py` and the
   JavaScript mirror files
 - **THEN** it reports zero shipped-content flags for those files
+
+#### Scenario: Kit catalogs cover the shipped definition domains
+- **WHEN** the shared kit's catalogs are inventoried
+- **THEN** they cover at least items, skills, races/subraces, player presets, NPC and
+  monster tiers, anchors, wilderness regions, city gates, scene archetypes,
+  shops/economy, quests, titles, dialogue, buffs, and sexual acts
+
+#### Scenario: The kit carries no unused entries
+- **WHEN** the shared synthetic catalogs are audited
+- **THEN** the kit only carries catalog entries that at least one test consumes
+
+#### Scenario: Exotic shapes go through factories, not shared growth
+- **WHEN** a migration change needs an exotic entity shape
+- **THEN** it is added through the kit's `make_*` factories with local registration
+  rather than growing shared catalogs with unused entries
 
 #### Scenario: Kit keys cannot collide with shipped data
 - **WHEN** the kit self-test compares every kit key and display label against the shipped
@@ -139,11 +187,9 @@ itself and its mirrors SHALL be clean under the test-data lint gate.
 The kit SHALL expose a scoped patch helper usable as both a context manager and a
 class/test decorator that replaces the selected shipped catalogs with the synthetic
 catalogs for the decorated scope and restores the previous state exactly on exit —
-`patch.dict` semantics for mutable registries and attribute-swap semantics (including
-consumer-module bindings that name-imported the registry, discovered from the source
-tree rather than a hand-maintained list) for frozen `MappingProxyType` catalogs —
-driven by a single registry-target table maintained only inside the kit, including the
-import-time captures in `world/lore/sync.py`.
+`patch.dict` semantics for mutable registries and attribute-swap semantics for frozen
+`MappingProxyType` catalogs — driven by a single registry-target table maintained only
+inside the kit.
 
 #### Scenario: Patch scope ends with the shipped registry intact
 - **WHEN** a test decorated with the kit helper resolves `t_iron_fang` through production
@@ -158,6 +204,16 @@ import-time captures in `world/lore/sync.py`.
   resolves only synthetic tiers for the duration of the scope, for every binding the
   kit's discovery pass finds (a binding discovered by the pass but left unpatched is a
   self-test failure)
+
+#### Scenario: Name-imported bindings are discovered from the source tree
+- **WHEN** the patch helper swaps a frozen `MappingProxyType` catalog
+- **THEN** consumer-module bindings that name-imported the registry are included,
+  discovered from the source tree rather than a hand-maintained list
+
+#### Scenario: The registry-target table covers import-time captures
+- **WHEN** the kit's single registry-target table is inspected
+- **THEN** it is maintained only inside the kit and includes the import-time captures in
+  `world/lore/sync.py`
 
 ### Requirement: The kit installs process-wide for separate test processes
 The kit SHALL expose an idempotent process-scoped install bootstrap that the
@@ -188,16 +244,7 @@ Node-gate self-test SHALL fail if either mirror drifts from the shared literals.
 Behavior tests in the 7 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
-A parser branch whose accepted payload is a closed production vocabulary with no
-synthetic substitute MAY keep its positive shipped-value assertion in a
-gate-tagged data-contract file instead; the migrated behavior file itself still
-carries no shipped-content reference.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -215,16 +262,32 @@ carries no shipped-content reference.
   rework
 - **THEN** the migrated skills tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
+#### Scenario: Closed-vocabulary parser branches stay contract-bound
+- **WHEN** a parser branch's accepted payload is a closed production vocabulary with no
+  synthetic substitute
+- **THEN** its positive shipped-value assertion MAY instead be kept in a gate-tagged
+  data-contract file, and the migrated behavior file itself still carries no
+  shipped-content reference
+
 ### Requirement: Quests and maps behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 28 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -242,21 +305,27 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated quest and map tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Combat core behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 18 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
-One manifest file whose assertions are exclusively shipped-content rulebook-row
-bindings (combat modifier triggers) is exempted by atomic debt-to-contract
-conversion under the exemption ledger's seeded-classification rule: it leaves the
-`debt` list and joins the registered `contract` list in the same commit, and the
-migrated behavior suites carry no shipped-content reference on its behalf.
+SHALL NOT pin quantities derived from shipped content. One manifest file whose
+assertions are exclusively shipped-content rulebook-row bindings (combat modifier
+triggers) is exempted by atomic debt-to-contract conversion.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -274,16 +343,32 @@ migrated behavior suites carry no shipped-content reference on its behalf.
   rework
 - **THEN** the migrated combat-core tests keep passing unchanged
 
+#### Scenario: The rulebook-row file converts under the seeded-classification rule
+- **WHEN** that manifest file's debt exemption is converted
+- **THEN** the conversion happens under the exemption ledger's seeded-classification
+  rule: it leaves the `debt` list and joins the registered `contract` list in the same
+  commit, and the migrated behavior suites carry no shipped-content reference on its
+  behalf
+
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Creation progression and lineage behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 21 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -301,21 +386,27 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated creation, progression, and lineage tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Equipment and item behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 17 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
-One manifest file whose assertions are exclusively shipped-content buffs.yaml row
-bindings (the one-test-per-key correspondence owner) is exempted by atomic
-debt-to-contract conversion under the exemption ledger's seeded-classification rule:
-it leaves the `debt` list and joins the registered `contract` list in the same commit,
-and the migrated behavior suites carry no shipped-content reference on its behalf.
+SHALL NOT pin quantities derived from shipped content. One manifest file whose
+assertions are exclusively shipped-content buffs.yaml row bindings (the one-test-per-key
+correspondence owner) is exempted by atomic debt-to-contract conversion.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -333,16 +424,32 @@ and the migrated behavior suites carry no shipped-content reference on its behal
   rework
 - **THEN** the migrated equipment and item tests keep passing unchanged
 
+#### Scenario: The buffs.yaml row file converts under the seeded-classification rule
+- **WHEN** that manifest file's debt exemption is converted
+- **THEN** the conversion happens under the exemption ledger's seeded-classification
+  rule: it leaves the `debt` list and joins the registered `contract` list in the same
+  commit, and the migrated behavior suites carry no shipped-content reference on its
+  behalf
+
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Guild shop and service behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 16 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -360,16 +467,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated guild, shop, and service tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Knowledge title and view behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 12 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -387,16 +503,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated knowledge, title, and view tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Monster and aftermath behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 14 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -414,16 +539,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated monster and aftermath tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Party quest delivery and companion behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 7 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -441,16 +575,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated party, quest delivery, and companion tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Sexual and status behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 14 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -468,16 +611,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated sexual-state and status tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Command and typeclass behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 27 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -495,16 +647,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated command and typeclass tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Art prompt and imports behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 23 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -522,16 +683,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated art, imports, and prompts tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Ai server and integration behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 17 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -549,16 +719,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated ai, server, and top-level tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Webclient presentation behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 18 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -576,16 +755,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated webclient presentation tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Webclient action behavior tests resolve game data through synthetic fixtures
 Behavior tests in the 12 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -603,18 +791,27 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated webclient action tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Webclient javascript tests resolve game data through synthetic fixtures
 Behavior tests in the 22 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit, file-local
 synthetic fixtures, production-owned wire constants, or values read from the committed
-payload fixture objects at runtime, instead of restating shipped catalog identifiers or
-shipped display prose in test source, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+payload fixture objects at runtime — never restated shipped catalog identifiers or
+shipped display prose in test source — and SHALL NOT pin quantities derived from shipped
+content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -633,16 +830,25 @@ echoes synthetic-fixture content is not a passing conversion.
   rework
 - **THEN** the migrated webclient javascript tests keep passing unchanged
 
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
+
 ### Requirement: Managed browser tests resolve game data through synthetic fixtures
 Behavior tests in the 19 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
-SHALL NOT pin quantities derived from shipped content. After the migration, none of the
-manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
-naming a manifest file is removed. Exemptions owned by other changes under the same
-directories are outside this requirement. Converted assertions SHALL establish the
-mechanics named by the OpenSpec requirements they annotate; an assertion that merely
-echoes synthetic-fixture content is not a passing conversion.
+SHALL NOT pin quantities derived from shipped content.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
@@ -670,6 +876,20 @@ echoes synthetic-fixture content is not a passing conversion.
 - **WHEN** shipped identifiers, display prose, or catalog sizes change in the game-data
   rework
 - **THEN** the migrated managed-browser tests keep passing unchanged
+
+#### Scenario: Freeze list loses every manifest entry
+- **WHEN** the migration completes for this area's manifest
+- **THEN** none of the manifest files is flagged by the test-data lint gate, and every
+  freeze-list debt entry naming a manifest file is removed
+
+#### Scenario: Other changes' exemptions are out of scope
+- **WHEN** a debt exemption under the same directories is owned by another change
+- **THEN** it is outside this requirement
+
+#### Scenario: Echo assertions are not a passing conversion
+- **WHEN** a converted assertion merely echoes synthetic-fixture content
+- **THEN** it is not a passing conversion; converted assertions SHALL establish the
+  mechanics named by the OpenSpec requirements they annotate
 
 #### Scenario: The server process is synthetic too
 - **WHEN** the managed browser server and seed run with this change's settings wiring

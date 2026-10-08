@@ -13,23 +13,10 @@ targets a single `Monster`, declares no `target_part` (異種 is a parless line)
 ## Requirements
 
 ### Requirement: Seven Tier 1-4 interspecies acts are registered, gated by hostile_act_count and/or climax_count and/or interspecies_act_count thresholds
-`world/skills/sexual_acts/interspecies.py`'s `INTERSPECIES_ACTS` tuple SHALL contain: two acts each
-declaring `unlock={"hostile_act_count": 10}` (`interspecies_touch`, `interspecies_caress`); two acts
-each declaring `unlock={"hostile_act_count": 30}` (`interspecies_entangle`,
-`interspecies_receive`); one act declaring the compound gate `unlock={"hostile_act_count": 30,
-"climax_count": 20}` (`interspecies_mating`); and two acts each declaring
-`unlock={"interspecies_act_count": 20}` (`interspecies_domination`, `interspecies_resonance`). Every
-one of these seven acts SHALL declare `target_spec=TargetSpec.SINGLE`, `target_part=None`,
-`resistible=True`, `actor_counters=("interspecies_act_count",)`, and
-`participant_counters=("interspecies_act_count",)`. An interspecies act
-happens between two bodies of different species, and `interspecies_act_count`
-records the experience from either side.
-The line's species gate stays exactly as shipped: the acts are authored
-against Monster targets, and target validation is NOT changed by this delta.
-Mirroring applies whenever the act resolves; a same-species cast
-(a target that is not a `Monster`) keeps the shipped actor-credit behavior
-and credits the participant only if the shipped handler's own rules already
-do — this delta adds no species condition to the counter handler.
+`world/skills/sexual_acts/interspecies.py`'s `INTERSPECIES_ACTS` tuple SHALL contain the seven acts
+`interspecies_touch`, `interspecies_caress`, `interspecies_entangle`, `interspecies_receive`,
+`interspecies_mating`, `interspecies_domination`, and `interspecies_resonance`, each gated by the
+unlock thresholds below.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 9`
@@ -58,6 +45,35 @@ do — this delta adds no species condition to the counter handler.
 #### Scenario: A same-species target keeps the shipped crediting behavior
 - **WHEN** entity A casts `interspecies_touch` at a non-Monster target under the shipped target contract
 - **THEN** crediting matches exactly the shipped pre-change behavior for that path (pin: the species gate is untouched)
+
+#### Scenario: All seven acts share the line's fixed field set
+- **WHEN** each of the seven acts' fields are inspected
+- **THEN** every one SHALL declare `target_spec=TargetSpec.SINGLE`, `target_part=None`,
+  `resistible=True`, `actor_counters=("interspecies_act_count",)`, and
+  `participant_counters=("interspecies_act_count",)`
+
+#### Scenario: The unlock mappings are tiered by counter thresholds
+- **WHEN** the seven acts' `unlock` mappings are inspected
+- **THEN** `interspecies_touch` and `interspecies_caress` each declare
+  `unlock={"hostile_act_count": 10}`; `interspecies_entangle` and `interspecies_receive` each
+  declare `unlock={"hostile_act_count": 30}`; `interspecies_mating` declares the compound gate
+  `unlock={"hostile_act_count": 30, "climax_count": 20}`; and `interspecies_domination` and
+  `interspecies_resonance` each declare `unlock={"interspecies_act_count": 20}`
+
+#### Scenario: The counter records participation from either side
+- **WHEN** an interspecies act happens between two bodies of different species
+- **THEN** `interspecies_act_count` records the experience from either side
+
+#### Scenario: The species gate stays exactly as shipped
+- **WHEN** this delta lands
+- **THEN** the acts are authored against Monster targets, and target validation is NOT changed by
+  this delta
+
+#### Scenario: Mirroring and same-species crediting follow the shipped handler
+- **WHEN** an act resolves, including a same-species cast (a target that is not a `Monster`)
+- **THEN** mirroring applies whenever the act resolves; a same-species cast keeps the shipped
+  actor-credit behavior and credits the participant only if the shipped handler's own rules already
+  do — this delta adds no species condition to the counter handler
 
 ### Requirement: Every act declares target_part=None, never a BODY_PARTS member
 Every one of the seven acts added by this change SHALL declare `target_part=None`.

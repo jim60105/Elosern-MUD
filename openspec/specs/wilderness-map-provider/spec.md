@@ -13,11 +13,7 @@ area, using the project-owned `TerrainRoom` and `WildernessReturnExit` typeclass
 of `evennia.contrib.grid.wilderness.wilderness.WildernessMapProvider`, whose
 `is_valid_coordinates` accepts exactly the coordinates `0 <= x <= WILDERNESS_MAX_X` and
 `0 <= y <= WILDERNESS_MAX_Y` that are NOT an anchor footprint cell of any
-`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`; point-shape entries
-contribute no footprint cells). The footprint exclusion SHALL be derived from the live registry
-at call time (a cache keyed on registry identity is conforming; a hardcoded cell list is not),
-so patching the registry in tests changes validity without patching the provider. The provider
-SHALL NOT special-case any anchor key.
+`WILDERNESS_ENTRY_REGISTRY` entry (`WildernessEntryPoint.footprint_cells`).
 
 #### Scenario: Coordinates inside the bound and outside every footprint are valid
 - **WHEN** `ElosernWildernessMapProvider().is_valid_coordinates(wilderness, (0, 0))` and
@@ -45,28 +41,27 @@ SHALL NOT special-case any anchor key.
 - **WHEN** `(WILDERNESS_MAX_X + 1) * WILDERNESS_KM_PER_CELL` is computed for both axes and squared
 - **THEN** the result is within 1% of `world_info.md`'s stated ~5,000,000 km² continent area
 
+#### Scenario: Point-shape entries contribute no footprint
+- **WHEN** a `WILDERNESS_ENTRY_REGISTRY` entry has point shape
+- **THEN** it contributes no footprint cells to the exclusion
+
+#### Scenario: The footprint exclusion is derived live from the registry
+- **WHEN** the footprint exclusion is implemented and exercised
+- **THEN** it SHALL be derived from the live registry at call time (a cache keyed on registry
+  identity is conforming; a hardcoded cell list is not), so patching the registry in tests changes
+  validity without patching the provider
+
+#### Scenario: No anchor key is special-cased
+- **WHEN** the provider validates coordinates
+- **THEN** it SHALL NOT special-case any anchor key
+
 ### Requirement: get_location_name and at_prepare_room delegate to the deterministic terrain model
 `ElosernWildernessMapProvider.get_location_name(coordinates)` SHALL return
 `WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh`.
-`ElosernWildernessMapProvider.at_prepare_room(coordinates, caller, room)` SHALL set
+`at_prepare_room(coordinates, caller, room)` SHALL set
 `room.ndb.active_desc` from `terrain_description(*coordinates)` and `room.scene_archetype` from
 `region_for_coordinates(*coordinates)`, unconditionally, on every call. It SHALL additionally
-ensure the coordinate's deterministic monster population by calling
-`world.maps.wilderness_population.ensure_population(room.wilderness, coordinates)` — the
-`wilderness-monster-population` capability — when `room.wilderness` resolves to the wilderness
-script, and SHALL be a population no-op (setting only the description and scene archetype) when
-no wilderness script is attached, so a pooled or unit-test `TerrainRoom` is never required to have
-one. Finally, when `coordinates` equal some registered gate's `approach_cell`, it SHALL set that
-gate's `return_direction` long-form exit (the contrib's normalized exit key) on the room to
-`traverse:true();view:true()` locks — the same lock-string form the stock
-`set_active_coordinates` pass uses for valid neighbors — so the gate exit is visible and offered
-from the approach cell even though the footprint cell beyond it is provider-invalid; the gateway
-step itself is performed by `WildernessReturnExit`'s registry branch, not by ordinary coordinate
-movement. At a coordinate that is not an approach cell it SHALL NOT touch any exit's locks.
-At a coordinate equal to a point-shape entry's `anchor_cell`, it SHALL instead set ALL EIGHT
-directional exits' locks to `traverse:true();view:true()` — the resolver advertises the entry's
-single gate in every direction at a point anchor, and the hook keeps offered exits identical to
-resolver truth regardless of which neighbors the stock validity pass happened to unlock.
+ensure the coordinate's deterministic monster population per the scenarios below.
 
 #### Scenario: get_location_name matches the region registry
 - **WHEN** `get_location_name((x, y))` is called
@@ -121,6 +116,37 @@ resolver truth regardless of which neighbors the stock validity pass happened to
   attached wilderness script (as in the provider's unit tests)
 - **THEN** only the description, scene archetype, and (at approach cells) gate locks are set, no
   exception is raised, and no monster is created
+
+#### Scenario: Population assurance calls the capability resolver
+- **WHEN** `at_prepare_room` ensures the coordinate's deterministic monster population — the
+  `wilderness-monster-population` capability
+- **THEN** it does so by calling
+  `world.maps.wilderness_population.ensure_population(room.wilderness, coordinates)` when
+  `room.wilderness` resolves to the wilderness script, and SHALL be a population no-op (setting
+  only the description and scene archetype) when no wilderness script is attached, so a pooled or
+  unit-test `TerrainRoom` is never required to have one
+
+#### Scenario: Gate exit locks use the stock lock-string form
+- **WHEN** `coordinates` equal some registered gate's `approach_cell`
+- **THEN** `at_prepare_room` SHALL set that gate's `return_direction` long-form exit (the contrib's
+  normalized exit key) on the room to `traverse:true();view:true()` locks — the same lock-string
+  form the stock `set_active_coordinates` pass uses for valid neighbors — so the gate exit is
+  visible and offered from the approach cell even though the footprint cell beyond it is
+  provider-invalid
+- **AND** the gateway step itself is performed by `WildernessReturnExit`'s registry branch, not by
+  ordinary coordinate movement
+
+#### Scenario: Non-approach coordinates leave locks alone
+- **WHEN** `coordinates` name a coordinate that is not an approach cell
+- **THEN** `at_prepare_room` SHALL NOT touch any exit's locks
+
+#### Scenario: Point anchors open all eight exits to match the resolver
+- **WHEN** `coordinates` equal a point-shape entry's `anchor_cell`
+- **THEN** `at_prepare_room` SHALL instead set ALL EIGHT directional exits' locks to
+  `traverse:true();view:true()` — the resolver advertises the entry's single gate in every
+  direction at a point anchor, and the hook keeps offered exits identical to resolver truth
+  regardless of which neighbors the stock validity pass happened to unlock
+
 ### Requirement: ElosernWildernessMapProvider uses TerrainRoom and WildernessReturnExit
 `ElosernWildernessMapProvider.room_typeclass` SHALL be `typeclasses.rooms.TerrainRoom` and
 `ElosernWildernessMapProvider.exit_typeclass` SHALL be `typeclasses.exits.WildernessReturnExit`.

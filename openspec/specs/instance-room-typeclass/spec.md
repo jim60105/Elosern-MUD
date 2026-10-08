@@ -33,10 +33,8 @@ property of any kind.
 ### Requirement: InstanceRoom persists expire_tick, named, interacted, pin_reasons, owned_entities, and origin_room
 `InstanceRoom` SHALL expose six persistent attributes: `expire_tick: int | None` (default `None`),
 `named: bool` (default `False`), `interacted: bool` (default `False`), `pin_reasons: list[str]`
-(default an empty list), `owned_entities: list` (default an empty list — entities registered via
-`register_owned_entity()` to be despawned, rather than merely relocated, when this room reclaims), and
-`origin_room` (default `None`). `expire_tick` of `None` SHALL mean the room is not subject to TTL
-reclamation (either never assigned one, or promoted).
+(default an empty list), `owned_entities: list` (default an empty list), and
+`origin_room` (default `None`).
 
 #### Scenario: Defaults on a freshly created InstanceRoom
 - **WHEN** an `InstanceRoom` is created with none of the six attributes explicitly set
@@ -47,6 +45,15 @@ reclamation (either never assigned one, or promoted).
 - **WHEN** each of the six attributes is set to a non-default value and the room is re-fetched from
   the database
 - **THEN** the re-fetched room's values match what was set
+
+#### Scenario: owned_entities holds entities to despawn at reclamation
+- **WHEN** entities are registered via `register_owned_entity()`
+- **THEN** they are recorded in `owned_entities` to be despawned, rather than merely relocated,
+  when this room reclaims
+
+#### Scenario: A null expire_tick means no TTL reclamation
+- **WHEN** `expire_tick` is `None`
+- **THEN** the room is not subject to TTL reclamation (either never assigned one, or promoted)
 
 ### Requirement: at_object_receive sets interacted to True the first time a PlayerCharacter enters
 `InstanceRoom.at_object_receive` SHALL set `self.db.interacted = True` when the entering object is an
@@ -67,19 +74,7 @@ entering object type, and SHALL NOT unset `interacted` once it is `True`.
 - **THEN** `room.db.interacted` remains `True`
 
 ### Requirement: at_object_delete refuses deletion while a PlayerCharacter is present or the room is pinned
-`InstanceRoom.at_object_delete` SHALL return `False`, aborting deletion, when `self.db.pin_reasons` is
-non-empty, or when `self.contents` includes any instance of `typeclasses.characters.PlayerCharacter`.
-It SHALL return `True` (permitting deletion, subject to the superclass's own `at_object_delete`) when
-neither condition holds — including when the room's contents include an `NPC` or `Monster` but no
-`PlayerCharacter`, since non-player entity presence alone SHALL NOT block deletion at the typeclass
-level (see the `instance-reclamation` capability for how a reclaiming room's own non-player occupants
-are despawned or relocated before this check is ever exercised in the normal path).
-
-This requirement was corrected by rubber-duck review from an earlier draft that refused deletion for
-*any* `LivingEntity` present, including NPCs. That earlier rule made reclamation of a room containing
-a quest-spawned NPC (design doc §7.1/§7.2's normal case, not an edge case) defer forever, since no
-NPC-despawn mechanism exists to ever clear the blocking condition. The corrected rule below is what a
-conforming implementation SHALL enforce.
+`InstanceRoom.at_object_delete` SHALL return `False`, aborting deletion, when `self.db.pin_reasons` is non-empty, or when `self.contents` includes any instance of `typeclasses.characters.PlayerCharacter`. It SHALL return `True` (permitting deletion, subject to the superclass's own `at_object_delete`) when neither condition holds — including when the contents include an `NPC` or `Monster` but no `PlayerCharacter`: non-player entity presence alone SHALL NOT block deletion at the typeclass level.
 
 #### Scenario: Deletion is refused while pinned
 - **WHEN** `room.delete()` is called on an `InstanceRoom` with a non-empty `pin_reasons`
@@ -105,3 +100,17 @@ conforming implementation SHALL enforce.
   `PlayerCharacter` present, not only `reclaim_due_instances()`
 - **THEN** deletion is still refused — the safety net does not depend on going through any particular
   call site
+
+#### Scenario: Reclamation handles non-player occupants upstream of this check
+- **WHEN** a reclaiming room has its own non-player occupants in the normal path
+- **THEN** they are despawned or relocated before this check is ever exercised, per the
+  `instance-reclamation` capability
+
+#### Scenario: The corrected rule supersedes the earlier LivingEntity draft
+- **WHEN** this gate is compared with the earlier draft that refused deletion for *any*
+  `LivingEntity` present, including NPCs (the draft this requirement was corrected from by
+  rubber-duck review)
+- **THEN** what a conforming implementation SHALL enforce is the corrected rule: the earlier rule
+  made reclamation of a room containing a quest-spawned NPC (design doc §7.1/§7.2's normal case,
+  not an edge case) defer forever, since no NPC-despawn mechanism exists to ever clear the
+  blocking condition

@@ -9,11 +9,7 @@ Define universal skill ownership independent of imported or spawned skill data.
 `{"flee", "basic_attack"}`, and `SkillHandler.owned_keys()` SHALL include every key in `INNATE_SKILL_KEYS` in its
 returned list, in addition to the entity's own imported `active`/`passive` keys.
 `basic_attack` SHALL be a zero-cost active SINGLE/ENEMY physical-damage skill that SHALL resolve
-through the ordinary ActionResolver path. It SHALL declare `usable_out_of_combat=True`, meaning it is
-*selectable* from exploration solely as a field-combat initiation; it SHALL remain unable to resolve
-without a battlefield, because `action-resolution-pipeline`'s damaging-action gate rejects a
-`DamageEffect`-carrying skill whose context has no battlefield. `flee` SHALL declare
-`usable_out_of_combat=False`.
+through the ordinary ActionResolver path.
 
 #### Scenario: An entity with no imported skill data still owns both innate actions
 - **WHEN** `SkillHandler.owned_keys()` is called for an entity whose `entity.db.skills` is unset
@@ -39,6 +35,20 @@ without a battlefield, because `action-resolution-pipeline`'s damaging-action ga
 - **WHEN** `basic_attack` is resolved with a `RoomActionContext`
 - **THEN** the `usable_out_of_combat` gate does not reject it, and it rejects with
   `RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET` instead — no damage is dealt and no resource is spent
+
+#### Scenario: basic_attack declares usable_out_of_combat True as field-combat initiation only
+- **WHEN** `basic_attack`'s declaration is inspected
+- **THEN** it SHALL declare `usable_out_of_combat=True`, meaning it is *selectable* from exploration
+  solely as a field-combat initiation
+
+#### Scenario: The damaging-action gate keeps basic_attack unresolvable without a battlefield
+- **WHEN** `basic_attack` is selected from exploration but its context has no battlefield
+- **THEN** it remains unable to resolve, because `action-resolution-pipeline`'s damaging-action gate
+  rejects a `DamageEffect`-carrying skill whose context has no battlefield
+
+#### Scenario: flee declares usable_out_of_combat False
+- **WHEN** `flee`'s declaration is inspected
+- **THEN** it SHALL declare `usable_out_of_combat=False`
 
 ### Requirement: Innate ownership is unconditional and not combat-gated
 `SkillHandler.owned_keys()`'s inclusion of `INNATE_SKILL_KEYS` SHALL NOT depend on whether the entity is
@@ -72,11 +82,8 @@ combat state anywhere in this mechanism.
 
 ### Requirement: flee declares its skill category at its own construction site
 `world/rules/disengage.py`'s direct `SkillDef(...)` construction for `flee` SHALL declare
-`category=SkillCategory.MARTIAL_ARTS` (re-homed from the retired `MOVEMENT` branch by the Phase B
-taxonomy consolidation, pairing `flee` with its `INNATE_SKILL_KEYS` sibling `basic_attack`). This
-classification SHALL be supplied at `flee`'s own construction site, not inferred or special-cased
-elsewhere, consistent with this capability's existing requirement that `world/skills/` never import
-from `world/rules/`.
+`category=SkillCategory.MARTIAL_ARTS`, supplied at `flee`'s own construction site, not inferred or
+special-cased elsewhere.
 
 #### Scenario: flee is classified MOVEMENT
 - **WHEN** `SKILL_REGISTRY["flee"]` is inspected after `world.rules.disengage` has been imported
@@ -87,3 +94,14 @@ from `world/rules/`.
 #### Scenario: disengage.py fails to import without an explicit category
 - **WHEN** `world/rules/disengage.py`'s `SkillDef(...)` construction for `flee` is inspected
 - **THEN** it supplies an explicit `category` argument, because `SkillDef.category` has no default and omitting it raises `TypeError` at import time
+
+#### Scenario: The MARTIAL_ARTS category is the Phase B re-homing
+- **WHEN** `flee`'s declared category is traced to its taxonomy origin
+- **THEN** `SkillCategory.MARTIAL_ARTS` was re-homed from the retired `MOVEMENT` branch by the
+  Phase B taxonomy consolidation, pairing `flee` with its `INNATE_SKILL_KEYS` sibling
+  `basic_attack`
+
+#### Scenario: Construction-site declaration preserves the dependency direction
+- **WHEN** `flee`'s category classification site is inspected
+- **THEN** supplying it at `flee`'s own construction site is consistent with this capability's
+  existing requirement that `world/skills/` never import from `world/rules/`

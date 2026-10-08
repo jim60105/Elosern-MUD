@@ -11,24 +11,10 @@ invariants, the 「名‧姓」 Chinese display-name composition contract, the i
 
 ### Requirement: Name pack registry freezes the vendored corpus at import time
 `world/lore/names.py` SHALL parse the five pack JSON files under `third_party/fantasy-namegen/data/packs/`
-and the translit table `third_party/fantasy-namegen/data/translit/fantasy.json` at module import, and
-expose the results as `NAME_PACK_REGISTRY` wrapped in `MappingProxyType`. It SHALL define frozen
-`NamePart` dataclass with fields `text` (original-language spelling), `zh` (Traditional Chinese
-translit rendering), and `meaning_zh` (etymology/imagery note, empty string when the corpus part
-carries none), and frozen `NamePack` dataclass with fields `key`, `race_key: str | None`,
-`surnames: tuple[NamePart, ...]`, `given` (a `Mapping[str, tuple[NamePart, ...]]` with exactly the
-keys `"m"`, `"f"`, `"u"`), and `naming_note_zh` (taken from the pack's `rules.naming.note`).
-`NAME_PACK_REGISTRY` SHALL contain exactly the five pack keys `fantasy-human`, `fantasy-elf`,
-`fantasy-dwarf`, `fantasy-orc`, `fantasy-halfling`, carrying every corpus part exactly once —
-1,274 part occurrences across the current vendored snapshot. `NamePart.text` SHALL NOT be
-required to be globally unique: a source spelling may legitimately appear in several packs or
-several `given` pools (1,261 distinct spellings across 1,274 occurrences), and every occurrence
-is carried as its own `NamePart`. `NamePack.given` SHALL be a concrete `dict` subclass
-(`FrozenDict`) that (a) is never a `MappingProxyType`, so `dataclasses.asdict` can deepcopy it on
-the sync mirror path (deepcopy rebuilds the type via `__reduce__`), and (b) rejects every mutation
-(`__setitem__`/`__delitem__`/`update`/`pop`/`clear`/`setdefault` raise `TypeError`), so the
-frozen-registry invariant holds below the top-level mapping — a consumer can never empty a
-validated pool after import.
+and the translit table `third_party/fantasy-namegen/data/translit/fantasy.json` at module import,
+exposing the results as `NAME_PACK_REGISTRY` wrapped in `MappingProxyType`, built from frozen
+`NamePart` and `NamePack` dataclasses. The registry SHALL contain exactly the five vendored pack
+keys, carrying every corpus part exactly once.
 
 #### Scenario: Registry has exactly the five vendored packs
 - **WHEN** `NAME_PACK_REGISTRY` is inspected
@@ -59,6 +45,33 @@ validated pool after import.
   a string (empty allowed when the corpus part has no `meaning`); no part's `zh` contains ASCII
   letters, i.e. no lookup silently fell back to the untranslated original
 
+#### Scenario: NamePart carries spelling, Chinese rendering, and etymology
+- **WHEN** any `NamePart` field set is inspected
+- **THEN** it has `text` (original-language spelling), `zh` (Traditional Chinese translit rendering),
+  and `meaning_zh` (etymology/imagery note, empty string when the corpus part carries none)
+
+#### Scenario: NamePack fields mirror the pack document
+- **WHEN** any `NamePack` field set is inspected
+- **THEN** it has `key`, `race_key: str | None`, `surnames: tuple[NamePart, ...]`, `given` (a
+  `Mapping[str, tuple[NamePart, ...]]` with exactly the keys `"m"`, `"f"`, `"u"`), and
+  `naming_note_zh` (taken from the pack's `rules.naming.note`)
+
+#### Scenario: Corpus count and spelling multiplicity are stated
+- **WHEN** the registry is compared against the current vendored snapshot
+- **THEN** it carries 1,274 part occurrences, and `NamePart.text` is NOT required to be globally
+  unique: a source spelling may legitimately appear in several packs or several `given` pools
+  (1,261 distinct spellings across 1,274 occurrences), and every occurrence is carried as its own
+  `NamePart`
+
+#### Scenario: given pools are a concrete immutable dict subclass
+- **WHEN** the type of `NamePack.given` is inspected
+- **THEN** it is a concrete `dict` subclass (`FrozenDict`) that is never a `MappingProxyType`, so
+  `dataclasses.asdict` can deepcopy it on the sync mirror path (deepcopy rebuilds the type via
+  `__reduce__`), and it rejects every mutation
+  (`__setitem__`/`__delitem__`/`update`/`pop`/`clear`/`setdefault` raise `TypeError`), so the
+  frozen-registry invariant holds below the top-level mapping — a consumer can never empty a
+  validated pool after import
+
 ### Requirement: Race binding maps the three playable races and leaves the spare packs unbound
 `world/lore/names.py` SHALL expose `NAME_PACK_BY_RACE` as a `MappingProxyType` mapping exactly
 `"human"` → `"fantasy-human"`, `"elf"` → `"fantasy-elf"`, and `"beastfolk"` → `"fantasy-orc"`,
@@ -78,21 +91,12 @@ appear as values of `NAME_PACK_BY_RACE`.
 - **THEN** each has `race_key is None`, and neither pack key appears in `NAME_PACK_BY_RACE.values()`
 
 ### Requirement: Registry load enforces the corpus invariants at import time
-Loading `world.lore.names` SHALL validate, at module import, three invariants and raise a named
-error (never silently accepting deviating data): (1) the translit table covers every corpus part,
-with the missing words enumerated in the error message; (2) every pack's `m`, `f`, and `u` pools are
-non-empty, every pack's `surnames` is non-empty, every pack set is exactly the five vendored pack
-keys, and every race-binding entry names a `RACE_REGISTRY` key and a registered pack; (3) each
-pack's representative longest composition — the longest `given.zh` in that pack's pools plus the
-separator plus that pack's longest `surname.zh`, a strict upper bound over every pairing in the
-pack — passes `world/rules/character_creation.py::_validate_name`, reached via a function-local
-deferred import so `lore` gains no top-level dependency on `rules`. The whole load/validate step
-SHALL be a pure builder function taking the pack payloads, the translit table, and the race
-bindings as explicit arguments (production passes the module constants at the import tail), so
-every rejection path is testable by injection without touching the filesystem or module globals.
-The module is settings-required: the deferred validator import executes the Django/Evennia import
-chain, which is safe because every consumer imports `world.lore.names` only inside a bootstrapped
-Evennia process (server startup, the lore test runner, and later rules/UI consumers).
+Loading `world.lore.names` SHALL validate three invariants at module import and raise a named
+error (never silently accepting deviating data): (1) the translit table covers every corpus part;
+(2) the pool/surname non-emptiness, exact pack-set, and race-binding invariants enumerated in the
+scenarios below; (3) each pack's representative longest composition passes
+`world/rules/character_creation.py::_validate_name`. The whole load/validate step SHALL be a pure
+builder function.
 
 #### Scenario: Full translit coverage holds on the vendored snapshot
 - **WHEN** the translit table is checked against every `text` value of every pack part
@@ -122,6 +126,30 @@ Evennia process (server startup, the lore test runner, and later rules/UI consum
   `zh` rendering exceeds the validator bound
 - **THEN** each call raises the named error instead of returning a registry, proving the import
   tail actually invokes every invariant on the constructed data
+
+#### Scenario: Load validates pool, pack-set, and race-binding integrity
+- **WHEN** invariant (2) is checked at import
+- **THEN** every pack's `m`, `f`, and `u` pools are non-empty, every pack's `surnames` is
+  non-empty, every pack set is exactly the five vendored pack keys, and every race-binding entry
+  names a `RACE_REGISTRY` key and a registered pack
+
+#### Scenario: The longest composition is the strict upper bound
+- **WHEN** a pack's representative longest composition is formed for invariant (3)
+- **THEN** it is the longest `given.zh` in that pack's pools plus the separator plus that pack's
+  longest `surname.zh`, a strict upper bound over every pairing in the pack, and the validator is
+  reached via a function-local deferred import so `lore` gains no top-level dependency on `rules`
+
+#### Scenario: The builder is pure and injection-testable
+- **WHEN** the load/validate step runs in production and in tests
+- **THEN** the builder takes the pack payloads, the translit table, and the race bindings as
+  explicit arguments, production passes the module constants at the import tail, and every
+  rejection path is testable by injection without touching the filesystem or module globals
+
+#### Scenario: The settings-required import chain is safe
+- **WHEN** the deferred validator import executes the Django/Evennia import chain
+- **THEN** this is safe because every consumer imports `world.lore.names` only inside a
+  bootstrapped Evennia process (server startup, the lore test runner, and later rules/UI
+  consumers)
 
 ### Requirement: Display names compose from Chinese renderings with the middle-dot separator
 `world/lore/names.py` SHALL define `NAME_SEPARATOR = "‧"` (U+2027 HYPHENATION POINT) as the only

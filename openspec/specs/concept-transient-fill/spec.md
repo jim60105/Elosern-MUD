@@ -12,7 +12,7 @@ form from the proposal without ever auto-submitting it.
 ## Requirements
 
 ### Requirement: Concept applies transiently with zero persistent writes
-The `creation.concept` adapter and the Telnet `character concept` command SHALL run the same guarded `character_creation` generative pipeline and, on a validated proposal, write no persistent state: the WebClient adapter SHALL store the validated proposal (race, subrace, allocations, and the persona block) in a session-scoped transient slot mirroring the existing session options-state pattern, return a plain success with the stable code `concept_applied`, and declare the `creation` panel affected so the panel refresh carries the proposal. Because the concept path writes no draft, no concept outcome SHALL read, write, or invalidate the activation-confirmation fingerprint state — a still-valid earlier save confirmation survives a concept apply untouched, and a concept completion can never authorize activation of a draft it did not save. The slot SHALL bind the actor it was written for (mirroring the options-state owner binding), SHALL NOT render for a different puppet, and SHALL be cleared when the session's puppet changes. The slot SHALL be overwritten by a later successful apply, cleared when a `creation.custom` save or `creation.reset` succeeds, and lost with the session. The `ui_action_result` envelope SHALL NOT gain a data field, and no draft, trait, identity, or `creation_pending` value SHALL change on any concept outcome.
+The `creation.concept` adapter and the Telnet `character concept` command SHALL run the same guarded `character_creation` generative pipeline and, on a validated proposal, write no persistent state: the WebClient adapter SHALL store the validated proposal (race, subrace, allocations, and the persona block) in a session-scoped transient slot mirroring the existing session options-state pattern.
 
 #### Scenario: A successful apply fills only the session slot
 - **WHEN** a pending character submits `creation.concept` and the guarded layer returns a valid proposal
@@ -38,21 +38,33 @@ The `creation.concept` adapter and the Telnet `character concept` command SHALL 
 - **WHEN** a session holding an unconsumed proposal slot disconnects and a new session logs in for the same pending character
 - **THEN** the new session's creation panel shows the persisted draft unchanged and contains no proposal key
 
+#### Scenario: Concept never touches the activation-confirmation fingerprint
+- **WHEN** any concept outcome occurs while activation-confirmation fingerprint state exists
+- **THEN** no concept outcome reads, writes, or invalidates that state: a still-valid earlier save confirmation survives a concept apply untouched, and a concept completion can never authorize activation of a draft it did not save
+
+#### Scenario: The slot is bound to the actor it was written for
+- **WHEN** a proposal slot is written for a session's puppet
+- **THEN** the slot mirrors the options-state owner binding, does not render for a different puppet, and is cleared when the session's puppet changes
+
+#### Scenario: The slot lifecycle follows applies, saves, resets, and the session
+- **WHEN** the slot's owning session continues operating
+- **THEN** the slot is overwritten by a later successful apply, cleared when a `creation.custom` save or `creation.reset` succeeds, and lost with the session
+
+#### Scenario: No concept outcome changes persistent state or the result envelope
+- **WHEN** any concept outcome is returned
+- **THEN** the `ui_action_result` envelope gains no data field, and no draft, trait, identity, or `creation_pending` value changes
+
+#### Scenario: A successful apply returns the stable code and declares the creation panel
+- **WHEN** the WebClient adapter completes a validated concept apply
+- **THEN** it returns a plain success with the stable code `concept_applied` and declares the `creation` panel affected so the panel refresh carries the proposal
+
 ### Requirement: The creation panel renders the transient proposal
 The `creation` panel available payload SHALL additionally accept the optional top-level key
 `proposal`, present only when the authenticated session holds a transient proposal. The proposal
-object SHALL contain exactly `revision` (a positive integer transient sequence number, strictly
-increasing within the session across successive applies), `race` (a registry key), `subrace` (a
-registry key or null), `allocations` (one integer per `ALLOCATABLE_AXES` axis — the full seven-axis
-set including `magic_power`), and `persona` (an object with exactly `personality`, `life_story`,
-and `habit`, each 1..600 non-empty code points), plus five optional transient-fill keys that are
-present only when the validated generative proposal carried a value: `display_name` (1..64 code
-points), `age` and `apparent_age` (integers in 0..10000), `background` (1..600 code points), and
-`affinity_elements` (a list of at most 8 distinct registered element keys). An absent optional key
-SHALL NOT be encoded as null, and every value SHALL be deep-copied from the session snapshot with
-no live object reference. A worst-case proposal (three 600-code-point persona fields, a maximum
-background, a maximum display name, both ages, and an eight-element affinity set) SHALL still fit
-the canonical envelope bound.
+object SHALL contain exactly the base fields `revision`, `race`, `subrace`, `allocations`, and
+`persona`, plus five optional transient-fill keys (`display_name`, `age`, `apparent_age`,
+`background`, and `affinity_elements`) that are present only when the validated generative
+proposal carried a value for each.
 
 #### Scenario: A panel renders the pending proposal
 - **WHEN** a creation panel is built for a session whose slot holds a proposal
@@ -81,9 +93,25 @@ the canonical envelope bound.
 - **WHEN** the same concept is applied twice and both responses are byte-identical in content
 - **THEN** the second panel proposal carries a strictly greater `revision` than the first
 
+#### Scenario: The base proposal fields carry their defined shapes
+- **WHEN** a proposal object is validated
+- **THEN** `revision` is a positive integer transient sequence number, strictly increasing within the session across successive applies; `race` is a registry key; `subrace` is a registry key or null; `allocations` holds one integer per `ALLOCATABLE_AXES` axis — the full seven-axis set including `magic_power`; and `persona` is an object with exactly `personality`, `life_story`, and `habit`, each 1..600 non-empty code points
+
+#### Scenario: The transient-fill keys carry their defined bounds
+- **WHEN** transient-fill keys are validated
+- **THEN** `display_name` is 1..64 code points, `age` and `apparent_age` are integers in 0..10000, `background` is 1..600 code points, and `affinity_elements` is a list of at most 8 distinct registered element keys
+
+#### Scenario: Proposal values are snapshot deep copies without null placeholders
+- **WHEN** a proposal renders through the panel
+- **THEN** an absent optional key SHALL NOT be encoded as null, and every value SHALL be deep-copied from the session snapshot with no live object reference
+
+#### Scenario: The worst-case proposal includes both ages and fits the canonical envelope bound
+- **WHEN** a worst-case proposal — three 600-code-point persona fields, a maximum background, a maximum display name, both ages, and an eight-element affinity set — renders through the panel
+- **THEN** it SHALL still fit the canonical envelope bound
+
 
 ### Requirement: Persona rides the custom draft, payload, and activation
-The `custom_filled` draft SHALL carry a required, nullable `persona` key holding either null or exactly `{personality, life_story, habit}` with each value 1..600 non-empty code points validated through the existing persona-block validator, and a draft missing the key SHALL be treated as a malformed legacy shape and degraded through the existing draft-degradation path. The `creation.custom` payload SHALL accept exactly nine keys including a required `persona` key (null or the exact three-key object; the browser convention ships null when all three fields are empty), and the deterministic save SHALL store the submitted value verbatim without any carry-over or race comparison. Activation SHALL write the character's persona record from the custom draft's persona key (falling back to the existing background-only branch when it is null).
+The `custom_filled` draft SHALL carry a required, nullable `persona` key holding either null or exactly `{personality, life_story, habit}` with each value 1..600 non-empty code points validated through the existing persona-block validator. Activation SHALL write the character's persona record from the custom draft's persona key (falling back to the existing background-only branch when it is null).
 
 #### Scenario: A custom save stores a valid persona block verbatim
 - **WHEN** `creation.custom` submits the nine-key payload with a valid three-field persona block
@@ -101,30 +129,25 @@ The `custom_filled` draft SHALL carry a required, nullable `persona` key holding
 - **WHEN** a pending character activates with a custom draft carrying a non-null persona block
 - **THEN** the activation transaction persists the import-card persona record from that block plus any background, and no concept-stage state is consulted
 
+#### Scenario: A legacy draft without the persona key degrades
+- **WHEN** a stored draft is missing the `persona` key
+- **THEN** it SHALL be treated as a malformed legacy shape and degraded through the existing draft-degradation path
+
+#### Scenario: The custom payload carries the persona key
+- **WHEN** `creation.custom` validates its payload
+- **THEN** it SHALL accept exactly nine keys including a required `persona` key (null or the exact three-key object; the browser convention ships null when all three fields are empty)
+
+#### Scenario: The deterministic save stores the persona verbatim
+- **WHEN** `creation.custom` performs the deterministic save
+- **THEN** it SHALL store the submitted persona value verbatim without any carry-over or race comparison
+
 ### Requirement: The browser form pre-fills from the proposal without submitting
 Whenever the rendered proposal's `revision` exceeds the last revision the browser applied, the
 browser creation form SHALL copy the proposal's race, subrace, allocations, and three persona
 fields, plus every present transient-fill field — display name, actual age, apparent age,
 background, and affinity elements (filtered to the incoming race's registered element keys and
-trimmed to its input bound) — into the local
-unsent form state and record that revision; an absent transient-fill field SHALL leave the local
-value untouched, except that the race write itself always enforces the new race's affinity
-bound: a proposal that changes the race SHALL trim an existing over-bound local affinity
-selection to that bound even when the proposal carries no affinity elements, because the
-player-picked set must stay within the race's legal capacity (the same trim the player's own
-race change performs). When the fresh apply completes while the player is on the concept tab, the form
-SHALL switch to the custom tab automatically, and the client SHALL surface exactly one toast
-naming the applied proposal — the success confirmation, written by the form's own apply path
-through the action-feedback queue API, never duplicated by the result slice (which stays silent
-on success); a panel
-rebuild or a remount that re-renders an already-unconsumed proposal
-SHALL fill without any automatic tab switch. The form SHALL NOT auto-submit,
-and SHALL keep the three persona textareas visible and editable in custom mode at all times.
-Persona local validation SHALL be all-empty-or-all-filled: an all-empty triple submits null; a
-partially-filled triple blocks submission with a localized reason. When the proposal's race
-differs from the player's current selection while local persona text exists, the form SHALL show a
-non-blocking review prompt naming the incoming race; no server-side overwrite or rejection SHALL
-accompany a race change.
+trimmed to its input bound) — into the local unsent form state and record that revision.
+The form SHALL NOT auto-submit.
 
 #### Scenario: A proposal fills an untouched form
 - **WHEN** the panel delivers a proposal carrying the base fields and all five transient-fill
@@ -168,3 +191,27 @@ accompany a race change.
   present locally
 - **THEN** a non-blocking review prompt names the proposal's race and the form remains submittable
   with the player's own text
+
+#### Scenario: An absent transient-fill field keeps the local value but the race write enforces the affinity bound
+- **WHEN** a proposal is applied and an optional transient-fill field is absent
+- **THEN** the field SHALL leave the local value untouched, except that the race write itself always enforces the new race's affinity bound: a proposal that changes the race SHALL trim an existing over-bound local affinity selection to that bound even when the proposal carries no affinity elements, because the player-picked set must stay within the race's legal capacity (the same trim the player's own race change performs)
+
+#### Scenario: A fresh apply from the concept tab switches tabs with exactly one toast
+- **WHEN** a fresh apply completes while the player is on the concept tab
+- **THEN** the form SHALL switch to the custom tab automatically, and the client SHALL surface exactly one toast naming the applied proposal — the success confirmation, written by the form's own apply path through the action-feedback queue API, never duplicated by the result slice (which stays silent on success)
+
+#### Scenario: A rebuild or remount fills without navigating
+- **WHEN** a panel rebuild or a remount re-renders an already-unconsumed proposal
+- **THEN** the form SHALL fill without any automatic tab switch
+
+#### Scenario: The persona textareas stay visible and editable
+- **WHEN** the browser creation form is in custom mode
+- **THEN** the form SHALL keep the three persona textareas visible and editable at all times
+
+#### Scenario: An all-empty persona triple submits null
+- **WHEN** persona local validation — all-empty-or-all-filled — meets an all-empty triple
+- **THEN** the form submits null; a partially-filled triple blocks submission with a localized reason
+
+#### Scenario: A race-changing proposal with local persona text shows a review prompt
+- **WHEN** the proposal's race differs from the player's current selection while local persona text exists
+- **THEN** the form SHALL show a non-blocking review prompt naming the incoming race, and no server-side overwrite or rejection SHALL accompany a race change

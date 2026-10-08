@@ -12,20 +12,9 @@ are exercised against a second, deliberately unlike entry.
 `zcoord="village_ciaran"` describing a ten-node connected tree: a single
 entrance node, a central plaza, and eight further exterior nodes reflecting
 the branch's culture and dwellings. The plaza SHALL spawn as the settlement's
-sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`.
-
-The village SHALL remain a tree as it grows. It SHALL contain no cycle and no
-crossroads, because a settlement of a hundred people laid out with the
-branching street pattern of a town reads as a town. Growth SHALL add leaves
-and short branches, never a loop.
-
-Every intra-village link SHALL spawn as the project's costed grid exit so
-movement inside the village charges the ordinary move cost, exactly as
-movement inside the capital does.
-
-Room keys and descriptions SHALL be Traditional Chinese and SHALL read as a
-lived-in forest settlement rather than as a town: no walls, no gates, no
-marketplace and no signed premises.
+sole `AnchorRoom`, carrying `anchor_key="village_ciaran"`. Every
+intra-village link SHALL spawn as the project's costed grid exit so
+movement inside the village charges the ordinary move cost.
 
 #### Scenario: The village grid spawns connected with one anchor
 - **WHEN** grid synchronization runs
@@ -54,21 +43,23 @@ marketplace and no signed premises.
   occupy exactly the coordinates they occupied before, so no landed place's
   exterior moves
 
+#### Scenario: Growth adds leaves, never a loop or crossroads
+- **WHEN** the village map grows
+- **THEN** it remains a tree with no cycle and no crossroads — growth adds
+  leaves and short branches, never a loop — because a settlement of a
+  hundred people laid out with the branching street pattern of a town reads
+  as a town
+
+#### Scenario: Village text reads as a lived-in forest settlement
+- **WHEN** the village's room keys and descriptions are authored
+- **THEN** they SHALL be Traditional Chinese and SHALL read as a lived-in
+  forest settlement rather than as a town: no walls, no gates, no
+  marketplace and no signed premises
+
 ### Requirement: The village has exactly one concealed entrance
 The village SHALL have exactly one connection to anything outside it, at its
 entrance node, serving both as the arrival point from the starting room and
 as the return point from the wilderness.
-
-That entrance SHALL be presented as a concealed path, not a city gate: the
-world's elven villages have no walls and no gates, their concealment being
-the forest and the villagers themselves. The naming and description SHALL
-reflect that even though the entrance occupies the same registry slot a city
-gate would.
-
-The connection SHALL be one-way from the starting room, on the same terms
-the capital's is: no village room SHALL hold an exit whose destination is
-the starting room, and synchronization SHALL prune any such exit on every
-run.
 
 #### Scenario: The village is reachable from the starting room
 - **WHEN** the starting room's exits are inspected after grid
@@ -84,6 +75,19 @@ run.
 - **WHEN** the entrance node's key and description are read
 - **THEN** they describe a concealed path through the forest, and name no
   wall, gate or guard
+
+#### Scenario: A concealed path occupies the city-gate registry slot
+- **WHEN** the entrance is registered in the slot a city gate would occupy
+- **THEN** its naming and description SHALL still present a concealed path,
+  not a city gate: the world's elven villages have no walls and no gates,
+  their concealment being the forest and the villagers themselves
+
+#### Scenario: Synchronization prunes any exit back to the starting room
+- **WHEN** grid synchronization runs and any village room holds an exit whose
+  destination is the starting room
+- **THEN** synchronization SHALL prune that exit on every run, keeping the
+  connection one-way from the starting room on the same terms the capital's
+  is
 
 ### Requirement: The village has a wilderness footprint disjoint from every other settlement
 The village SHALL declare a wilderness footprint and at least one gate

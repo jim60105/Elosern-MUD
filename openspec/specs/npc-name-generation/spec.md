@@ -14,15 +14,10 @@ generator never dying.
 
 ### Requirement: roll_name maps sex to the given pool of a pack and composes the Chinese display name
 `world/rules/namegen.py` SHALL expose `roll_name(pack_key: str, sex: str | None, rng: Random) -> str`
-that looks up `NAME_PACK_REGISTRY[pack_key]` and selects the given pool by `sex`: `"female"` →
-pool `"f"`, `"male"` → pool `"m"`, `"other"` → pool `"u"`, and an empty string, `None`, or any
-value outside `SEX_VALUES` → a pool chosen randomly from `"m"`, `"f"`, `"u"` via `rng` (design D2:
-unrecognised values are treated exactly like unspecified ones; this layer validates nothing).
-It SHALL return
-`compose_display_name(given, surname)` — the `given.zh‧surname.zh` composition owned by
-`world/lore/names.py` — picking both parts from the selected pack via `rng`, and SHALL NOT define
-its own separator constant or concatenate parts itself. The original-language `NamePart.text`
-SHALL never appear in the returned name.
+that looks up `NAME_PACK_REGISTRY[pack_key]` and selects the given pool by `sex`:
+`"female"` → `"f"`, `"male"` → `"m"`, `"other"` → `"u"`; an empty string, `None`, or any value
+outside `SEX_VALUES` → a pool chosen randomly from `"m"`, `"f"`, `"u"` via `rng`.
+It SHALL return `compose_display_name(given, surname)` with both parts drawn from the selected pack via `rng`.
 
 #### Scenario: female and male select the f and m pools
 - **WHEN** `roll_name("fantasy-human", "female", rng)` and `roll_name("fantasy-human", "male", rng)`
@@ -44,13 +39,21 @@ SHALL never appear in the returned name.
 - **THEN** the result consists solely of `zh` fields joined by `NAME_SEPARATOR` and contains no
   part's `text` value as a substring
 
+#### Scenario: Unrecognised sex values are treated as unspecified
+- **WHEN** a `sex` value arrives that is unrecognised (design D2)
+- **THEN** it is treated exactly like an unspecified one; this layer validates nothing
+
+#### Scenario: Composition is owned by world/lore/names.py
+- **WHEN** `roll_name` composes the returned name
+- **THEN** it uses the `given.zh‧surname.zh` composition owned by `world/lore/names.py` and SHALL
+  NOT define its own separator constant or concatenate parts itself
+
 ### Requirement: roll_name_for_race resolves via NAME_PACK_BY_RACE with a bound-packs-only random fallback
 `world/rules/namegen.py` SHALL expose `roll_name_for_race(race_key: str | None, sex: str | None,
 rng: Random) -> str` that resolves the pack through `NAME_PACK_BY_RACE` when `race_key` names a
 bound race, delegating to the same rolling logic as `roll_name`. When `race_key` is `None` or has
 no mapping, it SHALL choose uniformly at random via `rng` among the packs that appear as values of
-`NAME_PACK_BY_RACE` (the race-bound packs), so `fantasy-dwarf` and `fantasy-halfling` — registered
-with `race_key=None` — never participate in the random fallback.
+`NAME_PACK_BY_RACE` (the race-bound packs).
 
 #### Scenario: Bound races roll from their mapped pack
 - **WHEN** `roll_name_for_race` is called with `"human"`, `"elf"`, or `"beastfolk"`
@@ -66,13 +69,16 @@ with `race_key=None` — never participate in the random fallback.
   candidates, so every bound pack is selectable and the choice index is decoupled from the
   mapping's literal insertion order.
 
+#### Scenario: Unbound registered packs never join the fallback
+- **WHEN** packs such as `fantasy-dwarf` and `fantasy-halfling` are registered with `race_key=None`
+- **THEN** they never participate in the random fallback
+
 ### Requirement: Unknown pack keys raise KeyError and empty filtered pools fall back to the full given pool
 `roll_name` SHALL propagate `KeyError` unchanged when `pack_key` is not a key of
-`NAME_PACK_REGISTRY` — callers pass program constants and the generator MUST NOT swallow or
+`NAME_PACK_REGISTRY`; callers pass program constants and the generator MUST NOT swallow or
 substitute. When the sex-selected pool is empty, the roller SHALL fall back to the concatenation of
 that pack's three given pools (`"m"` ＋ `"f"` ＋ `"u"`) so the generator never dies; the surname
-pool is not sex-filtered and needs no fallback. The empty-pool semantics SHALL be testable against
-synthetic `NamePack` values without mutating the frozen registry.
+pool is not sex-filtered and needs no fallback.
 
 #### Scenario: Unknown pack key raises KeyError
 - **WHEN** `roll_name("fantasy-dragonkin", "female", rng)` is called
@@ -84,15 +90,17 @@ synthetic `NamePack` values without mutating the frozen registry.
 - **THEN** the given part is drawn from the union of the pack's remaining non-empty given pools
   and the call returns a composed name instead of raising
 
+#### Scenario: Empty-pool semantics are testable without mutating the registry
+- **WHEN** the empty-pool behavior is tested
+- **THEN** it SHALL be testable against synthetic `NamePack` values without mutating the frozen
+  registry
+
 ### Requirement: Rolling is a pure function of the injected rng for replayability
 `world/rules/namegen.py` SHALL be a pure-logic module with no database access, no Evennia imports,
 and no module-level or global RNG: every random decision (pool selection for unspecified sex, pack
 selection for the race fallback, given and surname draws) MUST be made through the caller-injected
 `rng: Random` argument. Two identical calls with `Random` instances seeded identically SHALL return
-the same name, which is how the consuming changes obtain their replay guarantees — the character
-creation dice injects an unseeded module-level `Random()` (names enter the payload like typed
-input), while the NPC flow injects `Random(zlib.crc32(f"{definition.key}:{stage}:{role}".encode()))`
-so blueprint rebuilds yield the same NPC name. Neither strategy lives in this module.
+the same name, which is how the consuming changes obtain their replay guarantees.
 
 #### Scenario: Fixed seed replays identical names
 - **WHEN** `roll_name` and `roll_name_for_race` are each called twice through freshly constructed
@@ -103,3 +111,17 @@ so blueprint rebuilds yield the same NPC name. Neither strategy lives in this mo
 - **WHEN** `world.rules.namegen` is inspected
 - **THEN** it constructs no `Random` instance at import or call time, never calls module-level
   `random.choice`-style functions, and its only randomness source is the `rng` parameter
+
+#### Scenario: Character creation injects an unseeded Random
+- **WHEN** the character-creation dice rolls a name
+- **THEN** it injects an unseeded module-level `Random()` — names enter the payload like typed
+  input
+
+#### Scenario: The NPC flow injects a deterministic seed
+- **WHEN** the NPC flow rolls a name
+- **THEN** it injects `Random(zlib.crc32(f"{definition.key}:{stage}:{role}".encode()))` so
+  blueprint rebuilds yield the same NPC name
+
+#### Scenario: Replay strategies live with the consumers
+- **WHEN** either seeding strategy is considered
+- **THEN** neither strategy lives in this module

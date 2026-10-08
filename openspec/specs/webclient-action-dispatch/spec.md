@@ -5,7 +5,7 @@ Exact bounded UI action validation, allowlisted adapters, session identity, stal
 ## Requirements
 
 ### Requirement: UI actions use an exact bounded request envelope
-`ui_action` SHALL accept exactly `protocol_version`, `presentation_epoch`, `request_id`, `base_revision`, `action_id`, and `payload`. Protocol version SHALL be integer 1; epoch SHALL satisfy the protocol's exact 22-character form; request ID SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; action ID SHALL be 1..64 lowercase dotted identifier characters; base revision SHALL be a non-negative JavaScript-safe integer excluding booleans; and payload SHALL be an object within global bounds plus its registered action-specific smaller schema. Unknown fields or invalid global values SHALL be rejected before action lookup.
+`ui_action` SHALL accept exactly `protocol_version`, `presentation_epoch`, `request_id`, `base_revision`, `action_id`, and `payload`. Protocol version SHALL be integer 1; epoch SHALL satisfy the protocol's exact 22-character form; and payload SHALL be an object within global bounds plus its registered action-specific smaller schema. Unknown fields or invalid global values SHALL be rejected before action lookup.
 
 #### Scenario: A valid action reaches action lookup
 - **WHEN** an authenticated puppeted WebSocket session submits an exact envelope within every global bound
@@ -14,6 +14,10 @@ Exact bounded UI action validation, allowlisted adapters, session identity, stal
 #### Scenario: An oversized action is rejected early
 - **WHEN** an action exceeds the envelope size, depth, field, string, or list bound
 - **THEN** the dispatcher invokes no action-specific validator and no adapter
+
+#### Scenario: Identifier and revision field formats are exact
+- **WHEN** `ui_action` fields are validated
+- **THEN** request ID SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; action ID SHALL be 1..64 lowercase dotted identifier characters; and base revision SHALL be a non-negative JavaScript-safe integer excluding booleans
 
 ### Requirement: Action identity comes only from the authenticated session
 The dispatcher SHALL accept actions only from authenticated WebSocket sessions with an active puppet and SHALL pass only `session.puppet` as the actor. The action payload SHALL NOT accept an actor, account, session, or puppet identifier, and no error response SHALL disclose another actor's state.
@@ -28,37 +32,7 @@ The dispatcher SHALL accept actions only from authenticated WebSocket sessions w
 
 ### Requirement: Action registries are allowlisted and duplicate-safe
 
-The action registry SHALL bind each stable action ID to one exact payload
-validator and one adapter, SHALL reject duplicate registration, and SHALL reject
-unknown action IDs. The production registry SHALL contain the two account
-adapters `account.character.create` and `account.character.switch`, the three
-combat adapters `combat.cast`, `combat.flee`, and `combat.forfeit`, the eight
-service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`,
-`guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, and
-`shop.sell`, the two inventory adapters `inventory.use` and
-`inventory.toggle_equip`, the six creation adapters `creation.preset`,
-`creation.custom`, `creation.concept`, `creation.roll_name`,
-`creation.activate`, and `creation.reset`, the sixteen exploration adapters
-`explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`,
-`explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`,
-`explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`,
-`explore.possess`, `explore.possess_release`, `explore.deliver`,
-`explore.skill_preview`, and `explore.cast`, the two
-title ballot adapters `title.accept` and `title.decline`, the two title codex
-adapters `title.equip` and `title.remove`, the persona adapter
-`character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and
-`npc.persona.update`, the `options.dismiss` action, the four correspondence
-adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`,
-the seven gallery management adapters `gallery.subject.select`,
-`gallery.generate`, `gallery.default.set`, `gallery.card.delete`,
-`gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`,
-the four personal official-art preference adapters `gallery.official.select`,
-`gallery.official.clear_selection`, `gallery.official.geometry.set`, and
-`gallery.official.geometry.clear`, and the four dream collaboration adapters
-`dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`.
-`explore.skill_preview` SHALL perform only epoch-scoped presentation selection;
-`explore.cast` SHALL perform field use through the deterministic core. Neither
-SHALL route through the text command parser.
+The action registry SHALL bind each stable action ID to one exact payload validator and one adapter, SHALL reject duplicate registration, and SHALL reject unknown action IDs. The production registry SHALL contain exactly the action-ID groups enumerated in the scenarios below, each action ID with its own exact validator and deterministic adapter.
 
 #### Scenario: Unknown action cannot become a command
 
@@ -95,9 +69,19 @@ validator and deterministic adapter
 - **WHEN** the two SkillBook action IDs are resolved through the production registry
 - **THEN** each has its own exact validator/adapter, preview selection makes no canonical gameplay mutation, and field casting executes only through its deterministic entry
 
+#### Scenario: Production registry composition is fixed
+
+- **WHEN** the production registry is built
+- **THEN** it contains the two account adapters `account.character.create` and `account.character.switch`, the three combat adapters `combat.cast`, `combat.flee`, and `combat.forfeit`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the sixteen exploration adapters `explore.move`, `explore.look`, `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `explore.skill_preview`, and `explore.cast`, the two title ballot adapters `title.accept` and `title.decline`, the two title codex adapters `title.equip` and `title.remove`, the persona adapter `character.persona.update`, the two NPC author-editor adapters `npc.persona.read` and `npc.persona.update`, the `options.dismiss` action, the four correspondence adapters `letters.list`, `letters.collect`, `letters.read`, and `letters.send`, the seven gallery management adapters `gallery.subject.select`, `gallery.generate`, `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`, `gallery.binding.save`, and `gallery.stage.update`, the four personal official-art preference adapters `gallery.official.select`, `gallery.official.clear_selection`, `gallery.official.geometry.set`, and `gallery.official.geometry.clear`, and the four dream collaboration adapters `dream.say`, `dream.draft`, `dream.confirm`, and `dream.awaken`
+
+#### Scenario: Skill preview and cast bypass the text parser
+
+- **WHEN** `explore.skill_preview` or `explore.cast` is admitted
+- **THEN** `explore.skill_preview` performs only epoch-scoped presentation selection and `explore.cast` performs field use through the deterministic core, and neither routes through the text command parser
+
 ### Requirement: Adapters may receive the authenticated session through a fixed optional third parameter
 
-Every registered adapter SHALL declare the callable signature `adapter(actor, payload, session=None)`. The dispatcher SHALL invoke every adapter with the authenticated session as the third positional argument and SHALL never use runtime signature introspection to decide what to pass. A direct two-argument invocation of an adapter (for example in a unit test) SHALL behave exactly as before through the default. The session SHALL be used only for per-session presentation targeting (for example dismiss eviction); adapters SHALL NOT read or write character state through it, and the actor identity rule (session.puppet only) is unchanged.
+Every registered adapter SHALL declare the callable signature `adapter(actor, payload, session=None)`. The dispatcher SHALL invoke every adapter with the authenticated session as the third positional argument and SHALL never use runtime signature introspection to decide what to pass. A direct two-argument invocation of an adapter (for example in a unit test) SHALL behave exactly as before through the default.
 
 #### Scenario: A dispatched adapter receives the session
 
@@ -113,6 +97,11 @@ Every registered adapter SHALL declare the callable signature `adapter(actor, pa
 
 - **WHEN** the dispatcher invokes an adapter
 - **THEN** it passes `(actor, payload, session)` positionally unconditionally, without inspecting the callable signature
+
+#### Scenario: Session use is presentation-targeting only
+
+- **WHEN** an adapter receives the session
+- **THEN** it SHALL be used only for per-session presentation targeting (for example dismiss eviction), the adapter SHALL NOT read or write character state through it, and the actor identity rule (session.puppet only) is unchanged
 
 ### Requirement: Adapters preserve deterministic ownership boundaries
 Every adapter SHALL re-resolve every client-referenced identity, re-authorize current domain state, and call a public API owned by the deterministic core or its explicitly named subsystem owner. An adapter SHALL NOT assign `.db`, `AttributeProperty`, traits, buffs, sexual state, map knowledge, quest state, wallet, inventory, or location directly. Presenters SHALL NOT invoke adapters.
@@ -160,7 +149,7 @@ The dispatcher SHALL retain a bounded insertion-ordered cache of completed actio
 - **THEN** puppet A's cached result is not replayed and no result or presentation from the retired sequence is published to puppet B
 
 ### Requirement: Each session admits only one mutation in flight
-The server SHALL permit at most one distinct UI mutation in flight per live transport-and-puppet sequence, regardless of browser control state. A concurrent distinct action SHALL return outcome `rejected` with code `busy` and the current revision without adapter invocation or disturbing the admitted request. `ui_sync` SHALL remain available while an action is in flight. Coordinator publication SHALL serialize sync snapshots and action completion so a sync may occur before or after, but not between, a completion presentation and its result.
+The server SHALL permit at most one distinct UI mutation in flight per live transport-and-puppet sequence, regardless of browser control state. A concurrent distinct action SHALL return outcome `rejected` with code `busy` and the current revision without adapter invocation or disturbing the admitted request. `ui_sync` SHALL remain available while an action is in flight.
 
 #### Scenario: Concurrent mutation is rejected server-side
 - **WHEN** one proof adapter is held in flight and the same session submits a different request ID
@@ -182,10 +171,13 @@ The server SHALL permit at most one distinct UI mutation in flight per live tran
 - **WHEN** an old puppet's already-started adapter settles after the session adopts a new puppet and epoch
 - **THEN** its captured deterministic call is not retried or redirected and it publishes no result or panel state into the new sequence
 
-### Requirement: Admitted action completion publishes canonical state before unlocking
-After an admitted non-duplicate action settles, the coordinator SHALL build presentation from committed canonical state and allocate exactly one next revision inside one publication critical section. Success or domain rejection with a declared nonempty affected-panel set SHALL emit one update; stale, internal error, or an empty affected-panel set SHALL emit one full snapshot. The server SHALL send that presentation before an exact `ui_action_result` naming the same revision and SHALL release the server in-flight marker only after both sends. The browser SHALL release its mutation lock only after receiving the result and accepting presentation state at or above `presentation_revision`. A cached duplicate MAY replay its prior result without a new presentation, and a busy pre-admission rejection SHALL NOT alter the admitted request's lock.
+#### Scenario: Sync snapshots serialize around completions
 
-An action whose committed effect retires the session's presentation and dispatch sequence — a puppet change — SHALL NOT perform that effect inside its adapter, because a retired sequence publishes nothing into its replacement and the request would receive no result at all. Such an action SHALL instead decide and report synchronously and schedule its effect to run only after its result has been sent and both the server in-flight marker and the browser mutation lock have been released. Its result SHALL report the outcome of the authorization decision, which SHALL be complete before the result is sent. The scheduled effect SHALL re-validate that decision against committed state, SHALL verify that the effect actually took hold rather than assuming an API that can refuse silently succeeded, SHALL report any failure to the player through the ordinary message channel at a severity matching how far the failure got, and SHALL publish recovery presentation whenever a puppet remains to render it for. Such an action SHALL declare no affected panels and SHALL emit no completion presentation, so no state derived from the retiring puppet is published at the retiring epoch.
+- **WHEN** the coordinator publishes sync snapshots and action completions
+- **THEN** publication serializes them so a sync may occur before or after, but not between, a completion presentation and its result
+
+### Requirement: Admitted action completion publishes canonical state before unlocking
+After an admitted non-duplicate action settles, the coordinator SHALL build presentation from committed canonical state and allocate exactly one next revision inside one publication critical section. Success or domain rejection with a declared nonempty affected-panel set SHALL emit one update; stale, internal error, or an empty affected-panel set SHALL emit one full snapshot.
 
 #### Scenario: Successful completion refreshes before result
 - **WHEN** a proof adapter commits successfully and declares an affected panel
@@ -215,6 +207,35 @@ An action whose committed effect retires the session's presentation and dispatch
 - **WHEN** the scheduled effect calls an API that refuses by returning without raising
 - **THEN** the verification step detects that the effect did not take hold and the recovery path runs, rather than the transition proceeding as though it had succeeded
 
+#### Scenario: Presentation precedes result and unlock
+- **WHEN** the coordinator publishes an admitted action's completion
+- **THEN** the server SHALL send that presentation before an exact `ui_action_result` naming the same revision
+- **AND** it SHALL release the server in-flight marker only after both sends
+
+#### Scenario: Browser lock releases only at the named revision
+- **WHEN** the server has sent a completion presentation and result
+- **THEN** the browser SHALL release its mutation lock only after receiving the result and accepting presentation state at or above `presentation_revision`
+
+#### Scenario: Duplicate replay and busy rejection leave lock state intact
+- **WHEN** a cached duplicate request is replayed, or a busy pre-admission rejection is returned
+- **THEN** the duplicate MAY replay its prior result without a new presentation
+- **AND** the busy rejection SHALL NOT alter the admitted request's lock
+
+#### Scenario: Sequence-retiring result reports the completed decision
+- **WHEN** an action whose committed effect is a puppet change decides its authorization synchronously
+- **THEN** its result SHALL report the outcome of the authorization decision, which SHALL be complete before the result is sent
+- **AND** the scheduled effect SHALL re-validate that decision against committed state
+- **AND** the effect SHALL be scheduled to run only after its result has been sent and both the server in-flight marker and the browser mutation lock have been released
+
+#### Scenario: Sequence-retiring actions emit no completion presentation
+- **WHEN** a sequence-retiring action completes
+- **THEN** it SHALL declare no affected panels and SHALL emit no completion presentation, so no state derived from the retiring puppet is published at the retiring epoch
+
+#### Scenario: Scheduled effect failures carry matching severity
+- **WHEN** a scheduled sequence-retiring effect fails at any stage
+- **THEN** it SHALL report the failure to the player through the ordinary message channel at a severity matching how far the failure got
+- **AND** it SHALL publish recovery presentation whenever a puppet remains to render it for
+
 ### Requirement: Action results are safe and disconnects are never retried automatically
 Every admitted action whose transport-and-puppet sequence remains active through publication SHALL resolve with the exact result envelope defined by the OOB protocol. A retired sequence SHALL publish nothing into its replacement. Internal results SHALL expose no traceback, local path, raw exception, or raw payload. If transport loss makes an outcome uncertain, the browser SHALL NOT automatically resubmit the request and SHALL show an uncertain-result notice after canonical resynchronization.
 
@@ -236,14 +257,7 @@ The action dispatcher SHALL return a bounded rejection (stable code, no characte
 - **THEN** the client receives a rejection with a stable code and no character state
 
 ### Requirement: combat.cast payload carries an optional bounded scale
-The `combat.cast` payload validator SHALL accept an optional `scale` field alongside `skill_key`,
-`target_ids`, and `target_shorthand`. The value SHALL be a JSON number exactly equal to one member of
-the `freeform_cast_scales` table (`0.25`, `0.5`, `1.0`, `2.0`, `4.0`); a boolean, a non-number, or a
-non-member number SHALL be rejected as `malformed_payload` without adapter invocation. An absent
-field SHALL default to `1.0`. The field MAY accompany every target form (NONE, SELF, SINGLE, and
-AREA, including shorthands). The adapter SHALL thread the validated scale into
-`revalidate_submission` and `submit_player_action`, so a scale the deterministic gate forbids is
-rejected before initiative with the stable `SCALED_CAST_FORBIDDEN` code.
+The `combat.cast` payload validator SHALL accept an optional `scale` field alongside `skill_key`, `target_ids`, and `target_shorthand`. The value SHALL be a JSON number exactly equal to one member of the `freeform_cast_scales` table (`0.25`, `0.5`, `1.0`, `2.0`, `4.0`); an absent field SHALL default to `1.0`. A boolean, a non-number, or a non-member number SHALL be rejected as `malformed_payload` without adapter invocation.
 
 #### Scenario: A member scale is accepted on every target form
 - **WHEN** a client submits `combat.cast` with `scale: 2.0` together with an explicit SINGLE
@@ -259,9 +273,17 @@ rejected before initiative with the stable `SCALED_CAST_FORBIDDEN` code.
 - **WHEN** a client submits a valid `combat.cast` without a `scale` field
 - **THEN** the adapter behaves exactly as before this change (`scale == 1.0`)
 
+#### Scenario: Scale accompanies every target form
+- **WHEN** a `combat.cast` payload carries `scale` with any target form
+- **THEN** the field MAY accompany every target form (NONE, SELF, SINGLE, and AREA, including shorthands)
+
+#### Scenario: Deterministic gate rejects forbidden scales before initiative
+- **WHEN** the adapter processes a validated scale
+- **THEN** it SHALL thread the validated scale into `revalidate_submission` and `submit_player_action`, so a scale the deterministic gate forbids is rejected before initiative with the stable `SCALED_CAST_FORBIDDEN` code
+
 ### Requirement: A non-success action result surfaces its message exactly once
 
-When the client recognizes a matching non-success `ui_action_result` — outcome `rejected`, `stale`, or `error`, carrying the same request id and epoch as its in-flight dispatch — and the creation overlay is not the presenting surface, it SHALL make the envelope's server-authored message visible to the player exactly once per recognized result, rendered as one narrative error line carrying that message verbatim through the bounded narrative path. The client SHALL NOT paraphrase, translate, or synthesize replacement text while the envelope carries a message, and SHALL show a single stable fallback line when a recognized non-success result carries none. A successful result SHALL surface no additional line. While the creation overlay is mounted it SHALL be the presenting surface: the overlay SHALL render the recognized non-success result's message verbatim in an always-reachable result region across every wizard stage, and no narrative line SHALL be appended for that result. Surfacing SHALL NOT alter the in-flight lock, the revision-gated release (including the `stale` rule that holds the lock until the recovery snapshot commits), the uncertain-result notice, or the no-automatic-resubmit rule.
+When the client recognizes a matching non-success `ui_action_result` — outcome `rejected`, `stale`, or `error`, carrying the same request id and epoch as its in-flight dispatch — and the creation overlay is not the presenting surface, it SHALL make the envelope's server-authored message visible to the player exactly once per recognized result, rendered as one narrative error line carrying that message verbatim through the bounded narrative path.
 
 #### Scenario: A rejected move explains itself in the feed
 
@@ -287,3 +309,24 @@ When the client recognizes a matching non-success `ui_action_result` — outcome
 
 - **WHEN** a recognized non-success result carries no usable message
 - **THEN** the narrative shows the single stable fallback line rather than failing silently
+
+#### Scenario: Messages are never rewritten or fabricated
+
+- **WHEN** a recognized non-success result carries a message, or carries none
+- **THEN** the client SHALL NOT paraphrase, translate, or synthesize replacement text while the envelope carries a message
+- **AND** it SHALL show a single stable fallback line when a recognized non-success result carries none
+
+#### Scenario: Successful results stay silent
+
+- **WHEN** the client recognizes a successful result
+- **THEN** it SHALL surface no additional line
+
+#### Scenario: Creation overlay is the sole presenting surface
+
+- **WHEN** the creation overlay is mounted and a recognized non-success result arrives
+- **THEN** the overlay SHALL be the presenting surface and SHALL render the result's message verbatim in an always-reachable result region across every wizard stage, and no narrative line SHALL be appended for that result
+
+#### Scenario: Surfacing never alters dispatch safety rules
+
+- **WHEN** a non-success result message is surfaced
+- **THEN** surfacing SHALL NOT alter the in-flight lock, the revision-gated release (including the `stale` rule that holds the lock until the recovery snapshot commits), the uncertain-result notice, or the no-automatic-resubmit rule

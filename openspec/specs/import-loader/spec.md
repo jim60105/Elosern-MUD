@@ -31,13 +31,11 @@ run in one database transaction so a later runtime failure rolls back earlier ob
 
 ### Requirement: Loaded trait values are the literal imported stats, merged onto the race floor for omitted keys, never re-derived or multiplied
 `loader.py` SHALL construct traits from `race_floor(RACE_REGISTRY[race])` updated by the record's
-literal `stats`, with no skill multipliers, no profession multipliers, and no re-derivation. The
-sole tier influence allowed: when the record declares `profession` whose registry row carries a
-non-null `default_tier` AND the record's own `stats` is empty, trait construction SHALL route
-through the race-baseline tiered construction (`initial_trait_config(race, subrace, tier)`)
-instead of the plain race floor. A record declaring any literal stat keeps those literal values
-unchanged, and a record without `profession` (or with a null-tier row) SHALL construct traits
-byte-identically to the pre-change loader.
+literal `stats`, with no skill or profession multipliers and no re-derivation. The sole tier
+influence allowed: when the record declares `profession` whose registry row carries a non-null
+`default_tier` AND the record's own `stats` is empty, trait construction SHALL route through the
+race-baseline tiered construction (`initial_trait_config(race, subrace, tier)`) instead of the
+plain race floor.
 
 #### Scenario: An explicitly imported stat value is used verbatim
 - **WHEN** a character record's `stats.atk_phys` is `88` and the record's `race` is `elf`
@@ -69,20 +67,16 @@ byte-identically to the pre-change loader.
 - **WHEN** a record omits `profession`
 - **THEN** trait construction is byte-identical to the pre-change loader for the same record
 
+#### Scenario: A null-tier profession row is a no-op
+- **WHEN** a record declares `profession` naming a registry row whose `default_tier` is null
+- **THEN** trait construction is byte-identical to the pre-change loader for the same record
+
 ### Requirement: Non-trait record fields are stored verbatim into the seam attributes without interpretation
 `loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and
 `disguised_stats` into the corresponding `LivingEntity` attributes exactly as validated, without
-adding, removing, or transforming any content (the sole derived write is the lineage auto-seed —
-see `use-driven-skill-lineage`: `skills`/`passives` are extended with the transitive
-prerequisite-ownership closure of what the record declared, prerequisite proficiency is seeded to
-exactly the edge value, the whole normalization runs before schema range validation, and an explicit
-imported `skill_proficiency` entry always beats the seed), and SHALL store `inventory` into
-`entity.db.inventory` using Evennia's attribute store directly (no seam attribute declaration
-required from any other change). For an NPC target, the validated persona is the normalized compact
-card, and the loader SHALL write it through the deterministic NPC persona initializer with `import`
-provenance naming the record key, inside the batch transaction, so the NPC also carries persona
-metadata at version 1; the stored card SHALL equal the validated card exactly. For a non-NPC
-target, the persona SHALL be stored verbatim.
+adding, removing, or transforming any content; the sole derived write is the lineage auto-seed
+(see `use-driven-skill-lineage`). The loader SHALL store `inventory` into `entity.db.inventory`
+using Evennia's attribute store directly.
 
 #### Scenario: persona is stored without inspection
 - **WHEN** a valid character record loaded against `PlayerCharacter` carries a `persona` object with arbitrary nested structure
@@ -123,6 +117,30 @@ target, the persona SHALL be stored verbatim.
 - **THEN** the constructed entity's `entity.db.inventory` equals that array exactly, and no
   modification to `typeclasses/entities.py` is required for this to work
 
+#### Scenario: No other change must declare a seam attribute for inventory
+- **WHEN** the loader writes `inventory` through Evennia's attribute store
+- **THEN** no seam attribute declaration is required from any other change
+
+#### Scenario: Lineage normalization runs before schema range validation
+- **WHEN** the lineage auto-seed expands a record's `skills`/`passives`
+- **THEN** the whole normalization runs before schema range validation
+
+#### Scenario: An explicit imported proficiency entry beats the seed
+- **WHEN** a record declares an explicit `skill_proficiency` entry for a prerequisite the seed would
+  also add
+- **THEN** the explicit imported entry always wins over the seeded value
+
+#### Scenario: An NPC persona is the normalized card written with import provenance
+- **WHEN** an NPC-target record is loaded
+- **THEN** the validated persona is the normalized compact card, written through the deterministic
+  NPC persona initializer with `import` provenance naming the record key, inside the batch
+  transaction, so the NPC also carries persona metadata at version 1, and the stored card equals
+  the validated card exactly
+
+#### Scenario: A non-NPC persona is stored verbatim
+- **WHEN** a record is loaded against a non-NPC target
+- **THEN** the persona is stored verbatim
+
 ### Requirement: The loader can target either PlayerCharacter or NPC
 `loader.py`'s entity-construction function SHALL accept a `typeclass` parameter defaulting to `NPC`,
 allowing a caller to construct a `PlayerCharacter` instead, without this change performing any
@@ -141,8 +159,7 @@ Account/session binding.
 `loader.py` SHALL assign `entity.sex = record["sex"]` during instantiation, using the same direct
 `AttributeProperty`-assignment shape as `entity.race = record["race"]` and
 `entity.subrace = record.get("subrace")` — not the `entity.db.*` seam-attribute shape used for
-opaque payloads (`persona`, `sexual_baseline`, `skills`/`passives`, `equipment`,
-`disguised_stats`). `sex` is a required schema property (see `import-schema`), so this assignment
+opaque payloads. `sex` is a required schema property (see `import-schema`), so this assignment
 SHALL always read a value present in the validated record, never a missing key.
 
 #### Scenario: A validated record's sex value is assigned verbatim
@@ -154,21 +171,17 @@ SHALL always read a value present in the validated record, never a missing key.
 - **THEN** the `sex` assignment reads `entity.sex = record["sex"]`, with no corresponding
   `entity.db.sex` assignment anywhere in the loader
 
+#### Scenario: Opaque payload fields keep the db seam shape
+- **WHEN** the loader stores `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, or
+  `disguised_stats`
+- **THEN** those use the `entity.db.*` seam-attribute shape, unlike `sex`
+
 ### Requirement: A profession-bearing NPC record assembles blueprint components with explicit precedence
 When a validated NPC record declares `profession`, `loader.py` SHALL attach, inside the record's
-construction transaction, every component of the profession blueprint that the record does NOT
-list explicitly in its own `components` (blueprint minus explicit types — an explicit entry of the
-same type replaces the blueprint entry entirely, design D5). Explicit vocabulary entries the
-blueprint omits SHALL be appended in record order. Component kwargs SHALL come only from authored
-sources: the record's explicit `components` entry kwargs. When a blueprint component's identity
-kwargs (any of `service_id`, `shop_key`, `branch_key`, `dialogue_key`) cannot be fully supplied
-from authored record data, the WHOLE batch SHALL be rejected with a named issue BEFORE any entity
-is constructed (the shared batch validator owns the rejection; the loader re-runs the same
-resolution fail-closed as its second gate); the loader SHALL NEVER invent or default an identity
-value. Assembly SHALL attach through the same component-attach path
-`world/rules/guild_economy.py`'s sync uses, and an absent-`profession` record SHALL construct
-byte-identically to the pre-change loader. Each assembled NPC SHALL emit one
-`import_profession_assembled` info event (`char` = the record key, `profession` = the row key).
+construction transaction, every blueprint component the record does NOT list explicitly in its
+own `components` (blueprint minus explicit types — an explicit entry of the same type replaces
+the blueprint entry entirely, design D5). Component kwargs SHALL come only from authored sources:
+the record's explicit `components` entry kwargs.
 
 #### Scenario: Blueprint minus explicit components
 - **WHEN** a record declares a profession whose blueprint carries `guild_staff` and
@@ -187,6 +200,34 @@ byte-identically to the pre-change loader. Each assembled NPC SHALL emit one
 - **WHEN** component attachment fails midway (e.g. a duplicate component slot)
 - **THEN** `load_batch` persists nothing for the whole batch, matching the existing
   all-or-nothing contract
+
+#### Scenario: Explicit entries the blueprint omits keep record order
+- **WHEN** the record's `components` lists an entry of a type the blueprint omits
+- **THEN** that entry is appended in record order
+
+#### Scenario: Identity resolution is fail-closed at two gates
+- **WHEN** a blueprint component's identity kwargs cannot be fully supplied from authored record data
+- **THEN** the shared batch validator owns the whole-batch rejection with a named issue BEFORE any
+  entity is constructed, and the loader re-runs the same resolution fail-closed as its second gate
+
+#### Scenario: The loader never invents an identity value
+- **WHEN** an identity kwarg (any of `service_id`, `shop_key`, `branch_key`, `dialogue_key`) is
+  unsupplied
+- **THEN** the loader never invents or defaults the value
+
+#### Scenario: Assembly reuses the guild economy attach path
+- **WHEN** assembled components are attached
+- **THEN** they attach through the same component-attach path `world/rules/guild_economy.py`'s
+  sync uses
+
+#### Scenario: No profession means byte-identical construction
+- **WHEN** a record omits `profession`
+- **THEN** it constructs byte-identically to the pre-change loader
+
+#### Scenario: Each assembled NPC emits one assembly info event
+- **WHEN** an NPC record with `profession` finishes assembly
+- **THEN** it emits one `import_profession_assembled` info event (`char` = the record key,
+  `profession` = the row key)
 
 ### Requirement: A blueprint schedule template is applied to assembled NPCs only
 When the profession row's `schedule_template` is non-null and the constructed entity is an `NPC`,

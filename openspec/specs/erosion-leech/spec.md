@@ -9,13 +9,8 @@ Enable damaging HP rate buffs carrying a validated caster-share clause to credit
 A buff definition whose fixed-delta `rate` modifier targets `hp` with a negative delta and declares a
 validated `caster_share` clause SHALL, on each tick, credit the buff's origin caster HP equal to
 `floor(actual_loss × caster_share)`, where `actual_loss` is the victim's HP actually removed by that
-tick after clamping — never the nominal delta. The credit SHALL be paid in the same tick pass,
-SHALL increase (never decrease) the caster's HP, SHALL clamp at the caster's HP maximum, SHALL
-dispatch no further outcome events (no `hp_loss`, no reaction re-entry on either party), and SHALL
-leave the victim's existing single `hp_loss` dispatch and the combat round's tick-record settlement
-exactly as they are. A row without the clause SHALL tick bit-identically to its pre-clause behavior.
-The mechanism SHALL read no element, skill or buff-key identity — any element's damaging hp rate row
-may declare it.
+tick after clamping — never the nominal delta. The credit SHALL be paid in the same tick pass, SHALL
+increase (never decrease) the caster's HP, and SHALL clamp at the caster's HP maximum.
 
 #### Scenario: Full-share erosion tick moves the actual loss to the caster
 - **WHEN** a synthetic hp rate row with `caster_share: 1.0` applied by a living caster ticks a victim
@@ -47,15 +42,28 @@ may declare it.
 - **THEN** the non-share row's victim and any other entity change exactly as before the clause
   existed
 
+#### Scenario: The credit leg dispatches no further outcome events
+- **WHEN** a share-bearing tick pays its credit leg
+- **THEN** no further outcome events dispatch — no `hp_loss`, no reaction re-entry on either party —
+  and the victim's existing single `hp_loss` dispatch is left exactly as it is
+
+#### Scenario: The combat round's tick-record settlement is unchanged
+- **WHEN** a share-bearing tick settles within a combat round
+- **THEN** the combat round's tick-record settlement is exactly as it was before the clause existed
+
+#### Scenario: A row without the clause is bit-identical
+- **WHEN** a damaging hp rate row without the `caster_share` clause ticks
+- **THEN** it SHALL tick bit-identically to its pre-clause behavior
+
+#### Scenario: Any element's damaging hp rate row may declare the clause
+- **WHEN** a damaging hp rate row of any element declares a validated `caster_share` clause
+- **THEN** the credit mechanism applies, because it SHALL read no element, skill or buff-key identity
+
 ### Requirement: Leech origin is the grant-time snapshot and extinguishes with either party
 The credit recipient SHALL be resolved from the buff cache's persisted grant-time source identity —
 never from any caller-supplied field and never re-derived at tick time from anything but that stored
-identity. Re-application by a different caster SHALL redirect subsequent ticks' credit to the newest
-applier exactly as the shipped damaging-buff source-replacement contract already replaces the cached
-source, while a refresh carrying no new source SHALL retain the previous one. Credit SHALL extinguish
-— with zero writes and no errors — when the buff instance expires, is dispelled or cleansed, when the
-victim dies, or when the origin caster is dead or unresolvable; the victim's tick damage itself SHALL
-be unaffected by extinguishment.
+identity. Credit SHALL extinguish — with zero writes and no errors — when the buff instance expires,
+is dispelled or cleansed, when the victim dies, or when the origin caster is dead or unresolvable.
 
 #### Scenario: Refresh redirects the origin to the newest applier
 - **WHEN** caster B re-applies the same share-bearing erosion key caster A applied, before expiry
@@ -76,3 +84,16 @@ be unaffected by extinguishment.
   source identity than the resolving actor
 - **THEN** the persisted origin remains the actor-derived identity the shipped attribution contract
   establishes, and credit follows it
+
+#### Scenario: Re-application redirects the cached source
+- **WHEN** the buff is re-applied by a different caster
+- **THEN** subsequent ticks' credit SHALL redirect to the newest applier, exactly as the shipped
+  damaging-buff source-replacement contract already replaces the cached source
+
+#### Scenario: A sourceless refresh keeps the previous origin
+- **WHEN** the buff is refreshed carrying no new source
+- **THEN** the previously persisted origin SHALL be retained
+
+#### Scenario: Victim tick damage survives extinguishment
+- **WHEN** the credit extinguishes for any of the listed reasons
+- **THEN** the victim's tick damage itself SHALL be unaffected by extinguishment

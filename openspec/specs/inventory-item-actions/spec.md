@@ -5,7 +5,11 @@ Allowlisted UI actions, adapters, client confirmation and toggle behavior, text 
 ## Requirements
 
 ### Requirement: Inventory mutations use exact allowlisted UI actions
-The production UI action registry SHALL register `inventory.use` and `inventory.toggle_equip`. `inventory.toggle_equip` SHALL accept exactly `{item_key}`. `inventory.use` SHALL accept exactly `{item_key}` or `{item_key, target_key}`, where each key is a bounded non-empty string containing no whitespace (the typed `use`/`equip` commands parse their arguments as whitespace-delimited tokens and the browser input echo prints the line verbatim, so an echoed line must stay byte-replayable). `target_key` SHALL name **whom** an effect reaches and SHALL NOT influence **what** the item does: the item's effects and their scopes are fixed by the item-effect rulebook, and a supplied target is consumed only by an effect the rulebook already scoped to a single entity. The authenticated session SHALL be the only actor source. Neither payload SHALL accept actor, quantity, effect, consumable, slot, HP, combat, or presentation fields. The adapters SHALL re-resolve current canonical state and call only the public deterministic item-use, combat-session, or equipment-toggle APIs; they SHALL NOT assign persistent state directly or route through the text parser.
+The production UI action registry SHALL register `inventory.use` and `inventory.toggle_equip`.
+`inventory.toggle_equip` SHALL accept exactly `{item_key}`. `inventory.use` SHALL accept exactly
+`{item_key}` or `{item_key, target_key}`, where each key is a bounded non-empty string containing
+no whitespace. A supplied `target_key` SHALL name **whom** an effect reaches and SHALL NOT
+influence **what** the item does. The authenticated session SHALL be the only actor source.
 
 #### Scenario: Item use delegates once
 - **WHEN** an authenticated actor submits `inventory.use` with one held usable item key
@@ -34,8 +38,34 @@ The production UI action registry SHALL register `inventory.use` and `inventory.
 - **THEN** the deterministic preflight rejects it, because group reach is fixed by the rulebook and is
   never selectable by the client
 
+#### Scenario: Item keys stay byte-replayable in echoed input
+- **WHEN** the whitespace ban on item and target keys is examined
+- **THEN** it holds because the typed `use`/`equip` commands parse their arguments as
+  whitespace-delimited tokens and the browser input echo prints the line verbatim, so an echoed
+  line must stay byte-replayable
+
+#### Scenario: Effects and scopes come from the item-effect rulebook
+- **WHEN** an `inventory.use` settlement determines what an item does
+- **THEN** the item's effects and their scopes are fixed by the item-effect rulebook, and a
+  supplied target is consumed only by an effect the rulebook already scoped to a single entity
+
+#### Scenario: Payloads reject non-key fields
+- **WHEN** an `inventory.use` or `inventory.toggle_equip` payload carries actor, quantity, effect,
+  consumable, slot, HP, combat, or presentation fields
+- **THEN** exact payload validation rejects it before adapter invocation
+
+#### Scenario: Adapters use only public deterministic APIs
+- **WHEN** an inventory adapter handles a validated payload
+- **THEN** it re-resolves current canonical state and calls only the public deterministic
+  item-use, combat-session, or equipment-toggle APIs, and it never assigns persistent state
+  directly or routes through the text parser
+
 ### Requirement: Inventory tiles confirm use and directly toggle equipment
-The combat dock root SHALL add one client-local `背包` row that opens the frameless inventory drawer without dispatching, inventing a gameplay action, pushing a router frame, or changing server-authored combat actions. Deliberate activation of an inventory tile SHALL follow its committed action descriptor while pointer hover and keyboard focus continue to expose the shared inspector. An inspect-only tile SHALL dispatch nothing. A disabled action SHALL show its committed bounded reason and dispatch nothing. An enabled `inventory.use` SHALL open a labelled modal confirmation naming the item; confirm SHALL dispatch exactly once, while cancel, close, or Escape SHALL dispatch nothing and restore focus to the originating tile. An enabled `inventory.toggle_equip` SHALL dispatch exactly once immediately without confirmation. Pointer and keyboard activation SHALL be equivalent.
+The combat dock root SHALL add one client-local `背包` row that opens the frameless inventory
+drawer without dispatching, inventing a gameplay action, pushing a router frame, or changing
+server-authored combat actions. An enabled `inventory.use` SHALL open a labelled modal
+confirmation naming the item; confirm SHALL dispatch exactly once, while cancel, close, or
+Escape SHALL dispatch nothing and restore focus to the originating tile.
 
 #### Scenario: Combat root opens the frameless bag locally
 - **WHEN** the player activates `背包` from the combat dock root
@@ -57,8 +87,28 @@ The combat dock root SHALL add one client-local `背包` row that opens the fram
 - **WHEN** five accessories are equipped and the player activates a disabled unequipped accessory tile
 - **THEN** the UI presents the server-authored accessory-cap warning, sends no request, and does not choose an accessory to remove
 
+#### Scenario: Tile activation follows the committed descriptor
+- **WHEN** an inventory tile is deliberately activated
+- **THEN** the activation follows its committed action descriptor, while pointer hover and
+  keyboard focus continue to expose the shared inspector
+
+#### Scenario: An inspect-only tile dispatches nothing
+- **WHEN** a tile whose committed action descriptor is inspect-only is activated
+- **THEN** the UI dispatches no action
+
+#### Scenario: A disabled action shows its reason without dispatching
+- **WHEN** a tile with a disabled action is activated
+- **THEN** the UI shows the committed bounded reason and dispatches nothing
+
+#### Scenario: Pointer and keyboard activation are equivalent
+- **WHEN** an inventory tile is activated by pointer or by keyboard
+- **THEN** both activation paths produce the same dispatch behavior
+
 ### Requirement: Item dialogs and dispatch state fail closed across replacement and transport changes
-The confirmation dialog and tile-local action state SHALL be client-local and SHALL never mutate committed panel data. A services-panel replacement, drawer close, mode change, epoch change, or transport reset SHALL close the dialog and discard its pending local intent. While any mutation is in flight, repeated tile activation SHALL emit no second request. A server rejection caused by state changing after confirmation opened SHALL use the existing action-result alert and the next canonical publication SHALL remain authoritative.
+The confirmation dialog and tile-local action state SHALL be client-local and SHALL never mutate
+committed panel data. A services-panel replacement, drawer close, mode change, epoch change, or
+transport reset SHALL close the dialog and discard its pending local intent. While any mutation
+is in flight, repeated tile activation SHALL emit no second request.
 
 #### Scenario: Replaced inventory retires an open confirmation
 - **WHEN** an item-use confirmation is open and a new services panel commits
@@ -76,8 +126,16 @@ The confirmation dialog and tile-local action state SHALL be client-local and SH
 - **WHEN** the request passes current epoch/revision checks but HP becomes full before deterministic settlement
 - **THEN** item preflight rejects with `hp_full`, no potion is consumed, and the UI displays the current-state rejection without optimistic mutation
 
+#### Scenario: A post-confirmation rejection uses the existing alert
+- **WHEN** the server rejects a confirmed action because state changed after the confirmation
+  opened
+- **THEN** the rejection uses the existing action-result alert and the next canonical publication
+  remains authoritative
+
 ### Requirement: Inventory actions publish all affected canonical panels
-A completed inventory action SHALL publish one canonical presentation commit covering every surface its settlement may change. Item use SHALL refresh inventory, status, combat/context state, clock-derived state, and terminal mode when applicable. Equipment toggle SHALL refresh inventory equipped flags, status, combat previews, and character equipment rows whenever the character panel is available; in combat, where the character panel retains its registered unavailable form, canonical inventory equipped flags SHALL remain the visible equipment truth. The client SHALL derive quantity and equipped indicators only from that accepted commit and SHALL NOT optimistically decrement or toggle them.
+A completed inventory action SHALL publish one canonical presentation commit covering every
+surface its settlement may change. The client SHALL derive quantity and equipped indicators only
+from that accepted commit and SHALL NOT optimistically decrement or toggle them.
 
 #### Scenario: Successful potion use refreshes quantity and HP together
 - **WHEN** a consumable healing potion action succeeds
@@ -91,15 +149,28 @@ A completed inventory action SHALL publish one canonical presentation commit cov
 - **WHEN** equipment is toggled during combat while the character panel is unavailable
 - **THEN** the accepted publication updates canonical inventory equipped flags and combat-derived panels without fabricating character equipment rows
 
+#### Scenario: Item use refreshes every affected surface
+- **WHEN** an item-use settlement completes
+- **THEN** the canonical commit refreshes inventory, status, combat/context state, clock-derived
+  state, and terminal mode when applicable
+
+#### Scenario: Equipment toggle refreshes every available surface
+- **WHEN** an equipment-toggle settlement completes while the character panel is available
+- **THEN** the canonical commit refreshes inventory equipped flags, status, combat previews, and
+  character equipment rows
+
+#### Scenario: Canonical equipped flags are the combat equipment truth
+- **WHEN** equipment is toggled in combat, where the character panel retains its registered
+  unavailable form
+- **THEN** canonical inventory equipped flags remain the visible equipment truth
+
 ### Requirement: Text clients expose the same deterministic item operations
 The player command surface SHALL provide `使用 <item_key> [target]` with alias `use` and
 `裝備 <item_key>` with alias `equip`. These commands SHALL pass only the parsed item key, and for
-`使用` the optional parsed target token, into the same deterministic APIs used by UI adapters. Both
-commands SHALL be available in exploration and active combat. Combat use SHALL enter the same
-combat-session facade and consume one round on success; equipment toggle SHALL consume no round.
-Stable rejections SHALL render the same Traditional Chinese reason semantics as UI actions, including
-the no-target and invalid-target reasons. Command additions and syntax SHALL update both
-`docs/game/commands.md` and `docs/game/command-reference.md` in the same change.
+`使用` the optional parsed target token, into the same deterministic APIs used by UI adapters.
+Both commands SHALL be available in exploration and active combat. Command additions and syntax
+SHALL update both `docs/game/commands.md` and `docs/game/command-reference.md` in the same
+change.
 
 #### Scenario: Telnet healing matches WebClient healing
 - **WHEN** equivalent injured actors use the same potion through the text command and `inventory.use`
@@ -118,3 +189,14 @@ the no-target and invalid-target reasons. Command additions and syntax SHALL upd
 - **WHEN** a text client runs `使用` on a single-scope item with no target argument
 - **THEN** the no-target rejection renders in Traditional Chinese through the shared reason surface and
   nothing is consumed
+
+#### Scenario: Combat use costs one round and equip costs none
+- **WHEN** a text-client combat use succeeds and, separately, a text-client equipment toggle
+  completes
+- **THEN** the combat use has entered the same combat-session facade and consumed one round,
+  while the equipment toggle consumed no round
+
+#### Scenario: Stable rejections match UI reason semantics
+- **WHEN** a text command hits a stable rejection such as no-target or invalid-target
+- **THEN** it renders the same Traditional Chinese reason semantics as the corresponding UI
+  action

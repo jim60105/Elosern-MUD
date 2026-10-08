@@ -9,14 +9,7 @@ Define the read-only species and variant registries that carry the approved best
 `world/lore/monster_species.py` SHALL define a frozen `MonsterSpecies` dataclass with fields `key`,
 `display_name_zh`, `published_description_zh`, `published_appearance_zh`, `published_ecology_zh`,
 `habitat_tags`, `author_hidden_truth_zh`, `author_explanation_zh`, `author_conjecture_zh`,
-`default_variant_key`, and `ordinary_variant: bool`, plus a frozen `MonsterVariant` dataclass with
-fields `key`, `species_key`, `display_name_zh`, `description_zh`, `threat_tier`, `ordinary_variant`,
-`combat_profile`, and `danger_grade`. Module-level `MONSTER_SPECIES_REGISTRY` and
-`MONSTER_VARIANT_REGISTRY` keyed by those stable keys SHALL be the source of truth, and no
-`MonsterSpecies` field SHALL store an ability baseline that a variant also stores. Stable keys SHALL
-satisfy the existing shared stable-key validation contract, SHALL NOT be derived from a display name,
-a threat tier, or an individual entity, and renaming a display name SHALL NOT change identity. Neither
-class SHALL carry an inheritance, parent, or override field.
+`default_variant_key`, and `ordinary_variant: bool`, plus a frozen `MonsterVariant` dataclass.
 
 #### Scenario: Identity survives a rename and a tier change
 - **WHEN** a species' or variant's `display_name_zh` or a variant's `threat_tier` is changed while its key is kept
@@ -30,13 +23,39 @@ class SHALL carry an inheritance, parent, or override field.
 - **WHEN** a variant record is constructed
 - **THEN** it is a complete standalone record with no parent key, no partial-overwrite field, and no resolution step that merges values from the species record
 
+#### Scenario: The variant dataclass declares its fields
+
+- **WHEN** the `MonsterVariant` dataclass definition is inspected
+- **THEN** it is frozen and declares fields `key`, `species_key`, `display_name_zh`,
+  `description_zh`, `threat_tier`, `ordinary_variant`, `combat_profile`, and `danger_grade`
+
+#### Scenario: The registries are the source of truth
+
+- **WHEN** consumers look up species or variant lore
+- **THEN** module-level `MONSTER_SPECIES_REGISTRY` and `MONSTER_VARIANT_REGISTRY` keyed by those
+  stable keys SHALL be the source of truth
+
+#### Scenario: Stable keys satisfy the shared validation contract
+
+- **WHEN** registry keys are authored
+- **THEN** stable keys SHALL satisfy the existing shared stable-key validation contract
+- **AND** SHALL NOT be derived from a display name, a threat tier, or an individual entity
+
+#### Scenario: Renaming a display name does not change identity
+
+- **WHEN** a record's display name is renamed
+- **THEN** identity SHALL NOT change
+
+#### Scenario: Neither class carries an inheritance field
+
+- **WHEN** either dataclass definition is inspected
+- **THEN** neither class SHALL carry an inheritance, parent, or override field
+
 ### Requirement: Every variant belongs to its species and the default variant is an ordinary variant of it
 Registry construction SHALL reject a `MonsterVariant` whose `species_key` names no registered
 species, SHALL reject a variant registered under a key already owned by a different species, and
 SHALL reject a species whose `default_variant_key` names no registered variant, names a variant of a
-different species, or names a variant whose `ordinary_variant` is false. Variant display names SHALL
-NOT be used to classify a variant as ordinary or stronger: the classification SHALL be an explicit
-authored field.
+different species, or names a variant whose `ordinary_variant` is false.
 
 #### Scenario: An orphan variant is rejected at import time
 - **WHEN** a variant declares a `species_key` absent from `MONSTER_SPECIES_REGISTRY`
@@ -54,24 +73,18 @@ authored field.
 - **WHEN** a variant display name contains wording that suggests strength while its authored `ordinary_variant` is true
 - **THEN** registry validation and every consumer treat the variant as ordinary; no name matching participates in classification
 
+#### Scenario: Ordinary classification is an explicit authored field
+
+- **WHEN** a variant's ordinary-or-stronger classification is determined
+- **THEN** variant display names SHALL NOT be used to classify it: the classification SHALL be an
+  explicit authored field
+
 ### Requirement: Numeric combat profiles and danger grades are balance-gated slots, never invented values
 `MonsterVariant.combat_profile` SHALL be either `None` or a frozen record that carries a complete
 value set (HP, MP, SP, physical combat power, agility, defense, `magic_power`) as literal authored
 values, and `MonsterVariant.danger_grade` SHALL be either `None` or an authored guild danger grade.
 Registry construction SHALL reject a partially populated profile, a non-integer value, a negative
-value, and a `magic_power` outside the variant's tier magic band. MP and SP carry no tier band, so
-their literals are gated by approval rather than by an inference rule: a nonzero pool is content no
-approval covers, which the approved-literal contract below rejects because the approved value is a
-written zero. Only an explicit user balance approval may populate a slot: the authored values SHALL be the
-approved values verbatim, and a registry edit SHALL NOT re-derive, re-tune, re-round, or interpolate
-them, nor infer any value from a display name, a description, a threat tier, or another variant. Once
-approval is granted for a variant, that variant SHALL ship the approved complete profile and the
-approved guild danger grade. While a slot is `None` on some future variant, a consumer SHALL treat it
-as "no approved per-variant profile exists": never as a zero, never as a per-species number invented
-from flavour, and never as tier-band truth about the variant itself. The single sanctioned numeric
-fallback while a profile is `None` is the named interim rule owned by individual construction — the
-existing threat-tier band construction at the variant's declared tier, recorded with its numeric
-source — and consumers SHALL NOT read the registry slot as if it carried that fallback.
+value, and a `magic_power` outside the variant's tier magic band.
 
 #### Scenario: A partial numeric profile is rejected
 - **WHEN** a variant profile omits any one of the seven numeric fields or sets one to `None`
@@ -93,14 +106,45 @@ source — and consumers SHALL NOT read the registry slot as if it carried that 
 - **WHEN** a registry edit changes an approved literal to a value computed from another field, from a display name, or from the tier band
 - **THEN** the shipped-content contract fails, because the approved literals are pinned and tier-band membership alone does not prove a value was approved
 
+#### Scenario: MP and SP pools are gated by approval, not inference
+
+- **WHEN** MP or SP literals are authored for a variant
+- **THEN** MP and SP carry no tier band, so their literals are gated by approval rather than by an
+  inference rule: a nonzero pool is content no approval covers, which the approved-literal contract
+  below rejects because the approved value is a written zero
+
+#### Scenario: Only explicit user balance approval populates a slot
+
+- **WHEN** a profile or grade slot is populated
+- **THEN** only an explicit user balance approval may populate it: the authored values SHALL be the
+  approved values verbatim, and a registry edit SHALL NOT re-derive, re-tune, re-round, or
+  interpolate them, nor infer any value from a display name, a description, a threat tier, or
+  another variant
+
+#### Scenario: Granted approval ships both profile and grade
+
+- **WHEN** approval is granted for a variant
+- **THEN** that variant SHALL ship the approved complete profile and the approved guild danger grade
+
+#### Scenario: A None slot means no approved profile exists
+
+- **WHEN** a slot is `None` on some future variant
+- **THEN** a consumer SHALL treat it as "no approved per-variant profile exists": never as a zero,
+  never as a per-species number invented from flavour, and never as tier-band truth about the
+  variant itself
+
+#### Scenario: The interim fallback is owned by individual construction
+
+- **WHEN** a profile is `None` and a numeric value is needed
+- **THEN** the single sanctioned numeric fallback is the named interim rule owned by individual
+  construction — the existing threat-tier band construction at the variant's declared tier,
+  recorded with its numeric source
+- **AND** consumers SHALL NOT read the registry slot as if it carried that fallback
+
 ### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
 The registries SHALL NOT register, reference, or imply a skill key, behaviour profile, or combat trait
 for the six approved special abilities (wind grain-shaking, lamp-mimicking glow, earth burrow-packing,
-mana-drain on contact, fog-channeling, rock-sonance). Ability text SHALL be permitted only as
-published narrative prose, including its approved limits. Any executable form of these abilities is a
-named external prerequisite owned by the skill/behaviour-mechanics work; a registry field, a stored
-trait, or a placeholder value SHALL NOT stand in for it, and no consumer SHALL be permitted to
-interpret narrative text as an available effect.
+mana-drain on contact, fog-channeling, rock-sonance).
 
 #### Scenario: No behaviour seam is faked
 - **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the six abilities
@@ -110,13 +154,23 @@ interpret narrative text as an available effect.
 - **WHEN** the existing behaviour-selection path resolves a variant whose narrative describes a special ability
 - **THEN** the resolved behaviour is exactly the existing damage-oriented decision path with no new effect, and the proposal records the mechanics prerequisite rather than an implementation
 
+#### Scenario: Ability text is published narrative only
+
+- **WHEN** ability text is authored for one of the six approved abilities
+- **THEN** it SHALL be permitted only as published narrative prose, including its approved limits
+
+#### Scenario: Executable abilities are an external prerequisite
+
+- **WHEN** an executable form of one of these abilities is wanted
+- **THEN** it is a named external prerequisite owned by the skill/behaviour-mechanics work; a
+  registry field, a stored trait, or a placeholder value SHALL NOT stand in for it
+- **AND** no consumer SHALL be permitted to interpret narrative text as an available effect
+
 ### Requirement: Published projections expose only marked public fields
 The species and variant registries SHALL expose published views built from explicitly marked public
 fields only. `author_hidden_truth_zh`, `author_explanation_zh`, and `author_conjecture_zh` SHALL NOT
 appear in any published view, and a public description gap SHALL NOT be filled from an author-private
-field. Where a published conjecture is present it SHALL remain marked as conjecture with its source or
-uncertainty intact, and no player-facing serializer, presentation payload, or narrative context SHALL
-serialize the whole species or variant record as a shortcut.
+field.
 
 #### Scenario: Private notes never serialize
 - **WHEN** a published species or variant view is serialized for a player-facing surface
@@ -129,6 +183,12 @@ serialize the whole species or variant record as a shortcut.
 #### Scenario: Conjecture stays conjecture
 - **WHEN** a species publishes unverified scholarly conjecture
 - **THEN** the published projection retains its uncertainty marking rather than presenting it as known truth
+
+#### Scenario: Whole-record serialization is forbidden
+
+- **WHEN** a player-facing surface needs species or variant data
+- **THEN** no player-facing serializer, presentation payload, or narrative context SHALL serialize
+  the whole species or variant record as a shortcut
 
 ### Requirement: Habitat tags are compatibility data and never authorize spawning
 Species `habitat_tags` SHALL express habitat compatibility only. No function in the species registry
@@ -148,10 +208,7 @@ tags match a habitat SHALL be equally capable of being absent from every room of
 The registries SHALL carry the six approved bestiary species and their twelve approved named variant
 directions with display and description strings in the canonical Traditional Chinese prose of
 `docs/lore/bestiary.md`, and the startup synchronization SHALL mirror the registries into their
-runtime store idempotently, emitting one boundary info event through the `world.observability` facade
-per synchronization step with registry-scoped context keys. Repeating synchronization SHALL leave the
-mirrored state unchanged, and synchronization SHALL NOT create, modify, or delete any monster, room,
-quest, or art record.
+runtime store idempotently.
 
 #### Scenario: Repeated startup synchronization is a no-op
 - **WHEN** the species synchronization step runs twice in one process
@@ -165,10 +222,42 @@ quest, or art record.
 - **WHEN** the new registry and synchronization modules are linted for logging
 - **THEN** they import only `world.observability` named functions and every event carries a context dict with the registry identifiers
 
-### Requirement: The approved first-batch profiles and grades are user-approved literals
-The twelve shipped variants SHALL carry the exact complete approved profiles in the following table, with MP/SP/magic_power zero and existing species/variant/display/grade/ecology/behavior identities unchanged. No new ability SHALL be introduced; newly constructed instances SHALL use these rows without live migration.
+#### Scenario: Each synchronization step logs one boundary event
 
-MP, SP, and magic power remain zero for all twelve existing variants. Species keys, variant keys, names, grades, ecology, and existing behavior identities are retained. This change adds no monster spell or special ability.
+- **WHEN** a synchronization step runs
+- **THEN** it emits one boundary info event through the `world.observability` facade with
+  registry-scoped context keys
+
+#### Scenario: Synchronization is state-preserving and entity-safe
+
+- **WHEN** synchronization repeats or runs against runtime data
+- **THEN** repeating synchronization SHALL leave the mirrored state unchanged
+- **AND** synchronization SHALL NOT create, modify, or delete any monster, room, quest, or art record
+
+### Requirement: The approved first-batch profiles and grades are user-approved literals
+The twelve shipped variants SHALL carry the exact complete approved profiles in the table stated in
+the scenario below, with MP/SP/magic_power zero and existing
+species/variant/display/grade/ecology/behavior identities unchanged. No new ability SHALL be
+introduced; newly constructed instances SHALL use these rows without live migration.
+
+#### Scenario: New instance
+- **WHEN** a registered variant constructs a new monster
+- **THEN** its literal profile is authoritative without skill/gear coefficients baked in
+
+The approval fence SHALL cover exactly these twelve variants. Each approved seven-value profile and danger grade SHALL equal the approval record, with no None slots. A different literal SHALL be a content defect rather than an implicit retuning decision.
+
+#### Scenario: Every shipped batch variant carries its approved values
+- **WHEN** the shipped registry is compared field by field against the twelve-variant approval record
+- **THEN** all seven profile values and grades equal the approved literals and no approved slot is None
+
+#### Scenario: Approval does not extend to unapproved content
+- **WHEN** a variant outside the approved twelve carries a profile or grade without separate approval
+- **THEN** the approved-content contract reports it rather than extending this approval
+
+#### Scenario: The approved profile table is pinned verbatim
+
+- **WHEN** the shipped registry is authored against the approval record
+- **THEN** the twelve variants carry exactly the following approved literals:
 
 | Variant key | Display name | Grade | Previous HP | Approved HP | Approved attack | Approved agility | Approved defense |
 |---|---|---|---:|---:|---:|---:|---:|
@@ -185,25 +274,26 @@ MP, SP, and magic power remain zero for all twelve existing variants. Species ke
 | `bank_lurker` | 吞潮鱷・潛岸型 | D | 340 | 140 | 22 | 12 | 14 |
 | `bay_warden` | 吞潮鱷・守灣型 | C | 400 | 210 | 28 | 12 | 15 |
 
-Lower HP and selected defense reductions remove extended attrition. Stronger forms retain danger through increased offense or agility. Independent axes preserve the cat's mobility, crocodile's endurance, and crab's defensive character.
+#### Scenario: Zero pools and retained identities survive the batch
 
-#### Scenario: New instance
-- **WHEN** a registered variant constructs a new monster
-- **THEN** its literal profile is authoritative without skill/gear coefficients baked in
+- **WHEN** the approved batch is applied to the existing registry
+- **THEN** MP, SP, and magic power remain zero for all twelve existing variants
+- **AND** species keys, variant keys, names, grades, ecology, and existing behavior identities are retained
+- **AND** this change adds no monster spell or special ability
 
-The approval fence SHALL cover exactly these twelve variants. Each approved seven-value profile and danger grade SHALL equal the approval record, with no None slots. A different literal SHALL be a content defect rather than an implicit retuning decision.
+#### Scenario: The approved literals retire attrition without changing character
 
-#### Scenario: Every shipped batch variant carries its approved values
-- **WHEN** the shipped registry is compared field by field against the twelve-variant approval record
-- **THEN** all seven profile values and grades equal the approved literals and no approved slot is None
-
-#### Scenario: Approval does not extend to unapproved content
-- **WHEN** a variant outside the approved twelve carries a profile or grade without separate approval
-- **THEN** the approved-content contract reports it rather than extending this approval
+- **WHEN** the approved literals are reviewed against the previous values
+- **THEN** lower HP and selected defense reductions remove extended attrition
+- **AND** stronger forms retain danger through increased offense or agility
+- **AND** independent axes preserve the cat's mobility, crocodile's endurance, and crab's defensive character
 
 ### Requirement: Every shipped combat profile and danger grade lies inside its declared tier band
-Validation SHALL independently check HP, attack, agility, defense and magic against their own tier axes and guild grade bounds. Calamity upper HP/physical bounds SHALL be open-ended; 3000/150 are reference values. Human racial/tier bounds SHALL remain finite and unchanged. Symmetric-band projection constraints SHALL be removed.
-Bands and rank ranges SHALL come from the existing keyed threat-tier registry through injectable tier faces carrying HP, separate attack/agility/defense, magic and guild-rank-range fields. Bounds SHALL be inclusive; an absent declared tier SHALL raise the named species-registry error. Danger grades SHALL be checked by rank order within the tier range, not set membership. Out-of-band authoring SHALL fail at import, and synthetic faces SHALL support every rejection test. MP/SP SHALL remain explicit literal resource pools with no inferred band checks.
+Validation SHALL independently check HP, attack, agility, defense and magic against their own tier
+axes and guild grade bounds. Bands and rank ranges SHALL come from the existing keyed threat-tier
+registry through injectable tier faces carrying HP, separate attack/agility/defense, magic and
+guild-rank-range fields. Bounds SHALL be inclusive; an absent declared tier SHALL raise the named
+species-registry error.
 
 #### Scenario: A profile above its tier band is rejected
 - **WHEN** a variant exceeds a finite HP maximum or an axis-specific physical bound
@@ -244,3 +334,30 @@ Bands and rank ranges SHALL come from the existing keyed threat-tier registry th
 #### Scenario: Open calamity
 - **WHEN** literal calamity monster exceeds HP3000 and physical150 within open upper limits
 - **THEN** monster classification accepts it without opening human bounds
+
+#### Scenario: Calamity bounds stay open, human bounds stay finite
+
+- **WHEN** tier bounds are projected onto validation
+- **THEN** Calamity upper HP/physical bounds SHALL be open-ended; 3000/150 are reference values
+- **AND** human racial/tier bounds SHALL remain finite and unchanged
+
+#### Scenario: Symmetric-band projection constraints are removed
+
+- **WHEN** validation projects tier bands onto variant fields
+- **THEN** symmetric-band projection constraints SHALL be removed
+
+#### Scenario: Out-of-band authoring fails at import
+
+- **WHEN** a variant is authored outside its declared bands
+- **THEN** the authoring SHALL fail at import
+- **AND** synthetic faces SHALL support every rejection test
+
+#### Scenario: Grades are checked by rank order
+
+- **WHEN** a danger grade is validated against the tier's guild rank range
+- **THEN** it SHALL be checked by rank order within the tier range, not set membership
+
+#### Scenario: MP and SP stay explicit literal pools
+
+- **WHEN** profiles are validated against tier bands
+- **THEN** MP/SP SHALL remain explicit literal resource pools with no inferred band checks

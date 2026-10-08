@@ -9,7 +9,7 @@ compensating every Evennia in-process cache surface when any step fails
 
 ### Requirement: Movement settles relocation, clock cost, map knowledge, and companion following as one coherent transaction
 
-Every successful traversal through any project exit lineage SHALL run inside one outer movement-settlement transaction that covers the Evennia relocation, the clock charge (`charge_movement`), destination map-knowledge recording (`record_arrival`), and companion following (`follow_companions`) as a single all-or-nothing unit. The boundary SHALL be opened inside the exit's own `at_traverse`, so the Telnet `ExitCommand` path, the WebClient `_move_adapter` path, and the scene-door command path all pass through it. `WorldClock.advance`'s own transaction degrades to a savepoint inside the boundary.
+Every successful traversal through any project exit lineage SHALL run inside one outer movement-settlement transaction that covers the Evennia relocation, the clock charge (`charge_movement`), destination map-knowledge recording (`record_arrival`), and companion following (`follow_companions`) as a single all-or-nothing unit.
 
 #### Scenario: A successful plain-exit traversal commits every settlement step together
 
@@ -26,9 +26,19 @@ Every successful traversal through any project exit lineage SHALL run inside one
 - **WHEN** an `NPC`-typeclassed object successfully traverses any project exit lineage
 - **THEN** the traversal succeeds and passes through the movement-settlement transaction, while the settlement steps (charge, record, follow) remain internal no-ops for the non-player traverser
 
+#### Scenario: The boundary is opened inside the exit's own at_traverse for every client path
+
+- **WHEN** a traversal arrives via the Telnet `ExitCommand` path, the WebClient `_move_adapter` path, or the scene-door command path
+- **THEN** each passes through the movement-settlement transaction, because the boundary is opened inside the exit's own `at_traverse`
+
+#### Scenario: The clock's own transaction degrades to a savepoint inside the boundary
+
+- **WHEN** the settlement's clock charge runs `WorldClock.advance` inside the movement-settlement boundary
+- **THEN** `WorldClock.advance`'s own transaction degrades to a savepoint inside the boundary
+
 ### Requirement: A failed movement compensates the persisted relocation and reconciles every Evennia cache surface
 
-When any step inside the movement-settlement transaction raises, when the outer transaction fails at commit, or when a wilderness lineage traversal returns falsy after relocating the traverser, the boundary SHALL compensate before the failure surfaces: the traverser and every companion the settlement moved SHALL be returned to their pre-move locations (using hook-free Evennia relocations, or the wilderness coordinate API where applicable), the wilderness script's `itemcoordinates`, `rooms`, and `unused_rooms` bookkeeping SHALL be restored to its pre-move state, and every in-process Evennia cache the settlement touched SHALL be reconciled — in-memory `db_location` values, the source and destination rooms' `contents_cache`, and the attribute backend caches of touched entities (restored from pre-move snapshots, including map-knowledge and quest-observation surfaces) — because Django rollback alone reverts only durable rows. Compensation steps SHALL run in a fixed deterministic order, each step SHALL be best-effort with a logged diagnostic on failure, and a compensation failure SHALL NOT mask or replace the original failure.
+When any step inside the movement-settlement transaction raises, when the outer transaction fails at commit, or when a wilderness lineage traversal returns falsy after relocating the traverser, the boundary SHALL compensate before the failure surfaces: the traverser and every companion the settlement moved SHALL be returned to their pre-move locations via hook-free Evennia relocations, or the wilderness coordinate API where applicable.
 
 #### Scenario: A clock-charge failure during a plain exit move returns the player to the source
 
@@ -60,9 +70,26 @@ When any step inside the movement-settlement transaction raises, when the outer 
 - **WHEN** the outer movement-settlement transaction fails at commit
 - **THEN** the durable rows (location, clock, attributes) revert to the pre-move state and a fresh read of the in-process objects shows the same pre-move state: `db_location`, contents caches, attribute values, and the world-clock tick (verified deterministically by invoking the compensation against a deliberately constructed divergent in-process state, since Django test cases wrap every transaction so commit failure cannot occur at the boundary level in tests)
 
+#### Scenario: Compensation restores wilderness script bookkeeping to its pre-move state
+
+- **WHEN** compensation runs after a wilderness lineage movement failed
+- **THEN** the wilderness script's `itemcoordinates`, `rooms`, and `unused_rooms` bookkeeping is restored to its pre-move state
+
+#### Scenario: Compensation reconciles every in-process Evennia cache the settlement touched
+
+- **WHEN** compensation runs after a failed movement settlement
+- **THEN** every in-process Evennia cache the settlement touched is reconciled — in-memory `db_location` values, the source and destination rooms' `contents_cache`, and the attribute backend caches of touched entities (restored from pre-move snapshots, including map-knowledge and quest-observation surfaces)
+- **AND** this reconciliation is required because Django rollback alone reverts only durable rows
+
+#### Scenario: Compensation steps are ordered, best-effort, and non-masking
+
+- **WHEN** the boundary's compensation sequence runs
+- **THEN** the steps run in a fixed deterministic order and each step is best-effort with a logged diagnostic on failure
+- **AND** a compensation failure does not mask or replace the original failure
+
 ### Requirement: A failed movement reports failure truthfully on every client path
 
-A movement whose settlement failed SHALL report failure (WebClient `move_failed`, Telnet command error propagation) only after compensation restored the traverser's authoritative location, and no client path SHALL observe or act on a player relocated without time, knowledge, or companions. The one documented exception is the plain-exit lineage's `move_to` hook quirk (a hook raising after relocation makes `move_to` return `False` without an exception and `DefaultExit.at_traverse` return `None` on both branches), which the mixin lineage cannot detect; the wilderness lineages close this gap through their falsy-return trigger.
+A movement whose settlement failed SHALL report failure (WebClient `move_failed`, Telnet command error propagation) only after compensation restored the traverser's authoritative location, and no client path SHALL observe or act on a player relocated without time, knowledge, or companions.
 
 #### Scenario: WebClient explore.move reports move_failed with the player still at the source
 
@@ -73,3 +100,9 @@ A movement whose settlement failed SHALL report failure (WebClient `move_failed`
 
 - **WHEN** `ExitCommand` traverses an exit and the clock charge raises
 - **THEN** the traversal propagates the failure and the player remains in the source room with the clock unchanged
+
+#### Scenario: The plain-exit move_to hook quirk is the one documented reporting exception
+
+- **WHEN** a `move_to` hook raises after relocation on the plain-exit lineage, making `move_to` return `False` without an exception and `DefaultExit.at_traverse` return `None` on both branches
+- **THEN** this is the one documented exception to truthful failure reporting, which the mixin lineage cannot detect
+- **AND** the wilderness lineages close this gap through their falsy-return trigger

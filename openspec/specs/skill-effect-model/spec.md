@@ -9,42 +9,9 @@ at import, not silently at use.
 
 ### Requirement: parse_effect classifies every declared prefix into a typed dataclass
 `world/skills/effects.py` SHALL define `parse_effect(effect_id: str)` returning one of a fixed set of
-frozen dataclasses, one per recognized prefix. The recognized set is the complete set
-already dispatched by `world/skills/effects.py` plus `stimulus` (introduced by
-`light-sacrament-casting`, which syncs before this change) plus `pleasure_peak` plus `gauge_transfer` plus
-`revoke_grants` (introduced by `conferral-revocation`, which syncs before this change) plus this change's
-shipped `reveal_disguise` and `session_stamp`,
-namely: (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
-`passive_trait`, `movement`, `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`,
-`self_buff_apply`, `confer_growth_rate`, `sexual_event`, `sexual_event_actor`, `sexual_event_target`,
-`pleasure`, `sexual_counter`, `act_pair_event`, `damage`, `heal`, `self_heal`, `cleanse`, `disengage`,
-`divine_mystery`, `divine_pleasure_max`, `divine_climax_extension_stage`, `divine_drain`,
-`divine_saturate_sensitivity`, `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`,
-`stimulus`, `pleasure_peak`, `gauge_transfer`, `revoke_grants`, `reveal_disguise`, `session_stamp`, plus `rite_blessing` and `rite_shelter` (introduced by `implement-holy-rite-cast-rail`). `rite_blessing` SHALL parse exactly `rite_blessing:<buff-key>` into a frozen typed dataclass carrying the `buffs.yaml` buff key (any other payload — bare, empty, or multi-segment — raises `ValueError` at parse and therefore at registry load). `rite_shelter` SHALL be a BARE prefix parsing into a payload-free frozen marker dataclass; any payload (`rite_shelter:<anything>`) SHALL raise `ValueError` at parse and therefore at registry load. `parse_effect` SHALL raise `ValueError` for any prefix
-not in this set and SHALL retain every prefix previously recognized, so no shipped skill fails to
-parse. `growth_rate` SHALL parse exactly the four-segment form
-`growth_rate:<stat>:<multiplier>:<scope>`, where `<stat>` is `practice` (the retired `magic` stat
-key keeps failing closed), `<multiplier>` is a finite non-negative number, and `<scope>` is a key of
-`ELEMENT_REGISTRY` naming the one lineage tree whose practice the effect accelerates. The parsed
-`GrowthRateEffect` SHALL carry that scope. The previous three-segment form
-`growth_rate:<stat>:<multiplier>` SHALL raise `ValueError` and therefore fail registry load, so an
-unscoped growth rate cannot survive as data with its old global meaning.
-`gauge_transfer` SHALL parse `gauge_transfer:<gauge>:<drain|restore>:fixed:<positive int>`,
-`gauge_transfer:<gauge>:<drain|restore>:fraction:<finite fraction in (0,1]>` and
-`gauge_transfer:<gauge>:<drain|restore>:all` — with `<gauge>` from the closed set {`mp`, `hp`} and
-`hp` admitted for `drain` only — into one frozen typed dataclass, and SHALL reject every other
-payload at parse (and therefore at registry load). The corresponding immutable
-`GaugeTransferPolicy` on `EffectPolicy` SHALL validate fail-closed like `DamagePolicy`: recovery share
-within [0,1], bonus entries naming only existing buff-definition keys, bonuses declared only for
-restore directions, an hp restore direction rejected as a construction error (HP restoration is the
-heal effect's exclusive verb), and no potency coefficient attached to a transfer occurrence.
-`self_heal` SHALL accept exactly two grammar forms on its one recognized prefix: the bare form,
-parsing to the defaulted stat-basis `SelfHealEffect` exactly as before, and
-`self_heal:missing_fraction:<finite fraction in (0,1]>`, parsing to a typed `SelfHealEffect`
-carrying the missing-HP magnitude basis and its validated fraction. Every other `self_heal` payload
-SHALL keep raising `ValueError` (and therefore failing at registry load), and a non-identity potency
-coefficient attached to a `missing_fraction` occurrence SHALL be rejected at skill construction
-(the declared fraction IS the magnitude).
+frozen dataclasses, one per recognized prefix. `parse_effect` SHALL raise `ValueError` for any
+prefix not in this set and SHALL retain every prefix previously recognized, so no shipped skill
+fails to parse.
 
 #### Scenario: A known prefix parses into its dataclass
 - **WHEN** `parse_effect("stat_multiply:atk_phys:100")` is called
@@ -156,18 +123,77 @@ divine mystery, so a reveal either lifts a veil or finds none.
   before any cast is possible, and a registry row declaring `rite_blessing:martial_blessing`
   round-trips through `parsed_effects`
 
+#### Scenario: The recognized prefix set is exactly the enumerated closure
+- **WHEN** the recognized prefix set is enumerated
+- **THEN** it is the complete set already dispatched by `world/skills/effects.py` plus `stimulus`
+  (introduced by `light-sacrament-casting`, which syncs before this change) plus `pleasure_peak`
+  plus `gauge_transfer` plus `revoke_grants` (introduced by `conferral-revocation`, which syncs
+  before this change) plus this change's shipped `reveal_disguise` and `session_stamp`, namely:
+  (`stat_multiply`, `growth_rate`, `sexual_magic_mastery`, `passive_buff`, `combat_prediction`,
+  `passive_trait`, `movement`, `weapon_style`, `confer_skill_partial`, `set_disguise`, `buff_apply`,
+  `self_buff_apply`, `confer_growth_rate`, `sexual_event`, `sexual_event_actor`,
+  `sexual_event_target`, `pleasure`, `sexual_counter`, `act_pair_event`, `damage`, `heal`,
+  `self_heal`, `cleanse`, `disengage`, `divine_mystery`, `divine_pleasure_max`,
+  `divine_climax_extension_stage`, `divine_drain`, `divine_saturate_sensitivity`,
+  `divine_clamp_shame`, `divine_mark_submission`, `divine_restore_purity`, `stimulus`,
+  `pleasure_peak`, `gauge_transfer`, `revoke_grants`, `reveal_disguise`, `session_stamp`, plus
+  `rite_blessing` and `rite_shelter` (introduced by `implement-holy-rite-cast-rail`)
+
+#### Scenario: The rite grammars are exactly one typed key and one bare marker
+- **WHEN** `rite_blessing` or `rite_shelter` is parsed
+- **THEN** `rite_blessing` parses exactly `rite_blessing:<buff-key>` into a frozen typed dataclass
+  carrying the `buffs.yaml` buff key — any other payload (bare, empty, or multi-segment) raises
+  `ValueError` at parse and therefore at registry load — and `rite_shelter` is a BARE prefix
+  parsing into a payload-free frozen marker dataclass where any payload
+  (`rite_shelter:<anything>`) raises `ValueError` at parse and therefore at registry load
+
+#### Scenario: The growth_rate grammar is exactly four segments
+- **WHEN** `growth_rate` is parsed
+- **THEN** it parses exactly the four-segment form `growth_rate:<stat>:<multiplier>:<scope>`, where
+  `<stat>` is `practice` (the retired `magic` stat key keeps failing closed), `<multiplier>` is a
+  finite non-negative number, and `<scope>` is a key of `ELEMENT_REGISTRY` naming the one lineage
+  tree whose practice the effect accelerates, the parsed `GrowthRateEffect` carries that scope, and
+  the previous three-segment form `growth_rate:<stat>:<multiplier>` raises `ValueError` and
+  therefore fails registry load, so an unscoped growth rate cannot survive as data with its old
+  global meaning
+
+#### Scenario: The gauge_transfer grammar and its policy validate fail-closed
+- **WHEN** `gauge_transfer` is parsed and its policy is constructed
+- **THEN** it parses `gauge_transfer:<gauge>:<drain|restore>:fixed:<positive int>`,
+  `gauge_transfer:<gauge>:<drain|restore>:fraction:<finite fraction in (0,1]>` and
+  `gauge_transfer:<gauge>:<drain|restore>:all` — with `<gauge>` from the closed set {`mp`, `hp`}
+  and `hp` admitted for `drain` only — into one frozen typed dataclass, rejecting every other
+  payload at parse (and therefore at registry load), and the corresponding immutable
+  `GaugeTransferPolicy` on `EffectPolicy` validates fail-closed like `DamagePolicy`: recovery share
+  within [0,1], bonus entries naming only existing buff-definition keys, bonuses declared only for
+  restore directions, an hp restore direction rejected as a construction error (HP restoration is
+  the heal effect's exclusive verb), and no potency coefficient attached to a transfer occurrence
+
+#### Scenario: The self_heal prefix accepts exactly two grammar forms
+- **WHEN** `self_heal` is parsed
+- **THEN** it accepts exactly two forms on its one recognized prefix: the bare form, parsing to the
+  defaulted stat-basis `SelfHealEffect` exactly as before, and
+  `self_heal:missing_fraction:<finite fraction in (0,1]>`, parsing to a typed `SelfHealEffect`
+  carrying the missing-HP magnitude basis and its validated fraction; every other `self_heal`
+  payload keeps raising `ValueError` (and therefore failing at registry load), and a non-identity
+  potency coefficient attached to a `missing_fraction` occurrence is rejected at skill
+  construction (the declared fraction IS the magnitude)
+
 ### Requirement: A damage effect can declare the absence of an element
 `parse_effect` SHALL accept the reserved element segment `none` on the `damage` prefix, returning a
 typed damage effect whose element is `None` and whose school is the declared school. Every other
-element segment SHALL keep parsing exactly as before, and the parsed element SHALL remain a value no
-settlement path consumes: the school selects the attacking stat, and elemental affinity scales
-practice only for a skill whose own element appears on a magic-school damage effect, which an
-elementless effect can never satisfy.
+element segment SHALL keep parsing exactly as before.
 
 #### Scenario: The reserved token parses to an absent element
 - **WHEN** `parse_effect("damage:none:physical")` is called
 - **THEN** it returns the damage effect type with an absent element and the school `physical`, and the
   same call for every registry element key returns that element unchanged
+
+#### Scenario: The parsed element is never consumed by settlement
+- **WHEN** a parsed damage effect settles
+- **THEN** the parsed element is a value no settlement path consumes: the school selects the
+  attacking stat, and elemental affinity scales practice only for a skill whose own element appears
+  on a magic-school damage effect, which an elementless effect can never satisfy
 
 ### Requirement: SkillDef.__post_init__ rejects unparseable effects at construction
 `SkillDef.__post_init__` SHALL call `parse_effect` on every string in `effects` and store the results
@@ -187,10 +213,8 @@ effect string does not parse.
 ### Requirement: An elementless damage effect and a declared skill element are mutually exclusive
 A skill definition SHALL fail construction when it declares an element together with an elementless
 damage effect: the two authorities would then disagree about whether the skill has an element, and
-presentation reads one while the effect declares the other. The check is one-directional by design —
-an element-bearing damage effect on a skill that declares no element stays legal, because that shape
-predates this change across shipped and synthetic definitions and is not this change's concern. A
-skill with no damage effect at all SHALL be unaffected.
+presentation reads one while the effect declares the other. A skill with no damage effect at all
+SHALL be unaffected.
 
 #### Scenario: An elementless effect on an element-bearing skill fails at load
 - **WHEN** a skill is constructed declaring an element together with an elementless damage effect
@@ -203,6 +227,11 @@ skill with no damage effect at all SHALL be unaffected.
   with damage effects of that element, or declares no element alongside an element-bearing damage
   effect, or declares no damage effect at all
 - **THEN** construction succeeds and the definition exposes its declared element unchanged
+
+#### Scenario: The check is one-directional by design
+- **WHEN** an element-bearing damage effect appears on a skill that declares no element
+- **THEN** the declaration stays legal, because that shape predates this change across shipped and
+  synthetic definitions and is not this change's concern
 
 ### Requirement: passive_trait effects are declared inert by design, not by omission
 `parse_effect("passive_trait:<name>")` SHALL return a `FlavorEffect(name=<name>)` instance. No
@@ -254,7 +283,7 @@ A skill SHALL support an immutable positive finite potency for each damage or he
 - **THEN** the specified stages apply once, independently clamp each HP gap and never revive an HP-zero recipient
 
 ### Requirement: Effect audiences select recipients without changing skill faction constraints
-Each effect SHALL permit an immutable audience of selected candidates, self, selected allies including selected self, or selected enemies. Unconfigured effects SHALL use the complete validated selection. Relation-based audiences SHALL never add unselected entities. Self-bound effects SHALL validate the actor and bind it once. An effect MAY additionally declare one immutable audience condition from the closed gauge-state vocabulary (the recipient's MP maximum zero, or positive), validated at authoring and evaluated at planning; a condition without an audience is contradictory and fails authoring. Invalid or contradictory audience declarations SHALL fail authoring.
+Each effect SHALL permit an immutable audience of selected candidates, self, selected allies including selected self, or selected enemies. Unconfigured effects SHALL use the complete validated selection. Invalid or contradictory audience declarations SHALL fail authoring.
 
 #### Scenario: Same mechanism serves an alternate element
 - **WHEN** a synthetic alternate-element spell combines enemy damage and ally recovery in a mixed selection
@@ -272,8 +301,20 @@ Each effect SHALL permit an immutable audience of selected candidates, self, sel
 - **WHEN** a synthetic component declares an audience plus one gauge-state condition, and separately an authoring declares the condition alone or both mutually exclusive facts together
 - **THEN** the well-formed declaration restricts that component's recipients to the matching subset of its audience, while each contradictory declaration fails at skill construction
 
+#### Scenario: Relation audiences never widen the selection
+- **WHEN** a relation-based audience is applied
+- **THEN** it never adds unselected entities
+
+#### Scenario: Self-bound effects bind the actor once
+- **WHEN** an effect is self-bound
+- **THEN** it validates the actor and binds it once
+
+#### Scenario: The gauge-state condition vocabulary is closed
+- **WHEN** an effect declares an audience condition
+- **THEN** it MAY declare only one immutable condition from the closed gauge-state vocabulary (the recipient's MP maximum zero, or positive), validated at authoring and evaluated at planning, and a condition without an audience is contradictory and fails authoring
+
 ### Requirement: Conditional damage policies compose without double matching
-A damage effect SHALL support a validated target-fact predicate, conditional attack multiplier, conditional defense bypass and maximum-HP fraction. Multiple matching facts within one ANY predicate SHALL activate a policy once. Defaults SHALL preserve ordinary damage. Other elements SHALL be able to use the same policy behavior. Additionally, the predicate vocabulary SHALL accept a validated dynamic-fact entry of the form `buff:<definition-key>`, naming a loaded buff definition whose live, unexpired instance on the target IS the matching fact at settlement time; the entry SHALL be rejected at policy construction when the key names no loaded definition, and every other namespaced entry form SHALL keep failing exactly as before. A `buff:` entry SHALL match only through the target's current buff state — never through static affinity or classification data — and SHALL compose with bare static facts, the conditional multiplier, the conditional bypass and the maximum-HP fraction under the identical any-match-once-per-strike semantics, at any point in the action's life (a marker applied, expired or removed between authoring and settlement flips the fact with the instance). A policy MAY additionally declare the independent boolean `unconditional_defense_bypass` (default False), which ignores defense subtraction for EVERY target regardless of predicate match. Construction SHALL reject `unconditional_defense_bypass=True` co-declared with a non-empty `bypass_defense=True` (one meaning, one field) and accept it with an empty predicate (reducing to the shipped unconditional-execution behavior) or with any predicate set; the shipped conditional `bypass_defense` semantics stay unchanged, and every existing policy (empty or non-empty predicate, with or without conditional bypass) behaves bit-identically.
+A damage effect SHALL support a validated target-fact predicate, conditional attack multiplier, conditional defense bypass and maximum-HP fraction. Multiple matching facts within one ANY predicate SHALL activate a policy once. Defaults SHALL preserve ordinary damage. Other elements SHALL be able to use the same policy behavior.
 
 #### Scenario: Two facts match once
 - **WHEN** a target matches both configured alternative classifications
@@ -303,12 +344,28 @@ A damage effect SHALL support a validated target-fact predicate, conditional att
 - **WHEN** a synthetic policy declares a `buff:` predicate entry with a conditional multiplier plus `unconditional_defense_bypass`, and strikes the same high-defense target while standing-on-the-marker and while not standing on it
 - **THEN** both strikes ignore defense subtraction while only the marker-standing strike receives the declared multiplier, a predicate-bearing `bypass_defense=True` policy keeps bypassing only on a static-predicate match, an empty-predicate `bypass_defense=True` policy keeps bypassing unconditionally, and a policy declaring both bypass fields True is rejected at construction
 
+#### Scenario: The buff namespace enters the predicate vocabulary
+- **WHEN** the predicate vocabulary is validated at policy construction
+- **THEN** it accepts a validated dynamic-fact entry of the form `buff:<definition-key>`, naming a loaded buff definition whose live, unexpired instance on the target IS the matching fact at settlement time, the entry is rejected at policy construction when the key names no loaded definition, and every other namespaced entry form keeps failing exactly as before
+
+#### Scenario: A buff fact rides only live buff state
+- **WHEN** a `buff:` entry is evaluated at settlement
+- **THEN** it matches only through the target's current buff state — never through static affinity or classification data — and composes with bare static facts, the conditional multiplier, the conditional bypass and the maximum-HP fraction under the identical any-match-once-per-strike semantics, at any point in the action's life (a marker applied, expired or removed between authoring and settlement flips the fact with the instance)
+
+#### Scenario: unconditional_defense_bypass is an independent default-off boolean
+- **WHEN** a policy declares `unconditional_defense_bypass`
+- **THEN** it defaults False, ignores defense subtraction for EVERY target regardless of predicate match, construction rejects it co-declared with a non-empty `bypass_defense=True` (one meaning, one field) and accepts it with an empty predicate (reducing to the shipped unconditional-execution behavior) or with any predicate set, the shipped conditional `bypass_defense` semantics stay unchanged, and every existing policy (empty or non-empty predicate, with or without conditional bypass) behaves bit-identically
+
 ### Requirement: A follow-up strike repeats damage on evidence or unconditionally without repeating the action
-A validated damage policy SHALL permit up to two extra independent strikes — either against a target with matching recent evidence (the evidence-conditional shape: `repeat_when` naming a recognized evidence kind, pinned to exactly one extra strike) or unconditionally on every successful action resolution (the predicate-free shape: an extra-strike declaration of one or two with no `repeat_when`). Each strike SHALL have an independent hit roll and the same coefficient/policy. No strike's miss SHALL suppress any later strike. The action SHALL pay resources/time and award eligible practice once, project ordered damage correctly across every strike, and retain all rolls while emitting at most one terminal defeat or knockout for a target regardless of the declared count. The extra-strike count SHALL stay within the closed set {0, 1, 2} of ADDITIONAL strikes (total strikes = 1 + the declared count); every other shipped `DamagePolicy` validation SHALL stay fail-closed exactly as before — the unknown-evidence-kind rejection, the boolean-count rejection, and the 「`repeat_when` requires `extra_strikes` of exactly one」 pin included — and the construction rule 「an extra strike requires `repeat_when`」 SHALL stay retired so the predicate-free shape is legal vocabulary for any element.
+A validated damage policy SHALL permit up to two extra independent strikes — either against a target with matching recent evidence (the evidence-conditional shape: `repeat_when` naming a recognized evidence kind, pinned to exactly one extra strike) or unconditionally on every successful action resolution (the predicate-free shape: an extra-strike declaration of one or two with no `repeat_when`). Each strike SHALL have an independent hit roll and the same coefficient/policy.
 
 #### Scenario: A first miss does not suppress the second roll
 - **WHEN** fixed rolls make the first strike miss and the follow-up hit on an eligible target under an evidence-conditional policy
 - **THEN** only the second damages HP and both rolls are recorded for one paid cast
+
+#### Scenario: A miss never suppresses a later strike
+- **WHEN** any strike misses under a multi-strike policy
+- **THEN** no strike's miss suppresses any later strike
 
 #### Scenario: Ineligible target has one strike
 - **WHEN** recent evidence is missing or expired for an evidence-conditional policy
@@ -338,6 +395,14 @@ A validated damage policy SHALL permit up to two extra independent strikes — e
 - **WHEN** a later commit step fails midway through a three-strike settlement
 - **THEN** every staged strike's HP movement, diversion spending, and evidence are restored to the pre-cast state
 
+#### Scenario: One paid action underlies every strike
+- **WHEN** a multi-strike cast resolves
+- **THEN** the action pays resources/time and awards eligible practice once, projects ordered damage correctly across every strike, retains all rolls, and emits at most one terminal defeat or knockout for a target regardless of the declared count
+
+#### Scenario: The extra-strike count stays in a closed set and validation stays fail-closed
+- **WHEN** a damage policy declares its extra-strike count
+- **THEN** the count stays within the closed set {0, 1, 2} of ADDITIONAL strikes (total strikes = 1 + the declared count); every other shipped `DamagePolicy` validation stays fail-closed exactly as before — the unknown-evidence-kind rejection, the boolean-count rejection, and the 「`repeat_when` requires `extra_strikes` of exactly one」 pin included — and the construction rule 「an extra strike requires `repeat_when`」 stays retired so the predicate-free shape is legal vocabulary for any element
+
 ### Requirement: Peak effects and marker-selected state maxima are validated typed behavior
 Effect authoring SHALL accept a peak effect with declared recipient policy and an optional marker-bound maximum on a state-derived magnitude. Unknown effect syntax, invalid marker references and contradictory recipient policies SHALL fail before runtime. These declarations SHALL use the same behavior for synthetic spells of any element.
 
@@ -353,9 +418,7 @@ Effect authoring SHALL accept a peak effect with declared recipient policy and a
 `parse_effect`'s `damage` branch SHALL reject a school segment outside the closed set `{"physical",
 "magic"}` with `ValueError`, at parse time and therefore at registry load, exactly as it already
 rejects an empty element or an empty/malformed school segment. The element segment SHALL remain
-unvalidated against `world.lore.elements.ELEMENT_REGISTRY` at this layer — that check stays a
-cast-time-only concern (see the following requirement) because a broad set of test fixtures
-deliberately author non-registry element tokens that must keep constructing.
+unvalidated against `world.lore.elements.ELEMENT_REGISTRY` at this layer.
 
 #### Scenario: A malformed school fails at registry load
 - **WHEN** `parse_effect("damage:fire:sonic")` is called
@@ -367,19 +430,18 @@ deliberately author non-registry element tokens that must keep constructing.
   called for any element string previously accepted
 - **THEN** it returns the same `DamageEffect` it returned before this change
 
+#### Scenario: The element check stays a cast-time-only concern
+- **WHEN** the parse layer decides what to validate
+- **THEN** the element-vs-registry check is deliberately left to cast time (see the following
+  requirement), because a broad set of test fixtures deliberately author non-registry element
+  tokens that must keep constructing
+
 ### Requirement: The damage:<element>:<school> grammar has exactly one parser
 `world.skills.effects.parse_effect` SHALL be the only function in the codebase that splits or
 validates the `damage:<element>:<school>` string shape. Any other module that needs the parsed
 element or school SHALL obtain it by calling `parse_effect` (directly, or through a thin wrapper that
 calls `parse_effect` and layers only validation `parse_effect` deliberately excludes) rather than
-independently re-implementing the string split. A cast-time-only concern excluded from
-`parse_effect` by design — validating a non-`None` element against
-`world.lore.elements.ELEMENT_REGISTRY` — MAY be layered on top of `parse_effect`'s result by such a
-wrapper, but MUST NOT re-derive the element or school from the raw string a second time.
-`DamageEffect.element` is `str | None` (the reserved `damage:none:<school>` token parses to
-`element=None`, denoting the absence of an element); the wrapper's cast-time element check MUST treat
-`None` as always legal — never evaluating "not a registry key" for the elementless sentinel — the same
-way `parse_effect`'s own damage branch already does.
+independently re-implementing the string split.
 
 #### Scenario: The cast-time wrapper delegates instead of re-parsing
 - **WHEN** `world/rules/combat.py`'s cast-time damage-effect helper is inspected
@@ -398,3 +460,17 @@ way `parse_effect`'s own damage branch already does.
   combat
 - **THEN** the action is not rejected by the cast-time element-registry check — the parsed element is
   `None`, not a registry key, and `None` is always legal
+
+#### Scenario: A wrapper layers cast-time validation without re-deriving
+- **WHEN** a wrapper layers a cast-time-only concern excluded from `parse_effect` by design —
+  validating a non-`None` element against `world.lore.elements.ELEMENT_REGISTRY` — on top of
+  `parse_effect`'s result
+- **THEN** it MAY do so, but MUST NOT re-derive the element or school from the raw string a second
+  time
+
+#### Scenario: The element field is an optional carrying the absence sentinel
+- **WHEN** `DamageEffect.element` is read
+- **THEN** it is `str | None` (the reserved `damage:none:<school>` token parses to `element=None`,
+  denoting the absence of an element), and the wrapper's cast-time element check MUST treat `None`
+  as always legal — never evaluating "not a registry key" for the elementless sentinel — the same
+  way `parse_effect`'s own damage branch already does

@@ -9,16 +9,11 @@ authored, never what spawns.
 ## Requirements
 
 ### Requirement: Ambient and site placement are frozen keyed lore data validated at construction
-`world/lore/monster_placement.py` SHALL define frozen `AmbientPlacementRule` values (region key,
-eligible variant keys, quantity, capacity, determinism parameters) and frozen `MonsterSite` values
-(`key`, kind from the closed vocabulary `camp | nest | boss_site`, variant keys, host anchor or
-coordinate, capacity, `one_shot` flag, and a recovery condition for recoverable sites drawn from a
-closed in-game-time/approved-deterministic vocabulary), with module-level keyed registries following the
-existing lore discipline: construction-time validation, idempotent startup mirror, no runtime mutation
-from `world/lore/`. Validation SHALL reject an unknown region key, an unknown variant key, a placement
-whose species' habitat tags are incompatible with the target habitat (an authoring-data error, since
-tags constrain authoring only), a missing recovery condition on a non-one-shot site, and a recovery
-condition outside the closed vocabulary.
+`world/lore/monster_placement.py` SHALL define frozen `AmbientPlacementRule` and `MonsterSite` values
+held in module-level keyed registries following the existing lore discipline: construction-time
+validation, idempotent startup mirror, no runtime mutation from `world/lore/`. Registry construction
+SHALL reject invalid authoring data — unknown keys and recovery-condition violations — and never
+publish a partial registry.
 
 #### Scenario: An unknown variant reference is rejected at import time
 - **WHEN** a site or ambient rule names a variant key absent from the variant registry
@@ -32,13 +27,23 @@ condition outside the closed vocabulary.
 - **WHEN** a site is authored as recoverable with no recovery condition, or with a free-text condition outside the closed vocabulary
 - **THEN** registry construction raises the named error
 
+#### Scenario: Ambient rules are frozen values with the authored fields
+- **WHEN** an `AmbientPlacementRule` is constructed
+- **THEN** it is frozen and carries the region key, eligible variant keys, quantity, capacity, and determinism parameters
+
+#### Scenario: Sites are frozen values with the authored fields
+- **WHEN** a `MonsterSite` is constructed
+- **THEN** it is frozen and carries `key`, a kind from the closed vocabulary `camp | nest | boss_site`, variant keys, a host anchor or coordinate, capacity, the `one_shot` flag, and — for recoverable sites — a recovery condition drawn from a closed in-game-time/approved-deterministic vocabulary
+
+#### Scenario: An unknown region reference is rejected at construction
+- **WHEN** an ambient rule names a region key absent from the region registry
+- **THEN** registry construction raises the named placement-registry error and no partial registry is published
+
 ### Requirement: Every placed individual carries its owner marker and reconciliation stays inside the owner domain
 Individuals created by ambient placement SHALL carry the existing ambient ownership marker, and
 individuals created by a site SHALL carry a persistent site-ownership marker naming its site key.
-Ambient reconciliation SHALL act only on ambient-marked individuals; site reconciliation SHALL act only
-on individuals marked for that site. Neither SHALL delete, move, replace, or modify a monster owned by
-another owner — including quest-, story-, combat-session-, or other-site-owned individuals — and ambient
-maintenance SHALL never resume, respawn, clear, or otherwise stand in for a site's lifecycle.
+Each owner's reconciliation SHALL act only on individuals bearing its own marker and SHALL never
+delete, move, replace, or modify an individual owned by another owner.
 
 #### Scenario: Ambient cleanup leaves site-owned monsters untouched
 - **WHEN** ambient reconciliation runs at a coordinate hosting a site-owned individual
@@ -52,15 +57,20 @@ maintenance SHALL never resume, respawn, clear, or otherwise stand in for a site
 - **WHEN** an individual bound to an accepted quest record stands inside a site's footprint and either owner reconciles
 - **THEN** the quest-bound individual is untouched by both reconciliation passes
 
+#### Scenario: All foreign owners are protected
+- **WHEN** either reconciliation pass encounters an individual owned by a quest, story, combat session, or another site
+- **THEN** that individual is not deleted, moved, replaced, or modified
+
+#### Scenario: Ambient maintenance never stands in for site lifecycle
+- **WHEN** ambient maintenance runs
+- **THEN** it never resumes, respawns, clears, or otherwise stands in for a site's lifecycle
+
 ### Requirement: One-shot sites stay cleared and recoverable sites recover only on approved conditions
 A site authored one-shot SHALL remain cleared after its individuals are defeated until an author-side
-re-issue; no player action (re-entering a room, accepting a quest) and no elapsed wall-clock time SHALL
-recover it. A recoverable site SHALL recover only when its registered in-game-clock condition or approved
+re-issue. A recoverable site SHALL recover only when its registered in-game-clock condition or approved
 deterministic condition is satisfied, evaluated by the `world/maps/` site owner through the existing
-world-clock settlement seam. Recovery SHALL create fresh individuals with fresh persistent identities
-through the construction owner; it SHALL NOT resurrect, re-bind, or reuse the defeated individuals'
-identities. Whether a site has recovered SHALL be visible state, so quest republish decisions and site
-lifecycle cannot contradict each other.
+world-clock settlement seam, creating fresh individuals with fresh persistent identities through the
+construction owner. Whether a site has recovered SHALL be visible state.
 
 #### Scenario: A one-shot nest does not come back on its own
 - **WHEN** a one-shot site's individuals are defeated and the in-game clock advances, the room is re-entered, and a quest is accepted
@@ -74,12 +84,22 @@ lifecycle cannot contradict each other.
 - **WHEN** a cleared recoverable site whose condition has not matured is re-entered by the player
 - **THEN** no individual appears and the cleared state is unchanged
 
+#### Scenario: Wall-clock time never revives a one-shot site
+- **WHEN** wall-clock time elapses after a one-shot site's individuals are defeated, with no author-side re-issue
+- **THEN** the site remains cleared regardless of how much real time has passed
+
+#### Scenario: Recovery never reuses defeated identities
+- **WHEN** a recoverable site recovers after its previous individuals were defeated
+- **THEN** none of the defeated individuals is resurrected, re-bound to the site, or reused; every standing individual has a fresh persistent identity
+
+#### Scenario: Recovery state is visible to the quest layer
+- **WHEN** the quest layer consults whether a cleared recoverable site has recovered
+- **THEN** it reads the site's visible recovery state rather than inferring it, so republish decisions and site lifecycle agree
+
 ### Requirement: Placement honors capacity and determinism
 Ambient reconciliation SHALL maintain quantities up to, but never beyond, the authored regional quantity
-and capacity, and SHALL create no individual whose species/variant differs from the rule's authored
-variant set. Site passes SHALL respect site capacity. Ambient selection over a rule's variant set SHALL
-be a pure deterministic function of coordinates and authored parameters — no RNG, no database state, no
-wall clock — reusing the existing coordinate-hash discipline, and repeated reconciliation of unchanged
+and capacity, and site passes SHALL respect site capacity. Ambient selection SHALL be a pure
+deterministic function of coordinates and authored parameters, and repeated reconciliation of unchanged
 state SHALL be a no-op.
 
 #### Scenario: Capacity is a ceiling, not a reshuffle
@@ -89,6 +109,14 @@ state SHALL be a no-op.
 #### Scenario: Same coordinate, same species selection
 - **WHEN** ambient selection is evaluated twice for the same coordinate
 - **THEN** the same variant is selected both times, across process restarts, with no random or clock input read
+
+#### Scenario: Selection stays inside the authored variant set
+- **WHEN** ambient reconciliation creates an individual for a rule
+- **THEN** the individual's species/variant is one of the rule's authored variant set
+
+#### Scenario: Determinism reuses the coordinate-hash discipline
+- **WHEN** ambient selection is evaluated
+- **THEN** it reads no RNG, no database state, and no wall clock, reusing the existing coordinate-hash discipline
 
 ### Requirement: Placement decisions are boundary-observable through the facade
 Ambient creation/removal decisions, site clearing, site recovery, and rejected recovery attempts SHALL
@@ -103,14 +131,8 @@ logs, and reconciliation passes that change nothing SHALL stay silent.
 ### Requirement: A site's living individuals are the quest layer's binding source and no quest may create or recover a site
 The site owner SHALL expose a read that answers, for one authored site key, which of that site's own living
 individuals currently stand and what the site's durable lifecycle state is. The read SHALL be pure: it
-SHALL create, populate, recover, move, delete, or modify nothing, it SHALL emit no lifecycle decision event
-(it decides nothing), and repeating it SHALL leave every surface equal. It SHALL answer for a world that is
-not provisioned, for an unknown site key, for a never-populated site, and for a cleared site, without
-treating any of those as a recovery opportunity. A quest clear-out SHALL take its bound set from that read
-alone: neither acceptance nor the board SHALL populate, recover, or spawn an individual for a quest, and a
-site's first population and its recovery SHALL remain the site owner's clock-settled lifecycle decisions.
-Binding a quest to a site's individuals SHALL NOT change the site's ownership markers, its durable state,
-or the number of individuals it owns.
+SHALL create, populate, recover, move, delete, or modify nothing and SHALL emit no lifecycle decision event
+(it decides nothing).
 
 #### Scenario: The read answers with the site's own living individuals
 - **WHEN** a populated site's read is taken
@@ -131,3 +153,15 @@ or the number of individuals it owns.
 #### Scenario: Reading twice changes nothing
 - **WHEN** the read is taken twice in one process for the same site
 - **THEN** both answers are equal and no persistent surface differs between them
+
+#### Scenario: A quest clear-out binds only from the site read
+- **WHEN** a quest needs its bound set of targets
+- **THEN** it takes that set from this read alone, and neither quest acceptance nor the quest board populates, recovers, or spawns an individual for the quest
+
+#### Scenario: Site population and recovery stay the site owner's decisions
+- **WHEN** a site is first populated or later recovers
+- **THEN** the change is the site owner's clock-settled lifecycle decision, never a quest-driven action
+
+#### Scenario: An unprovisioned world or unknown site key is answered without side effects
+- **WHEN** the read is taken for a world that is not provisioned, or for a site key absent from the registry
+- **THEN** it answers without treating either case as a recovery opportunity, and no individual or site surface changes

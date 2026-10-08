@@ -37,7 +37,7 @@ or Battlefield instances SHALL NOT be stored.
 - **THEN** a second `engage` request is rejected without replacing it
 
 ### Requirement: One preflight-valid player action drives one complete ordinary combat round
-During active combat, a selected skill SHALL build one player `ActionRequest` and a selected usable item SHALL build one `ItemUseRequest`. The combat-session facade SHALL call the matching side-effect-free preflight before any initiative action. A preflight rejection SHALL not run NPC actions/upkeep or consume a round. After successful preflight, a session action provider SHALL supply the selected request once for the player and deterministic behavior-policy `ActionRequest` values for every other participant — monsters and allied companions alike, each at most one per round, with targets selected from the opposing team. `run_round()` SHALL preserve initiative, resolution, and upkeep and SHALL dispatch the closed request union explicitly to `ActionResolver` or the deterministic item-use resolver. If an earlier initiative action makes the preflight-valid request reject at the player's turn, the already-started round SHALL remain consumed.
+During active combat, a selected skill SHALL build one player `ActionRequest` and a selected usable item SHALL build one `ItemUseRequest`. The combat-session facade SHALL call the matching side-effect-free preflight before any initiative action. After successful preflight, `run_round()` SHALL preserve initiative, resolution, and upkeep and SHALL dispatch the closed request union explicitly to `ActionResolver` or the deterministic item-use resolver.
 
 #### Scenario: Player chooses a skill action before NPC turns run
 - **WHEN** the player submits a valid combat cast
@@ -63,13 +63,23 @@ During active combat, a selected skill SHALL build one player `ActionRequest` an
 - **WHEN** preflight succeeds but an earlier initiative action makes the player's selected skill or item request invalid
 - **THEN** the player's resolution may reject, prior actions and upkeep remain committed, and the round count increases once
 
+#### Scenario: A preflight rejection consumes nothing
+- **WHEN** the matching side-effect-free preflight rejects the selected request
+- **THEN** no NPC actions or upkeep run and no round is consumed
+
+#### Scenario: The action provider supplies every participant's request
+- **WHEN** preflight succeeds and the round is assembled
+- **THEN** a session action provider supplies the selected request once for the player and deterministic behavior-policy `ActionRequest` values for every other participant — monsters and allied companions alike, each at most one per round, with targets selected from the opposing team
+
+#### Scenario: A started round stays consumed
+- **WHEN** an earlier initiative action makes the preflight-valid request reject at the player's turn
+- **THEN** the already-started round remains consumed
+
 ### Requirement: Combat time settles once at terminal session outcome
 Session rounds SHALL accumulate without command-default cast time. On enemy defeat, player defeat,
 successful flee, nonlethal exam outcome, or bounded terminal condition, the total rounds times six
-seconds SHALL settle once through `settle_combat_result()`, and the settlement entity scope SHALL be
-every living, non-fled member of the session's battlefield roster (player, companions, and any
-non-defeated foe still present), so all participants receive gauge regen for the accumulated combat
-time. Then active session/context state SHALL be cleared. The settlement SHALL be idempotent: a
+seconds SHALL settle once through `settle_combat_result()`. Then active session/context state SHALL
+be cleared. The settlement SHALL be idempotent: a
 terminal outcome SHALL record a durable settled marker so a restart that re-reads the session can
 never settle the same rounds a second time.
 
@@ -91,6 +101,12 @@ never settle the same rounds a second time.
 - **THEN** the companion's HP/MP/SP are regenerated for the accumulated combat seconds, and a knocked-out
   companion rises above the nonlethal HP floor when its regen allows
 
+#### Scenario: Settlement scope is the living non-fled roster
+- **WHEN** a terminal settlement runs
+- **THEN** the settlement entity scope is every living, non-fled member of the session's battlefield
+  roster (player, companions, and any non-defeated foe still present), so all participants receive
+  gauge regen for the accumulated combat time
+
 ### Requirement: The knocked-out player settles the session as defeat
 If the player is in the battlefield's knocked-out set at the round cap or
 when the round otherwise ends without a side eliminated, the session SHALL
@@ -104,15 +120,27 @@ settle with outcome `defeat` — the defeated player SHALL be settled at HP
 
 ### Requirement: A round and its settlement form one atomic persistence unit
 
-The shared submission body SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state. Upkeep-settled effects (damaging-tick HP, defeat entries, and quest effects staged by the upkeep settlement) SHALL commit inside the same unit: the body SHALL forward the session's `simulated` and companion `nonlethal_keys` policy into resolution for both the `opening="round"` and the `opening="overwhelm"` path, and an upkeep settlement failure SHALL roll back the whole round. On a hostile-defeat terminal outcome, the complete defeat aftermath (violator departure, weak buff grant, and the adult phases contributed by later changes) SHALL commit in that one transaction together with the `settled_tick` marker and the session-record clearing; the physical departure deletions ride `transaction.on_commit`, so an outer round transaction's rollback discards them too.
+The shared submission body SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state.
 
 #### Scenario: Termination mid-round leaves no half-committed round
 
 - **WHEN** a process terminates after some combatant effects committed but before the session record update
 - **THEN** after restart either the full round (effects plus `rounds_elapsed`) is durable or none of it is
 
+#### Scenario: Upkeep effects commit inside the same unit
+- **WHEN** the upkeep settlement stages damaging-tick HP, defeat entries, or quest effects
+- **THEN** those upkeep-settled effects commit inside the same unit: the body forwards the session's `simulated` and companion `nonlethal_keys` policy into resolution for both the `opening="round"` and the `opening="overwhelm"` path, and an upkeep settlement failure rolls back the whole round
+
+#### Scenario: Defeat aftermath commits in the one transaction
+- **WHEN** a hostile-defeat terminal outcome settles
+- **THEN** the complete defeat aftermath (violator departure, weak buff grant, and the adult phases contributed by later changes) commits in that one transaction together with the `settled_tick` marker and the session-record clearing
+
+#### Scenario: Departure deletions ride on_commit
+- **WHEN** the defeat aftermath deletes the departing entities physically
+- **THEN** the deletions ride `transaction.on_commit`, so an outer round transaction's rollback discards them too
+
 ### Requirement: Overwhelm waits for one player choice before compressed resolver-backed outcome
-At engagement the session SHALL record overwhelm classification but SHALL run no action before player input. Compression SHALL be reachable only through `submit_opening_action()`, and only when its two-part condition holds: `classify_overwhelm()` decides for the player's team **and** the submitted skill damages a member of the opposing team. A submission made inside an already-active session SHALL NEVER compress, whatever the verdict and whatever was submitted. When compression is dispatched, the selected request SHALL be used for the first simulated player turn; subsequent compressed player turns SHALL use deterministic `basic_attack` against the lowest-HP living enemy. Every turn SHALL remain a member of the closed deterministic request union and SHALL emit compressed EventLogs; no path SHALL directly assign HP, consume inventory outside the item resolver, or bypass quest planners. The dispatcher SHALL pass the selected action's actor key, `action_kind` (`skill`), and `action_key` to the resolver so the compressed log emits exactly one matching first-round `commanded_action` entry. This identity plumbing SHALL affect only log identity, never round sequence, combat math, or settlement. A foe-overwhelming verdict SHALL remain informational and play one ordinary round per submission, preserving full skill, flee, and item choice. Undecided encounters SHALL pause for player input between ordinary rounds.
+At engagement the session SHALL record overwhelm classification but SHALL run no action before player input. Compression SHALL be reachable only through `submit_opening_action()`, and only when its two-part condition holds: `classify_overwhelm()` decides for the player's team **and** the submitted skill damages a member of the opposing team. A submission made inside an already-active session SHALL NEVER compress, whatever the verdict and whatever was submitted.
 
 #### Scenario: An opening damaging skill under a player-overwhelming verdict resolves compressed
 - **WHEN** compression is dispatched through `submit_opening_action()` for a damaging skill and a player-direction verdict
@@ -138,6 +166,26 @@ At engagement the session SHALL record overwhelm classification but SHALL run no
 - **WHEN** one round ends with both teams active and no player-direction overwhelm verdict
 - **THEN** the session persists and no additional round runs before the player's next action
 
+#### Scenario: Compressed turns follow the scripted sequence
+- **WHEN** compression is dispatched
+- **THEN** the selected request is used for the first simulated player turn, and subsequent compressed player turns use deterministic `basic_attack` against the lowest-HP living enemy
+
+#### Scenario: Compression stays inside the resolver boundaries
+- **WHEN** compressed turns resolve
+- **THEN** every turn remains a member of the closed deterministic request union and emits compressed EventLogs, and no path directly assigns HP, consumes inventory outside the item resolver, or bypasses quest planners
+
+#### Scenario: The dispatcher passes action identity for log fidelity only
+- **WHEN** the dispatcher hands the selected action to the resolver
+- **THEN** it passes the selected action's actor key, `action_kind` (`skill`), and `action_key` so the compressed log emits exactly one matching first-round `commanded_action` entry, and this identity plumbing affects only log identity, never round sequence, combat math, or settlement
+
+#### Scenario: A foe-overwhelming verdict stays informational
+- **WHEN** the verdict is foe-overwhelming
+- **THEN** it remains informational and plays one ordinary round per submission, preserving full skill, flee, and item choice
+
+#### Scenario: Undecided encounters pause for input
+- **WHEN** an encounter is undecided
+- **THEN** it pauses for player input between ordinary rounds
+
 ### Requirement: Overwhelm compression is player-direction only
 `submit_opening_action()` SHALL invoke the overwhelm resolver only when `classify_overwhelm` returns the player's team and the submitted skill damages a member of the opposing team; any other verdict (contested or foe-overwhelming), and any non-damaging or non-enemy-directed skill, SHALL NOT trigger compression. No other production call site SHALL invoke the resolver.
 
@@ -157,9 +205,7 @@ At engagement the session SHALL record overwhelm classification but SHALL run no
 The deterministic startup sequence SHALL reconstruct valid persisted sessions and skip-safety
 registration through `restore_persisted_sessions()`. A persisted record that cannot be strictly parsed
 SHALL be cleared or quarantined without settling world time or participant effects derived from its
-untrusted fields, and SHALL leave the player unblocked for ordinary hostile engagement. Missing,
-deleted, moved, duplicated, or malformed participants in a well-formed record SHALL produce a
-diagnostic and deterministic session termination without leaving the player blocked.
+untrusted fields, and SHALL leave the player unblocked for ordinary hostile engagement.
 
 #### Scenario: Reload preserves an active battle
 - **WHEN** the server reloads with a valid session whose participants remain in its room
@@ -178,6 +224,12 @@ diagnostic and deterministic session termination without leaving the player bloc
 - **WHEN** startup cleared a malformed persisted record and the player then engages a valid co-located
   living monster
 - **THEN** a fresh hostile session is created and the player can act in it
+
+#### Scenario: A well-formed record with bad participants terminates deterministically
+- **WHEN** startup finds missing, deleted, moved, duplicated, or malformed participants in a
+  well-formed record
+- **THEN** it produces a diagnostic and deterministic session termination without leaving the
+  player blocked
 
 ### Requirement: Malformed session payloads fail closed without unhandled conversion errors
 `read_session` SHALL raise `CombatSessionError` with the `malformed_session` reason for any
@@ -211,7 +263,7 @@ defeat by the reconciliation.
 
 ### Requirement: Startup combat restoration advances time only after every deterministic clock source is registered
 
-The deterministic startup sequence SHALL run every deterministic sync that precedes session restoration — `sync_service_interiors()`, `sync_quest_runtime()`, `sync_guild_economy()`, `sync_guard_npc()`, and `sync_npc_schedules()` — before `restore_persisted_sessions()` may advance the world clock, so the recovery advance's `WorldClock.advance` runs the same registered stage set as any ordinary advance (`quest_deadlines`, `caravan_arrivals`, `shop_hours`, `npc_schedules`, plus `instance_reclamation` registered by `sync_grid`). The sequence SHALL still run `restore_persisted_sessions()` before `sync_wilderness()` so a defeated population monster referenced by a committed session is never deleted or respawned first. No recovery window can bypass an unregistered deterministic callback.
+The deterministic startup sequence SHALL run every deterministic sync that precedes session restoration — `sync_service_interiors()`, `sync_quest_runtime()`, `sync_guild_economy()`, `sync_guard_npc()`, and `sync_npc_schedules()` — before `restore_persisted_sessions()` may advance the world clock.
 
 #### Scenario: All deterministic syncs precede session restoration, which precedes wilderness sync
 
@@ -222,6 +274,20 @@ The deterministic startup sequence SHALL run every deterministic sync that prece
 
 - **WHEN** a cold start begins with an active quest whose `deadline_tick` falls inside the settlement window of a recovered invalid session
 - **THEN** the quest record transitions to `FAILED` with reason `deadline_expired` during restoration, because `quest_deadlines` was already registered
+
+#### Scenario: Restoration keeps its wilderness ordering and admits no bypass
+
+- **WHEN** the startup sequence is composed
+- **THEN** it still runs `restore_persisted_sessions()` before `sync_wilderness()` so a defeated
+  population monster referenced by a committed session is never deleted or respawned first, and no
+  recovery window can bypass an unregistered deterministic callback
+
+#### Scenario: The recovery advance runs the ordinary registered stage set
+
+- **WHEN** a recovered session's recovery advance runs `WorldClock.advance`
+- **THEN** it runs the same registered stage set as any ordinary advance (`quest_deadlines`,
+  `caravan_arrivals`, `shop_hours`, `npc_schedules`, plus `instance_reclamation` registered by
+  `sync_grid`), which is why every deterministic sync precedes restoration
 
 ### Requirement: Active sessions block movement and define pause, forfeit, and recovery outcomes
 A PlayerCharacter with an active combat session SHALL be unable to traverse or otherwise leave the
@@ -244,7 +310,7 @@ SHALL perform the same cleanup, with exam recovery settling FAIL.
   deleted, and the player may request a later attempt
 
 ### Requirement: Player combat submission accepts one explicit target value
-`submit_player_action(actor, skill_key, targets_or_shorthand)` SHALL accept only a concrete list of live participant objects or one of `all-enemies`, `all-allies`, and `all`. It SHALL reject any other scalar, a duplicate explicit participant, or a participant outside the current reconstructed session before initiative. Player-facing NONE and SELF SHALL require an empty list; the facade SHALL bind that empty SELF input to the actor and leave NONE empty. SINGLE SHALL receive exactly one explicit participant, and AREA SHALL receive a nonempty explicit list or one approved shorthand. The facade SHALL retain battlefield reconstruction, shared preview, `ActionResolver.preflight()`, initiative, session persistence, terminal settlement, and recovery ownership. It SHALL NOT own compression dispatch, which belongs to `submit_opening_action()` alone. No single-object compatibility overload SHALL exist.
+`submit_player_action(actor, skill_key, targets_or_shorthand)` SHALL accept only a concrete list of live participant objects or one of `all-enemies`, `all-allies`, and `all`. It SHALL reject any other scalar, a duplicate explicit participant, or a participant outside the current reconstructed session before initiative. Player-facing NONE and SELF SHALL require an empty list; the facade SHALL bind that empty SELF input to the actor and leave NONE empty.
 
 #### Scenario: Explicit AREA participants drive one round
 - **WHEN** a player submits an AREA skill with two distinct current enemy objects
@@ -258,8 +324,24 @@ SHALL perform the same cleanup, with exam recovery settling FAIL.
 - **WHEN** a production caller passes one participant object instead of a list
 - **THEN** the facade rejects the malformed call before initiative rather than wrapping it through a compatibility branch
 
+#### Scenario: SINGLE and AREA keep their target shapes
+- **WHEN** a SINGLE or AREA skill is submitted
+- **THEN** SINGLE receives exactly one explicit participant, and AREA receives a nonempty explicit list or one approved shorthand
+
+#### Scenario: The facade retains its orchestration ownership
+- **WHEN** a submission is processed
+- **THEN** the facade retains battlefield reconstruction, shared preview, `ActionResolver.preflight()`, initiative, session persistence, terminal settlement, and recovery ownership
+
+#### Scenario: The facade never owns compression
+- **WHEN** compression dispatch is needed
+- **THEN** it belongs to `submit_opening_action()` alone and the facade does not own it
+
+#### Scenario: No single-object compatibility overload exists
+- **WHEN** a caller attempts the old single-object call shape
+- **THEN** no single-object compatibility overload exists to accept it
+
 ### Requirement: Telnet combat discovery and target tokens have rule parity
-`combat actions` SHALL list every owned active skill in deterministic handler order and assign session-local target tokens from persisted participant order: `a1`, `a2`, and so on for `player_ids`, then `e1`, `e2`, and so on for `enemy_ids`. A token SHALL remain bound to the same dbref for the session lifetime and SHALL never be persisted separately. Active-session `cast` SHALL accept one token, a comma-separated list containing tokens only, or one complete approved AREA shorthand; it SHALL retain existing one-target display-name search. Comma input SHALL reject names, unknown or duplicate tokens, and shorthand/token mixtures before initiative.
+`combat actions` SHALL list every owned active skill in deterministic handler order and assign session-local target tokens from persisted participant order: `a1`, `a2`, and so on for `player_ids`, then `e1`, `e2`, and so on for `enemy_ids`. A token SHALL remain bound to the same dbref for the session lifetime and SHALL never be persisted separately.
 
 #### Scenario: Combat actions lists stable tokens and active skills
 - **WHEN** a Telnet player requests `combat actions` before and after one nonterminal round
@@ -276,6 +358,14 @@ SHALL perform the same cleanup, with exam recovery settling FAIL.
 #### Scenario: Mixed syntax cannot bypass target rules
 - **WHEN** the player enters a duplicate token list, a token mixed with a display name, or `all-enemies,e1`
 - **THEN** the command rejects before preview, initiative, round count, or world-time change
+
+#### Scenario: Active-session cast accepts the approved syntax set
+- **WHEN** the player casts inside an active session
+- **THEN** `cast` accepts one token, a comma-separated list containing tokens only, or one complete approved AREA shorthand, and retains existing one-target display-name search
+
+#### Scenario: Comma input rejects malformed entries before initiative
+- **WHEN** comma input contains names, unknown or duplicate tokens, or shorthand/token mixtures
+- **THEN** it rejects before initiative
 
 ### Requirement: Combat boundaries emit observability events
 
@@ -302,11 +392,7 @@ round's durable commit and MUST NOT alter the atomic round/settlement unit.
 `opening: Literal["round", "overwhelm"] = "round"` and `first_actor: str | None = None`, and SHALL
 run one `combat.run_round()` whenever `opening` is `"round"`. It SHALL NOT consult
 `classify_overwhelm()` to choose between an ordinary round and compression; the choice SHALL be the
-caller's, expressed through `opening`. `submit_player_action()` and `submit_player_item_use()` SHALL
-NOT pass `opening` and SHALL NOT call `classify_overwhelm()` for dispatch, so every submission made
-inside an already-active session resolves exactly one round regardless of the power verdict. The
-session's `simulated` and companion `nonlethal_keys` policy, the item journal sink, and the
-notification sink SHALL be forwarded identically for both `opening` values.
+caller's, expressed through `opening`.
 
 #### Scenario: An overwhelming verdict no longer compresses an in-session submission
 - **WHEN** the player submits a preflight-valid skill in a session for which `classify_overwhelm()`
@@ -330,15 +416,22 @@ notification sink SHALL be forwarded identically for both `opening` values.
 - **THEN** both forward the same `simulated`, `nonlethal_keys`, journal sink, and notification sink
   values into resolution
 
+#### Scenario: In-session entries never opt into compression
+- **WHEN** `submit_player_action()` and `submit_player_item_use()` run
+- **THEN** they pass no `opening` and call no `classify_overwhelm()` for dispatch, so every
+  submission made inside an already-active session resolves exactly one round regardless of the
+  power verdict
+
+#### Scenario: Policy and sinks forward identically for both openings
+- **WHEN** the shared submission body runs under either `opening` value
+- **THEN** the session's `simulated` and companion `nonlethal_keys` policy, the item journal sink,
+  and the notification sink are forwarded identically for both `opening` values
+
 ### Requirement: engage_group opens one session against several co-located hostile targets
 `world/rules/combat_session.py` SHALL provide `engage_group(actor, targets)`, applying every
 validation, companion collection, record construction, battlefield reconstruction, persistence, skip
 safety registration, and dialogue-session clearing that single-target engagement performs, with
-`enemy_ids` holding one dbref per supplied target in deterministic order. `engage(actor, target)`
-SHALL retain its signature and semantics and SHALL delegate to `engage_group(actor, [target])`, so
-its existing call sites are unchanged. `engage_group()` SHALL reject the whole request — persisting
-no session — when the actor is not a `PlayerCharacter`, already has an active session, or when any
-supplied target is not a living hostile `Monster` in the actor's room.
+`enemy_ids` holding one dbref per supplied target in deterministic order.
 
 #### Scenario: A two-enemy session reconstructs, persists, resolves, and settles
 - **WHEN** `engage_group()` is called with two living hostile monsters in the actor's room, and the
@@ -358,23 +451,22 @@ supplied target is not a living hostile `Monster` in the actor's room.
 - **THEN** the request is rejected, no session is persisted, no battlefield is registered, and no
   world time changes
 
+#### Scenario: engage delegates to engage_group unchanged
+- **WHEN** `engage(actor, target)` is called
+- **THEN** it retains its signature and semantics and delegates to `engage_group(actor, [target])`,
+  so its existing call sites are unchanged
+
+#### Scenario: Any invalid precondition rejects the whole request
+- **WHEN** the actor is not a `PlayerCharacter`, already has an active session, or any supplied
+  target is not a living hostile `Monster` in the actor's room
+- **THEN** `engage_group()` rejects the whole request — persisting no session
+
 ### Requirement: submit_opening_action is the sole compression dispatcher and always grants the player first strike
 `world/rules/combat_session.py` SHALL provide `submit_opening_action(actor, skill_key, targets, scale)`
 as the only production caller that may request compression. It SHALL select
 `opening="overwhelm"` if and only if `classify_overwhelm(battlefield)` returns the actor's team
 **and** `overwhelm.commanded_damage_reaches_enemy()` reports that the submitted skill damages a
-member of the opposing team; in every other case it SHALL select `opening="round"`. It SHALL pass
-`first_actor` equal to the actor's roster key for both selections, so the opening action resolves
-before any other combatant acts. It SHALL accept skills only; no item request SHALL reach it.
-
-`submit_opening_action()` SHALL accept only a concrete list of participant objects and SHALL reject
-an approved AREA shorthand (`all-enemies`, `all-allies`, `all`) before initiative, even though
-`submit_player_action()` accepts one. This is a correctness requirement, not a convenience:
-`commanded_damage_reaches_enemy()` reads concrete roster keys, so a shorthand reaching it would fail
-to intersect the enemy team and return `False`, silently selecting `opening="round"` and disabling
-one-shot settlement with no diagnostic. Rejecting the shorthand makes that failure unreachable
-instead of invisible. It SHALL likewise reject a target that is not a member of the reconstructed
-battlefield's roster, matching `submit_player_action()`'s existing not-present rejection.
+member of the opposing team; in every other case it SHALL select `opening="round"`.
 
 #### Scenario: An AREA shorthand is rejected before initiative
 - **WHEN** `submit_opening_action()` is called with `"all-enemies"` instead of a concrete list
@@ -408,3 +500,27 @@ battlefield's roster, matching `submit_player_action()`'s existing not-present r
   verdict and once with a non-damaging skill
 - **THEN** in both cases the player's action resolves before any other combatant's in the opening
   round
+
+#### Scenario: The dispatcher always passes the actor's roster key as first_actor
+- **WHEN** either opening selection is dispatched
+- **THEN** `submit_opening_action()` passes `first_actor` equal to the actor's roster key for both
+  selections, so the opening action resolves before any other combatant acts
+
+#### Scenario: Only skills reach the dispatcher
+- **WHEN** casting traffic is routed
+- **THEN** `submit_opening_action()` accepts skills only and no item request reaches it
+
+#### Scenario: The opening entry rejects shorthand for correctness
+- **WHEN** `submit_opening_action()` is called with an approved AREA shorthand (`all-enemies`,
+  `all-allies`, `all`) instead of a concrete list of participant objects, even though
+  `submit_player_action()` accepts one
+- **THEN** it rejects before initiative, because this is a correctness requirement, not a
+  convenience: `commanded_damage_reaches_enemy()` reads concrete roster keys, so a shorthand
+  reaching it would fail to intersect the enemy team and return `False`, silently selecting
+  `opening="round"` and disabling one-shot settlement with no diagnostic, and rejecting the
+  shorthand makes that failure unreachable instead of invisible
+
+#### Scenario: Off-roster targets reject like the ordinary facade
+- **WHEN** `submit_opening_action()` is called with a target that is not a member of the
+  reconstructed battlefield's roster
+- **THEN** it rejects, matching `submit_player_action()`'s existing not-present rejection

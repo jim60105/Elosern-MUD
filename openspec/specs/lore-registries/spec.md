@@ -5,17 +5,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 ## Requirements
 
 ### Requirement: RaceProfile encodes the three-race power gap
-`world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields
-`key`, `lifespan`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and
-`can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
-exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`. `StaticBand` SHALL be
-four-dimensional — `atk_phys`, `agility`, `defense`, and `magic_power`, each a
-`tuple[int, int]` — and the race `static_baseline` SHALL carry the growth-redesign interim
-bands: human `(1, 22)` on the three combat axes with `magic_power (5, 90)`, beastfolk
-`(4, 34)` with `magic_power (1, 30)`, elf `(70, 95)` with `magic_power (100, 900)`. The
-former `magic_cap` and `starting_magic_level` fields SHALL NOT exist: the fourth
-`static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic
-average survives.
+`world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields `key`, `lifespan`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and `can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 
 #### Scenario: Registry has exactly the three documented races
 - **WHEN** `RACE_REGISTRY` is inspected
@@ -54,16 +44,20 @@ average survives.
 - **THEN** each carries a `magic_power` tuple of two integers with a non-decreasing range, for
   every race baseline and every monster tier band
 
+#### Scenario: StaticBand is four-dimensional
+- **WHEN** `StaticBand` is inspected
+- **THEN** it is four-dimensional — `atk_phys`, `agility`, `defense`, and `magic_power`, each a `tuple[int, int]`
+
+#### Scenario: Race static baselines carry the growth-redesign interim bands
+- **WHEN** the three races' `static_baseline` values are inspected
+- **THEN** they carry the growth-redesign interim bands: human `(1, 22)` on the three combat axes with `magic_power (5, 90)`, beastfolk `(4, 34)` with `magic_power (1, 30)`, elf `(70, 95)` with `magic_power (100, 900)`
+
+#### Scenario: The former magic fields do not exist and the fourth axis is the only bound
+- **WHEN** `RaceProfile` is inspected
+- **THEN** the former `magic_cap` and `starting_magic_level` fields SHALL NOT exist — the fourth `static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic average survives
+
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
-`world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`,
-`display_name_zh`, `order`, `band: tuple[int, int | None]`, `magic_band: tuple[int, int]`,
-`guild_rank_hint`, and `description`, and a module-level
-`STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers,
-and two elf tiers. `band` remains the shared physical-power band applied to
-`atk_phys`/`agility`/`defense`; `magic_band` is the tier's own deterministic `magic_power`
-floor-to-ceiling band, replacing the deleted race-level `starting_magic_level` as the source of
-tier-built NPC and profile magic power. Registry load SHALL validate every `magic_band` is a
-subset of the owning race's `static_baseline.magic_power` band.
+`world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`, `display_name_zh`, `order`, `band: tuple[int, int | None]`, `magic_band: tuple[int, int]`, `guild_rank_hint`, and `description`, and a module-level `STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers, and two elf tiers.
 
 #### Scenario: Every tier references a real race and stays within that race's static_baseline
 - **WHEN** every entry in `STATIC_TIER_REGISTRY` is inspected
@@ -104,17 +98,16 @@ subset of the owning race's `static_baseline.magic_power` band.
   owning race's `static_baseline.magic_power` band
 - **THEN** registry load raises a named error rather than accepting the deviating tier
 
+#### Scenario: Band and magic_band carry their documented roles
+- **WHEN** a tier's `band` and `magic_band` fields are inspected
+- **THEN** `band` remains the shared physical-power band applied to `atk_phys`/`agility`/`defense`, and `magic_band` is the tier's own deterministic `magic_power` floor-to-ceiling band, replacing the deleted race-level `starting_magic_level` as the source of tier-built NPC and profile magic power
+
+#### Scenario: Registry load validates every magic_band against the race band
+- **WHEN** the registry loads
+- **THEN** load validates every `magic_band` is a subset of the owning race's `static_baseline.magic_power` band
+
 ### Requirement: Subrace registry covers elf branches, beastfolk subspecies, and human bloodline subraces with stat modifiers
-`world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`,
-`agility`, and `defense` (each a `float` fractional delta, default `0.0`), a frozen `Subrace`
-dataclass with fields `key`, `race_key`, `display_name_zh`, `common_name_zh`, `population`,
-`home_anchor_key`, `affinity_elements`, `specialty`, `static_modifiers`, and `vital_overrides`, and
-a module-level `SUBRACE_REGISTRY: dict[str, Subrace]` containing the three elf branches
-(`fionnen`, `ciaran`, `eolas`), the seven named beastfolk subspecies (`wolfkin`, `catkin`,
-`bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`), and the five named human bloodline
-subraces (`human_royal`, `human_noble`, `human_coastal`, `human_plains`, `human_highland`), so
-that every race in `RACE_REGISTRY` has at least one subrace and no player-facing subrace selection
-ever needs a "none" option.
+`world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`, `agility`, and `defense` (each a `float` fractional delta, default `0.0`), a frozen `Subrace` dataclass with fields `key`, `race_key`, `display_name_zh`, `common_name_zh`, `population`, `home_anchor_key`, `affinity_elements`, `specialty`, `static_modifiers`, and `vital_overrides`, and a module-level `SUBRACE_REGISTRY: dict[str, Subrace]`.
 
 #### Scenario: Every subrace references a real race
 - **WHEN** every entry in `SUBRACE_REGISTRY` is inspected
@@ -232,6 +225,22 @@ ever needs a "none" option.
   documents a `vital_overrides` band is inspected
 - **THEN** `vital_overrides is None` for that entry, meaning it uses `RaceProfile.vital_baseline`
   unmodified
+
+#### Scenario: The registry carries the three elf branches
+- **WHEN** `SUBRACE_REGISTRY` is inspected for elven entries
+- **THEN** it contains the three elf branches (`fionnen`, `ciaran`, `eolas`)
+
+#### Scenario: The registry carries the seven named beastfolk subspecies
+- **WHEN** `SUBRACE_REGISTRY` is inspected for beastfolk entries
+- **THEN** it contains the seven named beastfolk subspecies (`wolfkin`, `catkin`, `bearkin`, `rabbitkin`, `bovinekin`, `tigerkin`, `foxkin`)
+
+#### Scenario: The registry carries the five named human bloodline subraces
+- **WHEN** `SUBRACE_REGISTRY` is inspected for human entries
+- **THEN** it contains the five named human bloodline subraces (`human_royal`, `human_noble`, `human_coastal`, `human_plains`, `human_highland`)
+
+#### Scenario: No subrace selection ever needs a "none" option
+- **WHEN** the registry is read as a whole against `RACE_REGISTRY`
+- **THEN** every race in `RACE_REGISTRY` has at least one subrace and no player-facing subrace selection ever needs a "none" option
 
 ### Requirement: Element registry covers the eight documented elements
 `world/lore/elements.py` SHALL define a frozen `Element` dataclass and a module-level
@@ -366,15 +375,7 @@ with exactly nine entries: three capitals, three elven villages, and three known
   mountain range as neutral ground no nation can govern
 
 ### Requirement: Currency is an integer count of 銅 with no floats in the money path
-`world/lore/economy.py` SHALL define `COPPER_PER_SILVER = 100` and `COPPER_PER_GOLD = 10000` as
-integer constants, a `to_copper(gold: int = 0, silver: int = 0, copper: int = 0) -> int` helper
-that returns an `int`, a frozen `PriceEntry` dataclass with integer `min_copper` and
-`max_copper: int | None` fields, and a module-level `PRICE_TABLE: dict[str, PriceEntry]` covering
-every purchasing-power reference in `world_info.md` (inn stay, meal, potion, plain sword, magic
-weapon, commoner annual income, adventurer annual income) plus every band the lore item codex
-assigns to a catalogued item, including the regional-delicacy band that separates named local
-foods from an ordinary meal and the intimacy-device band shared by the codex's wearable and
-usable 性玩具 entries.
+`world/lore/economy.py` SHALL define `COPPER_PER_SILVER = 100` and `COPPER_PER_GOLD = 10000` as integer constants, a `to_copper(gold: int = 0, silver: int = 0, copper: int = 0) -> int` helper that returns an `int`, and a frozen `PriceEntry` dataclass with integer `min_copper` and `max_copper: int | None` fields.
 
 #### Scenario: Conversion constants match the documented rate
 - **WHEN** `to_copper(gold=1)`, `to_copper(silver=1)`, and `to_copper(copper=1)` are each called
@@ -403,26 +404,20 @@ The price registry SHALL add `magic_armor` with integer minimum 10000 copper and
 - **WHEN** an enchanted armor offer costs 10000 copper or more, including above mundane armor maximum
 - **THEN** magic_armor validates it without changing mundane armor bounds
 
+#### Scenario: The price table covers every documented purchasing-power reference
+- **WHEN** the module-level `PRICE_TABLE: dict[str, PriceEntry]` is inspected
+- **THEN** it covers every purchasing-power reference in `world_info.md` (inn stay, meal, potion, plain sword, magic weapon, commoner annual income, adventurer annual income) plus every band the lore item codex assigns to a catalogued item
+
+#### Scenario: The regional-delicacy band separates named local foods
+- **WHEN** `PRICE_TABLE` is inspected for local-food pricing
+- **THEN** it includes the regional-delicacy band that separates named local foods from an ordinary meal
+
+#### Scenario: The intimacy-device band is shared by both codex shapes
+- **WHEN** `PRICE_TABLE` is inspected for intimacy-device pricing
+- **THEN** it includes the intimacy-device band shared by the codex's wearable and usable 性玩具 entries
+
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
-This requirement fixes only the concrete human selections in the starting-kit registry; the
-general kit-existence/equipment-only/load-time-validation contract stays owned by the
-`player-character-creation` capability's kit requirements, which deliberately leave
-per-subrace selections to registry data. The starting-kit registry SHALL map the five human
-bloodline subraces to exactly the approved lineage kits, keyed by the renamed subrace keys:
-`human_royal` → 鍍金軍刀 + 鎖子甲 +
-銀髮簪 (`gilded_saber`, `chainmail`, `silver_hairpin` — UNCOMMON, UNCOMMON, COMMON);
-`human_noble` → 騎士制式長劍 + 皮甲 + 銀髮簪 (`knight_blade`, `leather_armor`,
-`silver_hairpin` — UNCOMMON, COMMON, COMMON); `human_coastal` → 普通劍 + 皮甲 + 鐵短刀
-(`plain_sword`, `leather_armor`, `iron_dagger`); `human_plains` → 普通劍 + 皮甲 + 銀髮簪
-(`plain_sword`, `leather_armor`, `silver_hairpin`); `human_highland` → 普通劍 + 皮甲 +
-狩獵擲斧 (`plain_sword`, `leather_armor`, `hunting_throwing_axe`). The three commoner-lineage
-kits SHALL each hold exactly three COMMON items — identical rarity profiles differentiated only
-by the character of the third item (dockside 鐵短刀, everyday 銀髮簪, hill-woodland 狩獵擲斧),
-never an affluence gradient. 王族 and 貴族 keep their UNCOMMON inherited arms; the equality
-that matters is among the three commoner lineages. `wooden_club` SHALL NOT appear in any kit.
-Items rejected on tier or incongruity grounds (`great_axe` — the UNCOMMON bearfolk weapon;
-`storage_pouch` — RARE, 帝國壟斷的空間魔法小袋; `gliding_cloak` — EPIC) SHALL NOT appear in
-any human kit.
+This requirement fixes only the concrete human selections in the starting-kit registry; the general kit-existence/equipment-only/load-time-validation contract stays owned by the `player-character-creation` capability's kit requirements, which deliberately leave per-subrace selections to registry data. The starting-kit registry SHALL map the five human bloodline subraces to exactly the approved lineage kits, keyed by the renamed subrace keys.
 
 #### Scenario: The five human kits match the lineage table
 - **WHEN** the starting-kit registry's human entries are inspected
@@ -443,14 +438,24 @@ any human kit.
 - **WHEN** every kit in the starting-kit registry is inspected
 - **THEN** no kit contains `wooden_club`
 
+#### Scenario: The lineage kits carry the approved item sets
+- **WHEN** the five human kits are inspected
+- **THEN** `human_royal` → 鍍金軍刀 + 鎖子甲 + 銀髮簪 (`gilded_saber`, `chainmail`, `silver_hairpin` — UNCOMMON, UNCOMMON, COMMON); `human_noble` → 騎士制式長劍 + 皮甲 + 銀髮簪 (`knight_blade`, `leather_armor`, `silver_hairpin` — UNCOMMON, COMMON, COMMON); `human_coastal` → 普通劍 + 皮甲 + 鐵短刀 (`plain_sword`, `leather_armor`, `iron_dagger`); `human_plains` → 普通劍 + 皮甲 + 銀髮簪 (`plain_sword`, `leather_armor`, `silver_hairpin`); `human_highland` → 普通劍 + 皮甲 + 狩獵擲斧 (`plain_sword`, `leather_armor`, `hunting_throwing_axe`)
+
+#### Scenario: The commoner-lineage kits share an identical rarity profile
+- **WHEN** the three commoner-lineage kits are inspected
+- **THEN** each holds exactly three COMMON items — identical rarity profiles differentiated only by the character of the third item (dockside 鐵短刀, everyday 銀髮簪, hill-woodland 狩獵擲斧), never an affluence gradient
+
+#### Scenario: The noble lineages keep their UNCOMMON inherited arms
+- **WHEN** the 王族 and 貴族 kits are inspected
+- **THEN** they keep their UNCOMMON inherited arms; the equality that matters is among the three commoner lineages
+
+#### Scenario: Rejected items appear in no human kit
+- **WHEN** every human kit is inspected
+- **THEN** items rejected on tier or incongruity grounds (`great_axe` — the UNCOMMON bearfolk weapon; `storage_pouch` — RARE, 帝國壟斷的空間魔法小袋; `gliding_cloak` — EPIC) SHALL NOT appear in any human kit
+
 ### Requirement: Human lineage renames ship without a save-data compatibility layer
-The human subrace rename SHALL be a clean breaking change: no alias table, no migration script,
-and no compatibility handling for the retired keys `human_wealthy`, `human_commoner` (as a
-subrace key), or `human_laborer`. The registry, tests, fixtures, presets, and docs SHALL name
-only the new keys. (Any database carried across the rename would keep the orphaned
-`lore:subraces:*` Scripts because `world/lore/sync.py::sync_all` creates and overwrites but
-never prunes; the database is rebuilt, and adding pruning to `sync_all` is explicitly out of
-scope.)
+The human subrace rename SHALL be a clean breaking change with no alias table, no migration script, and no compatibility handling for the retired keys.
 
 #### Scenario: Retired keys resolve nowhere in shipped data
 - **WHEN** `SUBRACE_REGISTRY`, `PLAYER_PRESET_REGISTRY`, the starting-kit registry, and the
@@ -465,18 +470,20 @@ scope.)
   names the unrelated `StaticTier` concept — after the rename it is the only surviving meaning
   of the string
 
+#### Scenario: The retired keys are exactly the wealth-ladder subrace keys
+- **WHEN** the scope of the breaking change is inspected
+- **THEN** the retired keys are `human_wealthy`, `human_commoner` (as a subrace key), and `human_laborer`
+
+#### Scenario: Only the new keys are named
+- **WHEN** the registry, tests, fixtures, presets, and docs are inspected
+- **THEN** they SHALL name only the new keys
+
+#### Scenario: Orphaned Scripts are not pruned and the database is rebuilt
+- **WHEN** a database were carried across the rename
+- **THEN** it would keep the orphaned `lore:subraces:*` Scripts because `world/lore/sync.py::sync_all` creates and overwrites but never prunes; the database is rebuilt, and adding pruning to `sync_all` is explicitly out of scope
+
 ### Requirement: Subrace specialty prose is server-owned Traditional Chinese for every entry
-Every `Subrace.specialty` value in `SUBRACE_REGISTRY` SHALL be Traditional Chinese (zh-TW)
-player-facing prose, derived server-side from the registry and rendered verbatim to the player by
-the character-creation surfaces (`commands/character_creation.py` renders
-`{display_name_zh}（{common_name_zh}）——{specialty}`; the WebClient creation menu uses
-`entry.specialty` as the subrace description). No `specialty` value SHALL contain an English
-sentence: the field is the server-owned label text for a Chinese subrace name, exactly as the
-creation panel's `sex` options are server-owned Traditional Chinese labels
-(`webclient-character-creation-ui`), and no browser-side translation or English fallback exists.
-This contract binds all fifteen entries — the five human bloodlines, the three elf branches, and
-the seven beastfolk subspecies — and every value SHALL stay within the creation protocol's
-`MAX_SPECIALTY_CODE_POINTS` (256) bound so it ships on the same path unchanged.
+Every `Subrace.specialty` value in `SUBRACE_REGISTRY` SHALL be Traditional Chinese (zh-TW) player-facing prose, derived server-side from the registry and rendered verbatim to the player by the character-creation surfaces.
 
 #### Scenario: Every specialty renders as Chinese beside its Chinese name
 - **WHEN** a player building a custom character is shown a subrace line — the CLI prompt
@@ -499,13 +506,20 @@ the seven beastfolk subspecies — and every value SHALL stay within the creatio
 - **THEN** each is at most 256 code points, so the WebClient creation panel ships the field
   through the existing validation path with no protocol change
 
+#### Scenario: The creation surfaces render the specialty verbatim
+- **WHEN** the character-creation surfaces render a subrace
+- **THEN** `commands/character_creation.py` renders `{display_name_zh}（{common_name_zh}）——{specialty}` and the WebClient creation menu uses `entry.specialty` as the subrace description
+
+#### Scenario: No specialty contains an English sentence
+- **WHEN** any `specialty` value is inspected
+- **THEN** no `specialty` value SHALL contain an English sentence: the field is the server-owned label text for a Chinese subrace name, exactly as the creation panel's `sex` options are server-owned Traditional Chinese labels (`webclient-character-creation-ui`), and no browser-side translation or English fallback exists
+
+#### Scenario: The contract binds all fifteen entries within the protocol bound
+- **WHEN** the contract's scope is inspected
+- **THEN** it binds all fifteen entries — the five human bloodlines, the three elf branches, and the seven beastfolk subspecies — and every value SHALL stay within the creation protocol's `MAX_SPECIALTY_CODE_POINTS` (256) bound so it ships on the same path unchanged
+
 ### Requirement: Placement registries follow the frozen keyed lore-data contract
-`world/lore/monster_placement.py` SHALL hold the ambient-placement and monster-site registries as
-module-level keyed dicts of frozen dataclasses — the source of truth that consumers read instead of
-duplicating constants — validated at construction (import) time with a named error, mirrored into the
-runtime store idempotently by the existing `world/lore/sync.py` startup discipline, and never mutated at
-runtime by `world/lore/`. The registries SHALL expose no spawn, place, reconcile, or recovery callable:
-placement execution belongs to `world/maps/`, which reads these registries.
+`world/lore/monster_placement.py` SHALL hold the ambient-placement and monster-site registries as module-level keyed dicts of frozen dataclasses — the source of truth that consumers read instead of duplicating constants.
 
 #### Scenario: Consumers read the registry rather than a copy
 - **WHEN** the site owner needs a site's capacity or recovery condition
@@ -518,3 +532,15 @@ placement execution belongs to `world/maps/`, which reads these registries.
 #### Scenario: The lore module cannot place anything
 - **WHEN** the placement module's public surface is inspected
 - **THEN** it offers read and validation operations only, with no spawn/reconcile/recovery entry point
+
+#### Scenario: Construction-time validation carries a named error
+- **WHEN** the registries are constructed (imported)
+- **THEN** they are validated at construction (import) time with a named error
+
+#### Scenario: The startup mirror is idempotent and lore never mutates at runtime
+- **WHEN** startup runs and the game operates
+- **THEN** the registries are mirrored into the runtime store idempotently by the existing `world/lore/sync.py` startup discipline, and never mutated at runtime by `world/lore/`
+
+#### Scenario: The registries expose no placement execution
+- **WHEN** the registries' public surface is inspected
+- **THEN** they SHALL expose no spawn, place, reconcile, or recovery callable: placement execution belongs to `world/maps/`, which reads these registries

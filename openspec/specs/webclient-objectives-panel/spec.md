@@ -8,22 +8,7 @@ The tracked-objectives read model — shape, describe-seam reuse, host independe
 The presentation registry SHALL register an `objectives` panel at schema version 1. Its available
 form SHALL contain exactly `schema_version`, `available`, and `rows`, where `rows` is an ordered
 list — in quest-log order — of at most three entries, one per the holder's quest records with
-`tracked` true and state `in_progress`. Each row SHALL contain exactly `quest_id`,
-`display_name`, `objective_line`, `stage_index`, `stage_total`, `stage_progress`,
-`objective_quantity`, `reward_copper`, and `deadline_line`: `quest_id` and `display_name` SHALL
-equal the record's and its definition's values bounded by the shared identifier and display-name
-bounds; `objective_line` SHALL be the deterministic single-line objective prose rendered by the
-quest describe seam for the record's current stage; `stage_index` and `stage_total` SHALL be
-integers giving the current stage's zero-based index and the definition's stage count;
-`stage_progress` and `objective_quantity` SHALL be the record's progress and the current
-objective's quantity; `reward_copper` SHALL be the offer's integer copper reward, or `null` when
-no live offer exists; and `deadline_line` SHALL be the deterministic remaining-deadline prose or
-`null`. The panel SHALL be available for any puppeted explorer holding quests regardless of
-whether any local service host is present. An empty tracked set SHALL be an available form with
-`rows` exactly `[]`, and the registered common unavailable form SHALL keep the shared field set,
-reason, and semantics. The presenter SHALL be read-only — it SHALL NOT accept, abandon, fulfil,
-fail, advance, or re-track any quest — and a corrupt quest log SHALL degrade the panel to the
-shared unavailable form rather than emit a partial list.
+`tracked` true and state `in_progress`.
 
 #### Scenario: Tracked quests serialize with describe-seam prose
 - **WHEN** a holder with one tracked in-progress quest at stage index 1, progress 2 of quantity 5,
@@ -55,13 +40,61 @@ shared unavailable form rather than emit a partial list.
   negative progress, a non-integer `reward_copper`, or an over-bound line
 - **THEN** the server validator rejects it and the client mirror rejects it identically
 
+#### Scenario: Each row carries exactly the contracted keys
+
+- **WHEN** an objectives row is serialized
+- **THEN** it contains exactly `quest_id`, `display_name`, `objective_line`, `stage_index`, `stage_total`, `stage_progress`, `objective_quantity`, `reward_copper`, and `deadline_line`
+
+#### Scenario: Identifiers and display names follow the shared bounds
+
+- **WHEN** a row is built from a quest record
+- **THEN** `quest_id` and `display_name` equal the record's and its definition's values bounded by the shared identifier and display-name bounds
+
+#### Scenario: The objective line comes from the quest describe seam
+
+- **WHEN** a row is built for a record at a given stage
+- **THEN** `objective_line` is the deterministic single-line objective prose rendered by the quest describe seam for the record's current stage
+
+#### Scenario: Stage fields carry zero-based index and stage count
+
+- **WHEN** a row is built for a record's current stage
+- **THEN** `stage_index` and `stage_total` are integers giving the current stage's zero-based index and the definition's stage count
+
+#### Scenario: Progress fields carry the record's progress and the objective's quantity
+
+- **WHEN** a row is built for a record's current objective
+- **THEN** `stage_progress` is the record's progress and `objective_quantity` is the current objective's quantity
+
+#### Scenario: The reward is the offer's copper or null without a live offer
+
+- **WHEN** a row is built for a quest whose offer is or is not live
+- **THEN** `reward_copper` is the offer's integer copper reward, or `null` when no live offer exists
+
+#### Scenario: The deadline line is the remaining-deadline prose or null
+
+- **WHEN** a row is built for a record with or without a deadline
+- **THEN** `deadline_line` is the deterministic remaining-deadline prose or `null`
+
+#### Scenario: The presenter is read-only
+
+- **WHEN** the objectives presenter handles a panel request
+- **THEN** it does not accept, abandon, fulfil, fail, advance, or re-track any quest
+
+#### Scenario: The registered unavailable form keeps the shared contract
+
+- **WHEN** the registered common unavailable form is inspected
+- **THEN** it keeps the shared field set, reason, and semantics
+
+#### Scenario: The panel is available without any local service host
+
+- **WHEN** any puppeted explorer holding quests receives a snapshot, whether or not any local service host is present
+- **THEN** the `objectives` panel is available
+
 ### Requirement: Objectives presentation stays current across quest and tracking seams
 The coordinator SHALL push the `objectives` panel — together with the `services` panel it pairs
 with — after the quest write seams (accept, abandon, fulfil, fail, and stage-progress
 transitions) and after the tracking operation, so a committed `rows` list never shows a retired
-quest, a superseded stage progress, or a tracking state the record no longer carries. The
-client-side panel allowlists (UMD protocol mirror and Vue store mirror) SHALL name `objectives`
-in lockstep with the server registry under the three-list agreement contract.
+quest, a superseded stage progress, or a tracking state the record no longer carries.
 
 #### Scenario: Tracking a quest re-pushes the tracker rows
 - **WHEN** the holder tracks a quest while connected
@@ -75,3 +108,8 @@ in lockstep with the server registry under the three-list agreement contract.
 #### Scenario: Fulfilment removes the row
 - **WHEN** a tracked quest is fulfilled or abandoned
 - **THEN** the next committed payload omits that `quest_id`
+
+#### Scenario: Client-side panel allowlists name objectives in lockstep
+
+- **WHEN** the client-side panel allowlists (UMD protocol mirror and Vue store mirror) are inspected
+- **THEN** they name `objectives` in lockstep with the server registry under the three-list agreement contract

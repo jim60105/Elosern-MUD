@@ -14,13 +14,9 @@ vocabulary; `action-options-layer` (generation), `action-options-trigger-service
 ### Requirement: world/ai/action_options.py defines the frozen one-wire-shape card vocabulary
 `world/ai/action_options.py` SHALL define frozen dataclasses `OptionSet` and `SuggestionCard`.
 `SuggestionCard` SHALL carry exactly `kind` (`"known_action" | "freeform"`), `action_code` (a real
-dispatcher action id string), `label` (player-facing text), `params` (`Mapping[str, str | int]`,
-additionally admitting the exact boolean room-survey marker `{"room": true}` of the canonical
-look payload, schema design doc §1.1), and optional `hint` — one wire shape, no hidden side
-structure. `OptionSet` SHALL carry `fingerprint` (opaque string), `context_kind`
-(`"exploration"` in v1), `status` (exactly `"ready"`), and a card tuple. Construction SHALL
-reject mutable containers anywhere (`_reject_mutable_containers`, mirroring `QuestBlueprint` in
-`world/ai/scenario_director.py`) so a proposal is safe to hand across the `world/ai` boundary.
+dispatcher action id string), `label` (player-facing text), `params`, and optional `hint` — one
+wire shape, no hidden side structure. `OptionSet` SHALL carry `fingerprint`, `context_kind`,
+`status`, and a card tuple.
 
 #### Scenario: A proposal rejects mutable containers at construction
 - **WHEN** an `OptionSet` is constructed with a list or dict nested inside its card params
@@ -30,14 +26,22 @@ reject mutable containers anywhere (`_reject_mutable_containers`, mirroring `Que
 - **WHEN** an `OptionSet` is constructed with `status` set to `"generating"` or `"degraded"`
 - **THEN** construction rejects it — transport states are never cached (design doc §1.1)
 
+#### Scenario: Card params carry the mapping shape
+- **WHEN** a `SuggestionCard` declares `params`
+- **THEN** `params` is a `Mapping[str, str | int]`, additionally admitting the exact boolean room-survey marker `{"room": true}` of the canonical look payload (schema design doc §1.1)
+
+#### Scenario: OptionSet field values are fixed
+- **WHEN** an `OptionSet` is constructed
+- **THEN** `fingerprint` is an opaque string, `context_kind` is `"exploration"` in v1, and `status` is exactly `"ready"`
+
+#### Scenario: The mutable-container rejection mirrors QuestBlueprint
+- **WHEN** `_reject_mutable_containers` runs at construction
+- **THEN** it mirrors `QuestBlueprint` in `world/ai/scenario_director.py`, so a proposal is safe to hand across the `world/ai` boundary
+
 ### Requirement: The schema defines exact caps and a status-dependent card-count contract
 `world/ai/action_options.py` SHALL define `MIN_CARDS`/`MAX_CARDS` (3/5), `MAX_LABEL_LENGTH` (24),
-`MAX_HINT_LENGTH` (60), `MAX_PARAMS` (4 keys), the trigger-service bounds
-`MAX_OPTIONSET_CACHE_ENTRIES` (16) and `NEGATIVE_MEMO_TTL` (30 seconds), and value shapes: ints
-within `MAX_SAFE_INTEGER`, strings ≤ 32 chars, or the exact boolean room-survey marker
-(`{"room": true}` of the canonical look payload, schema design doc §1.1). The validation ladder
-SHALL accept 0–5 cards (stage 4); the 3–5 minimum is a *generation* rule owned by
-`action-options-layer`, not a ladder rejection (three-layer contract, schema design doc §1.2).
+`MAX_HINT_LENGTH` (60), `MAX_PARAMS` (4 keys), and the trigger-service bounds
+`MAX_OPTIONSET_CACHE_ENTRIES` (16) and `NEGATIVE_MEMO_TTL` (30 seconds).
 
 #### Scenario: Card count within the acceptance band passes
 - **WHEN** a proposal with 0 to 5 cards is validated
@@ -47,18 +51,19 @@ SHALL accept 0–5 cards (stage 4); the 3–5 minimum is a *generation* rule own
 - **WHEN** a proposal with 6 cards is validated
 - **THEN** it fails stage 4 with the named rejection `card_count_out_of_range`
 
+#### Scenario: Accepted value shapes are enumerated
+- **WHEN** a param value is validated
+- **THEN** it is an int within `MAX_SAFE_INTEGER`, a string ≤ 32 chars, or the exact boolean room-survey marker (`{"room": true}` of the canonical look payload, schema design doc §1.1)
+
+#### Scenario: Card-count acceptance is a ladder/generation split
+- **WHEN** the validation ladder checks card count
+- **THEN** it SHALL accept 0–5 cards (stage 4), while the 3–5 minimum is a *generation* rule owned by `action-options-layer`, not a ladder rejection (three-layer contract, schema design doc §1.2)
+
 ### Requirement: The validation ladder runs 12 fixed stages with one named rejection code each
 `validate_optionset(raw, *, fingerprint, affordances, leak_blocklist=frozenset())` SHALL run
 stages in fixed order: enrichment (0), structure (1), fingerprint (2), kind (3), card count (4),
 card keys (5), label (6), placeholder gate (7), digit gate (8), canonical match (9), hint gate
-(10), normalization (11). Each stage SHALL raise one named error from the ladder's code set
-(`schema_violation`, `card_count_out_of_range`, `empty_label`, `label_too_long`, `non_cjk_label`,
-`placeholder_label`, `digit_in_label`, `unknown_action_code`, `no_such_affordance`,
-`unknown_target`, `hint_too_long`, `leak_detected`). Stage 6 SHALL reuse the exact
-`world/ai/narrator.py` `_validate_has_cjk` logic; stages 7–8 SHALL be implemented in this module
-as a generic `{...}` placeholder pattern and a mechanical ASCII-digit gate — narrator's own
-placeholder regex is token-specific (`{actor}|{target}|{data[...]}`) and narrator has no digit
-gate, so the card gates cannot be shared imports (schema design doc stage 6–8 amendment).
+(10), normalization (11). Each stage SHALL raise one named error from the ladder's code set.
 
 #### Scenario: A structurally invalid proposal fails at the structure stage
 - **WHEN** the raw dict has keys other than the `OptionSet` fields
@@ -77,23 +82,24 @@ gate, so the card gates cannot be shared imports (schema design doc stage 6–8 
 - **THEN** stage 7 rejects it with `placeholder_label` — unlike the narrator's token-specific
   placeholder rule, the card gate rejects every brace-token
 
+#### Scenario: The ladder's rejection code set is closed
+- **WHEN** any stage raises
+- **THEN** the error is one of `schema_violation`, `card_count_out_of_range`, `empty_label`, `label_too_long`, `non_cjk_label`, `placeholder_label`, `digit_in_label`, `unknown_action_code`, `no_such_affordance`, `unknown_target`, `hint_too_long`, `leak_detected`
+
+#### Scenario: Stage 6 reuses the narrator's CJK check
+- **WHEN** stage 6 validates a label's CJK content
+- **THEN** it reuses the exact `world/ai/narrator.py` `_validate_has_cjk` logic
+
+#### Scenario: Stages 7–8 are module-local gates, not shared imports
+- **WHEN** the placeholder and digit gates are implemented
+- **THEN** they live in this module as a generic `{...}` placeholder pattern and a mechanical ASCII-digit gate — narrator's own placeholder regex is token-specific (`{actor}|{target}|{data[...]}`) and narrator has no digit gate, so the card gates cannot be shared imports (schema design doc stage 6–8 amendment)
+
 ### Requirement: Stage 9 enforces canonical replacement against the affordance vocabulary
 For `known_action` cards, the model's `params` SHALL be treated as curation hints, never checked
 for equality; stage 9 SHALL resolve `action_code` against the `affordances` argument and, on a
 unique match, **unconditionally replace the card's params with that affordance's canonical
 payload** so the validated card always satisfies `(action_code, params) == (affordance.action_id,
-affordance.params)`. When several current affordances share `action_code` (e.g. one move entry
-per exit), the model's typed params SHALL select the unique entry whose canonical params they
-match — a hint, never a rejection against a single canonical — and a card whose params identify
-no unique entry SHALL reject with `no_such_affordance` rather than guess. An `action_code`
-outside the current affordances SHALL reject with `unknown_action_code` (unregistered) or
-`no_such_affordance` (registered but not current). For `freeform` cards, stage 9 SHALL require
-`action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` equal to a freeform
-affordance's bound target; the matched freeform affordance SHALL itself carry exactly the binding
-shape, and the validated card's params SHALL remain exactly `{"npc_id": <int>}`. The freeform
-card's `{npc_id}` params are the single binding-only exception to the canonical-payload rule; the
-full `validate_talk_freeform_payload` (which requires `speech`) runs only on the client-composed
-dispatch payload (schema design doc §1).
+affordance.params)`.
 
 #### Scenario: A valid-now known card passes with canonical replacement
 - **WHEN** a card's `action_code` matches exactly one current affordance but the model typed
@@ -131,14 +137,29 @@ dispatch payload (schema design doc §1).
 - **THEN** the validated card's params equal exactly `{"npc_id": <int>}` — never a copy of the
   affordance's params, so extra fields cannot smuggle past the binding contract
 
+#### Scenario: Multi-entry codes are pinned by the model's params
+- **WHEN** several current affordances share `action_code` (e.g. one move entry per exit)
+- **THEN** the model's typed params SHALL select the unique entry whose canonical params they match — a hint, never a rejection against a single canonical
+- **AND** a card whose params identify no unique entry rejects with `no_such_affordance` rather than guess
+
+#### Scenario: Codes outside the current affordances reject by registration status
+- **WHEN** an `action_code` is outside the current affordances
+- **THEN** it rejects with `unknown_action_code` (unregistered) or `no_such_affordance` (registered but not current)
+
+#### Scenario: Freeform cards bind exactly the talk target
+- **WHEN** stage 9 validates a `freeform` card
+- **THEN** it requires `action_code == "explore.talk_freeform"` and `params == {"npc_id": <int>}` equal to a freeform affordance's bound target
+- **AND** the matched freeform affordance itself carries exactly the binding shape, and the validated card's params remain exactly `{"npc_id": <int>}`
+
+#### Scenario: Freeform params are the single binding-only exception
+- **WHEN** the canonical-payload rule is applied
+- **THEN** the freeform card's `{npc_id}` params are its single binding-only exception; the full `validate_talk_freeform_payload` (which requires `speech`) runs only on the client-composed dispatch payload (schema design doc §1)
+
 ### Requirement: Leak gates apply to model-visible text only and expose no hidden values
 The ladder SHALL apply the leak predicate to `label` and `hint` only — against the caller-supplied
-`leak_blocklist: frozenset[str]` parameter of `validate_optionset` (numeric literals and hidden
-trait keys of the deterministic view; default empty frozenset keeps the function total and pure)
-plus the placeholder and digit gates; `params` are never leak-checked (after stage 9 they are
-canonical copies or the freeform binding). The hinted categories SHALL be rejected: true-trait
-numbers, raw affinity numbers, values that differ between `disguised_stats` and true traits, and
-tokens not present in the bounded public context.
+`leak_blocklist: frozenset[str]` parameter of `validate_optionset` plus the placeholder and digit
+gates; `params` are never leak-checked (after stage 9 they are canonical copies or the freeform
+binding).
 
 #### Scenario: A hint leaking a true-trait number is rejected
 - **WHEN** a hint contains a numeric literal that appears in the caller's `LEAK_BLOCKLIST`
@@ -147,6 +168,14 @@ tokens not present in the bounded public context.
 #### Scenario: Params are exempt from the blocklist
 - **WHEN** a params value is an ordinary opaque id that happens to equal a blocklist token
 - **THEN** no leak rejection fires — the gates never inspect `params`
+
+#### Scenario: The blocklist is caller-supplied and defaults empty
+- **WHEN** `validate_optionset` is called without `leak_blocklist`
+- **THEN** the default empty frozenset keeps the function total and pure; the caller supplies numeric literals and hidden trait keys of the deterministic view
+
+#### Scenario: Leaking hint categories are rejected
+- **WHEN** a hint falls in any of these categories: true-trait numbers, raw affinity numbers, values that differ between `disguised_stats` and true traits, or tokens not present in the bounded public context
+- **THEN** each is rejected
 
 ### Requirement: Enrichment injects caller-side fields before validation
 The module SHALL provide an enrichment helper that, given the raw LLM card dicts, injects the
@@ -162,12 +191,18 @@ this change's fixtures feed already-resolved `{"npc_id": int}` params.
 
 ### Requirement: The LLM JSON output contract is enforced by exact-field parsing
 The module SHALL parse model output as inline `response_format` JSON (schema_id `action_options`),
-matching the schema design doc §5: `known_action` cards carry `action_code`, `label`, optional
-`params` and `hint`; `freeform` cards carry `npc_index`, `label`, optional `hint`; `fingerprint`
-and `status` are caller-side and absent from model output. Parsing SHALL use the exact-field
-parser pattern of `web/webclient/presentation/protocol.py`: unknown keys on a card are rejected,
-and a wrong shape fails with a named rejection instead of being silently coerced.
+matching the schema design doc §5. Parsing SHALL use the exact-field parser pattern of
+`web/webclient/presentation/protocol.py`: unknown keys on a card are rejected, and a wrong shape
+fails with a named rejection instead of being silently coerced.
 
 #### Scenario: A model payload with an unknown key is rejected
 - **WHEN** a card dict contains an extra key such as `"target"` or `"score"`
 - **THEN** parsing rejects the card rather than ignoring the key
+
+#### Scenario: Per-kind card fields follow the §5 contract
+- **WHEN** model output is parsed
+- **THEN** `known_action` cards carry `action_code`, `label`, optional `params` and `hint`, and `freeform` cards carry `npc_index`, `label`, optional `hint`
+
+#### Scenario: Caller-side fields are absent from model output
+- **WHEN** the model produces its JSON payload
+- **THEN** `fingerprint` and `status` are caller-side and absent from model output

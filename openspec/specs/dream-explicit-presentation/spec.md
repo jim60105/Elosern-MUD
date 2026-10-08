@@ -7,7 +7,7 @@ Provides the approved explicit dream scene through validated generation while ke
 
 ### Requirement: Dream collaboration uses the approved explicit frame
 
-The dream SHALL stage an obscured goddess-like counterpart of stable persona, seated on a white throne that stands on a sea of clouds above an ankle-deep flood of her own gushing fluids, who pleases herself and speaks with the player standing in that flood, spurting visibly from her exaggerated well-used genitals — not an identified deity/material NPC. The dream stage's scene artwork SHALL be served from the external official-artwork system as a server-resolved same-origin URL, never bundled into the client. Each validated exchange SHALL combine explicit sexual scene prose and counterpart dialogue during story negotiation using established canonical vocabulary. Explicit content SHALL be accepted for this capability; sanitizing it SHALL NOT substitute for approved presentation.
+The dream SHALL stage an obscured goddess-like counterpart of stable persona, seated on a white throne that stands on a sea of clouds above an ankle-deep flood of her own gushing fluids, who pleases herself and speaks with the player standing in that flood, spurting visibly from her exaggerated well-used genitals. Each validated exchange SHALL combine explicit sexual scene prose and counterpart dialogue during story negotiation using established canonical vocabulary.
 
 #### Scenario: Recorded explicit response validates
 - **WHEN** a recorded response combines approved explicit scene prose and spoiler-free dialogue
@@ -16,6 +16,18 @@ The dream SHALL stage an obscured goddess-like counterpart of stable persona, se
 #### Scenario: Divine identity is asserted
 - **WHEN** a response identifies a canonical deity or discloses divine mysteries
 - **THEN** validation rejects the assertion without authorizing a world fact
+
+#### Scenario: The counterpart is never an identified deity or material NPC
+- **WHEN** the dream's counterpart is staged
+- **THEN** it is an obscured, stable-persona counterpart — not an identified deity or material NPC
+
+#### Scenario: Scene artwork comes from the official-artwork system
+- **WHEN** the dream stage's scene artwork is presented
+- **THEN** it is served from the external official-artwork system as a server-resolved same-origin URL, never bundled into the client
+
+#### Scenario: Explicit content is accepted, sanitizing is no substitute
+- **WHEN** the capability's presentation is validated
+- **THEN** explicit content is accepted for this capability, and sanitizing it is never substituted for the approved presentation
 
 ### Requirement: Server-owned dream arousal advances only with completed exchanges
 

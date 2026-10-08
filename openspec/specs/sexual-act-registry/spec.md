@@ -11,19 +11,10 @@ line) ships in later proposals; this capability only makes that content possible
 
 ### Requirement: SexualActDef carries exactly the metadata a sex act needs beyond SkillDef
 `world/skills/sexual_acts/_builder.py` SHALL define `SexualActDef` as a frozen dataclass with exactly
-these fields: `key`, `unlock` (a mapping of `SexualState` counter attribute names to integer
-thresholds, all of which SHALL be met for the act to unlock), `base_pleasure` (a positive integer),
-`actor_part` and `target_part` (each `None` or a member of `world.lore.sexual_vocab.BODY_PARTS`),
-`actor_pleasure_ratio` (a float), `actor_counters` and `participant_counters` (each a tuple of
-`SexualState` counter attribute names), `sexual_events` (a tuple of event-name strings in emission
-order), `resistible` (a bool), `pair_events` (a tuple of `(sex_pair, event_name)` entries, empty for
-acts without a sex-conditional event; see the pair-events requirement), and `ownership_gated` (a
-bool, default `False`) — when `True` the row is never unlocked through the counter-derivation branch
-of `unlocked_act_keys_for` regardless of its `unlock` mapping, and is usable only by entities that
-actually own the paired `SkillDef` key; the derivation-side exclusion itself is pinned by the
-`sexual-state-handler` capability. `SexualActDef` SHALL declare no `line` field; an act's line is
-read from the paired `SkillDef.group`. `_act_family()` SHALL NOT expose an `ownership_gated` row
-knob (catalogue rows are never ownership-gated; only hand-built rows may set it).
+these fields: `key`, `unlock`, `base_pleasure`, `actor_part`, `target_part`, `actor_pleasure_ratio`,
+`actor_counters`, `participant_counters`, `sexual_events`, `resistible`, `pair_events`, and
+`ownership_gated` (a bool, default `False`). `SexualActDef` SHALL declare no `line` field.
+`_act_family()` SHALL NOT expose an `ownership_gated` row knob.
 
 #### Scenario: A seed act declares an empty unlock mapping
 - **WHEN** a `SexualActDef` is constructed with `unlock={}` and the default `ownership_gated=False`
@@ -47,6 +38,38 @@ knob (catalogue rows are never ownership-gated; only hand-built rows may set it)
 - **THEN** `act.unlock` is a read-only `MappingProxyType` view, `dict(act.unlock) == unlock` still
   holds, and mutating the caller's original dict after construction does not change `act.unlock`
 
+#### Scenario: Unlock maps counter attribute names to integer thresholds
+- **WHEN** `SexualActDef`'s `unlock` field is inspected
+- **THEN** it is a mapping of `SexualState` counter attribute names to integer thresholds, all of
+  which SHALL be met for the act to unlock
+
+#### Scenario: The remaining fields carry their declared types
+- **WHEN** `SexualActDef`'s remaining fields are inspected
+- **THEN** `base_pleasure` is a positive integer, `actor_pleasure_ratio` is a float, `resistible` is
+  a bool, `actor_counters` and `participant_counters` are each a tuple of `SexualState` counter
+  attribute names, and `sexual_events` is a tuple of event-name strings in emission order
+
+#### Scenario: Body parts are None or BODY_PARTS members
+- **WHEN** `SexualActDef`'s `actor_part` or `target_part` is inspected
+- **THEN** each is `None` or a member of `world.lore.sexual_vocab.BODY_PARTS`
+
+#### Scenario: Pair events carry sex-pair/event-name entries
+- **WHEN** `SexualActDef`'s `pair_events` field is inspected
+- **THEN** it is a tuple of `(sex_pair, event_name)` entries, empty for acts without a
+  sex-conditional event; see the pair-events requirement
+
+#### Scenario: Ownership gating restricts derivation and use
+- **WHEN** a row's `ownership_gated` is `True`
+- **THEN** the row is never unlocked through the counter-derivation branch of
+  `unlocked_act_keys_for` regardless of its `unlock` mapping, and is usable only by entities that
+  actually own the paired `SkillDef` key
+- **AND** the derivation-side exclusion itself is pinned by the `sexual-state-handler` capability
+
+#### Scenario: Catalogue rows are never ownership-gated
+- **WHEN** `_act_family()` row knobs are enumerated
+- **THEN** no `ownership_gated` knob is exposed: catalogue rows are never ownership-gated; only
+  hand-built rows may set it
+
 ### Requirement: Every SexualActDef is paired with an ordinary SkillDef under the same key, categorised SEXUAL_ACT
 `_act_family()` SHALL construct, for each row it is given, one `SkillDef` (with `category=
 SkillCategory.SEXUAL_ACT`, `group` set to the family's line, `kind=SkillKind.ACTIVE`, `cost={}`, and
@@ -66,12 +89,8 @@ register both under the same key in `SKILL_REGISTRY` and `SEXUAL_ACT_REGISTRY` r
 `world/skills/sexual_acts/` SHALL contain `solo.py`, `shame.py`, `partner.py`, `combat.py`,
 `interspecies.py`, and `divine.py`, each exporting one module-level tuple constant
 (`SOLO_ACTS`, `SHAME_ACTS`, `PARTNER_ACTS`, `COMBAT_ACTS`, `INTERSPECIES_ACTS`, `DIVINE_ACTS`
-respectively). `solo.py`, `shame.py`, `partner.py`, and `combat.py` carry the seed acts registered
-by the `sexual-act-seeds` change. `interspecies.py` (filled by `sexual-catalog-interspecies`) and
-`divine.py` (filled by `sexual-catalog-divine-core`) are no longer required to remain empty — every
-one of the six modules SHALL export a non-empty tuple once its owning catalog proposal has landed.
-`world/skills/sexual_acts/__init__.py` SHALL import all six and merge their contents into
-`SEXUAL_ACT_REGISTRY` and `SKILL_REGISTRY`.
+respectively). `world/skills/sexual_acts/__init__.py` SHALL import all six and merge their contents
+into `SEXUAL_ACT_REGISTRY` and `SKILL_REGISTRY`.
 
 #### Scenario: The six content modules are importable and non-empty
 - **WHEN** each of `solo.py`, `shame.py`, `partner.py`, `combat.py`, `interspecies.py`, and `divine.py`
@@ -83,6 +102,16 @@ one of the six modules SHALL export a non-empty tuple once its owning catalog pr
   non-empty tuple of rows and changes no other line module
 - **THEN** `SEXUAL_ACT_REGISTRY` and `SKILL_REGISTRY` both reflect the new acts after re-import, with
   no edit required to `__init__.py`, `_builder.py`, or any other line module
+
+#### Scenario: The four seed modules carry the seed acts
+- **WHEN** `solo.py`, `shame.py`, `partner.py`, and `combat.py` are inspected
+- **THEN** they carry the seed acts registered by the `sexual-act-seeds` change
+
+#### Scenario: The later-filled modules need not remain empty
+- **WHEN** `interspecies.py` (filled by `sexual-catalog-interspecies`) and `divine.py` (filled by
+  `sexual-catalog-divine-core`) are inspected
+- **THEN** they are no longer required to remain empty — every one of the six modules SHALL export a
+  non-empty tuple once its owning catalog proposal has landed
 
 ### Requirement: Every act applying pleasure to another participant applies non-zero pleasure to its own actor, unless it requires divine arts
 `_act_family()` SHALL raise `ValueError`, naming the offending key, for any row whose
@@ -141,9 +170,7 @@ counter attribute names, and that every string in any act's `sexual_events` or i
 ### Requirement: SEXUAL_ACT_REGISTRY's keys and SKILL_REGISTRY's SEXUAL_ACT-categorised keys agree exactly, modulo the two named mastery exclusions
 A structural test SHALL assert that `set(SEXUAL_ACT_REGISTRY)` equals the set of `SKILL_REGISTRY`
 keys whose `category` is `SkillCategory.SEXUAL_ACT`, with `{"divine_sexual_mastery",
-"reincarnation_boon_yuna"}` excluded from that comparison on both sides. `divine_sexual_arts` SHALL
-NOT be a member of the exclusion set: it is registered as a catalogue row (see the added
-requirement) and participates in the agreement comparison on both sides. The shipped structural
+"reincarnation_boon_yuna"}` excluded from that comparison on both sides. The shipped structural
 constant `_MASTERY_EXCLUSIONS` is therefore exactly that two-key set once the integration lands.
 
 #### Scenario: The two registries agree after the catalogue lands
@@ -164,15 +191,17 @@ constant `_MASTERY_EXCLUSIONS` is therefore exactly that two-key set once the in
 - **THEN** the comparison fails naming `divine_sexual_arts`, proving the exclusion set no longer
   hides it
 
+#### Scenario: divine_sexual_arts is not excluded
+- **WHEN** the exclusion set is inspected
+- **THEN** `divine_sexual_arts` is not a member: it is registered as a catalogue row (see the added
+  requirement) and participates in the agreement comparison on both sides
+
 ### Requirement: _act_family() populates every row's effects with the pleasure and sexual_counter prefixes for that row's own key, plus one sexual_event entry per declared event and one act_pair_event entry when the row declares pair_events
 `world/skills/sexual_acts/_builder.py`'s `_act_family()` SHALL set every `SkillDef` it constructs to
 `effects=[f"pleasure:{key}", f"sexual_counter:{key}", *(f"sexual_event_actor:{name}" if name in
 _ACTOR_SCOPED_EVENTS else f"sexual_event:{name}" for name in row.sexual_events),
-*(f"act_pair_event:{key}",) if row.pair_events else ()]`, where `key` is that row's own key,
-`row.sexual_events` is that row's declared event tuple in order, a declared event name in the
-`_ACTOR_SCOPED_EVENTS` vocabulary is emitted through the actor-scoped `sexual_event_actor:` prefix
-and every other declared name through `sexual_event:`, and the trailing `act_pair_event:<key>`
-entry is present exactly when the row declares a non-empty `pair_events` tuple.
+*(f"act_pair_event:{key}",) if row.pair_events else ()]`, where `key` is that row's own key and
+`row.sexual_events` is that row's declared event tuple in order.
 
 #### Scenario: A family row's SkillDef carries both new prefixes keyed to its own act
 - **WHEN** `_act_family()` is called with one row naming key `"test_act"` and `sexual_events=()`
@@ -197,14 +226,22 @@ entry is present exactly when the row declares a non-empty `pair_events` tuple.
 - **WHEN** `_act_family()` builds more than one row in a single call
 - **THEN** each row's `effects` list names only that row's own key, never another row's
 
+#### Scenario: Actor-scoped names use the actor-scoped prefix
+- **WHEN** a declared event name is in the `_ACTOR_SCOPED_EVENTS` vocabulary
+- **THEN** it is emitted through the actor-scoped `sexual_event_actor:` prefix and every other
+  declared name through `sexual_event:`
+
+#### Scenario: The pair-event entry appears exactly with pair_events
+- **WHEN** a row's declared `pair_events` tuple is examined
+- **THEN** the trailing `act_pair_event:<key>` entry is present exactly when the row declares a
+  non-empty `pair_events` tuple
+
 ### Requirement: Acts classify each declared event by name into the actor-scoped or participant-scoped channel
 `world/skills/sexual_acts/_builder.py` SHALL declare `_ACTOR_SCOPED_EVENTS`, a frozenset naming the
 performer-scoped event vocabulary exactly: `self_exposure`, `public_exposure`,
-`watched_during_activity`, `public_sexual_activity`. A structural test SHALL assert that every
-member of `_ACTOR_SCOPED_EVENTS` is a value some rule in `world/rules/rulebook/sexual.yaml` carries
-as `when["event"]`, that every event name an act declares resolves to exactly one of the two
-channels (actor-scoped names in the set, participant-scoped names outside it), and that no act
-declares an event name absent from both vocabularies.
+`watched_during_activity`, `public_sexual_activity`. Every event name an act declares resolves to
+exactly one of the two channels: actor-scoped names are in the set, participant-scoped names are
+outside it.
 
 #### Scenario: The vocabulary names only real rulebook events
 - **WHEN** the structural test iterates `_ACTOR_SCOPED_EVENTS`
@@ -219,13 +256,19 @@ declares an event name absent from both vocabularies.
 - **WHEN** a hypothetical act declares `sexual_events=("a_fake_event",)`
 - **THEN** the structural test fails, naming the act's key and the unrecognized event
 
+#### Scenario: Structural test pins vocabulary and channel resolution
+- **WHEN** the structural test runs
+- **THEN** it asserts that every member of `_ACTOR_SCOPED_EVENTS` is a value some rule in
+  `world/rules/rulebook/sexual.yaml` carries as `when["event"]`, that every event name an act
+  declares resolves to exactly one of the two channels, and that no act declares an event name
+  absent from both vocabularies
+
 ### Requirement: An act declaring pair_events SHALL be a SINGLE-target act whose entries are sorted two-sex tuples naming real rulebook events
 `_act_family()` SHALL raise `ValueError`, naming the offending key, for any row that declares a
 non-empty `pair_events` tuple unless all of the following hold: the row's `target_spec` is
 `TargetSpec.SINGLE`; every entry's sex pair is a tuple of exactly two members of
 `world.lore.sex.SEX_VALUES`, each entry sorted ascending with no pair repeated; and no entry's event
-name is one of the forbidden `sexual_events` names (`stimulus_applied`, `sustained_stimulus_applied`,
-`extreme_stimulus_applied`, `climax_ends`, `climax_extended`).
+name is one of the forbidden `sexual_events` names.
 
 #### Scenario: A pair-events act with an AREA target spec is rejected
 - **WHEN** `_act_family()` is called with a row declaring `pair_events` and
@@ -240,6 +283,11 @@ name is one of the forbidden `sexual_events` names (`stimulus_applied`, `sustain
 #### Scenario: A pair-events entry naming a forbidden event is rejected
 - **WHEN** `_act_family()` is called with a row whose `pair_events` names `"climax_ends"`
 - **THEN** it raises `ValueError` naming that row's key and the forbidden event
+
+#### Scenario: The forbidden event names
+- **WHEN** a `pair_events` entry's event name is validated
+- **THEN** the forbidden `sexual_events` names are `stimulus_applied`,
+  `sustained_stimulus_applied`, `extreme_stimulus_applied`, `climax_ends`, `climax_extended`
 
 ### Requirement: an act's sexual_events never names a pleasure-, wetness-, or climax-settlement-owned event
 `SexualActDef.sexual_events` SHALL NOT contain any of `"stimulus_applied"`,
@@ -290,8 +338,6 @@ A structural test SHALL assert that every act whose line (`SkillDef.group`) is n
 `unlock={}`, `ownership_gated=True`, `target_part=None`, `resistible=True`, `actor_counters=()`,
 `participant_counters=()`, and `effects=["sexual_event_target:stimulus_applied"]`; it SHALL NOT be
 constructed via `_act_family()`, and `world/skills/registry.py` SHALL NOT define this key inline.
-Because it is a catalogue row with `resistible=True`, the shipped `_step4b_sexual_resist_gate`
-applies to it exactly as it applies to the seven existing divine acts.
 
 #### Scenario: The divine line carries the eighth pair
 - **WHEN** `world.skills.sexual_acts.divine.DIVINE_ACTS` is inspected after this change
@@ -317,16 +363,18 @@ applies to it exactly as it applies to the seven existing divine acts.
   because the mastery branch excludes `requires_divine_arts=True` acts and the counter branch
   excludes `ownership_gated` rows
 
+#### Scenario: The resist gate applies to the catalogue row
+- **WHEN** the eighth act is exercised through the sexual act pipeline
+- **THEN** because it is a catalogue row with `resistible=True`, the shipped
+  `_step4b_sexual_resist_gate` applies to it exactly as it applies to the seven existing divine acts
+
 ### Requirement: Only actual ownership grants divine_sexual_arts to a divine-capable entity
 A structural-plus-behavior pair SHALL pin that an entity whose `base_owned_keys()` excludes
-`divine_sexual_arts` — a fresh non-Yuna elf included — neither derives the key through
+`divine_sexual_arts` neither derives the key through
 `unlocked_act_keys()`/`owned_keys()` nor casts it (the `_step1_ownership` step rejects), while the
 `yuna_darknight` preset's actual ownership grants the cast. The seven shipped divine acts'
-counter-derivation behavior SHALL NOT change: only `ownership_gated=True` rows are excluded from the
-counter branch. The confer/grant surface (`conferred_grants()`) SHALL NOT become an acquisition path
-for this row: `SkillHandler.owned_keys()` is base keys plus derived act keys and `_step1_ownership`
-consults it alone — the shipped ownership-only contract, restated here because the row's entire
-exclusivity rests on it.
+counter-derivation behavior SHALL NOT change. The confer/grant surface (`conferred_grants()`)
+SHALL NOT become an acquisition path for this row.
 
 #### Scenario: A fresh elf does not derive or cast the signature act
 - **WHEN** `owned_keys()` is read for a fresh elf entity that owns no skill kits beyond innates, and
@@ -348,14 +396,20 @@ exclusivity rests on it.
 - **WHEN** `unlocked_act_keys()` is read on a fresh entity of any race
 - **THEN** all seven `divine.py` acts are present, unchanged from the shipped empty-unlock semantics
 
+#### Scenario: Only ownership-gated rows leave the counter branch
+- **WHEN** the counter-derivation branch's exclusions are inspected
+- **THEN** only `ownership_gated=True` rows are excluded from it
+
+#### Scenario: Ownership-only consultation is the shipped contract
+- **WHEN** `_step1_ownership` decides whether a cast is permitted
+- **THEN** it consults `SkillHandler.owned_keys()` alone, which is base keys plus derived act keys —
+  the shipped ownership-only contract, restated here because the row's entire exclusivity rests on it
+
 ### Requirement: The only claim of divine_sexual_arts in shipped data is Yuna's preset
 A structural test SHALL flatten the `active_skills` plus `passive_skills` lists of every
-`PLAYER_PRESET_REGISTRY` entry — the sole shipped **authored** skill-kit surface today, since shipped
-NPC companions are built from preset cards (the claim covers authored content, not arbitrary
-runtime `db.skills` writes, for which no shipped catalog scan exists) — and assert that exactly one
-claimant, the `yuna_darknight` preset, declares the key `divine_sexual_arts`. The scan SHALL read
-the live registry
-rather than a hardcoded preset list, so any new preset is covered automatically.
+`PLAYER_PRESET_REGISTRY` entry and assert that exactly one claimant, the `yuna_darknight` preset,
+declares the key `divine_sexual_arts`. The scan SHALL read the live registry rather than a
+hardcoded preset list, so any new preset is covered automatically.
 
 #### Scenario: Yuna is the sole claimant
 - **WHEN** the structural test flattens every shipped claiming surface
@@ -371,3 +425,9 @@ rather than a hardcoded preset list, so any new preset is covered automatically.
 - **THEN** every `PLAYER_PRESET_REGISTRY` key contributes both its `active_skills` and its
   `passive_skills` (count-checked against the live registry), so no kit escapes the uniqueness
   assertion
+
+#### Scenario: The claim covers authored content only
+- **WHEN** the scope of the uniqueness claim is examined
+- **THEN** `PLAYER_PRESET_REGISTRY` is the sole shipped **authored** skill-kit surface today, since
+  shipped NPC companions are built from preset cards; the claim covers authored content, not
+  arbitrary runtime `db.skills` writes, for which no shipped catalog scan exists

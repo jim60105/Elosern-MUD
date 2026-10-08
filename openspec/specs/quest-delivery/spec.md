@@ -49,11 +49,7 @@ stays correct.
 ### Requirement: Delivery progress comes only from a committed transfer to the bound recipient
 `DELIVER` progress SHALL advance only from a committed item transfer in which the quest holder is
 the giver, the receiver is the stage's bound recipient, and the transferred key matches the
-objective's `item_key`. Progress SHALL advance by the transferred quantity, capped at the objective
-quantity, and surplus SHALL NOT carry into a later stage. A transfer of a different item, to a
-different receiver, or in which the holder is the receiver rather than the giver SHALL advance
-nothing. There SHALL be no public "item delivered" assertion a caller can forge: the progress
-computation SHALL be reachable only from a committed transfer.
+objective's `item_key`. There SHALL be no public "item delivered" assertion a caller can forge.
 
 #### Scenario: Handing the parcel to the bound recipient advances the stage
 - **WHEN** the holder transfers the objective's item to the bound recipient
@@ -71,6 +67,15 @@ computation SHALL be reachable only from a committed transfer.
 - **WHEN** the delivery observer is inspected
 - **THEN** it exposes only a computation over a committed transfer and no public progress-assertion
   entry point
+
+#### Scenario: Progress advances by transferred quantity capped at the objective
+- **WHEN** a qualifying transfer commits
+- **THEN** progress advances by the transferred quantity, capped at the objective quantity, and
+  surplus does not carry into a later stage
+
+#### Scenario: A transfer to a different receiver advances nothing
+- **WHEN** the holder transfers the objective's item to a receiver other than the bound recipient
+- **THEN** no delivery objective advances
 
 ### Requirement: The delivery observer computes a replacement and writes nothing
 `world/quests/deliver.py` SHALL expose a pure computation returning the quest-log replacement and pin
@@ -111,16 +116,8 @@ raise the renderer's named error rather than printing a raw key.
 
 A player SHALL be able to hand a quest item to its bound recipient through a deterministic path that
 consults no LLM, no image service, and no generative proposal. The deterministic path SHALL be
-reachable both from the web client, as the registered `explore.deliver` action, and from the text
-surface, as a player command. Neither route SHALL depend on an NPC dialogue intent, so a delivery
-quest SHALL be completable end to end with every generative profile failing.
-The deterministic path SHALL hand exactly the remaining objective quantity
-(`objective.quantity - stage_progress`) of the selected active stage in one invocation; the payload
-carries no quantity, and the quantity is re-derived server-side. When several in-progress records
-bind the same recipient and item key, one shared selection policy — used by both the deterministic
-rule and the affordance builder — SHALL select the stage with the lowest remaining quantity (ties
-breaking in quest-log order), so an advertised delivery is always satisfiable by the hand-over that
-follows it.
+reachable both from the web client and from the text surface, so a delivery quest SHALL be
+completable end to end with every generative profile failing.
 
 #### Scenario: A delivery completes with all generative services failing
 - **WHEN** every `LLM_PROFILES` entry is configured to fail and the holder hands the objective item
@@ -133,21 +130,38 @@ follows it.
 - **THEN** both invoke the identical deterministic rule and produce identical state changes and
   identical rejection reasons
 
+#### Scenario: Each surface reaches the path through its own entry point
+- **WHEN** the deterministic path is reached from the web client and from the text surface
+- **THEN** the web client reaches it as the registered `explore.deliver` action and the text
+  surface as a player command, and neither route depends on an NPC dialogue intent
+
 #### Scenario: A partially advanced stage is completed by one hand-over
 - **WHEN** the holder's delivery stage has already gained progress and the holder carries exactly
   the remaining objective quantity
 - **THEN** the deterministic hand-over transfers exactly that remaining quantity and the stage
   completes
 
+#### Scenario: The payload carries no quantity
+- **WHEN** a deterministic delivery is invoked
+- **THEN** the payload carries no quantity, and the quantity is re-derived server-side
+
+#### Scenario: One invocation hands exactly the remaining quantity
+- **WHEN** the deterministic path runs for the selected active stage
+- **THEN** it hands exactly the remaining objective quantity
+  (`objective.quantity - stage_progress`) in one invocation
+
+#### Scenario: One shared selection policy picks the lowest remaining quantity
+- **WHEN** several in-progress records bind the same recipient and item key
+- **THEN** one shared selection policy — used by both the deterministic rule and the affordance
+  builder — selects the stage with the lowest remaining quantity (ties breaking in quest-log order),
+  so an advertised delivery is always satisfiable by the hand-over that follows it
+
 ### Requirement: The delivery action is registered with an exact bounded payload
 
 The production action registry SHALL additionally contain `explore.deliver` with its own exact
 payload validator and deterministic adapter. Its payload SHALL be exactly the recipient's integer
 identity and the bounded item key; a payload carrying extra, missing, mistyped, or out-of-bound
-fields SHALL be rejected before the adapter runs. The adapter SHALL obtain the actor from the
-authenticated session, re-resolve the recipient and the quest record itself, and SHALL NOT trust any
-client-supplied quest ID, stage index, quantity, or reward value. It SHALL route no action ID or
-payload through the text command parser.
+fields SHALL be rejected before the adapter runs.
 
 #### Scenario: The registry binds the delivery action
 - **WHEN** the production action registry is enumerated
@@ -163,6 +177,16 @@ payload through the text command parser.
 - **WHEN** a well-formed delivery request names a recipient and an item
 - **THEN** the adapter resolves the actor from the session and re-derives the matching quest record,
   stage, and quantity from stored state
+
+#### Scenario: The adapter trusts no client-supplied state
+- **WHEN** the adapter runs
+- **THEN** it obtains the actor from the authenticated session, re-resolves the recipient and the
+  quest record itself, and does not trust any client-supplied quest ID, stage index, quantity, or
+  reward value
+
+#### Scenario: The text command parser carries no action payload
+- **WHEN** delivery requests are routed
+- **THEN** no action ID or payload routes through the text command parser
 
 ### Requirement: A delivery is refused honestly and changes nothing when refused
 
@@ -200,16 +224,7 @@ The general give command (`給`) SHALL route both of its transfer branches — t
 and the materialized-object branch — through the same committed-transfer advance seam the
 dialogue-intent transfer primitive uses, inside its own transaction, with the surrounding give
 owning the snapshots and the rollback, so the delivery advance commits atomically with the item
-movement and rolls back with it. The snapshots SHALL cover both parties' inventory, quest log, and
-traits surfaces, the receiver plan's acquisition pin rooms, and the pin rooms the delivery advance
-touches. A failed advance SHALL restore all of them to a byte-identical world, reconcile the moved
-objects' in-process caches, and report a safe Traditional Chinese message. The give's established
-refusals — unmovable items and refused moves — SHALL keep their existing outcomes.
-
-The general give SHALL perform no quest-scoped refusal and no combat gate: it stays a raw transfer,
-a transfer that matches no active delivery stage SHALL move the items and advance nothing, and only
-the committed-transfer observer decides progress. The quest-scoped refusal semantics remain the
-contract of `交付` / `explore.deliver`.
+movement and rolls back with it.
 
 #### Scenario: Giving the objective key to the bound recipient advances the stage
 - **WHEN** the holder gives the objective's registry key to the stage's bound recipient through the
@@ -246,3 +261,21 @@ contract of `交付` / `explore.deliver`.
   the receiver plan's acquisition pin state are byte-identical to before the command, the moved or
   materialized objects' in-process caches are reconciled with the rolled-back database, and the
   player receives a safe Traditional Chinese failure message
+
+#### Scenario: Snapshots cover every touched surface
+- **WHEN** the give prepares its rollback snapshots
+- **THEN** they cover both parties' inventory, quest log, and traits surfaces, the receiver plan's
+  acquisition pin rooms, and the pin rooms the delivery advance touches
+
+#### Scenario: Established give refusals keep their outcomes
+- **WHEN** the give hits an established refusal — an unmovable item or a refused move
+- **THEN** it keeps its existing outcome
+
+#### Scenario: The give stays a raw transfer with no quest-scoped gate
+- **WHEN** the general give runs
+- **THEN** it performs no quest-scoped refusal and no combat gate, and only the committed-transfer
+  observer decides progress
+
+#### Scenario: Quest-scoped refusals stay the contract of the delivery verb
+- **WHEN** quest-scoped refusal semantics are needed
+- **THEN** they remain the contract of `交付` / `explore.deliver`, not the general give

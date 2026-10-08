@@ -10,12 +10,8 @@ inside the game, rendered deterministically from immutable quest values.
 ### Requirement: A player can inspect one own quest's full detail
 `guild show <quest_id>` SHALL render one of the caller's own quest records with
 its display name, state, stage index, the current stage's objective description,
-progress, deadline (when the definition sets one), and the registered reward for
-that definition at the caller's branch (when one exists). When the definition
-carries them, it SHALL additionally render the authored guild grade, the rating
-rationale, and the background flavor as three distinctly labelled sections — the
-rationale and flavor verbatim from the definition's authored prose — and an
-absent optional field SHALL be omitted rather than fabricated. It SHALL resolve the
+progress, the deadline when the definition sets one, and the registered reward
+at the caller's branch when one exists. It SHALL resolve the
 record through the quest runtime read APIs and SHALL NOT require a local
 `GuildStaff` host. An unknown quest id SHALL produce a Traditional Chinese error
 and SHALL cause no state change.
@@ -62,6 +58,11 @@ and SHALL cause no state change.
 #### Scenario: Prose-only quest still shows unmet objectives
 - **WHEN** a flavor-rich quest's objectives are incomplete
 - **THEN** the detail shows flavor prose alongside incomplete progress, never a completion claim
+
+#### Scenario: Authored grade, rationale, and flavor render when present
+- **WHEN** the definition carries an authored guild grade, rating rationale, and background flavor
+- **THEN** the detail additionally renders them as three distinctly labelled sections, the rationale and flavor verbatim from the definition's authored prose
+- **AND** an absent optional field is omitted rather than fabricated
 
 ### Requirement: Objective descriptions are deterministic and exhaustive
 The rendering layer SHALL produce a Traditional Chinese description for every

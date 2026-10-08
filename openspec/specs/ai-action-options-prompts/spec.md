@@ -10,12 +10,7 @@ generative-layer profile that requires structured output at construction time.
 `prompts/action_options.yaml` SHALL ship exactly the keys `action_options.system` and
 `action_options.user` (schema_version 1, matching the existing prompt files' format). The system
 key SHALL direct the model as a game-design curator for an adult single-player world proposing 3–5
-actions in Traditional Chinese, always choosing `known_action` cards from the provided affordance
-codes and using `freeform` only for speech a present person could plausibly be addressed with. The
-user key SHALL carry the serialized context block. Both keys SHALL repeat the hard rules: no
-numbers in player-visible `label`/`hint` text (structural fields such as `npc_index` and `params`
-are exempt), no hidden values, no fabricated targets, cards reference only present
-people/places/things, and exactly the documented JSON schema output (pipeline design doc §3).
+actions in Traditional Chinese. The user key SHALL carry the serialized context block.
 
 #### Scenario: Both prompt keys resolve through the loader
 - **WHEN** `world/prompts/loader.py` loads the prompt library
@@ -26,16 +21,23 @@ people/places/things, and exactly the documented JSON schema output (pipeline de
 - **THEN** it explicitly forbids numbers in `label`/`hint` text, hidden values, and fabricated
   targets, while exempting structural fields (`npc_index`, `params`) from the number rule
 
+#### Scenario: The system prompt constrains card selection
+
+- **WHEN** the `action_options.system` text is inspected
+- **THEN** it directs the model to always choose `known_action` cards from the provided affordance codes and to use `freeform` only for speech a present person could plausibly be addressed with
+
+#### Scenario: Both prompt keys repeat the hard rules
+
+- **WHEN** both `action_options.system` and `action_options.user` texts are inspected
+- **THEN** both repeat the hard rules: no numbers in player-visible `label`/`hint` text (structural fields such as `npc_index` and `params` are exempt), no hidden values, no fabricated targets, cards reference only present people/places/things, and exactly the documented JSON schema output (pipeline design doc §3)
+
 ### Requirement: The registry declares the action_options entries with an exact placeholder allowlist
 `world/prompts/registry.py` SHALL register `action_options.system` and `action_options.user`
 `PromptSpec` entries with **different allowlists**: `action_options.system` SHALL have an empty
-`allowed_placeholders` (its text is static role/hard-rule direction and must never carry context
-tokens), and `action_options.user` SHALL have `allowed_placeholders` exactly equal to the
-`ActionOptionsContext` fields of the pipeline design doc §2 (`room_name`, `room_summary`,
-`npc_entries`, `monster_entries`, `objective`, `narrative_tail`, `affordances`), with `max_length`
-bounds consistent with the other system prompts. The loader SHALL reject any `{token}` in the YAML
-text not on the registered allowlist (typo like `{nmme}` fails validation), and the
-registry/loader parity contract SHALL cover both new keys.
+`allowed_placeholders` (static role/hard-rule direction that must never carry context tokens),
+and `action_options.user` SHALL have `allowed_placeholders` exactly equal to the
+`ActionOptionsContext` fields of the pipeline design doc §2, with `max_length` bounds consistent
+with the other system prompts.
 
 #### Scenario: A placeholder typo in action_options.yaml is caught
 - **WHEN** the YAML text contains a `{token}` not in the registered allowlist
@@ -47,10 +49,21 @@ registry/loader parity contract SHALL cover both new keys.
   `ActionOptionsContext` field names
 - **THEN** they are exactly equal — the parity contract test covers both new keys
 
+#### Scenario: The user allowlist enumerates the context fields
+
+- **WHEN** `action_options.user`'s `allowed_placeholders` are inspected
+- **THEN** they are exactly `room_name`, `room_summary`, `npc_entries`, `monster_entries`, `objective`, `narrative_tail`, `affordances`
+
 #### Scenario: The system prompt carries no allowlisted tokens
 - **WHEN** `action_options.system`'s `allowed_placeholders` are inspected
 - **THEN** the allowlist is empty — a context token accidentally placed in the system text fails
   loading instead of being silently rendered
+
+#### Scenario: The loader rejects unallowlisted tokens and parity covers both keys
+
+- **WHEN** the YAML text contains any `{token}` not on the registered allowlist (typo like `{nmme}`)
+- **THEN** the loader fails validation for it
+- **AND** the registry/loader parity contract covers both new keys
 
 ### Requirement: LAYER_NAMES gains the action_options slot with structured-output defaults
 `world/ai/profiles.py` SHALL add `"action_options"` to `LAYER_NAMES`, and `default_profiles()`
@@ -66,11 +79,9 @@ assert the effective profile for the new layer.
 ### Requirement: Construction-time validation rejects a structured-output-disabled action_options profile at settings load
 `world/ai/profiles.py` SHALL enforce a per-layer required-flag rule: building profiles with
 `action_options.supports_response_format: false` SHALL raise `ProfileValidationError` naming the
-layer and field. `server/conf/settings.py` SHALL validate the effective profile map at import time
-(one `build_profiles(LLM_PROFILES)` call placed after every settings override, including the
-`secret_settings` block at the end of the module), so a misconfigured endpoint for the one layered
-JSON-schema consumer fails **at startup** rather than at the first live call (pipeline design doc
-§5). All other bounds and layers SHALL behave exactly as today.
+layer and field. `server/conf/settings.py` SHALL validate the effective profile map at import time,
+so a misconfigured endpoint for the one layered JSON-schema consumer fails **at startup** rather
+than at the first live call (pipeline design doc §5).
 
 #### Scenario: A disabled structured-output action_options profile fails at settings load
 - **WHEN** the settings module is imported with an `action_options` entry carrying
@@ -82,3 +93,13 @@ JSON-schema consumer fails **at startup** rather than at the first live call (pi
 - **WHEN** the same validator builds a map with another layer's
   `supports_response_format: false`
 - **THEN** it builds normally — only the action_options layer carries the requirement
+
+#### Scenario: Settings validation runs after every override
+
+- **WHEN** `server/conf/settings.py` places its single `build_profiles(LLM_PROFILES)` validation call
+- **THEN** the call sits after every settings override, including the `secret_settings` block at the end of the module
+
+#### Scenario: All other bounds and layers are unchanged
+
+- **WHEN** the validator runs with the new per-layer rule in place
+- **THEN** all other bounds and layers behave exactly as today

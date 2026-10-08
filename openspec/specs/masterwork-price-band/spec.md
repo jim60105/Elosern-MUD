@@ -11,16 +11,9 @@ trade.
 `PRICE_TABLE` SHALL carry a `masterwork_gear` band whose floor is 100 copper
 and whose ceiling is 500,000 copper. The band SHALL describe goods whose
 price is set by scarcity rather than materials: ordinary where the maker's
-own community trades them, extraordinary where they are rare.
-
-The band SHALL be wide enough that one item key can legally carry an
-everyday price in the community that makes it and a far higher price
-elsewhere, because a price band describes what an object is, not what one
-market charges for it. The ceiling SHALL stay strictly below the `relic`
-band's floor so the keepsake band retains an exclusive price region.
-
-The band key SHALL NOT name a race or a culture. Master-crafted goods from
-any people are admissible.
+own community trades them, extraordinary where they are rare. The ceiling
+SHALL stay strictly below the `relic` band's floor so the keepsake band
+retains an exclusive price region.
 
 #### Scenario: One item carries an ordinary and a scarce price
 - **WHEN** two shops offer the same `masterwork_gear` item, one at an
@@ -37,16 +30,20 @@ any people are admissible.
 - **WHEN** the `masterwork_gear` ceiling and the `relic` floor are compared
 - **THEN** the ceiling is strictly lower, so no price is legal in both bands
 
+#### Scenario: One price band describes the object, not one market
+- **WHEN** the band's width is considered
+- **THEN** it SHALL be wide enough that one item key can legally carry an everyday price in the
+  community that makes it and a far higher price elsewhere, because a price band describes what an
+  object is, not what one market charges for it
+
+#### Scenario: The band key names no race or culture
+- **WHEN** the band key is authored
+- **THEN** it SHALL NOT name a race or a culture, and master-crafted goods from any people are
+  admissible
+
 ### Requirement: A keepsake-band item can never be offered for sale
 No item whose price-table band is `relic` SHALL be offered for sale, at any
 price. The `relic` band means a one-of-a-kind keepsake that is never traded.
-
-That prohibition is today only an implicit consequence of the band's 999,999
-copper floor, which an author can satisfy exactly. This requirement makes it
-absolute, so a keepsake cannot reach a shelf by being priced at its own
-floor. The load-time rejection that enforces it is owned by the goods-list
-validator described in the `commerce-assortments` capability; this
-requirement states the rule the band carries.
 
 #### Scenario: A relic-band item is unshelvable at any price
 - **WHEN** an item whose band is `relic` is priced at exactly the band floor
@@ -58,6 +55,17 @@ requirement states the rule the band carries.
   than a shop
 - **THEN** it is held and inspected normally; only the shop offer path is
   closed
+
+#### Scenario: The prohibition is made absolute over the band floor
+- **WHEN** the band's 999,999 copper floor is considered — today only an implicit consequence of
+  the prohibition, which an author can satisfy exactly
+- **THEN** this requirement makes the prohibition absolute, so a keepsake cannot reach a shelf by
+  being priced at its own floor
+
+#### Scenario: Enforcement is owned by the goods-list validator
+- **WHEN** the load-time rejection for a relic-band offer is located
+- **THEN** it is owned by the goods-list validator described in the `commerce-assortments`
+  capability; this requirement states the rule the band carries
 
 ### Requirement: Goods a community trades everyday do not sit in the keepsake band
 An item that authored content places on sale SHALL NOT declare the `relic`

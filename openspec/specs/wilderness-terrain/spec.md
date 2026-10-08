@@ -57,10 +57,7 @@ random or wall-clock input, and SHALL return the same value for the same input o
 selecting one of `region_for_coordinates(x, y)`'s region's `terrain_flavor_zh` variants via the fixed
 arithmetic formula `index = (x * 92821 + y * 68917) % len(variants)` over `(x, y)` alone. The function
 SHALL call no LLM client, no random-number generator, and no wall-clock read, satisfying the design
-doc's offline-playability criterion. The formula's constants (`92821`, `68917`) and
-`WILDERNESS_REGION_REGISTRY`'s exact `terrain_flavor_zh` text are both part of this requirement's
-contract, not implementation detail left to the implementer's discretion — see the literal-pin
-scenario below.
+doc's offline-playability criterion.
 
 #### Scenario: Same coordinates always produce the same description
 - **WHEN** `terrain_description(x, y)` is called twice with the same `(x, y)`
@@ -87,6 +84,11 @@ scenario below.
 #### Scenario: No LLM or network dependency exists in the call path
 - **WHEN** `world/maps/wilderness_provider.py` is inspected for imports and calls
 - **THEN** it references no module under `world/ai/`, no HTTP client, and no `random` module call
+
+#### Scenario: The constants and flavor text are contract, not discretion
+- **WHEN** the formula's constants (`92821`, `68917`) and `WILDERNESS_REGION_REGISTRY`'s exact `terrain_flavor_zh` text are weighed
+- **THEN** both are part of this requirement's contract, not implementation detail left to the implementer's discretion — see the literal-pin scenario
+
 ### Requirement: WILDERNESS_REGION_REGISTRY is mirrored into LoreRecord Scripts idempotently
 `world/lore/sync.py::_ALL_REGISTRIES` SHALL include `WILDERNESS_REGION_REGISTRY` under the category
 key `"wilderness_regions"`, so `sync_all()` mirrors it into `LoreRecord` Scripts exactly as it mirrors

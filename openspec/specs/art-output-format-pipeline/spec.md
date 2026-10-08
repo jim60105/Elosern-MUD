@@ -14,18 +14,9 @@ the existing named error codes.
 `world/art/formats.py::encode(...)` SHALL convert the transport PNG bytes of a
 `GeneratedImage` into the format named by `ART_SD_OUTPUT_FORMAT` (`png`,
 `webp`, `jpeg`, or `avif`) at `ART_SD_OUTPUT_QUALITY` (1–100), returning the
-encoded bytes together with the store extension for that format (`.png`,
-`.webp`, `.jpg`, `.avif`). The sd-webui wire format SHALL remain PNG — no
-request behavior changes. For `png` the conversion SHALL be a lossless Pillow
-re-save with the metadata policy of D3 applied, so the policy can never be
-bypassed by the format choice. The encoder SHALL normalize the decoded image
-to the mode each format accepts (JPEG is encoded from an RGB view; Pillow's
-`convert("RGB")` drops any alpha channel). Encoding a non-PNG or corrupted input SHALL raise the named `SDError` code
-`sd_format_error`; the check is format-aware — input that decodes as a *valid* JPEG or WebP is
-rejected exactly like garbage (the decoded image's format must be PNG), and the failure happens
-before any output is produced. No other error taxonomy is introduced. Quality SHALL affect lossy
-formats only. The default `png` pipeline SHALL keep pixel-identical output to today's verbatim-PNG
-path.
+encoded bytes together with the store extension for that format. Encoding a non-PNG
+or corrupted input SHALL raise the named `SDError` code `sd_format_error` before any
+output is produced.
 
 #### Scenario: WebP output is produced at the configured quality
 - **WHEN** `ART_SD_OUTPUT_FORMAT=webp` and `ART_SD_OUTPUT_QUALITY=60` and a valid PNG is encoded
@@ -61,24 +52,46 @@ path.
   valid, or a decodable valid JPEG or WebP
 - **THEN** it raises `SDError` with code `sd_format_error` and nothing is written to the store
 
+#### Scenario: The png conversion is a lossless re-save with the D3 policy
+- **WHEN** `ART_SD_OUTPUT_FORMAT=png`
+- **THEN** the conversion is a lossless Pillow re-save with the metadata policy of D3 applied, so the
+  policy can never be bypassed by the format choice
+
+#### Scenario: The encoder normalizes the decoded image to each format's accepted mode
+- **WHEN** an image is encoded for any format
+- **THEN** the encoder normalizes the decoded image to the mode each format accepts — JPEG is encoded
+  from an RGB view, and Pillow's `convert("RGB")` drops any alpha channel
+
+#### Scenario: The format check demands a decoded format of PNG
+- **WHEN** the input decodes as a *valid* JPEG or WebP
+- **THEN** it is rejected exactly like garbage — the decoded image's format must be PNG
+
+#### Scenario: Quality affects lossy formats only
+- **WHEN** `ART_SD_OUTPUT_QUALITY` is varied
+- **THEN** it affects lossy formats only
+
+#### Scenario: The default png pipeline matches the verbatim-PNG path byte-for-byte in pixels
+- **WHEN** the default `png` pipeline runs
+- **THEN** it keeps pixel-identical output to today's verbatim-PNG path
+
+#### Scenario: The returned store extension per format
+- **WHEN** `encode` returns
+- **THEN** the extension is `.png`, `.webp`, `.jpg`, or `.avif` for the respective format
+
+#### Scenario: The wire protocol stays PNG-only
+- **WHEN** the output format is configured away from `png`
+- **THEN** the sd-webui wire format remains PNG — no request behavior changes
+
+#### Scenario: No other error taxonomy is introduced
+- **WHEN** the encoder's failure modes are enumerated
+- **THEN** `sd_format_error` is the only named code this pipeline adds; no other error taxonomy is
+  introduced
+
 ### Requirement: Generation metadata is embedded when preserved and provably absent when not
 When `ART_SD_PRESERVE_GENERATION_METADATA` is true, the encoded output SHALL
-carry the A1111-shaped generation-parameters text (prompt, negative prompt,
-steps, CFG scale, sampler, scheduler, width, height, and — when the record
-carries one — the seed, plus the configured checkpoint when set) in the
-format-native location: PNG a text chunk (`tEXt` for Latin-1-safe text, `iTXt` otherwise) with
-key `parameters`; JPEG, WebP, and AVIF EXIF `UserComment`.
-Every encode path — ON and OFF alike —
-SHALL work from a sanitized pixel copy of the decoded source carrying no source metadata (an
-empty `.info`), so server-embedded text, EXIF, or ICC can never survive by encoder pass-through
-in either mode: the parameters block is regenerated from engine-known values, never copied
-wholesale from server-supplied chunks. When the setting is false, the delivered artifact SHALL
-carry no generation metadata at all: PNG output SHALL be re-saved with zero text chunks, and
-JPEG/WebP/AVIF output SHALL be encoded without EXIF or ICC. Verification is format-aware
-metadata inspection — every PNG ancillary chunk type parsed (no `tEXt`, `zTXt`, `iTXt`, `eXIf`,
-or `iCCP`), JPEG APP-segments and WebP RIFF chunks parsed (no EXIF, XMP, or ICC payload), AVIF
-`Image.info` free of `exif`/`xmp`/ICC — and the original server parameter text asserted absent —
-never byte-marker scanning alone.
+carry the A1111-shaped generation-parameters text in the format-native location:
+PNG a text chunk with key `parameters`; JPEG, WebP, and AVIF EXIF `UserComment`.
+When the setting is false, the delivered artifact SHALL carry no generation metadata at all.
 
 #### Scenario: Preserved metadata round-trips from the encoded artifact
 - **WHEN** metadata preservation is on and a png, webp, jpeg, or avif image
@@ -104,18 +117,39 @@ never byte-marker scanning alone.
   `None`
 - **THEN** the parameters text omits the seed entry entirely
 
+#### Scenario: The parameters text's fields
+- **WHEN** metadata preservation is on
+- **THEN** the text carries prompt, negative prompt, steps, CFG scale, sampler, scheduler, width,
+  height, and — when the record carries one — the seed, plus the configured checkpoint when set
+
+#### Scenario: The PNG text chunk flavor follows the text's encoding
+- **WHEN** the parameters text is written into a PNG
+- **THEN** it uses `tEXt` for Latin-1-safe text and `iTXt` otherwise
+
+#### Scenario: Every encode works from a sanitized pixel copy
+- **WHEN** any encode runs — metadata preservation ON or OFF alike
+- **THEN** it works from a sanitized pixel copy of the decoded source carrying no source metadata (an
+  empty `.info`), so server-embedded text, EXIF, or ICC can never survive by encoder pass-through in
+  either mode: the parameters block is regenerated from engine-known values, never copied wholesale
+  from server-supplied chunks
+
+#### Scenario: The stripped form per format
+- **WHEN** `ART_SD_PRESERVE_GENERATION_METADATA=false`
+- **THEN** PNG output is re-saved with zero text chunks, and JPEG/WebP/AVIF output is encoded without
+  EXIF or ICC
+
+#### Scenario: Verification is format-aware inspection, never byte-marker scanning alone
+- **WHEN** absence of metadata is verified
+- **THEN** every PNG ancillary chunk type is parsed (no `tEXt`, `zTXt`, `iTXt`, `eXIf`, or `iCCP`),
+  JPEG APP-segments and WebP RIFF chunks are parsed (no EXIF, XMP, or ICC payload), AVIF `Image.info`
+  is checked free of `exif`/`xmp`/ICC, and the original server parameter text is asserted absent
+
 ### Requirement: An alpha channel survives every alpha-capable output format
 
 `world/art/formats.py::encode(...)` SHALL preserve the alpha channel of an RGBA transport
 PNG end to end for each of the three alpha-capable output formats — `png`, `webp`, and
 `avif` — so a transparent-background artifact produced upstream is still transparent after
-it is stored. Decoding the encoded bytes SHALL yield an image whose mode carries alpha and
-whose fully transparent source pixels are still fully transparent, in both metadata modes
-(`ART_SD_PRESERVE_GENERATION_METADATA` true and false), because the encoder's sanitizing
-pixel copy SHALL copy the source mode rather than flattening it. The existing `jpeg`
-behavior is unchanged: JPEG accepts no alpha and continues to be encoded from an RGB view,
-which is why the `art-portrait-cutout` capability refuses the `jpeg` + background-removal
-combination at settings import rather than allowing a silent flatten.
+it is stored.
 
 #### Scenario: Alpha round-trips through each alpha-capable format
 - **WHEN** an RGBA PNG with a fully transparent region is encoded with
@@ -133,3 +167,18 @@ combination at settings import rather than allowing a silent flatten.
 - **WHEN** an opaque RGB PNG is encoded for each of the four supported formats
 - **THEN** the stored output is unchanged from the pre-change pipeline's output for that
   format
+
+#### Scenario: The decoded alpha check in both metadata modes
+- **WHEN** the encoded bytes are decoded
+- **THEN** the image's mode carries alpha and its fully transparent source pixels are still fully
+  transparent, in both metadata modes (`ART_SD_PRESERVE_GENERATION_METADATA` true and false)
+
+#### Scenario: The sanitizing pixel copy preserves the source mode
+- **WHEN** the encoder builds its sanitized working copy
+- **THEN** it copies the source mode rather than flattening it
+
+#### Scenario: JPEG alpha behavior is unchanged
+- **WHEN** `ART_SD_OUTPUT_FORMAT=jpeg`
+- **THEN** the existing behavior stands: JPEG accepts no alpha and continues to be encoded from an
+  RGB view, which is why the `art-portrait-cutout` capability refuses the `jpeg` + background-removal
+  combination at settings import rather than allowing a silent flatten

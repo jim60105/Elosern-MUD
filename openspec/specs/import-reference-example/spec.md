@@ -61,9 +61,8 @@ convention (see the `import-schema` capability).
 
 ### Requirement: The reference example exercises every major schema branch and a complete NPC card
 `examples/example_character.json` SHALL set a `subrace` (exercising the race/subrace cross-check),
-a fully populated `stats` object (all eight keys), an empty `disguised_stats` object (the record's
-`human` race cannot use divine arts, so a non-empty layer would be rejected by the
-`disguised-stats-boundary` capability's race guard), non-empty `skills` and `passives` arrays, a
+a fully populated `stats` object (all eight keys), an empty `disguised_stats` object, non-empty
+`skills` and `passives` arrays, a
 `sexual_baseline` with `arousal`, `virgin`, `sensitivity`, and at least one additional optional level
 field set, and a `persona` that is a complete compact NPC card.
 
@@ -89,3 +88,11 @@ field set, and a `persona` that is a complete compact NPC card.
 #### Scenario: The example's persona is a complete compact card
 - **WHEN** `examples/example_character.json`'s `persona` object is inspected through the card contract
 - **THEN** it is a valid seven-field compact NPC card
+
+#### Scenario: The example's skills and passives arrays are non-empty
+- **WHEN** `examples/example_character.json`'s `skills` and `passives` arrays are inspected
+- **THEN** both are non-empty
+
+#### Scenario: A non-empty disguised layer would be rejected by the race guard
+- **WHEN** the `disguised_stats` emptiness convention is traced to its enforcement
+- **THEN** the record's `human` race cannot use divine arts, so a non-empty layer would be rejected by the `disguised-stats-boundary` capability's race guard

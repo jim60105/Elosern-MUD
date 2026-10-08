@@ -13,17 +13,6 @@ The presentation registry SHALL register a `lore_codex` panel at schema version 
 SHALL contain exactly `schema_version`, `available`, `categories`, and `discovered_total`, and the
 registered common unavailable form SHALL keep the shared field set, reason, and semantics.
 
-`categories` SHALL be the eight codex categories in `CODE_CATEGORIES` mapping order — never a
-subset and never reordered — each containing exactly `key`, `label`, `count`, and `entries`. `label`
-SHALL be the player-facing category name. `count` SHALL equal the length of that category's
-`entries`. Each entry SHALL contain exactly `key`, `title`, and `card`, where `card` is an ordered
-list of that category's declared card fields rendered through the canonical `lore_card` renderer,
-each field carrying exactly `name` and `value`. `discovered_total` SHALL equal the sum of the
-category counts.
-
-The presenter SHALL be read-only: it SHALL NOT mutate the discovered record, reveal an entry, or
-touch any other state, and SHALL emit no live object or filesystem reference.
-
 #### Scenario: A codex with two discoveries serializes exactly
 - **WHEN** a puppeted holder who has discovered one race and one anchor receives a full snapshot
 - **THEN** the payload carries all eight categories in mapping order, the race and anchor groups each
@@ -39,15 +28,37 @@ touch any other state, and SHALL emit no live object or filesystem reference.
 - **WHEN** the panel is built twice in a row for the same holder
 - **THEN** `db.lore_discovered` is byte-for-byte unchanged and both serializations are identical
 
+#### Scenario: The categories array mirrors the registry
+- **WHEN** the panel serializes
+- **THEN** `categories` is the eight codex categories in `CODE_CATEGORIES` mapping order, never a
+  subset and never reordered
+
+#### Scenario: A category group carries exactly its four fields
+- **WHEN** a category group is serialized
+- **THEN** it contains exactly `key`, `label`, `count`, and `entries`, where `label` is the
+  player-facing category name and `count` equals the length of that category's `entries`
+
+#### Scenario: An entry carries exactly its key, title, and rendered card
+- **WHEN** an entry is serialized
+- **THEN** it contains exactly `key`, `title`, and `card`, where `card` is an ordered list of that
+  category's declared card fields rendered through the canonical `lore_card` renderer, each field
+  carrying exactly `name` and `value`
+
+#### Scenario: discovered_total sums the category counts
+- **WHEN** the panel serializes
+- **THEN** `discovered_total` equals the sum of the category counts
+
+#### Scenario: The presenter touches no state and emits no references
+- **WHEN** the panel is built for any holder
+- **THEN** it has not mutated the discovered record, revealed an entry, or touched any other state,
+  and it emits no live object or filesystem reference
+
 ### Requirement: The panel discloses only what the holder discovered
 
 An entry SHALL appear only when the holder's record contains its namespaced identifier. The panel
 SHALL NOT ship an undiscovered entry, SHALL NOT ship a count, total, ratio, or placeholder that
 reveals how many entries a category could hold, and SHALL NOT ship a locked, hidden, or greyed entry
-stub. A category with nothing discovered SHALL ship as an empty group carrying only its key, its
-label, `count` 0, and an empty entry list — the same non-disclosure rule the `lore` command enforces
-by returning one fixed not-found line for unknown categories, unknown keys, and undiscovered entries
-alike.
+stub.
 
 #### Scenario: An undiscovered entry is absent entirely
 - **WHEN** a holder has discovered one of several registered entries in a category
@@ -58,6 +69,12 @@ alike.
 - **THEN** it contains no registry total, no denominator, no completion ratio, and no placeholder
   entry
 
+#### Scenario: A category with nothing discovered ships as an empty group
+- **WHEN** a holder has discovered nothing in a category
+- **THEN** the category ships as an empty group carrying only its key, its label, `count` 0, and an
+  empty entry list — the same non-disclosure rule the `lore` command enforces by returning one fixed
+  not-found line for unknown categories, unknown keys, and undiscovered entries alike
+
 ### Requirement: Cards are rendered by the canonical renderer, never composed by the presenter
 
 Each entry's `card` SHALL be exactly what `lore_card(category, key)` returns for that entry, in the
@@ -65,10 +82,6 @@ category's declared field order, with no field added, removed, reordered, reword
 mid-value by the presenter. An entry present in the holder's record whose key no longer resolves in
 its registry SHALL be omitted from the payload rather than shipped with a fabricated card, and the
 omission SHALL NOT make the panel unavailable.
-
-A malformed identifier — empty category or key, or a key carrying extra delimiters — is corruption,
-not a vanished key: the reader SHALL reject it as a corrupt record rather than hand it to the
-presenter for omission.
 
 #### Scenario: A card matches the renderer exactly
 - **WHEN** an entry is serialized
@@ -83,6 +96,12 @@ presenter for omission.
 - **WHEN** the holder's record holds an identifier such as `race:` or `race:elf:extra`
 - **THEN** the reader treats it as a corrupt record and the whole panel degrades; it is not omitted
   from an otherwise-available payload
+
+#### Scenario: A malformed identifier is rejected before presentation
+- **WHEN** the holder's record holds a malformed identifier — empty category or key, or a key
+  carrying extra delimiters
+- **THEN** the reader rejects it as a corrupt record rather than hand it to the presenter for
+  omission, because it is corruption, not a vanished key
 
 ### Requirement: The lore codex panel is host-independent
 
@@ -113,9 +132,7 @@ rewrite, or repair the stored record.
 The panel SHALL declare explicit bounds: a maximum entry count per category, a maximum total entry
 count, a maximum card-field count per entry, and code-point bounds on every string. It SHALL close
 with the shared `MAX_CANONICAL_JSON_BYTES` envelope guard and FAIL CLOSED rather than truncating or
-paginating, so growth in an underlying lore registry surfaces as a loud test failure that forces a
-deliberate decision rather than a silently clipped codex. The client-side validator SHALL mirror
-these exact bounds, guarded by the existing dual-direction parity test.
+paginating.
 
 #### Scenario: Exceeding a bound raises rather than truncating
 - **WHEN** a holder's discoveries would produce a payload exceeding a declared bound or the envelope
@@ -126,6 +143,16 @@ these exact bounds, guarded by the existing dual-direction parity test.
 - **WHEN** a payload with a ninth category, a reordered category list, an extra entry field, or an
   extra card-field key reaches the client validator
 - **THEN** the client rejects it rather than rendering it
+
+#### Scenario: Registry growth surfaces as a loud failure
+- **WHEN** growth in an underlying lore registry pushes a payload past a declared bound
+- **THEN** it surfaces as a loud test failure that forces a deliberate decision rather than a
+  silently clipped codex
+
+#### Scenario: The client validator mirrors the declared bounds
+- **WHEN** the server declares its payload bounds
+- **THEN** the client-side validator mirrors these exact bounds, guarded by the existing
+  dual-direction parity test
 
 ### Requirement: The panel is pushed when a discovery lands
 
@@ -146,15 +173,7 @@ which the writer treats as a no-op, SHALL NOT push.
 The codex drawer SHALL render only the committed `lore_codex` panel. It SHALL present a category
 strip carrying one control per shipped category plus an aggregate control covering every discovered
 entry, an entry list for the selected category, and the selected entry's card. Navigation between
-these levels SHALL be local to the client: selecting a category or an entry SHALL dispatch no action
-and SHALL trigger no fetch, because the panel already carries every discovered entry and its rendered
-card.
-
-The card SHALL render the panel's card fields in the order the panel supplies them, with no field
-added, reordered, or truncated by the drawer and every field value verbatim. Each field SHALL be
-named by the drawer's closed readable vocabulary for the declared card fields (名稱, 描述, 首都,
-地貌, 例證), never by its raw field identifier, which stays only a non-visible hook; a field outside
-that vocabulary SHALL be named by the neutral 資料 and keep its value.
+these levels SHALL be local to the client.
 
 #### Scenario: Selecting a category filters locally
 - **WHEN** the player selects a category control
@@ -168,6 +187,26 @@ that vocabulary SHALL be named by the neutral 資料 and keep its value.
 #### Scenario: The aggregate control shows everything discovered
 - **WHEN** the player selects the aggregate control
 - **THEN** every discovered entry across every category is listed
+
+#### Scenario: Navigation is local because the panel is complete
+- **WHEN** the player navigates between the drawer's levels
+- **THEN** no action is dispatched and no fetch is triggered, because the panel already carries
+  every discovered entry and its rendered card
+
+#### Scenario: The card renders in the panel's field order
+- **WHEN** a card renders in the drawer
+- **THEN** it shows the panel's card fields in the order the panel supplies them, with no field
+  added, reordered, or truncated by the drawer and every field value verbatim
+
+#### Scenario: Card fields carry readable names
+- **WHEN** a card field renders in the drawer
+- **THEN** it is named by the drawer's closed readable vocabulary for the declared card fields
+  (名稱, 描述, 首都, 地貌, 例證), never by its raw field identifier, which stays only a non-visible
+  hook
+
+#### Scenario: A field outside the vocabulary falls back to 資料
+- **WHEN** a card field is outside the closed readable vocabulary
+- **THEN** it is named by the neutral 資料 and keeps its value
 
 ### Requirement: The codex drawer discloses no more than the panel does
 
@@ -194,10 +233,7 @@ unavailable panel SHALL render the registry-owned unavailable reason and no code
 
 The codex drawer SHALL be opened by the labelled 圖鑑 control in the top navigation bar's tool group,
 and by no control inside the quest drawer or the command line. The control SHALL open the codex
-reference drawer through the store's single open-drawer entry point, so at most one focus-trapped
-surface is open at a time and the existing drawer teardown rules apply unchanged, and closing the
-drawer SHALL return focus to the control. Its glyph SHALL be visually distinct from the adjacent
-title-codex (稱號冊) control, which opens a different system.
+reference drawer through the store's single open-drawer entry point.
 
 #### Scenario: The top navigation bar opens the codex
 - **WHEN** the player activates the 圖鑑 control in the top navigation bar's tool group while the command line is collapsed
@@ -211,6 +247,20 @@ title-codex (稱號冊) control, which opens a different system.
 - **WHEN** the top navigation bar's tool group renders
 - **THEN** the world-codex control and the title-codex control carry distinct labels and distinct
   glyphs
+
+#### Scenario: Opening the codex respects drawer exclusivity
+- **WHEN** the control opens the codex reference drawer
+- **THEN** at most one focus-trapped surface is open at a time and the existing drawer teardown
+  rules apply unchanged
+
+#### Scenario: Closing the drawer returns focus
+- **WHEN** the codex drawer closes
+- **THEN** focus returns to the 圖鑑 control
+
+#### Scenario: The glyph is distinct from the title-codex control
+- **WHEN** the top navigation bar's tool group renders
+- **THEN** the codex control's glyph is visually distinct from the adjacent title-codex (稱號冊)
+  control, which opens a different system
 
 ### Requirement: Codex entry titles are the registry's display names
 

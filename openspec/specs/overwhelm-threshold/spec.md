@@ -6,11 +6,9 @@ Defines overwhelm classification as a pure, per-round recomputable query: a powe
 ### Requirement: The power-ratio signal is computed from team-summed effective_power, checked in both
 directions independently
 `world/rules/overwhelm.py` SHALL provide `team_effective_power(battlefield, team_key) -> float`,
-summing `combat.effective_power()` (change 9, unmodified) over every living, non-fled member of the
-named team, and `power_ratio_verdict(battlefield, team_a, team_b) -> str | None`, returning `team_a`
-when `team_effective_power(team_a) / team_effective_power(team_b) >= power_ratio_threshold`, `team_b`
-when the reverse division meets the same threshold, and `None` otherwise. `world/rules/rulebook/
-overwhelm.yaml` SHALL declare `power_ratio_threshold: 100`.
+summing `combat.effective_power()` over every living, non-fled member of the named team, and
+`power_ratio_verdict(battlefield, team_a, team_b) -> str | None`, returning the team whose summed
+power divided by the other's meets `power_ratio_threshold`, and `None` otherwise.
 
 #### Scenario: A team whose aggregate effective_power is 100x or more the other team's is the ratio verdict
 - **WHEN** `power_ratio_verdict()` is called for two teams where one team's summed `effective_power()`
@@ -38,16 +36,21 @@ overwhelm.yaml` SHALL declare `power_ratio_threshold: 100`.
   not depend on reading the dead member's current hp anywhere in `team_effective_power()`'s own logic
   beyond the liveness check itself
 
+#### Scenario: effective_power is change 9's, unmodified
+- **WHEN** the summed term's provenance is inspected
+- **THEN** it is `combat.effective_power()` (change 9, unmodified)
+
+#### Scenario: The threshold is declared in the rulebook yaml
+- **WHEN** `world/rules/rulebook/overwhelm.yaml` is inspected
+- **THEN** it declares `power_ratio_threshold: 100`
+
 ### Requirement: The hit-rate signal detects to-hit saturation without rolling dice, checked over every
 cross-team pair
 `world/rules/overwhelm.py` SHALL provide `hit_rate_verdict(battlefield, team_a, team_b) -> str | None`,
-returning `team_a` only if every living, non-fled member of `team_a` has a guaranteed-hit (effective-
-agility difference `>= 50`) relationship against every living, non-fled member of `team_b`, **and**
-every member of `team_b` has a guaranteed-miss (effective-agility difference `<= -50`) relationship
-against every member of `team_a` — both checked as independent conditions, reusing change 9's
-`defender_constant` (`combat.COMBAT_YAML["to_hit"]["defender_constant"]`) and the same
-`effective_value("agility")`/`evaluate_combat_modifiers()` reads `dice-combat`'s to-hit formula already
-performs, without calling `roll_d100()`.
+returning `team_a` only if every living, non-fled member of `team_a` guaranteed-hits (effective-agility
+difference `>= 50`) every living, non-fled member of `team_b`, **and** every member of `team_b`
+guaranteed-misses (difference `<= -50`) every member of `team_a` — both checked as independent
+conditions, without calling `roll_d100()`.
 
 #### Scenario: A team that always hits and is never hit is the hit-rate verdict
 - **WHEN** every member of `team_a` has an effective-agility advantage of 50 or more over every member
@@ -68,13 +71,20 @@ performs, without calling `roll_d100()`.
 - **THEN** `hit_rate_verdict()` evaluates that pair's "always hits" and "never hits" conditions as two
   separate boolean checks, and does not assume one follows automatically from the other's negation
 
+#### Scenario: The signal reuses dice-combat's own to-hit reads
+- **WHEN** `hit_rate_verdict()`'s inputs are inspected
+- **THEN** it reuses change 9's `defender_constant`
+  (`combat.COMBAT_YAML["to_hit"]["defender_constant"]`) and the same
+  `effective_value("agility")`/`evaluate_combat_modifiers()` reads `dice-combat`'s to-hit formula
+  already performs
+
 ### Requirement: A decided direction is computed by combining the ratio and hit-rate signals by
 agreement, falling back to contested on disagreement
 `world/rules/overwhelm.py` SHALL provide an internal decided-direction computation combining
 `power_ratio_verdict()`/`hit_rate_verdict()`. When exactly one of the two returns a non-`None` team
-key, that key SHALL be the decided direction. When both return the same non-`None` team key, that key
-SHALL be the decided direction. When both return non-`None` but different team keys, the decided
-direction SHALL be `None`. When both return `None`, the decided direction SHALL be `None`.
+key, or when both return the same non-`None` team key, that key SHALL be the decided direction. When
+both return non-`None` but different team keys, or when both return `None`, the decided direction
+SHALL be `None`.
 
 #### Scenario: Ratio fires alone (both sides can still land blows)
 - **WHEN** `power_ratio_verdict()` returns a team key and `hit_rate_verdict()` returns `None` for the
@@ -107,13 +117,10 @@ direction SHALL be `None`. When both return `None`, the decided direction SHALL 
 ### Requirement: A decided direction is further gated by an estimated-round-count bound — overwhelm
 means decided AND quick, not merely decided
 `world/rules/overwhelm.py` SHALL provide `estimated_rounds_to_conclude(battlefield, overwhelming_team,
-overwhelmed_team) -> float`, a calibrated estimate of how many more rounds it
-would take the overwhelming team to reduce the overwhelmed team's **current**, not max, total hp to
-zero, using each attacker's actual to-hit probability and only `combat.COMBAT_YAML["damage"]
-["base_multiplier"]` (never the solid-hit or critical bonus), without calling `roll_d100()`.
-`world/rules/rulebook/overwhelm.yaml` SHALL declare `max_estimated_rounds: 5`. Once a decided direction
-exists (per the prior requirement), `classify_overwhelm()` SHALL return `None` instead of that
-direction whenever `estimated_rounds_to_conclude()` for that direction exceeds `max_estimated_rounds`.
+overwhelmed_team) -> float`, a calibrated, roll-free round estimate (see scenarios). Once a decided
+direction exists (per the prior requirement), `classify_overwhelm()` SHALL return `None` instead of
+that direction whenever `estimated_rounds_to_conclude()` for that direction exceeds
+`max_estimated_rounds`.
 
 #### Scenario: A genuine curbstomp within the round bound is accepted as overwhelm
 - **WHEN** a decided direction's `estimated_rounds_to_conclude()` is at or below `max_estimated_rounds`
@@ -147,6 +154,20 @@ direction whenever `estimated_rounds_to_conclude()` for that direction exceeds `
   team keys
 - **THEN** `classify_overwhelm()` returns `None` without needing to call `estimated_rounds_to_conclude()`
   at all (there is no direction to bound)
+
+#### Scenario: The estimate uses actual to-hit probability and only the base damage multiplier
+- **WHEN** `estimated_rounds_to_conclude()`'s inputs are inspected
+- **THEN** it uses each attacker's actual to-hit probability and only
+  `combat.COMBAT_YAML["damage"]["base_multiplier"]` (never the solid-hit or critical bonus)
+
+#### Scenario: The estimate measures rounds to zero current hp, roll-free
+- **WHEN** `estimated_rounds_to_conclude()`'s semantics are inspected
+- **THEN** it estimates how many more rounds it would take the overwhelming team to reduce the
+  overwhelmed team's **current**, not max, total hp to zero, without calling `roll_d100()`
+
+#### Scenario: The round bound is declared in the rulebook yaml
+- **WHEN** `world/rules/rulebook/overwhelm.yaml` is inspected
+- **THEN** it declares `max_estimated_rounds: 5`
 
 ### Requirement: classify_overwhelm is a pure query, recomputable every round with no stale state
 `classify_overwhelm()` SHALL be a pure function of the `Battlefield`'s current state — it SHALL NOT
@@ -184,10 +205,7 @@ sequence relative to other calls.
 `True` only when both conditions hold: the skill definition resolved from `SKILL_REGISTRY` for
 `skill_key` carries at least one `world.skills.effects.DamageEffect` among its parsed `effects`,
 **and** at least one member of `target_keys` belongs to the `battlefield` team opposing
-`battlefield.team_of(actor_key)`. `target_keys` SHALL be an iterable of concrete roster keys;
-resolving an approved AREA shorthand into concrete keys is the caller's responsibility, and a value
-that is not a concrete roster key SHALL simply fail to match the enemy team rather than raise.
-A `skill_key` absent from `SKILL_REGISTRY` SHALL return `False` without raising.
+`battlefield.team_of(actor_key)`.
 
 #### Scenario: A damage skill aimed at an enemy is the only true case
 - **WHEN** `commanded_damage_reaches_enemy()` is called for a skill whose effects include
@@ -217,6 +235,16 @@ A `skill_key` absent from `SKILL_REGISTRY` SHALL return `False` without raising.
 #### Scenario: An unknown skill key is false, not an error
 - **WHEN** the query is called with a `skill_key` that `SKILL_REGISTRY` does not contain
 - **THEN** it returns `False` and raises nothing
+
+#### Scenario: target_keys are concrete roster keys, never shorthand
+- **WHEN** the query receives `target_keys`
+- **THEN** they are an iterable of concrete roster keys; resolving an approved AREA shorthand into
+  concrete keys is the caller's responsibility, and a value that is not a concrete roster key simply
+  fails to match the enemy team rather than raising
+
+#### Scenario: An absent skill_key returns False without raising
+- **WHEN** the query is called with a `skill_key` absent from `SKILL_REGISTRY`
+- **THEN** it returns `False` without raising
 
 ### Requirement: The damage query is side-effect free, roll-free, and recomputable
 `commanded_damage_reaches_enemy()` SHALL NOT call `roll_d100()`, construct a `PendingEffect`, write

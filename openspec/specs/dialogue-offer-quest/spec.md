@@ -24,27 +24,10 @@ and retried within the budget rather than passed to the engine.
 ### Requirement: The offer_quest intent is verified against the registered guild offer surface
 
 The deterministic applier SHALL verify, before any write, that (1) the speaking NPC is an `NPC`
-carrying either the `GuildStaff` component with a `branch_key` or the `QuestIssuer` component,
-which is the sole authority for issuing a private commission; (2) the speaker's resolved issuer key
-has a registered issuance for `quest_key`; and (3) the eligibility rule of that issuer kind passes.
-For a `GuildStaff` speaker the issuance SHALL be a `GuildQuestOffer` registered at that branch
-(`get_guild_offer(quest_key, branch_key)`) and the player SHALL be a
-registered guild member whose canonical rank exists and is within the offer's quest rank band,
-using the same canonical eligibility check the guild board applies. For a `QuestIssuer` speaker the
-issuance SHALL be a registered private commission at that speaker's resolved issuer key, and the
-existence of that issuance SHALL be the whole eligibility rule — a private commission has no rank
-band, so no registration or rank gate applies and none SHALL be invented. A speaker carrying both
-components SHALL be resolved by the namespace of the issuance registered for `quest_key`; an
-ambiguous case where both kinds hold an issuance for the same key SHALL fail verification rather
-than choosing one. A speaker whose carried authority carries malformed identity data (an authored
-`issuer_key` that fails the shared issuer-key grammar, or a `branch_key` that does) SHALL fail
-verification rather than dispatching through the remaining authority.
-
-Any verification failure SHALL
-return `applied=False` with a documented reason, preserve the speech, and change no state. The AI
-SHALL NOT be able to assign a quest the speaker does not hold an issuance for, waive a registration
-or rank gate, choose the branch, the issuer, or the offer identity, or make an NPC carrying neither
-component issue anything.
+carrying either the `GuildStaff` component with a `branch_key` or the `QuestIssuer` component;
+(2) the speaker's resolved issuer key has a registered issuance for `quest_key`; and (3) the
+eligibility rule of that issuer kind passes. Any verification failure SHALL return
+`applied=False` with a documented reason, preserve the speech, and change no state.
 
 #### Scenario: A staff NPC of the registered branch can offer the quest
 - **WHEN** the speaking NPC is an `NPC` carrying `GuildStaff` with a branch at which `quest_key`
@@ -80,17 +63,46 @@ component issue anything.
 - **THEN** verification fails, the speech is preserved, and no state changes — the applier does not
   choose an issuer
 
+#### Scenario: QuestIssuer is the sole authority for private commissions
+- **WHEN** the speaker's component authority is interpreted
+- **THEN** the `QuestIssuer` component is the sole authority for issuing a private commission
+
+#### Scenario: GuildStaff eligibility is the board's canonical check
+- **WHEN** the speaker is a `GuildStaff` NPC
+- **THEN** the issuance SHALL be a `GuildQuestOffer` registered at that branch
+  (`get_guild_offer(quest_key, branch_key)`) and the player SHALL be a registered guild member
+  whose canonical rank exists and is within the offer's quest rank band, using the same canonical
+  eligibility check the guild board applies
+
+#### Scenario: Private-commission issuance existence is the whole eligibility rule
+- **WHEN** the speaker is a `QuestIssuer` NPC
+- **THEN** the issuance SHALL be a registered private commission at that speaker's resolved issuer
+  key, and its existence SHALL be the whole eligibility rule — a private commission has no rank
+  band, so no registration or rank gate applies and none SHALL be invented
+
+#### Scenario: A dual-component speaker resolves by issuance namespace
+- **WHEN** a speaker carries both components and only one kind holds an issuance for `quest_key`
+- **THEN** the speaker SHALL be resolved by the namespace of the issuance registered for
+  `quest_key`
+
+#### Scenario: Malformed authority identity fails verification
+- **WHEN** a speaker's carried authority has malformed identity data (an authored `issuer_key`
+  that fails the shared issuer-key grammar, or a `branch_key` that does)
+- **THEN** verification fails rather than dispatching through the remaining authority
+
+#### Scenario: The AI cannot bend the verification surface
+- **WHEN** the AI drives an `offer_quest` intent
+- **THEN** it SHALL NOT be able to assign a quest the speaker does not hold an issuance for, waive
+  a registration or rank gate, choose the branch, the issuer, or the offer identity, or make an
+  NPC carrying neither component issue anything
+
 ### Requirement: A verified offer_quest is assigned directly and atomically
 
 On successful verification, the applier SHALL delegate to the quest runtime's `accept_quest(
 player, quest_key)` and SHALL additionally call the sole affinity writer with the `guild` source
 (`apply_affinity_change(npc, player, "guild", 1)`), both inside one atomic transaction that
 snapshots the player's quest-log surface and the NPC's affinity record and restores them on any
-exception; the speech is the notification and there is no pending-offer step. The affinity write
-SHALL follow the sole writer's budget rules exactly as the board-acceptance path does: a
-budget-capped or capped-at-maximum write (applied amount 0) SHALL NOT roll back the quest, and the
-applier SHALL report the outcome accordingly. Duplicate-quest rejection SHALL be delegated to the
-quest runtime. The AI SHALL NOT create, mutate, or bypass quest records directly.
+exception; the speech is the notification and there is no pending-offer step.
 
 #### Scenario: A dialogue-assigned quest lands like a board-accepted one
 - **WHEN** the verified intent assigns `quest_key`, the quest runtime accepts it, and the affinity
@@ -108,6 +120,20 @@ quest runtime. The AI SHALL NOT create, mutate, or bypass quest records directly
 - **WHEN** the quest runtime rejects the acceptance (already-active quest, or any commit exception)
 - **THEN** the applier returns `applied=False`, the speech is preserved, the quest log and
   affinity record are restored to their prior state, and no affinity was granted
+
+#### Scenario: The affinity write obeys the sole writer's budget rules
+- **WHEN** the affinity write runs inside the atomic transaction
+- **THEN** it SHALL follow the sole writer's budget rules exactly as the board-acceptance path
+  does: a budget-capped or capped-at-maximum write (applied amount 0) SHALL NOT roll back the
+  quest, and the applier SHALL report the outcome accordingly
+
+#### Scenario: Duplicate rejection is delegated to the runtime
+- **WHEN** a duplicate quest acceptance is encountered
+- **THEN** duplicate-quest rejection SHALL be delegated to the quest runtime
+
+#### Scenario: The AI never touches quest records directly
+- **WHEN** the verified intent is applied
+- **THEN** the AI SHALL NOT create, mutate, or bypass quest records directly
 
 ### Requirement: A verified offer_quest names its issuance when assigning
 

@@ -60,42 +60,19 @@ and resolution and fails if either symbol appears in any of them.
 ### Requirement: disguised_stats keys are readable by exactly three consumers, including implemented guild registration
 The docstring of `get_display_value` and this specification SHALL name exactly three permitted call
 sites: appearance rendering (`look`), guild registration records, and appraisal items. Appearance
-rendering SHALL be implemented through the `look <target>` displayed-stats block, which SHALL call
-the accessor for the displayed combat five (`atk_phys`, `agility`, `defense`, `magic_power`, `hp`).
-Guild registration SHALL call the accessor once per documented trait key to persist a historical
-displayed-stat snapshot. Appraisal items MAY remain deferred. No other guild operation, including
-board eligibility, reward settlement, merit checks, examiner profile selection, combat, or
-promotion, SHALL call the accessor or read `disguised_stats`.
-
-This requirement bounds READERS. A CONSUMER is a module that surfaces or resolves a displayed stat
-value from the mapping for a player-facing view or a persisted record: the `look <target>`
-displayed-stats block and the guild-registration snapshot path, with the status read model
-(`world/rules/status_query.py`) being the status-side face of the same appearance-rendering
-consumer (master design D2 counts "look / the status read model" as that one consumer).
-Perception paths — the NPC-dialogue prompt injection and its no-leak secret set
-(`typeclasses/npcs.py` feeding `world/ai/npc_dialogue.py`) and the `status_disguise` cast event
-context (`commands/action.py`) — pass the mapping as opaque perceived-display material and never
-resolve a gameplay stat from it; they are not consumers and are unchanged by this requirement.
-
-Seeding the layer is a separate, bounded set of WRITERS: `world/imports/loader.py` (import
-records) and `world/rules/character_creation.py` (preset activation) SHALL be the only production
-modules that seed `entity.db.disguised_stats` from an authored declaration at entity
-construction, each never reading the mapping back to make a decision. The companion builder
-`world/rules/starting_companions.py` seeds each declared partner preset's own authored card
-during preset activation — the same construction-time seeding class, derived entirely from the
-partner's registry declaration and never read back. The runtime write for
-`status_disguise`, `world/rules/skill_effects.py::apply_disguise_effect`, is sanctioned and bound
-by the `skill-handler` capability's own requirement (it touches only the display layer).
-Snapshot/restore machinery (the activation, action, clock, and cast-settlement rollback surfaces)
-may re-assign the attribute to a previously recorded value; a restore carries its writer's value
-and authors none of its own. A writer SHALL NOT be counted as a consumer, and the
-forbidden-module list (`world/rules/combat.py`, `world/rules/dice.py`,
-`world/rules/targeting.py`) SHALL remain closed to both reads and writes.
+rendering SHALL be implemented through the `look <target>` displayed-stats block. Guild registration
+SHALL call the accessor once per documented trait key to persist a historical displayed-stat
+snapshot; appraisal items MAY remain deferred.
 
 #### Scenario: Accessor documentation still names exactly three consumers
 - **WHEN** `get_display_value`'s docstring is inspected
 - **THEN** it names appearance rendering (`look`), guild registration records, and appraisal items
   as the only permitted callers and states that combat, resolution, and damage must not call it
+
+#### Scenario: No other guild operation may read the disguise layer
+- **WHEN** any other guild operation runs — including board eligibility, reward settlement, merit
+  checks, examiner profile selection, combat, or promotion
+- **THEN** it SHALL NOT call the accessor or read `disguised_stats`
 
 #### Scenario: Appearance rendering and registration are the only implemented consumers
 - **WHEN** production (non-test) source modules are scanned for `get_display_value` or
@@ -116,22 +93,60 @@ forbidden-module list (`world/rules/combat.py`, `world/rules/dice.py`,
 - **WHEN** `world/rules/combat.py`, `world/rules/dice.py`, and `world/rules/targeting.py` are scanned
 - **THEN** none of them contains `disguised_stats` or `get_display_value`, unchanged by the creation-side writer
 
+#### Scenario: The requirement bounds readers, with a defined consumer
+- **WHEN** this requirement's scope is read
+- **THEN** it bounds READERS, and a CONSUMER is a module that surfaces or resolves a displayed stat
+  value from the mapping for a player-facing view or a persisted record: the `look <target>`
+  displayed-stats block and the guild-registration snapshot path, with the status read model
+  (`world/rules/status_query.py`) being the status-side face of the same appearance-rendering
+  consumer (master design D2 counts "look / the status read model" as that one consumer)
+
+#### Scenario: The look block calls the accessor for the combat five
+- **WHEN** the `look <target>` displayed-stats block renders stats
+- **THEN** it SHALL call the accessor for the displayed combat five (`atk_phys`, `agility`,
+  `defense`, `magic_power`, `hp`)
+
+#### Scenario: Perception paths are not consumers
+- **WHEN** the NPC-dialogue prompt injection and its no-leak secret set
+  (`typeclasses/npcs.py` feeding `world/ai/npc_dialogue.py`) and the `status_disguise` cast event
+  context (`commands/action.py`) pass the mapping
+- **THEN** they pass it as opaque perceived-display material and never resolve a gameplay stat from
+  it; they are not consumers and are unchanged by this requirement
+
+#### Scenario: Seeding writers are a separate bounded set
+- **WHEN** `entity.db.disguised_stats` is seeded from an authored declaration at entity construction
+- **THEN** `world/imports/loader.py` (import records) and `world/rules/character_creation.py`
+  (preset activation) SHALL be the only production modules that seed it, each never reading the
+  mapping back to make a decision
+
+#### Scenario: The companion builder seeds declared partner cards
+- **WHEN** preset activation runs the companion builder `world/rules/starting_companions.py`
+- **THEN** it seeds each declared partner preset's own authored card — the same construction-time
+  seeding class, derived entirely from the partner's registry declaration and never read back
+
+#### Scenario: The skill-handler runtime write is separately sanctioned
+- **WHEN** `status_disguise` writes at runtime via
+  `world/rules/skill_effects.py::apply_disguise_effect`
+- **THEN** that write is sanctioned and bound by the `skill-handler` capability's own requirement
+  (it touches only the display layer)
+
+#### Scenario: Restores re-assign but author nothing
+- **WHEN** snapshot/restore machinery (the activation, action, clock, and cast-settlement rollback
+  surfaces) re-assigns the attribute to a previously recorded value
+- **THEN** a restore carries its writer's value and authors none of its own
+
+#### Scenario: Writers are not consumers and the forbidden list stays closed
+- **WHEN** writers are counted against the consumer set
+- **THEN** a writer SHALL NOT be counted as a consumer, and the forbidden-module list
+  (`world/rules/combat.py`, `world/rules/dice.py`, `world/rules/targeting.py`) SHALL remain closed
+  to both reads and writes
+
 ### Requirement: The disguise layer records whether the veil verb placed it
 An entity carrying a disguise layer MAY also carry a PLACEMENT record: a boolean stating that the
-veil verb itself wrote the layer during play. A present, true record means the verb placed the veil;
-an ABSENT record means it did not, which covers every authored origin (an import record, preset
-activation, or the companion builder) and any entity seeded before the record existed. There is no
-false value to write and no third state.
-
-The record SHALL answer exactly one question — may the veil verb lift the veil it is cast over — and
-SHALL have exactly one reader, the verb's self-cast branch. No reveal path, display path, or
-combat path SHALL read it. It SHALL NOT encode how strong a veil is: this world admits one grade of
-veil, because only the bloodline-gated divine mystery can write one.
-
-The record SHALL be stored SEPARATELY from the display mapping, so the mapping's key set, its import
-schema and every sanctioned reader are unchanged and continue to see only trait-key overrides.
-Clearing the disguise layer SHALL clear the placement record in the same operation, and both SHALL be
-restored together when a resolution is rolled back.
+veil verb itself wrote the layer during play. The record SHALL answer exactly one question — may the
+veil verb lift the veil it is cast over — and SHALL have exactly one reader, the verb's self-cast
+branch. It SHALL be stored SEPARATELY from the display mapping, clearing with the layer and
+restoring with it on rollback.
 
 #### Scenario: A cast veil records its placement
 - **WHEN** the veil verb writes a veil onto an entity
@@ -163,23 +178,27 @@ restored together when a resolution is rolled back.
 - **THEN** the only reader is the veil verb's self-cast branch, and no reveal, display, or combat
   module appears
 
+#### Scenario: The record admits no false value and no third state
+- **WHEN** a placement record is written or read
+- **THEN** there is no false value to write and no third state: a present, true record means the
+  verb placed the veil and an absent record means it did not
+
+#### Scenario: The record encodes no veil strength
+- **WHEN** a placement record is interpreted
+- **THEN** it SHALL NOT encode how strong a veil is: this world admits one grade of veil, because
+  only the bloodline-gated divine mystery can write one
+
+#### Scenario: The display mapping contract is unchanged
+- **WHEN** the placement record is stored separately from the display mapping
+- **THEN** the mapping's key set, its import schema and every sanctioned reader are unchanged and
+  continue to see only trait-key overrides
+
 ### Requirement: Only an entity that can use divine arts may be seeded with a disguise layer
-A disguise layer SHALL exist only on an entity whose race declares that it can use divine arts. The
-veil verb is bloodline-gated, and nothing else in the game writes a disguise layer, so a veil on any
-other entity describes state the engine would refuse to produce.
-
-Every SEEDING boundary SHALL enforce this before the layer can be persisted: the lore-registry
-validation that admits authored preset cards, and the import validation that admits authored records.
-Enforcement SHALL fail closed — a race that does not resolve is treated as unable to use divine arts,
-so an unknown race cannot smuggle a veil past the check.
-
-The check SHALL read the race's declared divine-arts capability rather than inspecting skill
-ownership, so an entity is judged on whether its bloodline could ever place a veil, not on whether
-this particular declaration happens to list the veil skill.
-
-This requirement bounds the layer's WEARER. It does not change which values the layer may hold, who
-may read it, or which modules may write it; those remain governed by this capability's existing
-requirements.
+A disguise layer SHALL exist only on an entity whose race declares that it can use divine arts.
+Every SEEDING boundary SHALL enforce this before the layer can be persisted, and enforcement SHALL
+fail closed: a race that does not resolve is treated as unable to use divine arts. This requirement
+bounds the layer's WEARER; which values the layer may hold, who may read it, and which modules may
+write it remain governed by this capability's existing requirements.
 
 #### Scenario: An authored preset on a non-divine race may not declare a disguise layer
 - **WHEN** a preset card whose race cannot use divine arts declares a non-empty `disguised_stats`
@@ -205,3 +224,24 @@ requirements.
 - **WHEN** a preset card or a character record on a non-divine race declares an empty
   `disguised_stats`
 - **THEN** validation accepts it, because no layer is seeded
+
+#### Scenario: The seeding boundaries that enforce the rule
+- **WHEN** a disguise layer approaches persistence
+- **THEN** every SEEDING boundary enforces the rule first: the lore-registry validation that admits
+  authored preset cards, and the import validation that admits authored records
+
+#### Scenario: An unknown race cannot smuggle a veil
+- **WHEN** enforcement fails closed on a race that does not resolve
+- **THEN** that race is treated as unable to use divine arts, so an unknown race cannot smuggle a
+  veil past the check
+
+#### Scenario: The check reads declared capability, not skill ownership
+- **WHEN** the check judges an entity
+- **THEN** it SHALL read the race's declared divine-arts capability rather than inspecting skill
+  ownership, judging whether its bloodline could ever place a veil, not whether this particular
+  declaration happens to list the veil skill
+
+#### Scenario: A veil on a non-divine entity is state the engine refuses
+- **WHEN** one considers why the rule exists
+- **THEN** the veil verb is bloodline-gated, and nothing else in the game writes a disguise layer,
+  so a veil on any other entity describes state the engine would refuse to produce

@@ -19,18 +19,10 @@ unchanged.
 
 ### Requirement: Eight Tier 1/2/3/5 combat acts are registered, gated by hostile_act_count and/or climax_count and/or climax_extension_count thresholds
 `world/skills/sexual_acts/combat.py`'s `COMBAT_ACTS` tuple SHALL contain, in addition to
-`sexual-act-seeds`'s one seed row: two acts each declaring `unlock={"hostile_act_count": 5}`
-(`combat_tease_whisper`, `combat_tease_touch`); three acts each declaring
-`unlock={"hostile_act_count": 20}` (`combat_charm`, `combat_bind_caress`,
-`combat_forced_pleasure`); two acts each declaring the compound gate
-`unlock={"hostile_act_count": 40, "climax_count": 30}` (`combat_forced_climax`,
-`combat_relentless_torment`); and one act declaring the compound gate
-`unlock={"hostile_act_count": 80, "climax_extension_count": 30}` (`combat_climax_domination`).
+`sexual-act-seeds`'s one seed row, the eight tier-gated acts named in the scenarios below.
 Every one of these eight acts SHALL declare `resistible=True`,
 `actor_counters=("hostile_act_count",)`, and
-`participant_counters=("hostile_act_count",)`. A hostile sexual act happens
-between two bodies, and `hostile_act_count` records participation from
-either side.
+`participant_counters=("hostile_act_count",)`.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 4`
@@ -57,6 +49,26 @@ either side.
   `combat_tease_whisper` targeting hostile entity B at `hostile_act_count == 0`
 - **THEN** afterward `A.sexual.hostile_act_count` equals `6` and `B.sexual.hostile_act_count`
   equals `1`
+
+#### Scenario: The two Tier 1 acts share the hostile_act_count 5 gate
+- **WHEN** the Tier 1 acts `combat_tease_whisper` and `combat_tease_touch` are read from `COMBAT_ACTS`
+- **THEN** each declares `unlock={"hostile_act_count": 5}`
+
+#### Scenario: The three Tier 2 acts share the hostile_act_count 20 gate
+- **WHEN** the Tier 2 acts `combat_charm`, `combat_bind_caress`, and `combat_forced_pleasure` are read from `COMBAT_ACTS`
+- **THEN** each declares `unlock={"hostile_act_count": 20}`
+
+#### Scenario: The two Tier 3 acts share the hostile_act_count 40 + climax_count 30 gate
+- **WHEN** the Tier 3 acts `combat_forced_climax` and `combat_relentless_torment` are read from `COMBAT_ACTS`
+- **THEN** each declares the compound gate `unlock={"hostile_act_count": 40, "climax_count": 30}`
+
+#### Scenario: The single Tier 5 act carries the hostile_act_count 80 + climax_extension_count 30 gate
+- **WHEN** the Tier 5 act `combat_climax_domination` is read from `COMBAT_ACTS`
+- **THEN** it declares the compound gate `unlock={"hostile_act_count": 80, "climax_extension_count": 30}`
+
+#### Scenario: Counters credit both bodies of a hostile act
+- **WHEN** the counter declarations of the eight acts are examined
+- **THEN** `hostile_act_count` records participation from either side, because a hostile sexual act happens between two bodies
 
 ### Requirement: combat_forced_climax, combat_relentless_torment, and combat_climax_domination reliably clear the climax extension threshold
 `combat_forced_climax`, `combat_relentless_torment`, and `combat_climax_domination` SHALL each

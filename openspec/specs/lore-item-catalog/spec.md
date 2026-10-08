@@ -6,7 +6,7 @@ Holds the behavioral invariants that follow from an item's declared mechanical s
 ## Requirements
 
 ### Requirement: Retiring an item key leaves no dangling reference
-An item key that leaves the registry SHALL leave every surface that names items in the same change. Every loader, validator, and registry that can name an item key SHALL fail closed on a key the registry does not define — raising and naming the offending key and its owning surface — rather than skipping the reference, substituting a placeholder, or degrading to an unnamed item. This SHALL hold for shop offered keys and shop offers, equipment modifier bindings and equipment-effect entries, item-effect profiles, starting kits, character presets, and quest objectives and rewards alike, so that a half-completed removal is impossible to ship rather than merely discouraged.
+An item key that leaves the registry SHALL leave every surface that names items in the same change. Every loader, validator, and registry that can name an item key SHALL fail closed on a key the registry does not define rather than skipping the reference, substituting a placeholder, or degrading to an unnamed item, so that a half-completed removal is impossible to ship rather than merely discouraged.
 
 #### Scenario: A shop offer naming a retired key fails the catalog load
 - **WHEN** a shop's offered keys or offers name an item key the registry does not define
@@ -27,6 +27,14 @@ An item key that leaves the registry SHALL leave every surface that names items 
 #### Scenario: A completed retirement leaves the catalog closed
 - **WHEN** an item key is removed from the registry together with every reference to it
 - **THEN** startup succeeds, every loader closes with no unbound key and no orphaned entry, and no surface reports a missing item
+
+#### Scenario: The fail-closed error names the key and its owning surface
+- **WHEN** any loader, validator, or registry fails closed on an item key the registry does not define
+- **THEN** it raises naming the offending key and its owning surface
+
+#### Scenario: Every item-naming surface participates in the fail-closed check
+- **WHEN** shop offered keys and shop offers, equipment modifier bindings and equipment-effect entries, item-effect profiles, starting kits, character presets, or quest objectives and rewards name an undefined item key
+- **THEN** each such surface fails closed under the same rule — none is exempt
 
 ### Requirement: An item declaring no mechanics is inert
 An item that declares neither use mechanics nor an equipment slot SHALL be holdable, inspectable, and — when sellable and stocked — tradeable, and SHALL refuse every mechanical interaction with a stable named reason rather than a generic failure. Using such an item SHALL be refused for having no use mechanics; equipping it SHALL be refused for not being equipment. Neither refusal SHALL move a gauge, consume the item, or mutate inventory.

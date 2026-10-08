@@ -28,7 +28,7 @@ never modify traits, attributes beyond the single persona record, or the world c
   attribute, and the module's source contains no import of a state-mutating module
 
 ### Requirement: Flatten produces one bounded, labeled prompt block
-`PersonaStore.flatten(fields=("personality", "life_story", "habit"))` SHALL return a single string with one labeled section per present field in the declared field order (e.g. 性格：… / 人生經歷：… / 習慣：…, and 背景：… for a `background` field), each field string capped and the combined block capped at a total bound. A missing record, a non-mapping record, or a record with none of the requested fields renderable SHALL return `None` and never raise. The default field set (and therefore the default NPC dialogue injection path) remains the three prose fields; `background` is included only when explicitly requested. Rendering SHALL be tolerant of stored shapes: a non-empty string renders verbatim after capping; a Mapping renders as one `子鍵：值` line per renderable entry in declared-key order for known key groups (`identity` → public then hidden; `appearance` → height, weight, measurement, style, overview, attire, feature) with unrecognized sub-keys following, using the localized sub-key labels where defined and the raw key otherwise; a list or tuple renders as dash-prefixed item lines; deeper nesting stringifies as a final fallback; a value of any other shape (number, boolean, null) is skipped without raising. The structural keys SHALL carry localized labels — `identity` as 身分 (a Mapping rendering its public and hidden entries as 公開身分 and 隱秘身分 lines, a plain string rendering as a single 身分 section), `appearance` as 外觀, and `social_connection` as 人脈 with each entry keyed by its counterparty name — and every rendered section SHALL pass through the same per-field and whole-block caps as the prose fields. `PersonaStore` SHALL additionally expose a read-only `public_view()` returning a new store over a copy of the record in which a mapping-valued `identity` is rebuilt into an independent hidden-free snapshot: every `hidden`-keyed mapping entry is pruned at any depth, every nested container is freshly copied (so later mutation of the stored record cannot re-introduce hidden content), and cycle back-references are dropped from the copy (a string-valued `identity` and any non-mapping record pass through verbatim), so callers flatten a hidden-free view by construction without mutating or re-reading the stored record.
+`PersonaStore.flatten(fields=("personality", "life_story", "habit"))` SHALL return a single string with one labeled section per present field in the declared field order, each field string capped and the combined block capped at a total bound. A missing record, a non-mapping record, or a record with none of the requested fields renderable SHALL return `None` and never raise.
 
 #### Scenario: Three present fields flatten in declared order with labels
 - **WHEN** a record contains all three fields and `flatten()` is called with the default fields
@@ -78,6 +78,47 @@ never modify traits, attributes beyond the single persona record, or the world c
 - **WHEN** a record's `identity` nests a mapping or list below its `public` layer that itself holds a `hidden` entry, and the stored record's nested containers are mutated toward hidden keys after `public_view()` was taken
 - **THEN** no hidden-keyed value at any depth appears in the view's flattened block, the view output is unchanged by those later mutations, and cyclic containers degrade to a dropped branch instead of raising
 
+#### Scenario: Prose sections carry their localized labels
+- **WHEN** flatten renders present prose fields
+- **THEN** the sections are labeled 性格：… / 人生經歷：… / 習慣：…, and 背景：… for a `background` field
+
+#### Scenario: The default field set stays the three prose fields
+- **WHEN** the default field set is used (and therefore the default NPC dialogue injection path)
+- **THEN** it remains the three prose fields and `background` is included only when explicitly requested
+
+#### Scenario: Strings render verbatim after capping
+- **WHEN** a stored field value is a non-empty string
+- **THEN** it renders verbatim after capping
+
+#### Scenario: Mapping entries render in declared key order
+- **WHEN** a stored field value is a Mapping
+- **THEN** it renders as one `子鍵：值` line per renderable entry in declared-key order for known key
+  groups (`identity` → public then hidden; `appearance` → height, weight, measurement, style,
+  overview, attire, feature) with unrecognized sub-keys following, using the localized sub-key labels
+  where defined and the raw key otherwise
+
+#### Scenario: Deep nesting falls back to stringification
+- **WHEN** a stored value nests deeper than the mapping/list handling reaches
+- **THEN** it stringifies as a final fallback; a list or tuple renders as dash-prefixed item lines,
+  and a value of any other shape (number, boolean, null) is skipped without raising
+
+#### Scenario: Structural keys carry localized labels and share the caps
+- **WHEN** the structural keys render
+- **THEN** they carry localized labels — `identity` as 身分 (a Mapping rendering its public and
+  hidden entries as 公開身分 and 隱秘身分 lines, a plain string rendering as a single 身分 section),
+  `appearance` as 外觀, and `social_connection` as 人脈 with each entry keyed by its counterparty
+  name — and every rendered section passes through the same per-field and whole-block caps as the
+  prose fields
+
+#### Scenario: public_view rebuilds a hidden-free snapshot by copy
+- **WHEN** `public_view()` is called
+- **THEN** it returns a new read-only store over a copy of the record in which a mapping-valued
+  `identity` is rebuilt into an independent hidden-free snapshot: every `hidden`-keyed mapping entry
+  is pruned at any depth, every nested container is freshly copied (so later mutation of the stored
+  record cannot re-introduce hidden content), and cycle back-references are dropped from the copy
+  (a string-valued `identity` and any non-mapping record pass through verbatim), so callers flatten a
+  hidden-free view by construction without mutating or re-reading the stored record
+
 ### Requirement: LivingEntity.persona mounts the PersonaStore handler
 `LivingEntity.persona` SHALL be a `lazy_property` returning a `PersonaStore` instance, replacing
 the placeholder `AttributeProperty(default=None)`. Raw storage SHALL remain at `entity.db.persona`,
@@ -101,9 +142,7 @@ The in-game 「看」 surface (shared by the text command and the WebClient look
 living entity's flattened persona block (including the `背景：` section when the record carries a
 background) when the player looks at themself, at another player character, or at an NPC, using the
 same code path for all three. Looking at the room or at an object SHALL NOT append any persona
-block. A record without any of the rendered fields renders nothing, so entities without a persona
-(e.g. monsters) are unchanged; the displayed-stats block is
-unaffected.
+block.
 
 #### Scenario: Looking at yourself shows the persona block
 - **WHEN** an active character whose persona record has content uses 「看 自己」
@@ -122,6 +161,11 @@ unaffected.
 #### Scenario: Looking at the room or an object omits any persona block
 - **WHEN** the actor looks at the room or at an object
 - **THEN** no persona block is appended to those outputs
+
+#### Scenario: Persona-less entities and the stats block are unchanged
+- **WHEN** a looked-at entity's record lacks any of the rendered fields
+- **THEN** nothing renders, so entities without a persona (e.g. monsters) are unchanged, and the
+  displayed-stats block is unaffected
 
 ### Requirement: The speech_style field renders with its localized label
 `PersonaStore` flattening SHALL render a requested `speech_style` field with the localized label `說話風格：` under the same per-field and whole-block caps as every other field, and SHALL leave the default field set, the generic shape handling, the public view, and the truncation behavior for every other consumer unchanged.

@@ -8,7 +8,7 @@ Define the immutable, author-supplied NPC identity title: the single validator e
 
 ### Requirement: NPC titles are validated single-line plain text
 
-The deterministic core SHALL expose one validator, `world.rules.npc_identity.validate_npc_title(value)`, as the single place every NPC-title write path validates against. It SHALL first normalize the value by stripping surrounding whitespace (of any kind, U+3000 included), and every acceptance decision below SHALL be made on that stripped form, which it SHALL return. It SHALL accept only a `str` (a `bool` is not a `str` and is rejected) whose stripped form contains 1 to 32 code points. It SHALL reject, by raising, a non-`str` value, a stripped form that is empty, a stripped form longer than 32 code points, a stripped form containing any internal whitespace character — including the full-width space U+3000 that the composer reserves as its separator — a stripped form containing any control character, and a stripped form containing the Evennia markup delimiter `|`. Rejection messages SHALL be stable English identifiers carrying no player-facing prose.
+The deterministic core SHALL expose one validator, `world.rules.npc_identity.validate_npc_title(value)`, as the single place every NPC-title write path validates against. It SHALL first strip surrounding whitespace (of any kind, U+3000 included), decide acceptance on that stripped form, and return it. It SHALL accept only a `str` (a `bool` is not a `str` and is rejected) whose stripped form contains 1 to 32 code points, and SHALL reject every other value by raising.
 
 #### Scenario: A legal title round-trips stripped
 
@@ -30,9 +30,19 @@ The deterministic core SHALL expose one validator, `world.rules.npc_identity.val
 - **WHEN** `validate_npc_title` is called with `None`, an integer, a boolean, `""`, or `"   "`
 - **THEN** every one of them is rejected
 
+#### Scenario: The rejection classes are rejected by raising
+
+- **WHEN** `validate_npc_title` is called with a non-`str` value, a value whose stripped form is empty, a value whose stripped form is longer than 32 code points, or a value whose stripped form contains any internal whitespace character (including the full-width space U+3000 that the composer reserves as its separator), any control character, or the Evennia markup delimiter `|`
+- **THEN** every one of them is rejected by raising
+
+#### Scenario: Rejection messages are stable identifiers
+
+- **WHEN** any rejection is raised
+- **THEN** the message is a stable English identifier carrying no player-facing prose
+
 ### Requirement: The NPC title is a creation-time attribute with no runtime write surface
 
-The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `AttributeProperty` with the default `""`, materialized lazily (no storage row exists until a write path assigns one). The default is a storage default for entities no authored creation path produced (test fixtures, transient scaffolds) — a degraded state the composer renders as the plain name, NOT a supported production creation shape: every production NPC path (import loader, SceneBuilder occupants, registry-backed hosts and examiners) is fail-closed at its own author face, owned by the later changes in this batch, and the typeclass deliberately provides no create-time title parameter because title validation belongs to those authored paths. This capability SHALL NOT introduce any runtime write surface for it: no setter method, no helper that assigns it, no player or staff command, and no generative or dialogue-intent path SHALL be able to change an NPC's title after creation. The only writers SHALL be authored creation paths, which validate through `validate_npc_title` before assigning. The guarantee is the absence of a title-specific write API on this capability's surfaces; Evennia's generic attribute access (`entity.db.npc_title = ...`) remains framework infrastructure deliberately outside the claim — tests seed malformed stored state through it.
+The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `AttributeProperty` with the default `""`, materialized lazily (no storage row exists until a write path assigns one). This capability SHALL NOT introduce any runtime write surface: no setter, no assigning helper, no player or staff command, and no generative or dialogue-intent path SHALL change an NPC's title after creation. Only authored creation paths, validating through `validate_npc_title`, SHALL write it.
 
 #### Scenario: An untitled NPC is a degraded storage state, not a production path
 
@@ -45,9 +55,24 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 - **WHEN** the `NPC` typeclass surface and the registered command sets are inspected for a title write path
 - **THEN** no title setter, title-assigning helper, or title-changing command is present
 
+#### Scenario: The empty default is a storage default, not a production creation shape
+
+- **WHEN** the meaning of the `""` default is inspected
+- **THEN** it applies only to entities no authored creation path produced (test fixtures, transient scaffolds) — a degraded state the composer renders as the plain name, NOT a supported production creation shape — while every production NPC path (import loader, SceneBuilder occupants, registry-backed hosts and examiners) is fail-closed at its own author face, owned by the later changes in this batch
+
+#### Scenario: The typeclass provides no create-time title parameter
+
+- **WHEN** the `NPC` typeclass creation surface is inspected
+- **THEN** it deliberately provides no create-time title parameter, because title validation belongs to the authored paths
+
+#### Scenario: Generic attribute access stays framework infrastructure
+
+- **WHEN** the write-surface guarantee is scoped
+- **THEN** it is the absence of a title-specific write API on this capability's surfaces: Evennia's generic attribute access (`entity.db.npc_title = ...`) remains framework infrastructure deliberately outside the claim, and tests seed malformed stored state through it
+
 ### Requirement: A single deterministic composer renders the NPC full identity
 
-`world.rules.npc_identity` SHALL be the only place the NPC full identity is composed. `npc_title_value(entity)` SHALL return the entity's stored title as a `str`, and SHALL return `""` for an entity that is not an `NPC`, for a missing or empty title, for stored content that is not a non-empty string, for a stored string whose stripped form violates the validator's content rules (internal whitespace, control or non-printable characters, or the markup delimiter — such a row could never come from an authored path, and rendering it would put Evennia markup or a separator-ambiguous identity on screen), and for a title accessor that raises; a stored string that is content-legal but overlong SHALL still be returned, since length corruption is the documented degraded state the display bounds truncate rather than a render hazard. `npc_display_name(entity)` SHALL return `姓名` + U+3000 + `稱號` when both a renderable title and a readable plain key are present, the plain key when the title degrades, and `""` only when even the key is unreadable — never a separator-led composition. Both functions SHALL be pure reads that never write, never log, and never raise: malformed stored state SHALL degrade to the plain key so no presentation surface becomes unavailable over one title field, with accessor failure contained by narrow safe-read boundaries. The separator constant SHALL be held by this module itself and SHALL NOT be imported from the player title system, which this capability leaves entirely unchanged.
+`world.rules.npc_identity` SHALL be the only place the NPC full identity is composed. `npc_title_value(entity)` SHALL return the stored title as a `str`, or `""` for a non-`NPC` entity, a missing or empty title, stored content that is not a non-empty string, a stored string whose stripped form violates the validator's content rules, or a raising title accessor. `npc_display_name(entity)` SHALL return `姓名` + U+3000 + `稱號` when a renderable title and readable key are present, else the plain key.
 
 #### Scenario: A titled NPC composes with the full-width separator
 
@@ -74,9 +99,29 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 - **WHEN** `npc_display_name` is called for an entity whose `key` is missing, raises, or renders empty while a title is stored
 - **THEN** it returns `""` — never 「　稱號」 with a leading separator — and raises nothing
 
+#### Scenario: An overlong content-legal title is still returned
+
+- **WHEN** `npc_title_value` is called for a stored string that is content-legal but overlong
+- **THEN** it still returns that string, since length corruption is the documented degraded state the display bounds truncate rather than a render hazard
+
+#### Scenario: Malformed stored content is never rendered
+
+- **WHEN** the degrade of a stored string whose stripped form violates the validator's content rules is considered
+- **THEN** the content rules are internal whitespace, control or non-printable characters, or the markup delimiter; such a row could never come from an authored path, and rendering it would put Evennia markup or a separator-ambiguous identity on screen
+
+#### Scenario: Composition is a pure, contained read
+
+- **WHEN** `npc_title_value` and `npc_display_name` are called
+- **THEN** both are pure reads that never write, never log, and never raise: malformed stored state degrades to the plain key so no presentation surface becomes unavailable over one title field, with accessor failure contained by narrow safe-read boundaries
+
+#### Scenario: The separator constant is module-owned
+
+- **WHEN** the U+3000 separator constant's ownership is inspected
+- **THEN** it is held by `world.rules.npc_identity` itself and is not imported from the player title system, which this capability leaves entirely unchanged
+
 ### Requirement: Full identity appears only on opt-in text display surfaces
 
-`NPC.get_display_name` SHALL accept an opt-in `full_identity` keyword defaulting to false. With the flag absent or false, its return value SHALL be byte-identical to the pre-change plain-name output; with the flag true, it SHALL return `npc_display_name(self)`. Exactly two text surfaces SHALL pass the flag: the shared room character listing (`ObjectParent.get_display_characters`), and the look header of an NPC — the appearance-template name slot, so the text 「看 <目標>」 command, the `at_look` seam, and the webclient `explore.look` action stay identical to one another as the localized-appearance contract requires. Every other caller — movement, say, whisper, give and pickup echoes, the follow-lost notification, and combat text — SHALL NOT pass the flag and SHALL keep rendering the plain name. Passing the flag to a non-NPC character SHALL be accepted and SHALL render that entity's plain name.
+`NPC.get_display_name` SHALL accept an opt-in `full_identity` keyword defaulting to false. Flag absent or false: the return value SHALL be byte-identical to the pre-change plain-name output; flag true: it SHALL return `npc_display_name(self)`. Exactly two text surfaces SHALL pass the flag: the shared room character listing (`ObjectParent.get_display_characters`), and the look-header name slot of an NPC. Every other caller SHALL NOT pass the flag and SHALL render the plain name.
 
 #### Scenario: The room character listing shows the full identity
 
@@ -98,9 +143,24 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 - **WHEN** a room contains a player character and a monster alongside the titled NPC
 - **THEN** the 「人物」 line renders their plain keys and no separator or placeholder appears for them
 
+#### Scenario: The look header keeps every entry path identical
+
+- **WHEN** the look-header flag is traced through its entry paths
+- **THEN** the name slot is the appearance-template name slot, so the text 「看 <目標>」 command, the `at_look` seam, and the webclient `explore.look` action stay identical to one another as the localized-appearance contract requires
+
+#### Scenario: The non-flag caller set is enumerated
+
+- **WHEN** the callers that must not pass the flag are enumerated
+- **THEN** they are movement, say, whisper, give and pickup echoes, the follow-lost notification, and combat text, and every resulting message keeps rendering the plain name
+
+#### Scenario: A non-NPC character accepts the flag
+
+- **WHEN** the flag is passed to a non-NPC character
+- **THEN** it is accepted and renders that entity's plain name
+
 ### Requirement: The webclient exploration panel renders the NPC full identity on entity and interact rows
 
-The `exploration` panel SHALL source the `display_name` of its `look.entities` rows and its `interact` target rows from `npc_display_name`, so a titled NPC reads as 「姓名　稱號」 there. The room row, the `move` rows, and the `look.objects` rows SHALL keep their existing plain-key source. The panel's existing bounds SHALL NOT change: the composed identity is at most 97 code points (a key of at most 64, one separator, a title of at most 32), inside the 128-code-point display-name bound, and the rows SHALL keep their existing truncating (never raising) bounding behavior. The change SHALL NOT alter the panel schema version, field set, ordering, or availability rules.
+The `exploration` panel SHALL source the `display_name` of its `look.entities` rows and its `interact` target rows from `npc_display_name`, so a titled NPC reads as 「姓名　稱號」 there. The room row, the `move` rows, and the `look.objects` rows SHALL keep their existing plain-key source. The panel's existing bounds SHALL NOT change; the rows SHALL keep their truncating (never raising) bounding behavior. The change SHALL NOT alter the panel schema version, field set, ordering, or availability.
 
 #### Scenario: A titled NPC reads with its title on both row kinds
 
@@ -116,6 +176,11 @@ The `exploration` panel SHALL source the `display_name` of its `look.entities` r
 
 - **WHEN** the panel is built in a room with an untitled NPC and with an NPC whose stored title is malformed
 - **THEN** both rows carry the plain key, the panel is available, and the payload validates
+
+#### Scenario: The composed identity fits the existing display-name bound
+
+- **WHEN** the composed identity's size is checked against the panel's bounds
+- **THEN** it is at most 97 code points (a key of at most 64, one separator, a title of at most 32), inside the 128-code-point display-name bound, so the existing bounds need no change
 
 ### Requirement: Compact presentation rows keep the plain NPC name
 
@@ -175,7 +240,7 @@ This capability SHALL add the NPC title behavior without changing the requiremen
 
 ### Requirement: An imported character record carries a required authored title
 
-`CHARACTER_SCHEMA_V1` SHALL declare `title` as a required property typed `{"type": "string", "minLength": 1}` whose `description` states that the field is a required single-line plain-text NPC title and that its full rule set — the stripped 1-to-32-code-point bound included — is enforced by `world.rules.npc_identity.validate_npc_title`. The rule set SHALL NOT be duplicated in the schema as a `pattern` or a `maxLength` keyword: the bound applies to the validator's stripped form, and a raw `maxLength` would reject values the validator canonicalizes and accepts, splitting the single-validator contract. The semantic validation phase SHALL run `validate_npc_title` and SHALL convert its rejection into a record-level `Issue` naming the `title` field, so the single validator stays the only place the rule set exists; any value the validator accepts SHALL pass the structural phase. A record missing `title`, or whose `title` is not a string, is empty, whose stripped form exceeds the bound, or contains a whitespace character (including U+3000), a control character, or `|` SHALL be rejected. No compatibility layer, alternative schema version, or migration SHALL be introduced for the added field.
+`CHARACTER_SCHEMA_V1` SHALL declare `title` as a required property typed `{"type": "string", "minLength": 1}` whose `description` states that the field is a required single-line plain-text NPC title whose full rule set is enforced by `world.rules.npc_identity.validate_npc_title`. The semantic validation phase SHALL run `validate_npc_title` and SHALL convert its rejection into a record-level `Issue` naming the `title` field, so the single validator stays the only place the rule set exists.
 
 #### Scenario: A record without a title is rejected naming the field
 
@@ -207,9 +272,34 @@ This capability SHALL add the NPC title behavior without changing the requiremen
 - **WHEN** `CHARACTER_SCHEMA_V1` is inspected
 - **THEN** `title` appears in the required list, its property carries only `type`/`minLength` plus a description naming the shared validator and its code-point bound, the property definition carries neither `pattern` nor `maxLength`, and the schema's own document-title keyword still reads `"CHARACTER_SCHEMA_V1"`
 
+#### Scenario: The description carries the full rule set pointer
+
+- **WHEN** the `title` property's `description` is read
+- **THEN** it states that the field is a required single-line plain-text NPC title and that its full rule set — the stripped 1-to-32-code-point bound included — is enforced by `world.rules.npc_identity.validate_npc_title`
+
+#### Scenario: The rule set is not duplicated in the schema
+
+- **WHEN** the `title` property definition is considered
+- **THEN** the rule set is not duplicated as a `pattern` or a `maxLength` keyword: the bound applies to the validator's stripped form, and a raw `maxLength` would reject values the validator canonicalizes and accepts, splitting the single-validator contract
+
+#### Scenario: Any validator-accepted value passes the structural phase
+
+- **WHEN** any value that `validate_npc_title` accepts is submitted as a record's `title`
+- **THEN** the structural phase produces no issue for it
+
+#### Scenario: The rejection set is enumerated
+
+- **WHEN** a record is missing `title`, or its `title` is not a string, is empty, has a stripped form exceeding the bound, or contains a whitespace character (including U+3000), a control character, or `|`
+- **THEN** the record is rejected
+
+#### Scenario: No compatibility layer or migration is added
+
+- **WHEN** the rollout of the added field is considered
+- **THEN** no compatibility layer, alternative schema version, or migration is introduced for it
+
 ### Requirement: The import loader persists the validated title on NPC entities only
 
-`world/imports/loader.py` SHALL assign the title during instantiation as the return value of `validate_npc_title(record["title"])` — the stripped canonical form — so the creation point is fail-closed even when reached with an unvalidated record. The assignment SHALL happen only when the constructed entity is an `NPC` (or an `NPC` subclass), because `npc_title` is declared as an `AttributeProperty` on `NPC` alone and assigning it on another typeclass would create a non-persistent instance attribute. A character record imported as a `PlayerCharacter` SHALL still be required to carry a valid `title`, and that title SHALL NOT be persisted anywhere on the constructed player character. The assignment SHALL run inside the existing all-or-nothing transaction, so a batch that fails afterwards persists no title.
+`world/imports/loader.py` SHALL assign the title during instantiation as the return value of `validate_npc_title(record["title"])` — the stripped canonical form — so the creation point is fail-closed even when reached with an unvalidated record. The assignment SHALL happen only when the constructed entity is an `NPC` (or an `NPC` subclass). The assignment SHALL run inside the existing all-or-nothing transaction, so a batch that fails afterwards persists no title.
 
 #### Scenario: An imported NPC reads back its authored title
 
@@ -231,9 +321,19 @@ This capability SHALL add the NPC title behavior without changing the requiremen
 - **WHEN** a batch's second record fails validation, or construction of a later entity raises
 - **THEN** no entity from that batch exists and no `npc_title` was persisted for any of them
 
+#### Scenario: A player-character title is persisted nowhere
+
+- **WHEN** a character record is imported as a `PlayerCharacter`
+- **THEN** the title is not persisted anywhere on the constructed player character
+
+#### Scenario: The NPC-only assignment is required by the property declaration
+
+- **WHEN** the reason for the NPC-only assignment is inspected
+- **THEN** `npc_title` is declared as an `AttributeProperty` on `NPC` alone, and assigning it on another typeclass would create a non-persistent instance attribute
+
 ### Requirement: The import face rejects a name already used by an existing NPC
 
-The author-supplied name at the import face is the record's `key` — the value the loader passes to `create_object` and the value every display surface composes with the title. `world/imports/loader.py` SHALL, before constructing anything and inside the same transaction, reject a batch containing a record whose `key` equals the key of an already-persisted `NPC` (including any `NPC` subclass such as `LLMNPC`). The rejection SHALL fail the whole batch with zero entities persisted, SHALL attach a record-level diagnostic naming the `key` field on the offending record, and SHALL be carried by the existing `ImportRejected` report shape. The loader SHALL NOT reuse the existing entity, rename the incoming record, or overwrite any field of the existing NPC. This gate SHALL apply regardless of the target typeclass of the import. A key that collides with a persisted player character, monster, room, or object SHALL NOT be rejected by this gate, which enforces NPC-name uniqueness only. The existing batch-internal duplicate-key rejection SHALL be unchanged and SHALL compose with this gate.
+The author-supplied name at the import face is the record's `key` — the value the loader passes to `create_object` and the value every display surface composes with the title. `world/imports/loader.py` SHALL, before constructing anything and inside the same transaction, reject a batch whose record `key` equals the key of an already-persisted `NPC` (including subclasses such as `LLMNPC`), failing the whole batch with zero entities persisted and a `key` diagnostic on the offending record.
 
 #### Scenario: A record colliding with an existing NPC fails the whole batch
 
@@ -265,9 +365,29 @@ The author-supplied name at the import face is the record's `key` — the value 
 - **WHEN** a batch contains two records sharing one key that no existing NPC uses
 - **THEN** the existing batch-internal duplicate-key rejection fails the batch, unchanged by this gate
 
+#### Scenario: The loader never reuses, renames, or overwrites
+
+- **WHEN** a record collides with an already-persisted `NPC`
+- **THEN** the loader does not reuse the existing entity, rename the incoming record, or overwrite any field of the existing NPC
+
+#### Scenario: The gate applies regardless of the target typeclass
+
+- **WHEN** a colliding batch is loaded under any target typeclass
+- **THEN** the gate rejects it, regardless of the target typeclass of the import
+
+#### Scenario: The gate enforces NPC-name uniqueness only
+
+- **WHEN** a record key collides with a persisted player character, monster, room, or object
+- **THEN** it is not rejected by this gate, which enforces NPC-name uniqueness only
+
+#### Scenario: The rejection rides the existing report shape
+
+- **WHEN** the collision rejection is reported
+- **THEN** the record-level diagnostic naming the `key` field is carried by the existing `ImportRejected` report shape
+
 ### Requirement: The offline validation CLI stays a file-scope check with no database access
 
-`world/imports/validate.py` SHALL remain free of any database access: it validates record files structurally, semantically, and for batch-internal key uniqueness only. The existing-NPC name gate SHALL live at the load boundary, not in the CLI, and its absence from the CLI SHALL NOT be reported as a degraded check — the CLI's file scope is a defined boundary, not a degraded one, and the degraded-validation banner keeps naming only genuinely unavailable checks. The division SHALL be documented in the GM import documentation.
+`world/imports/validate.py` SHALL remain free of any database access: it validates record files structurally, semantically, and for batch-internal key uniqueness only. The existing-NPC name gate SHALL live at the load boundary, not in the CLI, and its absence from the CLI SHALL NOT be reported as a degraded check — the CLI's file scope is a defined boundary, not a degraded one. The division SHALL be documented in the GM import documentation.
 
 #### Scenario: The CLI validates a colliding record file cleanly
 
@@ -284,9 +404,14 @@ The author-supplied name at the import face is the record's `key` — the value 
 - **WHEN** any batch is validated through the CLI
 - **THEN** the degraded-check list is unchanged by this capability, and no banner claims the existing-name check is degraded
 
+#### Scenario: The degraded banner names only genuinely unavailable checks
+
+- **WHEN** the degraded-validation banner is rendered
+- **THEN** it keeps naming only genuinely unavailable checks
+
 ### Requirement: The reference card and the GM import documentation carry the title field
 
-`world/imports/examples/example_character.json` SHALL carry a valid `title` and SHALL keep producing zero rejections and zero warnings. `docs/gm/characters.md` SHALL document `title` in its required-field table, SHALL set it in the inline example record, SHALL state that the field takes effect only for NPC imports, SHALL state that the NPC's displayed name comes from `key` (not from the inert `display_name` field), and SHALL state that the CLI does not check names against already-persisted NPCs while `load_batch()` does. The player-facing command documentation SHALL NOT change, because this capability adds no command surface.
+`world/imports/examples/example_character.json` SHALL carry a valid `title` and SHALL keep producing zero rejections and zero warnings. `docs/gm/characters.md` SHALL document `title` in its required-field table, SHALL set it in the inline example record, and SHALL state that the field takes effect only for NPC imports. The player-facing command documentation SHALL NOT change, because this capability adds no command surface.
 
 #### Scenario: The reference card stays clean under the new required field
 
@@ -303,9 +428,14 @@ The author-supplied name at the import face is the record's `key` — the value 
 - **WHEN** `docs/game/commands.md` and `docs/game/command-reference.md` are compared against their pre-change content
 - **THEN** they are unchanged, and the command-documentation test stays green
 
+#### Scenario: The GM documentation names `key` as the displayed-name source
+
+- **WHEN** `docs/gm/characters.md` is read
+- **THEN** it states that the NPC's displayed name comes from `key` (not from the inert `display_name` field), and that the CLI does not check names against already-persisted NPCs while `load_batch()` does
+
 ### Requirement: The import boundary emits commit and rejection events
 
-`world/imports/loader.py` SHALL emit boundary events through the `world.observability` facade: an info event when a batch commits, and a warn event when a batch is rejected, at every rejection site, carrying a reason code that distinguishes a validation rejection from an existing-NPC name rejection. Every call SHALL pass a `context` mapping carrying batch-level identifiers (record counts, the target typeclass name, the reason code) and SHALL NOT carry player-facing prose or title text. The event identifiers SHALL be stable English snake_case. `world/imports/validate.py` SHALL NOT import the facade, so its existing exception-to-diagnostic blocks stay outside the exception-hygiene rule's adopter scope.
+`world/imports/loader.py` SHALL emit boundary events through the `world.observability` facade: an info event when a batch commits, and a warn event when a batch is rejected, at every rejection site, carrying a reason code that distinguishes a validation rejection from an existing-NPC name rejection. Every call SHALL pass a `context` mapping carrying batch-level identifiers and SHALL NOT carry player-facing prose or title text. The event identifiers SHALL be stable English snake_case.
 
 #### Scenario: A committed batch leaves a trace
 
@@ -322,9 +452,19 @@ The author-supplied name at the import face is the record's `key` — the value 
 - **WHEN** the observability lint runs after this change
 - **THEN** it exits zero, the loader's calls all carry a non-empty `context`, and the freeze list is still empty
 
+#### Scenario: The context identifiers are enumerated
+
+- **WHEN** a loader event's `context` mapping is inspected
+- **THEN** it carries batch-level identifiers — record counts, the target typeclass name, the reason code
+
+#### Scenario: The validation CLI stays outside the facade
+
+- **WHEN** `world/imports/validate.py` is inspected
+- **THEN** it does not import the observability facade, so its existing exception-to-diagnostic blocks stay outside the exception-hygiene rule's adopter scope
+
 ### Requirement: The existing import contracts are unchanged by the added title field
 
-This capability SHALL add the import-side title behavior without changing the requirement text of `import-schema`, `import-validation`, `import-loader`, or `import-reference-example`: the record-type discriminator, the age gate, the entity-key character-set and digit-only reservation, the base-value stats convention, the opaque persona, the sexual-baseline vocabulary, the batch all-or-nothing semantics, the degraded-validation banner, the verbatim seam storage, and the `typeclass` parameter all keep their current contracts. The only structural difference is one more required property and one more semantic check.
+The added import-side title behavior SHALL NOT change the requirement text of `import-schema`, `import-validation`, `import-loader`, or `import-reference-example`: the record-type discriminator, the age gate, the entity-key charset and digit-only reservation, the base-value stats convention, the opaque persona, the sexual-baseline vocabulary, the batch all-or-nothing semantics, the degraded-validation banner, the verbatim seam storage, and the `typeclass` parameter keep their current contracts.
 
 #### Scenario: Every pre-existing rejection reason still rejects
 
@@ -336,16 +476,18 @@ This capability SHALL add the import-side title behavior without changing the re
 - **WHEN** the reference record — now carrying a `title` — is instantiated
 - **THEN** its traits, persona, sexual baseline, skills, equipment, inventory, affinity elements, ages, and portrait policy are byte-identical to their pre-change values
 
+#### Scenario: The title field is the only structural difference
+
+- **WHEN** the import contracts are compared against their pre-change state
+- **THEN** the only structural difference is one more required property and one more semantic check
+
 ### Requirement: Blueprint scene occupants spawn under the authored name with the authored title
 The SceneBuilder SHALL spawn every stage occupant whose `key` is the entry's authored
 `display_name` in the shared name validator's normalized (stripped) form, and SHALL persist the
-entry's authored `title` in the shared title validator's normalized form as the NPC title; the
-`db.display_name` write SHALL carry the same normalized name. The existing
-`db.display_name` write SHALL be preserved so the portrait-subject reader keeps reading the same
-value. If any occupant lacks a characterization, its `display_name`, or its `title` at spawn time,
+entry's authored `title` in the shared title validator's normalized form as the NPC title.
+If any occupant lacks a characterization, its `display_name`, or its `title` at spawn time,
 the SceneBuilder SHALL raise `SceneBuilderSpawnError` and roll back the whole materialization
-before creating any room or entity — a missing authored identity fails closed exactly like the
-existing age-bounds revalidation does.
+before creating any room or entity.
 
 #### Scenario: A materialized occupant answers to its authored name
 - **WHEN** a compiled stage with `npc_req: [{"role": "bandit", "tier": "bandit", "display_name": "黑鬍", "title": "林間盜匪頭目", ...}]` materializes
@@ -367,13 +509,15 @@ existing age-bounds revalidation does.
 - **WHEN** an occupant spawns under its authored name
 - **THEN** `db.display_name` still carries the same authored value for the art-subject consumer
 
+#### Scenario: A missing authored identity fails closed like age-bounds revalidation
+
+- **WHEN** a missing authored identity is compared to the existing age-bounds revalidation
+- **THEN** it fails closed exactly like the existing age-bounds revalidation does
+
 ### Requirement: The blueprint author face enforces occupant name uniqueness
 Any two `npc_req` entries within one blueprint — in the same stage or across stages — SHALL NOT
-declare the same `display_name`. Because the authored name becomes the spawned occupant's `key`
-and each quest materialization spawns fresh occupants with no cross-stage identity reuse, even an
-identical-characterization duplicate could live as two same-`key` entities, so the name rule is
-blueprint-wide uniqueness, stricter than the existing shared-`stable_key` agreement rule it is
-implemented alongside.
+declare the same `display_name`. The name rule is blueprint-wide uniqueness, stricter than the
+existing shared-`stable_key` agreement rule it is implemented alongside.
 
 #### Scenario: Same-stage duplicate names are rejected
 - **WHEN** one stage declares two `npc_req` entries whose `display_name` values are identical
@@ -386,15 +530,19 @@ implemented alongside.
   whole blueprint; shared portrait identity remains the mechanism for one character appearing in
   multiple scenes
 
+#### Scenario: Fresh spawns make any duplicate a same-key hazard
+
+- **WHEN** the reason for blueprint-wide uniqueness is inspected
+- **THEN** the authored name becomes the spawned occupant's `key` and each quest materialization
+  spawns fresh occupants with no cross-stage identity reuse, so even an identical-characterization
+  duplicate could live as two same-`key` entities
+
 ### Requirement: Shop and guild registries author host and examiner identities validated at load
 `ShopDefinition` and `GuildBranch` SHALL each carry required `host_name` and `host_title` fields,
 and `GuildRank` SHALL carry required `examiner_name` and `examiner_title` fields, all declared
 without defaults so a missing column is a module-import `TypeError`. The lore modules owning
 these registries SHALL validate every row's authored names and titles through the shared name and
-title validators at module load time (invalid values raise named `ValueError`s), and SHALL check
-that authored NPC names do not repeat across the shop, guild-branch, and guild-rank registries.
-The row validators SHALL be pure functions callable with explicit rows so violations are testable
-without mutating the shipped registries.
+title validators at module load time (invalid values raise named `ValueError`s).
 
 #### Scenario: A row with an invalid authored title fails module load
 - **WHEN** the pure row validator is called with a registry row whose authored title violates the
@@ -410,20 +558,24 @@ without mutating the shipped registries.
 - **WHEN** `world.lore.settlements.shops` and `world.lore.guild` are imported
 - **THEN** every shipped row passes name, title, and cross-registry uniqueness validation
 
+#### Scenario: The lore modules check cross-registry name uniqueness at load
+
+- **WHEN** the lore modules owning the registries load
+- **THEN** they check that authored NPC names do not repeat across the shop, guild-branch, and
+  guild-rank registries
+
+#### Scenario: The row validators are pure and explicitly callable
+
+- **WHEN** the row validators' shape is inspected
+- **THEN** they are pure functions callable with explicit rows, so violations are testable
+  without mutating the shipped registries
+
 ### Requirement: Guild service hosts reuse by service anchor and never rename
 `sync_guild_economy` SHALL locate a service host by the `service_id` recorded on its service
 component — never by display `key`. A missing host SHALL be created once under the roster row's
 authored `name` as its `key` with the authored `title` persisted as its NPC title. An existing
 host located by its service anchor SHALL never be renamed and SHALL never have its title written
 at sync time — a host that predates authored identities is reused as-is, never backfilled.
-Roster-authoritative convergence replaces the batch's one-time legacy-key cleanup as the
-deletion mechanism: deletion anchors on roster membership of the component `service_id`, never
-the entity key. A titleless candidate whose service anchors all match no roster row is
-unambiguous stale development state and SHALL be deleted so the roster pass recreates it under
-the full authored identity when its row returns; an NPC carrying no service component SHALL
-survive untouched, and a titled candidate that still holds at least one roster-matching anchor
-SHALL be kept with a named warning for manual repair. Locating an anchor claimed by more than
-one live host SHALL fail closed with a named integrity error before any mutation.
 
 #### Scenario: First sync creates the authored host
 - **WHEN** `sync_guild_economy` runs with no existing host for a service component
@@ -449,6 +601,30 @@ one live host SHALL fail closed with a named integrity error before any mutation
 #### Scenario: Duplicate service anchors fail closed
 - **WHEN** two live NPCs carry service components with the same `service_id` and sync runs
 - **THEN** a named integrity error is raised and no host is created, renamed, or deleted
+
+#### Scenario: Anchor contention fails closed before any mutation
+
+- **WHEN** sync locates a service anchor claimed by more than one live host
+- **THEN** it fails closed with a named integrity error before any mutation
+
+#### Scenario: Convergence replaces the legacy-key cleanup as the deletion mechanism
+
+- **WHEN** the deletion mechanism for stale hosts is considered
+- **THEN** roster-authoritative convergence replaces the batch's one-time legacy-key cleanup:
+  deletion anchors on roster membership of the component `service_id`, never the entity key
+
+#### Scenario: A stale titleless candidate is deleted for recreation
+
+- **WHEN** a titleless candidate's service anchors all match no roster row
+- **THEN** it is unambiguous stale development state and is deleted, so the roster pass recreates
+  it under the full authored identity when its row returns
+
+#### Scenario: Component-less NPCs survive and anchored titled candidates are kept
+
+- **WHEN** an NPC carrying no service component exists, and separately when a titled candidate
+  still holds at least one roster-matching anchor
+- **THEN** the component-less NPC survives untouched, and the titled candidate is kept with a
+  named warning for manual repair
 
 ### Requirement: Exam examiners carry their authored identity
 The examination opponent spawn SHALL use the rank's authored `examiner_name` and SHALL persist the

@@ -5,7 +5,7 @@ Defines the guarded generative call pipeline that validates output, retries with
 ## Requirements
 
 ### Requirement: Guarded generative calls validate, retry, then degrade
-`world/ai/guardrail.py` SHALL provide a guarded-call pipeline with three ordered stages matching design §7.5: local jsonschema validation of the returned text against the call's declared output schema, semantic validation through pluggable validator hooks, and a bounded retry loop that appends the validation error message to the prompt and retries. When the retry budget is exhausted, the pipeline SHALL return the layer's registered degrade fallback rather than raising or returning invalid output. The retry budget SHALL be interpreted as `1 + max_retries` total calls: the initial attempt plus up to `max_retries` retries, and each retry SHALL append that round's complete validation error list while leaving the original messages unchanged.
+`world/ai/guardrail.py` SHALL provide a guarded-call pipeline with three ordered stages matching design §7.5: local jsonschema validation of the returned text against the call's declared output schema, semantic validation through pluggable validator hooks, and a bounded retry loop. When the retry budget is exhausted, the pipeline SHALL return the layer's registered degrade fallback rather than raising or returning invalid output.
 
 #### Scenario: A schema-valid response is accepted on the first attempt
 - **WHEN** the endpoint returns text that satisfies both the declared jsonschema and every semantic validator
@@ -18,6 +18,16 @@ Defines the guarded generative call pipeline that validates output, retries with
 #### Scenario: Exhausted retries degrade to the layer fallback
 - **WHEN** every retry attempt returns output that still fails validation
 - **THEN** the pipeline returns the layer's registered degrade fallback and the deterministic game continues unaffected
+
+#### Scenario: The retry budget is 1 + max_retries total calls
+- **WHEN** the retry budget is interpreted
+- **THEN** it means the initial attempt plus up to `max_retries` retries — `1 + max_retries` total
+  calls
+
+#### Scenario: Retries append the round's errors without touching originals
+- **WHEN** a retry is issued after a validation failure
+- **THEN** it appends that round's complete validation error list to the prompt while leaving the
+  original messages unchanged
 
 ### Requirement: Semantic validators are pluggable and layer-scoped
 Semantic validation SHALL be supplied as hook functions registered per layer, each receiving the parsed output and returning either an empty error list or a list of specific error messages. The pipeline SHALL run every registered semantic validator for the governing layer in a stable order and SHALL treat any non-empty error list as a validation failure. Later changes add their layer-specific rank, reward, archetype, and whitelist validators without modifying the pipeline.
@@ -46,7 +56,7 @@ A client-level failure (connection error, timeout, HTTP error, or an unparseable
 - **THEN** the pipeline's outcome is indistinguishable from degradation: the caller receives the fallback, no invalid output escapes, and no game state changes
 
 ### Requirement: Structured-output hints are passed per call
-The guarded pipeline SHALL accept a layer-neutral per-call request descriptor containing the chat messages, an optional output jsonschema, and an optional schema identifier, and SHALL forward that descriptor to the client so the client can build a `response_format` hint exactly when the profile's `supports_response_format` flag is true. When the flag is false, the client SHALL omit `response_format` entirely and still complete as an ordinary chat completion. Layer-specific schemas remain owned by later changes; this capability defines only the transmission contract.
+The guarded pipeline SHALL accept a layer-neutral per-call request descriptor containing the chat messages, an optional output jsonschema, and an optional schema identifier, and SHALL forward that descriptor to the client so the client can build a `response_format` hint exactly when the profile's `supports_response_format` flag is true.
 
 #### Scenario: A capable profile requests structured output
 - **WHEN** a guarded call runs under a profile with `supports_response_format: true` and a per-call descriptor that declares an output schema
@@ -55,3 +65,8 @@ The guarded pipeline SHALL accept a layer-neutral per-call request descriptor co
 #### Scenario: An incapable profile never sends the hint
 - **WHEN** a guarded call runs under a profile with `supports_response_format: false`
 - **THEN** the request body contains no `response_format` field and still completes as an ordinary chat completion
+
+#### Scenario: The capability defines only the transmission contract
+- **WHEN** layer-specific schemas are considered
+- **THEN** they remain owned by later changes; this capability defines only the transmission
+  contract

@@ -10,9 +10,7 @@ than silently missing content.
 The six 神之秘法 family skills (`divine_sexual_mastery`, `divine_sexual_arts`, and the four
 unmechanized mysteries) SHALL declare `SkillDef.requires_divine_arts=True` and be ownable/castable
 only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. Skills without the marker
-(including the generic `sexual_event` mechanism) SHALL NOT be race-gated by this change. This
-change SHALL NOT modify `can_use_divine_arts` itself or its existing per-race values — it only adds
-consumers gated by the already-landed field.
+(including the generic `sexual_event` mechanism) SHALL NOT be race-gated by this change.
 
 #### Scenario: A non-elf cannot cast a Divine Mystery skill even if granted ownership
 - **WHEN** a `human` or `beastfolk` entity somehow owns `divine_sexual_arts`
@@ -30,19 +28,16 @@ consumers gated by the already-landed field.
 - **THEN** `_step1_divine_arts_gate` rejects the cast before any resist contest runs, exactly as for
   the `divine.py` acts
 
+#### Scenario: The change adds only consumers of the existing field
+- **WHEN** this change lands
+- **THEN** it SHALL NOT modify `can_use_divine_arts` itself or its existing per-race values — it only
+  adds consumers gated by the already-landed field
+
 ### Requirement: Divine Mystery practice accrues at most once per world-calendar day
 Resolution practice accrual for an ACTIVE skill whose `SkillCategory` is `DIVINE_MYSTERY` SHALL be
 claimed per actor, per skill, per world-calendar day: the first use-driven accrual of a calendar day
 awards normally and every further use-driven accrual of that same skill on that same day SHALL award
-nothing and report that nothing was claimed. The cadence governs the use-driven resolution pathway
-only; declared booked practice (`grant_study_practice_xp`) is not a use and accrues exactly as it
-does today. The calendar day SHALL be derived from the world clock's own calendar constants, never
-from wall-clock time. The claim SHALL be scoped by skill category only; a skill that declares
-`requires_divine_arts` but is NOT in the `DIVINE_MYSTERY` category SHALL accrue exactly as it does
-today. The claim SHALL be persisted on the actor and SHALL be restored together with the actor's
-proficiency when a resolution is rolled back, so a failed commit never consumes a day. The cadence
-SHALL be evaluated before the per-world-clock-tick dedupe claim, so a day-blocked use takes no tick
-claim.
+nothing and report that nothing was claimed.
 
 #### Scenario: A second use of the same mystery on the same day accrues nothing
 - **WHEN** an actor successfully resolves the same `DIVINE_MYSTERY` skill twice on the same
@@ -73,13 +68,35 @@ claim.
 - **WHEN** a `DIVINE_MYSTERY` accrual is refused because the day is already claimed
 - **THEN** no `(actor, skill, target)` entry for that call appears in the per-tick dedupe claim set
 
+#### Scenario: Booked practice is not a use
+- **WHEN** declared booked practice (`grant_study_practice_xp`) runs for a `DIVINE_MYSTERY` skill
+- **THEN** it is not a use-driven accrual and accrues exactly as it does today; the cadence governs
+  the use-driven resolution pathway only
+
+#### Scenario: The calendar day comes from the world clock
+- **WHEN** the cadence derives the current calendar day
+- **THEN** the day SHALL be derived from the world clock's own calendar constants, never from
+  wall-clock time
+
+#### Scenario: The claim scopes to skill category only
+- **WHEN** the cadence's claim scope is set
+- **THEN** it SHALL be scoped by skill category only: a skill that declares `requires_divine_arts`
+  but is NOT in the `DIVINE_MYSTERY` category SHALL accrue exactly as it does today
+
+#### Scenario: The claim persists with the actor and unwinds on rollback
+- **WHEN** a `DIVINE_MYSTERY` resolution's claim is taken and later rolled back
+- **THEN** the claim SHALL be persisted on the actor and SHALL be restored together with the actor's
+  proficiency when a resolution is rolled back, so a failed commit never consumes a day
+
+#### Scenario: The cadence precedes the tick dedupe claim
+- **WHEN** a use-driven accrual is evaluated
+- **THEN** the cadence SHALL be evaluated before the per-world-clock-tick dedupe claim, so a
+  day-blocked use takes no tick claim
+
 ### Requirement: The divine-mystery family takes no element verb and costs nothing
 Every skill in `SkillCategory.DIVINE_MYSTERY` SHALL declare an empty resource cost, SHALL declare
 `requires_divine_arts=True`, and SHALL NOT declare any damage or healing effect. The family's effects
-SHALL come only from the conferral, revocation, veil and reveal vocabulary — the layer that rewrites who
-holds a power, who can see a fact, and how fast someone learns — so the family never supplies, and never
-competes with, a combat verb an element tree owns. This is a family-wide invariant that any future node
-added to the category SHALL also satisfy.
+SHALL come only from the conferral, revocation, veil and reveal vocabulary.
 
 #### Scenario: No divine-mystery skill carries a cost
 - **WHEN** every registered skill in the `DIVINE_MYSTERY` category is inspected
@@ -99,14 +116,34 @@ added to the category SHALL also satisfy.
   `DIVINE_MYSTERY` skill and casts it
 - **THEN** the cast is rejected by the bloodline gate before any resource, roll or effect resolution
 
+#### Scenario: The veil/reveal layer keeps the family out of combat verbs
+- **WHEN** the family's effect vocabulary is audited
+- **THEN** it is the layer that rewrites who holds a power, who can see a fact, and how fast someone
+  learns, so the family never supplies, and never competes with, a combat verb an element tree owns
+
+#### Scenario: Future nodes inherit the family invariant
+- **WHEN** a future node is added to the `DIVINE_MYSTERY` category
+- **THEN** it SHALL also satisfy this family-wide invariant
+
 ### Requirement: Divine-mystery progression composes conferral, veil and reveal behavior
-A divine-mystery chain SHALL compose into executable behavior, not into declared-but-inert entries: a
-later rung of a conferral chain SHALL produce a strictly larger conferred effect on its target than an
-earlier rung of the same chain; a conferral node declaring an ally audience SHALL reach every ally in
-the resolved audience rather than only the selected target; and a node declaring several parents SHALL
-stay unusable until EVERY declared parent meets its threshold, becoming usable when the last one does.
+A divine-mystery chain SHALL compose into executable behavior, not into declared-but-inert entries,
+governing rung magnitude, ally-audience reach, and multi-parent thresholds as scenarioed below.
 These contracts SHALL be established over synthetic compositions rather than by restating the shipped
 catalog's rows.
+
+#### Scenario: Conferral rungs scale strictly
+- **WHEN** a later rung and an earlier rung of the same conferral chain act on a target
+- **THEN** the later rung SHALL produce a strictly larger conferred effect on its target than the
+  earlier rung of the same chain
+
+#### Scenario: Ally audiences include every ally
+- **WHEN** a conferral node declaring an ally audience resolves
+- **THEN** it SHALL reach every ally in the resolved audience rather than only the selected target
+
+#### Scenario: Multi-parent nodes gate on every parent
+- **WHEN** a node declaring several parents is evaluated
+- **THEN** it SHALL stay unusable until EVERY declared parent meets its threshold, becoming usable
+  when the last one does
 
 #### Scenario: A later rung confers more than an earlier rung
 - **WHEN** the same caster confers through an earlier-rung node and then through a later-rung node of

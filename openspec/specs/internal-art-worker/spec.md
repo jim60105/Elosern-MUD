@@ -6,24 +6,7 @@ Defines the in-process SDWebUIClient that generates one image per art subject th
 ## Requirements
 
 ### Requirement: The internal sd-webui client generates images through txt2img with bounded validation
-`world/art/sd_worker.py` SHALL provide an in-process `SDWebUIClient` that generates one image per
-art subject by POSTing a `/sdapi/v1/txt2img` request to the settings `ART_SD_BASE_URL` (default
-from the `SD_WEBUI_BASE_URL` environment variable, else `http://127.0.0.1:7860`) with a bounded
-wall-clock timeout (`ART_SD_TIMEOUT_SECONDS`, default 600) and returning the decoded PNG bytes.
-The request SHALL carry the rendered positive prompt, the rendered negative prompt, `steps` and
-`cfg_scale` from settings, `width`/`height` derived from the subject's aspect ratio (scene 16:9,
-portrait 3:4) from the `ART_SD_*` size settings, and `override_settings.samples_format: "png"`
-with `override_settings_restore_afterwards: true`; a non-empty `ART_SD_SAMPLER`,
-`ART_SD_SCHEDULER`, or `ART_SD_CHECKPOINT` SHALL pass through as `sampler_name`, `scheduler`, and
-`override_settings.sd_model_checkpoint` respectively. The HTTP call SHALL run synchronously on a
-background thread (never the reactor thread) and SHALL be the only place the engine opens an
-sd-webui connection. The client SHALL accept an injectable transport callable so tests and the
-browser harness can substitute a deterministic fake. The default transport SHALL enforce a total
-wall-clock deadline over the whole exchange (not just per-socket timeouts), restrict the scheme
-to `http`/`https`, and not follow redirects. The client SHALL bound memory use: the response
-body SHALL be read under `ART_SD_MAX_RESPONSE_BYTES`, the base64 payload SHALL decode under the
-same bound, and the decoded PNG SHALL have an IHDR whose width, height, and total pixels stay
-within `ART_SD_MAX_IMAGE_DIMENSIONS` and `ART_SD_MAX_IMAGE_PIXELS`.
+`world/art/sd_worker.py` SHALL provide an in-process `SDWebUIClient` that generates one image per art subject by POSTing a `/sdapi/v1/txt2img` request to the settings `ART_SD_BASE_URL` (default from the `SD_WEBUI_BASE_URL` environment variable, else `http://127.0.0.1:7860`) with a bounded wall-clock timeout (`ART_SD_TIMEOUT_SECONDS`, default 600) and returning the decoded PNG bytes.
 
 #### Scenario: A valid response produces PNG bytes for a scene subject
 - **WHEN** `SDWebUIClient.generate()` POSTs a txt2img request for a scene subject and the server
@@ -60,20 +43,32 @@ within `ART_SD_MAX_IMAGE_DIMENSIONS` and `ART_SD_MAX_IMAGE_PIXELS`.
 - **THEN** the call fails with `sd_response_too_large` or `sd_image_dimensions_too_large`, no
   unbounded memory is allocated, and nothing is written to the store
 
+#### Scenario: The request carries the documented payload
+- **WHEN** a request body is built
+- **THEN** it carries the rendered positive prompt, the rendered negative prompt, `steps` and `cfg_scale` from settings, `width`/`height` derived from the subject's aspect ratio (scene 16:9, portrait 3:4) from the `ART_SD_*` size settings, and `override_settings.samples_format: "png"` with `override_settings_restore_afterwards: true`
+
+#### Scenario: Non-empty sampler, scheduler, and checkpoint pass through
+- **WHEN** `ART_SD_SAMPLER`, `ART_SD_SCHEDULER`, or `ART_SD_CHECKPOINT` is non-empty
+- **THEN** it passes through as `sampler_name`, `scheduler`, and `override_settings.sd_model_checkpoint` respectively
+
+#### Scenario: The engine's only sd-webui connection point is off-reactor
+- **WHEN** the HTTP call runs
+- **THEN** it runs synchronously on a background thread (never the reactor thread) and is the only place the engine opens an sd-webui connection
+
+#### Scenario: The transport is injectable
+- **WHEN** tests or the browser harness need a deterministic fake
+- **THEN** the client accepts an injectable transport callable so they can substitute one
+
+#### Scenario: The default transport enforces deadline, scheme, and redirect rules
+- **WHEN** the default transport performs an exchange
+- **THEN** it enforces a total wall-clock deadline over the whole exchange (not just per-socket timeouts), restricts the scheme to `http`/`https`, and does not follow redirects
+
+#### Scenario: Memory use is bounded across response decoding
+- **WHEN** a response is received and decoded
+- **THEN** the response body is read under `ART_SD_MAX_RESPONSE_BYTES`, the base64 payload decodes under the same bound, and the decoded PNG has an IHDR whose width, height, and total pixels stay within `ART_SD_MAX_IMAGE_DIMENSIONS` and `ART_SD_MAX_IMAGE_PIXELS`
+
 ### Requirement: Art generation failures degrade to bounded named error codes
-`SDWebUIClient.generate()` SHALL map every failure mode to a named error carrying one of the
-bounded codes `sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`,
-`sd_no_image`, `sd_decode_error`, `sd_not_png`, `sd_response_too_large`, or
-`sd_image_dimensions_too_large`, and SHALL never raise an unbounded or unexpected exception into
-the caller. `world/art/worker.py` SHALL catch each named error per subject and settle that record
-`failed` with the bounded code, leaving every other claimed job unaffected. Prompt-template
-render failures, failure to resolve or construct the `ART_SD_CLIENT` dotted path, and unexpected
-internal errors SHALL likewise settle the subject `failed` with the bounded codes
-`sd_prompt_error`, `sd_client_config_error`, and `sd_internal_error` respectively, so every
-claimed subject reaches a terminal `done`/`failed` state and none stays `in_progress`. An
-unreachable, timed-out, or misbehaving sd-webui SHALL therefore never make the deterministic
-game unplayable: records remain failed, presenters keep their truthful placeholders, and the
-queue retry path (`@art retry`) recovers after the service is restored.
+`SDWebUIClient.generate()` SHALL map every failure mode to a named error carrying one of the bounded codes `sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`, `sd_no_image`, `sd_decode_error`, `sd_not_png`, `sd_response_too_large`, or `sd_image_dimensions_too_large`, and SHALL never raise an unbounded or unexpected exception into the caller.
 
 #### Scenario: An unreachable server settles a bounded failure
 - **WHEN** the configured base URL is unreachable
@@ -108,17 +103,20 @@ queue retry path (`@art retry`) recovers after the service is restored.
 - **THEN** that subject settles `failed` with its bounded code while the remaining subjects
   generate and settle independently
 
+#### Scenario: The worker settles each named error per subject
+- **WHEN** `world/art/worker.py` observes a named error for one claimed subject
+- **THEN** it catches the error per subject and settles that record `failed` with the bounded code, leaving every other claimed job unaffected
+
+#### Scenario: Prompt, client-config, and internal errors carry their own bounded codes
+- **WHEN** prompt-template render fails, resolving or constructing the `ART_SD_CLIENT` dotted path fails, or an unexpected internal error occurs
+- **THEN** the subject settles `failed` with the bounded codes `sd_prompt_error`, `sd_client_config_error`, and `sd_internal_error` respectively, so every claimed subject reaches a terminal `done`/`failed` state and none stays `in_progress`
+
+#### Scenario: A misbehaving sd-webui never makes the game unplayable
+- **WHEN** the sd-webui is unreachable, timed out, or misbehaving
+- **THEN** the deterministic game remains playable: records remain failed, presenters keep their truthful placeholders, and the queue retry path (`@art retry`) recovers after the service is restored
+
 ### Requirement: Art generation prompts are stored in the prompt library
-The positive and negative image-generation prompts SHALL be defined in `prompts/art.yaml` under
-the keys `art.scene_prompt`, `art.portrait_prompt`, and `art.negative_prompt`, and SHALL be the
-only source of that prompt text — `world/art/sd_worker.py` SHALL render them through
-`render_prompt()` like every other generative layer and SHALL NOT embed prompt text as Python
-constants. `art.scene_prompt` and `art.portrait_prompt` SHALL be templates accepting a
-`{description}` placeholder whose value is the deterministic subject description produced by
-`world/art/subjects.py` (scene sentence or character/monster template); `art.negative_prompt`
-SHALL be a plain text block with no placeholders. The shipped template text SHALL be authored per
-the image-prompt-builder-nl skill's guidance and SHALL be tunable by admins in the mounted
-`prompts/` folder without touching code.
+The positive and negative image-generation prompts SHALL be defined in `prompts/art.yaml` under the keys `art.scene_prompt`, `art.portrait_prompt`, and `art.negative_prompt`, and SHALL be the only source of that prompt text — `world/art/sd_worker.py` SHALL render them through `render_prompt()` like every other generative layer and SHALL NOT embed prompt text as Python constants.
 
 #### Scenario: Scene and portrait prompts render the deterministic description
 - **WHEN** the client builds a request for a scene subject and for a portrait subject
@@ -138,13 +136,20 @@ the image-prompt-builder-nl skill's guidance and SHALL be tunable by admins in t
   set, the completed image is left untouched, and `@art requeue` regenerates it with the prior
   valid output retained
 
+#### Scenario: The positive templates take the deterministic description
+- **WHEN** `art.scene_prompt` and `art.portrait_prompt` are defined
+- **THEN** they SHALL be templates accepting a `{description}` placeholder whose value is the deterministic subject description produced by `world/art/subjects.py` (scene sentence or character/monster template)
+
+#### Scenario: The negative prompt carries no placeholders
+- **WHEN** `art.negative_prompt` is defined
+- **THEN** it SHALL be a plain text block with no placeholders
+
+#### Scenario: Shipped template text follows the authoring skill and stays admin-tunable
+- **WHEN** the shipped template text is authored
+- **THEN** it follows the image-prompt-builder-nl skill's guidance and remains tunable by admins in the mounted `prompts/` folder without touching code
+
 ### Requirement: The client is injectable and tests never open a socket
-`world/art/sd_worker.py` SHALL expose the client class through the settings `ART_SD_CLIENT` dotted
-path (default `world.art.sd_worker.SDWebUIClient`), and `world/art/fake_sd_client.py` SHALL
-provide a deterministic `FakeSDWebUIClient` with the same interface that replays fixed PNG
-fixtures and scripted transport failures without any network access. Tests and the browser
-harness SHALL inject the fake through `ART_SD_CLIENT` or an equivalent transport override, so no
-unit, integration, or browser test ever opens a socket to an image service.
+`world/art/sd_worker.py` SHALL expose the client class through the settings `ART_SD_CLIENT` dotted path (default `world.art.sd_worker.SDWebUIClient`).
 
 #### Scenario: The fake client replays a fixed PNG
 - **WHEN** a test configures `ART_SD_CLIENT` to the fake and a job runs
@@ -156,6 +161,14 @@ unit, integration, or browser test ever opens a socket to an image service.
   fake
 - **THEN** the record settles `failed` with the matching bounded code and no network connection
   was attempted
+
+#### Scenario: A deterministic fake ships for networkless testing
+- **WHEN** `world/art/fake_sd_client.py` is inspected
+- **THEN** it provides a deterministic `FakeSDWebUIClient` with the same interface that replays fixed PNG fixtures and scripted transport failures without any network access
+
+#### Scenario: No test ever opens a socket to an image service
+- **WHEN** unit, integration, or browser tests run
+- **THEN** tests and the browser harness inject the fake through `ART_SD_CLIENT` or an equivalent transport override, so no unit, integration, or browser test ever opens a socket to an image service
 
 ### Requirement: Named degradation codes carry the swallowed exception in the log
 
@@ -174,27 +187,7 @@ code string alone.
   exception type, message, and origin frame in its `tb:` segment
 
 ### Requirement: Portrait prompts compose a full-body figure on a backdrop the cutout stage can key
-`art.portrait_prompt` SHALL compose a FULL-BODY character illustration — the whole figure from head
-to feet inside the frame — and SHALL NOT ask for a half-body, bust, or close-up crop. It SHALL ask
-for a flat, uniform, light backdrop, carrying at minimum the `simple background` and
-`white background` tags, and SHALL NOT ask for a painted, blurred, out-of-focus, textured, or
-scenic background. `art.negative_prompt` SHALL carry the matching background and crop negatives so
-the two templates cannot disagree.
-
-This is a pipeline contract, not a taste preference: `art-portrait-cutout` runs its matting stage on
-exactly the subject kinds `art.portrait_prompt` serves, and a painted or blurred backdrop is the
-hardest input that stage can be handed. The constraint SHALL hold whether or not `ART_REMBG_ENABLED`
-is set for a given deployment, so enabling the stage never requires a prompt edit and disabling it
-never leaves a prompt that only made sense with the stage on.
-
-`art.scene_prompt` SHALL be exempt: scene subjects are outside the cutout allowlist and SHALL keep
-composing their painted foreground, midground, and background planes.
-
-The generation model accepts natural-language English together with danbooru-style tags, so the
-backdrop instruction MAY ride as trailing tags beside the prose rather than being spelled out as a
-sentence. Both templates remain admin-tunable in the mounted `prompts/` folder; this requirement
-constrains what the SHIPPED text composes, and an admin edit that violates it is the admin's
-decision, surfaced through the existing rendered-prompt digest.
+`art.portrait_prompt` SHALL compose a FULL-BODY character illustration — the whole figure from head to feet inside the frame — and SHALL NOT ask for a half-body, bust, or close-up crop. It SHALL ask for a flat, uniform, light backdrop, carrying at minimum the `simple background` and `white background` tags, and SHALL NOT ask for a painted, blurred, out-of-focus, textured, or scenic background.
 
 #### Scenario: The shipped portrait prompt asks for a full body on a flat backdrop
 - **WHEN** the shipped `art.portrait_prompt` is rendered for a portrait subject
@@ -212,8 +205,32 @@ decision, surfaced through the existing rendered-prompt digest.
 - **WHEN** a portrait request is built with `ART_REMBG_ENABLED` true and again with it false
 - **THEN** the rendered positive and negative prompts are byte-identical in both runs
 
+#### Scenario: The negative prompt cannot disagree with the portrait composition
+- **WHEN** `art.negative_prompt` is defined alongside `art.portrait_prompt`
+- **THEN** it carries the matching background and crop negatives so the two templates cannot disagree
+
+#### Scenario: The composition is a pipeline contract
+- **WHEN** the portrait-backdrop constraint is justified
+- **THEN** it is a pipeline contract, not a taste preference: `art-portrait-cutout` runs its matting stage on exactly the subject kinds `art.portrait_prompt` serves, and a painted or blurred backdrop is the hardest input that stage can be handed
+
+#### Scenario: The constraint holds regardless of the cutout setting
+- **WHEN** a deployment does or does not set `ART_REMBG_ENABLED`
+- **THEN** the constraint SHALL hold either way, so enabling the stage never requires a prompt edit and disabling it never leaves a prompt that only made sense with the stage on
+
+#### Scenario: Scene prompts are exempt from the backdrop rule
+- **WHEN** `art.scene_prompt` is considered
+- **THEN** it SHALL be exempt: scene subjects are outside the cutout allowlist and SHALL keep composing their painted foreground, midground, and background planes
+
+#### Scenario: The backdrop instruction MAY ride as trailing tags
+- **WHEN** the portrait prompt is composed, given that the generation model accepts natural-language English together with danbooru-style tags
+- **THEN** the backdrop instruction MAY ride as trailing tags beside the prose rather than being spelled out as a sentence
+
+#### Scenario: Admin edits are the admin's decision, surfaced through the digest
+- **WHEN** an admin edits the templates in the mounted `prompts/` folder
+- **THEN** both templates remain admin-tunable; this requirement constrains what the SHIPPED text composes, and an admin edit that violates it is the admin's decision, surfaced through the existing rendered-prompt digest
+
 ### Requirement: Server-side generated-image retention is request-scoped and configurable
-The txt2img client SHALL respect `ART_SD_SERVER_RETAIN_IMAGES`, defaulting to `True`. Each `/sdapi/v1/txt2img` request SHALL include the top-level boolean `save_images` with the setting's value, explicitly controlling the API's server-side saving gate rather than relying on its default of `false`. When the setting is `False`, the request SHALL also include the top-level boolean fields `do_not_save_samples: true` and `do_not_save_grid: true`, requesting that sd-webui save neither generated samples nor grids in its own outputs directory. When it is `True`, both suppression fields SHALL be omitted entirely, enabling saving subject to the server's existing sample/grid output settings. The fields SHALL NOT be placed in `override_settings`, and configuring retention SHALL NOT issue `/sdapi/v1/options` mutations. The engine's returned-image validation, local output processing, and art-store persistence SHALL remain unchanged in either mode.
+The txt2img client SHALL respect `ART_SD_SERVER_RETAIN_IMAGES`, defaulting to `True`. Each `/sdapi/v1/txt2img` request SHALL include the top-level boolean `save_images` with the setting's value, explicitly controlling the API's server-side saving gate rather than relying on its default of `false`.
 
 #### Scenario: Enabled retention explicitly requests server saving
 - **WHEN** a txt2img request is built with the default `ART_SD_SERVER_RETAIN_IMAGES=True`
@@ -226,4 +243,20 @@ The txt2img client SHALL respect `ART_SD_SERVER_RETAIN_IMAGES`, defaulting to `T
 #### Scenario: Disabled server retention does not disable the engine's art store
 - **WHEN** a successful generation returns valid image bytes with server retention disabled
 - **THEN** the engine processes and stores those bytes through the same existing art-store path as with retention enabled
+
+#### Scenario: Disabled retention requests per-request suppression fields
+- **WHEN** `ART_SD_SERVER_RETAIN_IMAGES` is `False`
+- **THEN** the request SHALL also include the top-level boolean fields `do_not_save_samples: true` and `do_not_save_grid: true`, requesting that sd-webui save neither generated samples nor grids in its own outputs directory
+
+#### Scenario: Enabled retention omits the suppression fields
+- **WHEN** `ART_SD_SERVER_RETAIN_IMAGES` is `True`
+- **THEN** both suppression fields SHALL be omitted entirely, enabling saving subject to the server's existing sample/grid output settings
+
+#### Scenario: Retention is never an options mutation
+- **WHEN** retention is configured
+- **THEN** the fields SHALL NOT be placed in `override_settings`, and configuring retention SHALL NOT issue `/sdapi/v1/options` mutations
+
+#### Scenario: Engine-side handling is mode-independent
+- **WHEN** either retention mode is active
+- **THEN** the engine's returned-image validation, local output processing, and art-store persistence SHALL remain unchanged
 

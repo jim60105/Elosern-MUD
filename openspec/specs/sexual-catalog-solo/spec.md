@@ -17,12 +17,8 @@ acts (快感控制, 寸止, 極限忍耐) are deferred pending an engine capabil
 
 ### Requirement: Eleven Tier 1-3 solo acts are registered, gated by masturbation_count and/or toy_use_count thresholds
 `world/skills/sexual_acts/solo.py`'s `SOLO_ACTS` tuple SHALL contain, in addition to
-`sexual-act-seeds`'s three seed rows: five acts each declaring `unlock={"masturbation_count": 10}`
-(`solo_deep_touch`, `solo_both_hands`, `solo_finger_lick`, `solo_rear_touch`, `solo_nipple_play`);
-three acts each declaring `unlock={"masturbation_count": 25}` (`solo_toy_vibrator`,
-`solo_toy_clamps`, `solo_toy_plug`); and three acts each declaring the compound gate
-`unlock={"masturbation_count": 25, "toy_use_count": 15}` (`solo_toy_advanced_link`,
-`solo_toy_advanced_full`, `solo_bound_masturbation`). Every one of these eleven acts SHALL declare
+`sexual-act-seeds`'s three seed rows, the eleven tier-gated acts named in the scenarios below.
+Every one of these eleven acts SHALL declare
 `target_spec=TargetSpec.SELF`, `target_part=None`, `participant_counters=()`, and
 `resistible=False`.
 
@@ -43,6 +39,18 @@ three acts each declaring `unlock={"masturbation_count": 25}` (`solo_toy_vibrato
 - **THEN** `solo_toy_advanced_link` is absent from the returned set
 - **WHEN** the same entity's `masturbation_count` becomes `25`
 - **THEN** `solo_toy_advanced_link` is present in the returned set
+
+#### Scenario: The five Tier 1 acts share the masturbation_count 10 gate
+- **WHEN** the Tier 1 acts `solo_deep_touch`, `solo_both_hands`, `solo_finger_lick`, `solo_rear_touch`, and `solo_nipple_play` are read from `SOLO_ACTS`
+- **THEN** each declares `unlock={"masturbation_count": 10}`
+
+#### Scenario: The three Tier 2 toy acts share the masturbation_count 25 gate
+- **WHEN** the Tier 2 acts `solo_toy_vibrator`, `solo_toy_clamps`, and `solo_toy_plug` are read from `SOLO_ACTS`
+- **THEN** each declares `unlock={"masturbation_count": 25}`
+
+#### Scenario: The three Tier 3 advanced-toy acts share the compound gate
+- **WHEN** the Tier 3 acts `solo_toy_advanced_link`, `solo_toy_advanced_full`, and `solo_bound_masturbation` are read from `SOLO_ACTS`
+- **THEN** each declares the compound gate `unlock={"masturbation_count": 25, "toy_use_count": 15}`
 
 ### Requirement: Tier 2 and Tier 3 acts credit both masturbation_count and toy_use_count on cast
 Each of `solo_toy_vibrator`, `solo_toy_clamps`, `solo_toy_plug`, `solo_toy_advanced_link`,

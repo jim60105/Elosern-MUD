@@ -22,13 +22,8 @@ SHALL default to `buff`. `poisoned`, `paralysis`, and `fear` SHALL declare `pola
 ### Requirement: cleanse:status removes every active debuff-polarity buff from the target
 `world/rules/buffs.py` SHALL define a `cleanse` effect handler, registered via
 `register_effect_handler` in `world/rules/action.py`, resolving `cleanse:status` by removing every
-currently-active buff on the target whose `buffs.yaml` definition has `polarity == "debuff"`. It
-SHALL obtain that set through the same shared selector-driven removal every other debuff-clearing
-caller uses, so the cleanse effect and any other clearing path can never diverge. Buffs with
-`polarity == "buff"` SHALL NOT be removed. Removal SHALL route through
-`entity.buffs.remove(..., dispel=True)`, whose dispel flag runs Evennia's external-removal hooks
-(`at_dispel` then `at_remove`), recording cleanse as a forced external removal rather than a natural
-expiry.
+currently-active buff on the target whose `buffs.yaml` definition has `polarity == "debuff"`. Buffs
+with `polarity == "buff"` SHALL NOT be removed.
 
 #### Scenario: Cleansing removes an active debuff
 - **WHEN** a `cleanse:status` effect resolves against a target with an active `poisoned` buff
@@ -44,14 +39,18 @@ expiry.
 - **THEN** it reaches the same shared selector-driven removal, with the debuff selector, that every
   other debuff-clearing caller reaches
 
+#### Scenario: Removal runs the external-removal hooks
+- **WHEN** a `cleanse:status` removal executes
+- **THEN** it routes through `entity.buffs.remove(..., dispel=True)`, whose dispel flag runs
+  Evennia's external-removal hooks (`at_dispel` then `at_remove`), recording cleanse as a forced
+  external removal rather than a natural expiry
+
 ### Requirement: Status removal is expressed as one selector-driven operation returning a count
 `world/rules/buffs.py` SHALL expose a public removal function taking an entity and one selector, and
 returning the number of buff instances actually removed. The selector vocabulary SHALL be exactly: a
 concrete `buffs.yaml` definition key, `negative` (every active debuff-polarity instance), `positive`
-(every active buff-polarity instance), and `all` (both). Selection SHALL resolve against **live buff
-instances**, not definition keys, so a definition with several live instances loses all of them; every
-removal SHALL route through the same `dispel=True` external-removal path the cleanse handler already
-uses. A selector matching nothing SHALL write nothing and return `0`.
+(every active buff-polarity instance), and `all` (both). A selector matching nothing SHALL write
+nothing and return `0`.
 
 #### Scenario: The negative selector removes every debuff and nothing else
 - **WHEN** the removal function is called with `negative` against a target carrying two active
@@ -75,3 +74,13 @@ uses. A selector matching nothing SHALL write nothing and return `0`.
 #### Scenario: A selector matching nothing is a no-op
 - **WHEN** the removal function is called with `negative` against a target carrying no debuffs
 - **THEN** nothing is written and it returns `0`
+
+#### Scenario: Selection resolves against live buff instances
+- **WHEN** a selector is applied
+- **THEN** it resolves against **live buff instances**, not definition keys, so a definition with
+  several live instances loses all of them
+
+#### Scenario: Every removal routes through the dispel path
+- **WHEN** the removal function removes any instance
+- **THEN** it routes through the same `dispel=True` external-removal path the cleanse handler
+  already uses

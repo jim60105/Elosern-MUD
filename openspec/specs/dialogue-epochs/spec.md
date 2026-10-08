@@ -40,13 +40,7 @@ content of a fully-authored pair: an NPC persona block at the compact card's
 full bound (2000 rendered code points, no truncation) rendered into the
 character anchor, plus the speaking player's public persona block inside the
 current frame, with zero optional material (no history, recall, or summary)
-SHALL fit the profile's maximum input budget. Optional dialogue sections SHALL
-be sized so content the aggregate input bound admits is never rejected later by
-a section hard bound: after the deterministic reduction order (oldest replay
-frames, then chat-memory lines, then recall cognition, then epoch summary) has
-converged inside the aggregate bound, the final prompt SHALL be accepted rather
-than degraded. Rejection of mandatory overflow SHALL remain the only budget
-failure path, and mandatory content SHALL never be silently removed.
+SHALL fit the profile's maximum input budget.
 
 #### Scenario: A full-card pair converses without degradation
 
@@ -65,6 +59,23 @@ failure path, and mandatory content SHALL never be silently removed.
 - **THEN** frames and memory drop oldest-first, then cognition and epoch
   summary, until the prompt fits, and only a still-overflowing mandatory
   current frame rejects
+
+#### Scenario: Section hard bounds never reject what the aggregate bound admitted
+
+- **WHEN** optional dialogue sections are sized against the aggregate input bound
+- **THEN** content the aggregate input bound admits is never rejected later by a section hard bound
+
+#### Scenario: Deterministic reduction converges to acceptance
+
+- **WHEN** the deterministic reduction order (oldest replay frames, then
+  chat-memory lines, then recall cognition, then epoch summary) has converged
+  inside the aggregate bound
+- **THEN** the final prompt is accepted rather than degraded
+
+#### Scenario: Mandatory overflow is the only budget failure path
+
+- **WHEN** a dialogue prompt hits any budget limit
+- **THEN** rejection of mandatory overflow is the only budget failure path, and mandatory content is never silently removed
 
 ### Requirement: Caching is optional observability
 

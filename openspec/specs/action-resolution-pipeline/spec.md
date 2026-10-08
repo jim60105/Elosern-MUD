@@ -9,8 +9,7 @@ Defines ActionResolver as the sole entry point for every skill invocation, runni
 `ActionResolver.preflight(request)` SHALL validate skill ownership/kind, current resources, targets,
 action capability, declared actor/target state and contact conditions, nonempty effect audiences, effect-handler availability, and time-cost metadata without randomness, effect
 staging, EventLog emission, state mutation, or world-time advance. It SHALL return the same named
-rejection categories as `resolve()` for those checks. A successful preflight SHALL not guarantee that
-state remains valid after earlier initiative actions; final resolution SHALL still run all eight steps.
+rejection categories as `resolve()` for those checks.
 
 #### Scenario: Preflight rejection has no side effects
 - **WHEN** preflight rejects an unknown skill, insufficient resource, invalid target, blocking buff,
@@ -28,16 +27,18 @@ state remains valid after earlier initiative actions; final resolution SHALL sti
 - **THEN** final resolution returns its ordinary named rejection without claiming that the started round
   is rollback-safe
 
+#### Scenario: Successful preflight does not guarantee later validity
+- **WHEN** a preflight succeeds and the world state evolves before the actor acts
+- **THEN** a successful preflight does not guarantee that state remains valid after earlier
+  initiative actions
+- **AND** final resolution still runs all eight steps
+
 ### Requirement: Nonlethal policy transforms lethal projection before EventLog planners
 A validated BattlefieldActionContext MAY carry a deterministic `nonlethal` policy as a
-session-wide flag and/or per-entity `nonlethal_keys` (entity keys protected by the policy; in a
-hostile session these are the allied companions). During damage
-projection, a positive-to-non-positive crossing under the policy SHALL stage HP at 1 and mark the exact
-target knocked out; the per-entity key set SHALL apply to the damaged target's key and the
-session-wide flag SHALL apply to every target, with the flag unchanged in its existing exam
-semantics. Step 7 SHALL emit `target_knocked_out` and SHALL NOT emit `target_defeated`. This
-transformation SHALL occur before event-effect planners, so DEFEAT progress,
-protected-entity failure, and loot consumers receive no defeat entry. Contexts without the policy SHALL
+session-wide flag and/or per-entity `nonlethal_keys`. Under the
+policy, a positive-to-non-positive damage crossing SHALL stage HP at 1 and mark the exact target
+knocked out; step 7 SHALL emit `target_knocked_out` and SHALL NOT emit `target_defeated`. This
+transformation SHALL occur before event-effect planners. Contexts without the policy SHALL
 retain existing lethal behavior.
 
 #### Scenario: Nonlethal projection emits knockout only
@@ -63,6 +64,21 @@ retain existing lethal behavior.
 - **WHEN** identical damage resolves without a nonlethal policy
 - **THEN** the existing lethal HP crossing and target-defeated planner behavior apply
 
+#### Scenario: Policy keys protect entities, companions in hostile sessions
+- **WHEN** a nonlethal policy declares per-entity `nonlethal_keys`
+- **THEN** those entity keys are the entities protected by the policy, and in a hostile session they
+  are the allied companions
+
+#### Scenario: Key set and session-wide flag scopes of application
+- **WHEN** damage is projected under a nonlethal policy
+- **THEN** the per-entity key set applies to the damaged target's key and the session-wide flag
+  applies to every target
+- **AND** the flag is unchanged in its existing exam semantics
+
+#### Scenario: Defeat consumers receive no defeat entry
+- **WHEN** the transformation occurs before event-effect planners
+- **THEN** DEFEAT progress, protected-entity failure, and loot consumers receive no defeat entry
+
 ### Requirement: ActionResolver is the sole entry point for every skill invocation
 `world/rules/action.py` SHALL provide `ActionResolver.resolve(request: ActionRequest) -> ActionResult`
 as the only function through which any skill — active or passive-gated, combat or non-combat — is
@@ -83,19 +99,6 @@ target resolution, (4) action capability, (5) effect resolution, (6) resource de
 EventLog construction, (8) time-cost computation. Any step that fails SHALL cause `resolve()` to
 return an `ActionResult` with `outcome == "rejected"` and a `reason` drawn from a named
 `RejectReason` value — never a bare boolean or an unstructured exception escaping to the caller.
-Step 6's `mp` resource deduction SHALL be applied through the canonical MP-change writer as the
-staged pending effect's committed behavior, carrying the cast skill as the MP-event source, while
-hp and sp deduction behavior and the preflight/recheck amount agreement stay unchanged; an MP
-crossing to zero caused by cost payment is an ordinary attributed depletion fact, never a new
-rejection reason.
-Step 7 SHALL convert a structured damage pending-effect description into a `"roll"` `EventEntry`
-and, when the attack hit, a `"damage"` `EventEntry`; it SHALL NOT perform combat math or randomness.
-Step 7 SHALL track projected HP in pending-effect order and emit exactly one `"target_defeated"` entry
-when damage crosses a living target from positive HP to zero-or-lower. That entry SHALL carry the
-target's integer dbref and monster tier or `None`; display keys SHALL remain rendering fields only.
-After step 7 constructs the immutable log, registered event-effect planners SHALL derive additional
-`PendingEffect` values from that log and request before step 8. Planner failure SHALL reject as
-`EVENT_LOG_CONSTRUCTION_FAILED` before commit.
 
 #### Scenario: An unknown skill key rejects at step 1 with a named reason
 - **WHEN** `resolve()` is called with a `skill_key` the actor does not own
@@ -151,13 +154,39 @@ After step 7 constructs the immutable log, registered event-effect planners SHAL
 - **THEN** it returns
   `ActionResult(outcome="rejected", reason=RejectReason.TIME_COST_LOOKUP_FAILED)`
 
+#### Scenario: Step 6 pays mp through the canonical MP-change writer
+- **WHEN** step 6 deducts an `mp` resource cost
+- **THEN** the deduction is applied through the canonical MP-change writer as the staged pending
+  effect's committed behavior, carrying the cast skill as the MP-event source
+- **AND** hp and sp deduction behavior and the preflight/recheck amount agreement stay unchanged
+
+#### Scenario: MP cost payment to zero is a depletion fact, not a rejection
+- **WHEN** an MP crossing to zero is caused by cost payment
+- **THEN** it is an ordinary attributed depletion fact, never a new rejection reason
+
+#### Scenario: Step 7 converts damage descriptions without combat math
+- **WHEN** step 7 processes a structured damage pending-effect description
+- **THEN** it converts it into a `"roll"` `EventEntry` and, when the attack hit, a `"damage"`
+  `EventEntry`, performing no combat math and no randomness
+
+#### Scenario: Defeat-entry display keys are rendering-only
+- **WHEN** a `target_defeated` entry is constructed
+- **THEN** display keys remain rendering fields only
+
+#### Scenario: Planners derive effects from the immutable log before step 8
+- **WHEN** step 7 constructs the immutable log
+- **THEN** registered event-effect planners derive additional `PendingEffect` values from that log
+  and the request before step 8
+
+#### Scenario: Planner failure rejects before commit
+- **WHEN** an event-effect planner fails
+- **THEN** the action rejects as `EVENT_LOG_CONSTRUCTION_FAILED` before commit
+
 ### Requirement: Resolution is atomic — a failure at any step leaves zero state mutated
 `ActionResolver.resolve()` SHALL NOT mutate any entity's `traits`, `sexual`, `buffs`, or
 `db.skill_grants` state as a side effect of steps 1 through 8's validation or staging work. All
 mutation SHALL occur inside exactly one commit operation, executed only after every one of the eight
-steps and every event-effect planner has succeeded. A failure at any step, in a planner, or during the
-commit operation SHALL leave every entity referenced by the request, every quest record, and every
-instance pin in exactly the state they held before `resolve()` was called.
+steps and every event-effect planner has succeeded.
 
 #### Scenario: A failure injected at any of the eight steps leaves state unchanged
 - **WHEN** `resolve()` is called with a fault injected at step 1, 2, 3, 4, 5, 6, 7, or 8 (one scenario
@@ -199,26 +228,17 @@ instance pin in exactly the state they held before `resolve()` was called.
   restore coverage
 - **THEN** the action rejects before any action or quest state is touched
 
+#### Scenario: Any failure leaves every referenced object at its pre-call state
+- **WHEN** `resolve()` fails at any step, in an event-effect planner, or during the commit operation
+- **THEN** every entity referenced by the request, every quest record, and every instance pin is left
+  in exactly the state it held before `resolve()` was called
+
 ### Requirement: A damaging action never resolves without a battlefield
 `world/rules/action.py` SHALL declare `RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET`, and
 `world/rules/player_messages.py` SHALL supply its Traditional Chinese player-facing line.
 `ActionResolver`'s capability step SHALL reject a request with that reason when the resolved
 `SkillDef`'s parsed `effects` carry at least one `world.skills.effects.DamageEffect` **and**
-`request.context.battlefield is None`. The rejection SHALL occur before any resource is spent,
-before `roll_d100()` is called, before any `PendingEffect` is staged, and before any world-clock
-access, so a refused request touches no surface and persists nothing. The condition SHALL be
-expressed as one shared predicate over the skill definition and the context, consumed by both
-`ActionResolver` and `world/rules/action_preview.py`, so preview, combat-session submission
-revalidation, and authoritative resolution cannot disagree.
-
-The reason's name states the player-facing rule while the condition tests for the battlefield's
-absence: from exploration the only way to obtain a battlefield is to open combat on a co-located
-monster, so the two coincide, and the resolver stays free of any typeclass dependency.
-
-Indirect hp movement SHALL NOT satisfy the condition: a skill carrying a `SexualDrainEffect` but no
-`DamageEffect` is not a damaging action for this gate, matching
-`overwhelm-threshold`'s `commanded_damage_reaches_enemy()` so both damage-shaped questions in the
-codebase read the same definition.
+`request.context.battlefield is None`.
 
 #### Scenario: A damaging skill permitted outside combat is still refused without a battlefield
 - **WHEN** `ActionResolver.resolve()` is called for a skill declaring `usable_out_of_combat=True`
@@ -253,13 +273,37 @@ codebase read the same definition.
   context, with no enumeration of registry keys and no dependence on how many skills currently
   declare `usable_out_of_combat=True`
 
+#### Scenario: Preview, revalidation, and resolution cannot disagree
+- **WHEN** the shared predicate is consumed by `ActionResolver` and `world/rules/action_preview.py`
+- **THEN** preview, combat-session submission revalidation, and authoritative resolution cannot
+  disagree
+- **AND** the condition is expressed as one shared predicate over the skill definition and the
+  context, consumed by both `ActionResolver` and `world/rules/action_preview.py`
+
+#### Scenario: The reason name coincides with the tested condition
+- **WHEN** the reason's name is read against the condition it tests
+- **THEN** the name states the player-facing rule while the condition tests for the battlefield's
+  absence: from exploration the only way to obtain a battlefield is to open combat on a co-located
+  monster, so the two coincide, and the resolver stays free of any typeclass dependency
+
+#### Scenario: Indirect hp movement never satisfies the condition
+- **WHEN** a skill carries a `SexualDrainEffect` but no `DamageEffect`
+- **THEN** indirect hp movement does not satisfy the condition — it is not a damaging action for this
+  gate, matching `overwhelm-threshold`'s `commanded_damage_reaches_enemy()` so both damage-shaped
+  questions in the codebase read the same definition
+
+#### Scenario: The rejection precedes every surface touch
+- **WHEN** the gate rejects a request
+- **THEN** the rejection occurs before any resource is spent, before `roll_d100()` is called, before
+  any `PendingEffect` is staged, and before any world-clock access, so a refused request touches no
+  surface and persists nothing
+
 ### Requirement: The out-of-combat gates fire in a fixed, specified order
 `ActionResolver`'s capability step SHALL evaluate the `usable_out_of_combat` gate **before** the
 damaging-action gate. A skill that does not declare `usable_out_of_combat` SHALL therefore continue
 to reject with `RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT` outside combat, whether or not it
 carries a `DamageEffect`; `RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET` SHALL be reachable only for
-skills the registry does permit outside combat. `world/rules/action_preview.py` SHALL evaluate the
-two conditions in the same order.
+skills the registry does permit outside combat.
 
 #### Scenario: An unflagged damage skill still reports the flag rejection
 - **WHEN** a skill carrying a `DamageEffect` and declaring `usable_out_of_combat=False` is resolved
@@ -273,14 +317,17 @@ two conditions in the same order.
 - **THEN** both report `SKILL_NOT_USABLE_OUT_OF_COMBAT` for the first and
   `DAMAGE_REQUIRES_MONSTER_TARGET` for the second
 
+#### Scenario: Preview evaluates the two conditions in the same order
+- **WHEN** `world/rules/action_preview.py` evaluates the `usable_out_of_combat` and damaging-action
+  conditions
+- **THEN** it evaluates the two conditions in the same order as `ActionResolver`
+
 ### Requirement: Neither ActionResolver nor targeting branches on combat state
 `world/rules/action.py` and `world/rules/targeting.py` SHALL contain no conditional that distinguishes
 combat from non-combat behavior other than exactly two explicitly marked gates: the
 `usable_out_of_combat` gate, and the damaging-action gate that rejects a `DamageEffect`-carrying
 skill when `request.context.battlefield is None`. Both SHALL be marked as such at their sites, and
-both SHALL read the context's battlefield rather than any combat-state token. All other
-combat-vs-non-combat behavior SHALL be expressed entirely through which concrete `ActionContext`
-implementation the caller supplies.
+both SHALL read the context's battlefield rather than any combat-state token.
 
 #### Scenario: A source scan finds no undeclared combat-state branch
 - **WHEN** `world/rules/action.py`, `world/rules/targeting.py`, and `world/rules/event_log.py` are
@@ -314,15 +361,18 @@ implementation the caller supplies.
   test-double call succeeds, with no difference in `action.py`'s or `targeting.py`'s executed source
   between the two calls
 
+#### Scenario: Remaining behavior comes from the supplied ActionContext
+- **WHEN** any other combat-vs-non-combat behavior is needed
+- **THEN** it is expressed entirely through which concrete `ActionContext` implementation the caller
+  supplies
+
 ### Requirement: The effect-resolution registry is open, prefix-keyed, and every handler declares its
 mutation surfaces
 `world/rules/action.py` SHALL expose `register_effect_handler(prefix, handler, surfaces)` as the only
 sanctioned way to add an effect-ID handler, where `surfaces` is the exact set of entity-state surfaces
 that handler's staged effects mutate. Step 5 SHALL dispatch purely by looking up an effect ID's prefix
 (the substring before its first `:`) in the registry, with no other conditional distinguishing one
-effect kind from another. Registration SHALL fail immediately if `surfaces` is not a subset of the
-surfaces `_commit()`'s snapshot/restore mechanism covers, and `_commit()` SHALL independently refuse to
-run any action whose staged effects declare a surface outside that same set.
+effect kind from another.
 
 #### Scenario: A newly registered handler resolves a previously-unknown prefix
 
@@ -369,16 +419,22 @@ run any action whose staged effects declare a surface outside that same set.
   `pytest.importorskip("world.rules.sexual_transitions")`, once that module is importable
 - **THEN** `resolve()` succeeds and the target's `entity.sexual` reflects `apply_event()`'s effect
 
+#### Scenario: Registration rejects surfaces beyond snapshot coverage
+- **WHEN** `register_effect_handler()` is called with `surfaces` that is not a subset of the surfaces
+  `_commit()`'s snapshot/restore mechanism covers
+- **THEN** registration SHALL fail immediately
+
+#### Scenario: Commit independently refuses uncovered surfaces
+- **WHEN** `_commit()` would run an action whose staged effects declare a surface outside the
+  snapshot/restore-covered set
+- **THEN** `_commit()` independently refuses to run that action
+
 ### Requirement: Event-effect planners are registered, deterministic, and idempotent by name
 `world/rules/action.py` SHALL expose `register_event_effect_planner(name, planner)`. Registration SHALL
 replace an existing planner with the same name rather than append a duplicate, supporting repeated
 server-start synchronization. Planners SHALL receive the `ActionRequest` and completed `EventLog`,
 SHALL perform no writes while planning, and SHALL return only `PendingEffect` values with declared
-mutation surfaces. A `quest_log` surface SHALL be owned by a `PlayerCharacter` and snapshot only its
-quest-log attribute; an `instance_pin` surface SHALL be owned by an `InstanceRoom` and snapshot only its
-pin-reasons attribute. Commit SHALL aggregate surfaces per every `PendingEffect.entity`, including
-objects outside the original request, and dispatch snapshot/restore by surface rather than assuming
-every touched object is a `LivingEntity`.
+mutation surfaces.
 
 #### Scenario: Repeated quest planner registration does not duplicate progress
 - **WHEN** startup registers the quest planner twice and one matching lethal action succeeds
@@ -393,6 +449,18 @@ every touched object is a `LivingEntity`.
 - **WHEN** protected-entity death stages quest-log and pin effects for two quest owners outside the
   original request and the second owner's write fails
 - **THEN** both players' quest logs, both rooms' pin lists, target HP, and actor state are restored
+
+#### Scenario: Surface ownership and snapshot scope
+- **WHEN** a planner returns effects on the `quest_log` or `instance_pin` surface
+- **THEN** a `quest_log` surface is owned by a `PlayerCharacter` and snapshots only its quest-log
+  attribute, and an `instance_pin` surface is owned by an `InstanceRoom` and snapshots only its
+  pin-reasons attribute
+
+#### Scenario: Commit aggregates surfaces per PendingEffect entity
+- **WHEN** commit runs over staged effects
+- **THEN** it aggregates surfaces per every `PendingEffect.entity`, including objects outside the
+  original request, and dispatches snapshot/restore by surface rather than assuming every touched
+  object is a `LivingEntity`
 
 ### Requirement: Every production skill path receives registered event-effect planning automatically
 Because out-of-combat casting and combat turns both call `ActionResolver.resolve()`, a successful action
@@ -412,7 +480,7 @@ SHALL NOT need a separate quest observer call, and SHALL NOT bypass planner exec
 - **THEN** registered planners run exactly as they do for command and combat callers
 
 ### Requirement: ActionResolver exposes shared side-effect-free action preview
-The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands. It SHALL cover ownership and active kind, current resources, exact target shape, presence, alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect prefixes, time metadata, and lineage eligibility. The lineage check SHALL use the single shared side-effect-free predicate `can_use_skill` — the same predicate consumed by `ActionResolver`, the skill menus, and the deterministic AI policy — so preview, submission revalidation, and authoritative preflight agree on the same eligibility; a prerequisite-unsatisfied skill SHALL report `RejectReason.UNKNOWN_SKILL` with the skill key. The same checks SHALL apply to the combat-session submission revalidation path, so a rejected submission stops before initiative. Modifier evaluation SHALL read a no-create context from existing stored buff and sexual-state data and SHALL NOT materialize a lazy handler or default. Preview SHALL NOT roll randomness, stage or apply effects, construct EventLogs, invoke event-effect planners, mutate any persistent or nonpersistent game state, or advance world time. `preflight()` and final `resolve()` SHALL remain authoritative and SHALL rerun their required checks.
+The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands.
 
 #### Scenario: Preview has no side effects
 - **WHEN** previews are built for every owned active skill and every current combat participant
@@ -446,6 +514,37 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 - **WHEN** the combat view (`build_combat_view`) is built for an actor who owns a spell whose MP cost exceeds their current MP
 - **THEN** the spell's descriptor carries `enabled == False` and the MP resource reason code, so both the Telnet `combat actions` command and the WebClient combat panel render it unavailable
 
+#### Scenario: Preview covers the full check set
+- **WHEN** a preview is evaluated
+- **THEN** it covers ownership and active kind, current resources, exact target shape, presence,
+  alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect
+  prefixes, time metadata, and lineage eligibility
+
+#### Scenario: Lineage eligibility rides the single shared predicate
+- **WHEN** preview checks lineage eligibility
+- **THEN** it uses the single shared side-effect-free predicate `can_use_skill` — the same predicate
+  consumed by `ActionResolver`, the skill menus, and the deterministic AI policy — so preview,
+  submission revalidation, and authoritative preflight agree on the same eligibility
+- **AND** a prerequisite-unsatisfied skill reports `RejectReason.UNKNOWN_SKILL` with the skill key
+
+#### Scenario: Submission revalidation applies the same checks
+- **WHEN** the combat-session submission revalidation path runs
+- **THEN** the same checks apply, so a rejected submission stops before initiative
+
+#### Scenario: Modifier evaluation reads a no-create context
+- **WHEN** preview evaluates modifiers
+- **THEN** it reads a no-create context from existing stored buff and sexual-state data and does not
+  materialize a lazy handler or default
+
+#### Scenario: Preview performs no side-effecting work
+- **WHEN** a preview is built
+- **THEN** it does not roll randomness, stage or apply effects, construct EventLogs, invoke
+  event-effect planners, mutate any persistent or nonpersistent game state, or advance world time
+
+#### Scenario: Preflight and resolve stay authoritative
+- **WHEN** preview has reported a result
+- **THEN** `preflight()` and final `resolve()` remain authoritative and rerun their required checks
+
 ### Requirement: Preflight rejects missing handler context before any round cost
 
 `ActionResolver.preflight()` and the combat-session revalidation SHALL verify that every effect handler's declared context keys are present in the submitted `event_context`; a missing key SHALL reject the action before initiative, round count, upkeep, or world time changes.
@@ -473,12 +572,7 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 The frozen `ActionRequest` dataclass SHALL gain a `scale: float = 1.0` field. `1.0` SHALL remain the
 behavior-preserving default for every existing construction site (the field is never required, and a
 request with `scale == 1.0` behaves exactly as before this change). `RejectReason` SHALL gain the
-member `SCALED_CAST_FORBIDDEN` for the freeform-casting gate. Every registered effect handler SHALL
-accept a `scale: float` argument (last position) invoked by the single call site in step 5; handlers
-that do not scale magnitudes SHALL ignore it. The resource-cost read SHALL become
-`_adjusted_costs(actor, skill, scale=1.0)`, and step 2 and step 6 SHALL both pass the request's
-scale to it, so preflight and deduction always compare and deduct the same scaled amount. No step
-count, ordering, or atomicity property of the pipeline SHALL change.
+member `SCALED_CAST_FORBIDDEN` for the freeform-casting gate.
 
 #### Scenario: Existing requests default to scale one
 - **WHEN** an `ActionRequest` is constructed without a `scale` argument, and a pre-existing request
@@ -495,6 +589,21 @@ count, ordering, or atomicity property of the pipeline SHALL change.
 - **WHEN** the freeform gate rejects a request
 - **THEN** the `ActionResult` carries `reason == RejectReason.SCALED_CAST_FORBIDDEN` and the ordinary
   rejected result shape (no event log, no time cost)
+
+#### Scenario: Every handler accepts the scale argument
+- **WHEN** the single step-5 call site invokes a registered effect handler
+- **THEN** every registered effect handler accepts a `scale: float` argument (last position), and
+  handlers that do not scale magnitudes ignore it
+
+#### Scenario: Resource costs read the request's scale
+- **WHEN** step 2 and step 6 read resource costs
+- **THEN** the resource-cost read is `_adjusted_costs(actor, skill, scale=1.0)` and both steps pass
+  the request's scale to it, so preflight and deduction always compare and deduct the same scaled
+  amount
+
+#### Scenario: Pipeline shape properties are unchanged
+- **WHEN** the scale field and rejection category are added
+- **THEN** no step count, ordering, or atomicity property of the pipeline changes
 
 ### Requirement: Successful commits emit an action_commit boundary event
 
@@ -516,7 +625,7 @@ change the all-or-nothing resolution semantics.
 - **THEN** no `action_commit` event is logged for that attempt
 
 ### Requirement: Audience planning agrees between preflight and final resolution
-Audience planning SHALL be side-effect-free and use authoritative current relationships. A nonempty selected pool with an empty component audience SHALL skip only that component without rolling. If all effect audiences are empty, the cast SHALL reject before resource, time or practice changes. Final resolution SHALL repeat audience validation after initiative changes. When a component declares an audience condition, planning SHALL additionally filter that component's recipients by the validated target-state gate evaluated from stored state (no handler materialization, no rolls), skipping only the gated component for non-matching targets; preflight and final resolution SHALL evaluate the identical gate against current state. Delivery SHALL retain existing transaction and event attribution guarantees.
+Audience planning SHALL be side-effect-free and use authoritative current relationships. A nonempty selected pool with an empty component audience SHALL skip only that component without rolling. If all effect audiences are empty, the cast SHALL reject before resource, time or practice changes. Final resolution SHALL repeat audience validation after initiative changes.
 
 #### Scenario: One audience is empty
 - **WHEN** an authored mixed spell has allies in its selection but no enemies
@@ -541,19 +650,23 @@ Audience planning SHALL be side-effect-free and use authoritative current relati
   the current stored state in final planning, and an all-empty gated audience still leaves the cast
   payable via its ungated components
 
+#### Scenario: An audience condition filters through the target-state gate
+- **WHEN** a component declares an audience condition
+- **THEN** planning additionally filters that component's recipients by the validated target-state
+  gate evaluated from stored state, with no handler materialization and no rolls, skipping only the
+  gated component for non-matching targets
+- **AND** preflight and final resolution evaluate the identical gate against current state
+
+#### Scenario: Delivery keeps its transaction and attribution guarantees
+- **WHEN** audience planning completes and delivery proceeds
+- **THEN** delivery retains the existing transaction and event attribution guarantees
+
 ### Requirement: The church-rite effect handlers reject with four named stable reasons
 `world/rules/action.py`'s `RejectReason` SHALL declare `RITE_NOT_ENROLLED`, `RITE_COOLDOWN_ACTIVE`,
 `RITE_OUTSIDE_VENUE`, and `RITE_ALREADY_SHELTERED`, and `world/rules/player_messages.py` SHALL
 supply each one's Traditional Chinese player-facing line.
 The two holy-rite effect handlers SHALL raise `RejectedAction` with these reasons during step-5
-staging, before any `PendingEffect` is staged: `RITE_NOT_ENROLLED` when the actor's `db.church`
-ledger is absent, `RITE_COOLDOWN_ACTIVE` when `rite_martial_blessing`'s ledger cooldown stamp is
-inside its rulebook cooldown window, `RITE_OUTSIDE_VENUE` when `rite_shelter` resolves outside a
-church-flagged place, and `RITE_ALREADY_SHELTERED` when `rite_shelter` resolves with the current
-day-block already marked. Each rejection SHALL leave every surface byte-identical and advance no
-clock, matching the pipeline's existing zero-write rejection promise. These gates live in the
-handlers (step 5), not the shared preview: `world/rules/action_preview.py` SHALL keep mirroring only
-the pre-staging steps, exactly as it does for every other handler-raised gate.
+staging, before any `PendingEffect` is staged.
 
 #### Scenario: An unenrolled caster is refused with the named reason and zero writes
 - **WHEN** an entity with no `db.church` ledger casts `rite_martial_blessing` out of combat
@@ -581,13 +694,41 @@ the pre-staging steps, exactly as it does for every other handler-raised gate.
 - **THEN** each maps to its configured Traditional Chinese line, with no raw enum or exception text
   reaching the player
 
+#### Scenario: Unenrolled casting raises RITE_NOT_ENROLLED
+- **WHEN** the actor's `db.church` ledger is absent
+- **THEN** the holy-rite handler raises `RejectedAction` with `RITE_NOT_ENROLLED` during step-5
+  staging, before any `PendingEffect` is staged
+
+#### Scenario: Cooldown-window casting raises RITE_COOLDOWN_ACTIVE
+- **WHEN** `rite_martial_blessing`'s ledger cooldown stamp is inside its rulebook cooldown window
+- **THEN** the handler raises `RejectedAction` with `RITE_COOLDOWN_ACTIVE` during step-5 staging,
+  before any `PendingEffect` is staged
+
+#### Scenario: Casting shelter outside a venue raises RITE_OUTSIDE_VENUE
+- **WHEN** `rite_shelter` resolves outside a church-flagged place
+- **THEN** the handler raises `RejectedAction` with `RITE_OUTSIDE_VENUE` during step-5 staging,
+  before any `PendingEffect` is staged
+
+#### Scenario: Already-sheltered day raises RITE_ALREADY_SHELTERED
+- **WHEN** `rite_shelter` resolves with the current day-block already marked
+- **THEN** the handler raises `RejectedAction` with `RITE_ALREADY_SHELTERED` during step-5 staging,
+  before any `PendingEffect` is staged
+
+#### Scenario: Rite rejections keep the zero-write promise
+- **WHEN** any of the four rite rejections fires
+- **THEN** it leaves every surface byte-identical and advances no clock, matching the pipeline's
+  existing zero-write rejection promise
+
+#### Scenario: The rite gates live in the handlers, not the preview
+- **WHEN** the placement of the rite gates is inspected
+- **THEN** they live in the handlers (step 5), not the shared preview: `world/rules/action_preview.py`
+  keeps mirroring only the pre-staging steps, exactly as it does for every other handler-raised gate
+
 ### Requirement: The defeat entry carries species and variant identity for species-backed monsters
 Step 7's `target_defeated` entry SHALL additionally carry the defeated monster's registered
 `species_key` and `variant_key` when the target is a species-backed individual, and SHALL omit both
 fields (or carry `None`) for a tier-only individual. Consumers SHALL resolve species or variant identity
 only from these fields, never by matching the target's display key or threat tier against registry text.
-The existing carriage — integer `target_id` dbref and monster tier or `None` — SHALL stay unchanged, and
-non-Monster targets SHALL be unaffected.
 
 #### Scenario: A species-backed defeat carries its registered identity
 - **WHEN** pending damage lethally crosses a species-backed monster
@@ -600,3 +741,8 @@ non-Monster targets SHALL be unaffected.
 #### Scenario: No consumer name-matches the registry
 - **WHEN** a defeat consumer needs to know the defeated species
 - **THEN** it reads the entry's species key, and no consumer resolves species identity by comparing a display name or tier against registry display text
+
+#### Scenario: Existing carriage stays unchanged, non-Monsters unaffected
+- **WHEN** species and variant identity is added to the entry
+- **THEN** the existing carriage — integer `target_id` dbref and monster tier or `None` — stays
+  unchanged, and non-Monster targets are unaffected

@@ -13,12 +13,7 @@ the `npc-schedule-runtime` capability.
 `templates:` mapping of role templates. Each template SHALL be a mapping carrying an `entries`
 list of exactly `{tick_offset, kind}` entries plus per-kind required fields: a `move` entry SHALL
 carry a `target` and SHALL NOT carry `state`; a `state` entry SHALL carry a `state` value and
-SHALL NOT carry a `target`. `tick_offset` SHALL be a non-negative integer strictly below the
-containing cycle's seconds (resolved through the existing clock day math), and entries SHALL repeat
-every configured cycle. A template MAY declare an optional `default_state` from the bounded state
-vocabulary; a successful `move` settlement writes that value, and `default_state` SHALL NOT be
-settable on individual entries. The declared state vocabulary for `state` SHALL be bounded and
-documented in the rulebook.
+SHALL NOT carry a `target`.
 
 #### Scenario: The shipped rulebook loads and validates
 - **WHEN** the `npc_schedules.yaml` rulebook is loaded by the validator
@@ -55,19 +50,32 @@ Templates SHALL accept optional cycle_days exactly 1 or 7 (non-boolean integers)
 - **WHEN** a seven-day template has an offset past one day but below seven days
 - **THEN** it validates, while an offset at the cycle end rejects
 
+#### Scenario: A tick_offset stays inside its cycle
+- **WHEN** an entry declares `tick_offset`
+- **THEN** it SHALL be a non-negative integer strictly below the containing cycle's seconds
+  (resolved through the existing clock day math)
+
+#### Scenario: Entries repeat every configured cycle
+- **WHEN** a template's entries are evaluated over time
+- **THEN** they repeat every configured cycle
+
+#### Scenario: default_state is a template-level optional
+- **WHEN** a template is authored
+- **THEN** it MAY declare an optional `default_state` from the bounded state vocabulary, a
+  successful `move` settlement writes that value, and `default_state` SHALL NOT be settable on
+  individual entries
+
+#### Scenario: The state vocabulary is bounded and documented
+- **WHEN** the rulebook's declared state vocabulary for `state` entries is inspected
+- **THEN** it is bounded and documented in the rulebook
+
 ### Requirement: Per-NPC schedules are assigned through one validated API and stored in exactly
 two validated shapes
 
 `world/rules/npc_schedules.py` SHALL provide `set_npc_schedule(npc, schedule)` as the sole writer
 of `npc.db.schedule`. The API SHALL accept exactly two shapes: a template reference
 (`{"schema_version": 1, "template": <key>, "overrides": {...}}`) or a full custom list
-(`{"schema_version": 1, "entries": [...]}`). A `None` value SHALL mean "no schedule". Any other
-shape — missing schema_version, both `template` and `entries` present, non-dict storage,
-entry counts beyond the bound — SHALL be rejected with a named error. The API SHALL
-record `effective_from_tick` (the current world tick at assignment) and SHALL maintain a
-persistent `schedule` tag on the NPC so settlement can find it regardless of when it was spawned
-or reassigned. Consumers reading a stored `db.schedule` SHALL validate it with the same parser;
-a malformed stored value resolves to "no schedule".
+(`{"schema_version": 1, "entries": [...]}`). A `None` value SHALL mean "no schedule".
 
 #### Scenario: A template reference with valid overrides parses
 - **WHEN** an NPC is assigned `{"schema_version": 1, "template": "guard", "overrides": {"1": {...}}}`
@@ -97,6 +105,23 @@ a malformed stored value resolves to "no schedule".
 #### Scenario: Clearing a schedule removes the tag
 - **WHEN** `set_npc_schedule(npc, None)` is called on a previously scheduled NPC
 - **THEN** `db.schedule` is `None` and the schedule tag is removed
+
+#### Scenario: Every other shape is rejected with a named error
+- **WHEN** an assignment carries any shape other than the two accepted ones — e.g. missing
+  schema_version, both `template` and `entries` present, non-dict storage, or entry counts beyond
+  the bound
+- **THEN** the API rejects it with a named error
+
+#### Scenario: Assignment records the effective tick and maintains the schedule tag
+- **WHEN** a schedule is assigned through the API
+- **THEN** the API records `effective_from_tick` (the current world tick at assignment) and
+  maintains a persistent `schedule` tag on the NPC so settlement can find it regardless of when it
+  was spawned or reassigned
+
+#### Scenario: Consumers validate stored schedules with the same parser
+- **WHEN** a consumer reads a stored `db.schedule`
+- **THEN** it validates it with the same parser, and a malformed stored value resolves to
+  "no schedule"
 
 Custom lists SHALL accept optional cycle_days exactly 1 or 7, default 1; template references SHALL inherit their template cycle and SHALL NOT override it at reference or entry level. Parsed schedules SHALL carry the resolved cycle duration.
 

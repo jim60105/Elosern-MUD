@@ -28,7 +28,7 @@ Every page and API request under /gm/ MUST require an authenticated account whos
 - **THEN** the resolver coverage test fails, including fallback routes
 
 ### Requirement: S1 route and payload scope
-The GM API SHALL expose GET /gm/api/session, GET /gm/api/dashboard and GET /gm/api/llm/calls/<call_id>. Session SHALL retain account name, permission level, server time and game version. Dashboard SHALL fold Django responsiveness and real read-only database health into its process section and provide the operations snapshot specified by gm-operations-dashboard. The former /gm/api/health SHALL be removed, without alias or compatibility handler. /gm/ and non-API history paths SHALL serve the shell; unknown APIs SHALL return JSON 404, never the shell. These routes SHALL require the landed S1 access/envelope foundation and S2a transcript contract.
+The GM API SHALL expose GET /gm/api/session, GET /gm/api/dashboard and GET /gm/api/llm/calls/<call_id>. Session SHALL retain account name, permission level, server time and game version. Dashboard SHALL fold Django responsiveness and real read-only database health into its process section and provide the operations snapshot specified by gm-operations-dashboard. /gm/ and non-API history paths SHALL serve the shell; unknown APIs SHALL return JSON 404, never the shell.
 
 #### Scenario: Operator session
 - **WHEN** a permitted account requests session
@@ -46,8 +46,16 @@ The GM API SHALL expose GET /gm/api/session, GET /gm/api/dashboard and GET /gm/a
 - **WHEN** a permitted account requests /gm/api/health or a non-API history path
 - **THEN** health returns the protected JSON 404 envelope and the history path serves the SPA shell
 
+#### Scenario: Health route fully removed
+- **WHEN** the former /gm/api/health route is examined after S1
+- **THEN** it is removed without alias or compatibility handler
+
+#### Scenario: Route prerequisites
+- **WHEN** the S1 routes are landed
+- **THEN** they require the landed S1 access/envelope foundation and S2a transcript contract
+
 ### Requirement: Consistent JSON transport
-Success responses SHALL use `{"ok":true,"data":<payload>}`; failures SHALL use `{"ok":false,"error":{"code":"<snake_case>","message":"<zh-TW>"}}` with the matching HTTP status. Clients SHALL branch on codes rather than messages. The pagination convention SHALL be `cursor=<opaque>&limit=<n>` and data `{"items":[...],"next_cursor":<opaque|null>}`; S1 SHALL add no paginated endpoint. State-changing requests SHALL use POST with Django CSRF protection; S1 SHALL add no production write endpoint and SHALL establish a readable CSRF cookie when serving the shell. Django REST API enablement SHALL remain false.
+Success responses SHALL use `{"ok":true,"data":<payload>}`; failures SHALL use `{"ok":false,"error":{"code":"<snake_case>","message":"<zh-TW>"}}` with the matching HTTP status. Clients SHALL branch on codes rather than messages. The pagination convention SHALL be `cursor=<opaque>&limit=<n>` and data `{"items":[...],"next_cursor":<opaque|null>}`.
 
 #### Scenario: Transport envelope
 - **WHEN** either S1 API succeeds or GM transport returns an authentication, authorization, or not-found failure
@@ -60,6 +68,18 @@ Success responses SHALL use `{"ok":true,"data":<payload>}`; failures SHALL use `
 #### Scenario: Anonymous test POST
 - **WHEN** an anonymous visitor requests the test-only GM POST view with or without a CSRF token
 - **THEN** authentication takes precedence and returns the HTTP 401 `unauthenticated` envelope, with one `gm_request` and the access-denial event
+
+#### Scenario: No paginated endpoint in S1
+- **WHEN** the S1 API surface is enumerated
+- **THEN** S1 adds no paginated endpoint, only the pagination convention above
+
+#### Scenario: Writes are POST with CSRF, none in production
+- **WHEN** a state-changing request is made or the S1 surface is enumerated
+- **THEN** state-changing requests use POST with Django CSRF protection, S1 adds no production write endpoint, and serving the shell establishes a readable CSRF cookie
+
+#### Scenario: Django REST API stays disabled
+- **WHEN** the S1 deployment configuration is checked
+- **THEN** Django REST API enablement remains false
 
 ### Requirement: Facade request and denial events
 Every GM API request SHALL emit an info-level `gm_request` facade event with `account`, `route`, and final `status` in context, including denied and unknown-route requests. Every access denial SHALL emit a warn-level `gm_denied` with `account` or `anonymous` and `route`. New GM modules SHALL use the facade and SHALL NOT be added to the observability freeze file. S1 SHALL add no audit model or `gm_action` write behavior.

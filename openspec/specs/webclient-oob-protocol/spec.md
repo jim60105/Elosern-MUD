@@ -5,9 +5,7 @@ Versioned WebSocket OOB envelopes, epoch/revision ordering, authenticated synchr
 ## Requirements
 
 ### Requirement: Elosern OOB messages use exact versioned envelopes
-The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's existing command/args/kwargs transport triple. Protocol version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types, non-finite numbers, canonical UTF-8 JSON over 65,536 bytes, nesting deeper than 8, an object with more than 64 fields, a list with more than 128 items, a generic string over 2,048 Unicode code points, or an integer outside
-`-9,007,199,254,740,991..9,007,199,254,740,991` (the full JavaScript-safe range); field-specific
-limits SHALL be equal or smaller.
+The WebClient foundation SHALL carry each Elosern OOB message as exactly one JSON object in the first positional argument of Evennia's existing command/args/kwargs transport triple. Protocol version 1 SHALL define client messages `ui_sync` and `ui_action` and server messages `ui_snapshot`, `ui_update`, `ui_action_result`, and `ui_protocol_error`. Every envelope SHALL reject unknown fields, invalid scalar types, and non-finite numbers.
 
 #### Scenario: A version-1 message uses the Evennia transport
 - **WHEN** the server emits a valid version-1 full snapshot
@@ -25,8 +23,16 @@ limits SHALL be equal or smaller.
 - **WHEN** an OOB envelope carries an integer below `-9,007,199,254,740,991` or above `9,007,199,254,740,991`
 - **THEN** the envelope is rejected before dispatch or adoption
 
+#### Scenario: Global structural bounds reject oversized envelopes
+- **WHEN** a message is canonical UTF-8 JSON over 65,536 bytes, nests deeper than 8, holds an object with more than 64 fields, a list with more than 128 items, a generic string over 2,048 Unicode code points, or an integer outside `-9,007,199,254,740,991..9,007,199,254,740,991` (the full JavaScript-safe range)
+- **THEN** every envelope validator rejects the message before dispatch or adoption
+
+#### Scenario: Field-specific limits stay within global bounds
+- **WHEN** a registered field defines a field-specific limit
+- **THEN** that limit SHALL be equal to or smaller than the applicable global bound
+
 ### Requirement: Full snapshots and updates have registered replacement semantics
-A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. `protocol_version` SHALL be integer 1; epoch SHALL be exactly 22 URL-safe ASCII characters generated from 128 random bits; snapshot/update revisions SHALL be positive safe integers excluding booleans; mode SHALL be `creation`, `exploration`, `combat`, or `dialogue`; layout version SHALL be in `1..65,535`; panel names SHALL be 1..64 lowercase identifier characters; and panel count SHALL not exceed 32. `server_time` SHALL contain exactly `year`, `season_index`, `season_label`, `day_in_season`, `hour`, `minute`, and `second`, bounded respectively to the safe non-negative integer range, `0..3`, 1..32 Unicode code points, `1..90`, `0..23`, `0..59`, and `0..59`. Every included update panel SHALL completely replace the prior value; the protocol SHALL NOT use JSON Patch or merge unknown nested state. Because an update's `mode` is recomputed at publication time, the committed mode SHALL NOT diverge from the committed dialogue panel: a `ui_update` whose recomputed mode is `dialogue` SHALL name the `dialogue` panel in its subset, so the client can never hold a dialogue-mode presentation while its stored dialogue panel is stale.
+A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentation_epoch`, `revision`, `mode`, `panels`, `layout_version`, and `server_time`. A `ui_update` SHALL contain the same exact top-level field set, with a nonempty registered subset in `panels`. Every included update panel SHALL completely replace the prior value; the protocol SHALL NOT use JSON Patch or merge unknown nested state.
 
 #### Scenario: Full synchronization replaces the complete store
 - **WHEN** the browser accepts a valid `ui_snapshot`
@@ -48,8 +54,16 @@ A version-1 `ui_snapshot` SHALL contain exactly `protocol_version`, `presentatio
 - **WHEN** an affected-panel update is published while the viewer's recomputed mode resolves to `dialogue` and its named subset omits the `dialogue` panel
 - **THEN** the emitted update still carries a freshly rendered `dialogue` panel alongside the named subset, and the client never commits mode `dialogue` over a stale dialogue panel
 
+#### Scenario: Top-level field value bounds are exact
+- **WHEN** a snapshot or update envelope is validated
+- **THEN** `protocol_version` SHALL be integer 1; `presentation_epoch` SHALL be exactly 22 URL-safe ASCII characters generated from 128 random bits; revisions SHALL be positive safe integers excluding booleans; `mode` — recomputed at publication time so the committed mode never diverges from the committed dialogue panel — SHALL be `creation`, `exploration`, `combat`, or `dialogue`; `layout_version` SHALL be in `1..65,535`; panel names SHALL be 1..64 lowercase identifier characters; and panel count SHALL not exceed 32
+
+#### Scenario: Server time fields are exact and bounded
+- **WHEN** a snapshot or update carries `server_time`
+- **THEN** it SHALL contain exactly `year`, `season_index`, `season_label`, `day_in_season`, `hour`, `minute`, and `second`, bounded respectively to the safe non-negative integer range, `0..3`, 1..32 Unicode code points, `1..90`, `0..23`, `0..59`, and `0..59`
+
 ### Requirement: Result and protocol-error envelopes are exact and non-overlapping
-A version-1 `ui_action_result` SHALL contain exactly `protocol_version`, `presentation_epoch`, `request_id`, `outcome`, `code`, `message`, and `presentation_revision`, plus `correlation_id` only when outcome is `error`, plus the optional `data` slot only when outcome is `success` and the admitted adapter explicitly returns one. `data` SHALL be a JSON object of at most 8 fields, each field name 1..64 lowercase identifier characters and each value a JSON-safe scalar, object, or list within the global envelope bounds measured from the envelope root, and the canonical JSON size of the whole `data` object SHALL fit a fixed budget that reserves room for the seven standard envelope fields under the global canonical byte ceiling so an emitted envelope can never exceed it. It SHALL carry no actor, session, epoch, revision, exception, local path, or live object reference: the validator SHALL reject, recursively at every nesting level, any field name equal to a reserved state key (`actor`, `session`, `epoch`, `revision`, `presentation_epoch`, `presentation_revision`, `correlation_id`, `exception`, `traceback`, `local_path`) or containing one as a dot-separated segment, and JSON-safety SHALL reject live objects and unsupported value types structurally. Outcome SHALL be `success`, `rejected`, `stale`, or `error`; busy SHALL use outcome `rejected` and code `busy`. A version-1 `ui_protocol_error` SHALL contain exactly `protocol_version`, `code`, `message`, and boolean `reload_required`, plus `correlation_id` only when code is `internal_error`. Request IDs SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; stable codes SHALL be 1..64 lowercase dotted or underscored identifier characters; messages SHALL be 1..512 Unicode code points; and correlation IDs SHALL be exactly 32 lowercase hexadecimal characters. Protocol errors SHALL contain no actor, panel, epoch, revision, request payload, exception, or local path.
+A version-1 `ui_action_result` SHALL contain exactly `protocol_version`, `presentation_epoch`, `request_id`, `outcome`, `code`, `message`, and `presentation_revision`, plus `correlation_id` only when outcome is `error` and the optional `data` slot only on `success` when the admitted adapter explicitly returns one. Outcome SHALL be `success`, `rejected`, `stale`, or `error`; busy SHALL use outcome `rejected` and code `busy`. The `data` slot carries no state-identity key or live object reference.
 
 #### Scenario: Internal action error has one safe correlation field
 - **WHEN** an admitted adapter fails unexpectedly
@@ -79,8 +93,24 @@ A version-1 `ui_action_result` SHALL contain exactly `protocol_version`, `presen
 - **WHEN** any currently registered adapter completes with a result that returns no `data`
 - **THEN** the emitted `ui_action_result` contains exactly the prior seven-field envelope (plus `correlation_id` when the outcome is `error`) with no `data` key present
 
+#### Scenario: Data slots stay within the fixed budget
+- **WHEN** a success result carries a `data` object
+- **THEN** it SHALL be a JSON object of at most 8 fields, each field name 1..64 lowercase identifier characters and each value a JSON-safe scalar, object, or list within the global envelope bounds measured from the envelope root, and the canonical JSON size of the whole `data` object SHALL fit a fixed budget that reserves room for the seven standard envelope fields under the global canonical byte ceiling so an emitted envelope can never exceed it
+
+#### Scenario: Data rejects live objects structurally
+- **WHEN** a result's `data` contains a live object reference or an unsupported JSON value type
+- **THEN** JSON-safety SHALL reject it structurally, so no result carries a live object reference
+
+#### Scenario: Protocol error fields are exactly bounded
+- **WHEN** a version-1 `ui_protocol_error` is validated
+- **THEN** it SHALL contain exactly `protocol_version`, `code`, `message`, and boolean `reload_required`, plus `correlation_id` only when code is `internal_error`, and SHALL contain no actor, panel, epoch, revision, request payload, exception, or local path
+
+#### Scenario: Shared identifier and text formats are exact
+- **WHEN** result or protocol-error fields are validated
+- **THEN** request IDs SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; stable codes SHALL be 1..64 lowercase dotted or underscored identifier characters; messages SHALL be 1..512 Unicode code points; and correlation IDs SHALL be exactly 32 lowercase hexadecimal characters
+
 ### Requirement: Every panel payload has an exact availability discriminator
-Each registered panel schema SHALL define an available form and the common unavailable form. The unavailable form SHALL contain exactly `schema_version`, `available: false`, and `reason`; reason SHALL contain bounded `code` and safe Traditional Chinese `message`, plus a bounded `correlation_id` only for an internal presenter failure. The unavailable form's `schema_version` SHALL equal the panel's registered schema version — the same version the panel's available form carries — so the client's registered-version gate accepts it. Available payloads SHALL contain `available: true` and only fields defined by their panel schema.
+Each registered panel schema SHALL define an available form and the common unavailable form. The unavailable form SHALL contain exactly `schema_version`, `available: false`, and `reason`; reason SHALL contain bounded `code` and safe Traditional Chinese `message`, plus a bounded `correlation_id` only for an internal presenter failure. Available payloads SHALL contain `available: true` and only fields defined by their panel schema.
 
 #### Scenario: Missing canonical data uses a safe unavailable value
 - **WHEN** a presenter cannot read required canonical data without mutation
@@ -94,8 +124,12 @@ Each registered panel schema SHALL define an available form and the common unava
 - **WHEN** the character presenter reports the common unavailable form for a character panel registered at schema version 3
 - **THEN** the unavailable payload carries `schema_version: 3` and the client accepts it, and a payload carrying any other version (`schema_version: 2`) is rejected without replacing or merging the stored panel
 
+#### Scenario: Unavailable schema versions match the registered gate
+- **WHEN** an unavailable panel payload is validated against the client's registered-version gate
+- **THEN** the unavailable form's `schema_version` SHALL equal the panel's registered schema version — the same version the panel's available form carries — so the gate accepts it
+
 ### Requirement: Presentation ordering is scoped by transport and puppet epoch
-The server SHALL generate a bounded cryptographically unpredictable presentation epoch for each live WebSocket transport and active-puppet sequence. Reconnection and puppet change SHALL create a new epoch and reset the ephemeral revision sequence. On each browser `connection_open`, the client SHALL begin a new local transport generation, retire the prior active epoch in bounded memory, clear presentation state, and enter `awaiting_initial_snapshot`. Only the first valid full snapshot delivered for the current generation with a non-retired epoch SHALL establish the active epoch; updates and results SHALL NOT establish it. Once active, every different-epoch presentation on that same transport SHALL be discarded. Epochs, generations, revisions, and retired-epoch memory SHALL NOT be persisted to Accounts, characters, Scripts, localStorage, or any canonical game record.
+The server SHALL generate a bounded cryptographically unpredictable presentation epoch for each live WebSocket transport and active-puppet sequence. Reconnection and puppet change SHALL create a new epoch and reset the ephemeral revision sequence. On each browser `connection_open`, the client SHALL begin a new local transport generation, retire the prior active epoch in bounded memory, clear presentation state, and enter `awaiting_initial_snapshot`.
 
 #### Scenario: Reconnect accepts a lower revision in a new epoch
 - **WHEN** a browser previously rendered epoch A revision 40 and receives the first valid full snapshot for its reconnected transport as epoch B revision 1
@@ -121,6 +155,18 @@ The server SHALL generate a bounded cryptographically unpredictable presentation
 - **WHEN** a message callback tagged with an older local transport generation fires after reconnection
 - **THEN** the browser discards it before epoch or revision evaluation
 
+#### Scenario: Only the first valid snapshot establishes the epoch
+- **WHEN** the current transport generation receives snapshots, updates, or results for a non-retired epoch
+- **THEN** only the first valid full snapshot delivered for that generation establishes the active epoch; updates and results SHALL NOT establish it
+
+#### Scenario: Different-epoch presentations are discarded once active
+- **WHEN** an epoch is active and another presentation for a different epoch arrives on that same transport
+- **THEN** every different-epoch presentation on that transport SHALL be discarded
+
+#### Scenario: Presentation ordering state is never persisted
+- **WHEN** epochs, generations, revisions, or retired-epoch memory exist during play
+- **THEN** they SHALL NOT be persisted to Accounts, characters, Scripts, localStorage, or any canonical game record
+
 ### Requirement: Synchronization requires an authenticated WebSocket puppet
 `ui_sync` SHALL accept exactly `{protocol_version: 1}` from an authenticated WebSocket session with an active puppet. Actor identity SHALL be obtained only from the session. Anonymous sessions, sessions without a puppet, unsupported protocol versions, non-WebSocket sessions, and client-supplied actor identity SHALL receive no character presentation state.
 
@@ -138,35 +184,7 @@ The server SHALL generate a bounded cryptographically unpredictable presentation
 
 ### Requirement: Presenter registration and execution are isolated and read-only
 
-The presentation registry SHALL reject duplicate panel names and SHALL expose
-only registered stable panel names to the coordinator. The registered production
-set SHALL include the `gallery`, `combat_beats` and `skill_use` panels alongside the existing
-registered panels; adding a registered panel SHALL remain a registry-registration
-act and SHALL NOT change any envelope schema. Each presenter SHALL receive
-session-derived read context, SHALL return JSON-safe panel data without invoking
-mutation APIs, and SHALL execute independently so one presenter failure cannot
-suppress other panels or narrative output. The dispatcher's completion
-publication for an admitted action that settled an ordinary combat round SHALL
-add the frozen record of that round to the read context; every other publication
-path SHALL build its context without a round record. The record
-SHALL be immutable, SHALL NOT be persisted, and SHALL NOT be serialized into any
-result envelope. A presenter whose subject is the account owning the
-rendered puppet, rather than the puppet itself, SHALL derive that account from
-the rendered actor's own ownership link and SHALL be held to the identical
-read-only, isolation, and availability-discriminator contract as every
-puppet-subject presenter; it SHALL NOT widen the read context to the transport
-session and SHALL NOT read any account the rendered actor does not belong to.
-The registry SHALL derive each panel's registered schema version from the panel
-schema's single server-side constant in its presenter module, and the client's
-panel allowlist and per-panel schema-version re-checks SHALL mirror the same
-value under a dual-direction parity contract so the two never diverge.
-
-The `skill_use` presenter SHALL receive only a copied skill/scale presentation
-selection belonging to the current transport-and-puppet epoch, never the transport
-session itself. It SHALL recompute current canonical availability without invoking
-a cast, creating a combat record or clock, or changing persistent state. An absent
-or retired selection SHALL produce its common unavailable form. This registration
-SHALL NOT change existing panel schema versions or the envelope protocol version.
+The presentation registry SHALL reject duplicate panel names and SHALL expose only registered stable panel names to the coordinator; adding a registered panel SHALL remain a registry-registration act and SHALL NOT change any envelope schema. Each presenter SHALL receive session-derived read context, SHALL return JSON-safe panel data without invoking mutation APIs, and SHALL execute independently so one presenter failure cannot suppress other panels or narrative output.
 
 #### Scenario: Duplicate presenter registration fails
 
@@ -207,8 +225,29 @@ SHALL NOT change existing panel schema versions or the envelope protocol version
 - **WHEN** a selected skill is rendered and the session later adopts another puppet/epoch
 - **THEN** `skill_use` is registered at version 1, other registered versions remain unchanged, no gameplay state was mutated by rendering, and the new epoch receives no old selection
 
+#### Scenario: Registered production panels join additively
+- **WHEN** the production registry is built
+- **THEN** the registered production set SHALL include the `gallery`, `combat_beats` and `skill_use` panels alongside the existing registered panels
+
+#### Scenario: The combat round record is ephemeral and immutable
+- **WHEN** the dispatcher's completion publication for an admitted action that settled an ordinary combat round builds its read context
+- **THEN** it SHALL add the frozen record of that round to the context, every other publication path SHALL build its context without a round record, and the record SHALL be immutable, SHALL NOT be persisted, and SHALL NOT be serialized into any result envelope
+
+#### Scenario: Account-subject presenters are derived and bounded
+- **WHEN** a presenter's subject is the account owning the rendered puppet, rather than the puppet itself
+- **THEN** it SHALL derive that account from the rendered actor's own ownership link, SHALL be held to the identical read-only, isolation, and availability-discriminator contract as every puppet-subject presenter, SHALL NOT widen the read context to the transport session, and SHALL NOT read any account the rendered actor does not belong to
+
+#### Scenario: Skill use recomputes availability without mutation
+- **WHEN** the `skill_use` presenter renders a selection
+- **THEN** it SHALL receive only a copied skill/scale presentation selection belonging to the current transport-and-puppet epoch, never the transport session itself, SHALL recompute current canonical availability without invoking a cast, creating a combat record or clock, or changing persistent state, and an absent or retired selection SHALL produce its common unavailable form
+- **AND** this registration SHALL NOT change existing panel schema versions or the envelope protocol version
+
+#### Scenario: Panel versions derive from module constants
+- **WHEN** the registry registers a panel's schema version
+- **THEN** it SHALL derive the registered version from the panel schema's single server-side constant in its presenter module, and the client's panel allowlist and per-panel schema-version re-checks SHALL mirror the same value under a dual-direction parity contract so the two never diverge
+
 ### Requirement: WebClient text commands refresh presentation after completion
-The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL attempt a full snapshot from then-current canonical state only after a WebClient command settles and SHALL NOT emit graphical state for Telnet commands. Presentation failure SHALL be logged separately and SHALL NOT consume a command failure. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.
+The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL attempt a full snapshot from then-current canonical state only after a WebClient command settles and SHALL NOT emit graphical state for Telnet commands. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.
 
 #### Scenario: A completed WebClient command refreshes state
 - **WHEN** a puppeted WebClient submits an ordinary synchronous text command that changes canonical state
@@ -225,6 +264,10 @@ The project `text` input function SHALL preserve Evennia's ordinary command sema
 #### Scenario: Command errback preserves failure semantics
 - **WHEN** a WebClient command handler Deferred settles through its errback path
 - **THEN** the wrapper preserves the original Failure and ordinary error output while attempting at most one safe post-settlement refresh
+
+#### Scenario: Presentation failure never consumes a command failure
+- **WHEN** the post-settlement snapshot attempt fails
+- **THEN** the presentation failure SHALL be logged separately and SHALL NOT consume a command failure
 
 ### Requirement: Protocol failures degrade without disabling text play
 Before a valid full snapshot, the WebClient SHALL disable graphical mutation controls. A malformed panel SHALL disable only that renderer and request at most one full resynchronization for the same failure episode. An incompatible protocol SHALL disable all graphical mutation controls and offer reload. OOB initialization failure SHALL leave narrative output and ordinary text input usable.

@@ -8,23 +8,10 @@ with stable dbref identity, one transition per event, and instance-pin release o
 
 ### Requirement: DEFEAT progress is planned automatically from committed player action events
 The quest event-effect planner SHALL inspect `target_defeated` entries produced by an
-`ActionResolver` request or by the combat upkeep settlement. It SHALL advance only active DEFEAT
-stages owned by the acting entity when that entity is a `PlayerCharacter`, and SHALL additionally
-advance the owner's matching stage when the acting entity is a bound companion of the owner (per the
-party binding) and is not knocked out; a companion's entries SHALL follow the same aggregation, cap,
-and one-transition rules as the owner's own. A
-bound-target objective SHALL match `data["target_id"]` against the record's `objective_target_ids`; an
-unbound tier objective SHALL match its declared `monster_tier`; a regional species-hunt objective SHALL
-match by the species-hunt rules below. Display
-keys SHALL NOT be used as entity identity. Counting SHALL key on the defeated individual's persistent
-identity, and each record SHALL keep the set of individual identities already counted for its current
-objective: a duplicate or redelivered `target_defeated` entry for an identity this record has already
-counted SHALL advance nothing. The resulting quest mutation SHALL commit in the same
-action or combat-round transaction as the lethal damage. The planner SHALL aggregate every matching
-defeat entry in one EventLog per quest, cap progress at the current objective quantity, perform at
-most one stage transition, and discard surplus kills rather than applying them to the next stage.
-Simulated defeats (guild examinations) and unattributed upkeep ticks SHALL advance no quest and SHALL
-not fail a protected entity.
+`ActionResolver` request or the combat upkeep settlement, advancing only active DEFEAT stages
+owned by a `PlayerCharacter` actor. Counting SHALL key on the defeated individual's persistent
+identity, never display keys, and the quest mutation SHALL commit in the same action or
+combat-round transaction as the lethal damage.
 
 #### Scenario: Player defeat advances a matching tier objective automatically
 - **WHEN** a player action lethally damages a monster whose tier matches the player's active DEFEAT stage
@@ -71,17 +58,36 @@ not fail a protected entity.
 - **WHEN** a lethal rate tick fires inside a guild examination, or an upkeep tick has no resolvable source
 - **THEN** no quest DEFEAT stage advances and no protected-entity failure occurs
 
+#### Scenario: A bound non-knocked-out companion kill advances the owner's stage
+- **WHEN** the acting entity is a bound companion of the owner (per the party binding) and is not knocked out
+- **THEN** the owner's matching stage advances under the same aggregation, cap, and one-transition rules as the owner's own
+
+#### Scenario: Bound-target objective matches target_id against the bound id set
+- **WHEN** the objective is bound-target
+- **THEN** matching is `data["target_id"]` against the record's `objective_target_ids`
+
+#### Scenario: Unbound tier objective matches the declared monster_tier
+- **WHEN** the objective is an unbound tier objective
+- **THEN** matching is against its declared `monster_tier`
+
+#### Scenario: Regional species-hunt objective uses the species-hunt rules
+- **WHEN** the objective is a regional species-hunt objective
+- **THEN** matching follows the species-hunt rules below
+
+#### Scenario: Duplicate or redelivered entries for counted identities advance nothing
+- **WHEN** a duplicate or redelivered `target_defeated` entry names an individual identity this record has already counted for its current objective
+- **THEN** the entry advances nothing, because each record keeps the set of individual identities already counted for its current objective
+
+#### Scenario: Planner aggregation caps progress with one transition and no surplus carryover
+- **WHEN** several matching defeat entries appear in one EventLog for a quest
+- **THEN** the planner SHALL aggregate every matching entry into that one EventLog per quest, cap progress at the current objective quantity, perform at most one stage transition, and discard surplus kills rather than applying them to the next stage
+
 ### Requirement: Room arrival drives REACH and ESCORT through supported persistent room hooks
 `QuestObservableRoomMixin.at_object_receive()` SHALL call its parent hook and then
-`observe_room_entry(self, obj)` for a `PlayerCharacter`. `GridRoom` SHALL adopt the mixin and
-`AnchorRoom` SHALL inherit it. `InstanceRoom` SHALL adopt it while preserving its existing interacted
-flag behavior. REACH SHALL match an anchor key, exact XYZ tuple, or bound instance dbref. Arrival
-observation SHALL advance when the player is the arriving object and at least one bound companion
-is present in the destination room — already there or arriving with the player — and SHALL be
-re-run once after companion follow moves complete so first-arrival co-presence is visible, with
-the one-transition rule making the repeated observation idempotent. ESCORT SHALL
-additionally require at least one protected entity and require every protected entity to be alive and
-present in the destination room.
+`observe_room_entry(self, obj)` for a `PlayerCharacter`. `GridRoom` SHALL adopt the mixin,
+`AnchorRoom` SHALL inherit it, and `InstanceRoom` SHALL adopt it while preserving its existing
+interacted flag behavior. REACH SHALL match an anchor key, exact XYZ tuple, or bound instance
+dbref, and arrival observation SHALL advance only when the player is the arriving object.
 
 #### Scenario: Anchor arrival completes a matching REACH stage
 - **WHEN** the player enters an `AnchorRoom` whose `anchor_key` matches the active stage locator
@@ -108,6 +114,18 @@ present in the destination room.
 #### Scenario: Existing instance interaction behavior remains intact
 - **WHEN** a player enters an `InstanceRoom`
 - **THEN** `interacted` becomes true and quest arrival observation also runs
+
+#### Scenario: Arrival requires a bound companion present in the destination
+- **WHEN** arrival observation runs for a matching destination
+- **THEN** it advances only when at least one bound companion is present in the destination room — already there or arriving with the player
+
+#### Scenario: Observation is re-run once after companion follow moves complete
+- **WHEN** companion follow moves complete after an arrival
+- **THEN** arrival observation is re-run once so first-arrival co-presence is visible, with the one-transition rule making the repeated observation idempotent
+
+#### Scenario: ESCORT requires a protected entity roster
+- **WHEN** an ESCORT arrival is evaluated
+- **THEN** at least one protected entity is required
 
 ### Requirement: Wilderness rooms do not advertise an arrival hook that normal traversal bypasses
 `TerrainRoom` SHALL NOT adopt `QuestObservableRoomMixin`, and no definition registered by this change
@@ -153,10 +171,7 @@ amount. Terminal records SHALL ignore later matching events, hooks, and transfer
 ### Requirement: Change 15 exposes a deterministic no-AI completion seam for Phase 4
 An integration test SHALL synchronize the hand-written catalog, accept its introductory hunt, resolve a
 player's lethal action against a matching monster through `ActionResolver`, and observe the quest become
-completed without directly calling quest progress functions or importing `world/ai/`. This completed
-record SHALL be suitable for change 16's future player-facing accept/combat-entry/turn-in and reward
-settlement. This API-level test SHALL NOT be treated as proof that the player-playable Phase-4 milestone
-is complete before that command-level change-16 integration exists.
+completed without directly calling quest progress functions or importing `world/ai/`.
 
 #### Scenario: Hand-written hunt completes through ordinary combat resolution
 - **WHEN** AI services are unavailable and an integration test accepts the catalog hunt through the
@@ -164,9 +179,17 @@ is complete before that command-level change-16 integration exists.
 - **THEN** deterministic resolution produces a `COMPLETED` record ready for change 16, without claiming
   that change 15 alone supplied player commands or a world encounter
 
+#### Scenario: Completed record is suitable for change 16
+- **WHEN** the seam produces its completed record
+- **THEN** the record SHALL be suitable for change 16's future player-facing accept/combat-entry/turn-in and reward settlement
+
+#### Scenario: API-level test is not milestone proof
+- **WHEN** this API-level test passes
+- **THEN** it SHALL NOT be treated as proof that the player-playable Phase-4 milestone is complete before that command-level change-16 integration exists
+
 ### Requirement: Arrival observation advances at most one per event and never exceeds quantity
 
-REACH/ESCORT arrival observation SHALL increment stage progress by at most one per matching arrival event and SHALL cap progress at the objective quantity, so even a non-1 quantity (should one slip through) can never jump to full completion in a single arrival. The post-follow re-observation (party-follow D-2) SHALL NOT re-count the same arrival event: when a companion was already present in the destination, the re-run is skipped because the first observation has already advanced every matching stage for that event.
+REACH/ESCORT arrival observation SHALL increment stage progress by at most one per matching arrival event and SHALL cap progress at the objective quantity, so even a non-1 quantity (should one slip through) can never jump to full completion in a single arrival.
 
 #### Scenario: First arrival with quantity one completes the stage
 
@@ -178,17 +201,16 @@ REACH/ESCORT arrival observation SHALL increment stage progress by at most one p
 - **WHEN** a matching arrival would advance progress beyond the objective quantity
 - **THEN** progress is capped at the quantity and the quest transitions at most once
 
+#### Scenario: Post-follow re-observation never re-counts the same arrival
+- **WHEN** the post-follow re-observation (party-follow D-2) runs and a companion was already present in the destination
+- **THEN** the re-run is skipped because the first observation has already advanced every matching stage for that event, so it SHALL NOT re-count the same arrival event
+
 ### Requirement: Species-hunt objectives match by variant membership, region, and persistent identity
 The quest planner SHALL evaluate a regional species-hunt DEFEAT objective against the `target_defeated`
 entry's species/variant identity fields: an entry counts only when its species key equals the
 objective's species key, its variant key is one of the objective's countable variant keys, and the
-defeated individual's location resolved inside the objective's declared region at defeat time. Each
-distinct persistent individual identity counts at most once per record (composing with the
-already-counted-identity dedupe), including stronger same-species variants in a general hunt — one
-stronger individual never counts twice and is never required when ordinary-eligible targets suffice. An
-entry with no species identity (tier-only individual) SHALL never satisfy a species hunt, and a hunt
-whose countable variants name specific variants SHALL count only those. Matching SHALL NOT consult
-display names, guild rank, or a single stat.
+defeated individual's location resolved inside the objective's declared region at defeat time.
+Matching SHALL NOT consult display names, guild rank, or a single stat.
 
 #### Scenario: A countable stronger variant counts once
 - **WHEN** a general hunt counts eligible variants and a stronger same-species individual inside the region is defeated
@@ -209,3 +231,15 @@ display names, guild rank, or a single stat.
 #### Scenario: Tier-only kills never satisfy a species hunt
 - **WHEN** a tier-only monster without species identity is defeated inside the region
 - **THEN** the species-hunt objective's progress is unchanged
+
+#### Scenario: Each distinct persistent individual identity counts at most once per record
+- **WHEN** eligible defeats are counted for one record
+- **THEN** each distinct persistent individual identity counts at most once, composing with the already-counted-identity dedupe
+
+#### Scenario: Stronger same-species variants count once and are never required
+- **WHEN** stronger same-species variants appear in a general hunt
+- **THEN** one stronger individual never counts twice and is never required when ordinary-eligible targets suffice
+
+#### Scenario: A specific-variant hunt counts only its named variants
+- **WHEN** a hunt's countable variants name specific variants
+- **THEN** only those variants are counted

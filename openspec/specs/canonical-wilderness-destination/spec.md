@@ -12,16 +12,10 @@ presentation surface (minimap, exploration menu, future surfaces) consumes this 
 ### Requirement: Wilderness destination resolution is canonical, shared, and registry-driven
 The system SHALL provide one resolver that derives the actual arrival node for a wilderness
 direction from the current coordinates, direction, and the gateway rules of
-`WILDERNESS_ENTRY_REGISTRY`, matching `WildernessReturnExit.at_traverse` semantics exactly
-(including every registered gate step that returns to the grid), and SHALL NOT derive
-destinations from the pooled self-loop `exit_obj.destination`. The gateway lookup and the
-neighbor-validity rule SHALL each be a single shared helper that `WildernessReturnExit` also
-uses — no duplicated per-call-site rule. The resolver SHALL return the `grid:` node of the
-gate's destination room when the coordinates equal a registered gate's `approach_cell` and the
-direction equals that gate's `return_direction`; SHALL return `None` when the neighbor cell is
-provider-invalid (out of the continent rectangle or an anchor footprint cell), mirroring the step
-refusal; and SHALL otherwise return the adjacent `wild:` node. The legacy single-pair rule
-(direction `"s"` at an entry's single `wilderness_xy`) SHALL NOT exist in any form.
+`WILDERNESS_ENTRY_REGISTRY`, and SHALL NOT derive destinations from the pooled self-loop
+`exit_obj.destination`. It returns the gate's destination room `grid:` node at a registered
+gate's `approach_cell` and `return_direction`, `None` on a provider-invalid neighbor cell,
+and otherwise the adjacent `wild:` node.
 
 #### Scenario: Wilderness direction resolves to the true neighbor
 - **WHEN** the resolver is asked for the north direction from `wild:(60, 96)`
@@ -54,3 +48,19 @@ refusal; and SHALL otherwise return the adjacent `wild:` node. The legacy single
 - **WHEN** the resolver is asked for a registered gate direction and the gate's destination
   `GridRoom` does not exist
 - **THEN** it returns `None`, matching the return exit's fail-closed refusal
+
+#### Scenario: Resolver semantics mirror the return exit exactly
+- **WHEN** the resolver's rules are compared with `WildernessReturnExit.at_traverse`
+- **THEN** they match exactly, including every registered gate step that returns to the grid
+
+#### Scenario: Gateway lookup and validity rule are shared helpers
+- **WHEN** the gateway lookup or the neighbor-validity rule is invoked by any caller
+- **THEN** each is a single shared helper that `WildernessReturnExit` also uses — no duplicated per-call-site rule
+
+#### Scenario: Provider-invalid spans out-of-rectangle and footprint cells
+- **WHEN** a neighbor cell is provider-invalid — out of the continent rectangle or an anchor footprint cell
+- **THEN** resolution returns `None`, mirroring the step refusal
+
+#### Scenario: The legacy single-pair rule is gone entirely
+- **WHEN** destination resolution is searched for the legacy single-pair rule (direction `"s"` at an entry's single `wilderness_xy`)
+- **THEN** it does not exist in any form

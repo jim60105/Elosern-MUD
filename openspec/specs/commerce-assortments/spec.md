@@ -13,17 +13,6 @@ keys as its identity; exact integer buy/sell copper, max/initial stock and
 restock quantity for each of those keys SHALL come from tunable rules
 outside the identity registry.
 
-Loading SHALL join the two sources and reject an assortment whose item set
-and offer rules disagree in either direction, an unknown item key, a
-non-integer money value, a negative price, a sell price above its buy price,
-a buy price outside the item's price band, and stock outside
-`0 <= initial <= max` with a positive restock quantity. These are the same
-rejections the per-shop join enforced; they are now evaluated once per
-assortment.
-
-An assortment SHALL NOT declare opening hours, a host, or a location. It
-describes goods, not a business.
-
 #### Scenario: An assortment missing an offer fails load
 - **WHEN** an assortment names an item key for which no offer rule exists
 - **THEN** catalog validation raises naming the assortment and the item,
@@ -38,6 +27,18 @@ describes goods, not a business.
 - **WHEN** several shops reference the same assortment
 - **THEN** its item/offer alignment is evaluated once, and a defect in it is
   reported against the assortment rather than repeated per shop
+
+#### Scenario: Loading joins the two sources with the same rejections
+- **WHEN** catalog loading joins the identity registry and the tunable offer rules
+- **THEN** loading SHALL join the two sources and reject an assortment whose item set and offer rules disagree in either direction, an unknown item key, a non-integer money value, a negative price, a sell price above its buy price, a buy price outside the item's price band, and stock outside `0 <= initial <= max` with a positive restock quantity
+
+#### Scenario: Rejections are evaluated once per assortment
+- **WHEN** the join rejections are evaluated
+- **THEN** these are the same rejections the per-shop join enforced; they are now evaluated once per assortment
+
+#### Scenario: An assortment describes goods, not a business
+- **WHEN** an assortment is declared
+- **THEN** it SHALL NOT declare opening hours, a host, or a location; it describes goods, not a business
 
 ### Requirement: An assortment may not contain a keepsake-band item
 Catalog loading SHALL reject an assortment containing an item whose
@@ -65,21 +66,6 @@ every shop at once.
 A shop SHALL declare which assortments it references rather than listing its
 own item keys. Its offered goods SHALL be the union of those assortments'
 item sets, and its offer rules SHALL be those assortments' offer rules.
-
-A shop SHALL reference at least one assortment. Referencing an unknown
-assortment SHALL fail catalog load. An item key contained by two of one
-shop's referenced assortments SHALL fail catalog load naming the shop, the
-item and both assortments, because the resolver would otherwise have to pick
-one of two prices by an unstated precedence rule.
-
-That rejection SHALL be scoped to a single shop. Two different shops whose
-assortments both contain one item key SHALL be accepted: one good sold in
-two places at two prices is the model working, not a collision.
-
-The resolved result SHALL be indistinguishable to every downstream consumer
-from a hand-listed shop: trading, stock persistence, restocking, opening
-hours and the player-facing commands SHALL observe the same flat set of
-priced offers they observed before assortments existed.
 
 #### Scenario: Two shops referencing one assortment stock the same goods
 - **WHEN** two shops reference the same assortment and nothing else
@@ -109,6 +95,22 @@ priced offers they observed before assortments existed.
 - **THEN** wallet, inventory, stock, acquisition progress and merchant
   affinity settle exactly as they do for a shop with hand-listed goods
 
+#### Scenario: A shop must reference at least one assortment
+- **WHEN** a shop is declared
+- **THEN** it SHALL reference at least one assortment
+
+#### Scenario: Duplicate item within one shop fails load for want of precedence
+- **WHEN** an item key is contained by two of one shop's referenced assortments
+- **THEN** it SHALL fail catalog load naming the shop, the item and both assortments, because the resolver would otherwise have to pick one of two prices by an unstated precedence rule
+
+#### Scenario: The duplicate rejection is scoped to one shop
+- **WHEN** two different shops' assortments both contain one item key
+- **THEN** that rejection SHALL be scoped to a single shop and the two shops SHALL be accepted: one good sold in two places at two prices is the model working, not a collision
+
+#### Scenario: Resolution is indistinguishable downstream
+- **WHEN** a shop's goods resolve from assortments
+- **THEN** the result SHALL be indistinguishable to every downstream consumer from a hand-listed shop: trading, stock persistence, restocking, opening hours and the player-facing commands SHALL observe the same flat set of priced offers they observed before assortments existed
+
 ### Requirement: Every shop's numeric rules are accounted for at load
 Catalog loading SHALL verify that every shop in the identity registry has
 tunable rules, and SHALL reject the catalog naming any shop that does not.
@@ -134,11 +136,6 @@ file, read in sorted filename order so the load is deterministic. Its
 `assortments:` and `shops:` lists SHALL concatenate across files and its
 `price_scales:` mappings SHALL merge.
 
-An assortment key, a shop key or a settlement scale declared in more than one
-file SHALL fail load naming the key and both files. Splitting the rulebook is
-only worth doing if each file owns what it declares, and a merge where the
-last file silently wins would remove exactly that guarantee.
-
 #### Scenario: Sections spread across files load as one catalog
 - **WHEN** the commerce rulebook directory holds assortments and shops split
   across several files
@@ -153,3 +150,11 @@ last file silently wins would remove exactly that guarantee.
 #### Scenario: The split changes no resolved offer
 - **WHEN** the resolved shop catalog is compared before and after the split
 - **THEN** every shop's offers, prices, stock and hours are unchanged
+
+#### Scenario: Duplicate declarations across files fail load
+- **WHEN** an assortment key, a shop key or a settlement scale is declared in more than one file
+- **THEN** load SHALL fail naming the key and both files
+
+#### Scenario: Each file owns what it declares
+- **WHEN** the rulebook is split across files
+- **THEN** splitting the rulebook is only worth doing if each file owns what it declares, and a merge where the last file silently wins would remove exactly that guarantee

@@ -10,21 +10,8 @@ identically by the text look command, the `at_look` seam, and the webclient expl
 The object-appearance layer SHALL render its presentation frames in Traditional Chinese for every
 entry path: the text look command (localized 「看」), the character's `at_look` hook, and the
 webclient `explore.look` action SHALL all produce the same zh-tw appearance. The room frame SHALL
-label its exits as 「出口」 (never `Exits:`), its contents/characters sections with zh-tw headers
-(never `Characters:` or `You see`), and the default description of an un-described object SHALL be
-zh-tw (never `You see nothing special.`). The room frame SHALL additionally render
-`room.db.scene_flavor` as a paragraph after the room description and before the 「出口」 line when
-the attribute is present. Every room typeclass (`Room`, `GridRoom`, `AnchorRoom`, `TerrainRoom`,
-`InstanceRoom`) SHALL render the shared zh-tw room frame — including the flavor-bearing
-`InstanceRoom`, which is not a subclass of `Room` (design D4 correction); no English frame string
-SHALL appear in the appearance of a room. A room without a flavor SHALL render no flavor paragraph:
-its appearance SHALL be identical to the flavor-bearing rendering of the same room except for the
-absence of that paragraph. No English frame string SHALL appear in the appearance
-of a room or object. The appearance of an NPC SHALL additionally include one affinity stage line
-(for example 「她看著你的眼神裡帶著信賴。」) rendered by the shared layer from the NPC's affinity
-record for the looking player, identical across all three entry paths; the numeric affinity value,
-cap, and threshold SHALL never appear, and entities without an affinity record SHALL render no
-stage line.
+label its exits as 「出口」 (never `Exits:`). No English frame string SHALL appear in the appearance
+of a room or object.
 
 #### Scenario: The text look command shows a zh-tw frame
 
@@ -68,6 +55,41 @@ stage line.
 - **THEN** the appearance is byte-identical to the same room with the flavor attribute absent —
   no flavor paragraph appears, the zh-tw room frame is unchanged, and the flavor feature adds
   nothing to a flavor-less room
+
+#### Scenario: Room sections use zh-tw headers
+
+- **WHEN** a player looks at a room whose frame has contents/characters sections
+- **THEN** those sections carry zh-tw headers and never `Characters:` or `You see`
+
+#### Scenario: An un-described object renders a zh-tw default description
+
+- **WHEN** a player looks at an object with no description of its own
+- **THEN** the default description is zh-tw and never `You see nothing special.`
+
+#### Scenario: The room frame renders scene_flavor in position
+
+- **WHEN** a room carries `room.db.scene_flavor`
+- **THEN** the room frame renders it as a paragraph after the room description and before the
+  「出口」 line
+
+#### Scenario: Every room typeclass renders the shared zh-tw room frame
+
+- **WHEN** a player looks at a `Room`, `GridRoom`, `AnchorRoom`, `TerrainRoom`, or `InstanceRoom`
+- **THEN** each renders the shared zh-tw room frame — including the flavor-bearing `InstanceRoom`,
+  which is not a subclass of `Room` (design D4 correction)
+
+#### Scenario: A flavor-less room matches the flavor-bearing rendering minus the paragraph
+
+- **WHEN** the appearance of a room without a flavor is compared to the flavor-bearing rendering
+  of the same room
+- **THEN** the two are identical except for the absence of the flavor paragraph
+
+#### Scenario: The affinity stage line is one shared-layer line per NPC
+
+- **WHEN** a player looks at an NPC with an affinity record for them
+- **THEN** the NPC appearance includes one affinity stage line (for example
+  「她看著你的眼神裡帶著信賴。」) rendered by the shared layer from the NPC's affinity record
+  for the looking player, identical across all three entry paths
 
 ### Requirement: Target appearance includes the displayed-stats block on every entry path
 The shared target-appearance layer SHALL append the displayed-stats block (`display_stat_block`)

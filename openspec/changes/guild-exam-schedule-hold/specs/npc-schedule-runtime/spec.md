@@ -90,3 +90,27 @@ The source SHALL consult an exam-owned persisted hold before settling host movem
 - **WHEN** a synthetic exam-owned hold covers a window with host movement/state and another NPC occurrence
 - **THEN** host location/state remain unchanged, other NPC settles normally and release can consume the held occurrences once without another clock advance
 
+#### Scenario: The schedule tag is maintained by the assignment API and startup sync
+- **WHEN** settlement queries the NPCs to settle
+- **THEN** it selects NPCs carrying the persistent `schedule` tag, which the `npc-schedule-model` assignment API and startup sync maintain
+
+#### Scenario: npc_stable_id is the persistent JSON-safe primary key
+- **WHEN** occurrences are ordered for settlement
+- **THEN** `npc_stable_id` is the persistent primary key (`npc_id`), unique and JSON-safe where display keys are not
+
+#### Scenario: An occurrence due exactly at the start boundary follows the effective-from rule
+- **WHEN** an occurrence is due exactly at `start_tick`
+- **THEN** it settles only when `effective_from_tick` equals that tick (the assignment happened at that same moment, so no earlier window could have settled it); any other occurrence at the start boundary was already settled by the preceding window
+
+#### Scenario: A move entry traverses the real Exit path under locks and vetoes
+- **WHEN** a due `move` entry is settled
+- **THEN** it resolves its target to a destination room and traverses the real Exit path from the NPC's current room, where locks and vetoes apply; on success it sets `schedule_state` to the referenced template's `default_state` and emits `npc_departed` / `npc_arrived` events
+
+#### Scenario: Every event carries a JSON-safe payload and computed due tick
+- **WHEN** a settlement event is emitted
+- **THEN** it carries a JSON-safe payload (the stable `npc_id`, a display `npc` key, and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`
+
+#### Scenario: Silenced NPCs are skipped first
+- **WHEN** settlement runs and `world/rules/service_gate.py::schedule_silenced(npc)` is true for an NPC — a bound party companion carrying a `place`-bound service component outside its anchor room
+- **THEN** settlement skips that NPC first, producing no entries, no events, and no state change for it, exactly as a schedule-less NPC, while every other NPC settles byte-identically to the pre-change settlement
+

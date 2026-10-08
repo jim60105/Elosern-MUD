@@ -60,10 +60,7 @@ design doc §5.2 names for that class.
 
 ### Requirement: LivingEntity non-trait handlers are working implementations including persona
 `LivingEntity` SHALL expose `traits`, `sexual`, `buffs`, `equipment`, `skills`, `relations`, and
-`persona` as working handlers (each owned by its capability change: traits by entity-traits,
-sexual by the sexual-state handler, buffs by the buff-handler integration, equipment and skills by
-equipment-inventory and the skill handler, relations by the affinity capability, persona by the
-persona-store capability). `persona` SHALL be a `PersonaStore` mount backed by the verbatim
+`persona` as working handlers. `persona` SHALL be a `PersonaStore` mount backed by the verbatim
 `entity.db.persona` record.
 
 #### Scenario: Non-trait handlers exist as working implementations
@@ -83,6 +80,10 @@ persona-store capability). `persona` SHALL be a `PersonaStore` mount backed by t
 - **THEN** `world/rules/persona.py` defines the `PersonaStore` class and no `AttributeProperty`
   persona placeholder remains on `LivingEntity`
 
+#### Scenario: Each handler is owned by its capability change
+- **WHEN** handler ownership is traced
+- **THEN** traits is owned by entity-traits, sexual by the sexual-state handler, buffs by the buff-handler integration, equipment and skills by equipment-inventory and the skill handler, relations by the affinity capability, and persona by the persona-store capability
+
 ### Requirement: Quest logs, dialogue memory, loot tables, and behaviour trees are not built
 This change SHALL NOT implement quest-log progression, dialogue-memory storage/retrieval
 semantics, loot-table roll logic, or behaviour-tree execution. These remain placeholder fields
@@ -97,10 +98,7 @@ whose behavior is added by later changes.
 ### Requirement: LivingEntity carries sex as a bounded-vocabulary attribute, defaulting to other
 `LivingEntity` SHALL declare `sex: str`, defaulting to `world.lore.sex.DEFAULT_SEX` (`"other"`), read
 from `world.lore.sex.SEX_VALUES` — a flat, dependency-free vocabulary, not a keyed registry like
-`RACE_REGISTRY`/`SUBRACE_REGISTRY`. Unlike `race`/`subrace` (which default to `None` because their
-registries have no "unspecified" member), `sex` defaults directly to the string `"other"`, because
-`SEX_VALUES` already contains an explicit unspecified/non-binary member and a second null state
-would be redundant.
+`RACE_REGISTRY`/`SUBRACE_REGISTRY`.
 
 #### Scenario: sex defaults to other on a freshly created entity
 - **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected before any sex is set
@@ -115,3 +113,7 @@ would be redundant.
 #### Scenario: sex is never None
 - **WHEN** `entity.sex`'s declared type is inspected
 - **THEN** it is `str`, not `str | None`, distinguishing it from `race`/`subrace`'s declared type
+
+#### Scenario: The direct "other" default is deliberate against the race/subrace pattern
+- **WHEN** `sex`'s default is compared with `race`/`subrace`'s `None` defaults
+- **THEN** `race`/`subrace` default to `None` because their registries have no "unspecified" member, while `sex` defaults directly to the string `"other"` because `SEX_VALUES` already contains an explicit unspecified/non-binary member and a second null state would be redundant

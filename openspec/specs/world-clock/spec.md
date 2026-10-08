@@ -87,14 +87,8 @@ scan, or `evennia`-wide object search to discover additional entities to settle.
 ### Requirement: gauge regen is a closed-form computation, never a per-second or per-quantum loop
 `world/rules/clock.py` SHALL compute HP/MP/SP regen for a settled entity as
 `min(max, current + rate * elapsed_seconds)`, applied once per `advance()` call per entity, regardless
-of how large `elapsed_seconds` is. This computation SHALL read `elapsed_seconds` from the `advance()`
-call's own argument, never from any wall-clock-timestamp-based mechanism the underlying `GaugeTrait`
-implementation might provide. Each gauge's effective rate SHALL first be multiplied by the entity's
-merged combat-modifier bundle value `{gauge}_regen_scale` (absent means `1.0`, any authored
-non-negative finite scale is legal); a zero scale SHALL freeze that gauge without consuming or
-clobbering its carried sub-unit regen remainder, and gauges with no scale row SHALL compute
-bit-identically to the pre-change form. The scale lookup SHALL be the existing bundle query, and no
-element-, buff- or skill-name branch may participate in the regen stage.
+of how large `elapsed_seconds` is. Each gauge's effective rate SHALL first be multiplied by the entity's
+merged combat-modifier bundle value `{gauge}_regen_scale`.
 
 #### Scenario: A large elapsed_seconds value is applied in one step
 - **WHEN** `advance()` is called with `seconds=28800` (8 hours) for an entity whose `hp` gauge has
@@ -116,6 +110,29 @@ element-, buff- or skill-name branch may participate in the regen stage.
 - **WHEN** a partial regen scale (e.g. `0.5`) is active for a large `elapsed_seconds`
 - **THEN** the gauge reflects `min(max, current + rate * scale * elapsed_seconds)` from one computation
 
+#### Scenario: Regen reads only the advance call's own elapsed argument
+- **WHEN** the regen computation runs
+- **THEN** it reads `elapsed_seconds` from the `advance()` call's own argument, never from any
+  wall-clock-timestamp-based mechanism the underlying `GaugeTrait` implementation might provide
+
+#### Scenario: An absent scale row means 1.0 and the pre-change arithmetic
+- **WHEN** a gauge has no `{gauge}_regen_scale` row in the entity's merged bundle
+- **THEN** the scale is `1.0` and the gauge computes bit-identically to the pre-change form
+
+#### Scenario: Any authored non-negative finite scale is legal
+- **WHEN** a bundle carries a `{gauge}_regen_scale` of any authored non-negative finite value,
+  including `0`
+- **THEN** the scale is accepted, and a zero scale freezes that gauge without consuming or clobbering
+  its carried sub-unit regen remainder
+
+#### Scenario: The scale lookup reuses the existing bundle query
+- **WHEN** the regen stage looks up a gauge's scale
+- **THEN** the lookup is the existing bundle query
+
+#### Scenario: No name branching participates in the regen stage
+- **WHEN** the regen stage computes for any entity
+- **THEN** no element-, buff- or skill-name branch participates in the stage
+
 ### Requirement: settle_combat_result is the sanctioned call site for combat-sourced advances
 `world/rules/clock.py` SHALL provide `settle_combat_result(result, entities) -> list[ScheduledEvent]`,
 accepting either a `BattleResult` (change 9) or an `OverwhelmResult` (change 10) and calling
@@ -134,14 +151,8 @@ integration point for a future top-level combat command that does not yet exist 
 `commands/action.py::CmdCast` SHALL settle a successful out-of-combat `ActionResolver.resolve()` call
 and its command-time charge inside one outer settlement transaction
 (`world/rules/cast_settlement.settle_out_of_combat_cast`, the cast-settlement-atomicity capability):
-the settlement SHALL invoke `ActionResolver.resolve()` and, only on success,
-`WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, entities=[self.caller])` as
-nested operations inside a single outer transaction, committing only after both succeed. `CmdCast`
-SHALL NOT call `WorldClock.advance()` directly, and SHALL NOT advance when the resolution is rejected.
-During an active persistent combat session, CmdCast SHALL delegate the selected request to combat-
-session orchestration and SHALL NOT advance command time. Completed combat rounds SHALL accumulate in
-the session and advance exactly once through `settle_combat_result(..., AdvanceSource.COMBAT)` at
-terminal settlement.
+`CmdCast` SHALL NOT call `WorldClock.advance()` directly, and SHALL NOT advance when the resolution is
+rejected. During an active persistent combat session, CmdCast SHALL NOT advance command time.
 
 #### Scenario: A successful out-of-combat cast advances its reported command time
 - **WHEN** CmdCast resolves an out-of-combat skill successfully with `time_cost_seconds == 6`
@@ -172,14 +183,28 @@ terminal settlement.
 - **THEN** `settle_combat_result()` advances exactly 18 seconds with `AdvanceSource.COMBAT` and no earlier
   in-session CmdCast added command time
 
+#### Scenario: Settlement nests resolve and advance in one transaction
+- **WHEN** the settlement runs for an out-of-combat cast
+- **THEN** it invokes `ActionResolver.resolve()` and, only on success,
+  `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, entities=[self.caller])` as
+  nested operations inside the single outer transaction, committing only after both succeed
+
+#### Scenario: An active-session cast is delegated to session orchestration
+- **WHEN** a player submits a cast during an active persistent combat session
+- **THEN** CmdCast delegates the selected request to combat-session orchestration and advances no
+  command time
+
+#### Scenario: Completed round time accumulates until terminal settlement
+- **WHEN** combat rounds complete during a session
+- **THEN** their time accumulates in the session and advances exactly once through
+  `settle_combat_result(..., AdvanceSource.COMBAT)` at terminal settlement
+
 ### Requirement: move and converse command-default time costs are declared as rulebook data only
 `world/rules/rulebook/clock.yaml`'s `command_defaults` mapping SHALL declare `move: 30` and
 `converse: 60` (design doc §6.5's flat defaults). `move` SHALL be consumed by every successful
 traversal of a `typeclasses.exits.Exit` or `typeclasses.exits.CostedXYZExit` instance by a
 `PlayerCharacter`, via `world.rules.movement.charge_movement()` (the `movement-cost-charging`
-capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia command — Evennia's own
-per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_post_traverse`, and
-`converse` remains unwired, exactly as change 11 and change 13 left it.
+capability). This change SHALL NOT add a bespoke `move` or `converse` Evennia command.
 
 #### Scenario: move and converse defaults are declared
 - **WHEN** `rulebook/clock.yaml`'s `command_defaults` is inspected
@@ -207,6 +232,15 @@ per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_po
   this change
 - **THEN** no code added by this change reads `command_defaults["converse"]`
 
+#### Scenario: Traversal hooks come from Evennia's auto-generated commands
+- **WHEN** a player traverses an exit
+- **THEN** `at_traverse`/`at_post_traverse` are invoked by Evennia's own per-exit, auto-generated
+  traversal commands
+
+#### Scenario: converse stays exactly as changes 11 and 13 left it
+- **WHEN** the converse command surface is inspected after this change
+- **THEN** `converse` remains unwired, exactly as change 11 and change 13 left it
+
 ### Requirement: World-clock presentation reads never create the singleton
 `world/rules/clock.py` SHALL provide a read-only accessor that returns the existing `WorldClock` or absence without creating a Script or other persistent state. The deterministic server startup lifecycle SHALL explicitly ensure the world-clock singleton before player presentation is accepted. Presentation code SHALL use only the read-only accessor and SHALL NOT call the create-or-read mutation helper.
 
@@ -226,10 +260,8 @@ per-exit, auto-generated traversal commands are what invoke `at_traverse`/`at_po
 `WorldClock.advance()` SHALL settle all per-entity stages, every registered boundary stage, and the
 final `tick` increment inside a single durable transaction with snapshot/restore of the touched
 entity attributes **and of every durable surface any registered boundary-stage source may write
-(through its declared advance-surface contract, including quest logs and room pins, merchant
-components, NPC schedule state and location, instance-room state, pruned map knowledge, narrative letter rows, durable delivery projection progress, and the wilderness monster-site lifecycle state and site-owned individual placement/bookkeeping)**, so a
-process termination or a failure inside the call can never leave character state advanced without
-the matching tick (or the reverse), and no observer can see or persist an uncommitted settlement.
+(through its declared advance-surface contract)**, so a process termination or a failure inside the
+call can never leave character state advanced without the matching tick (or the reverse).
 
 #### Scenario: Terminated advance leaves no partial save
 - **WHEN** a process is terminated while `advance()` is running after entity writes but before the
@@ -261,17 +293,22 @@ the matching tick (or the reverse), and no observer can see or persist an uncomm
   "npc_schedules", "correspondence_delivery", "instance_reclamation", "monster_site_lifecycle")`, an oversized call still raises before any write, and
   contracts run before any stage write
 
+#### Scenario: The snapshot extension covers every declared durable surface
+- **WHEN** the snapshot/restore scope of `advance()` is enumerated
+- **THEN** it includes, through the sources' declared advance-surface contracts, quest logs and room
+  pins, merchant components, NPC schedule state and location, instance-room state, pruned map
+  knowledge, narrative letter rows, durable delivery projection progress, and the wilderness
+  monster-site lifecycle state and site-owned individual placement/bookkeeping
+
+#### Scenario: No observer sees an uncommitted settlement
+- **WHEN** any observer reads character state or the tick while or after `advance()` runs
+- **THEN** it can never see or persist an uncommitted settlement
+
 ### Requirement: Every registered boundary-stage source declares the durable surfaces it may write
 `register_event_source(kind, source, surfaces)` SHALL accept an optional advance-surface contract: a
-pure, read-only callable `(start_tick, end_tick) -> mapping[id(obj), SurfaceSnapshot]` that
-re-discovers, with the same deterministic queries its settlement uses, every object the source may
-write and snapshots each durable surface and any location state through the shared attribute-snapshot
-helper. A source that writes durable state SHALL ship a contract; a source with no contract (`None`)
+pure, read-only callable `(start_tick, end_tick) -> mapping[id(obj), SurfaceSnapshot]`.
+A source that writes durable state SHALL ship a contract; a source with no contract (`None`)
 SHALL be treated as a read-only seam and SHALL not write durable state during settlement.
-`WorldClock.advance` SHALL run every registered contract before opening its transaction, SHALL merge
-the results with its caller-entity snapshot set by object identity, and SHALL restore every declared
-surface on failure. The two-argument registration form SHALL remain valid for read-only and test
-sources.
 
 #### Scenario: A writing source without a contract is a completeness violation
 - **WHEN** the registered boundary-stage sources are inspected (`caravan_arrivals`,
@@ -296,6 +333,21 @@ sources.
   `advance()` across a boundary
 - **THEN** the source's events are returned in the correct stage position exactly as before, with no
   contract required
+
+#### Scenario: The contract re-discovers and snapshots with its own queries
+- **WHEN** an advance-surface contract is invoked
+- **THEN** it re-discovers, with the same deterministic queries its settlement uses, every object the
+  source may write and snapshots each durable surface and any location state through the shared
+  attribute-snapshot helper
+
+#### Scenario: advance runs contracts, merges by identity, restores on failure
+- **WHEN** `WorldClock.advance` settles with registered contracts present
+- **THEN** it runs every registered contract before opening its transaction, merges the results with
+  its caller-entity snapshot set by object identity, and restores every declared surface on failure
+
+#### Scenario: The two-argument registration form stays valid
+- **WHEN** a read-only or test source registers without a contract
+- **THEN** the two-argument registration form remains valid
 
 #### Scenario: A contract is a pure read that never mutates state
 - **WHEN** a contract snapshot function is invoked

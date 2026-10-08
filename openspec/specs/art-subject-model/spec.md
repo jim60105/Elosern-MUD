@@ -8,11 +8,8 @@ Defines typed, namespaced, pre-validated art subject keys (ArtSubjectKind and fr
 ### Requirement: Art subject keys are typed, namespaced, and validated before queue access
 `world/art/subjects.py` SHALL define `ArtSubjectKind` (`scene`, `portrait:character`,
 `portrait:monster`) and a frozen `ArtSubject(kind, key)` whose serialized full key is
-`<kind>:<key>`. `parse_subject(full_key)` SHALL return an `ArtSubject` for a full key whose prefix is
-one of the three known kinds and whose subject key is non-empty, free of `:`, and free of control
-characters; anything else SHALL raise a named `ArtSubjectError`. No queue, store, worker, command, or
-presenter function SHALL accept a raw full-key string; every access path SHALL go through a parsed
-`ArtSubject`.
+`<kind>:<key>`. No queue, store, worker, command, or presenter function SHALL accept a raw
+full-key string; every access path SHALL go through a parsed `ArtSubject`.
 
 #### Scenario: Known kinds parse into typed subjects
 - **WHEN** `scene:forest_path`, `portrait:character:42`, and `portrait:monster:gray_wolf` are parsed
@@ -29,15 +26,15 @@ presenter function SHALL accept a raw full-key string; every access path SHALL g
 - **THEN** they serialize to different strings (`scene:<k>` vs `portrait:character:<k>`), so a
   record keyed by one can never be read or overwritten as the other
 
+#### Scenario: parse_subject is the gate between full-key strings and typed subjects
+- **WHEN** `parse_subject(full_key)` is called
+- **THEN** it returns an `ArtSubject` for a full key whose prefix is one of the three known kinds and whose subject key is non-empty, free of `:`, and free of control characters
+- **AND** anything else raises a named `ArtSubjectError`
+
 ### Requirement: Scene and generic-monster subjects resolve from immutable registries
-A scene subject SHALL re-validate its archetype against `SCENE_ARCHETYPE_REGISTRY`; a monster subject
-SHALL re-validate its archetype against `MONSTER_TIER_REGISTRY`. An unresolvable registry key SHALL
-raise a named `ArtSubjectError` and produce no record. This tier-validated monster subject SHALL remain
-the built-in silhouette/gallery generic layer's only monster subject vocabulary: a species key is never
-a valid `portrait:monster` subject key, and a species-backed individual's species image identity lives
-exclusively in the official content reference layer (the `species-portrait-identity` capability), so no
-queue, store, worker, command, or presenter path can smuggle a species key into the tier-validated
-subject vocabulary or confuse the two identity layers.
+A scene subject SHALL re-validate its archetype against `SCENE_ARCHETYPE_REGISTRY`; a monster
+subject SHALL re-validate its archetype against `MONSTER_TIER_REGISTRY`. An unresolvable registry
+key SHALL raise a named `ArtSubjectError` and produce no record.
 
 #### Scenario: A registered archetype yields a valid scene subject
 - **WHEN** a room carries `scene_archetype = "tavern_interior"` and that key exists in the registry
@@ -51,6 +48,11 @@ subject vocabulary or confuse the two identity layers.
 #### Scenario: A species key is not a subject key
 - **WHEN** a registered species key is forged into a `portrait:monster` subject
 - **THEN** it is rejected exactly like any other key absent from `MONSTER_TIER_REGISTRY`, and the species' official reference resolves through its own provenance-derived path instead
+
+#### Scenario: The tier-validated vocabulary is the generic layer's only monster subject vocabulary
+- **WHEN** the built-in silhouette/gallery generic layer resolves monster subjects through any queue, store, worker, command, or presenter path
+- **THEN** the tier-validated monster subject vocabulary is the only monster subject vocabulary available, and a species key is never a valid `portrait:monster` subject key
+- **AND** a species-backed individual's species image identity lives exclusively in the official content reference layer (the `species-portrait-identity` capability), so no path can smuggle a species key into the tier-validated subject vocabulary or confuse the two identity layers
 
 ### Requirement: Named-character portrait eligibility is explicit policy, never inferred
 `world/art/subjects.py` SHALL derive a `portrait:character` subject only from an explicit
@@ -73,49 +75,10 @@ LLM wrote the NPC.
 
 ### Requirement: Subject descriptions are deterministic and exclude non-physical truth
 `world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
-description per subject from allowed immutable or validated data: the one-sentence `scene_sentence`
-for scenes, the bestiary archetype description for generic monsters, and a template over
-race/subrace, APPARENT age, and the entity's authored physical appearance for characters. A
-character description SHALL be composed exclusively of the subject's visual truth; it SHALL NOT
-carry the character's `display_name` or any other identity string, because a proper noun is not a
-visual instruction and no checkpoint renders it. The description templates SHALL be rendered from
-the prompt library via `render_prompt("art.character_description", …)` and
-`render_prompt("art.monster_description", …)` — the library is the sole source of the description
-templates, and the module SHALL NOT embed them as Python constants. No separate visual-style
-fragment SHALL be rendered into the description: the deployment's visual style is configured
-through `ART_SD_STYLES` and reaches the server as a first-class request field, so the prompt
-library SHALL NOT carry an `art.style` key and the description SHALL NOT quote one. Scene
-descriptions SHALL continue to return the lore-owned `scene_sentence` verbatim.
-
-The age the character template renders SHALL be the entity's validated `apparent_age`, never its
-canonical `age`. The composition seam SHALL name the value it takes `apparent_age`, so a caller
-cannot pass the canonical age without the mismatch being visible at the call site. Both ages SHALL
-remain validated before any prompt render or queue write; only which one reaches the prompt changes.
-
-The appearance contribution SHALL be read exclusively from the persona record's `appearance` block
-and SHALL render its sub-keys in the declared `world/rules/persona.py::_SUBKEY_ORDER` order, so the
-same entity always yields the same prompt regardless of storage iteration order. An entity with no
-appearance data SHALL render an empty appearance section and produce the description it produced
-before this contribution existed.
-
-A character description SHALL be composable by an explicit FIELD SELECTION. The appearance
-contribution SHALL be included when, and only when, the caller selects the `appearance` field; the
-existing deterministic seams SHALL select it, and a caller that selects nothing SHALL produce exactly
-the description this capability produces for the unselected case. A caller MAY additionally
-select one or more EQUIPMENT fields (`weapon_main`, `weapon_off`, `armor`, `accessories`), each of
-which contributes the registry-owned `ItemPresentation` visual text of the items currently occupying
-that slot, read read-only from `world/lore/items.py`; an empty slot and an item key absent from the
-registry contribute nothing. A caller MAY additionally supply bounded free-form text, which SHALL be
-appended verbatim after every selected field's contribution. Field selection SHALL NOT change the
-description produced for any unselected field, and the same entity, the same selection, and the same
-free text SHALL always produce byte-identical output.
-
-A character description SHALL NOT include any other persona key — `personality`, `life_story`,
-`habit`, `background`, `identity` (public or hidden), or `social_connection` — and SHALL NOT include
-secret state, mutable combat resources, or `disguised_stats` presented as physical truth. The
-`PromptUnavailableError` fallback SHALL remain registry-driven, SHALL read no persona data, and
-SHALL likewise carry no display name — the degraded path SHALL NOT reintroduce what the template
-removed.
+description per subject from allowed immutable or validated data. A character description SHALL
+be composed exclusively of the subject's visual truth; it SHALL NOT carry the character's
+`display_name` or any other identity string, because a proper noun is not a visual instruction
+and no checkpoint renders it.
 
 #### Scenario: Character descriptions contain the appearance block and nothing else from the persona
 - **WHEN** a character description is generated for a character with a full persona and a disguise
@@ -174,6 +137,54 @@ removed.
 #### Scenario: The same selection is byte-identical across generations
 - **WHEN** the same character's description is generated twice with the same field selection and free text
 - **THEN** the two results are byte-identical, with fields in the declared order
+
+#### Scenario: Description templates come from the prompt library
+- **WHEN** character or monster descriptions are rendered
+- **THEN** they are rendered from the prompt library via `render_prompt("art.character_description", …)` and `render_prompt("art.monster_description", …)`
+- **AND** the library is the sole source of the description templates, and the module SHALL NOT embed them as Python constants
+
+#### Scenario: No style fragment is rendered into descriptions
+- **WHEN** any description is composed
+- **THEN** no separate visual-style fragment is rendered into it: the deployment's visual style is configured through `ART_SD_STYLES` and reaches the server as a first-class request field, so the prompt library SHALL NOT carry an `art.style` key and the description SHALL NOT quote one
+
+#### Scenario: Scene descriptions return the lore sentence verbatim
+- **WHEN** a scene description is generated
+- **THEN** it continues to return the lore-owned `scene_sentence` verbatim
+
+#### Scenario: The composition seam names the age it takes
+- **WHEN** a character description is composed
+- **THEN** the age the character template renders is the entity's validated `apparent_age`, never its canonical `age`, and the composition seam names the value it takes `apparent_age`, so a caller cannot pass the canonical age without the mismatch being visible at the call site
+- **AND** both ages remain validated before any prompt render or queue write; only which one reaches the prompt changes
+
+#### Scenario: Appearance sub-keys render in declared order
+- **WHEN** a character's appearance contribution is composed
+- **THEN** it is read exclusively from the persona record's `appearance` block and renders its sub-keys in the declared `world/rules/persona.py::_SUBKEY_ORDER` order, so the same entity always yields the same prompt regardless of storage iteration order
+
+#### Scenario: Descriptions are composable by field selection
+- **WHEN** a character description is generated
+- **THEN** it is composable by an explicit FIELD SELECTION, with the appearance contribution included when, and only when, the caller selects the `appearance` field
+- **AND** the existing deterministic seams select it, and a caller that selects nothing produces exactly the description this capability produces for the unselected case
+
+#### Scenario: Equipment fields contribute slot visuals
+- **WHEN** a caller additionally selects one or more EQUIPMENT fields (`weapon_main`, `weapon_off`, `armor`, `accessories`)
+- **THEN** each selected field contributes the registry-owned `ItemPresentation` visual text of the items currently occupying that slot, read read-only from `world/lore/items.py`, and an empty slot or an item key absent from the registry contributes nothing
+
+#### Scenario: Free-form text appends after every selected field
+- **WHEN** a caller additionally supplies bounded free-form text
+- **THEN** it is appended verbatim after every selected field's contribution
+- **AND** field selection does not change the description produced for any unselected field, and the same entity, the same selection, and the same free text always produce byte-identical output
+
+#### Scenario: No other persona key or non-physical state enters a description
+- **WHEN** a character description is generated
+- **THEN** it includes no other persona key — `personality`, `life_story`, `habit`, `background`, `identity` (public or hidden), or `social_connection` — and no secret state, mutable combat resources, or `disguised_stats` presented as physical truth
+
+#### Scenario: The degraded fallback stays registry-driven and persona-free
+- **WHEN** the `PromptUnavailableError` fallback produces a character description
+- **THEN** it remains registry-driven, reads no persona data, and carries no display name — the degraded path does not reintroduce what the template removed
+
+#### Scenario: Each subject kind draws from its allowed data source
+- **WHEN** descriptions are generated for scenes, generic monsters, and characters
+- **THEN** scenes use the one-sentence `scene_sentence`, generic monsters use the bestiary archetype description, and characters use a template over race/subrace, APPARENT age, and the entity's authored physical appearance
 
 ### Requirement: Subject producer validation rejects unrepresentable keys
 `_validate_subject_key` SHALL reject keys containing `|`, `/`, `:`, `{`, `}`, or control

@@ -41,9 +41,7 @@ actor who fled is not an *active* roster member), never as an independent reject
 `evaluate_skip_safety(actor)` SHALL return `SkipRejectReason.HOSTILE_PRESENT` when any living (`hp >
 0`) `Monster` instance is present in `actor.location`, independent of whether any `Battlefield` exists
 at all. This single condition is the entirety of what both "targeted by a hostile" and "unsafe
-location" mean at this point in the roadmap — design doc §6.5 names them as two phrases, but with no
-aggro/threat model anywhere in this project's roadmap, nothing distinguishes them: no terrain, zone, or
-map-layer signal is consulted, since none exists yet (changes 12-14).
+location" mean at this point in the roadmap.
 
 #### Scenario: A wandering, unengaged monster in the room rejects the skip
 - **WHEN** `evaluate_skip_safety(actor)` is called for an actor sharing a room with a living `Monster`
@@ -59,6 +57,10 @@ map-layer signal is consulted, since none exists yet (changes 12-14).
 - **WHEN** `evaluate_skip_safety(actor)` is called for an actor whose room contains no `Monster`
   instance
 - **THEN** it does not return `SkipRejectReason.HOSTILE_PRESENT`
+
+#### Scenario: No terrain, zone, or map-layer signal is consulted
+- **WHEN** the HOSTILE_PRESENT check evaluates an actor's location
+- **THEN** only the presence of a living `Monster` in `actor.location` is read — no terrain, zone, or map-layer signal is consulted, since none exists yet (changes 12-14); design doc §6.5's two phrases are undistinguished because no aggro/threat model exists anywhere in this project's roadmap
 
 ### Requirement: A safe actor's skip is unconditionally allowed
 `evaluate_skip_safety(actor)` SHALL return `None` when neither reject condition applies, allowing the

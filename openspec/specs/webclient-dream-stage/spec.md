@@ -13,8 +13,6 @@ While the committed `dream` panel state is open, the browser SHALL present the d
 - a reply bar for free text;
 - a message band that presents the narration and the goddess's lines under her name plate.
 
-The surface SHALL NOT use nested disclosure widgets. It SHALL NOT surface command syntax or JSON, and every button outside the 念頭 sheet's inline controls SHALL share the client's standard button styling. When the artwork URL is empty or fails to load, the surface SHALL remove the image and stay fully usable without it, never showing a broken-image glyph. A changed artwork URL SHALL be attempted afresh.
-
 #### Scenario: Open dream renders the stage regions
 - **WHEN** an open dream state with artwork is committed
 - **THEN** a modal dialog shows the artwork, the keepsake card with four exit rows, the reply bar and the message band, and contains no `<details>` element
@@ -23,9 +21,21 @@ The surface SHALL NOT use nested disclosure widgets. It SHALL NOT surface comman
 - **WHEN** the artwork request fails
 - **THEN** the image is removed and the stage stays usable without a broken-image glyph, and a republished URL is loaded again
 
+#### Scenario: An empty artwork URL is removed
+- **WHEN** the artwork URL is empty
+- **THEN** the surface removes the image and stays fully usable without it, never showing a broken-image glyph
+
+#### Scenario: A changed artwork URL is attempted afresh
+- **WHEN** the artwork URL changes
+- **THEN** the new URL is attempted afresh
+
+#### Scenario: The surface stays flat and standard-styled
+- **WHEN** the stage is rendered
+- **THEN** it uses no nested disclosure widgets and surfaces no command syntax or JSON, and every button outside the 念頭 sheet's inline controls shares the client's standard button styling
+
 ### Requirement: Exchange budget and goddess excitement have visual, non-colour-only forms
 
-The reply bar SHALL show the six-exchange budget as six pips, with spent exchanges hollow, plus a remaining-count label. The pip that the next send would spend SHALL be marked while the player is composing or a response is pending. The goddess's name plate SHALL show a five-segment excitement gauge lit up to the server-supplied track ordinal, plus the server-supplied level label.
+The reply bar SHALL show the six-exchange budget as six pips, with spent exchanges hollow, plus a remaining-count label. The goddess's name plate SHALL show a five-segment excitement gauge lit up to the server-supplied track ordinal, plus the server-supplied level label.
 
 Both SHALL be exposed as meters:
 - the budget meter's value text SHALL be `尚可交談 {remaining} 次，共 6 次`;
@@ -43,11 +53,13 @@ Both SHALL be exposed as meters:
 - **WHEN** the completed count rises to one
 - **THEN** exactly one pip is hollow
 
+#### Scenario: A pending response keeps the next pip marked
+- **WHEN** a response is pending
+- **THEN** the pip that the next send would spend remains marked, as it is while the player is composing
+
 ### Requirement: Narration and dialogue are paced by beats that only animate on a live exchange
 
-On a first entry (no completed exchange and no scene or dialogue), the message band SHALL type the opening as narration. Whenever the committed completed count increases while the surface is mounted (including an increase that arrives with a reconnect), the band SHALL type the new scene narration, then the goddess's line as a second beat. Activating the band (click, Enter or Space) SHALL complete a beat that is still typing, then advance to the next beat. Mounting the surface SHALL show the latest beat in full without typing. A republish that does not increase the completed count SHALL NOT replay or change the presented beat. A re-read control SHALL step back to the previous beat in full.
-
-Typing SHALL progress over time only at the full motion level, at the player's text speed. At the reduced and off levels text SHALL appear at once, and no animation SHALL outlast its motion level's duration. An assistive-technology announcement SHALL report each new response with the scene, the goddess's line, the excitement level and the remaining count. Pending and failure SHALL each be announced once when they occur.
+On a first entry (no completed exchange and no scene or dialogue), the message band SHALL type the opening as narration. Whenever the committed completed count increases while the surface is mounted (including an increase that arrives with a reconnect), the band SHALL type the new scene narration, then the goddess's line as a second beat. Mounting the surface SHALL show the latest beat in full without typing.
 
 #### Scenario: Arrival types the opening
 - **WHEN** a dream opens with no exchange yet
@@ -65,16 +77,33 @@ Typing SHALL progress over time only at the full motion level, at the player's t
 - **WHEN** a state with the same completed count is republished at a newer revision
 - **THEN** the presented beat is unchanged
 
+#### Scenario: Activating the band completes then advances
+- **WHEN** the player activates the band (click, Enter or Space) while a beat is still typing
+- **THEN** the beat completes and the next activation advances to the next beat
+
+#### Scenario: The re-read control steps back
+- **WHEN** the player uses the re-read control
+- **THEN** the band steps back to the previous beat in full
+
+#### Scenario: Typing is time-paced only at full motion
+- **WHEN** typing runs at the full motion level
+- **THEN** it progresses over time at the player's text speed
+
+#### Scenario: Reduced and off motion show text at once
+- **WHEN** the motion level is reduced or off
+- **THEN** text appears at once and no animation outlasts its motion level's duration
+
+#### Scenario: Each new response is announced in full
+- **WHEN** a new response arrives
+- **THEN** an assistive-technology announcement reports it with the scene, the goddess's line, the excitement level and the remaining count
+
+#### Scenario: Pending and failure announce once
+- **WHEN** a pending state or a failure occurs
+- **THEN** each is announced once when it occurs
+
 ### Requirement: The reply bar sends bounded free text and hands it back on failure
 
-The transport is locked while the client is disconnected, mutations are locked, the session is not active, a dispatch is in flight, or combat playback holds the command panel. The reply bar SHALL accept free text only while the server allows input and the transport is unlocked. While disconnected, the reply bar SHALL say that the link to the dream is being restored and that typed words are kept. Enter SHALL send `dream.say` with the current session id and revision and the message split at 2000 code points into two parts. Shift+Enter SHALL insert a newline, and Enter during an IME composition SHALL NOT send. A successful dispatch SHALL clear the field.
-
-While a response is pending:
-- the field SHALL be disabled;
-- the band SHALL echo the player's sent words, prefixed `你：`;
-- the name plate SHALL show that the goddess is responding.
-
-When the server reports a failed generation, the field SHALL be refilled with the words just sent (unless the player has typed new text), the send control SHALL read 再說一次, and no pip SHALL be spent. When at most two exchanges remain and the server reports the track is converging, a caption SHALL read 夢將抵達盡頭, extended with 最後一次交談 when one exchange remains. When all six exchanges are spent, the reply bar SHALL be replaced by an end bar reading 六次交談已盡，女神靜候你的決定。
+The reply bar SHALL accept free text only while the server allows input and the transport is unlocked. Enter SHALL send `dream.say` with the current session id and revision and the message split at 2000 code points into two parts. Shift+Enter SHALL insert a newline, and Enter during an IME composition SHALL NOT send. A successful dispatch SHALL clear the field.
 
 #### Scenario: Bounded send on Enter
 - **WHEN** the player types 4000 characters and presses Enter
@@ -100,6 +129,30 @@ When the server reports a failed generation, the field SHALL be refilled with th
 - **WHEN** the client is disconnected, mutations are locked, the session is inactive, or a dispatch is in flight
 - **THEN** the reply field and all four keepsake rows are disabled, and while disconnected the reconnect caption is shown
 
+#### Scenario: The transport lock conditions are enumerated
+- **WHEN** deciding whether the transport is locked
+- **THEN** it is locked while the client is disconnected, mutations are locked, the session is not active, a dispatch is in flight, or combat playback holds the command panel
+
+#### Scenario: Converging caption needs at most two exchanges left
+- **WHEN** deciding whether to show the converging caption
+- **THEN** it appears only when at most two exchanges remain and the server reports the track is converging, reads 夢將抵達盡頭, and is extended with 最後一次交談 when one exchange remains
+
+#### Scenario: Disconnected reply bar explains itself
+- **WHEN** the client is disconnected
+- **THEN** the reply bar says that the link to the dream is being restored and that typed words are kept
+
+#### Scenario: Pending response state is shown
+- **WHEN** a response is pending
+- **THEN** the field is disabled, the band echoes the player's sent words prefixed `你：`, and the name plate shows that the goddess is responding
+
+#### Scenario: Refill respects newly typed text
+- **WHEN** the server reports a failed generation
+- **THEN** the field is refilled with the words just sent, unless the player has typed new text
+
+#### Scenario: The end bar names the waiting goddess
+- **WHEN** all six exchanges are spent
+- **THEN** the reply bar is replaced by an end bar reading 六次交談已盡，女神靜候你的決定。
+
 ### Requirement: The keepsake card shows the 念頭 that would be carried out and offers distinct exits
 
 The keepsake card SHALL show:
@@ -112,8 +165,6 @@ The card SHALL offer four rows in this order:
 2. 帶著這個念頭醒來 (confirm);
 3. 記下念頭，繼續作夢 (draft; 記下念頭 once all exchanges are spent);
 4. ✕ 醒來 (awaken).
-
-Outside text fields and without a Ctrl, Meta or Alt modifier, digits 1–3 SHALL activate rows 1–3. When a live exchange spends the sixth turn, focus SHALL move to the confirm row (or to the edit row when there is no summary). The confirm, draft and awaken rows SHALL stay enabled during a pending response, after a failure and after the sixth exchange, and SHALL be disabled only while the transport is locked. Exactly one primary action SHALL be shown: the send control while conversation is possible, and the confirm row once all six exchanges are spent.
 
 #### Scenario: Decisive action follows the phase
 - **WHEN** the dream allows input
@@ -131,14 +182,24 @@ Outside text fields and without a Ctrl, Meta or Alt modifier, digits 1–3 SHALL
 - **WHEN** a live exchange reaches six with a summary present
 - **THEN** focus rests on the confirm row and the draft row reads 記下念頭
 
+#### Scenario: Digits 1 to 3 activate rows 1 to 3
+- **WHEN** a digit 1–3 is pressed outside text fields and without a Ctrl, Meta or Alt modifier
+- **THEN** it activates the row of that number
+
+#### Scenario: Sixth exchange without a summary focuses the edit row
+- **WHEN** a live exchange spends the sixth turn and there is no summary
+- **THEN** focus moves to the edit row instead of the confirm row
+
+#### Scenario: Exits are disabled only while the transport is locked
+- **WHEN** deciding when to disable the confirm, draft and awaken rows
+- **THEN** they stay enabled during a pending response, after a failure and after the sixth exchange, and are disabled only while the transport is locked
+
 ### Requirement: The 念頭 sheet edits the direction in one flat modal layer
 
 Opening the edit row SHALL show a modal sheet that traps focus and renders the rest of the stage inert. It SHALL contain, without nested disclosure:
 - the summary field, with a code-point counter out of 2000 and a revert-to-server control when the field differs;
-- a radio group offering 一段新的故事 and each server-offered thread. Above eight threads a text filter SHALL narrow the list. A saved thread no longer offered SHALL remain selectable as 先前選定的故事線（已不在清單中）;
-- five chip lists: themes, atmosphere, participants, emphasis, exclusions. Enter adds a trimmed, de-duplicated chip and Backspace on an empty input removes the last chip.
-
-The sheet's draft button SHALL dispatch `dream.draft`, close the sheet and keep the dream open. It SHALL show and announce 念頭已記下，夢仍在繼續。 only once a newer committed state carries a saved draft. A refused draft SHALL show no confirmation. Its confirm button SHALL dispatch `dream.confirm`. Both SHALL send `{kind, thread_id, summary}` plus only the non-empty preference lists, at the latest committed revision. Escape SHALL close the sheet and keep its edits.
+- a radio group offering 一段新的故事 and each server-offered thread;
+- five chip lists: themes, atmosphere, participants, emphasis, exclusions.
 
 #### Scenario: Chips and draft
 - **WHEN** the player adds the theme 重逢 twice and saves a draft
@@ -152,11 +213,37 @@ The sheet's draft button SHALL dispatch `dream.draft`, close the sheet and keep 
 - **WHEN** more than eight threads are offered and the player filters by text
 - **THEN** only matching threads remain listed
 
+#### Scenario: A vanished saved thread stays selectable
+- **WHEN** a saved thread is no longer offered by the server
+- **THEN** it remains selectable in the radio group as 先前選定的故事線（已不在清單中）
+
+#### Scenario: The thread filter appears above eight threads
+- **WHEN** more than eight threads are offered
+- **THEN** a text filter narrows the list
+
+#### Scenario: Chip editing rules
+- **WHEN** the player presses Enter in a chip input, or Backspace on an empty chip input
+- **THEN** Enter adds a trimmed, de-duplicated chip and Backspace removes the last chip
+
+#### Scenario: The draft button closes the sheet and keeps the dream
+- **WHEN** the sheet's draft button is activated
+- **THEN** it dispatches `dream.draft`, closes the sheet, and keeps the dream open
+
+#### Scenario: Draft confirmation waits for the committed state
+- **WHEN** a draft save is in progress
+- **THEN** 念頭已記下，夢仍在繼續。 is shown and announced only once a newer committed state carries a saved draft, and a refused draft shows no confirmation
+
+#### Scenario: Both buttons send the same payload shape
+- **WHEN** the sheet's draft or confirm button dispatches (`dream.draft` / `dream.confirm`)
+- **THEN** both send `{kind, thread_id, summary}` plus only the non-empty preference lists, at the latest committed revision
+
+#### Scenario: Escape keeps the sheet's edits
+- **WHEN** the player presses Escape with the sheet open
+- **THEN** the sheet closes and keeps its edits
+
 ### Requirement: Direction confirmation is validated locally without discarding words
 
 Confirming with an empty summary SHALL NOT dispatch. It SHALL open (or keep) the 念頭 sheet with the alert 念頭還是空的。寫下一句想帶走的話，或直接醒來。 and focus the summary. The confirm row SHALL be marked unavailable with the reason 尚無念頭 while the summary is empty, but SHALL stay focusable.
-
-A server direction longer than 2000 code points SHALL be shown in full. The counter SHALL mark the overflow, and draft and confirm SHALL be refused with an alert until the player shortens it. The text SHALL never be truncated silently.
 
 #### Scenario: Empty confirm
 - **WHEN** the player activates the confirm row with no summary
@@ -166,17 +253,16 @@ A server direction longer than 2000 code points SHALL be shown in full. The coun
 - **WHEN** the server direction is 2001 code points and the player confirms
 - **THEN** the field holds all 2001 code points, nothing is dispatched, and an alert names the 2000 limit
 
+#### Scenario: Overflow is marked, never truncated
+- **WHEN** a server direction is longer than 2000 code points
+- **THEN** it is shown in full, the counter marks the overflow, the text is never truncated silently, and draft and confirm are refused with an alert until the player shortens it
+
 ### Requirement: Escape never awakens and awakening protects unsaved local words
 
 Escape SHALL NOT dispatch any dream action. It SHALL do the first of these that applies:
 1. close an open awaken check or 念頭 sheet;
 2. move focus out of a text field to the message band;
 3. otherwise, move focus to the ✕ 醒來 row.
-
-Activating 醒來 with no local unsent reply and no unsaved 念頭 edit SHALL dispatch `dream.awaken` at once. Otherwise it SHALL open an alert dialog titled 就此醒來？ that names what would be lost. In that dialog:
-- initial focus SHALL rest on 回到夢中;
-- Escape or 回到夢中 SHALL return to the dream without dispatching;
-- 醒來 SHALL dispatch `dream.awaken`.
 
 #### Scenario: Escape focuses the awaken row
 - **WHEN** the player presses Escape with no layer open and focus outside a text field
@@ -185,6 +271,18 @@ Activating 醒來 with no local unsent reply and no unsaved 念頭 edit SHALL di
 #### Scenario: Unsent words are protected
 - **WHEN** the reply field holds text and the player activates 醒來
 - **THEN** the 就此醒來？ alert dialog appears with focus on 回到夢中, and only its 醒來 button dispatches `dream.awaken`
+
+#### Scenario: A clean awaken dispatches at once
+- **WHEN** 醒來 is activated with no local unsent reply and no unsaved 念頭 edit
+- **THEN** `dream.awaken` is dispatched at once, with no confirmation dialog
+
+#### Scenario: The awaken guard names what would be lost
+- **WHEN** 醒來 is activated while local unsent reply or unsaved 念頭 edits exist
+- **THEN** an alert dialog titled 就此醒來？ opens naming what would be lost
+
+#### Scenario: The awaken guard dialog behaves predictably
+- **WHEN** the 就此醒來？ dialog is open
+- **THEN** initial focus rests on 回到夢中, Escape or 回到夢中 returns to the dream without dispatching, and 醒來 dispatches `dream.awaken`
 
 ### Requirement: Republished drafts rehydrate without overwriting the player's own edits
 

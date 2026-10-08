@@ -8,17 +8,9 @@ Turn one exploration cast aimed at a living, co-located hostile monster into tha
 
 ### Requirement: A skill aimed at a co-located hostile monster from exploration always initiates combat
 `world/rules/combat_initiation.py` SHALL provide `field_combat_target(actor, target)`, returning
-`target` when it is a living `Monster` in the actor's own room and `None` otherwise. Hostility SHALL
-be expressed exactly as `engage()` already expresses it — being a `Monster` instance — so no second
-notion of hostility is introduced.
-
-`world/rules/combat_initiation.py` SHALL provide
-`initiate_field_combat(actor, skill_key, target, scale=1.0)`, which SHALL open one combat session and
-resolve the named skill as the actor's first action, **whatever that skill does**. The presence or
-absence of a `DamageEffect` SHALL NOT decide whether combat starts; it decides only whether the
-encounter is then settled in one shot, which `submit_opening_action()` determines. The function SHALL
-return the same result shape as `submit_player_action()` — a rejection, an ordinary round, or a
-terminal outcome — so callers share `world/rules/combat_result.py`'s rendering.
+`target` when it is a living `Monster` in the actor's own room and `None` otherwise. It SHALL also
+provide `initiate_field_combat(actor, skill_key, target, scale=1.0)`, which SHALL open one combat
+session and resolve the named skill as the actor's first action, **whatever that skill does**.
 
 #### Scenario: A damaging skill aimed at a room monster opens combat
 - **WHEN** `initiate_field_combat()` is called for a damage-carrying skill and a living `Monster` in
@@ -41,14 +33,27 @@ terminal outcome — so callers share `world/rules/combat_result.py`'s rendering
   monster in another room, or a monster at zero hp
 - **THEN** it returns `None`
 
+#### Scenario: Hostility is the Monster type check, not a second notion
+- **WHEN** `field_combat_target()` decides whether a target is hostile
+- **THEN** hostility is expressed exactly as `engage()` already expresses it — being a `Monster`
+  instance — so no second notion of hostility is introduced
+
+#### Scenario: Damage presence settles the encounter, never gates combat
+- **WHEN** whether the opening skill carries a `DamageEffect` is considered
+- **THEN** its presence or absence does not decide whether combat starts; it decides only whether the
+  encounter is then settled in one shot, which `submit_opening_action()` determines
+
+#### Scenario: The initiation returns the shared submission result shape
+- **WHEN** `initiate_field_combat()` returns
+- **THEN** the result has the same shape as `submit_player_action()`'s — a rejection, an ordinary
+  round, or a terminal outcome — so callers share `world/rules/combat_result.py`'s rendering
+
 ### Requirement: A damaging skill aimed at anything other than a co-located hostile monster is rejected at the entry
 `initiate_field_combat()`'s caller SHALL reject a cast whose skill carries a
 `world.skills.effects.DamageEffect` and whose target is not a living co-located `Monster`, with
-`RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET`. The rejection SHALL occur before any resource is
-spent, before any roll, before any session is persisted, and before any world-clock access. A
-non-damaging skill aimed at a non-monster SHALL continue to route through
-`world/rules/cast_settlement.settle_out_of_combat_cast()` with behaviour unchanged, so sexual acts
-and other non-damaging skills remain usable on NPCs exactly as before.
+`RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET`. A non-damaging skill aimed at a non-monster SHALL
+continue to route through `world/rules/cast_settlement.settle_out_of_combat_cast()` with behaviour
+unchanged.
 
 #### Scenario: A damage skill aimed at an NPC is refused with nothing spent
 - **WHEN** a player casts a damage-carrying skill at a co-located NPC from exploration
@@ -91,10 +96,7 @@ than delegated, because the deliberate use of a battlefield-backed context for v
 `initiate_field_combat()` SHALL build a candidate `Battlefield` by passing an unpersisted
 `CombatSessionRecord` to `reconstruct_battlefield()`, and SHALL validate the submission against it
 using a `BattlefieldActionContext` through `world/rules/action_preview.revalidate_submission()` and
-`ActionResolver.preflight()`. It SHALL NOT validate under a `RoomActionContext`, which reports every
-co-located non-self entity as `Relation.ALLY` and would therefore evaluate faction and range against
-a false world view. A rejection at this stage SHALL return before `engage_group()` is called, so no
-session is persisted, no resource is spent, and no world time passes.
+`ActionResolver.preflight()`. It SHALL NOT validate under a `RoomActionContext`.
 
 #### Scenario: A preflight rejection persists no session
 - **WHEN** the candidate validation rejects — insufficient resources, an action-blocking buff, a
@@ -114,6 +116,16 @@ session is persisted, no resource is spent, and no world time passes.
   enemies from allies against a room monster
 - **THEN** the monster is reported as an enemy, not an ally, because the validation context is
   battlefield-backed
+
+#### Scenario: A RoomActionContext would report a false world view
+- **WHEN** validation were instead run under a `RoomActionContext`
+- **THEN** every co-located non-self entity would be reported as `Relation.ALLY`, and faction and
+  range would therefore be evaluated against a false world view
+
+#### Scenario: A candidate-stage rejection returns before engagement
+- **WHEN** candidate validation rejects the submission
+- **THEN** the rejection returns before `engage_group()` is called, so no session is persisted, no
+  resource is spent, and no world time passes
 
 ### Requirement: A SINGLE skill opens against the named monster and an AREA skill opens against every living hostile monster in the room
 `initiate_field_combat()` SHALL select the session's enemy line-up from the skill's `TargetSpec`: a
@@ -140,28 +152,8 @@ deterministic order. It SHALL NOT pass an AREA shorthand, because
 ### Requirement: Session creation and the opening action share one failure boundary
 `initiate_field_combat()` SHALL run `engage_group()` and `submit_opening_action()` inside one
 `transaction.atomic()` it owns, so a failure in the opening action rolls back the session's creation
-rather than stranding the actor in a fight that never started. The
-nested `transaction.atomic()` inside the shared submission body SHALL degrade to a savepoint, and
-every `transaction.on_commit` callback staged inside it — the round boundary event and the terminal
-settlement's post-commit work — SHALL fire on this outer commit, as that body's contract already
-states.
-
-A database rollback alone SHALL NOT be relied on to undo engagement, because engagement leaves two
-kinds of state the rollback cannot reach:
-
-1. **Process-memory registration.** The skip-safety registration performed during engagement SHALL
-   be explicitly reversed on the failure path by unregistering the same participant identities the
-   engagement registered.
-2. **Evennia attribute caches.** Engagement writes `actor.db.active_combat` and clears
-   `actor.db.dialogue_session`. The Evennia idmapper cache is not transaction-aware, so a rolled-back
-   transaction leaves both readable at their post-engagement values in process.
-   `initiate_field_combat()` SHALL therefore snapshot those attribute surfaces **before**
-   `engage_group()` runs and restore them on the failure path, following the established precedent of
-   `world/rules/cast_settlement.py::_restore_settlement_state` and
-   `world/rules/combat_session.py::_restore_round_touched`. The shared submission body's own
-   `_snapshot_round_touched()` SHALL NOT be relied on for this: it snapshots at its own entry, which
-   in this flow is already after engagement wrote those values, so its restoration would reinstate
-   the engaged session rather than the pre-engagement absence.
+rather than stranding the actor in a fight that never started. A database rollback alone SHALL NOT
+be relied on to undo engagement, because engagement leaves state the rollback cannot reach.
 
 #### Scenario: A raising opening action leaves no trace
 - **WHEN** `submit_opening_action()` raises after `engage_group()` persisted the session
@@ -189,6 +181,33 @@ kinds of state the rollback cannot reach:
 - **WHEN** a field initiation resolves a compressed encounter that ends the fight
 - **THEN** the terminal settlement's effects commit, its post-commit work runs once on the outer
   commit, and its observability events are each logged exactly once
+
+#### Scenario: The nested transaction degrades to a savepoint
+- **WHEN** the shared submission body runs inside `initiate_field_combat()`'s outer
+  `transaction.atomic()`
+- **THEN** the nested `transaction.atomic()` inside that body degrades to a savepoint, and every
+  `transaction.on_commit` callback staged inside it — the round boundary event and the terminal
+  settlement's post-commit work — fires on this outer commit, as that body's contract already states
+
+#### Scenario: The failure path reverses skip-safety registration explicitly
+- **WHEN** the opening action fails after engagement registered participants with skip safety
+- **THEN** the process-memory registration performed during engagement is explicitly reversed on the
+  failure path by unregistering the same participant identities the engagement registered
+
+#### Scenario: Engagement's attribute-cache writes are snapshot and restored
+- **WHEN** engagement writes `actor.db.active_combat` and clears `actor.db.dialogue_session` and the
+  Evennia idmapper cache is not transaction-aware, so a rolled-back transaction leaves both readable
+  at their post-engagement values in process
+- **THEN** `initiate_field_combat()` snapshots those attribute surfaces **before** `engage_group()`
+  runs and restores them on the failure path, following the established precedent of
+  `world/rules/cast_settlement.py::_restore_settlement_state` and
+  `world/rules/combat_session.py::_restore_round_touched`
+
+#### Scenario: The submission body's own snapshot is not relied on
+- **WHEN** deciding what restores the attribute surfaces after a rolled-back initiation
+- **THEN** the shared submission body's own `_snapshot_round_touched()` is not relied on: it snapshots
+  at its own entry, which in this flow is already after engagement wrote those values, so its
+  restoration would reinstate the engaged session rather than the pre-engagement absence
 
 ### Requirement: The opening cast charges combat time, never command time
 A field-combat initiation SHALL NOT charge `AdvanceSource.COMMAND` world time for the opening cast.
@@ -229,8 +248,7 @@ a route: a living co-located `Monster` SHALL route to `initiate_field_combat()` 
 `world/rules/combat_result.settle_to_messages()`, and anything else SHALL keep the existing
 `settle_out_of_combat_cast()` route. `docs/game/commands.md` and
 `docs/game/command-reference.md` SHALL be updated in this change to describe `cast`'s behaviour in
-exploration: aiming at a room monster starts combat with that skill as the opening action, a damaging
-skill cannot be aimed at anything else, and a non-damaging skill aimed elsewhere behaves as before.
+exploration.
 
 #### Scenario: The command routes a monster-targeted cast into combat
 - **WHEN** a player runs the cast command from exploration naming a living co-located monster
@@ -245,3 +263,9 @@ skill cannot be aimed at anything else, and a non-damaging skill aimed elsewhere
 - **WHEN** `docs/game/commands.md` and `docs/game/command-reference.md` are inspected
 - **THEN** each describes the monster-target route, the damaging-skill restriction, and the unchanged
   non-damaging route, and the command documentation contract test passes
+
+#### Scenario: The documentation states the three exploration behaviours
+- **WHEN** `cast`'s exploration behaviour is documented
+- **THEN** the docs state that aiming at a room monster starts combat with that skill as the opening
+  action, that a damaging skill cannot be aimed at anything else, and that a non-damaging skill aimed
+  elsewhere behaves as before

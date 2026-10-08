@@ -18,26 +18,7 @@ available in exploration mode. Its available form SHALL contain exactly
 `schema_version`, `available`, `kind` (the literal `gallery`), `subjects`,
 `selected`, `filters`, `cards`, `official_entries`, `equipment_summary`, `capabilities`,
 `binding_warnings`, and `error_state`. The registered unavailable form SHALL keep the common field set,
-reason, and semantics. Building the panel SHALL NOT create, mutate, or delete a
-`GalleryRecord`, any card, any gallery job, or any official-art preference, and SHALL NOT consult the
-connectivity probe or any image-generation service. `official_entries` SHALL be the server-computed,
-bounded list of the selected subject's content reference's catalog-admitted official images (see the
-`official-art-personalization` capability), each row exactly `{identity, url, face_rect, is_current,
-is_catalog_default}` where `identity` is the stable root-relative official identity, `url` is the
-fingerprinted same-origin official media URL, `face_rect` is the metadata-or-fitted validated
-rectangle, `is_current` marks the subject's retained personal selection, and `is_catalog_default`
-marks the content's default image; official rows are selectable/previewable presentation data only
-and SHALL NOT be derived from, appended to, or merged into `GalleryRecord.cards`. An entity whose
-content reference resolves nothing in the catalog SHALL present `official_entries: []`. Both the
-Python and JavaScript mirrored validators SHALL enforce the exact row shape, bounds, and URL
-vocabulary, rejecting payloads accepted on only one side.
-
-`official_entries` SHALL hold at most 32 rows. Each row's `identity` SHALL be at most 192 code
-points and its `url` SHALL stay inside a per-row budget of 256 code points — pinned equal to
-`world/art/presenter.py::MAX_PORTRAIT_MEDIA_URL` — because a fingerprinted official URL embeds an
-operator-chosen filename; a catalog image whose identity or URL exceeds that budget SHALL be
-omitted from the list with one bounded diagnostic instead of failing the whole panel, exactly as
-the portrait payload's official branch falls through over budget.
+reason, and semantics.
 
 #### Scenario: An empty gallery is available, not unavailable
 
@@ -64,6 +45,46 @@ the portrait payload's official branch falls through over budget.
 - **WHEN** an official row carries a URL outside the official fingerprint vocabulary, an extra key, or a rectangle outside `[0, 1]`
 - **THEN** both the Python and the JavaScript validator reject the payload and the panel degrades to the renderer's recovery path
 
+#### Scenario: Panel building reads only
+
+- **WHEN** the panel is built
+- **THEN** it creates, mutates, and deletes no `GalleryRecord`, card, gallery job, or official-art preference, and consults neither the connectivity probe nor any image-generation service
+
+#### Scenario: Official rows carry the defined row shape and field semantics
+
+- **WHEN** `official_entries` is computed
+- **THEN** it is the server-computed bounded list of the selected subject's content reference's catalog-admitted official images (see the `official-art-personalization` capability), each row exactly `{identity, url, face_rect, is_current, is_catalog_default}` where `identity` is the stable root-relative official identity, `url` is the fingerprinted same-origin official media URL, `face_rect` is the metadata-or-fitted validated rectangle, `is_current` marks the subject's retained personal selection, and `is_catalog_default` marks the content's default image
+
+#### Scenario: Official rows never merge into the cards list
+
+- **WHEN** official rows are presented
+- **THEN** they are selectable/previewable presentation data only, never derived from, appended to, or merged into `GalleryRecord.cards`
+
+#### Scenario: A reference resolving to nothing presents an empty list
+
+- **WHEN** an entity's content reference resolves nothing in the catalog
+- **THEN** the panel presents `official_entries: []`
+
+#### Scenario: Both validator sides enforce the official row contract
+
+- **WHEN** an official-row payload crosses the wire
+- **THEN** both the Python and JavaScript mirrored validators enforce the exact row shape, bounds, and URL vocabulary, rejecting payloads accepted on only one side
+
+#### Scenario: The official list and rows are bounded
+
+- **WHEN** `official_entries` is assembled
+- **THEN** it holds at most 32 rows, each row's `identity` is at most 192 code points, and each row's `url` stays inside a per-row budget of 256 code points — pinned equal to `world/art/presenter.py::MAX_PORTRAIT_MEDIA_URL`
+
+#### Scenario: The URL budget is pinned because official URLs embed filenames
+
+- **WHEN** the per-row URL budget is justified
+- **THEN** it is pinned to the portrait media-URL constant because a fingerprinted official URL embeds an operator-chosen filename
+
+#### Scenario: An over-budget catalog image is omitted, not fatal
+
+- **WHEN** a catalog image's identity or URL exceeds the budget
+- **THEN** it is omitted from the list with one bounded diagnostic instead of failing the whole panel, exactly as the portrait payload's official branch falls through over budget
+
 ### Requirement: The subject rail names every gallery-bearing subject with companion-first ordering
 
 `subjects` SHALL be a bounded ordered list (at most 24 rows) of
@@ -71,17 +92,7 @@ the portrait payload's official branch falls through over budget.
 puppet's own character subject; then live character subjects with a gallery —
 active-party companions before all other characters (design §8.3), ordering
 facts taken from the party surface; then every `MONSTER_TIER_REGISTRY` entry
-resolved through the monster kind's typed producer. Subjects of a kind whose
-capability declaration grants no gallery (the scene kind) SHALL never appear.
-`selected` SHALL name one entry of `subjects`.
-
-The bounded rail SHALL reserve space for the puppet and all bestiary entries,
-truncating only the character candidate list in companion-first, numeric entity
-primary-key order. Full subject keys SHALL be unique. This world gallery is not
-an account-subject roster. Malformed candidates SHALL be skipped independently.
-Named character policies SHALL be eligible even without a gallery record;
-account characters without a named policy SHALL require an existing numeric
-subject record, except the puppet whose numeric identity is always eligible.
+resolved through the monster kind's typed producer.
 
 #### Scenario: Active party companions precede other characters
 
@@ -93,21 +104,43 @@ subject record, except the puppet whose numeric identity is always eligible.
 - **WHEN** the rail is built for any puppet
 - **THEN** every monster-tier subject appears and no scene-kind subject appears in any row
 
+#### Scenario: Gallery-less kinds never appear on the rail
+
+- **WHEN** a subject's kind has a capability declaration granting no gallery (the scene kind)
+- **THEN** that subject never appears on the rail
+
+#### Scenario: Selection always names a rail entry
+
+- **WHEN** the panel renders
+- **THEN** `selected` names one entry of `subjects`
+
+#### Scenario: Truncation preserves the puppet and bestiary
+
+- **WHEN** the bounded rail exceeds its 24-row cap
+- **THEN** it reserves space for the puppet and all bestiary entries, truncating only the character candidate list in companion-first, numeric entity primary-key order
+
+#### Scenario: Subject keys are unique across the world gallery
+
+- **WHEN** the rail is assembled
+- **THEN** full subject keys are unique, and this world gallery is not an account-subject roster
+
+#### Scenario: A malformed candidate is skipped alone
+
+- **WHEN** a subject candidate is malformed
+- **THEN** it is skipped independently without affecting the other rows
+
+#### Scenario: Named policies and records gate eligibility
+
+- **WHEN** character subjects are deemed eligible for the rail
+- **THEN** named character policies are eligible even without a gallery record, and account characters without a named policy require an existing numeric subject record — except the puppet, whose numeric identity is always eligible
+
 ### Requirement: Subject selection is session presentation state retired with the options layer
 
 Canonical requirement ID: `webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer`.
 
 The selected subject SHALL be stored per live WebSocket-and-puppet presentation
-sequence, defaulting to the puppet. A selection naming no current rail entry
-SHALL re-select the puppet at render time without an error. The store SHALL be
-retired at disconnect, unpuppet, and account character switch, exactly like the
-session options state. The store SHALL expose a write API taking a
-rail-grammar subject key and reporting `unknown_subject` for a key naming no
-rail entry; the gallery subject-selection `ui_action` adapter is its only
-caller, writes nothing else, and publishes one affected-panel update containing
-freshly rendered `gallery`, `art`, and `roster` panels on success or domain
-rejection under the gallery-management action contract. Nothing in this
-capability mutates a gallery record, card, or job.
+sequence, defaulting to the puppet. The store SHALL be retired at disconnect,
+unpuppet, and account character switch, exactly like the session options state.
 
 #### Scenario: Selecting a companion re-renders the companion's gallery
 
@@ -124,31 +157,33 @@ capability mutates a gallery record, card, or job.
 - **WHEN** the session unpuppets and later puppets again
 - **THEN** the new sequence's selection is the new puppet and no prior selection survives
 
+#### Scenario: A stale selection silently re-selects the puppet
+
+- **WHEN** the stored selection names no current rail entry
+- **THEN** the panel re-selects the puppet at render time without an error
+
+#### Scenario: The write API validates rail-grammar keys
+
+- **WHEN** the store's write API is called with a rail-grammar subject key
+- **THEN** it reports `unknown_subject` for a key naming no rail entry
+
+#### Scenario: The ui_action adapter is the store's only caller
+
+- **WHEN** the gallery subject-selection `ui_action` adapter writes a selection
+- **THEN** it is the store's only caller, writes nothing else, and publishes one affected-panel update containing freshly rendered `gallery`, `art`, and `roster` panels on success or domain rejection under the gallery-management action contract
+
+#### Scenario: Selection state touches no domain data
+
+- **WHEN** any part of this capability runs
+- **THEN** it mutates no gallery record, card, or job
+
 ### Requirement: Card rows are server-authored with chips, crown, and validated media
 
 Each entry of `cards` SHALL contain exactly `image_id`, `status` (`"card"`,
-`"pending"`, or `"failed"`), `label` (the server-authored zh-TW display line for
-the row — stored cards carry no name, so a card row reads 「肖像」 and a pending
-row 「肖像（生成中）」; the label SHALL NOT embed a timestamp, because
-`created_at` already carries the instant and the client presents it), `url` or null, `face_rect` or null, `stage` or null, `is_default`,
+`"pending"`, or `"failed"`), `label`, `url` or null, `face_rect` or null, `stage` or null, `is_default`,
 `chips`, `requested_fields`, `binding_present`, and `created_at`. Card rows come
-only from the tolerant card read; a media URL SHALL be built only from a card's
-stored identity validated against the subject's own gallery prefix, the closed
-extension set, the store-root confinement check, and the file-existence check —
-exactly the `art-gallery-resolution` presenter discipline: a card whose stored
-file has vanished SHALL be omitted from `cards`, never emitted with a broken
-URL. `chips` SHALL be the
-server-authored label list derived from the card's binding mask (`weapon_main`
-→ 「主手」, `weapon_off` → 「副手」, `armor` → 「防具」, `accessories` → 「飾品」),
-the face fact 「自訂臉框」 when the rect differs from the card's fitted default
-`default_face_rect(image_size)` else 「預設臉框」, and 「目前預設」 exactly when
-`is_default`. The row validators SHALL NOT re-derive which face chip a row must
-carry from the rect's numeric relation to the literal `DEFAULT_FACE_RECT`
-constant — the chip is authored server-side against the card's recorded
-`image_size`, which rows never carry (no row admits an `image_size` key), and
-both validator sides accept either face chip so a fitted-default row on a
-non-square image stays valid across the wire. `cards` SHALL be ordered
-newest-first by `created_at` with append order as the stable tiebreaker.
+only from the tolerant card read. `cards` SHALL be ordered newest-first by
+`created_at` with append order as the stable tiebreaker.
 
 #### Scenario: A bound custom-face default card carries its exact chips
 
@@ -177,21 +212,45 @@ newest-first by `created_at` with append order as the stable tiebreaker.
 - **WHEN** a stored card with stage `{scale: 0.6, x: 0.1, y: -0.2}` is projected
 - **THEN** its row carries that validated triple and the existing exactly-one-face-chip contract is unchanged, with no stage chip or filter
 
+#### Scenario: The label is the server-authored zh-TW display line
+- **WHEN** a stored-card row or a pending row is projected
+- **THEN** its `label` is the server-authored zh-TW display line for the row — stored cards carry no name, so a card row reads 「肖像」 and a pending row 「肖像（生成中）」
+
+#### Scenario: The label never embeds a timestamp
+- **WHEN** any row label is authored
+- **THEN** it SHALL NOT embed a timestamp, because `created_at` already carries the instant and the client presents it
+
+#### Scenario: A media URL is built only from a fully validated identity
+- **WHEN** a card row's media URL is built
+- **THEN** it comes only from a card's stored identity validated against the subject's own gallery prefix, the closed extension set, the store-root confinement check, and the file-existence check — exactly the `art-gallery-resolution` presenter discipline
+
+#### Scenario: A card whose file vanished is omitted
+- **WHEN** a card's stored file has vanished
+- **THEN** the card is omitted from `cards`, never emitted with a broken URL
+
+#### Scenario: Binding chips come from the card's binding mask
+- **WHEN** a row's `chips` list is authored
+- **THEN** it is the server-authored label list derived from the card's binding mask: `weapon_main` → 「主手」, `weapon_off` → 「副手」, `armor` → 「防具」, `accessories` → 「飾品」
+
+#### Scenario: The face chip names the custom or default frame
+- **WHEN** the face fact is authored for a row
+- **THEN** it is 「自訂臉框」 when the rect differs from the card's fitted default `default_face_rect(image_size)`, else 「預設臉框」
+
+#### Scenario: The crown chip marks exactly the default card
+- **WHEN** a row's chips are authored
+- **THEN** 「目前預設」 appears exactly when `is_default`
+
+#### Scenario: Validators never re-derive the face chip
+- **WHEN** either validator side checks a row's face chip
+- **THEN** it SHALL NOT re-derive which face chip a row must carry from the rect's numeric relation to the literal `DEFAULT_FACE_RECT` constant — the chip is authored server-side against the card's recorded `image_size`, which rows never carry (no row admits an `image_size` key), and both validator sides accept either face chip so a fitted-default row on a non-square image stays valid across the wire
+
 ### Requirement: Pending jobs and the recorded error render as truthful synthetic rows
 
 One read-only accessor over the art queue surface SHALL supply a subject's
 in-flight gallery job image ids and minted timestamps, bounded; each SHALL
 render as one `status: "pending"` row (spinner state) ordered with the cards by
 timestamp. A `GalleryRecord` carrying `last_error_code` SHALL render as exactly
-one `status: "failed"` row whose server-authored message is the bounded
-「暫時無法生成，稍後再試」 line carrying the stable code, placed newest by
-`last_error_at`. A failed row SHALL NOT fabricate a card: `url`, `face_rect` and `stage`
-are null and its `image_id` SHALL be deterministic synthetic state (uuid5 over
-the subject, the error timestamp, and the code), never a stored card's id. A
-pending row whose `image_id` also names a listed card (same-pass settle race)
-SHALL be dropped. With the image server
-unreachable the panel SHALL still be available: AI-offline generation is a
-surfaced failed row, never a panel degradation and never a broken card.
+one `status: "failed"` row.
 
 #### Scenario: An unreachable server surfaces the failed row not a broken panel
 
@@ -203,18 +262,33 @@ surfaced failed row, never a panel degradation and never a broken card.
 - **WHEN** a gallery job is queued and not yet settled when the panel renders
 - **THEN** exactly one pending row for that image id appears and the 生成中 filter count is at least one
 
+#### Scenario: The failed row carries the bounded authored message
+
+- **WHEN** a `GalleryRecord` with `last_error_code` renders its failed row
+- **THEN** the server-authored message is the bounded 「暫時無法生成，稍後再試」 line carrying the stable code, placed newest by `last_error_at`
+
+#### Scenario: A failed row fabricates no card
+
+- **WHEN** a failed row is rendered
+- **THEN** it fabricates no card: `url`, `face_rect` and `stage` are null and its `image_id` is deterministic synthetic state (uuid5 over the subject, the error timestamp, and the code), never a stored card's id
+
+#### Scenario: A settled pending row is dropped
+
+- **WHEN** a pending row's `image_id` also names a listed card (same-pass settle race)
+- **THEN** the pending row is dropped
+
+#### Scenario: An unreachable image server never degrades the panel
+
+- **WHEN** the image server is unreachable
+- **THEN** the panel is still available: AI-offline generation is a surfaced failed row, never a panel degradation and never a broken card
+
 ### Requirement: Binding-overlap warnings are computed only in the presenter
 
 The panel SHALL carry `binding_warnings`: for the selected subject, the bound
 cards whose masked slots ALL evaluate equal to the current equipment snapshot on
 every slot the card masks (i.e. cards that could satisfy their binding against
 the same equipment right now) — the subject's default card included when it is
-bound — ordered newest-first, at most five entries, each exactly `{image_id, label,
-conditions}` where `conditions` is the card's server-authored per-slot
-condition lines (slot label plus equipped display name; accessories rendered as
-the sorted list with 「任一」 semantics). An empty list SHALL be present, not
-null, whenever binding is unsupported or nothing overlaps. No matching rule
-SHALL exist in any client; the binding editor renders these facts verbatim.
+bound — ordered newest-first, at most five entries.
 
 #### Scenario: Two cards matching the current equipment overlap
 
@@ -226,29 +300,28 @@ SHALL exist in any client; the binding editor renders these facts verbatim.
 - **WHEN** a bound card masks `weapon_main` against an item the puppet is not wearing
 - **THEN** that card is absent from `binding_warnings`
 
+#### Scenario: Each warning entry has the exact shape
+
+- **WHEN** a `binding_warnings` entry is emitted
+- **THEN** it is exactly `{image_id, label, conditions}` where `conditions` is the card's server-authored per-slot condition lines (slot label plus equipped display name; accessories rendered as the sorted list with 「任一」 semantics)
+
+#### Scenario: No warnings is an empty list, never null
+
+- **WHEN** binding is unsupported or nothing overlaps
+- **THEN** an empty list is present, not null
+
+#### Scenario: Clients hold no matching rule
+
+- **WHEN** any client renders binding warnings
+- **THEN** no matching rule exists in any client; the binding editor renders these facts verbatim
+
 ### Requirement: Filter counts and the equipment summary are server-computed
 
 `filters` SHALL be the server-computed counts `{all, defaults, bound, pending,
-failed}` over exactly the rows the panel lists (全部 = every row; 預設 counts
-the default card; 已綁定 counts cards with a binding; 生成中 counts pending
-rows; 失敗 counts failed rows). For a kind declaring binding support,
-`equipment_summary` SHALL list the four slots with each slot's currently
-equipped normalized value and registry display name (accessories as a sorted
-list with an equipped-count of at most five), read from stored equipment state
-without materializing a handler; otherwise it SHALL be null. `capabilities`
-SHALL mirror the subject kind's declaration fields the management surface needs
-(`supports_bindings`, `supports_field_selection`, `supports_free_text`,
-`max_cards` or null). `error_state` SHALL be the record's last error code and
-timestamp or null.
-
-The exact equipment summary SHALL have `weapon_main`, `weapon_off`, `armor`,
-and `accessories`. A single slot SHALL contain exactly `{value, display_name}`,
-with a null value for no equipment. Accessories SHALL contain exactly
-`{value, display_names, equipped_count}`, sorted by Unicode code point with
-corresponding names and at most five values. Keys and display names SHALL be
-nonempty strings of at most 64 code points. `error_state` SHALL be exactly
-`{code, at}` or null; the code SHALL match `[a-z0-9_]{1,64}` and the timestamp
-SHALL be a finite epoch number within the safe JSON numeric range.
+failed}` over exactly the rows the panel lists. For a kind declaring binding
+support, `equipment_summary` SHALL list the four slots with each slot's
+currently equipped normalized value and registry display name, read from stored
+equipment state without materializing a handler; otherwise it SHALL be null.
 
 #### Scenario: Monster subjects carry no binding affordances
 
@@ -260,6 +333,41 @@ SHALL be a finite epoch number within the safe JSON numeric range.
 - **WHEN** the panel lists two bound cards, one default unbound card, one pending row, and one failed row
 - **THEN** filters are all 5, defaults 1, bound 2, pending 1, failed 1
 
+#### Scenario: Each filter count names its rows
+
+- **WHEN** the server counts filter rows
+- **THEN** 全部 = every row; 預設 counts the default card; 已綁定 counts cards with a binding; 生成中 counts pending rows; 失敗 counts failed rows
+
+#### Scenario: Accessories summarize as a bounded sorted list
+
+- **WHEN** the equipment summary renders the accessories slot
+- **THEN** accessories appear as a sorted list with an equipped-count of at most five
+
+#### Scenario: The summary mirrors the kind's declared capabilities
+
+- **WHEN** the panel presents `capabilities`
+- **THEN** it mirrors the subject kind's declaration fields the management surface needs (`supports_bindings`, `supports_field_selection`, `supports_free_text`, `max_cards` or null)
+
+#### Scenario: error_state carries the record's last error
+
+- **WHEN** the panel presents `error_state`
+- **THEN** it is the record's last error code and timestamp or null
+
+#### Scenario: The equipment summary has the exact slot shape
+
+- **WHEN** `equipment_summary` is validated
+- **THEN** it has exactly `weapon_main`, `weapon_off`, `armor`, and `accessories`; a single slot contains exactly `{value, display_name}`, with a null value for no equipment; accessories contain exactly `{value, display_names, equipped_count}`, sorted by Unicode code point with corresponding names and at most five values
+
+#### Scenario: Keys and names are short nonempty strings
+
+- **WHEN** summary keys and display names are validated
+- **THEN** each is a nonempty string of at most 64 code points
+
+#### Scenario: error_state is exactly code and timestamp
+
+- **WHEN** `error_state` is validated
+- **THEN** it is exactly `{code, at}` or null; the code matches `[a-z0-9_]{1,64}` and the timestamp is a finite epoch number within the safe JSON numeric range
+
 ### Requirement: The gallery payload is exactly version-mirrored across server and client
 
 The panel's schema version SHALL be one server-side constant shared by the
@@ -269,25 +377,42 @@ exact per-panel validator, and the dual-direction parity tests SHALL reject a
 payload accepted on one side and rejected on the other. Adding the panel SHALL
 be additive: no existing panel's schema or envelope changes.
 
-Both validators SHALL enforce unique canonical UUID image IDs, unique full
-subject keys, selected membership, puppet-first ordering, positive confined
-face rectangles, gallery URLs bound to the selected subject and image with the
-closed store extensions, coherent status/flags/chips/provenance, and exact
-nonnegative filter counts. Pending rows SHALL be bounded to eight and failed
-rows to one; synthetic rows SHALL have null URL/rectangle/stage, false flags, and empty
-chips/provenance. Defaults SHALL be at most one. Labels SHALL be at most 128
-code points, chips at most 16, URLs at most 129, and warning conditions at most
-four nonempty lines of at most 512 code points. Warnings SHALL name unique
-visible bound cards in newest-first order. Lone surrogates and unsafe numbers
-SHALL be rejected. The existing 65,536-byte canonical JSON limit SHALL apply;
-an oversized character gallery SHALL fail closed, not silently truncate cards.
-
 #### Scenario: A stale client rejects rather than renders
 
 - **WHEN** a gallery payload carries a field outside the mirrored exact schema
 - **THEN** both the Python validator and the JavaScript validator reject it and the panel degrades to that renderer's recovery path
 
 Real card stage SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL reject a missing stage key, null stage on a real card or non-null stage on a synthetic row. Schema version SHALL remain 1; server and client SHALL ship together.
+
+#### Scenario: Both validators enforce identity, ordering, and URL facts
+
+- **WHEN** either validator side checks a gallery payload
+- **THEN** it enforces unique canonical UUID image IDs, unique full subject keys, selected membership, puppet-first ordering, positive confined face rectangles, gallery URLs bound to the selected subject and image with the closed store extensions, coherent status/flags/chips/provenance, and exact nonnegative filter counts
+
+#### Scenario: Synthetic rows are bounded and neutralized
+
+- **WHEN** synthetic rows are validated
+- **THEN** pending rows are bounded to eight and failed rows to one, and synthetic rows carry null URL/rectangle/stage, false flags, and empty chips/provenance
+
+#### Scenario: Every field carries its documented bound
+
+- **WHEN** payload fields are validated
+- **THEN** defaults are at most one, labels at most 128 code points, chips at most 16, URLs at most 129, and warning conditions at most four nonempty lines of at most 512 code points
+
+#### Scenario: Warnings name unique visible cards newest-first
+
+- **WHEN** warning entries are validated
+- **THEN** they name unique visible bound cards in newest-first order
+
+#### Scenario: Lone surrogates and unsafe numbers are rejected
+
+- **WHEN** a payload carries lone surrogates or unsafe numbers
+- **THEN** both validators reject it
+
+#### Scenario: The oversized gallery fails closed at the JSON limit
+
+- **WHEN** a character gallery exceeds the existing 65,536-byte canonical JSON limit
+- **THEN** it fails closed and does not silently truncate cards
 
 #### Scenario: Invalid stage fails both wire validators
 - **WHEN** a real row has out-of-range stage, a missing stage key or null stage, or a pending/failed row carries a fabricated triple

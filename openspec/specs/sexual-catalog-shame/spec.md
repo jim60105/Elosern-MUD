@@ -20,16 +20,7 @@ actor-scoped `self_exposure` event shipped with the seed and adds the actor-scop
      genuine drops) for why. -->
 
 ### Requirement: Nine Tier 1-4 shame acts are registered, gated by exposure_act_count and/or watched_count thresholds
-`world/skills/sexual_acts/shame.py`'s `SHAME_ACTS` tuple SHALL contain, in addition to
-`sexual-act-seeds`'s one seed row: three acts each declaring `unlock={"exposure_act_count": 5}`
-(`shame_half_expose_chest`, `shame_half_expose_lower`, `shame_loosen_collar`); one act declaring
-`unlock={"exposure_act_count": 20}` (`shame_full_expose`); one act declaring
-`unlock={"exposure_act_count": 20, "masturbation_count": 25}` (`shame_public_masturbation`); one act
-declaring `unlock={"watched_count": 10}` (`shame_provocative_gaze`); one act declaring
-`unlock={"watched_count": 10, "exposure_act_count": 20}` (`shame_public_performance`); one act
-declaring `unlock={"exposure_act_count": 50}` (`shame_devoted_pose`); and one act declaring
-`unlock={"exposure_act_count": 50, "watched_count": 30}` (`shame_shameless_declaration`). Every one
-of these nine acts SHALL declare `actor_part=None`.
+`world/skills/sexual_acts/shame.py`'s `SHAME_ACTS` tuple SHALL contain, in addition to `sexual-act-seeds`'s one seed row, nine acts gated by `exposure_act_count` and/or `watched_count` thresholds declared as per-act `unlock` mappings (enumerated in the scenarios below). Every one of these nine acts SHALL declare `actor_part=None`.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `exposure_act_count == 4`
@@ -56,14 +47,24 @@ of these nine acts SHALL declare `actor_part=None`.
 - **WHEN** the same entity's `watched_count` becomes `30`
 - **THEN** `shame_shameless_declaration` is present in the returned set
 
+#### Scenario: Tier 1 unlock declarations
+- **WHEN** the Tier 1 shame act definitions are read
+- **THEN** `shame_half_expose_chest`, `shame_half_expose_lower`, and `shame_loosen_collar` each declare `unlock={"exposure_act_count": 5}`
+
+#### Scenario: Tier 2 unlock declarations
+- **WHEN** the Tier 2 shame act definitions are read
+- **THEN** `shame_full_expose` declares `unlock={"exposure_act_count": 20}` and `shame_public_masturbation` declares `unlock={"exposure_act_count": 20, "masturbation_count": 25}`
+
+#### Scenario: Tier 3 unlock declarations
+- **WHEN** the Tier 3 shame act definitions are read
+- **THEN** `shame_provocative_gaze` declares `unlock={"watched_count": 10}` and `shame_public_performance` declares `unlock={"watched_count": 10, "exposure_act_count": 20}`
+
+#### Scenario: Tier 4 unlock declarations
+- **WHEN** the Tier 4 shame act definitions are read
+- **THEN** `shame_devoted_pose` declares `unlock={"exposure_act_count": 50}` and `shame_shameless_declaration` declares `unlock={"exposure_act_count": 50, "watched_count": 30}`
+
 ### Requirement: Every act except shame_provocative_gaze reuses the self_exposure event, actor-scoped; no new sexual.yaml row is added
-`shame_hem_lift`, `shame_half_expose_chest`, `shame_half_expose_lower`, `shame_loosen_collar`,
-`shame_full_expose`, `shame_public_masturbation`, `shame_public_performance`, `shame_devoted_pose`,
-and `shame_shameless_declaration` SHALL each declare `"self_exposure"` in `sexual_events`, emitted
-through the actor-scoped channel (`sexual_event_actor:self_exposure`) so the event lands on the
-performing actor. `shame_provocative_gaze` SHALL declare `sexual_events=()`. Every act except
-`shame_provocative_gaze` SHALL also declare `"public_exposure"` in `sexual_events`.
-`world/rules/rulebook/sexual.yaml` SHALL gain no rule row from this change.
+Every shame act except `shame_provocative_gaze` SHALL declare both `"self_exposure"` and `"public_exposure"` in `sexual_events`, with `self_exposure` emitted through the actor-scoped channel (`sexual_event_actor:self_exposure`) so the event lands on the performing actor. `shame_provocative_gaze` SHALL declare `sexual_events=()`. `world/rules/rulebook/sexual.yaml` SHALL gain no rule row from this change.
 
 #### Scenario: Casting a Tier 1 act raises the actor's own exposure
 - **WHEN** an entity whose `exposure` is at its vocabulary floor casts `shame_half_expose_chest` on
@@ -83,6 +84,10 @@ performing actor. `shame_provocative_gaze` SHALL declare `sexual_events=()`. Eve
 #### Scenario: Casting a shame act grants the exposure experience type
 - **WHEN** an entity casts `shame_half_expose_chest` on itself
 - **THEN** the actor's `experience_types` contains `露出` afterward
+
+#### Scenario: The declaring acts are enumerated
+- **WHEN** the acts declaring `"self_exposure"` are listed
+- **THEN** they are `shame_hem_lift`, `shame_half_expose_chest`, `shame_half_expose_lower`, `shame_loosen_collar`, `shame_full_expose`, `shame_public_masturbation`, `shame_public_performance`, `shame_devoted_pose`, and `shame_shameless_declaration`
 
 ### Requirement: shame_public_masturbation credits three counters and emits five events
 `shame_public_masturbation` SHALL declare `actor_counters=("exposure_act_count",
@@ -137,14 +142,7 @@ SHALL keep `sexual_events=()`.
   `"public_sexual_activity"`
 
 ### Requirement: shame_provocative_gaze credits hostile_act_count on both participants
-`shame_provocative_gaze` SHALL declare `actor_counters=("hostile_act_count",)`
-and `participant_counters=("hostile_act_count",)`. The provoked target was
-subjected to a hostile sexual act, and `hostile_act_count` records
-participation from either side. The counter stays asymmetric for the
-direction-bound shame counters: the four public-exposure acts keep
-`participant_counters=()` because `exposure_act_count` records one's own
-exposure and `watched_count` records one's own watched experience — an
-audience member underwent neither.
+`shame_provocative_gaze` SHALL declare `actor_counters=("hostile_act_count",)` and `participant_counters=("hostile_act_count",)`.
 
 #### Scenario: Casting shame_provocative_gaze credits both participants
 - **WHEN** entity A casts `shame_provocative_gaze` targeting entity B, both starting at
@@ -157,6 +155,14 @@ audience member underwent neither.
   targeting one hostile entity
 - **THEN** afterward the actor's `watched_count` equals `11` and `exposure_act_count` equals `21`,
   and the target's `watched_count` and `exposure_act_count` are unchanged
+
+#### Scenario: Why both participants are credited
+- **WHEN** `shame_provocative_gaze` provokes its target
+- **THEN** the target has been subjected to a hostile sexual act, and `hostile_act_count` records participation from either side, so both participants are credited
+
+#### Scenario: Direction-bound shame counters stay asymmetric
+- **WHEN** one of the four public-exposure acts is declared
+- **THEN** it keeps `participant_counters=()`, because `exposure_act_count` records one's own exposure and `watched_count` records one's own watched experience — an audience member underwent neither
 
 ### Requirement: The three AREA acts declare target_part as a BODY_PARTS member, never None
 `shame_provocative_gaze`, `shame_public_performance`, and `shame_devoted_pose` SHALL each declare

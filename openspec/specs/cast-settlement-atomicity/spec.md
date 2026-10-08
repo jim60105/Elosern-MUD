@@ -8,22 +8,9 @@ surfaces.
 ## Requirements
 
 ### Requirement: Out-of-combat casts settle resolution and world-time cost in one outer transaction
-The out-of-combat cast command path SHALL route every cast that is not a field-combat initiation
-through
+The out-of-combat cast command path SHALL route every cast that is not a field-combat initiation through
 `world/rules/cast_settlement.settle_out_of_combat_cast(request)`, which SHALL snapshot all action- and
-clock-touched objects before resolution, open one outer `transaction.atomic()`, run
-`ActionResolver.resolve(request)` and — only on success —
-`WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, [request.actor])` as nested
-operations inside it, and return only after the outer transaction commits. A cast aimed at a living
-co-located `Monster` is a field-combat initiation and SHALL instead route through
-`world/rules/combat_initiation.initiate_field_combat()`, whose time cost is accumulated by the combat
-session and charged as combat time by its terminal settlement rather than as `AdvanceSource.COMMAND`
-time here. The snapshot SHALL cover,
-merged by object identity before the transaction opens: the merged advance-snapshot registry (per the
-world-clock advance-surface seam), the actor's and every request target's entity surfaces and quest
-logs, the battlefield's fled/knocked-out sets when the request context carries one, and the clock tick.
-Success rendering and EventLog presentation SHALL occur only after the outer transaction commits. A
-rejected resolution SHALL advance nothing and SHALL leave every snapshotted surface untouched.
+clock-touched objects before resolution and open one outer `transaction.atomic()`.
 
 #### Scenario: A successful status_disguise cast commits disguise, practice, and tick together
 - **WHEN** a player casts `status_disguise` out of combat and the settlement succeeds with
@@ -32,6 +19,11 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
   `db.skill_proficiency["status_disguise"]` increased by the race-scaled practice award, and
   `get_world_clock().tick` increased by exactly 6 — all visible in a fresh read after the outer commit,
   and the EventLog is rendered only after that commit
+
+#### Scenario: Resolution and clock advance run nested and the call returns only after commit
+
+- **WHEN** the settlement runs inside its outer transaction
+- **THEN** it runs `ActionResolver.resolve(request)` and — only on success — `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, [request.actor])` as nested operations inside the outer transaction, and returns only after the outer transaction commits
 
 #### Scenario: A successful buff-applying out-of-combat cast commits the buff and tick together
 - **WHEN** a player casts a buff-applying spell registered `usable_out_of_combat=True` with an empty
@@ -66,17 +58,31 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
   superset — the actor, the request targets, and the merged advance registry — so no rolled-back cast can
   leave an unsnapshotted write behind
 
+#### Scenario: A field-combat initiation defers its time cost to the combat session
+
+- **WHEN** a cast is aimed at a living co-located `Monster`, making it a field-combat initiation routed through `world/rules/combat_initiation.initiate_field_combat()`
+- **THEN** its time cost is accumulated by the combat session and charged as combat time by its terminal settlement rather than as `AdvanceSource.COMMAND` time in the out-of-combat settlement
+
+#### Scenario: The settlement snapshot covers the declared surfaces merged by object identity
+
+- **WHEN** the settlement builds its pre-resolution snapshot
+- **THEN** the snapshot covers, merged by object identity before the transaction opens: the merged advance-snapshot registry (per the world-clock advance-surface seam), the actor's and every request target's entity surfaces and quest logs, the battlefield's fled/knocked-out sets when the request context carries one, and the clock tick
+
+#### Scenario: Success rendering and EventLog presentation are post-commit only
+
+- **WHEN** an out-of-combat cast resolves successfully
+- **THEN** success rendering and EventLog presentation occur only after the outer transaction commits
+
+#### Scenario: A rejected resolution leaves every snapshotted surface untouched
+
+- **WHEN** `ActionResolver.resolve` rejects the request inside the settlement
+- **THEN** the settlement advances nothing and leaves every snapshotted surface untouched
+
 ### Requirement: A failed out-of-combat settlement restores every touched Evennia cache before the failure surfaces
 When the clock callback, the final clock persistence, or the outer commit fails after a successful
 resolution, the settlement SHALL restore, before propagating the failure, the pre-action state of every
-snapshotted surface — actor and target Evennia Attributes (`traits`, `disguised_stats`, `sexual_traits`,
-`virgin`, `experience_types`, `buffs`, `skill_grants`, `skill_proficiency`, `quest_log`, `church`),
-the battlefield's fled/knocked-out sets when present, every callback-owned advance surface, and the
-clock tick — because Django rollback reverts only durable rows while Evennia's in-process caches keep
-the uncommitted values. Restore SHALL run in a fixed deterministic order after the rollback, SHALL be
-best-effort per step with a logged diagnostic on failure, and SHALL NOT mask or replace the original
-failure. The world-clock tick SHALL be restored from its pre-action snapshot, not from any post-action
-or post-advance value.
+snapshotted surface — because Django rollback reverts only durable rows while Evennia's in-process
+caches keep the uncommitted values.
 
 #### Scenario: A clock-callback failure rolls back a status_disguise cast completely
 - **WHEN** a player casts `status_disguise` out of combat with `db.disguised_stats` absent and no
@@ -119,3 +125,18 @@ or post-advance value.
 - **THEN** the failure propagates, `db.buffs`, `db.church` (merit, daily block, and any
   `blessing_last_tick` key), the trait cache, and the clock tick all equal their pre-action values
   in cache and storage, and no `rite_cast` event is emitted
+
+#### Scenario: The restore covers every enumerated snapshotted surface
+
+- **WHEN** the settlement restores after a failed out-of-combat settlement
+- **THEN** it restores the pre-action state of the actor and target Evennia Attributes (`traits`, `disguised_stats`, `sexual_traits`, `virgin`, `experience_types`, `buffs`, `skill_grants`, `skill_proficiency`, `quest_log`, `church`), the battlefield's fled/knocked-out sets when present, every callback-owned advance surface, and the clock tick
+
+#### Scenario: Restore execution is ordered, best-effort, and non-masking
+
+- **WHEN** the settlement's restore runs after the rollback
+- **THEN** it runs in a fixed deterministic order, is best-effort per step with a logged diagnostic on failure, and does not mask or replace the original failure
+
+#### Scenario: The world-clock tick is restored from its pre-action snapshot
+
+- **WHEN** the settlement restores the world-clock tick
+- **THEN** the tick is restored from its pre-action snapshot, not from any post-action or post-advance value

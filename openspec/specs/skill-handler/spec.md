@@ -37,12 +37,7 @@ backing data from the private `entity.db.skills` attribute, holding the
 `entity.traits.<trait_key>.value` (the stored base value) and multiplying it by every currently-owned
 active skill's matching `stat_multiply:<trait_key>:<multiplier>` effect and every applicable
 source-skill multiplier times its conferred grant's fractional `scale` (see the conferral requirement
-below), returning the result. This function and every other function in `world/skills/handler.py`
-SHALL NOT assign to `entity.traits.<any key>.value`,
-`.base`, or `.mod`.
-Duplicate occurrences of the same active skill key SHALL be resolution-idempotent rather than
-applying its multiplier repeatedly. A single `SkillDef` SHALL NOT define more than one multiplier
-for the same trait; encountering such a contradictory definition SHALL raise.
+below), returning the result.
 
 #### Scenario: effective_value multiplies the base trait value by an owned skill's multiplier
 - **WHEN** an entity's `entity.traits.atk_phys.value` is `88` and the entity owns the
@@ -57,6 +52,16 @@ for the same trait; encountering such a contradictory definition SHALL raise.
 - **WHEN** `world/skills/handler.py`'s source is inspected
 - **THEN** it contains no assignment expression targeting `entity.traits.<anything>`, `.base`, or
   `.mod` anywhere in the module
+
+#### Scenario: Duplicate active skill keys resolve idempotently
+- **WHEN** the same active skill key occurs more than once for an entity
+- **THEN** its multiplier is applied once, resolution-idempotent rather than applying the multiplier
+  repeatedly
+
+#### Scenario: A contradictory SkillDef multiplier raises
+- **WHEN** a single `SkillDef` defines more than one multiplier for the same trait and is encountered
+- **THEN** the encounter raises, because a `SkillDef` SHALL NOT define more than one multiplier for
+  the same trait
 
 #### Scenario: An entity with no matching multiplier skill returns the unmultiplied base value
 - **WHEN** an entity owns no skill whose `effects` include a `stat_multiply:atk_phys:*` entry
@@ -86,14 +91,7 @@ reference to `entity.traits` anywhere in its definition. No module under `world/
 persistent state.
 
 The values the veil writes SHALL be DERIVED deterministically from the race registry's mundane bands
-and SHALL NOT be supplied through `event_context`: each of the displayed combat five is rendered at the
-ceiling of the corresponding mundane band the registry already declares, so no balance constant is
-duplicated in code. Derivation SHALL live beside the write rather than inside it, so the write keeps
-its narrow single-writer contract. The write SHALL also record the veil's PROVENANCE as
-divine. A veil cast at an entity OTHER than the actor SHALL apply the veil to that entity. A veil cast
-at the actor SHALL toggle against a DIVINE veil ONLY: it SHALL clear the layer when the actor already
-carries a divine veil, and SHALL apply the derived veil when the actor carries none or carries a veil
-of mundane provenance. A veil the verb did not place SHALL never be lifted by casting the verb.
+and SHALL NOT be supplied through `event_context`.
 
 #### Scenario: apply_disguise_effect only changes disguised_stats
 - **WHEN** `apply_disguise_effect(entity, {"atk_phys": 60})` is called on an entity whose true
@@ -132,6 +130,29 @@ of mundane provenance. A veil the verb did not place SHALL never be lifted by ca
 - **THEN** it is veiled at the derived values with divine provenance, and its display is NOT reverted
   to true values
 
+#### Scenario: Displayed combat five render at the mundane band ceilings
+- **WHEN** the veil derives its displayed values
+- **THEN** each of the displayed combat five is rendered at the ceiling of the corresponding mundane
+  band the registry already declares, so no balance constant is duplicated in code
+
+#### Scenario: Derivation lives beside the write
+- **WHEN** the veil's derived values are computed
+- **THEN** derivation lives beside the write rather than inside it, so the write keeps its narrow
+  single-writer contract
+
+#### Scenario: The write records divine provenance
+- **WHEN** the veil write stores a layer
+- **THEN** it also records the veil's PROVENANCE as divine
+
+#### Scenario: Self-cast toggles against a divine veil only
+- **WHEN** a veil is cast at the actor
+- **THEN** it SHALL clear the layer when the actor already carries a divine veil, and SHALL apply the
+  derived veil when the actor carries none or carries a veil of mundane provenance
+
+#### Scenario: The verb never lifts a veil it did not place
+- **WHEN** the veil verb is cast and the target's veil was not placed by that verb
+- **THEN** the veil the verb did not place is never lifted by casting the verb
+
 #### Scenario: Casting the veil at an already-veiled other refreshes rather than lifts
 - **WHEN** an entity casts the veil at a different entity that already carries a veil
 - **THEN** the target stays veiled at the derived values, because only a self-cast toggles
@@ -165,9 +186,7 @@ persistent attributes or import mutators from `world.rules/`.
 passive keys plus `INNATE_SKILL_ORDER` — the same list `owned_keys()` returned before this
 requirement. `owned_keys()` SHALL return `base_owned_keys()` extended with every key in
 `entity.sexual.unlocked_act_keys()` (when the entity has a `sexual` attribute), sorted, appended
-after the base list. `world/skills/handler.py` SHALL read the entity's sexual state through a
-duck-typed `getattr(entity, "sexual", None)` and SHALL import nothing from `world.rules`, preserving
-`universal-action-ownership`'s existing "world/skills/ does not depend on world/rules/" requirement.
+after the base list.
 
 #### Scenario: base_owned_keys() matches owned_keys()'s pre-extension behaviour exactly
 - **WHEN** `base_owned_keys()` is called on any entity
@@ -189,6 +208,15 @@ duck-typed `getattr(entity, "sexual", None)` and SHALL import nothing from `worl
 - **WHEN** `owned_keys()` is called on an entity with no `sexual` attribute at all
 - **THEN** it returns `base_owned_keys()`'s value without raising
 
+#### Scenario: handler.py reads sexual state duck-typed
+- **WHEN** `world/skills/handler.py` needs the entity's sexual state
+- **THEN** it reads it through a duck-typed `getattr(entity, "sexual", None)`
+
+#### Scenario: world/skills/ keeps its independence from world/rules/
+- **WHEN** `world/skills/handler.py` resolves owned keys
+- **THEN** it imports nothing from `world.rules`, preserving `universal-action-ownership`'s existing
+  "world/skills/ does not depend on world/rules/" requirement
+
 #### Scenario: An unmaterialized entity's owned_keys() stays side-effect-free
 - **WHEN** `owned_keys()` is called on an entity whose sexual handler was never mounted, while the
   catalogue contains a seed act (an act with an empty `unlock` mapping)
@@ -204,44 +232,9 @@ duck-typed `getattr(entity, "sexual", None)` and SHALL import nothing from `worl
 ### Requirement: Conferral records a data-scaled grant of every skill its caster owns (統御術)
 `world/skills/handler.py` SHALL define a frozen `ConferredSkillGrant` dataclass (`source_key`,
 `skill_key`, `scale`) and a read-only `SkillHandler.conferred_grants()` query over the
-attribute `entity.db.skill_grants`, kept separate from `entity.db.skills`'s import-populated
-`{"active": [...], "passive": [...]}` structure. `trait_keys` is no longer a stored field — it is
-derived at resolution time from the referenced skill's own `parsed_effects` rather than duplicated in
-the grant record. `effective_value()` SHALL fold every applicable source skill's matching multiplier
-multiplied by the grant's fractional `scale` into its multiplier computation, in addition to the
-entity's own owned skills. The `skill_owned` rule-table context builder (`world/rules/
-combat_modifiers.py`, added by `skill-owned-rule-condition`) SHALL likewise fold a conferred grant's
-scaled adjustment into its evaluated bundle when the grant references a skill whose parsed effect is a
-`RuleTableEffect`. Conferral of a skill carrying a gate-type effect
-(`SexualMasteryEffect`, `DisguiseEffect`) SHALL raise
-`EFFECT_RESOLUTION_FAILED` at cast-resolution time rather than silently
-applying a no-op scale, and conferral of a skill carrying no continuous-valued
-effect any grant consumer can resolve (no `StatMultiplyEffect` and no
-`RuleTableEffect`) SHALL likewise be rejected instead of recording a silent
-no-op grant. `ElementMasteryEffect` left the gate-type enumeration together
-with the retired cast gate (`magic-xp-engine-retirement`): the `<element>_mastery`
-skills now carry only the inert `passive_trait:element_mastery` flavor effect and
-are therefore rejected by the no-continuous-effect clause instead. The write
-primitive SHALL live at
-`world.rules.skill_effects.record_conferred_grant()` so `world/skills/` remains
-outside the single-writer core.
-
-The store SHALL be keyed by `(source_key, skill_key)`: recording a grant for a pair that already has
-one SHALL REPLACE that grant rather than append a second, so a repeated conferral refreshes the scale
-instead of compounding the multiplier. Grants from two different sources for the same skill SHALL both
-be retained.
-
-The conferral write path SHALL additionally reject a skill that the conferring entity does not
-DIRECTLY own at record time, with the same `EFFECT_RESOLUTION_FAILED` rejection the shape validation
-uses, so a conferred grant can never exceed — or be chained onward from — what its source itself
-holds.
-
-The conferral scale SHALL be read from the conferring skill's own per-occurrence
-`EffectPolicy.coefficient` and SHALL NOT be supplied through `event_context`. The conferred SET SHALL
-be DERIVED rather than chosen: one grant SHALL be recorded for every skill the caster directly owns
-that passes the conferrability shape validation, each at that node's scale. A conferral whose derived
-set is empty SHALL raise `EFFECT_RESOLUTION_FAILED` rather than committing an action that records
-nothing. The same data-derived scale rule SHALL apply to the conferred growth-rate effect.
+attribute `entity.db.skill_grants`. `effective_value()` SHALL fold every applicable source skill's
+matching multiplier multiplied by the grant's fractional `scale` into its multiplier computation, in
+addition to the entity's own owned skills. The store SHALL be keyed by `(source_key, skill_key)`.
 
 #### Scenario: A conferred grant applies its own scale, independent of the source skill's own multiplier
 - **WHEN** an entity has no `body_enhancement` skill of its own but has a `ConferredSkillGrant` with
@@ -315,14 +308,63 @@ nothing. The same data-derived scale rule SHALL apply to the conferred growth-ra
   skill to a third entity
 - **THEN** the attempt is rejected, because the ownership precondition reads direct ownership only
 
+#### Scenario: The grant store is kept separate from owned skills
+- **WHEN** conferral grants are stored
+- **THEN** `entity.db.skill_grants` is kept separate from `entity.db.skills`'s import-populated
+  `{"active": [...], "passive": [...]}` structure
+
+#### Scenario: Grant trait keys derive at resolution time
+- **WHEN** a conferred grant is resolved
+- **THEN** its affected trait keys are derived from the referenced skill's own `parsed_effects` rather
+  than duplicated in the grant record, because `trait_keys` is no longer a stored field
+
+#### Scenario: The skill_owned context builder folds conferred adjustments
+- **WHEN** the `skill_owned` rule-table context builder (`world/rules/combat_modifiers.py`, added by
+  `skill-owned-rule-condition`) evaluates a grant referencing a skill whose parsed effect is a
+  `RuleTableEffect`
+- **THEN** it folds the conferred grant's scaled adjustment into its evaluated bundle
+
+#### Scenario: ElementMasteryEffect left the gate-type enumeration
+- **WHEN** a `<element>_mastery` skill is assessed for conferrability
+- **THEN** `ElementMasteryEffect` left the gate-type enumeration together with the retired cast gate
+  (`magic-xp-engine-retirement`): these skills now carry only the inert `passive_trait:element_mastery`
+  flavor effect and are therefore rejected by the no-continuous-effect clause instead
+
+#### Scenario: The write primitive lives in the single-writer core
+- **WHEN** a conferral grant is written
+- **THEN** the write primitive lives at `world.rules.skill_effects.record_conferred_grant()` so
+  `world/skills/` remains outside the single-writer core
+
+#### Scenario: A repeated conferral refreshes rather than compounds
+- **WHEN** a grant is recorded for a `(source_key, skill_key)` pair that already has one
+- **THEN** that grant is REPLACED rather than a second appended, so a repeated conferral refreshes the
+  scale instead of compounding the multiplier
+
+#### Scenario: Direct ownership gates the write path
+- **WHEN** the conferral write path records a skill the conferring entity does not DIRECTLY own at
+  record time
+- **THEN** it rejects with the same `EFFECT_RESOLUTION_FAILED` rejection the shape validation uses, so
+  a conferred grant can never exceed — or be chained onward from — what its source itself holds
+
+#### Scenario: Scale comes from the node's coefficient, not context
+- **WHEN** a conferral records its scale
+- **THEN** the scale is read from the conferring skill's own per-occurrence `EffectPolicy.coefficient`
+  and is not supplied through `event_context`
+
+#### Scenario: The conferred set is derived, not chosen
+- **WHEN** a conferral cast resolves
+- **THEN** one grant is recorded for every skill the caster directly owns that passes the
+  conferrability shape validation, each at that node's scale
+
+#### Scenario: The growth-rate effect follows the data-derived scale rule
+- **WHEN** a conferred growth-rate effect is applied
+- **THEN** the same data-derived scale rule applies as for the conferral scale
+
 ### Requirement: The conferral store has a revocation primitive reachable from a skill
 A deterministic-core revocation primitive SHALL exist in the same module as the conferral write. It
 SHALL clear the target's recorded skill grants and remove every `conferred_growth_rate` buff instance
 on that target, regardless of which source wrote them, leaving the target's own owned skills and every
-other buff untouched. Revocation SHALL be reachable from a skill through a `revoke_grants` effect
-prefix whose handler declares the `skill_grants` and `buffs` surfaces, so both writes ride the existing
-snapshot/restore face. Revocation SHALL be total rather than selective: it takes no source filter and
-no skill filter.
+other buff untouched.
 
 #### Scenario: Revocation clears both halves of the conferral vocabulary
 - **WHEN** the revocation primitive runs on a target holding grants from two different sources and an
@@ -345,20 +387,20 @@ no skill filter.
   snapshot
 - **THEN** the target's `skill_grants` and buff store are byte-equal to their pre-action values
 
+#### Scenario: Revocation is reachable from a skill
+- **WHEN** a skill declares the `revoke_grants` effect prefix whose handler declares the
+  `skill_grants` and `buffs` surfaces
+- **THEN** revocation is reachable through it, so both writes ride the existing snapshot/restore face
+
+#### Scenario: Revocation is total rather than selective
+- **WHEN** a revocation is invoked
+- **THEN** it takes no source filter and no skill filter
+
 ### Requirement: The disguise layer has an unconditional reveal primitive
 A deterministic-core reveal primitive SHALL exist in the same module as the disguise write, clearing a
 target's disguise layer and its placement record whenever the target carries a veil. It SHALL be
 reachable from a skill through a bare, payload-free `reveal_disguise` effect prefix whose handler
 declares the `traits` surface.
-
-The primitive SHALL take NO strength argument and SHALL NOT branch on any property of the veil it
-finds: this world admits exactly one grade of veil, because only the bloodline-gated divine mystery
-can write one, so a reveal either lifts what it finds or finds nothing. It SHALL NOT read the
-placement record, which belongs to the veil verb's self-cast branch alone.
-
-A reveal against an unveiled target SHALL be a reported no-op rather than a rejection, so the attempt
-neither leaks the absence of a veil through a rejection reason nor fails the action. The primitive
-SHALL NOT expose true trait values, identity, or persona; its only effect is removing a veil.
 
 #### Scenario: A reveal lifts an authored veil
 - **WHEN** a reveal resolves against a target carrying an authored disguise declaration
@@ -382,3 +424,19 @@ SHALL NOT expose true trait values, identity, or persona; its only effect is rem
 - **WHEN** any reveal resolves
 - **THEN** the only state it touches is the target's disguise layer and placement record; no true
   trait value, identity field, or persona record is read or written
+
+#### Scenario: A reveal takes no strength and branches on nothing
+- **WHEN** a reveal resolves against any veil
+- **THEN** the primitive takes NO strength argument and does not branch on any property of the veil it
+  finds: this world admits exactly one grade of veil, because only the bloodline-gated divine mystery
+  can write one, so a reveal either lifts what it finds or finds nothing
+
+#### Scenario: A reveal never reads the placement record
+- **WHEN** a reveal primitive runs
+- **THEN** it does not read the placement record, which belongs to the veil verb's self-cast branch
+  alone
+
+#### Scenario: An unveiled-target reveal is reported, not rejected
+- **WHEN** a reveal resolves against an unveiled target
+- **THEN** it is a reported no-op rather than a rejection, so the attempt neither leaks the absence of
+  a veil through a rejection reason nor fails the action

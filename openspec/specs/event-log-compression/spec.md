@@ -4,13 +4,7 @@
 Defines compress_event_logs, which preserves every attack record without kind-based filtering, marks the player's commanded action, and prepends a single overwhelm_resolution summary entry while keeping the full who-hit-whom record alongside it. Requires compressed logs to render through render_plain_text with no LLM involvement.
 ## Requirements
 ### Requirement: compress_event_logs preserves every attack record without kind-based filtering
-`compress_event_logs(raw_logs, overwhelming_team, overwhelmed_team, rounds, commanded_actor=None,
-commanded_skill=None, commanded_window=None) -> tuple[EventLog, ...]` SHALL preserve every
-`EventEntry` of every input
-`EventLog`, in its original order, via `dataclasses.replace()` on the parent `EventLog` (never a live
-mutation of a frozen instance). No `EventEntry` SHALL be removed because of its `kind` or its
-`data["hit"]` value. An input `EventLog` with zero entries SHALL NOT appear in the returned tuple.
-`world/rules/event_log.py`'s `EventEntry`/`EventLog` dataclass definitions SHALL NOT be modified.
+`compress_event_logs(raw_logs, overwhelming_team, overwhelmed_team, rounds, commanded_actor=None, commanded_skill=None, commanded_window=None) -> tuple[EventLog, ...]` SHALL preserve every `EventEntry` of every input `EventLog`, in its original order, via `dataclasses.replace()` on the parent `EventLog` (never a live mutation of a frozen instance). No `EventEntry` SHALL be removed because of its `kind` or its `data["hit"]` value.
 
 #### Scenario: A successful roll entry survives compression unchanged
 - **WHEN** `compress_event_logs()` processes an `EventLog` containing an `EventEntry` with
@@ -32,23 +26,16 @@ mutation of a frozen instance). No `EventEntry` SHALL be removed because of its 
 - **THEN** the file is byte-identical — `compress_event_logs()` constructs and transforms `EventEntry`/
   `EventLog` instances entirely through their existing public constructors and `dataclasses.replace()`
 
+#### Scenario: An empty input EventLog is dropped from the result
+- **WHEN** an input `EventLog` has zero entries
+- **THEN** it does not appear in the returned tuple
+
+#### Scenario: The dataclass definitions are untouched
+- **WHEN** this change lands
+- **THEN** `world/rules/event_log.py`'s `EventEntry`/`EventLog` dataclass definitions are not modified
+
 ### Requirement: compress_event_logs marks the player's commanded action with a commanded_action entry
-When `commanded_actor`, `commanded_action_kind` (`"skill"` or `"item"`), `commanded_action_key`,
-and `commanded_window` are all provided, `compress_event_logs()` SHALL prepend exactly one
-`EventEntry` with `kind="commanded_action"` to the first `EventLog` **within `commanded_window`**
-(the encounter's round-1 log slice) whose `actor` equals `commanded_actor` and whose `skill_key`
-equals `commanded_action_key`, in window order. An `"item"` marker additionally requires the
-candidate `EventLog` to carry an `item_used` entry for the commanded actor; a `"skill"` marker
-matches any skill-produced log. The entry's `actor` SHALL be `commanded_actor`, its `target` SHALL
-be `None`, and its `data` SHALL carry the resolved display label — under `"skill"` for skill
-markers (from `SKILL_REGISTRY`) or `"item"` for item markers (from the item registry's
-`display_name_zh`) — falling back to the raw key when the registry entry is unknown (never raising
-for a pure-presentation entry). Its `text_template` SHALL render as `你施展了「{data[skill]}」。`
-for skill markers and `你使用了「{data[item]}」。` for item markers. The marker SHALL be applied at
-most once; when no `EventLog` in the window matches, no marker SHALL be added; when any of the four
-keyword arguments is omitted or `commanded_action_kind` is not `skill` or `item`, no marker SHALL be
-added. The marker SHALL NOT alter any other entry, the parent `EventLog`'s `time_cost_seconds`, or
-the summary aggregation, and it SHALL NOT replace the commanded action's own entries.
+When `commanded_actor`, `commanded_action_kind` (`"skill"` or `"item"`), `commanded_action_key`, and `commanded_window` are all provided, `compress_event_logs()` SHALL prepend exactly one `EventEntry` with `kind="commanded_action"` to the first `EventLog` **within `commanded_window`** (the encounter's round-1 log slice) whose `actor` equals `commanded_actor` and whose `skill_key` equals `commanded_action_key`, in window order.
 
 #### Scenario: The commanded action's EventLog carries the marker
 - **WHEN** `compress_event_logs()` processes an encounter where the player commanded `fire_ball`
@@ -82,6 +69,30 @@ the summary aggregation, and it SHALL NOT replace the commanded action's own ent
 - **WHEN** `render_plain_text()` is called on the marked `EventLog` of a `basic_attack` command
 - **THEN** the rendered text opens with `你施展了「基本攻擊」。` followed by the commanded action's
   own roll and damage lines
+
+#### Scenario: Item markers require an item_used entry; skill markers match any skill log
+- **WHEN** the candidate match is evaluated for an `"item"` marker versus a `"skill"` marker
+- **THEN** an `"item"` marker additionally requires the candidate `EventLog` to carry an `item_used` entry for the commanded actor, while a `"skill"` marker matches any skill-produced log
+
+#### Scenario: The marker entry's shape and display label
+- **WHEN** a `commanded_action` entry is constructed
+- **THEN** its `actor` is `commanded_actor`, its `target` is `None`, and its `data` carries the resolved display label — under `"skill"` for skill markers (from `SKILL_REGISTRY`) or `"item"` for item markers (from the item registry's `display_name_zh`) — falling back to the raw key when the registry entry is unknown (never raising for a pure-presentation entry)
+
+#### Scenario: The marker's text_template per kind
+- **WHEN** the marker's `text_template` renders
+- **THEN** it renders as `你施展了「{data[skill]}」。` for skill markers and `你使用了「{data[item]}」。` for item markers
+
+#### Scenario: Incomplete or invalid command arguments add no marker
+- **WHEN** any of the four keyword arguments is omitted or `commanded_action_kind` is not `skill` or `item`
+- **THEN** no marker is added
+
+#### Scenario: The marker is applied at most once, and not at all without a match
+- **WHEN** the window is scanned for a matching `EventLog`
+- **THEN** the marker is applied at most once, and when no `EventLog` in the window matches, no marker is added
+
+#### Scenario: The marker alters nothing else
+- **WHEN** a marker is applied
+- **THEN** it does not alter any other entry, the parent `EventLog`'s `time_cost_seconds`, or the summary aggregation, and it does not replace the commanded action's own entries
 
 ### Requirement: compress_event_logs prepends one overwhelm_resolution summary entry aggregating the
 compressed encounter

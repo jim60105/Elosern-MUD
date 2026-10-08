@@ -11,8 +11,7 @@ Define the reusable ordered-level trait used by deterministic sexual-state mecha
 `world.rules.sexual_state.OrderedLevelTrait` in `settings.TRAIT_CLASS_PATHS`. Each instance SHALL be
 constructed with a `levels: tuple[str, ...]` keyword naming one of `world.lore.sexual_vocab`'s six
 frozen tuples, and SHALL store its current position as an integer ordinal bounded to
-`[0, len(levels) - 1]`. No `OrderedLevelTrait` instance SHALL redefine or hardcode a vocabulary of its
-own — the tuple always comes from `world.lore.sexual_vocab`.
+`[0, len(levels) - 1]`.
 
 #### Scenario: A freshly constructed trait starts at the vocabulary's first level
 - **WHEN** an `OrderedLevelTrait` is constructed with `levels=AROUSAL_LEVELS` and no explicit initial
@@ -28,6 +27,10 @@ own — the tuple always comes from `world.lore.sexual_vocab`.
 - **WHEN** `settings.TRAIT_CLASS_PATHS` is inspected
 - **THEN** it contains `"world.rules.sexual_state.OrderedLevelTrait"`, the same registration
   mechanism the contrib's own `RageTrait` example uses
+
+#### Scenario: No instance redefines its own vocabulary
+- **WHEN** an `OrderedLevelTrait` instance's vocabulary source is inspected
+- **THEN** it does not redefine or hardcode a vocabulary of its own — the tuple always comes from `world.lore.sexual_vocab`
 
 ### Requirement: OrderedLevelTrait's .level property returns the current Chinese label
 `OrderedLevelTrait` SHALL expose a `.level` property returning `self.levels[self.value]` — the

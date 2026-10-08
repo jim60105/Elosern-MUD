@@ -10,14 +10,14 @@ the two lifetime climax counters plus the male-male experience rule.
 
 ### Requirement: An entity whose climax_phase reaches 進行中 always resolves within finite settlement time
 `world/rules/sexual_state.py` SHALL provide `climax_settlement_action(entity) -> str | None`, a pure
-decision function returning `"extend"`, `"end"`, or `None`. Every settlement point that already calls
-`world.rules.sexual_state.decay_tick()` SHALL call `climax_settlement_action(entity)` immediately
-afterward and, when it returns `"extend"` or `"end"`, SHALL emit the correspondingly named event
-(`climax_extended` or `climax_ends`) through `world.rules.sexual_transitions.apply_event()`. No entity
-whose `climax_phase` reaches `進行中` SHALL remain there beyond the next settlement point unless an
-external caller has staged an extension (see the extension-staging requirement below); absent a staged
-extension, `climax_ends` SHALL fire and `climax_phase` SHALL move to `餘韻` via the existing guarded
-cycle.
+decision function returning `"extend"`, `"end"`, or `None`. No entity whose `climax_phase` reaches
+`進行中` SHALL remain there beyond the next settlement point unless an external caller has staged an
+extension (see the extension-staging requirement below).
+
+#### Scenario: Every decay_tick settlement point invokes the decision and emits its event
+
+- **WHEN** a settlement point that already calls `world.rules.sexual_state.decay_tick()` runs
+- **THEN** it calls `climax_settlement_action(entity)` immediately afterward and, when the call returns `"extend"` or `"end"`, emits the correspondingly named event (`climax_extended` or `climax_ends`) through `world.rules.sexual_transitions.apply_event()`
 
 #### Scenario: A combat round resolves an entity that entered 進行中 with no staged extension
 - **WHEN** a living, non-fled roster member's `climax_phase` is `進行中` at the start of
@@ -50,6 +50,11 @@ cycle.
 - **THEN** it returns `None` and writes nothing, so settlement paths that legitimately process such
   entities stay safe (mirroring `_has_settlement_work`'s `sexual is None` contract)
 
+#### Scenario: Absent a staged extension the entity resolves out of 進行中 via the guarded cycle
+
+- **WHEN** an entity in `climax_phase` `進行中` reaches a settlement point with no staged extension
+- **THEN** `climax_ends` fires and `climax_phase` moves to `餘韻` via the existing guarded cycle
+
 ### Requirement: climax_turns counts consecutive settlement points spent in 進行中, reset on leaving it
 `SexualState.climax_turns` SHALL be a read-only `int` property, incremented by exactly `1` each time
 `climax_settlement_action()` is called while `climax_phase` is `進行中`, and reset to `0` the moment
@@ -69,12 +74,7 @@ cycle.
 `SexualState` SHALL provide `stage_climax_extension(count: int = 1) -> None` as the sole write path
 for a new `pending_climax_extension` counter, adding `count` to its current value; `count` SHALL be a
 positive `int` (`>= 1`), and any other value SHALL raise `ValueError` without changing the counter.
-`SexualState` SHALL expose `pending_climax_extension` as a read-only `int` property. Each call to
-`climax_settlement_action()` that observes `climax_phase == 進行中` and `pending_climax_extension > 0`
-SHALL decrement it by exactly `1`, return `"extend"`, and leave the entity in `進行中` (no
-`climax_phase` transition); a zero value SHALL instead yield `"end"`. Whenever a settlement transaction
-is rolled back, `pending_climax_extension`, `climax_turns`, and the two lifetime counters SHALL be
-restored to their pre-transaction values exactly as the existing sexual surfaces are.
+`SexualState` SHALL expose `pending_climax_extension` as a read-only `int` property.
 
 #### Scenario: A single staged extension is consumed on the next settlement point
 - **WHEN** `stage_climax_extension()` is called once while the entity's `climax_phase` is `進行中`, and
@@ -107,6 +107,12 @@ restored to their pre-transaction values exactly as the existing sexual surfaces
 - **THEN** `climax_turns`, `pending_climax_extension`, and the two lifetime counters are restored to
   their pre-transaction persisted values, exactly as `virgin`/`experience_types` are
 
+#### Scenario: Settlement consumes exactly one pending extension and yields extend or end
+
+- **WHEN** a call to `climax_settlement_action()` observes `climax_phase == 進行中` with `pending_climax_extension > 0`
+- **THEN** it decrements the counter by exactly `1`, returns `"extend"`, and leaves the entity in `進行中`
+- **AND** a zero value instead yields `"end"`
+
 ### Requirement: climax_extended costs half of climax_ends' stamina and does not change climax_phase
 `world/rules/rulebook/sexual.yaml` SHALL declare `sp_cost_on_climax_extension`, triggered by the
 `climax_extended` event, applying a negative integer SP delta in the range `-15` to `-10` (half of
@@ -132,10 +138,7 @@ floor `sp_cost_on_climax` already respects. No rule triggered by `climax_extende
 The entity's lifetime climax counter (`高潮次數`) SHALL increment by exactly one each time
 `climax_settlement_action()` returns `"end"`. The entity's lifetime climax-extension counter
 (`連續高潮次數`) SHALL increment by exactly one each time it returns `"extend"`. Neither counter
-SHALL be incremented by any other call. The decision binding and the event names coincide in
-production — the settlement decision is the sole emitter of `climax_ends`/`climax_extended` — so
-the title's "per `climax_ends`/`climax_extended`" and the body's "each time
-`climax_settlement_action()` returns" describe the same contract.
+SHALL be incremented by any other call.
 
 #### Scenario: An unstaged resolution increments only the climax counter
 - **WHEN** `climax_settlement_action(entity)` returns `"end"`
@@ -146,6 +149,11 @@ the title's "per `climax_ends`/`climax_extended`" and the body's "each time
 - **WHEN** `climax_settlement_action(entity)` returns `"extend"`
 - **THEN** the entity's lifetime extension counter increases by exactly `1`, and its lifetime climax
   counter is unchanged
+
+#### Scenario: The decision binding and the event names coincide in production
+
+- **WHEN** the counter increments are read against the requirement title's "per `climax_ends`/`climax_extended`"
+- **THEN** the settlement decision is the sole emitter of `climax_ends`/`climax_extended`, so the title's "per `climax_ends`/`climax_extended`" and the body's "each time `climax_settlement_action()` returns" describe the same contract
 
 ### Requirement: penetrative_sex_with_male mirrors the shipped female counterpart and never touches virgin
 `world/rules/rulebook/sexual.yaml` SHALL declare `experience_gay_added`, triggered by the

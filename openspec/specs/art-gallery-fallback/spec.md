@@ -16,11 +16,8 @@ still shows a dignified portrait instead of a placeholder.
 The project SHALL commit exactly one image per key of the closed fallback vocabulary `man`, `woman`,
 `boy`, `girl`, `elder`, `monster_anon` into one fixed in-repo defaults directory, served through the
 existing `/art/defaults/<key>.<ext>` route. These SHALL be the only generated-art files the
-repository tracks: every runtime and seed-synced image stays outside git under the art store root. A
-contract test SHALL lock the vocabulary and the directory to each other in both directions — every
-key resolves to exactly one committed file, and every file in the directory belongs to the
-vocabulary — so a key can never resolve to a missing image and an untracked stray file can never be
-served. Each committed image SHALL be bounded in file size and SHALL depict no sexualized content.
+repository tracks: every runtime and seed-synced image stays outside git under the art store root.
+Each committed image SHALL be bounded in size and SHALL depict no sexualized content.
 
 #### Scenario: Every key resolves to a committed file
 - **WHEN** the contract test enumerates the fallback vocabulary
@@ -38,17 +35,20 @@ served. Each committed image SHALL be bounded in file size and SHALL depict no s
   `web/webclient-app/assets/redesign/` webclient fixture samples) and the
   art store root and the seed directory remain untracked
 
+#### Scenario: A contract test locks the vocabulary and directory together
+- **WHEN** the contract test locks the fallback vocabulary and the defaults directory to each other
+  in both directions
+- **THEN** every key resolves to exactly one committed file and every file in the directory belongs
+  to the vocabulary, so a key can never resolve to a missing image and an untracked stray file can
+  never be served
+
 ### Requirement: A fallback key resolves by declaration, then band, then deterministic hash
 `world/art/gallery_fallback.py` SHALL resolve a subject's fallback key by this ordered rule: (1) a
-fallback key explicitly declared by the subject's registry entry — player presets and the NPC and
-monster registries MAY declare one and every existing entry stays valid without one — wins outright;
-(2) otherwise a monster subject resolves `monster_anon`; (3) otherwise the subject's stored sex and
-apparent age select one band, and the subject's full key is hashed deterministically into that band's
-ordered key pool. A band's pool MAY hold more than one key, which is how a sex outside the
-female/male pair resolves. The resolution SHALL be a pure function of the subject key and the stored
-sex and apparent age: the same subject SHALL resolve the same key on every restart, on every process,
-and on every machine. Missing or malformed sex or apparent-age values SHALL fail closed to the adult
-band rather than raising.
+fallback key explicitly declared by the subject's registry entry wins outright; (2) otherwise a
+monster subject resolves `monster_anon`; (3) otherwise the subject's stored sex and apparent age
+select one band, and the subject's full key is hashed deterministically into that band's ordered key
+pool. The resolution SHALL be a pure function of the subject key and the stored sex and apparent
+age.
 
 #### Scenario: A declared key wins over the band rule
 - **WHEN** a subject's registry entry declares a fallback key
@@ -70,35 +70,30 @@ band rather than raising.
 - **WHEN** a subject's stored sex or apparent age is missing or malformed
 - **THEN** the adult band is used, no exception propagates, and a key is still resolved
 
+#### Scenario: A declaration is optional and existing entries stay valid
+- **WHEN** player presets and the NPC and monster registries declare, or do not declare, a fallback
+  key
+- **THEN** declaring one is permitted (MAY) and every existing entry stays valid without one
+
+#### Scenario: A band pool may hold several keys
+- **WHEN** a band's ordered key pool holds more than one key
+- **THEN** that is how a sex outside the female/male pair resolves
+
+#### Scenario: The same key resolves on every process and machine
+- **WHEN** the same subject is resolved on another process or another machine
+- **THEN** the pure resolution of subject key, stored sex, and apparent age yields the same key
+
+#### Scenario: Missing or malformed values fail closed rather than raising
+- **WHEN** a subject's stored sex or apparent-age value is missing or malformed
+- **THEN** resolution SHALL fail closed to the adult band rather than raising
+
 ### Requirement: The fallback seam supplies a URL and a face rectangle and reports its use
 `world/art/gallery_match.py::fallback_for(subject, entity=None)` SHALL return the resolved key's
 committed `defaults/<key>.<ext>` identity together with that key's declared face rectangle, taken
 from a fixed per-key rectangle map that falls back to the shared default rectangle for any key
-without its own entry (the presenter builds the `/art/defaults/<key>.<ext>` URL from the identity
-exactly like every other payload branch). Every entry of the fixed map SHALL be pixel-square
-against its committed image's pixel dimensions (`w × width` and `h × height` agree within one
-pixel), so every rectangle the seam supplies marks a square region of the image it ships with; a
-contract test SHALL decode each committed default and fail when its map entry is not pixel-square
-for that file's decoded size. The presenter threads the entity it already resolved as
-the optional argument; a subject-only call SHALL stay legal and recover only a deterministic
-identification — an ambiguous shared stable key recovers no entity and fails closed to the band
-rule. Each use SHALL emit one `gallery_fallback_used` info event
-through the `world.observability`
-facade carrying the `subject`, `kind`, and resolved fallback `key` in `context`. The seam SHALL NOT
-create a record, append a card, copy a file into the store, or write any state.
-
-The presenter SHALL carry the resolved fallback key, media identity, and rectangle as a distinct
-decorative `fallback` field on every stage-eligible payload — including payloads whose real
-portrait resolved — so a browser whose real image later fails to load can render the
-already-resolved silhouette without a new request or state mutation. The payload SHALL establish
-the closed origin discriminator vocabulary itself (`runtime` for card/classic images, `silhouette`
-when only the fallback resolved, `placeholder` otherwise), which the `official-art-resolution`
-capability later extends with the `official` value; the fallback field is decorative
-presentation data and SHALL NOT report the subject's portrait as `done`, generated, or completed
-by virtue of resolving (only a real payload image carries a media URL of its own), and it SHALL NOT change the subject's underlying
-missing/pending/failed/unavailable status, which SHALL pass through from the asset/gallery state
-exactly as before. A subject's real portrait state SHALL therefore remain observable even while a
-silhouette media identity is present for stage rendering.
+without its own entry. Each use SHALL emit one `gallery_fallback_used` info event through the
+`world.observability` facade carrying the `subject`, `kind`, and resolved fallback `key` in
+`context`.
 
 #### Scenario: A subject with no card and no classic asset resolves a fallback image
 - **WHEN** the chain reaches the seam for a subject with no card and no `done` classic asset
@@ -125,17 +120,50 @@ silhouette media identity is present for stage rendering.
 - **WHEN** the same subject later resolves a real runtime image and that image then fails to load in the browser
 - **THEN** the payload's real image carries the `runtime` origin beside the retained decorative `fallback` reference, the browser renders the silhouette with the load-failure label without any new request or state mutation, and no generated-state write ever occurred during the silhouette phase
 
+#### Scenario: The presenter builds the fallback URL like every other branch
+- **WHEN** the presenter builds the payload for a resolved fallback identity
+- **THEN** it builds the `/art/defaults/<key>.<ext>` URL from the identity exactly like every other
+  payload branch
+
+#### Scenario: Map entries are pixel-square against their committed images
+- **WHEN** each entry of the fixed per-key rectangle map is checked against its committed image's
+  pixel dimensions
+- **THEN** `w × width` and `h × height` agree within one pixel, so every rectangle the seam supplies
+  marks a square region of the image it ships with
+
+#### Scenario: The presenter threads its entity; a subject-only call stays legal
+- **WHEN** the presenter calls the seam with the entity it already resolved as the optional argument,
+  or calls it with a bare subject
+- **THEN** a subject-only call stays legal and recovers only a deterministic identification, and an
+  ambiguous shared stable key recovers no entity and fails closed to the band rule
+
+#### Scenario: Every stage-eligible payload carries the decorative fallback field
+- **WHEN** a stage-eligible payload is produced, including one whose real portrait resolved
+- **THEN** it carries the resolved fallback key, media identity, and rectangle as a distinct
+  decorative `fallback` field, so a browser whose real image later fails to load can render the
+  already-resolved silhouette without a new request or state mutation
+- **AND** the subject's real portrait state remains observable even while a silhouette media identity
+  is present for stage rendering
+
+#### Scenario: The payload establishes the closed origin discriminator vocabulary
+- **WHEN** a resolution payload is produced
+- **THEN** it establishes the closed origin discriminator vocabulary itself — `runtime` for
+  card/classic images, `silhouette` when only the fallback resolved, `placeholder` otherwise — which
+  the `official-art-resolution` capability later extends with the `official` value
+
+#### Scenario: The fallback field is decorative presentation data
+- **WHEN** a fallback resolves for a subject
+- **THEN** the decorative fallback field SHALL NOT report the subject's portrait as `done`, generated,
+  or completed by virtue of resolving — only a real payload image carries a media URL of its own — and
+  it SHALL NOT change the subject's underlying missing/pending/failed/unavailable status, which
+  passes through from the asset/gallery state exactly as before
+
 ### Requirement: The built-in fallback images carry a transparent background
 Each committed built-in fallback image SHALL be produced from the project art prompt library
 through the same background-removal and encoding stages the portrait worker applies to generated
 character and monster portraits, so each image carries an alpha channel in which the backdrop
 around the figure is fully transparent and the figure itself is opaque and composes over any stage
-or panel background without a visible rectangle or halo. The background SHALL have been removed
-with a permissively licensed model, so the committed images carry no non-commercial licence
-obligation. Each image SHALL keep its key, file name, and `.webp` extension, stay within the
-declared size bound, and carry a face rectangle re-authored against its own pixels. A contract test
-SHALL decode every committed default and fail when an image has no alpha channel, when any pixel
-of its corner regions is not fully transparent, or when the figure's eroded interior is not opaque.
+or panel background without a visible rectangle or halo.
 
 #### Scenario: Every default decodes with a transparent background
 - **WHEN** the contract test decodes each committed fallback image
@@ -153,3 +181,18 @@ of its corner regions is not fully transparent, or when the figure's eroded inte
 - **THEN** the closed six-key vocabulary, the `.webp` extension, the size bound, and the per-key
   face-rectangle resolution all still hold, and each key serves the regenerated file under its
   unchanged name
+
+#### Scenario: The background is removed with a permissively licensed model
+- **WHEN** a built-in fallback image's background is removed during production
+- **THEN** it SHALL have been removed with a permissively licensed model, so the committed images
+  carry no non-commercial licence obligation
+
+#### Scenario: Each image keeps its identity and re-authored rectangle
+- **WHEN** a built-in fallback image is committed
+- **THEN** it keeps its key, file name, and `.webp` extension, stays within the declared size bound,
+  and carries a face rectangle re-authored against its own pixels
+
+#### Scenario: The contract test rejects alpha, corner, or opacity defects
+- **WHEN** the contract test decodes every committed default
+- **THEN** it fails when an image has no alpha channel, when any pixel of its corner regions is not
+  fully transparent, or when the figure's eroded interior is not opaque

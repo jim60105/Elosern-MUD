@@ -6,7 +6,7 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 
 ### Requirement: NPC dialogue runs a guarded generative reply pipeline
 
-`world/ai/npc_dialogue.py` SHALL provide a guarded entry point `generate_npc_reply(...) -> Deferred[NPCDialogueReply | None]` that runs the `npc_dialogue` layer's validation-retry-degrade pipeline (design §7.5) and resolves, on success, to a frozen `NPCDialogueReply` carrying `speech: str` and `intent: dict`; on disabled profile, transport failure, or exhausted retries it SHALL resolve to `None` (the degraded outcome). The client SHALL be a required injected argument, and a call with an explicit `None` client SHALL errback with a named error before any prompt construction or transport work. The output SHALL be validated against the registered `{speech, intent}` jsonschema and the layer's semantic validators, and retried within the `1 + max_retries` budget with the validation errors appended.
+`world/ai/npc_dialogue.py` SHALL provide a guarded entry point `generate_npc_reply(...) -> Deferred[NPCDialogueReply | None]` that runs the `npc_dialogue` layer's validation-retry-degrade pipeline (design §7.5): output is validated against the registered `{speech, intent}` jsonschema and the layer's semantic validators, and the call resolves, on success, to a frozen `NPCDialogueReply` carrying `speech: str` and `intent: dict`.
 
 #### Scenario: A schema-valid reply resolves with no retry
 - **WHEN** the endpoint returns a `{speech, intent}` object satisfying the output schema and every semantic validator on the first attempt
@@ -24,9 +24,13 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 - **WHEN** `generate_npc_reply` is called with an explicit `None` client
 - **THEN** the call errbacks with a named client-required error before any prompt construction or transport interaction
 
+#### Scenario: The client arrives only as an injected argument
+- **WHEN** any caller uses `generate_npc_reply`
+- **THEN** the client is a required injected argument and the dialogue layer never constructs its own transport client
+
 ### Requirement: NPC dialogue prompts are deterministic, bounded, and inject disguised stats, affinity context, and persona
 
-`build_npc_dialogue_prompt(...)` SHALL produce a deterministic system/user message pair serialized from the NPC's identity (name, description, location in the current turn frame), the speaking player's identity and `disguised_stats`, the NPC's affinity context for the speaking player (`affinity` as the true numeric value, `affinity_cap`, and `affinity_stage` as the display stage name), optional persona blocks (the NPC's own persona in the system message and the speaking player's persona as `player.persona`), and a bounded rendered view of durable pair dialogue plus owner-permitted fixed and recalled memories, using stable JSON serialization with hard bounds on memory lines, per-field string length, and total size. The affinity block SHALL be serialized as `player.affinity = {"value": int, "cap": int, "stage": str}` and SHALL be read-only: building a prompt SHALL never create, persist, or mutate an affinity record, and a player without a record SHALL omit the block. The system message SHALL be rendered from the prompt library's `npc_dialogue.system` key via `render_prompt("npc_dialogue.system", name=…, desc=…, location="", persona=…)` as the capability/character sections of the versioned stable prefix — the library is the sole source of the system-prompt template, and the module SHALL NOT embed it as a Python constant; only the allowlisted `{name}`, `{desc}`, `{location}`, and `{persona}` placeholders are substituted, and `persona` SHALL be passed on every call (the flattened block when one exists, an empty string when not) so the `{persona}` token is always substituted and the empty-substitution output equals the pre-persona system message. The system message SHALL fix the NPC's role, the 正體中文 language, and the output contract: reply with a `{speech, intent}` object, never invent outcomes, express only what the NPC could perceive — including reading the player's `disguised_stats` as the truth — choose `adjust_relation` deltas from the supplied affinity context within the bounded 0–10 range, and treat the numeric affinity value and cap as secrets never spoken aloud. The no-leak check SHALL be installed for a call whenever its secret set is non-empty — including calls with no affinity context but with disguise true values — and SHALL treat a reply whose speech contains the affinity value, the cap, or any bound disguise true value as a decimal integer substring (fullwidth digit forms folded via NFKC normalization) as a validation failure, retried within the budget, and on budget exhaustion degraded to `None` rather than presented; the check SHALL be bound to the individual call's own secret numbers through the request descriptor so interleaved calls never cross-contaminate, and stage names SHALL remain allowed in speech. Identical input SHALL produce byte-identical prompts with no live entity references.
+`build_npc_dialogue_prompt(...)` SHALL produce a deterministic system/user message pair serialized, with stable JSON serialization, from the NPC's identity (name, description, location in the current turn frame), the speaking player's identity and `disguised_stats`, the NPC's affinity context for the speaking player, optional persona blocks, and a bounded rendered view of durable pair dialogue plus owner-permitted fixed and recalled memories.
 
 #### Scenario: A disguised elf reads as weak to the NPC
 - **WHEN** a prompt is built for an NPC facing a player whose `disguised_stats` hide their true power
@@ -78,9 +82,58 @@ Defines the NPC dialogue layer that runs a guarded generative reply pipeline for
 
 The rendered order SHALL be global rules, world digest, capability contract, character anchor, epoch summary, then append-only turn frames. Changing location, relationships, recall and affordances SHALL occur only in the current turn frame. Persona/prompt/rendering version changes SHALL invalidate the affected prefix and epoch; original historical frames SHALL retain their original tick data.
 
+#### Scenario: Serialization is hard-bounded
+- **WHEN** a prompt is rendered
+- **THEN** stable JSON serialization applies hard bounds on memory lines, per-field string length, and total size
+
+#### Scenario: The affinity block is plain read-only data
+- **WHEN** an affinity record exists for the speaking player
+- **THEN** the block is serialized as `player.affinity = {"value": int, "cap": int, "stage": str}`
+- **AND** the affinity context supplied to the builder carries `affinity` as the true numeric value, `affinity_cap`, and `affinity_stage` as the display stage name
+- **AND** building a prompt never creates, persists, or mutates an affinity record
+- **AND** a player without a record omits the block entirely
+
+#### Scenario: Persona blocks have fixed placements
+- **WHEN** persona blocks are included in a prompt
+- **THEN** the NPC's own persona appears in the system message and the speaking player's persona appears as `player.persona`
+
+#### Scenario: The prompt library is the sole template source
+- **WHEN** the `npc_dialogue` system-message template is located
+- **THEN** the prompt library is the sole source of the system-prompt template and the module embeds it as no Python constant
+
+#### Scenario: Only allowlisted placeholders are substituted
+- **WHEN** the system template is rendered
+- **THEN** only the allowlisted `{name}`, `{desc}`, `{location}`, and `{persona}` placeholders are substituted
+- **AND** `persona` is passed on every call — the flattened block when one exists, an empty string when not — so the `{persona}` token is always substituted and the empty-substitution output equals the pre-persona system message
+
+#### Scenario: The system message fixes role, language, and output contract
+- **WHEN** the NPC dialogue system message is read
+- **THEN** it fixes the NPC's role, the 正體中文 language, and the output contract: reply with a `{speech, intent}` object
+
+#### Scenario: The system message forbids invented outcomes and non-perception
+- **WHEN** the system message constrains generation
+- **THEN** the model may never invent outcomes and may express only what the NPC could perceive — including reading the player's `disguised_stats` as the truth
+
+#### Scenario: The system message bounds relation deltas and secrets
+- **WHEN** the system message governs affinity behaviour
+- **THEN** `adjust_relation` deltas are chosen from the supplied affinity context within the bounded 0–10 range
+- **AND** the numeric affinity value and cap are treated as secrets never spoken aloud
+
+#### Scenario: The no-leak check installs on disguise-only secrets
+- **WHEN** a call has no affinity context but its bound disguise true values make the secret set non-empty
+- **THEN** the no-leak check is installed for that call just as for calls with affinity context
+
+#### Scenario: Leak attempts exhaust the retry budget and degrade
+- **WHEN** repeated replies leak secret numbers until the `1 + max_retries` budget is exhausted
+- **THEN** the call degrades to `None` rather than presenting the leak
+
+#### Scenario: Leak checks bind per call through the request descriptor
+- **WHEN** dialogue calls interleave
+- **THEN** each call's no-leak check is bound to that call's own secret numbers through the request descriptor, so interleaved calls never cross-contaminate
+
 ### Requirement: Intent extraction is whitelisted and shape-validated per kind
 
-The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the eight whitelisted kinds `give_item` / `take_item` / `offer_quest` / `request_guild_exam` / `adjust_relation` / `reveal_lore` / `party_invite` / `none`. The `request_guild_exam` intent SHALL carry exactly one payload field, `target_rank`; `give_item` and `take_item` SHALL carry `item_key` and a positive `qty`; `adjust_relation` SHALL carry exactly one payload field, `delta`, a non-negative integer with `0 <= delta <= 10`; `party_invite` SHALL carry exactly one payload field, `accept`, a boolean; `offer_quest` SHALL carry exactly one payload field, `quest_key`, a non-empty string of at most 64 code points; `reveal_lore` SHALL carry exactly two payload fields, `category` and `key`, each a non-empty string of at most 64 code points. Outputs whose kind is outside the whitelist or whose payload violates the per-kind shape SHALL be rejected by a semantic validator and retried within the budget. Whitelisting an intent kind SHALL mean the shape is accepted for extraction; it does not guarantee the intent is executable (executability is decided by the deterministic applier).
+The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the eight whitelisted kinds `give_item` / `take_item` / `offer_quest` / `request_guild_exam` / `adjust_relation` / `reveal_lore` / `party_invite` / `none`, with a per-kind payload shape validated by a semantic validator: outputs whose kind is outside the whitelist or whose payload violates the per-kind shape are rejected and retried within the budget.
 
 #### Scenario: A whitelisted intent with a valid payload passes
 - **WHEN** the model returns an intent such as `{"kind": "give_item", "item_key": "healing_potion", "qty": 1}`, `{"kind": "request_guild_exam", "target_rank": "E"}`, `{"kind": "adjust_relation", "delta": 3}`, `{"kind": "party_invite", "accept": true}`, `{"kind": "offer_quest", "quest_key": "forest_clearing"}`, or `{"kind": "reveal_lore", "category": "race", "key": "ciaran"}`
@@ -111,11 +164,39 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 - **THEN** the output is rejected by the per-kind semantic validator and retried rather than passed
   to the engine
 
+#### Scenario: Item intents carry a key and positive quantity
+- **WHEN** the model returns `give_item` or `take_item`
+- **THEN** the payload shape requires `item_key` and a positive `qty`
+
+#### Scenario: The exam intent carries exactly a target rank
+- **WHEN** the model returns `request_guild_exam`
+- **THEN** the payload shape requires exactly one field, `target_rank`
+
+#### Scenario: The relation intent carries a bounded delta
+- **WHEN** the model returns `adjust_relation`
+- **THEN** the payload shape requires exactly one field, `delta`, a non-negative integer with `0 <= delta <= 10`
+
+#### Scenario: The party-invite intent carries a boolean accept
+- **WHEN** the model returns `party_invite`
+- **THEN** the payload shape requires exactly one field, `accept`, a boolean
+
+#### Scenario: The offer-quest intent carries a bounded quest key
+- **WHEN** the model returns `offer_quest`
+- **THEN** the payload shape requires exactly one field, `quest_key`, a non-empty string of at most 64 code points
+
+#### Scenario: The reveal-lore intent carries a bounded category and key
+- **WHEN** the model returns `reveal_lore`
+- **THEN** the payload shape requires exactly two fields, `category` and `key`, each a non-empty string of at most 64 code points
+
+#### Scenario: A whitelisted kind is not a guarantee of executability
+- **WHEN** an intent kind is whitelisted
+- **THEN** only its shape is accepted for extraction; executability is decided by the deterministic applier
+
 ### Requirement: Intent application is deterministic, verified, and non-escalating
 
-`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it, using existing deterministic APIs only. `request_guild_exam` SHALL delegate to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`, which rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination; the AI SHALL NOT be able to choose examiner stats, waive a gate, promote the player, or start combat directly. `give_item` and `take_item` SHALL verify that the giver actually holds the requested item quantity and SHALL transfer it through the validated inventory-planning boundary as one all-or-nothing operation whose failure restores both entities' database and in-process state. `adjust_relation` SHALL verify the bounded `delta` payload and delegate to `world/rules/affinity.py::apply_affinity_change(npc, player, "ai_dialogue", delta)` from `affinity-system`; the AI SHALL NOT choose a delta outside 0–10, and the applier SHALL report the actually applied amount (`IntentOutcome.delta_used`): a partially budget-applied delta SHALL be reported as applied with its applied amount, while a fully blocked or rejected delta (applied amount 0) SHALL be discarded as an intent with the speech kept. `party_invite` SHALL verify the boolean `accept` payload and, on `accept: true`, delegate to `world/rules/party.py::join_party(npc, player)` from `party-core`, which rechecks co-location, the NPC target, the absence of an existing binding, and the 4-companion bound; on `accept: false` it SHALL report an applied no-op. `offer_quest` SHALL verify the bounded `quest_key` payload and delegate to the dialogue-offer-quest applier, which rechecks the speaker's authored issuing authority (`GuildStaff` or `QuestIssuer`) and the registered issuance for the speaker's resolved issuer key under that issuer kind's own eligibility rule, then assigns the quest through the quest runtime in one all-or-nothing operation with +1 guild affinity. `reveal_lore` SHALL verify the bounded `category`/`key` payload and delegate to `world/rules/lore_knowledge.py::record_lore_reveal(player, category, key)`, which checks the category allowlist and registry resolvability and records the discovery append-only; a repeat reveal SHALL be an applied no-op and no affinity SHALL be granted. **Illegal or unverifiable intent SHALL be discarded while the speech is kept** — the world is never changed by an intent the NPC could not perform.
+`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it, using existing deterministic APIs only: illegal or unverifiable intent is discarded while the speech is kept, and the world is never changed by an intent the NPC could not perform.
 
-> **Removed scenario.** The former "A whitelisted but not-yet-executable intent is rejected without state change" scenario is removed by this change: `reveal_lore` becomes executable here, `offer_quest` became executable in `dialogue-offer-quest`, and no forward-declared intent kinds remain.
+**Removed scenario**: The former "A whitelisted but not-yet-executable intent is rejected without state change" scenario is removed by this change: `reveal_lore` becomes executable here, `offer_quest` became executable in `dialogue-offer-quest`, and no forward-declared intent kinds remain.
 
 #### Scenario: A guild exam intent is routed through the deterministic gate
 - **WHEN** the extracted intent is `request_guild_exam` with a `target_rank`
@@ -181,9 +262,46 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 - **WHEN** the extracted intent is `reveal_lore` with an unknown category or an unresolvable key
 - **THEN** the intent is discarded, the speech is preserved, and no codex record changes
 
+#### Scenario: The AI cannot escalate through the exam gate
+- **WHEN** `request_guild_exam` is applied
+- **THEN** the AI cannot choose examiner stats, waive a gate, promote the player, or start combat directly
+
+#### Scenario: The exam gate performs its own rechecks
+- **WHEN** `apply_npc_intent` delegates `request_guild_exam` to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`
+- **THEN** that API itself rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination
+
+#### Scenario: Item transfers are all-or-nothing across both entities
+- **WHEN** a `give_item` or `take_item` transfer is applied after holdings are verified
+- **THEN** it transfers through the validated inventory-planning boundary as one all-or-nothing operation whose failure restores both entities' database and in-process state
+
+#### Scenario: Relation deltas route through the affinity-system writer
+- **WHEN** `adjust_relation` is applied
+- **THEN** the applier verifies the bounded `delta` payload and delegates to `world/rules/affinity.py::apply_affinity_change(npc, player, "ai_dialogue", delta)` from `affinity-system`
+- **AND** the AI cannot choose a delta outside 0–10
+
+#### Scenario: The applier reports the actually applied delta amount
+- **WHEN** an `adjust_relation` delta is partially budget-applied
+- **THEN** the applier reports it as applied with the applied amount in `IntentOutcome.delta_used`
+- **AND** a fully blocked or rejected delta (applied amount 0) is discarded as an intent with the speech kept
+
+#### Scenario: Accepted party invites route through party-core
+- **WHEN** `party_invite` with `accept: true` is applied
+- **THEN** the applier verifies the boolean `accept` payload and delegates to `world/rules/party.py::join_party(npc, player)` from `party-core`, which rechecks co-location, the NPC target, the absence of an existing binding, and the 4-companion bound
+- **AND** on `accept: false` the applier reports an applied no-op
+
+#### Scenario: Quest offers recheck authority and issue all-or-nothing
+- **WHEN** `offer_quest` is applied
+- **THEN** the applier verifies the bounded `quest_key` payload and delegates to the dialogue-offer-quest applier, which rechecks the speaker's authored issuing authority (`GuildStaff` or `QuestIssuer`) and the registered issuance for the speaker's resolved issuer key under that issuer kind's own eligibility rule
+- **AND** the quest is assigned through the quest runtime in one all-or-nothing operation with +1 guild affinity
+
+#### Scenario: Lore reveals record append-only with no affinity
+- **WHEN** `reveal_lore` is applied
+- **THEN** the applier verifies the bounded `category`/`key` payload and delegates to `world/rules/lore_knowledge.py::record_lore_reveal(player, category, key)`, which checks the category allowlist and registry resolvability and records the discovery append-only
+- **AND** a repeat reveal is an applied no-op and no affinity is granted
+
 ### Requirement: NPC dialogue degrades to greeting or silence offline
 
-When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `generate_npc_reply` SHALL resolve to `None`, and the caller SHALL render that as the NPC's authored greeting when one is available, or as silence when it is not; the game SHALL remain fully playable with the LLM entirely offline, and no dialogue call SHALL change state or open a network connection. The authored greeting SHALL be resolved in order: the greeting stored in the NPC's own bounded per-instance offline-greeting field (seeded at build, author-editable, and overriding every authored default when set), then the NPC's dialogue-table greeting when its table authors one, then the greeting authored by the NPC profile named in its persona provenance; a runtime card edit SHALL NOT change the table or profile default, and the instance field speaks exactly its stored text.
+When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `generate_npc_reply` SHALL resolve to `None`, and the caller SHALL render that as the NPC's authored greeting when one is available, or as silence when it is not; the game SHALL remain fully playable with the LLM entirely offline, and no dialogue call SHALL change state or open a network connection.
 
 #### Scenario: Offline dialogue falls back to the authored greeting
 - **WHEN** the LLM is offline and the NPC has an authored greeting
@@ -201,12 +319,21 @@ When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `gen
 - **WHEN** the LLM is offline, an NPC has no table greeting and an empty offline-greeting field, and its persona provenance names a profile that authors a greeting
 - **THEN** the player receives that profile greeting verbatim with no state change
 
+#### Scenario: Greeting resolution follows the fixed order
+- **WHEN** an offline NPC's authored greeting is resolved
+- **THEN** it resolves in order: the greeting stored in the NPC's own bounded per-instance offline-greeting field, then the NPC's dialogue-table greeting when its table authors one, then the greeting authored by the NPC profile named in its persona provenance
+
+#### Scenario: The instance offline-greeting field overrides every default
+- **WHEN** the NPC's per-instance offline-greeting field is set
+- **THEN** the field is seeded at build, is author-editable, and overrides every authored default when set
+
+#### Scenario: A runtime card edit does not alter shared defaults
+- **WHEN** a card is edited at runtime
+- **THEN** the edit changes neither the table nor the profile greeting default, and the instance field speaks exactly its stored text
+
 ### Requirement: The LLMNPC entity provides chat memory, thinking state, and a dialogue seam
 
-`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass using narrative-owned append-only durable pair turns and a bounded rendered prompt view, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt — including the NPC's own affinity context for the speaking player, read from the relations handler without creating or mutating any record — runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`. The client SHALL be a required injected argument and SHALL NOT be constructed lazily from a typeclass; tests use `FakeLLMClient` only. The seam's imports of `world.ai` and `world.rules.npc_intents` SHALL be deferred to the server-ready call path so that importing `typeclasses.npcs` before `evennia._init()` cannot bind the guardrail's import-time logger to `None`. Before invoking the guarded pipeline, the seam SHALL consult
-`world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
-that stable rejection line and SHALL NOT build a prompt, run the pipeline, append memory, or
-apply an intent.
+`typeclasses/npcs.py` SHALL provide an `LLMNPC(NPC)` entity typeclass using narrative-owned append-only durable pair turns and a bounded rendered prompt view, a thinking-state feedback contract, and an `at_talked_to(speech, character, client)` seam that builds the dialogue prompt, runs the guarded reply pipeline, maps the degraded outcome to the authored greeting or silence, and routes a verified intent to `world/rules/npc_intents.apply_npc_intent`.
 
 #### Scenario: A reply is recorded and a verified intent is applied
 - **WHEN** the player talks to an `LLMNPC` and the guarded pipeline resolves a valid `NPCDialogueReply`
@@ -236,6 +363,24 @@ apply an intent.
 - **WHEN** the player talks to an `LLMNPC` whose schedule state blocks `talk`
 - **THEN** the stable rejection line is presented, and no prompt is built, no pipeline runs, no memory is appended, and no intent is applied
 
+#### Scenario: The seam reads affinity context without writing
+- **WHEN** the seam builds the dialogue prompt for a speaking player
+- **THEN** the prompt includes the NPC's own affinity context for that player, read from the relations handler without creating or mutating any record
+
+#### Scenario: The client is injected and never lazy-built
+- **WHEN** the seam is exercised
+- **THEN** the client is a required injected argument and is never constructed lazily from a typeclass
+- **AND** tests use `FakeLLMClient` only
+
+#### Scenario: Deferred imports protect the guardrail logger
+- **WHEN** `typeclasses.npcs` is imported before `evennia._init()`
+- **THEN** the seam's imports of `world.ai` and `world.rules.npc_intents` are deferred to the server-ready call path, so the import cannot bind the guardrail's import-time logger to `None`
+
+#### Scenario: The seam consults the schedule before the pipeline
+- **WHEN** the seam is about to invoke the guarded pipeline
+- **THEN** it consults `world/rules/npc_schedules.py::interaction_reason(npc, "talk")`
+- **AND** a non-`None` result presents that stable rejection line and builds no prompt, runs no pipeline, appends no memory, and applies no intent
+
 ### Requirement: Async dialogue intents revalidate context at completion
 
 When an async NPC exchange completes, the system SHALL revalidate that the player and the NPC are still co-located and that the NPC is still interactable before applying the reply's intent; a stale completion SHALL display the speech but discard the intent with a clear message.
@@ -254,7 +399,7 @@ When an async NPC exchange completes, the system SHALL revalidate that the playe
 
 ### Requirement: The generative dialogue layer preserves the transport and single-writer boundaries
 
-`world/ai/npc_dialogue.py` SHALL import no state writer, no typeclass, no live transport, and no socket; it SHALL consume the client through the injected protocol and consume the prompt and degrade seams without importing entity or rules packages. No module under `world/ai/` SHALL apply a state change under any circumstance, and the sole transport composition site SHALL remain `world/ai/client.py` plus presentation composition roots that inject the client into the seams. The repository-wide transport-boundary contract test SHALL remain green without modification.
+`world/ai/npc_dialogue.py` SHALL import no state writer, no typeclass, no live transport, and no socket; it SHALL consume the client through the injected protocol and consume the prompt and degrade seams without importing entity or rules packages. No module under `world/ai/` SHALL apply a state change under any circumstance, and the sole transport composition site SHALL remain `world/ai/client.py` plus presentation composition roots that inject the client into the seams.
 
 #### Scenario: The new module complies with the existing contract test
 - **WHEN** `tests/test_ai_transport_contract.py` scans the new `world/ai/npc_dialogue.py`
@@ -264,8 +409,12 @@ When an async NPC exchange completes, the system SHALL revalidate that the playe
 - **WHEN** an intent is applied
 - **THEN** every state change is performed by `world/rules/npc_intents.py` through existing deterministic APIs, never by a module under `world/ai/`
 
+#### Scenario: The transport-boundary contract test stays green
+- **WHEN** the repository-wide transport-boundary contract test runs
+- **THEN** it remains green without modification
+
 ### Requirement: A persona edit during an asynchronous exchange discards the stale response
-Every asynchronous NPC dialogue exchange SHALL capture the NPC's identity and current `persona_version` when it builds the prompt, and at settlement, before any response-side effect, SHALL compare the NPC's current `persona_version` with the captured value. Any inequality SHALL produce a distinct stale-persona terminal outcome, separate from the degraded/offline outcome and from the separated-context outcome. A stale-persona exchange SHALL NOT present its speech, append the NPC response to chat memory, apply any intent, record or replace the dialogue-session line, or run the degraded party-invite threshold; it SHALL settle with one safe localized explanation, clear the thinking state, and SHALL NOT retry. The player's own line recorded before the edit MAY remain in memory. An unchanged or no-op save SHALL NOT invalidate an exchange. The gate SHALL apply to every consumer of the exchange seam — the browser free-form talk action, the browser party-invite action, the text `invite` command, and any other caller of the shared exchange — through the shared result and memory path, not only a browser control. Already committed speech and effects SHALL NOT be undone.
+Every asynchronous NPC dialogue exchange SHALL capture the NPC's identity and current `persona_version` when it builds the prompt, and at settlement, before any response-side effect, SHALL compare the NPC's current `persona_version` with the captured value. Any inequality SHALL produce a distinct stale-persona terminal outcome, separate from the degraded/offline outcome and from the separated-context outcome.
 
 #### Scenario: A one-leaf edit discards a pending free-form reply
 - **WHEN** a browser free-form talk is in flight and the NPC's `habit` is saved through the persona writer before the reply settles
@@ -286,6 +435,27 @@ Every asynchronous NPC dialogue exchange SHALL capture the NPC's identity and cu
 #### Scenario: Stale-persona settlement clears thinking state without retry
 - **WHEN** an exchange settles as stale-persona after its thinking timer started
 - **THEN** the timer is cancelled, no second request is made, and the pending state ends
+
+#### Scenario: A stale-persona exchange performs no response-side effect
+- **WHEN** an exchange settles as stale-persona
+- **THEN** it presents no speech, appends no NPC response to chat memory, applies no intent, records or replaces no dialogue-session line, and runs no degraded party-invite threshold
+- **AND** it settles with one safe localized explanation, clears the thinking state, and does not retry
+
+#### Scenario: A pre-edit player line may survive
+- **WHEN** an exchange is invalidated by a persona edit
+- **THEN** the player's own line recorded before the edit may remain in memory
+
+#### Scenario: No-op saves do not invalidate exchanges
+- **WHEN** an unchanged or no-op save occurs during an exchange
+- **THEN** the exchange is not invalidated
+
+#### Scenario: The gate covers every exchange consumer
+- **WHEN** any consumer of the exchange seam settles — the browser free-form talk action, the browser party-invite action, the text `invite` command, or any other caller of the shared exchange
+- **THEN** the stale-persona gate applies through the shared result and memory path, not only a browser control
+
+#### Scenario: Committed work is never undone
+- **WHEN** a persona edit invalidates an exchange
+- **THEN** already committed speech and effects are not undone
 
 ### Requirement: NPC context recalls only permitted committed experience
 

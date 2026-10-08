@@ -40,11 +40,7 @@ function SHALL inspect or interpret the content of `reason` beyond membership te
 
 ### Requirement: register_owned_entity marks an entity for despawn, not relocation, on reclaim
 `world/maps/instance.py::register_owned_entity(room, entity)` SHALL append `entity` to
-`room.db.owned_entities` if not already present. This is the seam whoever spawns an entity into an
-instance room for that scene's own use (per design doc §7.2, ordinarily change 21's `SceneBuilder`
-spawning a `ScenarioDirector`-requested `npc_req`) calls immediately afterward, so
-`reclaim_due_instances()` knows the entity's lifetime is meant to match the room's own, rather than
-treating it as an incidental occupant to merely relocate.
+`room.db.owned_entities` if not already present.
 
 #### Scenario: Registering adds an entity exactly once
 - **WHEN** `register_owned_entity(room, npc)` is called twice with the same `npc`
@@ -55,21 +51,20 @@ treating it as an incidental occupant to merely relocate.
   `register_owned_entity()` for it
 - **THEN** that `NPC` is absent from `room.db.owned_entities`
 
+#### Scenario: Registration is the scene-spawn seam that marks a matching lifetime
+- **WHEN** whoever spawns an entity into an instance room for that scene's own use (per design doc
+  §7.2, ordinarily change 21's `SceneBuilder` spawning a `ScenarioDirector`-requested `npc_req`)
+  calls this seam immediately afterward
+- **THEN** `reclaim_due_instances()` knows the entity's lifetime is meant to match the room's own,
+  rather than treating it as an incidental occupant to merely relocate
+
 ### Requirement: reclaim_due_instances defers only rooms with a PlayerCharacter present or an active pin
 `world/maps/instance.py::reclaim_due_instances(start_tick, end_tick)` SHALL, for every `InstanceRoom`
 with `expire_tick is not None and expire_tick <= end_tick`, defer (neither delete nor promote) any
 room whose `pin_reasons` is non-empty or whose `contents` includes any
 `typeclasses.characters.PlayerCharacter` instance, emitting a `ScheduledEvent` of kind
 `"instance_reclaim_deferred"`. A deferred room's `expire_tick` SHALL be left unchanged, so it is
-re-evaluated on every subsequent call. The presence of an `NPC` or `Monster` alone, with no
-`PlayerCharacter` present, SHALL NOT defer reclamation — see the despawn/relocate requirement below
-for how such entities are resolved instead.
-
-This requirement was corrected by rubber-duck review from an earlier draft that deferred on any
-`LivingEntity` (including NPCs). Design doc §7.1/§7.2 makes an NPC-occupied instance room the normal
-case for a quest scene, not an edge case, and with no NPC despawn mechanism anywhere in the codebase,
-deferring on NPC presence alone meant such a room would never resolve — the corrected rule below is
-what a conforming implementation SHALL enforce.
+re-evaluated on every subsequent call.
 
 #### Scenario: A room with a PlayerCharacter present is deferred, not reclaimed
 - **WHEN** `reclaim_due_instances(start_tick, end_tick)` is called and a due `InstanceRoom` contains a
@@ -93,6 +88,19 @@ what a conforming implementation SHALL enforce.
   and unpinned before the next `advance()` call
 - **THEN** the next `reclaim_due_instances()` call reclaims or promotes it, with no additional
   bookkeeping required to "remember" it was previously due
+
+#### Scenario: An NPC or Monster alone never defers reclamation
+- **WHEN** a due room contains only an `NPC` or `Monster`, with no `PlayerCharacter` present
+- **THEN** their presence alone SHALL NOT defer reclamation — see the despawn/relocate requirement
+  below for how such entities are resolved instead
+
+#### Scenario: The defer rule is the rubber-duck-corrected rule
+- **WHEN** this requirement's history is consulted
+- **THEN** it was corrected by rubber-duck review from an earlier draft that deferred on any
+  `LivingEntity` (including NPCs): design doc §7.1/§7.2 makes an NPC-occupied instance room the
+  normal case for a quest scene, not an edge case, and with no NPC despawn mechanism anywhere in
+  the codebase, deferring on NPC presence alone meant such a room would never resolve — the
+  corrected rule is what a conforming implementation SHALL enforce
 
 ### Requirement: reclaim_due_instances promotes rooms that are both named and interacted
 For every due `InstanceRoom` with no `PlayerCharacter` present and no active pin, whose `named` and
@@ -136,21 +144,7 @@ Immediately before `reclaim_due_instances()` deletes a room routed to reclamatio
 SHALL, for every `typeclasses.entities.LivingEntity` instance still in that room's `contents`: delete
 it if it appears in `room.db.owned_entities`; otherwise relocate it to `settings.DEFAULT_HOME` (via
 the same lookup `DefaultObject.clear_contents()` itself uses) without deleting it. Only after this
-step SHALL `room.delete()` be called. This requirement SHALL hold regardless of whether the entity is
-an `NPC` or `Monster` — the routing rule (despawn vs. relocate) depends only on `owned_entities`
-membership, never on entity type.
-
-The entity clearing SHALL only ever run for a room the typeclass safety net would accept: the step
-SHALL first consult `InstanceRoom.at_object_delete()` (D-1), and if that returns `False`, SHALL emit
-`"instance_reclaim_deferred"` with no entity despawned or relocated. A deferred room therefore keeps
-its contents and its `owned_entities` registry intact, so the retry is side-effect-free. This replaces
-an earlier draft that cleared entities and then attempted deletion inside a rolling-back transaction —
-a design Evennia's idmapper does not reliably support, and which could leave an owned NPC data-lost on
-the refused-delete path (rubber-duck review).
-
-This is the concrete resolution the rubber-duck review demanded: a due room containing only an NPC
-(no `PlayerCharacter`, no pin) is not merely deferred forever — it is **actually and eventually
-reclaimed**, with its NPC handled by exactly one of the two specified outcomes below.
+step SHALL `room.delete()` be called.
 
 #### Scenario: An NPC-bearing due room is eventually reclaimed, not permanently deferred
 - **WHEN** a due, unpinned `InstanceRoom` contains only an `NPC` (no `PlayerCharacter`), and is not
@@ -187,32 +181,35 @@ reclaimed**, with its NPC handled by exactly one of the two specified outcomes b
   safety net is consulted before any entity is despawned or relocated, so no partial state survives a
   refused delete
 
+#### Scenario: Routing depends only on ownership, never on entity type
+- **WHEN** the despawn-vs-relocate routing rule is applied to entities of any type
+- **THEN** the requirement SHALL hold regardless of whether the entity is an `NPC` or `Monster` —
+  the routing rule depends only on `owned_entities` membership, never on entity type
+
+#### Scenario: Entity clearing consults the typeclass safety net first
+- **WHEN** the entity-clearing step is about to run for a room
+- **THEN** it SHALL only ever run for a room the typeclass safety net would accept: the step SHALL
+  first consult `InstanceRoom.at_object_delete()` (D-1), and if that returns `False`, SHALL emit
+  `"instance_reclaim_deferred"` with no entity despawned or relocated — a deferred room therefore
+  keeps its contents and its `owned_entities` registry intact, so the retry is side-effect-free
+
+#### Scenario: The pre-check replaces the rolling-back-transaction draft
+- **WHEN** this requirement's history is consulted
+- **THEN** the safety-net pre-check replaces an earlier draft that cleared entities and then
+  attempted deletion inside a rolling-back transaction — a design Evennia's idmapper does not
+  reliably support, and which could leave an owned NPC data-lost on the refused-delete path
+  (rubber-duck review)
+
+#### Scenario: The rubber-duck-demanded resolution is eventual reclaim with one of two NPC outcomes
+- **WHEN** a due room containing only an NPC (no `PlayerCharacter`, no pin) reaches reclamation
+- **THEN** it is not merely deferred forever — it is **actually and eventually reclaimed**, with
+  its NPC handled by exactly one of the two specified outcomes below
+
 ### Requirement: reclaim_due_instances deletes rooms that are due, unblocked, and not promotable
 For every due `InstanceRoom` with no `PlayerCharacter` present, no active pin, that is not both
 `named` and `interacted`, `reclaim_due_instances()` SHALL clear its non-player entities (per the
 requirement above), call `room.delete()`, and emit a `ScheduledEvent` of kind `"instance_reclaimed"`
-if deletion succeeds. `reclaim_due_instances()` SHALL NOT raise under any circumstance on this path:
-if the typeclass safety net refuses the room (a `False` return from `InstanceRoom.at_object_delete()`
-or from `room.delete()` itself), `reclaim_due_instances()` SHALL emit a `ScheduledEvent` of kind
-`"instance_reclaim_deferred"` instead. When the refusal is discovered by the pre-flight safety-net
-check (the only path expected to be reachable, and the only one that runs before any entity is
-cleared), the deferred room's contents and ownership registry are untouched; a deferred event emitted
-from the delete-result branch is an unreachable-in-normal-operation defensive outcome and SHALL still
-not raise.
-
-Inside the same `transaction.atomic()` block, `reclaim_due_instances()` SHALL call
-`world.rules.map_knowledge.prune_reclaimed_room(room.id)` (the `map-knowledge` capability) **before**
-`_clear_non_player_entities(room)` and `room.delete()` run, so every affected player's visited record
-loses the reclaimed room's `room:<dbref>` in the same transaction as the room cleanup and deletion and
-no knowledge failure ever occurs after room/entity caches have already been mutated. The pruning SHALL
-snapshot each affected character's knowledge value before mutation and restore every snapshot on any
-write failure, and SHALL raise a dedicated `KnowledgePruneError` only on a genuine persistence failure.
-When `prune_reclaimed_room` raises, the reclaim branch SHALL mark the transaction for rollback
-(`transaction.set_rollback(True)`) and SHALL append the deferred `ScheduledEvent` only after leaving
-the atomic block; `reclaim_due_instances` SHALL NOT emit `"instance_reclaimed"` for a rolled-back
-transaction. The pruning or deletion failure SHALL leave the room eligible for a later reclamation
-attempt and SHALL NOT raise out of `reclaim_due_instances`. A promoted room (routed to the promotion
-branch, `expire_tick` set to `None`) SHALL NOT be pruned and SHALL retain its visited identity.
+if deletion succeeds.
 
 #### Scenario: An unnamed, uninteracted due room with no occupants is reclaimed
 - **WHEN** `reclaim_due_instances(start_tick, end_tick)` is called and a due room with no
@@ -251,6 +248,51 @@ branch, `expire_tick` set to `None`) SHALL NOT be pruned and SHALL retain its vi
 #### Scenario: A promoted room is not pruned
 - **WHEN** a due `InstanceRoom` that is both `named` and `interacted` is promoted
 - **THEN** its `room:<dbref>` remains in every affected player's visited record and no pruning runs
+
+#### Scenario: The reclaim path never raises; a refused delete defers instead
+- **WHEN** the typeclass safety net refuses the room (a `False` return from
+  `InstanceRoom.at_object_delete()` or from `room.delete()` itself)
+- **THEN** `reclaim_due_instances()` SHALL NOT raise under any circumstance on this path and SHALL
+  emit a `ScheduledEvent` of kind `"instance_reclaim_deferred"` instead
+
+#### Scenario: A pre-flight refusal leaves contents and ownership untouched
+- **WHEN** the refusal is discovered by the pre-flight safety-net check — the only path expected to
+  be reachable, and the only one that runs before any entity is cleared
+- **THEN** the deferred room's contents and ownership registry are untouched
+
+#### Scenario: A delete-result refusal is defensive and still never raises
+- **WHEN** a deferred event is emitted from the delete-result branch
+- **THEN** that is an unreachable-in-normal-operation defensive outcome and SHALL still not raise
+
+#### Scenario: Pruning runs inside the reclaim transaction, before cleanup and deletion
+- **WHEN** the reclaim branch runs inside the same `transaction.atomic()` block
+- **THEN** `reclaim_due_instances()` SHALL call `world.rules.map_knowledge.prune_reclaimed_room(room.id)`
+  (the `map-knowledge` capability) **before** `_clear_non_player_entities(room)` and `room.delete()`
+  run, so every affected player's visited record loses the reclaimed room's `room:<dbref>` in the
+  same transaction as the room cleanup and deletion and no knowledge failure ever occurs after
+  room/entity caches have already been mutated
+
+#### Scenario: Pruning snapshots knowledge values and restores them on write failure
+- **WHEN** map-knowledge pruning mutates affected characters' knowledge
+- **THEN** it SHALL snapshot each affected character's knowledge value before mutation and restore
+  every snapshot on any write failure, and SHALL raise a dedicated `KnowledgePruneError` only on a
+  genuine persistence failure
+
+#### Scenario: A pruning raise rolls back and defers after the atomic block
+- **WHEN** `prune_reclaimed_room` raises
+- **THEN** the reclaim branch SHALL mark the transaction for rollback
+  (`transaction.set_rollback(True)`) and SHALL append the deferred `ScheduledEvent` only after
+  leaving the atomic block, and `reclaim_due_instances` SHALL NOT emit `"instance_reclaimed"` for a
+  rolled-back transaction
+
+#### Scenario: A pruning or deletion failure leaves the room reclaimable later and never raises
+- **WHEN** pruning or deletion fails
+- **THEN** the failure SHALL leave the room eligible for a later reclamation attempt and SHALL NOT
+  raise out of `reclaim_due_instances`
+
+#### Scenario: A promoted room is never pruned and keeps its visited identity
+- **WHEN** a room is routed to the promotion branch and its `expire_tick` set to `None`
+- **THEN** it SHALL NOT be pruned and SHALL retain its visited identity
 
 ### Requirement: reclaim_due_instances is registered as the instance_reclamation event source at server start
 `world/maps/instance.py::register_instance_reclamation()` SHALL call

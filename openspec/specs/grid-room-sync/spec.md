@@ -75,19 +75,11 @@ city to exist after a fresh container boot.
 
 ### Requirement: A single authored, idempotent Exit bridges Limbo and the sample city
 `sync_grid()` SHALL locate the starting room through the shared `LIMBO_KEY` constant
-(`world/maps/bootstrap.py`), which holds the room's zh-tw key — never by dbref and never by a
-hard-coded `"Limbo"` literal. When the room is found, `sync_grid()` SHALL author bridging exits
-exclusively from `CITY_GATE_REGISTRY` (`world/maps/city_gates.py`): for every registry row it SHALL
-idempotently ensure exactly one ordinary (non-grid) `Exit` from the starting room to that row's
-gate coordinate exists — never any exit leading back to the starting room — without duplicating it
-on repeated calls. The exit toward the sample city SHALL use the row's zh-tw key 「南門」 with the
-row's zh-tw aliases and SHALL carry no English aliases; when a bridge exit already exists with
-legacy English aliases, `sync_grid()` SHALL reconcile its key and aliases in place to the authored
-registry values on every call, not only at creation. After the forward pass, `sync_grid()` SHALL
-delete every persisted `Exit` whose destination is the starting room (the `limbo-one-way-gates`
-capability's prune invariant), so a reverse exit seeded into the database converges away on the
-next sync. When no room keyed `LIMBO_KEY` exists, `sync_grid()` SHALL log a warning and skip
-creating the bridging exits, and SHALL NOT raise.
+(`world/maps/bootstrap.py`) — never by dbref, never by a `"Limbo"` literal. When the room
+is found, it SHALL author bridging exits exclusively from `CITY_GATE_REGISTRY`
+(`world/maps/city_gates.py`): for every registry row, exactly one ordinary (non-grid)
+`Exit` from the starting room to that row's gate coordinate, ensured idempotently —
+never an exit back to the starting room, never duplicated on repeated calls.
 
 #### Scenario: The bridging exit exists after sync_grid runs
 - **WHEN** `sync_grid()` runs against a database containing a room keyed `LIMBO_KEY`
@@ -127,18 +119,27 @@ creating the bridging exits, and SHALL NOT raise.
 - **THEN** that exit object no longer exists after the run, the forward 「南門」 exit is converged as
   authored, and a second `sync_grid()` call deletes nothing further and logs no prune event
 
+#### Scenario: Bridge exits converge to the registry on every call
+- **WHEN** `sync_grid()` runs and a bridge exit toward the sample city already exists
+- **THEN** its key and aliases are reconciled in place to the authored registry values on every
+  call, not only at creation
+
+#### Scenario: The forward pass ends with the prune invariant
+- **WHEN** the forward bridging pass of `sync_grid()` finishes
+- **THEN** `sync_grid()` deletes every persisted `Exit` whose destination is the starting room —
+  the `limbo-one-way-gates` capability's prune invariant — so a reverse exit seeded into the
+  database converges away on the next sync
+
+#### Scenario: A missing Limbo logs a warning before skipping
+- **WHEN** `sync_grid()` runs and no room keyed `LIMBO_KEY` is found
+- **THEN** it logs a warning, skips creating the bridging exits, and does not raise
+
 ### Requirement: Authored room prose is Traditional Chinese
 Every authored room description the game ships SHALL be Traditional Chinese prose — both the
 `desc` of a grid prototype and the interior description a place record carries. A room's name
 and its description SHALL be in the same language: a Chinese room name over an English body is
-the specific defect this rule exists to prevent, because it is the state the codebase reached
-by nobody checking.
-
-Authoring notes, specification identifiers and change names SHALL NOT appear in a description.
-They are player-facing text.
-
-A guard SHALL check this over the whole shipped corpus, so a new English description fails
-rather than accumulating.
+the specific defect this rule exists to prevent. Authoring notes, specification identifiers and change names SHALL NOT appear
+in a description; they are player-facing text. A guard SHALL check the corpus.
 
 #### Scenario: Every shipped room description is Traditional Chinese
 - **WHEN** every authored grid prototype description and every place's interior description is
@@ -152,3 +153,12 @@ rather than accumulating.
 #### Scenario: No description carries an authoring note
 - **WHEN** the shipped descriptions are searched for specification identifiers and change names
 - **THEN** none is found
+
+#### Scenario: The name-language mismatch is the nobody-checking defect
+- **WHEN** an authored room pairs a Chinese room name with an English body
+- **THEN** it violates the same-language rule — this mismatch is the state the codebase reached
+  by nobody checking
+
+#### Scenario: The guard stops English descriptions from accumulating
+- **WHEN** a new English description is added to the shipped corpus
+- **THEN** the guard fails it over the whole corpus, so the defect fails rather than accumulating

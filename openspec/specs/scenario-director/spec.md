@@ -6,18 +6,11 @@ Defines the scenario-director layer that generates validated quest blueprints th
 
 ### Requirement: Scene-archetype and NPC-tier registries are immutable lore data
 `world/lore/scene_archetypes.py` SHALL define a frozen `SceneArchetype` dataclass and a module-level
-`SCENE_ARCHETYPE_REGISTRY: dict[str, SceneArchetype]` keyed by scene-kind keys (for example
-`forest_path`, `tavern_interior`, `dungeon_interior`, `city_street`, `wilderness_path`,
-`mountain_path`, `ruin_interior`, `coastal_path`, `cave_interior`, `shrine_interior`).
+`SCENE_ARCHETYPE_REGISTRY: dict[str, SceneArchetype]` keyed by scene-kind keys, and
 `world/lore/npc_tiers.py` SHALL define a frozen `NPCTier` dataclass and a module-level
-`NPC_TIER_REGISTRY: dict[str, NPCTier]` keyed by role-tier keys (for example `civilian`, `guard`,
-`merchant`, `adventurer`, `mage`, `noble`, `bandit`, `priest`, `knight`). Each `NPCTier` SHALL also
-carry `race_key` and `static_tier_key`, naming immutable entries of `RACE_REGISTRY` and
-`STATIC_TIER_REGISTRY`, so a role tier's deterministic physical stats resolve from the lore tables and
-change 21's SceneBuilder never duplicates balance constants. Both registries SHALL be non-empty,
+`NPC_TIER_REGISTRY: dict[str, NPCTier]` keyed by role-tier keys. Both registries SHALL be non-empty,
 frozen, and consumable by any package without violating the single-writer or deterministic-path
-boundaries; `world/ai/` validators, change 21's SceneBuilder, and the `world/quests` compiler SHALL
-read these registry values rather than duplicating constants.
+boundaries.
 
 #### Scenario: Both registries are non-empty and closed
 - **WHEN** `SCENE_ARCHETYPE_REGISTRY` and `NPC_TIER_REGISTRY` are inspected
@@ -40,14 +33,24 @@ read these registry values rather than duplicating constants.
 - **THEN** both consumers reference the lore registry values without importing a state writer or
   duplicating the constants
 
+#### Scenario: The registry key vocabularies are the documented examples
+- **WHEN** the registries are keyed
+- **THEN** scene-kind keys include (for example) `forest_path`, `tavern_interior`, `dungeon_interior`, `city_street`, `wilderness_path`, `mountain_path`, `ruin_interior`, `coastal_path`, `cave_interior`, `shrine_interior`, and role-tier keys include (for example) `civilian`, `guard`, `merchant`, `adventurer`, `mage`, `noble`, `bandit`, `priest`, `knight`
+
+#### Scenario: Each NPC tier resolves its physical stats from lore
+- **WHEN** an `NPCTier` is declared
+- **THEN** it carries `race_key` and `static_tier_key`, naming immutable entries of `RACE_REGISTRY` and `STATIC_TIER_REGISTRY`, so a role tier's deterministic physical stats resolve from the lore tables and change 21's SceneBuilder never duplicates balance constants
+
+#### Scenario: Consumers read the registries instead of duplicating
+- **WHEN** `world/ai/` validators, change 21's SceneBuilder, and the `world/quests` compiler consume tier data
+- **THEN** they read these registry values rather than duplicating constants
+
 ### Requirement: QuestBlueprint is the closed, deeply immutable AI proposal type
 `world/ai/scenario_director.py` SHALL define frozen `QuestBlueprint` dataclasses whose `quest_type`
 SHALL be restricted to exactly the five `QuestType` values (採集, 討伐, 護衛, 探索, 緊急) and whose
 stages SHALL carry explicit integer `index` values in a contiguous sequence starting at zero. No
 blueprint field SHALL contain a mutable dict or list, and construction SHALL reject any mutable
-container so immutability is enforced by the constructor, not only by the dataclass. `QuestBlueprint`
-SHALL be a distinct proposal type from the runtime `QuestDefinition`; raw mappings SHALL NOT be
-accepted by the runtime quest registry, and the two types SHALL NOT be interchangeable.
+container so immutability is enforced by the constructor, not only by the dataclass.
 
 #### Scenario: A valid blueprint preserves explicit stage indices
 - **WHEN** a blueprint is constructed with stages carrying indices 0 and 1
@@ -62,29 +65,16 @@ accepted by the runtime quest registry, and the two types SHALL NOT be interchan
   values
 - **THEN** construction fails and no `QuestBlueprint` value is produced
 
+#### Scenario: The proposal type stays distinct from the runtime type
+- **WHEN** proposals face the runtime quest registry
+- **THEN** `QuestBlueprint` is a distinct proposal type from the runtime `QuestDefinition`, raw mappings are NOT accepted by the runtime quest registry, and the two types are not interchangeable
+
 ### Requirement: ScenarioDirector prompt construction is deterministic, bounded, and faithful
 `world/ai/scenario_director.py::build_scenario_prompt(context)` SHALL return a (system, user) message
 pair. The system message SHALL be the prompt library's `scenario_director.system` key rendered via
 `render_prompt("scenario_director.system", name_inspiration=<inspiration bank>)` — the library is the
-sole source of the system prompt text, and the module SHALL NOT embed it as a Python constant. The
-rendered system message SHALL fix the director role in 伊洛瑟恩大陸, the 正體中文 language, the
-fidelity rule (reference only known world content, never invent ranks, archetypes, NPC tiers, item
-keys, or rewards), and the JSON output contract that is the `QuestBlueprint` shape. The user message
-SHALL serialize the request context (requested quest type, allowed rank, issuer branch, anchor)
-with stable sorted JSON serialization. The prompt SHALL be bounded by fixed per-field length caps and
-a bounded total size, and SHALL contain only plain JSON-compatible data with no live entity
-references, so identical input always produces byte-identical prompts.
-
-The system message SHALL additionally carry a deterministic name-inspiration bank: the module SHALL
-compute `zlib.crc32` over the serialized bounded request context, roll a fixed number of names
-through the read-only `world.rules.namegen.roll_name_for_race(None, "", Random(seed))`, and inject
-them as the `name_inspiration` values together with the library text's guidance that the names are
-inspiration only — directly usable, or adjustable to the character's declared sex and background —
-countering same-name bias when the author runs out of inspiration, and that every `npc_req` entry
-MUST carry the required identity fields `display_name` and `title`. The bank remains an
-inspiration-only surface: the rolled names are never a fallback final name written by the system,
-and the injection itself SHALL add no output-schema field; the requiredness of `display_name` and
-`title` is enforced by the shared characterization validator, not by the prompt.
+sole source of its text — and SHALL carry a deterministic name-inspiration bank. Identical input
+SHALL always produce byte-identical prompts.
 
 #### Scenario: Identical contexts produce identical prompts
 - **WHEN** `build_scenario_prompt()` is called twice with the same context
@@ -130,22 +120,36 @@ and the injection itself SHALL add no output-schema field; the requiredness of `
   file is the only place its text (including the naming-guidance sentence) is defined — and the
   module renders it rather than embedding any of the text as a Python constant
 
+#### Scenario: The rendered system message fixes role, language, fidelity, and contract
+- **WHEN** the rendered system message is inspected
+- **THEN** it fixes the director role in 伊洛瑟恩大陸, the 正體中文 language, the fidelity rule (reference only known world content, never invent ranks, archetypes, NPC tiers, item keys, or rewards), and the JSON output contract that is the `QuestBlueprint` shape
+
+#### Scenario: The user message serializes the request context stably
+- **WHEN** the user message is built
+- **THEN** it serializes the request context (requested quest type, allowed rank, issuer branch, anchor) with stable sorted JSON serialization
+
+#### Scenario: The bank rolls a fixed count through the read-only rule layer
+- **WHEN** the module builds the inspiration bank
+- **THEN** it computes `zlib.crc32` over the serialized bounded request context and rolls a fixed number of names through the read-only `world.rules.namegen.roll_name_for_race(None, "", Random(seed))`, injecting them as the `name_inspiration` values
+
+#### Scenario: The prompt is size-bounded plain data
+- **WHEN** a prompt is constructed
+- **THEN** it is bounded by fixed per-field length caps and a bounded total size and contains only plain JSON-compatible data with no live entity references
+
+#### Scenario: The bank is inspiration only, never a system-written fallback
+- **WHEN** the bank is injected with the library text's guidance that the names are inspiration only — directly usable, or adjustable to the character's declared sex and background — countering same-name bias when the author runs out of inspiration
+- **THEN** the rolled names are never a fallback final name written by the system
+
+#### Scenario: Identity requiredness is the validator's job, not the prompt's
+- **WHEN** the prompt states that every `npc_req` entry MUST carry the required identity fields `display_name` and `title`
+- **THEN** the injection itself adds no output-schema field, and the requiredness of `display_name` and `title` is enforced by the shared characterization validator, not by the prompt
+
 ### Requirement: generate_quest_blueprint runs the guarded pipeline and enforces the request context
 `world/ai/scenario_director.py::generate_quest_blueprint(client, *, context)` SHALL require the
 client as an injected argument and SHALL reject an explicit `None` with a named
 `ScenarioDirectorClientRequiredError` as its first statement, before any prompt construction or
-transport work. It SHALL build a `ChatRequestDescriptor` whose messages come from
-`build_scenario_prompt(context)` and whose `schema_id` is `"scenario_director"`, yield the
-`scenario_director` layer's `guarded_call`, `json.loads` the accepted text into a frozen
-`QuestBlueprint`, and apply a post-guardrail fitness gate that re-checks the parsed blueprint against
-the request context (allowed rank, requested quest type, issuer branch, anchor). A blueprint that is
-schema- and semantically valid but does not fit the context SHALL be treated as a degrade trigger.
-On any degrade trigger (disabled profile, transport failure, exhausted retries, or context misfit)
-the call SHALL resolve to a deterministic draw from the hand-written template pool that also fits the
-context. When no compatible template exists, the call SHALL errback with a named
-`ScenarioDirectorTemplateError`. When the layer is registered, the call SHALL never resolve to an
-invalid proposal or to `None`; a call made before registration SHALL errback with a named
-`ScenarioDirectorNotRegisteredError`.
+transport work. It SHALL apply a post-guardrail fitness gate that re-checks the parsed blueprint
+against the request context (allowed rank, requested quest type, issuer branch, anchor).
 
 #### Scenario: A valid context-fitting blueprint resolves to a frozen QuestBlueprint
 - **WHEN** `generate_quest_blueprint()` is called with a client that returns accepted blueprint JSON
@@ -185,18 +189,31 @@ invalid proposal or to `None`; a call made before registration SHALL errback wit
 - **THEN** the call errbacks with a named `ScenarioDirectorNotRegisteredError` rather than silently
   fabricating a blueprint
 
+#### Scenario: The pipeline runs through the descriptor and the guarded call
+- **WHEN** the call proceeds with a client
+- **THEN** it builds a `ChatRequestDescriptor` whose messages come from `build_scenario_prompt(context)` and whose `schema_id` is `"scenario_director"`, yields the `scenario_director` layer's `guarded_call`, and `json.loads` the accepted text into a frozen `QuestBlueprint`
+
+#### Scenario: A context-misfitting valid blueprint is a degrade trigger
+- **WHEN** a blueprint is schema- and semantically valid but does not fit the request context
+- **THEN** it is treated as a degrade trigger
+
+#### Scenario: Any degrade trigger draws a context-fitting template
+- **WHEN** any degrade trigger occurs (disabled profile, transport failure, exhausted retries, or context misfit)
+- **THEN** the call resolves to a deterministic draw from the hand-written template pool that also fits the context
+
+#### Scenario: No compatible template is a named errback
+- **WHEN** no compatible template exists for the context
+- **THEN** the call errbacks with a named `ScenarioDirectorTemplateError`
+
+#### Scenario: A registered layer never resolves invalid or None
+- **WHEN** the layer is registered, or a call is made before registration
+- **THEN** the call never resolves to an invalid proposal or to `None`, and a pre-registration call errbacks with a named `ScenarioDirectorNotRegisteredError`
+
 ### Requirement: Semantic validators bound rank, reward, archetype, NPC tier, and every world reference
 The `scenario_director` layer SHALL register semantic validators under stable names so the shared
-pipeline retries on violations and degrades on exhaustion. Validators SHALL reject: a `rank` outside
-`GUILD_RANK_REGISTRY`; reward copper below the rank's `reward_min_copper` or above its
-`reward_max_copper` (with S honoring its open upper bound); non-integer or negative merit; reward
-item keys outside `ITEM_REGISTRY` with non-positive quantities or duplicate keys; a `location_req`
-archetype outside `SCENE_ARCHETYPE_REGISTRY`; an `npc_req` tier outside `NPC_TIER_REGISTRY`; a DEFEAT
-stage declaring a `monster_tier` outside `MONSTER_TIER_REGISTRY`; an issuer branch outside
-`GUILD_BRANCH_REGISTRY`; non-contiguous stage indices; a `deadline_hours` that is neither `None` nor
-a positive integer; empty or non-CJK `name`/`scene_sentence`; fields exceeding length caps; and
-leaked template-placeholder syntax. Each rejected attempt SHALL append a concrete validation message
-before retrying.
+pipeline retries on violations and degrades on exhaustion, covering the rank, reward, archetype, tier,
+branch, index, deadline, string, and placeholder rejections pinned by the scenarios below. Each
+rejected attempt SHALL append a concrete validation message before retrying.
 
 #### Scenario: An unknown rank is rejected and retried
 - **WHEN** a client returns a blueprint whose `rank` is not in `GUILD_RANK_REGISTRY`
@@ -221,27 +238,32 @@ before retrying.
   deadline, and strings are all valid and within bounds
 - **THEN** the pipeline returns it as a frozen `QuestBlueprint` with no retry
 
+#### Scenario: Out-of-band or malformed rewards are rejected
+- **WHEN** a blueprint declares reward copper below the rank's `reward_min_copper` or above its `reward_max_copper` (with S honoring its open upper bound), non-integer or negative merit, or reward item keys outside `ITEM_REGISTRY` with non-positive quantities or duplicate keys
+- **THEN** the validators reject it
+
+#### Scenario: A rank outside the registry is rejected
+- **WHEN** a blueprint declares a `rank` outside `GUILD_RANK_REGISTRY`
+- **THEN** the validators reject it
+
+#### Scenario: A monster tier or issuer branch outside the registries is rejected
+- **WHEN** a DEFEAT stage declares a `monster_tier` outside `MONSTER_TIER_REGISTRY` or the issuer branch is outside `GUILD_BRANCH_REGISTRY`
+- **THEN** the validators reject it
+
+#### Scenario: A bad deadline is rejected
+- **WHEN** a blueprint declares a `deadline_hours` that is neither `None` nor a positive integer
+- **THEN** the validators reject it
+
+#### Scenario: Bad strings, oversize fields, and placeholder leaks are rejected
+- **WHEN** a blueprint carries empty or non-CJK `name`/`scene_sentence`, fields exceeding length caps, or leaked template-placeholder syntax
+- **THEN** the validators reject it
+
 ### Requirement: Blueprint validation accepts and bounds the optional npc characterization fields
 The scenario director's blueprint validator SHALL require three per-occupant characterization
-fields — `display_name` (authored name, bounded non-empty text through the shared bound helper),
-`title` (authored NPC title, single-line plain text through the shared bound helper), and
-`persona` (a complete compact NPC card) — on every `npc_req` entry, in addition to the existing
-role/tier/disposition checks, and SHALL accept the two optional fields `age`/`apparent_age`
-(paired) and `portrait: {stable_key}`. The `background` field and any partial persona block SHALL
-NOT be part of the proposal shape. Every field SHALL be validated through the shared bound helper
-under `world/quests/` (the single rule source, imported read-only): `display_name` and `title`
-required with their shared character-set rules; `persona` required and satisfying the compact card
-contract (exactly seven fields, required leaves non-empty, per-leaf, identity-section, and total
-rendered bounds); `age`/`apparent_age` paired values satisfying `type(value) is int` with the hard
-age floor `0` and an upper bound from `NPC_TIER_REGISTRY[tier].race_key` →
-`RACE_REGISTRY[race].lifespan`; `portrait` a mapping with exactly one `stable_key` field that is
-subject-key-valid. A payload whose tier is unknown, whose occupant is missing `display_name`,
-`title`, or `persona`, whose card violates the contract, whose ages are unpaired, non-integer,
-negative, or beyond the race lifespan, or whose portrait key is malformed SHALL be rejected and
-retried within the budget exactly like today's other semantic failures, and on budget exhaustion
-SHALL degrade to the offline template pool. A blueprint SHALL declare at most three `npc_req`
-occupants in total across all of its stages, so its occupant cards fit one bounded model response;
-a blueprint exceeding that total SHALL be rejected and retried like any other semantic failure.
+fields — `display_name`, `title`, and `persona` — on every `npc_req` entry, in addition to the
+existing role/tier/disposition checks, and SHALL accept the two optional fields `age`/`apparent_age`
+(paired) and `portrait: {stable_key}`, with every field validated through the shared bound helper
+under `world/quests/` — the single rule source.
 
 #### Scenario: A valid named occupant with a title and ages passes validation
 - **WHEN** a blueprint's `npc_req` entry declares a known tier plus `display_name`, `title`, a
@@ -284,11 +306,39 @@ a blueprint exceeding that total SHALL be rejected and retried like any other se
   card contract, and no inline duplicate of the age/name/title/key/card rules exists in the
   scenario director
 
+#### Scenario: The required fields carry their shared shapes
+- **WHEN** the required characterization fields are validated
+- **THEN** `display_name` is authored name as bounded non-empty text through the shared bound helper and `title` is authored NPC title as single-line plain text through the shared bound helper, each required with its shared character-set rules
+
+#### Scenario: The persona card obeys the compact card contract
+- **WHEN** `persona` is validated
+- **THEN** it is required and must satisfy the compact card contract (exactly seven fields, required leaves non-empty, per-leaf, identity-section, and total rendered bounds)
+
+#### Scenario: The ages obey int-ness, floor, and race lifespan
+- **WHEN** `age`/`apparent_age` are validated
+- **THEN** they must be paired values satisfying `type(value) is int` with the hard age floor `0` and an upper bound from `NPC_TIER_REGISTRY[tier].race_key` → `RACE_REGISTRY[race].lifespan`
+
+#### Scenario: The portrait key must be subject-key-valid
+- **WHEN** `portrait` is validated
+- **THEN** it must be a mapping with exactly one `stable_key` field that is subject-key-valid
+
+#### Scenario: The proposal shape excludes background and partial cards
+- **WHEN** a proposal declares the `background` field or any partial persona block
+- **THEN** neither is part of the proposal shape
+
+#### Scenario: Every characterization violation retries then degrades
+- **WHEN** a payload's tier is unknown, its occupant is missing `display_name`, `title`, or `persona`, its card violates the contract, its ages are unpaired, non-integer, negative, or beyond the race lifespan, or its portrait key is malformed
+- **THEN** it is rejected and retried within the budget exactly like today's other semantic failures, and on budget exhaustion the call degrades to the offline template pool
+
+#### Scenario: The occupant total is capped at three
+- **WHEN** a blueprint declares `npc_req` occupants across its stages
+- **THEN** it declares at most three in total across all of its stages, so its occupant cards fit one bounded model response, and a blueprint exceeding that total is rejected and retried like any other semantic failure
+
 ### Requirement: The director prompt asks for a complete card per occupant
 The `scenario_director.system` prompt-library text SHALL instruct the model to give every
 `npc_req` a `persona` object with the seven compact-card fields, SHALL state which leaves may be
 empty (`identity.hidden`, `social_connection`), that `speech_style` describes how the character
-talks, and the per-leaf and total bounds, SHALL ask for compact cards of roughly 800 code points each and at most three occupants per blueprint, and SHALL contain no shipped NPC's card prose. The
+talks, and the per-leaf and total bounds, and SHALL contain no shipped NPC's card prose. The
 `scenario_director` output schema SHALL require that object with exactly those keys at both levels
 and no `background` key.
 
@@ -299,6 +349,10 @@ and no `background` key.
 #### Scenario: The schema rejects a background key
 - **WHEN** an `npc_req` persona object carries a `background` key or omits `speech_style`
 - **THEN** output-schema validation fails
+
+#### Scenario: The prompt sizes the cards and caps the occupants
+- **WHEN** the prompt-library text is inspected
+- **THEN** it asks for compact cards of roughly 800 code points each and at most three occupants per blueprint
 
 ### Requirement: Offline template occupants carry fully authored cards
 Every NPC-bearing template in the hand-written template pool SHALL declare, for each occupant, a
@@ -317,12 +371,8 @@ LLM-free quest generation still materializes occupants with complete characteriz
 `world/ai/director_templates.py` SHALL define a non-empty tuple of hand-written, pre-validated
 `QuestBlueprint` values that reference only permanent world content (known monster tiers, anchors,
 grid coordinates, and known items). Every template SHALL satisfy the output schema and every
-semantic validator, SHALL be indexed so a request context can be matched against it (rank, quest
-type, issuer branch, anchor), and SHALL compile through the deterministic boundary to a
-`QuestDefinition` that registers and can be completed by the deterministic loop without any LLM or
-SceneBuilder. The degraded draw SHALL be deterministic: identical request contexts always select the
-same template from the pool. The template pool SHALL import the proposal model one-way and SHALL be
-read through a lazy accessor so no module-level import cycle forms with the director module.
+semantic validator and SHALL be indexed so a request context can be matched against it (rank, quest
+type, issuer branch, anchor).
 
 #### Scenario: The pool is non-empty and every template validates
 - **WHEN** the template pool is inspected and each template is run through the schema and semantic
@@ -345,17 +395,24 @@ read through a lazy accessor so no module-level import cycle forms with the dire
   turns it in
 - **THEN** the loop completes with no LLM call and no generative module ever mutating state
 
+#### Scenario: Templates compile through the deterministic boundary
+- **WHEN** a template is compiled for play
+- **THEN** it compiles through the deterministic boundary to a `QuestDefinition` that registers and can be completed by the deterministic loop without any LLM or SceneBuilder
+
+#### Scenario: The degraded draw is deterministic
+- **WHEN** the template pool is consulted on a degrade
+- **THEN** the draw is deterministic: identical request contexts always select the same template from the pool
+
+#### Scenario: The pool is read lazily to avoid import cycles
+- **WHEN** the director module needs the pool
+- **THEN** the template pool imports the proposal model one-way and is read through a lazy accessor, so no module-level import cycle forms with the director module
+
 ### Requirement: The canonical payload contract is versioned and shared by both boundaries
 The `QuestBlueprint.to_payload()` JSON-safe mapping SHALL be the canonical proposal contract. Its
-per-stage mapping rules SHALL be pinned: objective `kind` maps to `ObjectiveKind`
-(`reach_location`→REACH, `defeat`→DEFEAT, `escort`→ESCORT, `acquire`→ACQUIRE); `location_req.layer`
-maps to `DestinationKind` (`anchor`→ANCHOR with a placed anchor key, `grid`→GRID with coordinates,
-`instance`→BOUND_INSTANCE, and `wilderness` is not representable); a DEFEAT stage SHALL declare
-exactly one of a known `monster_tier` or `npc_reqs` (which becomes `requires_bound_targets=True`); an
-ACQUIRE stage SHALL declare a known `item_key`; a `quantity` SHALL be a positive integer; a `deadline`
-SHALL map to `QuestDefinition.deadline_hours`; and `failure.conditions` SHALL be accepted only as an
-empty list. The `scenario_director` output schema and the compiler SHALL both derive from this one
-pinned contract, so the guardrail and the compiler cannot drift.
+per-stage mapping rules SHALL be pinned — the objective-kind, layer, DEFEAT/ACQUIRE, quantity,
+deadline, and failure-clause rules below — and the `scenario_director` output schema and the
+compiler SHALL both derive from this one pinned contract, so the guardrail and the compiler cannot
+drift.
 
 #### Scenario: The guardrail schema and the compiler accept the same payload
 - **WHEN** a payload passes the `scenario_director` output schema and semantic validators
@@ -376,35 +433,32 @@ pinned contract, so the guardrail and the compiler cannot drift.
 - **WHEN** a payload declares a non-empty `failure.conditions` list
 - **THEN** the compiler rejects it with a named error rather than silently dropping the conditions
 
+#### Scenario: Objective kinds map onto the runtime enum
+- **WHEN** an objective `kind` is mapped
+- **THEN** `reach_location`→REACH, `defeat`→DEFEAT, `escort`→ESCORT, `acquire`→ACQUIRE
+
+#### Scenario: Layers map onto destination kinds
+- **WHEN** `location_req.layer` is mapped
+- **THEN** `anchor`→ANCHOR with a placed anchor key, `grid`→GRID with coordinates, `instance`→BOUND_INSTANCE, and `wilderness` is not representable
+
+#### Scenario: DEFEAT declares exactly one target source
+- **WHEN** a DEFEAT stage is contracted
+- **THEN** it declares exactly one of a known `monster_tier` or `npc_reqs` (which becomes `requires_bound_targets=True`)
+
+#### Scenario: ACQUIRE, quantity, and deadline obey their shapes
+- **WHEN** a stage declares an ACQUIRE objective, a quantity, or a deadline
+- **THEN** an ACQUIRE stage declares a known `item_key`, a `quantity` is a positive integer, and a `deadline` maps to `QuestDefinition.deadline_hours`
+
+#### Scenario: Failure conditions accept only the empty list
+- **WHEN** `failure.conditions` is contracted
+- **THEN** it is accepted only as an empty list
+
 ### Requirement: The deterministic compile boundary translates validated proposals into the runtime type
 `world/quests/compile.py` SHALL provide `compile_quest_blueprint(validated_payload) -> CompiledQuest`
 that re-validates the proposal against the lore registries and maps it onto the closed immutable
 runtime type: a `QuestDefinition` (with `QuestType`, contiguous stages, objective kinds, destinations,
-and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. The issuer key SHALL be
-either guild-namespaced or character-namespaced; a character-namespaced issuance SHALL carry zero
-merit and SHALL name a carrier authorized to issue, and a violation of either SHALL raise before any
-mutation. The blueprint boundary accepts a registered branch declared either as its bare branch key
-(the form the request context and guardrail declare today) or as the full `guild:<branch key>` form;
-the compiled issuance key is always namespaced. It SHALL raise a named
-`QuestCompileError` on any invalid payload before any mutation. The generated `QuestDefinition.key`
-SHALL be a stable content digest over the canonical runtime definition serialization **plus the
-canonical serialization of the compiled per-stage spawn requirements**, so two blueprints with
-identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`,
-or `npc_reqs`, or any carried characterization field — the required `display_name` and `title`, the
-optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal
-content always yields an equal key. `register_generated_quest(...)` SHALL register the compiled
-`QuestDefinition`, its issuance, **and its per-stage spawn requirements (readable through
-`scene_requirements_for(definition_key)`)** as one all-or-nothing operation. The issuance SHALL be
-written through the sole writer of its own namespace — a guild issuance as a `GuildQuestOffer` in the
-guild offer registry, a character issuance as a `QuestIssuance` in the quest issuance registry — so
-neither store gains a second writer. The operation SHALL: it SHALL preflight all
-three registries' equal/conflict states before writing any of them, SHALL roll back every write if
-any later write fails, and SHALL leave no spawn-requirement entry behind on a rolled-back
-publication, so a generated definition is never left registered without its issuance or its
-requirements. `scene_requirements_for` SHALL return an empty tuple for any key with no registered
-requirements (for example a hand-written catalog quest). Raw AI-shaped dicts SHALL still be rejected
-by `register_quest_definition` — the compile boundary is the sole sanctioned translator and AI dicts
-never enter `QUEST_DEFINITION_REGISTRY` directly.
+and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. It SHALL raise a named
+`QuestCompileError` on any invalid payload before any mutation.
 
 #### Scenario: A valid blueprint compiles to a registrable definition
 - **WHEN** a validated blueprint passes through `compile_quest_blueprint`
@@ -495,18 +549,42 @@ never enter `QUEST_DEFINITION_REGISTRY` directly.
 - **THEN** both compile to the same definition key and register as two distinct issuances under that
   one definition, neither overwriting the other
 
+#### Scenario: Issuer keys follow the namespacing rules
+- **WHEN** a compiled issuance key is derived
+- **THEN** it is either guild-namespaced or character-namespaced; a character-namespaced issuance carries zero merit and names a carrier authorized to issue, and a violation of either raises before any mutation
+
+#### Scenario: The boundary accepts both branch spellings
+- **WHEN** a blueprint declares a registered branch as its bare branch key (the form the request context and guardrail declare today) or as the full `guild:<branch key>` form
+- **THEN** the boundary accepts either, and the compiled issuance key is always namespaced
+
+#### Scenario: The definition key digests runtime content plus scene requirements
+- **WHEN** a `QuestDefinition.key` is generated
+- **THEN** it is a stable content digest over the canonical runtime definition serialization plus the canonical serialization of the compiled per-stage spawn requirements, so two blueprints with identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`, or `npc_reqs`, or any carried characterization field — the required `display_name` and `title`, the optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal content always yields an equal key
+
+#### Scenario: Registration publishes definition, issuance, and requirements atomically
+- **WHEN** `register_generated_quest(...)` runs
+- **THEN** it registers the compiled `QuestDefinition`, its issuance, and its per-stage spawn requirements (readable through `scene_requirements_for(definition_key)`) as one all-or-nothing operation
+
+#### Scenario: Issuance rides the sole writer of its namespace
+- **WHEN** a generated issuance is written
+- **THEN** a guild issuance is written as a `GuildQuestOffer` in the guild offer registry and a character issuance as a `QuestIssuance` in the quest issuance registry, so neither store gains a second writer
+
+#### Scenario: The publication preflights and rolls back completely
+- **WHEN** the all-or-nothing registration writes its three registries
+- **THEN** it preflights all three registries' equal/conflict states before writing any of them, rolls back every write if any later write fails, and leaves no spawn-requirement entry behind on a rolled-back publication, so a generated definition is never left registered without its issuance or its requirements
+
+#### Scenario: Keys without requirements read back empty
+- **WHEN** `scene_requirements_for` is called for a key with no registered requirements (for example a hand-written catalog quest)
+- **THEN** it returns an empty tuple
+
+#### Scenario: AI dicts never enter the registry directly
+- **WHEN** a raw AI-shaped dict is offered for registration
+- **THEN** `register_quest_definition` still rejects it — the compile boundary is the sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly
+
 ### Requirement: Scene-bound proposal stages are validated before publication
 The `scenario_director` guardrail semantic validators and the deterministic compiler SHALL both
-enforce the same scene-bound rules, so the two sides cannot drift. A stage SHALL NOT declare any
-`npc_req` entry unless its `location_req.layer` is exactly `"instance"` — occupant-bearing scenes
-must be reclaimable instances, never permanent rooms, so permanent maps are never polluted by spawned
-scene NPCs and scene occupants always have a reclaim lifecycle. An ESCORT stage SHALL use a permanent
-(`anchor`/`grid`) destination, never `"instance"` and never `npc_reqs` — the SceneBuilder locates
-permanent rooms only, so it never spawns an escort's protected entities into a destination room
-(which would auto-complete the escort on entry) and never pollutes a permanent map. A DEFEAT stage
-that declares `npc_reqs` SHALL carry an objective `quantity` no greater than the number of `npc_req`
-entries, so a bound-target objective is always satisfiable (progress counts distinct bound defeats).
-A non-`None` `location_req.anchor_near` SHALL name a key present in `ANCHOR_PLACEMENT_REGISTRY`.
+enforce the same scene-bound rules, so the two sides cannot drift, covering the occupant-layer,
+escort-destination, bound-target-quantity, and `anchor_near` rules pinned by the scenarios below.
 Every violation SHALL be reported as a validation error that triggers a retry on the generative path
 and a named `QuestCompileError` on the deterministic path, before any publication.
 
@@ -539,14 +617,27 @@ and a named `QuestCompileError` on the deterministic path, before any publicatio
   rejection, and an un-guardrail-validated payload with a scene-bound violation is rejected by the
   compiler deterministically
 
+#### Scenario: Occupants require an instance layer
+- **WHEN** a stage declares any `npc_req` entry
+- **THEN** its `location_req.layer` must be exactly `"instance"` — occupant-bearing scenes must be reclaimable instances, never permanent rooms, so permanent maps are never polluted by spawned scene NPCs and scene occupants always have a reclaim lifecycle
+
+#### Scenario: Escorts require permanent destinations and no occupants
+- **WHEN** an ESCORT stage is validated
+- **THEN** it must use a permanent (`anchor`/`grid`) destination, never `"instance"` and never `npc_reqs` — the SceneBuilder locates permanent rooms only, so it never spawns an escort's protected entities into a destination room (which would auto-complete the escort on entry) and never pollutes a permanent map
+
+#### Scenario: Bound-target quantities stay satisfiable
+- **WHEN** a DEFEAT stage declares `npc_reqs`
+- **THEN** it carries an objective `quantity` no greater than the number of `npc_req` entries, so a bound-target objective is always satisfiable (progress counts distinct bound defeats)
+
+#### Scenario: A declared anchor_near must be a placed anchor
+- **WHEN** a stage declares a non-`None` `location_req.anchor_near`
+- **THEN** it must name a key present in `ANCHOR_PLACEMENT_REGISTRY`
+
 ### Requirement: Hook registration is atomic, idempotent, and boot-tolerant
 `register_scenario_director()` SHALL install the output schema, every semantic validator, and the
 sentinel degrade fallback in one operation, and SHALL remove every own hook (by identity) on a
 partial failure so the layer is never left half-registered. A second call SHALL be a no-op that keeps
-the first registration and swallows only this module's own duplicate-registration errors. Production
-SHALL call it from `server/conf/at_server_startstop.py`'s `at_server_start()` hook inside a
-boot-tolerant wrapper that logs and skips on a foreign leftover registration without aborting server
-startup.
+the first registration and swallows only this module's own duplicate-registration errors.
 
 #### Scenario: Duplicate registration keeps the first registration
 - **WHEN** `register_scenario_director()` is called twice
@@ -563,13 +654,16 @@ startup.
 - **THEN** the wrapper logs a warning, server startup continues, and the reply gate still fails
   loudly on use
 
+#### Scenario: Production wires the registration into server startup
+- **WHEN** the server boots in production
+- **THEN** it calls `register_scenario_director()` from `server/conf/at_server_startstop.py`'s `at_server_start()` hook inside a boot-tolerant wrapper that logs and skips on a foreign leftover registration without aborting server startup
+
 ### Requirement: The scenario-director layer preserves the single-writer and transport boundaries
 `world/ai/scenario_director.py` SHALL import no state writer, no typeclass, and no live transport,
 and SHALL consume the client through the injected protocol exactly like `narrator.py` and
 `npc_dialogue.py`, so the repository-wide transport-boundary contract stays green with no edits.
 `world/quests/compile.py` SHALL contain no `world.ai`/`ollama`/`llm_client` fragment, keeping the
-deterministic-path ban green. Every test of this change SHALL use `FakeLLMClient` or an equivalent
-recorded fixture and never contact a live endpoint, per design §10.
+deterministic-path ban green.
 
 #### Scenario: The scenario-director module stays inside the transport boundary
 - **WHEN** the repository-wide transport-boundary contract scans `world/ai/scenario_director.py`
@@ -583,6 +677,10 @@ recorded fixture and never contact a live endpoint, per design §10.
 #### Scenario: All scenario-director tests run offline
 - **WHEN** the scenario-director test suite runs with no LLM service available
 - **THEN** every test passes using recorded fixtures and none opens a network connection
+
+#### Scenario: Tests use fakes or fixtures per design §10
+- **WHEN** any test of this change exercises the layer
+- **THEN** it uses `FakeLLMClient` or an equivalent recorded fixture and never contacts a live endpoint, per design §10
 
 ### Requirement: The scenario-director name inspiration reads the namegen rule layer without crossing the single-writer boundary
 `world/ai/scenario_director.py` SHALL consume `world.rules.namegen` strictly as a pure read: no

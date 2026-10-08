@@ -107,11 +107,7 @@ fail validation at startup rather than at first use. Every entry SHALL declare a
 Every effect SHALL declare one scope from the closed vocabulary: the acting entity, one other entity,
 the actor's own side, the opposing side, or everyone present. Each scope SHALL map to exactly one
 targeting requirement consumed by the shared target resolver, so item targets pass the identical
-presence, alive, range, and faction validations a skill's targets pass. An item's reach SHALL be a
-property of the item: the rulebook fixes it, and no player input, UI affordance, or command argument
-SHALL widen or narrow it. The acting-entity scope SHALL bind the actor with a self-only constraint;
-the single-entity scope SHALL consume the one explicit target the caller supplied; the three group
-scopes SHALL expand through the action context.
+presence, alive, range, and faction validations a skill's targets pass.
 
 #### Scenario: Every scope value loads
 - **WHEN** a rulebook declares one effect at each of the five scopes
@@ -130,3 +126,11 @@ scopes SHALL expand through the action context.
 - **WHEN** an item effect scoped to a single entity and a single-target skill are both resolved
   against the same dead candidate
 - **THEN** both reject for the same reason through the same shared resolver
+
+#### Scenario: An item's reach is fixed by the rulebook
+- **WHEN** any caller attempts to change an item's reach
+- **THEN** reach is a property of the item — the rulebook fixes it, and no player input, UI affordance, or command argument widens or narrows it
+
+#### Scenario: Each scope binds its targets in one fixed way
+- **WHEN** scopes resolve to targets
+- **THEN** the acting-entity scope binds the actor with a self-only constraint, the single-entity scope consumes the one explicit target the caller supplied, and the three group scopes expand through the action context

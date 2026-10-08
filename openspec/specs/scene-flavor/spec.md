@@ -11,11 +11,8 @@ the deterministic game fully playable with the LLM offline.
 `world/ai/scene_flavor.py` SHALL provide a generative layer that consumes the `scene_builder`
 LLM profile through the shared guardrail pipeline: a bounded deterministic prompt built from an
 injected context, semantic validation, retry-with-appended-errors, and a degrade fallback
-resolving to `None`. The module SHALL import no state writer, no typeclass, no live transport, and
-no socket (the repository-wide transport-boundary contract SHALL stay green); the client SHALL be
-a required injected argument and an explicit `None` SHALL be rejected with a named error before
-any prompt construction or transport work. A disabled `scene_builder` profile SHALL short-circuit
-directly to the degrade outcome with no network request.
+resolving to `None`. The client SHALL be a required injected argument and an explicit `None`
+SHALL be rejected with a named error before any prompt construction or transport work.
 
 #### Scenario: The layer resolves to a flavor paragraph with a live client
 - **WHEN** `generate_scene_flavor(context, client)` is called with a valid bounded context and a
@@ -42,14 +39,21 @@ directly to the degrade outcome with no network request.
 - **THEN** the call errbacks with a named `SceneFlavorNotRegisteredError` identifying that the
   scene-flavor hooks are not installed, and no flavor is silently fabricated
 
+#### Scenario: The module keeps the import boundary clean
+- **WHEN** the scene-flavor module's imports are audited
+- **THEN** it imports no state writer, no typeclass, no live transport, and no socket, so the
+  repository-wide transport-boundary contract SHALL stay green
+
+#### Scenario: A disabled profile short-circuits to the degrade outcome
+- **WHEN** the `scene_builder` profile is disabled and the layer is invoked
+- **THEN** it short-circuits directly to the degrade outcome with no network request
+
 ### Requirement: The flavor output is plain text with deterministic gates
 The layer SHALL validate every returned flavor: it SHALL be non-empty, SHALL be at least 50 and at
 most 200 characters, SHALL contain at least one CJK Unified Ideograph (Traditional Chinese
 surface), and SHALL contain no digit character (any ASCII or Unicode decimal digit).
 A validation failure SHALL be appended to the prompt and retried under the profile's retry budget;
-retry exhaustion SHALL resolve to `None`. The outcome `None` SHALL be the only pipeline-failure
-shape — no exception escapes from the guarded pipeline except the named client-required error;
-the named not-registered error is a registration-precondition error, not a pipeline failure.
+retry exhaustion SHALL resolve to `None`.
 
 #### Scenario: Valid flavor passes the gates
 - **WHEN** a replay returns Traditional Chinese prose between 50 and 200 characters with no digits
@@ -73,13 +77,17 @@ the named not-registered error is a registration-precondition error, not a pipel
 - **WHEN** every attempt under the retry budget fails validation or transport
 - **THEN** the call resolves to `None` and the deterministic game continues unaffected
 
+#### Scenario: None is the only pipeline-failure shape
+- **WHEN** the guarded pipeline fails at any stage
+- **THEN** the outcome resolves to `None` — no exception escapes from the guarded pipeline except
+  the named client-required error, and the named not-registered error is a registration-precondition
+  error, not a pipeline failure
+
 ### Requirement: The flavor prompt is deterministic and data-driven
 The layer SHALL render the `scene_builder.system` prompt-library key with exactly four values —
 `scene_sentence`, `quest_context`, `room_name`, and `region` — each capped to a bounded length,
 and SHALL build the user message from the bounded structured context with stable sorted JSON
-serialization. Identical context SHALL produce byte-identical (system, user) message pairs. A
-broken or unavailable `scene_builder.system` key SHALL resolve the call to `None` (prompt
-unavailability never blocks startup and never raises from the layer).
+serialization. Identical context SHALL produce byte-identical (system, user) message pairs.
 
 #### Scenario: Identical context yields byte-identical prompts
 - **WHEN** the same bounded context is passed to the prompt builder twice
@@ -94,15 +102,17 @@ unavailability never blocks startup and never raises from the layer).
 - **WHEN** the `scene_builder.system` key is marked unavailable in the prompt library
 - **THEN** the entry point resolves to `None` with a logged diagnostic and no state change
 
+#### Scenario: A broken prompt key never raises from the layer
+- **WHEN** the `scene_builder.system` key is broken rather than merely unavailable
+- **THEN** the call resolves to `None` — prompt unavailability never blocks startup and never
+  raises from the layer
+
 ### Requirement: Instance quest scenes schedule one post-commit flavor generation
 A freshly spawned `BOUND_INSTANCE` quest scene with a scene-sentence context SHALL schedule exactly
 one scene-flavor generation, registered through `transaction.on_commit` so it fires only after the
-spawn transaction actually commits (a nested outer transaction that rolls back SHALL never schedule
-a generation). The scheduling SHALL be fire-and-forget: it never blocks arrival, never delays
-materialization, never raises to the caller — synchronous failures (unregistered layer, malformed
-context, client-construction failure) included, which SHALL be logged as bounded diagnostics and
-resolved to nothing — and a failure resolves to "no flavor". An already-bound stage, a permanent
-destination, or a scene without a scene-sentence context SHALL schedule nothing.
+spawn transaction actually commits. The scheduling SHALL be fire-and-forget: it never blocks
+arrival, never delays materialization, and never raises to the caller; a failure resolves to
+"no flavor".
 
 #### Scenario: A fresh instance scene schedules one generation
 - **WHEN** a player materializes a fresh instance scene whose requirement or archetype carries a
@@ -133,14 +143,25 @@ destination, or a scene without a scene-sentence context SHALL schedule nothing.
 - **THEN** the scheduled generation resolves to no flavor, no network request occurs, and the room
   is unchanged
 
+#### Scenario: A rolled-back nested outer transaction never schedules
+- **WHEN** the spawn happens inside a nested outer transaction that rolls back
+- **THEN** no generation is scheduled by the on_commit registration
+
+#### Scenario: Synchronous failures degrade to bounded diagnostics
+- **WHEN** a synchronous scheduling failure occurs — unregistered layer, malformed context, or
+  client-construction failure
+- **THEN** it is logged as a bounded diagnostic and resolved to nothing, never raising to the caller
+
+#### Scenario: Non-fresh contexts schedule nothing
+- **WHEN** the stage is already bound, the destination is permanent, or the scene has no
+  scene-sentence context
+- **THEN** nothing is scheduled
+
 ### Requirement: The flavor write is deterministic, idempotent, and sole-writer
 `room.db.scene_flavor` SHALL be written only by the deterministic SceneBuilder apply helper. The
 write SHALL verify the room's database row authoritatively (a cached typeclass is not proof of
-existence after reclamation) before writing, SHALL be a no-op when the room no longer exists or
-already carries a flavor (never overwrites, never regenerates), SHALL catch database and
-object-deletion exceptions and resolve them to the same no-op outcome, SHALL never roll back or
-block the materialization transaction, and SHALL leave the room description (`room.db.desc`)
-untouched.
+existence after reclamation) before writing, and SHALL be a no-op when the room no longer exists or
+already carries a flavor (never overwrites, never regenerates).
 
 #### Scenario: A completed flavor is written once
 - **WHEN** a flavor generation completes successfully for an existing flavor-less room
@@ -155,6 +176,15 @@ untouched.
 #### Scenario: A room with an existing flavor never regenerates
 - **WHEN** a completion tries to apply a flavor to a room that already carries one
 - **THEN** the existing value is kept and no regeneration occurs
+
+#### Scenario: Database and deletion errors resolve to the no-op
+- **WHEN** the write raises a database or object-deletion exception
+- **THEN** the exception is caught and resolves to the same no-op outcome
+
+#### Scenario: The write never disturbs the materialization transaction
+- **WHEN** the flavor write runs alongside the materialization transaction
+- **THEN** it never rolls back or blocks that transaction and leaves the room description
+  (`room.db.desc`) untouched
 
 ### Requirement: Completed flavor is pushed to present players and rendered in look
 On a successful write, the flavor SHALL be pushed as plain text to every `PlayerCharacter` whose

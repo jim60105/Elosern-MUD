@@ -12,8 +12,7 @@ evennia.js `logged_in` OOB event arrives, cleared on `connection_open` and `conn
 and SHALL map the committed transport status to the overlay slice by the exact precedence:
 `!connected → 「連線中斷」`, `!loggedIn → 「等待登入」`, authenticated `detached` (a `no_puppet`
 detach that cannot obtain a snapshot) → 「等待登入」, authenticated `awaiting_initial_snapshot`
-→ 「連線中」, and `active` → 「就緒」. A session SHALL never present 「連線中」 indefinitely
-while logged out, because the server sends no `ui_snapshot` to an anonymous session.
+→ 「連線中」, and `active` → 「就緒」.
 
 #### Scenario: A logged-out tab waits for login instead of connecting forever
 - **WHEN** a browser tab opens the WebClient without a logged-in website session and the WebSocket connects
@@ -30,6 +29,10 @@ while logged out, because the server sends no `ui_snapshot` to an anonymous sess
 #### Scenario: A detached session waits for login and retries its synchronization
 - **WHEN** a `no_puppet` detach happens around login and the server later re-emits `logged_in`
 - **THEN** the overlay shows 「等待登入」 and the client sends one bounded `ui_sync` retry so a re-attached puppet can deliver the snapshot
+
+#### Scenario: A logged-out session never presents connecting indefinitely
+- **WHEN** the overlay status is evaluated for a session that is not logged in
+- **THEN** it never shows 「連線中」 indefinitely, because the server sends no `ui_snapshot` to an anonymous session
 
 ### Requirement: The WebClient uses the real game name in its brand surfaces
 The WebClient SHALL render the game name 「伊洛瑟恩」 as the brand on the connect overlay and

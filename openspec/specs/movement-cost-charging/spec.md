@@ -13,12 +13,7 @@ non-teleport exit lineage charges successful player movement through it via
 resolving the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calling
 `world.rules.clock.get_world_clock().advance(cost, AdvanceSource.COMMAND, [traversing_object])` when
 `world.rules.player_control.is_player_driven(traversing_object)` is true, and doing nothing
-otherwise. No other function or inline call site in this project SHALL call
-`world.rules.clock.get_world_clock().advance()` for a movement event; every exit lineage that charges
-movement SHALL call `charge_movement()`. When `cost_key == "wilderness_move"` and `traversing_object`
-owns the `flight` skill (`"flight" in traversing_object.skills.owned_keys()`), `charge_movement()`
-SHALL return without advancing the clock — the flight waiver. This waiver applies only to
-`"wilderness_move"`; every other `cost_key` charges normally regardless of owned skills.
+otherwise.
 
 #### Scenario: charge_movement advances the clock by the resolved cost for a PlayerCharacter
 - **WHEN** `charge_movement(player_character, "move")` is called
@@ -55,23 +50,24 @@ SHALL return without advancing the clock — the flight waiver. This waiver appl
   owning `flight`
 - **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["wilderness_move"]`
 
+#### Scenario: Movement-event clock advancement is exclusive to charge_movement
+- **WHEN** any function or inline call site in this project is inspected for movement-event clock
+  advancement
+- **THEN** none calls `world.rules.clock.get_world_clock().advance()` for a movement event, and
+  every exit lineage that charges movement calls `charge_movement()`
+
+#### Scenario: The flight waiver is keyed on the exact owned-skill membership check
+- **WHEN** `charge_movement(traversing_object, cost_key)` runs with `cost_key == "wilderness_move"`
+  and `"flight" in traversing_object.skills.owned_keys()`
+- **THEN** `charge_movement()` returns without advancing the clock, while every other `cost_key`
+  charges normally regardless of owned skills
+
 ### Requirement: MovementCostMixin charges via at_post_traverse, not at_traverse's return value
 `typeclasses/exits.py` SHALL define `MovementCostMixin`, a plain mixin carrying a class attribute
 `movement_cost_key: str` (default `"move"`) and overriding `at_post_traverse(traversing_object,
 source_location, **kwargs)` to call `super().at_post_traverse(...)` followed by
 `after_successful_movement(traversing_object, source_location, cost_key=self.movement_cost_key,
-destination=traversing_object.location)` — the shared movement-completion helper — which SHALL call
-`world.rules.movement.charge_movement(traversing_object, cost_key)` and then
-`world.rules.map_knowledge.record_arrival(traversing_object)`. Recording map knowledge happens only
-after the movement transaction has already succeeded, because this hook fires exclusively from the
-stock `DefaultExit.at_traverse` success branch — the same structural guarantee that already makes the
-charge correct. The mixin SHALL additionally override `at_traverse(traversing_object,
-target_location, **kwargs)` only to open the movement-settlement boundary (the
-movement-settlement-atomicity capability): it SHALL delegate the traversal itself to
-`super().at_traverse(...)` inside that boundary and SHALL NOT inspect or reinterpret any return value
-from it — `at_traverse`'s return value remains `None` in both branches, and success detection stays
-with `at_post_traverse` and the callers' location checks. Recording map knowledge SHALL NOT change
-the movement-charge behavior in any way.
+destination=traversing_object.location)` — the shared movement-completion helper.
 
 #### Scenario: A successful traversal through a MovementCostMixin exit charges exactly once and records arrival
 - **WHEN** a `PlayerCharacter` successfully traverses an exit whose class includes
@@ -119,14 +115,35 @@ the movement-charge behavior in any way.
   around a call to `super().at_traverse(...)`, contains no inline
   `world.rules.clock.get_world_clock().advance()` call, and its `at_post_traverse` is unchanged
 
+#### Scenario: The completion helper charges then records arrival
+- **WHEN** `after_successful_movement(traversing_object, source_location, cost_key=..., destination=...)`
+  runs
+- **THEN** it calls `world.rules.movement.charge_movement(traversing_object, cost_key)` and then
+  `world.rules.map_knowledge.record_arrival(traversing_object)`
+
+#### Scenario: Map knowledge is recorded only after the movement transaction succeeded
+- **WHEN** `MovementCostMixin.at_post_traverse` fires
+- **THEN** it fires exclusively from the stock `DefaultExit.at_traverse` success branch — the same
+  structural guarantee that already makes the charge correct — so recording map knowledge happens
+  only after the movement transaction has already succeeded
+
+#### Scenario: at_traverse never inspects or reinterprets super()'s return value
+- **WHEN** `MovementCostMixin.at_traverse` delegates the traversal to `super().at_traverse(...)`
+  inside the settlement boundary
+- **THEN** it does not inspect or reinterpret any return value from that call — `at_traverse`'s
+  return value remains `None` in both branches, and success detection stays with `at_post_traverse`
+  and the callers' location checks
+
+#### Scenario: Recording map knowledge leaves movement-charge behavior unchanged
+- **WHEN** `record_arrival` recording is performed alongside a movement charge
+- **THEN** the movement-charge behavior is not changed in any way by the recording
+
 ### Requirement: typeclasses.exits.Exit and CostedXYZExit both carry MovementCostMixin with
 movement_cost_key "move"
 `typeclasses/exits.py::Exit(MovementCostMixin, ObjectParent, DefaultExit)` SHALL include
-`MovementCostMixin` in its base classes, with `movement_cost_key = "move"` (the mixin's default,
-inherited unmodified). `typeclasses/exits.py` SHALL also define `CostedXYZExit(MovementCostMixin,
-evennia.contrib.grid.xyzgrid.xyzroom.XYZExit)`, likewise with `movement_cost_key = "move"`, preserving
-every other behavior `XYZExit` already provides (coordinate tags, `.xyz`/`.xyz_destination`
-properties, `.create()`).
+`MovementCostMixin` in its base classes, with `movement_cost_key = "move"`.
+`typeclasses/exits.py` SHALL also define `CostedXYZExit(MovementCostMixin,
+evennia.contrib.grid.xyzgrid.xyzroom.XYZExit)`, likewise with `movement_cost_key = "move"`.
 
 #### Scenario: Exit charges move on successful traversal
 - **WHEN** a `PlayerCharacter` successfully traverses a plain `typeclasses.exits.Exit` instance
@@ -145,6 +162,15 @@ properties, `.create()`).
   `PlayerCharacter` successfully traverses either exit of the pair
 - **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]` per
   successful traversal, with no edit to change 14's own `spawn_instance_room()` required
+
+#### Scenario: Exit inherits the mixin's default cost key unmodified
+- **WHEN** `typeclasses/exits.py::Exit` is inspected
+- **THEN** its `movement_cost_key = "move"` is the mixin's default, inherited unmodified
+
+#### Scenario: CostedXYZExit preserves XYZExit's pre-existing behaviors
+- **WHEN** a `CostedXYZExit` is inspected or used
+- **THEN** every other behavior `XYZExit` already provides is preserved (coordinate tags,
+  `.xyz`/`.xyz_destination` properties, `.create()`)
 
 ### Requirement: Movement never charges through a teleport, spawn, or non-exit relocation
 No call to `DefaultObject.move_to()` that is not routed through an `Exit`'s own `at_traverse` (for

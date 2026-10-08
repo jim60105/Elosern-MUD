@@ -7,20 +7,7 @@ Define deterministic title storage, the fixed-title lore registry, transactional
 ## Requirements
 
 ### Requirement: Title state is a two-kind collection and a two-slot equip record
-`db.title_collection` SHALL be a list of entries identified by `(kind, key |
-display)`: fixed entries `{"kind": "fixed", "key", "granted_tick"}` and epithet
-entries `{"kind": "epithet", "display", "origin_quote", "granted_tick"}`. Fixed
-keys SHALL appear at most once (duplicate grants are silent no-ops); epithet
-displays SHALL be unique within the collection; fixed entries SHALL never be
-removable (no delete API, command, or code path — asserted by a structural test).
-`db.title_equipped` SHALL be `{"fixed": <fixed key or None>, "epithet": <display
-or None>}`, storing identifiers (never copies). Both attributes SHALL be
-registered on the snapshot/restore surface before any writer; missing attributes
-SHALL read exactly as `[]` and `{"fixed": None, "epithet": None}`. Bank writers
-SHALL validate every input before any write — a fixed key must name a registry
-row, epithet display and origin quote must be non-blank strings, the epithet
-display must fit its storage cap, and `granted_tick` must be a non-negative
-integer — and SHALL raise `TitleDataError` leaving state byte-identical.
+`db.title_collection` SHALL be a list of entries identified by `(kind, key | display)`: fixed entries `{"kind": "fixed", "key", "granted_tick"}` and epithet entries `{"kind": "epithet", "display", "origin_quote", "granted_tick"}`. Fixed keys SHALL appear at most once (duplicate grants are silent no-ops); epithet displays SHALL be unique within the collection. `db.title_equipped` SHALL be `{"fixed": <fixed key or None>, "epithet": <display or None>}`, storing identifiers (never copies).
 
 #### Scenario: Duplicate fixed grant is a no-op
 - **WHEN** an entity already holding fixed key `g_f_rank` is granted it again
@@ -30,15 +17,24 @@ integer — and SHALL raise `TitleDataError` leaving state byte-identical.
 - **WHEN** a triggering action commits a title write and a later failure restores the action snapshot
 - **THEN** `title_collection` and `title_equipped` return to their pre-action values
 
+#### Scenario: Fixed entries are never removable
+- **WHEN** the structural test scans for any delete API, command, or code path over fixed entries
+- **THEN** none exists
+
+#### Scenario: Snapshot registration precedes writers
+- **WHEN** any title writer is introduced
+- **THEN** `title_collection` and `title_equipped` are already registered on the snapshot/restore surface
+
+#### Scenario: Missing attributes read as empty
+- **WHEN** the attributes have never been written
+- **THEN** they read exactly as `[]` and `{"fixed": None, "epithet": None}`
+
+#### Scenario: Bank writers validate every input before any write
+- **WHEN** a bank write is attempted with a fixed key that names no registry row, blank display or origin quote, an over-cap display, or a negative/non-integer `granted_tick`
+- **THEN** the writer raises `TitleDataError` and state is byte-identical
+
 ### Requirement: compose_title is the single pure composition of the full title
-`world/rules/titles.py` SHALL define
-`compose_title(fixed: str | None, epithet: str | None) -> str` joining the
-non-empty parts fixed-first, epithet-second, with a full-width space (「　」),
-returning the empty string when both slots are empty. No consumer SHALL store a
-composed copy; every read composes live from the two slots' identifiers. On the
-empty string, narrative consumers SHALL fall back to the character's own name and
-the LLM prompt's identity section SHALL be omitted entirely (never filled with a
-placeholder).
+`world/rules/titles.py` SHALL define `compose_title(fixed: str | None, epithet: str | None) -> str` joining the non-empty parts fixed-first, epithet-second, with a full-width space (「　」), returning the empty string when both slots are empty. No consumer SHALL store a composed copy; every read composes live from the two slots' identifiers.
 
 #### Scenario: Both slots compose with the full-width space
 - **WHEN** `compose_title("F級冒險者", "南門新客")` is called
@@ -48,25 +44,12 @@ placeholder).
 - **WHEN** either argument is `None`
 - **THEN** the result is the other part alone, and `compose_title(None, None)` returns `""`
 
+#### Scenario: The empty composition falls back to the name, never a placeholder
+- **WHEN** the composition is the empty string
+- **THEN** narrative consumers fall back to the character's own name and the LLM prompt's identity section is omitted entirely, never filled with a placeholder
+
 ### Requirement: The fixed-title lore registry validates and syncs idempotently
-`world/lore/titles.py` SHALL hold frozen `FixedTitleDef(key, display_name_zh,
-category, flavor_zh, hint_zh, predicate)` entries in a keyed registry mirrored
-into Evennia Scripts idempotently at startup, alongside the registry constant
-`STARTER_EPITHET` (display 「南門新客」). Load validation SHALL reject: duplicate
-keys; empty `hint_zh`; predicates referencing registry faces that do not exist
-(element, monster threat tier, quest key, guild rank key, sexual experience
-type). Load validation SHALL additionally reject ambiguous equip identifiers —
-a duplicate `display_name_zh` or a key equal to another row's display — and a
-display longer than 63 code points. The published registry SHALL be an
-immutable mapping proxy (no in-place mutation). Predicate families are
-declarative (`lineage_complete`, `mastery_owned`, `first_kill_tier`,
-`quest_completed`, `guild_rank_reached`, `sexual_experience`,
-`counter_threshold`, `church_skills_redeemed`) carrying parameters only;
-`church_skills_redeemed` carries the integer `threshold` parameter and
-references no external registry face. The codex `category` vocabulary SHALL be
-extended with the 聖職 (`clergy`) member, and the shipped clergy ladder rows
-validate against it at module load exactly as the guild rows validate against
-the guild-rank face.
+`world/lore/titles.py` SHALL hold frozen `FixedTitleDef(key, display_name_zh, category, flavor_zh, hint_zh, predicate)` entries in a keyed registry mirrored into Evennia Scripts idempotently at startup, alongside the registry constant `STARTER_EPITHET` (display 「南門新客」). Load validation SHALL reject malformed or ambiguous registries before anything is published.
 
 #### Scenario: A dangling predicate reference fails at load
 - **WHEN** a registry row's predicate names a nonexistent quest key
@@ -80,14 +63,32 @@ the guild-rank face.
 - **WHEN** a ladder row declares the 聖職 category, and a planted row declares a category outside the closed enum
 - **THEN** the ladder row loads and the planted row raises naming the row
 
+#### Scenario: Duplicate keys and empty hints fail at load
+- **WHEN** the registry carries a duplicate key or a row with empty `hint_zh`, or a predicate references a nonexistent registry face (element, monster threat tier, quest key, guild rank key, sexual experience type)
+- **THEN** load validation rejects the registry
+
+#### Scenario: Ambiguous equip identifiers fail at load
+- **WHEN** a `display_name_zh` is duplicated or a key equals another row's display
+- **THEN** load validation rejects the registry, keeping every equip identifier unambiguous
+
+#### Scenario: An overlong display fails at load
+- **WHEN** a row's display is longer than 63 code points
+- **THEN** load validation rejects the registry
+
+#### Scenario: The published registry is immutable
+- **WHEN** a caller attempts in-place mutation of the published registry
+- **THEN** the immutable mapping proxy refuses it
+
+#### Scenario: Predicate families are declarative
+- **WHEN** the predicate families (`lineage_complete`, `mastery_owned`, `first_kill_tier`, `quest_completed`, `guild_rank_reached`, `sexual_experience`, `counter_threshold`, `church_skills_redeemed`) are inspected
+- **THEN** each carries parameters only; `church_skills_redeemed` carries the integer `threshold` parameter and references no external registry face
+
+#### Scenario: The clergy category joins the codex vocabulary
+- **WHEN** the shipped clergy ladder rows validate at module load
+- **THEN** they validate against the codex `category` vocabulary extended with the 聖職 (`clergy`) member, exactly as the guild rows validate against the guild-rank face
+
 ### Requirement: Fixed-title grants ride the triggering action's atomic transaction
-A registered event-effect planner SHALL evaluate pending predicates against the
-step-7 EventLog (non-EventLog faces read through the existing shared read
-helpers) and stage fixed-title grants as `PendingEffect` values committed inside
-the triggering action's own transaction; collection membership short-circuits
-re-grants, so a staged-then-rolled-back grant re-applies naturally when its
-events next appear and nothing can be written twice. A successful live grant
-SHALL push one OOB notification (「獲得稱號：屠龍者」).
+A registered event-effect planner SHALL evaluate pending predicates against the step-7 EventLog (non-EventLog faces read through the existing shared read helpers) and stage fixed-title grants as `PendingEffect` values committed inside the triggering action's own transaction; collection membership short-circuits re-grants, so a staged-then-rolled-back grant re-applies naturally when its events next appear and nothing can be written twice.
 
 #### Scenario: A predicate-satisfying kill grants inside the same commit
 - **WHEN** an action commits an EventLog satisfying a `first_kill_tier` predicate
@@ -97,19 +98,12 @@ SHALL push one OOB notification (「獲得稱號：屠龍者」).
 - **WHEN** a staged grant is rolled back and a later action reproduces the same qualifying events
 - **THEN** exactly one entry exists afterwards
 
+#### Scenario: A live grant pushes one notification
+- **WHEN** a fixed-title grant commits successfully on a live session
+- **THEN** one OOB notification (「獲得稱號：屠龍者」) is pushed
+
 ### Requirement: Guild registration and rank promotion grant paired titles atomically
-Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing
-`world/rules/guild.py::register_adventurer` transaction SHALL grant the
-F-rank title (「F級冒險者」)
-in one commit, with no planner or LLM involvement;
-re-registration SHALL be an idempotent no-op through the fixed-key dedupe rule.
-The starter epithet 「南門新客」 SHALL NOT be granted at registration: it is
-granted by `world/rules/titles.py::grant_first_quest_epithet` inside the
-actor's first guild reward-claim transaction (quest-reward-settlement), through
-the regular `bank_epithet` writer. Exam promotions SHALL grant the new rank's
-title inside `settle_exam_outcome`'s promotion transaction; a rolled-back
-promotion removes it. Merit changes, branch
-moves, and any future demotion SHALL NOT revoke banked titles.
+Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing `world/rules/guild.py::register_adventurer` transaction SHALL grant the F-rank title (「F級冒險者」) in one commit, with no planner or LLM involvement. Exam promotions SHALL grant the new rank's title inside `settle_exam_outcome`'s promotion transaction; a rolled-back promotion removes it.
 
 #### Scenario: Registration banks the rank title only
 - **WHEN** a fresh character completes guild registration
@@ -127,17 +121,21 @@ moves, and any future demotion SHALL NOT revoke banked titles.
 - **WHEN** an exam promotion commits, and separately when the same promotion is rolled back
 - **THEN** the E-rank title appears exactly in the first case
 
+#### Scenario: Re-registration dedupes through the fixed-key rule
+- **WHEN** a member registers again
+- **THEN** the grant is an idempotent no-op through the fixed-key dedupe rule
+
+#### Scenario: The starter epithet is granted at the first reward claim, not registration
+- **WHEN** guild registration completes
+- **THEN** the starter epithet 「南門新客」 is not granted; it is granted by `world/rules/titles.py::grant_first_quest_epithet` inside the actor's first guild reward-claim transaction (quest-reward-settlement), through the regular `bank_epithet` writer
+
+#### Scenario: Non-promotion guild changes never revoke titles
+- **WHEN** merit changes, branch moves, or any future demotion occurs
+- **THEN** banked titles are not revoked
+
 
 ### Requirement: Slot non-empty is an invariant with auto-equip and no unequip
-For each kind, collection-non-empty SHALL imply the matching equip slot is
-non-empty. Every mutator that banks an entry (fixed grant, the first-quest
-epithet grant, and the
-future epithet adoption) SHALL auto-equip it into an empty slot within the same
-transaction, and SHALL only bank into an occupied slot. No code path, command, or
-API SHALL empty a slot (there is no `title clear`). The only empty-slot window
-for the fixed slot is after character activation and before guild registration;
-the only empty-slot window for the epithet slot is before the member's first
-completed guild reward claim.
+For each kind, collection-non-empty SHALL imply the matching equip slot is non-empty. Every mutator that banks an entry (fixed grant, the first-quest epithet grant, and the future epithet adoption) SHALL auto-equip it into an empty slot within the same transaction, and SHALL only bank into an occupied slot. No code path, command, or API SHALL empty a slot (there is no `title clear`).
 
 #### Scenario: First fixed grant auto-equips; later grants bank
 - **WHEN** an entity's empty fixed slot receives its first grant, and separately when a second fixed title is granted
@@ -146,6 +144,10 @@ completed guild reward claim.
 #### Scenario: No mutator sequence empties an occupied slot
 - **WHEN** any sequence of F's mutators runs on a collection holding each kind
 - **THEN** the state "collection non-empty, slot empty" never occurs
+
+#### Scenario: The empty-slot windows are bounded
+- **WHEN** the entity's lifecycle is examined for empty slots
+- **THEN** the only empty-slot window for the fixed slot is after character activation and before guild registration, and the only empty-slot window for the epithet slot is before the member's first completed guild reward claim
 
 
 ### Requirement: The title equip surface swaps identifiers and never un equips
@@ -181,24 +183,15 @@ presentation and unbanked-equipment never affects predicate truth.
 - **THEN** the predicate reads satisfied from the collection
 
 ### Requirement: Epithet nomination fires only at rest points and is throttled
-The nomination trigger (the composition-root
-`server.title_nomination_service.schedule_epithet_nomination(entity)`; the
-transport contract forbids `world/rules` and `commands` from importing
-`world/ai`, so scheduling lives in the service and persisting in the rules
-writer) SHALL fire only at the four narrative rest points — logout, a
-world-clock day boundary while the entity is resting, an examination
-pass, and a quest-arc completion — and never during combat settlement. While a
-`db.pending_title_ballot` exists, every trigger SHALL return silently (one ballot
-at a time; no replacement path). A declined ballot SHALL suppress
-renomination for `NOMINATION_COOLDOWN_DAYS` (title-registry constant, initial
-value 2) world-clock day boundaries — decline is the only cooldown source,
-because ballots never expire; an accepted ballot SHALL NOT start a
-cooldown. With the LLM offline, degraded, or past its bounded timeout, the stage
-SHALL not fire and fixed titles SHALL be unaffected.
+The nomination trigger — the composition-root `server.title_nomination_service.schedule_epithet_nomination(entity)` — SHALL fire only at the four narrative rest points — logout, a world-clock day boundary while the entity is resting, an examination pass, and a quest-arc completion — and never during combat settlement. While a `db.pending_title_ballot` exists, every trigger SHALL return silently (one ballot at a time; no replacement path).
 
 #### Scenario: A pending ballot suppresses every trigger
 - **WHEN** any rest-point trigger fires for an entity with a pending ballot
 - **THEN** no LLM call is made and the ballot is unchanged
+
+#### Scenario: Scheduling lives in the service, persisting in the rules writer
+- **WHEN** the nomination trigger's placement is checked against the transport contract
+- **THEN** the contract's ban on `world/rules` and `commands` importing `world/ai` holds — scheduling lives in the composition-root service and persisting in the rules writer
 
 #### Scenario: Decline cools down two day boundaries
 - **WHEN** a ballot is declined and day boundaries pass
@@ -208,25 +201,24 @@ SHALL not fire and fixed titles SHALL be unaffected.
 - **WHEN** a trigger fires while the options profile is degraded or absent
 - **THEN** the round is void, no ballot is stored, and gameplay is unaffected
 
+#### Scenario: Only decline starts a cooldown
+- **WHEN** a ballot is declined, and separately when one is accepted
+- **THEN** the decline suppresses renomination for `NOMINATION_COOLDOWN_DAYS` (title-registry constant, initial value 2) world-clock day boundaries — decline is the only cooldown source, because ballots never expire — and the accepted ballot starts no cooldown
+
+#### Scenario: An unavailable LLM never fires the stage
+- **WHEN** the LLM is offline, degraded, or past its bounded timeout
+- **THEN** the stage does not fire and fixed titles are unaffected
+
 ### Requirement: The nomination pipeline is 5 candidates through schema and collision filters
-The generative stage SHALL ask the Director for exactly five `{display, basis}`
-candidates from the recent EventLog summary and SHALL validate them through, in
-this order: (1) the closed output schema `{candidates: [{display: str, basis: str}]
-x 5}` — malformed JSON, wrong count, or overlong fields void the whole round;
-(2) deterministic per-candidate filters, first survivor wins: zh-tw form (2–8
-characters, no whitespace, no player-name substring), rejection on equality with
-any `FixedTitleDef.display_name_zh`, rejection on equality with any epithet in
-the entity's live collection, and in-batch duplicates keeping the first. The
-first three survivors form the ballot; one to three survivors ballot as-is; zero
-survivors void the round silently. Collision rules SHALL NOT appear in the prompt
-text. The generative module SHALL be pure proposal — it returns the filtered
-candidates (or nothing) and writes no attribute anywhere; persisting a ballot is
-performed solely by the rules-layer nomination writer, which re-checks
-suppression after the proposal returns.
+The generative stage SHALL ask the Director for exactly five `{display, basis}` candidates from the recent EventLog summary and SHALL validate them through, in this order: (1) the closed output schema `{candidates: [{display: str, basis: str}] x 5}` — malformed JSON, wrong count, or overlong fields void the whole round; (2) deterministic per-candidate filters, first survivor wins.
 
 #### Scenario: Malformed schema voids the round
 - **WHEN** the model returns four candidates, six candidates, or unparseable JSON
 - **THEN** no ballot is stored
+
+#### Scenario: The per-candidate filters are deterministic
+- **WHEN** the per-candidate filters run
+- **THEN** they enforce zh-tw form (2–8 characters, no whitespace, no player-name substring), reject equality with any `FixedTitleDef.display_name_zh`, reject equality with any epithet in the entity's live collection, and keep the first of in-batch duplicates
 
 #### Scenario: A nameless survivor survives deletion history
 - **WHEN** a candidate equals an epithet previously deleted from the collection
@@ -239,6 +231,18 @@ suppression after the proposal returns.
 #### Scenario: The generative module persists nothing
 - **WHEN** the proposer completes a round with survivors
 - **THEN** no attribute outside the rules-layer writer's transaction changed during the proposal
+
+#### Scenario: Survivor count decides the ballot
+- **WHEN** the filters run over the five candidates
+- **THEN** the first three survivors form the ballot, one to three survivors ballot as-is, and zero survivors void the round silently
+
+#### Scenario: Collision rules stay out of the prompt
+- **WHEN** the nomination prompt text is inspected
+- **THEN** no collision rule appears in it
+
+#### Scenario: Only the rules-layer writer persists the ballot
+- **WHEN** the pure-proposal module returns the filtered candidates (or nothing)
+- **THEN** persisting a ballot is performed solely by the rules-layer nomination writer, which re-checks suppression after the proposal returns
 
 ### Requirement: The ballot persists unchanged until consent
 The surviving candidates SHALL persist to `db.pending_title_ballot` as
@@ -253,22 +257,7 @@ an answer given in-session.
 - **THEN** adoption proceeds exactly as an in-session accept
 
 ### Requirement: Ballot persistence, acceptance, and decline are rules-layer writers only
-The rules layer SHALL own every ballot write: the nomination writer persists a
-validated proposal into `db.pending_title_ballot` in its own all-or-nothing step
-(a failed persist voids the round, leaving no partial proposal), and
-`world/rules/titles.py` SHALL expose `accept_epithet(entity, index)` validating
-`index` against the pending ballot, then within one atomic snapshot-registered
-transaction: bank the epithet (display, `origin_quote = basis`, `granted_tick`),
-auto-equip the epithet slot when empty (F's D8 discipline), and clear the ballot;
-a repeated or out-of-range accept SHALL reject with a stable reason and change
-nothing. A decline SHALL discard the batch, start the cooldown, record the
-declined displays into a bounded per-entity decline log, and emit a
-`title_epithet_declined` EventLog entry through the answering surface; the
-nomination prompt SHALL digest that decline log as soft-learning context so the
-Director's future summaries see what the player rejected, and no programmatic
-blacklist SHALL exist anywhere (the decline log is prompt context only, never a
-filter rule). No code path outside these three rules-layer writers SHALL change
-title state from a ballot.
+The rules layer SHALL own every ballot write: the nomination writer persists a validated proposal into `db.pending_title_ballot` in its own all-or-nothing step (a failed persist voids the round, leaving no partial proposal). No code path outside these three rules-layer writers SHALL change title state from a ballot.
 
 #### Scenario: Accept banks and auto-equips atomically
 - **WHEN** a player accepts candidate 1 while the epithet slot is occupied
@@ -280,24 +269,24 @@ title state from a ballot.
   displays, no collection entry is created, and the decline log persists them
   so the next nomination prompt digest carries what the player rejected
 
+#### Scenario: accept_epithet validates and commits atomically
+- **WHEN** `world/rules/titles.py::accept_epithet(entity, index)` is called
+- **THEN** it validates `index` against the pending ballot, then within one atomic snapshot-registered transaction banks the epithet (display, `origin_quote = basis`, `granted_tick`), auto-equips the epithet slot when empty (F's D8 discipline), and clears the ballot
+
+#### Scenario: A repeated or out-of-range accept changes nothing
+- **WHEN** `accept_epithet` is called again after acceptance or with an out-of-range `index`
+- **THEN** it rejects with a stable reason and changes nothing
+
+#### Scenario: A decline discards, cools down, and logs
+- **WHEN** a player declines a ballot
+- **THEN** the batch is discarded, the cooldown starts, the declined displays are recorded into a bounded per-entity decline log, and a `title_epithet_declined` EventLog entry is emitted through the answering surface
+
+#### Scenario: The decline log is prompt context, never a filter
+- **WHEN** the nomination prompt is built and the codebase is searched for blacklist logic
+- **THEN** the prompt digests the decline log as soft-learning context so the Director's future summaries see what the player rejected, and no programmatic blacklist exists anywhere (the decline log is prompt context only, never a filter rule)
+
 ### Requirement: TitleCodexView is a pure bounded read model for the codex
-`world/rules/title_view.py` SHALL expose
-`build_title_codex_view(character, *, max_rows, max_display_chars,
-max_basis_chars) -> TitleCodexView` reading only the lore registry,
-`db.title_collection`, `db.title_equipped`, and `db.pending_title_ballot`:
-fixed rows in registry order carrying
-`key`/`display`/`category`/`hint_zh` (hint only while locked)/`flavor_zh`
-(only when unlocked)/`unlocked`/`granted_tick`, epithet rows newest-first
-carrying `display`/`basis`/`granted_tick`/`equipped`/`can_remove`, an
-`equipped` dict, a live-composed `full_title`, the `pending_ballot` entries
-(degrading to empty when ballot state is malformed, without contaminating the
-title rows), and unlocked/total counters. Every string SHALL respect the
-passed maxima; the shipped display maxima SHALL equal the storage caps
-(64/63) so a rendered action identifier is never a truncated non-matching
-string. The view SHALL compute without mutating and repeat byte-identically
-while state is unchanged. OOB constants `TITLE_MAX_ROWS` /
-`TITLE_MAX_DISPLAY_CHARS` / `TITLE_MAX_BASIS_CHARS` (and the title-category
-enum) SHALL be mirrored across all four mirrors like every OOB surface.
+`world/rules/title_view.py` SHALL expose `build_title_codex_view(character, *, max_rows, max_display_chars, max_basis_chars) -> TitleCodexView` reading only the lore registry, `db.title_collection`, `db.title_equipped`, and `db.pending_title_ballot`. The view SHALL compute without mutating and repeat byte-identically while state is unchanged.
 
 #### Scenario: Locked rows show hints, unlocked rows show flavor
 - **WHEN** a view is built for a character holding part of the registry
@@ -307,21 +296,32 @@ enum) SHALL be mirrored across all four mirrors like every OOB surface.
 - **WHEN** an epithet's `origin_quote` exceeds `max_basis_chars`
 - **THEN** the row's basis is clipped to the cap and remains a contiguous prefix of the quote
 
+#### Scenario: Fixed rows carry the registry shape in registry order
+- **WHEN** the view renders fixed rows
+- **THEN** they appear in registry order carrying `key`/`display`/`category`/`hint_zh` (hint only while locked)/`flavor_zh` (only when unlocked)/`unlocked`/`granted_tick`
+
+#### Scenario: Epithet rows carry the banked shape newest-first
+- **WHEN** the view renders epithet rows
+- **THEN** they appear newest-first carrying `display`/`basis`/`granted_tick`/`equipped`/`can_remove`
+
+#### Scenario: The view carries equip, composition, ballot, and counters
+- **WHEN** the view is built
+- **THEN** it carries an `equipped` dict, a live-composed `full_title`, the `pending_ballot` entries, and unlocked/total counters
+
+#### Scenario: Malformed ballot state degrades the ballot only
+- **WHEN** ballot state is malformed
+- **THEN** `pending_ballot` degrades to empty without contaminating the title rows
+
+#### Scenario: Rendered strings respect the maxima and the shipped caps
+- **WHEN** the view renders any string
+- **THEN** it respects the passed maxima, and the shipped display maxima equal the storage caps (64/63) so a rendered action identifier is never a truncated non-matching string
+
+#### Scenario: The codex OOB constants are mirrored
+- **WHEN** the OOB constants `TITLE_MAX_ROWS` / `TITLE_MAX_DISPLAY_CHARS` / `TITLE_MAX_BASIS_CHARS` (and the title-category enum) are checked
+- **THEN** they are mirrored across all four mirrors like every OOB surface
+
 ### Requirement: The codex OOB payload and WebClient window are server-authored
-The `title` OOB schema v1 SHALL carry
-`{schema_version, fixed_rows, epithet_rows, equipped, full_title, unlocked,
-total, pending_ballot}` rendered by the WebClient as a big window: header with
-the live full-title preview; 「稱號」block with category tabs (戰鬥／法術／探索／公會／
-聖職／風流韻事), locked cards showing 🔒 + hint, clicking an unlocked fixed card
-requesting that fixed equip; 「異名」block with click-to-equip, ★ marking the
-equipped epithet, and the 「移除」 button rendered from the row's server-computed
-`can_remove` flag with no client-side rules; a 「提名中」tab presenting G's pending
-ballot with the accept/decline buttons; no 卸裝 control anywhere. The category
-enum SHALL stay mirrored across all its faces — the Python `TitleCategory`, the
-presentation mirror, the client `constants.js` validator enum, and its protocol
-test — and the panel validator SHALL reject a payload carrying a category
-outside the extended closed set. The preview SHALL update on every successful
-equip.
+The `title` OOB schema v1 SHALL carry `{schema_version, fixed_rows, epithet_rows, equipped, full_title, unlocked, total, pending_ballot}` rendered by the WebClient as a big window: header with the live full-title preview; 「稱號」block with category tabs (戰鬥／法術／探索／公會／聖職／風流韻事), locked cards showing 🔒 + hint, and clicking an unlocked fixed card requesting that fixed equip.
 
 #### Scenario: Locked cards offer no affordance
 - **WHEN** the window renders a row whose `unlocked` is false
@@ -335,27 +335,24 @@ equip.
 - **WHEN** a payload with 聖職-category rows reaches the panel, and separately a payload whose row category is outside the extended enum
 - **THEN** the first renders under its tab with the ladder rows, and the client validator rejects the second rather than rendering it
 
+#### Scenario: The 異名 block renders equip marks and server-driven removal
+- **WHEN** the window renders the 「異名」block
+- **THEN** rows are click-to-equip, ★ marks the equipped epithet, and the 「移除」 button renders from the row's server-computed `can_remove` flag with no client-side rules
+
+#### Scenario: The 提名中 tab carries the ballot and there is no unequip control
+- **WHEN** the window renders G's pending ballot
+- **THEN** the 「提名中」tab presents it with the accept/decline buttons, and no 卸裝 control exists anywhere in the window
+
+#### Scenario: The category enum stays mirrored across all its faces
+- **WHEN** the title category enum is checked
+- **THEN** the Python `TitleCategory`, the presentation mirror, the client `constants.js` validator enum, and its protocol test agree, and the panel validator rejects a payload carrying a category outside the extended closed set
+
+#### Scenario: The preview tracks every equip
+- **WHEN** an equip request succeeds
+- **THEN** the live full-title preview updates
+
 ### Requirement: Epithet removal is the only delete path and gates precede confirmation
-`world/rules/titles.py::remove_epithet(entity, display)` SHALL be the system's
-only collection-deleting API, validating in one pass before any review state
-exists, in this precedence: unknown display or wrong kind ⇒ stable rejection;
-it is the last remaining epithet ⇒ `TITLE_LAST_EPITHET` (under the D8
-invariant the sole epithet is necessarily the equipped one, so this gate MUST
-be evaluated first for the one-epithet case to name the true reason);
-`display` equals the equipped epithet ⇒ `TITLE_EQUIPPED_UNREMOVABLE` — neither
-gate code ever enters the confirm flow. Only an un-gated target echoes review
-info (display + basis) for the two-step Telnet path (`title remove epithet
-<display>` then literal `confirm` suffix; a display containing the literal
-final token quotes it so the suffix stays unambiguous; any other continuation
-cancels without state change), after which the executing call re-validates
-both gates and, within one snapshot-registered transaction, removes the entry,
-records `{tick, display}` into the bounded durable removal log
-(`title_epithet_removals`, the Director-facing feed mirroring the decline
-log), and emits the renderable `title_epithet_removed`
-(actor, display, tick) EventLog. Slots SHALL never be touched by removal.
-Fixed titles SHALL expose no delete API, command, or code path — a structural
-test asserts absence. Removal is irreversible; there is no recycle bin, and
-the removed name becomes nominatable again through G's live-collection filter.
+`world/rules/titles.py::remove_epithet(entity, display)` SHALL be the system's only collection-deleting API, validating in one pass before any review state exists, in this precedence: unknown display or wrong kind ⇒ stable rejection; it is the last remaining epithet ⇒ `TITLE_LAST_EPITHET`; `display` equals the equipped epithet ⇒ `TITLE_EQUIPPED_UNREMOVABLE` — neither gate code ever enters the confirm flow.
 
 #### Scenario: Equipped epithet refuses at gate one
 - **WHEN** `title remove epithet <equipped display>` is attempted
@@ -373,6 +370,26 @@ the removed name becomes nominatable again through G's live-collection filter.
 - **WHEN** the structural absence test scans titles modules and command surfaces
 - **THEN** no fixed-title delete API, command, or code path exists
 
+#### Scenario: The last-epithet gate is evaluated first under the D8 invariant
+- **WHEN** the one-epithet case is gated
+- **THEN** the last-epithet gate is evaluated first — under the D8 invariant the sole epithet is necessarily the equipped one — so the rejection names the true reason
+
+#### Scenario: Only an un-gated target echoes review info for the two-step Telnet path
+- **WHEN** a removal target passes both gates
+- **THEN** review info (display + basis) is echoed for `title remove epithet <display>` followed by the literal `confirm` suffix; a display containing the literal final token quotes it so the suffix stays unambiguous, and any other continuation cancels without state change
+
+#### Scenario: The executing call re-validates and records durably
+- **WHEN** a confirmed removal executes
+- **THEN** it re-validates both gates and, within one snapshot-registered transaction, removes the entry, records `{tick, display}` into the bounded durable removal log (`title_epithet_removals`, the Director-facing feed mirroring the decline log), and emits the renderable `title_epithet_removed` (actor, display, tick) EventLog
+
+#### Scenario: Removal never touches slots
+- **WHEN** any removal runs
+- **THEN** the equip slots are never touched
+
+#### Scenario: Removal is irreversible yet the name is renominable
+- **WHEN** an epithet has been removed
+- **THEN** there is no recycle bin, and the removed name becomes nominatable again through G's live-collection filter
+
 ### Requirement: Codex surfaces remain consistent across sessions
 Collection, equip record, removal log, and pending ballot are persistent
 attributes, so the codex window — including the 「提名中」tab and every
@@ -385,7 +402,7 @@ the durable removal log.
 - **THEN** the row is gone, counters updated, and the ballot tab state is unchanged by the logout
 
 ### Requirement: The church redeemed-count predicate family evaluates the redeemed ledger only
-`TitlePredicateFamily` SHALL gain exactly one member, `church_skills_redeemed`, carrying exactly one parameter: an integer threshold (registered on the `TitlePredicate` parameter face and its single-family validation like every existing family). `predicate_satisfied` SHALL evaluate it as `len(db.church.redeemed) >= threshold`, reading persistent state through the no-create helper only (an entity with no church ledger evaluates to false without materializing one; writes never occur in the evaluator). The count SHALL be the redeemed catalogue keys only — `saintess_vessel` is never in `redeemed` by the church capability's negative-set construction, so the office can never unlock a title through this family, and the family SHALL NOT reference any other church state.
+`TitlePredicateFamily` SHALL gain exactly one member, `church_skills_redeemed`, carrying exactly one parameter: an integer threshold (registered on the `TitlePredicate` parameter face and its single-family validation like every existing family). `predicate_satisfied` SHALL evaluate it as `len(db.church.redeemed) >= threshold`, reading persistent state through the no-create helper only.
 
 #### Scenario: The family fires exactly at the threshold
 - **WHEN** an entity with `len(db.church.redeemed)` of exactly k is evaluated against thresholds k and k+1
@@ -399,8 +416,16 @@ the durable removal log.
 - **WHEN** an entity with no `db.church` ledger is evaluated
 - **THEN** the result is false and no ledger or any other state is created
 
+#### Scenario: The evaluator never writes
+- **WHEN** `predicate_satisfied` evaluates the family
+- **THEN** no writes occur in the evaluator
+
+#### Scenario: The count is redeemed catalogue keys only
+- **WHEN** the family counts toward a threshold
+- **THEN** only the redeemed catalogue keys count — `saintess_vessel` is never in `redeemed` by the church capability's negative-set construction, so the office can never unlock a title through this family, and the family references no other church state
+
 ### Requirement: The clergy title ladder unlocks by redeemed count and never displays 聖女
-The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 category, one row per rung (虔信者／修女／神官／主教／樞機), each row's predicate a `church_skills_redeemed` integer threshold. The five thresholds are tuning placeholders: their finals SHALL be decided and recorded by this change's tuning task (design baseline 3／6／10／15／20, strictly ascending) in BOTH the registry rows and this requirement's scenarios before archive — the shipped rows and the recorded finals SHALL agree. Grants ride the existing fixed-title machinery verbatim — declarative predicate families, auto-unlock and auto-equip of an empty slot, display-only value, and NO other system may use these titles as a prerequisite. No fixed-title row of ANY category SHALL display or otherwise name the 聖女 office — the office stays prose per the saintess-vessel spec (reaffirmed, design §9).
+The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 category, one row per rung (虔信者／修女／神官／主教／樞機), each row's predicate a `church_skills_redeemed` integer threshold. The five thresholds are tuning placeholders (design baseline 3／6／10／15／20, strictly ascending). NO other system may use these titles as a prerequisite.
 
 #### Scenario: Each rung unlocks exactly at its count
 - **WHEN** a character's redeemed count crosses each ladder threshold (exactly at, and one below)
@@ -413,3 +438,15 @@ The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 cate
 #### Scenario: The ladder is display-only
 - **WHEN** the codebase is searched for title state consumed as a prerequisite
 - **THEN** no system gates anything on a clergy title key or display
+
+#### Scenario: Threshold finals are recorded by the tuning task
+- **WHEN** this change's tuning task decides the five threshold finals
+- **THEN** they are recorded in BOTH the registry rows and this requirement's scenarios before archive, and the shipped rows and the recorded finals agree
+
+#### Scenario: Ladder grants ride the existing machinery verbatim
+- **WHEN** a clergy ladder title is earned
+- **THEN** the existing fixed-title machinery applies verbatim — declarative predicate families, auto-unlock and auto-equip of an empty slot, and display-only value
+
+#### Scenario: The 聖女 office stays prose
+- **WHEN** the shipped registry is audited for any naming of the 聖女 office
+- **THEN** no fixed-title row of ANY category displays or otherwise names it — the office stays prose per the saintess-vessel spec (reaffirmed, design §9)

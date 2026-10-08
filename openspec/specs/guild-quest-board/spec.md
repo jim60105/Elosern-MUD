@@ -10,14 +10,20 @@ Define deterministic guild quest offers and their player-facing board workflow.
 The guild offer registry SHALL accept only frozen `GuildQuestOffer` values containing a known
 `definition_key`, known issuer branch, and deeply immutable `QuestReward`. Registration SHALL reject
 unknown references, negative copper or merit, non-positive item quantities, duplicate reward item keys,
-and copper outside the referenced quest rank's `GUILD_RANK_REGISTRY` reward band. Equal duplicate
-registration SHALL be idempotent and conflicting registration SHALL preserve the original. Hand-written
-offer reward values SHALL load from `guild_economy.yaml` rather than duplicate tunable numbers in Python.
+and copper outside the referenced quest rank's `GUILD_RANK_REGISTRY` reward band.
 
 #### Scenario: Valid hand-written offer registers
 - **WHEN** an offer references the introductory quest, its Altoria issuer, known reward items, and copper
   inside that quest rank's band
 - **THEN** the exact immutable offer is available from the registry
+
+#### Scenario: Equal duplicate registration is idempotent and conflicting registration preserves the original
+- **WHEN** an offer key is re-registered with equal, then with conflicting, content
+- **THEN** the equal re-registration is idempotent, and the conflicting re-registration preserves the original offer
+
+#### Scenario: Hand-written rewards are authored in YAML
+- **WHEN** hand-written offer reward values are located
+- **THEN** they load from `guild_economy.yaml` rather than duplicating tunable numbers in Python
 
 #### Scenario: Out-of-band reward is rejected
 - **WHEN** an F-rank quest offer declares copper above the F-rank maximum
@@ -31,16 +37,7 @@ offer reward values SHALL load from `guild_economy.yaml` rather than duplicate t
 `list_guild_offers(actor, staff)` SHALL require valid registration and local GuildStaff. It SHALL return
 only offers issued by that staff's branch whose quest-rank order is less than or equal to the actor's
 canonical `guild_rank` order, in stable rank/key order. It SHALL never read registration snapshot values
-or `disguised_stats` for eligibility. A bound clear-out over an authored site SHALL additionally be
-offered only while its site can currently supply the objective's quantity of living individuals, read
-through the same quest-layer read the acceptance-time guarantee uses, so the board never advertises work
-that acceptance would refuse; a cleared one-shot site's clear-out is therefore absent from the board, and
-a recoverable site's clear-out returns once its authored in-game condition has matured and it has
-repopulated. A site the world has not yet populated SHALL be treated the same way: its clear-out is absent
-until the world clock's own settlement populates the site, and no quest, board read, or acceptance ever
-populates one. The availability rule SHALL narrow the listing only: it SHALL NOT change the acceptance
-precheck, and it SHALL be independent of rank eligibility, of the objective-summary rendering, and of the
-ordering key: a board listed with summaries and without them returns the same offers in the same order.
+or `disguised_stats` for eligibility.
 
 #### Scenario: F member sees only local F offers
 - **WHEN** an F member lists a board containing local F/E offers and a remote F offer
@@ -66,29 +63,26 @@ ordering key: a board listed with summaries and without them returns the same of
 - **WHEN** a board containing clear-outs and species hunts is listed with and without objective summaries
 - **THEN** the returned offers and their order are identical, and only the rendered rows differ
 
+#### Scenario: The availability rule narrows the listing only
+- **WHEN** board availability is compared against rank filtering, objective-summary rendering, and the ordering key
+- **THEN** the availability rule narrows the listing only: it is independent of rank eligibility, of the objective-summary rendering, and of the ordering key
+
+#### Scenario: A bound clear-out is offered only while its site supplies the objective
+- **WHEN** a bound clear-out over an authored site is listed
+- **THEN** it is offered only while its site can currently supply the objective's quantity of living individuals
+
+#### Scenario: Site supply is read through the acceptance-time guarantee's quest-layer read
+- **WHEN** the board checks whether a bound clear-out's site can supply the objective's living individuals
+- **THEN** it reads through the same quest-layer read the acceptance-time guarantee uses, so the board never advertises work that acceptance would refuse
+
+#### Scenario: The availability rule never changes the acceptance precheck
+- **WHEN** the acceptance precheck is compared against board availability filtering
+- **THEN** the availability rule narrows only the listing and SHALL NOT change the acceptance precheck
+
 ### Requirement: Board acceptance and abandonment delegate to quest lifecycle
 `accept_guild_offer()` SHALL validate board eligibility and then invoke change 15's `accept_quest()` for
 the offer's definition, naming the issuing branch as the issuer key in the canonical
-`guild:<branch_key>` form derived from the resolved `GuildStaff` host's `branch_key`. The guild layer
-SHALL NOT construct that key by string concatenation; it SHALL use the shared issuer-key
-constructor, so the board path and the read seam can never disagree about the key's spelling. A
-successful acceptance SHALL additionally grant +1 affinity (`guild` source)
-with the issuing GuildStaff host through the sole-writer affinity API (`world/rules/affinity.py`),
-committed in one all-or-nothing operation with the quest record creation: the acceptance SHALL
-snapshot the actor's quest-log surface plus the host's affinity record (acceptance creates no
-instance pins — a stage's instance binding is made at stage advance, and a site clear-out's stage-zero
-target binding is made at acceptance without an instance pin), apply the quest
-record and the gain inside one transaction, and restore every surface on failure so a failed
-affinity write rolls back the acceptance; abandonment SHALL grant no affinity.
-When `accept_quest()` refuses an offer because the hunt cannot be legally satisfied (the
-target-availability guarantee fails) — a regional species hunt whose region cannot supply the count, or a
-bound clear-out whose site cannot supply its living individuals — the board path SHALL surface that named
-refusal as an ordinary rejection: no quest record, no affinity gain, and no partial provisioning,
-population, or binding left behind.
-The acceptance precheck SHALL remain the issuing branch plus the actor's rank alone: the availability rule
-narrows what the board lists, never what acceptance will attempt, so a player who names an offer's key
-directly or who accepts a listing taken before the site changed state receives the lifecycle's named
-refusal instead of a generic eligibility error.
+`guild:<branch_key>` form derived from the resolved `GuildStaff` host's `branch_key`.
 `abandon_guild_quest()` SHALL invoke `abandon_quest()` for the exact quest ID.
 The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts itself.
 
@@ -131,21 +125,37 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 - **THEN** the two records carry that branch's own issuer key, and each resolves to its own branch's
   registered reward
 
+#### Scenario: The issuer key comes from the shared constructor, never concatenation
+- **WHEN** the guild layer builds the `guild:<branch_key>` issuer key
+- **THEN** it SHALL NOT use string concatenation but the shared issuer-key constructor, so the board path and the read seam can never disagree about the key's spelling
+
+#### Scenario: Acceptance grants its affinity gain through the sole-writer API atomically
+- **WHEN** an offer acceptance succeeds
+- **THEN** it additionally grants +1 affinity (`guild` source) with the issuing GuildStaff host through the sole-writer affinity API (`world/rules/affinity.py`), committed in one all-or-nothing operation with the quest record creation
+- **AND** the acceptance snapshots the actor's quest-log surface plus the host's affinity record, applies the quest record and the gain inside one transaction, and restores every surface on failure so a failed affinity write rolls back the acceptance
+
+#### Scenario: Acceptance creates no instance pins
+- **WHEN** an offer is accepted
+- **THEN** acceptance creates no instance pins — a stage's instance binding is made at stage advance, and a site clear-out's stage-zero target binding is made at acceptance without an instance pin
+
+#### Scenario: Abandonment grants no affinity
+- **WHEN** an offered quest is abandoned through the guild layer
+- **THEN** no affinity is granted
+
+#### Scenario: An unsatisfiable hunt refusal is surfaced by name with nothing left behind
+- **WHEN** `accept_quest()` refuses an offer because the hunt cannot be legally satisfied (the target-availability guarantee fails) — a regional species hunt whose region cannot supply the count, or a bound clear-out whose site cannot supply its living individuals
+- **THEN** the board path surfaces that named refusal as an ordinary rejection: no quest record, no affinity gain, and no partial provisioning, population, or binding left behind
+
+#### Scenario: The acceptance precheck remains branch plus rank alone
+- **WHEN** acceptance eligibility is evaluated after board availability has narrowed the listing
+- **THEN** the precheck remains the issuing branch plus the actor's rank alone — the availability rule narrows what the board lists, never what acceptance will attempt — so a player who names an offer's key directly or who accepts a listing taken before the site changed state receives the lifecycle's named refusal instead of a generic eligibility error
+
 ### Requirement: Player-facing guild commands resolve one local service host
 The character cmdset SHALL provide commands for guild registration, offer listing, acceptance,
-quest-log listing, detail viewing, abandonment, and turn-in. Every guild service command
-(registration, board listing, acceptance, abandonment, turn-in) SHALL search only the caller's room
-and SHALL reject absent or ambiguous matching hosts with Traditional Chinese output. Read-only
-personal quest-log commands (`guild log` and `guild show`) SHALL operate on the caller's own
-persisted quest log and SHALL NOT require a local `GuildStaff` host. The guild staff dialogue SHALL
-provide the turn-in surface in addition to the commands: `talk <guild-staff> 回報` SHALL list, in
-deterministic `(accepted_tick, quest_id)` order, every quest record that is `COMPLETED`, whose
-definition has a registered offer at the staff's branch, and whose quest id is absent from the
-caller's reward claims, or answer that nothing is reportable; `talk <guild-staff> 回報 <quest_id>`
-SHALL turn in exactly that quest through the same deterministic `turn_in_quest` API used by
-`guild turnin`, with identical atomic settlement and rejection semantics. Both dialogue forms SHALL
-apply the same local-host rule: the talked-to NPC SHALL be the sole `GuildStaff` host in the
-caller's room, and the turn-in SHALL never accept a remote host or bypass `turn_in_quest`.
+quest-log listing, detail viewing, abandonment, and turn-in. Every guild service command SHALL
+search only the caller's room and SHALL reject absent or ambiguous matching hosts with
+Traditional Chinese output. Read-only personal quest-log commands (`guild log` and `guild show`)
+SHALL operate on the caller's own persisted quest log and SHALL NOT require a local `GuildStaff` host.
 
 #### Scenario: Guild workflow is reachable from commands
 - **WHEN** a player enters the Altoria guild hall and invokes the documented guild commands
@@ -192,11 +202,18 @@ caller's room, and the turn-in SHALL never accept a remote host or bypass `turn_
 - **THEN** both the listing and any turn-in attempt answer with the standard ambiguous-host
   rejection line and no quest, wallet, inventory, merit, or claim state changes
 
+#### Scenario: 回報 with nothing reportable answers so
+- **WHEN** a player talks to the local guild staff with `回報` and no quest record is `COMPLETED` with a registered offer at the staff's branch and an absent quest id in the caller's reward claims
+- **THEN** the staff answers that nothing is reportable
+
+#### Scenario: Dialogue turn-in routes through the same turn_in_quest API
+- **WHEN** a player talks to the local guild staff with `回報 <quest_id>`
+- **THEN** exactly that quest turns in through the same deterministic `turn_in_quest` API used by `guild turnin`, with identical atomic settlement and rejection semantics, never accepting a remote host or bypassing `turn_in_quest`
+
 ### Requirement: Board listing and quest log surface objective guidance
 `guild list` SHALL render each eligible offer with a one-line Traditional
 Chinese summary of the offered definition's first objective, in addition to the
-existing key, display name, and reward; a regional species hunt SHALL render as one
-deterministic line naming the region, species, and count. `guild log` SHALL render a hint that
+existing key, display name, and reward. `guild log` SHALL render a hint that
 `guild show <quest_id>` reveals full objective detail. Both SHALL be read-only
 presentation over existing registries and records, and SHALL NOT change board
 eligibility or quest state.

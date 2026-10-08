@@ -92,12 +92,10 @@ also present in `stats`, naming the offending key(s).
 
 ### Requirement: physical and vital stats outside plausible bands warn; magic above its cap rejects
 `validate.py` SHALL compare each present `stats` value against the corresponding band from
-`world.lore.races.RACE_REGISTRY[race].vital_baseline`/`static_baseline` (adjusted for
-`Subrace.vital_overrides` when a subrace with an override is present), and SHALL emit a warning —
+`world.lore.races.RACE_REGISTRY[race].vital_baseline`/`static_baseline`, and SHALL emit a warning —
 never a rejection — for any value outside that plausible band. The race's
-`static_baseline.magic_power` upper bound is the hard mechanical maximum instead: `magic_power`
-above it SHALL be rejected (deterministic `Issue("stats.magic_power", ...)`) before Evennia can
-clamp it, and a value below the lower bound warns like the other static axes.
+`static_baseline.magic_power` upper bound is the hard mechanical maximum: `magic_power` above it
+SHALL be rejected before Evennia can clamp it.
 
 #### Scenario: A stat value outside the race's band produces a warning, not a rejection
 - **WHEN** a human character record has `"stats": {"atk_phys": 50, ...}` (above the human
@@ -121,6 +119,18 @@ clamp it, and a value below the lower bound warns like the other static axes.
   (`RACE_REGISTRY["elf"].static_baseline.magic_power[1]`)
 - **THEN** the record is rejected on `stats.magic_power`
 
+#### Scenario: Subrace overrides adjust the compared band
+- **WHEN** a subrace with an override is present
+- **THEN** the compared band is adjusted for `Subrace.vital_overrides`
+
+#### Scenario: The magic rejection is a deterministic Issue
+- **WHEN** `magic_power` above the cap is rejected
+- **THEN** the rejection is the deterministic `Issue("stats.magic_power", ...)`
+
+#### Scenario: Magic below the lower bound warns
+- **WHEN** `magic_power` is below the race band's lower bound
+- **THEN** it warns like the other static axes rather than rejecting
+
 ### Requirement: sexual_baseline shape violations are rejections
 `validate.py` SHALL treat any `sexual_baseline` that fails `CHARACTER_SCHEMA_V1`'s structural
 constraints (missing required fields, or any level value outside its vocabulary) as a rejection,
@@ -135,9 +145,8 @@ distinct from the warning-only stats-band check.
 `validate.py` SHALL attempt to resolve a skill registry from `world.skills.registry.SKILL_REGISTRY`.
 When that module is not importable, the batch SHALL record `skill-registry` in
 `degraded_checks`, and the CLI SHALL expose it through the mandatory degraded-validation banner.
-Individual skill keys SHALL produce neither warnings nor rejections because no registry exists
-against which to judge them. When the module is importable, every key in
-`skills` or `passives` not found in the resolved registry SHALL produce a rejection.
+When the module is importable, every key in `skills` or `passives` not found in the resolved
+registry SHALL produce a rejection.
 
 #### Scenario: Skill validation is explicitly degraded when the registry module does not exist
 - **WHEN** `world.skills.registry` is not importable (as is the case for this change, since change
@@ -155,14 +164,16 @@ against which to judge them. When the module is importable, every key in
   `"fire_mastery"`, and a character record's `skills` includes `"fire_mastery"`
 - **THEN** no warning or rejection is produced for that key
 
+#### Scenario: Degraded state judges no individual skill keys
+- **WHEN** no skill registry exists against which to judge individual skill keys
+- **THEN** individual skill keys produce neither warnings nor rejections
+
 ### Requirement: The skill-registry promotion is verified against the real module, not only a mock
 Alongside the mocked-import test of the degrade/promote logic, the test suite SHALL include a test
 that checks whether `world.skills.registry.SKILL_REGISTRY` is genuinely importable in the current
 environment — skipping itself while it is not — and, once it genuinely is, asserts that an unknown
 skill key is rejected. The skip SHALL use a guarded real import with `unittest.skipUnless`, so
-Evennia's unittest discovery reports a skip instead of a module import error. This test SHALL NOT
-be satisfiable by a mock; it exists so that change 5
-cannot be considered complete while its registry leaves skill-key validation permanently lenient.
+Evennia's unittest discovery reports a skip instead of a module import error.
 
 #### Scenario: The self-arming test skips while the registry does not genuinely exist
 - **WHEN** the test suite runs in an environment where `world.skills.registry` does not exist
@@ -173,6 +184,10 @@ cannot be considered complete while its registry leaves skill-key validation per
   genuinely exists and is importable (not mocked)
 - **THEN** the self-arming skill-registry test executes and fails if an unknown skill key is not
   rejected by `_check_skills()`
+
+#### Scenario: The test is mock-unsatisfiable by design
+- **WHEN** change 5's registry completion is judged against this test
+- **THEN** this test SHALL NOT be satisfiable by a mock; it exists so that change 5 cannot be considered complete while its registry leaves skill-key validation permanently lenient
 
 ### Requirement: Import validation is all-or-nothing across a batch of files
 `validate.py` SHALL treat a set of files passed to one invocation as one batch: if any file in the
@@ -210,7 +225,7 @@ Every rejection or warning `validate.py` reports SHALL include the record's `key
 
 ### Requirement: Key charset is checked at import validation
 
-The import validator SHALL apply the entity-key character-set and length rules as structural checks shared with the schema, so no key that could corrupt downstream `|`-delimited effect serialization reaches the loader. The validator SHALL additionally reject digit-only keys through the shared reservation predicate (`is_reserved_player_stable_key`, hosted in `world/art/subjects.py`), mirroring the schema pattern: the digit-only region of the character-portrait keyspace is reserved for player characters, so an imported entity key can never collide with a player's `str(pk)` portrait stable key.
+The import validator SHALL apply the entity-key character-set and length rules as structural checks shared with the schema, so no key that could corrupt downstream `|`-delimited effect serialization reaches the loader. The validator SHALL additionally reject digit-only keys through the shared reservation predicate (`is_reserved_player_stable_key`, hosted in `world/art/subjects.py`).
 
 #### Scenario: Separator key is a structural issue
 
@@ -221,6 +236,10 @@ The import validator SHALL apply the entity-key character-set and length rules a
 
 - **WHEN** a character or world-entry record's key consists only of ASCII digits
 - **THEN** the record is flagged with a rejection naming the reserved digit-only region and excluded from instantiation, so the loader never creates an entity whose portrait stable key could equal a player's pk
+
+#### Scenario: Digit-only rejection mirrors the schema reservation pattern
+- **WHEN** digit-only keys are rejected at import validation
+- **THEN** the check mirrors the schema pattern: the digit-only region of the character-portrait keyspace is reserved for player characters, so an imported entity key can never collide with a player's `str(pk)` portrait stable key
 
 ### Requirement: Import validation enforces race-aware affinity counts and registry membership
 `validate.py` SHALL reject a character record whose `affinity_elements` (when present) contains an
@@ -261,13 +280,7 @@ this check.
 `validate.py` SHALL reject a character record that declares a non-empty `disguised_stats` while its
 race declares that it cannot use divine arts, or while its race does not resolve in the race
 registry. The issue SHALL name the record and the `disguised_stats` field, following the batch
-report's existing issue shape, and SHALL be a rejection rather than a warning: only the
-bloodline-gated veil verb can place a disguise layer, so such a record describes state the engine
-would refuse to produce.
-
-This check is independent of the existing subset rule. A record may violate both — declaring a
-disguised key absent from `stats` AND declaring a layer its bloodline could not wear — and SHALL then
-report both issues rather than stopping at the first.
+report's existing issue shape, and SHALL be a rejection rather than a warning.
 
 #### Scenario: A non-divine record carrying a disguise layer is rejected
 - **WHEN** a character record declares a race that cannot use divine arts together with a non-empty
@@ -291,16 +304,19 @@ report both issues rather than stopping at the first.
   its `stats`
 - **THEN** the report contains both the subset issue and the bloodline issue
 
+#### Scenario: The rejection rationale is the bloodline-gated veil verb
+- **WHEN** a non-divine record's disguise layer is judged
+- **THEN** it is a rejection rather than a warning because only the bloodline-gated veil verb can place a disguise layer, so such a record describes state the engine would refuse to produce
+
+#### Scenario: The disguise check is independent of the subset rule
+- **WHEN** the divine-arts disguise check runs
+- **THEN** it is independent of the existing subset rule; a record may violate both — declaring a disguised key absent from `stats` AND declaring a layer its bloodline could not wear — and both issues SHALL be reported rather than stopping at the first
+
 ### Requirement: Skill ownership requiring divine arts is rejected for a non-divine record
 `validate.py` SHALL reject a character record whose `skills` or `passives` name a registry entry that
 requires divine arts while the record's race declares that it cannot use divine arts, or while its
 race does not resolve. The issue SHALL name the offending field and key, matching the shape of the
 existing unknown-key issue for the same fields.
-
-This mirrors the load-time stance the preset registry already takes for authored preset cards, so the
-two authored-content paths agree on what a bloodline permits. When the skill registry is unavailable
-and the existing degraded-state reporting applies, this check SHALL degrade with it rather than
-rejecting every record.
 
 #### Scenario: A non-divine record owning a divine-arts skill is rejected
 - **WHEN** a character record declares a race that cannot use divine arts and lists a divine-arts
@@ -324,8 +340,12 @@ rejecting every record.
 - **THEN** the bloodline check reports nothing rather than rejecting, exactly as the unknown-key check
   does in the same state
 
+#### Scenario: The rule mirrors the preset registry's load-time stance
+- **WHEN** this rejection rule is designed against the authored-content paths
+- **THEN** it mirrors the load-time stance the preset registry already takes for authored preset cards, so the two authored-content paths agree on what a bloodline permits
+
 ### Requirement: NPC-target imports validate a complete compact card
-When the class a character record is validated and instantiated against is an NPC class (the NPC default when no class is given), import validation SHALL apply the compact NPC card contract to the record's `persona` and SHALL reject any contract violation as a named issue on `persona` or `persona.<leaf>` carrying the contract's stable reason, within the existing all-or-nothing batch. The discriminator SHALL be the resolved class passed to validation and instantiation, never a field claimed inside the record. A valid NPC-target record SHALL carry the normalized card as its validated persona. A non-NPC target SHALL keep the opaque object rule and SHALL NOT be inspected.
+When the class a character record is validated and instantiated against is an NPC class (the NPC default when no class is given), import validation SHALL apply the compact NPC card contract to the record's `persona` and SHALL reject any contract violation as a named issue on `persona` or `persona.<leaf>` carrying the contract's stable reason, within the existing all-or-nothing batch. A non-NPC target SHALL keep the opaque object rule and SHALL NOT be inspected.
 
 #### Scenario: An NPC import with a partial persona is rejected by leaf
 - **WHEN** a record without `speech_style` is validated with the NPC default target
@@ -342,3 +362,7 @@ When the class a character record is validated and instantiated against is an NP
 #### Scenario: The validated record carries the normalized card
 - **WHEN** an NPC-target record's persona leaves carry outer whitespace and CRLF line endings
 - **THEN** the validated record's persona holds the normalized leaves
+
+#### Scenario: The discriminator is the resolved class, not a record field
+- **WHEN** validation decides whether a record is an NPC target
+- **THEN** the discriminator SHALL be the resolved class passed to validation and instantiation, never a field claimed inside the record

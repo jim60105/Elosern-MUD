@@ -10,11 +10,8 @@ Defines the issuer layer's data model: the `issuer_key` grammar, the `Settlement
 The issuer layer SHALL define exactly three issuer-key forms and one shared parser that validates
 them: `guild:<branch_key>` for an adventurer-guild branch, `npc:<content_key>` for an authored
 character identity, and `npc:#<pk>` for a runtime-registered character identity. The parser SHALL
-return the namespace and the remainder as separate values. A key carrying an unknown namespace, no
-separator, an empty namespace, an empty remainder, an `npc:#` form whose remainder is not a
-positive integer, or a total length exceeding the shared key bound SHALL reject with a named error
-rather than being coerced or truncated. The parser SHALL perform no registry lookup, so an issuer
-key is well-formed or not independently of whether any issuance exists for it.
+return the namespace and the remainder as separate values and SHALL perform no registry lookup.
+A malformed key SHALL reject with a named error, never coerced or truncated.
 
 #### Scenario: Each of the three forms parses into namespace and remainder
 - **WHEN** `guild:guild_branch_altoria`, `npc:grey_granny`, and `npc:#1234` are parsed
@@ -25,6 +22,12 @@ key is well-formed or not independently of whether any issuance exists for it.
 - **WHEN** a key with an unknown namespace, no separator, an empty namespace, an empty remainder,
   an `npc:#` remainder that is not a positive integer, or a length over the shared bound is parsed
 - **THEN** the parser raises a named error and returns nothing
+
+#### Scenario: Well-formedness is independent of any registered issuance
+- **WHEN** a well-formed issuer key is parsed and no issuance exists for it
+- **AND** an otherwise malformed key is parsed under the same conditions
+- **THEN** the parser performs no registry lookup, so the well-formed key parses successfully and
+  the malformed key still raises its named error
 
 ### Requirement: Settlement is a closed two-value vocabulary
 
@@ -78,9 +81,9 @@ issuance SHALL keep the existing guild reward validation unchanged.
 The issuer layer SHALL own `QUEST_ISSUANCE_REGISTRY`, a process-local mapping keyed
 `(definition_key, issuer_key)` that stores `npc:`-namespaced issuances only. Registering a
 `guild:`-namespaced issuance SHALL reject with a named error, because guild offers keep their own
-sole writer. Registering content equal to what is already stored under an identity SHALL be a
-no-op; registering conflicting content under an existing identity SHALL raise before replacing the
-original — the same idempotency and conflict semantics the guild offer registry already applies.
+sole writer. Re-registration SHALL follow the same idempotency and conflict semantics the guild
+offer registry already applies: equal content is a no-op; conflicting content raises before
+replacing the original.
 
 #### Scenario: Registering the same private commission twice is a no-op
 - **WHEN** an identical `npc:`-namespaced issuance is registered a second time
@@ -98,11 +101,10 @@ original — the same idempotency and conflict semantics the guild offer registr
 
 The issuer layer SHALL expose `resolve_issuance(definition_key, issuer_key)` as the single read
 path every consumer uses. A `guild:`-namespaced key SHALL resolve through the existing
-`GUILD_OFFER_REGISTRY` lookup and return a `QuestIssuance` view carrying that offer's reward and
-`Settlement.COUNTER`. An `npc:`-namespaced key SHALL return the stored private commission. An
-identity with no registered issuance SHALL return `None`; the seam SHALL NOT fabricate an issuance,
-a reward, or a settlement value. A malformed issuer key SHALL raise the parser's named error rather
-than returning `None`, so a caller bug is distinguishable from an absent commission.
+`GUILD_OFFER_REGISTRY` lookup, returning a `QuestIssuance` view with `Settlement.COUNTER`; an
+`npc:`-namespaced key SHALL return the stored private commission. An unregistered identity SHALL
+return `None`, and a malformed issuer key SHALL raise the parser's named error rather than
+returning `None`.
 
 #### Scenario: A guild key resolves to a counter-settled view of the registered offer
 - **WHEN** `resolve_issuance` is called for a definition offered at a registered guild branch
@@ -120,6 +122,10 @@ than returning `None`, so a caller bug is distinguishable from an absent commiss
 #### Scenario: A malformed issuer key raises rather than resolving to nothing
 - **WHEN** `resolve_issuance` is called with an issuer key that does not parse
 - **THEN** it raises the parser's named error
+
+#### Scenario: The seam never fabricates missing data
+- **WHEN** `resolve_issuance` finds no registered issuance for an identity
+- **THEN** the seam fabricates no issuance, no reward, and no settlement value
 
 ### Requirement: The guild offer surface is unchanged by the issuer layer
 

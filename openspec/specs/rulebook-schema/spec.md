@@ -26,12 +26,10 @@ ambiguously-identified rule.
 ### Requirement: evaluate_condition() is the one shared matcher for event, field-threshold,
 field-changed, and buff-presence conditions
 `world/rules/rulebook/schema.py` SHALL provide `evaluate_condition(when, context)` recognizing exactly
-these condition keys: `event` (equality against `context["event"]`), `field` combined with `equals` or
-`gte` (comparison against `context[field]`), `field_changed` combined with `direction` (membership
-check against `context["_changed"]`), and `buff_active` (membership check against
-`context["active_buffs"]`). When a `when` block names more than one condition key, they SHALL combine
-with implicit AND. This SHALL be the only condition-matching function in the project usable by any
-rule table under `world/rules/rulebook/`.
+these condition keys: `event`, `field` combined with `equals` or `gte`, `field_changed` combined with
+`direction`, and `buff_active`. When a `when` block names more than one condition key, they SHALL
+combine with implicit AND. This SHALL be the only condition-matching function in the project usable by
+any rule table under `world/rules/rulebook/`.
 
 #### Scenario: An event condition matches the context's event
 - **WHEN** `evaluate_condition({"event": "stimulus_applied"}, {"event": "stimulus_applied"})` is
@@ -78,6 +76,12 @@ rule table under `world/rules/rulebook/`.
 - **THEN** it raises, naming the unrecognized key, rather than treating the condition as vacuously true
   or silently skipping it
 
+#### Scenario: Each condition key is evaluated against its designated context slot
+- **WHEN** any recognized condition is evaluated
+- **THEN** `event` is compared by equality against `context["event"]`, `field` with `equals`/`gte`
+  against `context[field]`, `field_changed` with `direction` by membership against
+  `context["_changed"]`, and `buff_active` by membership against `context["active_buffs"]`
+
 ### Requirement: The effect (`then`) clause is opaque to the shared schema module
 `world/rules/rulebook/schema.py` SHALL treat every `Rule.then` value as an uninterpreted `dict`. No
 function in this module SHALL branch on, validate, or assign meaning to any key inside `then` — that
@@ -108,10 +112,9 @@ The combat-modifier rulebook SHALL preflight every `equipment_worn`
 condition at its own load site, before any rule matching or startup
 mirroring: the value must be a string naming an `ITEM_REGISTRY` member that
 carries an equipment slot. Unknown keys, consumable/non-slot items, and
-non-string values SHALL fail loading with an identifying error; the shared
-evaluator SHALL additionally raise `ValueError` on a non-string value
-rather than silently mis-matching, and a condition context that lacks the
-worn-item fact SHALL fail the condition closed.
+non-string values SHALL fail loading with an identifying error, and a
+condition context that lacks the worn-item fact SHALL fail the condition
+closed.
 
 #### Scenario: Typo in a grace rule fails the preflight
 
@@ -137,3 +140,10 @@ worn-item fact SHALL fail the condition closed.
   startup
 - **THEN** preflight passes and the rules are queryable through the
   matcher
+
+#### Scenario: Shared evaluator refuses to mis-match non-string values
+
+- **WHEN** the shared evaluator matches an `equipment_worn` condition whose
+  value is not a string
+- **THEN** it additionally raises `ValueError` rather than silently
+  mis-matching

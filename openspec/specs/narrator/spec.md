@@ -5,7 +5,7 @@ Defines the narrator layer that maps deterministic `EventLog` records to Traditi
 ## Requirements
 
 ### Requirement: Narrator maps EventLogs to Traditional Chinese prose through the guarded pipeline
-`world/ai/narrator.py` SHALL provide `narrate_event_logs(event_logs, client) -> Deferred[str]`, a pure mapping from one or more deterministic `EventLog` objects to Traditional Chinese prose. The client SHALL be a required injected argument (never constructed or imported by the module), and `narrate_event_logs()` SHALL reject an explicit `None` client with a named `NarratorClientRequiredError` before any prompt construction or transport interaction. The function SHALL build a prompt from the event record, submit a layer-neutral request descriptor (messages only, no output schema) through the `narrator` layer's guarded call, and resolve with the returned prose text. The narrator SHALL have no access to any state-mutating API, SHALL return plain text that is never parsed back into game state, and SHALL accept the client through an injected protocol rather than importing a live transport.
+`world/ai/narrator.py` SHALL provide `narrate_event_logs(event_logs, client) -> Deferred[str]`, a pure mapping from one or more deterministic `EventLog` objects to Traditional Chinese prose. The client SHALL be a required injected argument, never constructed or imported by the module. The function SHALL build a prompt from the event record, submit a layer-neutral request descriptor (messages only, no output schema) through the `narrator` layer's guarded call, and resolve with the prose text.
 
 #### Scenario: A valid EventLog resolves to narrated prose
 - **WHEN** `narrate_event_logs()` is called with one `EventLog` and a client that returns accepted prose
@@ -23,18 +23,19 @@ Defines the narrator layer that maps deterministic `EventLog` records to Traditi
 - **WHEN** `narrate_event_logs()` is called with `client=None` under an enabled narrator profile
 - **THEN** the call errbacks with a named `NarratorClientRequiredError` before any prompt build or transport interaction, rather than crashing inside the guarded pipeline
 
+#### Scenario: The narrator holds no state-mutating access
+- **WHEN** `narrate_event_logs()` runs
+- **THEN** the narrator has access to no state-mutating API anywhere in the mapping path
+
+#### Scenario: The client arrives through an injected protocol
+- **WHEN** the narrator needs its client
+- **THEN** it accepts the client through an injected protocol rather than importing a live transport
+
 ### Requirement: Narrator prompt construction is deterministic, bounded, and faithful
 `world/ai/narrator.py` SHALL provide `build_narrator_prompt(event_logs)` returning a system/user
 message pair. The system message SHALL be loaded from the prompt library's `narrator.system` key
-via `render_prompt("narrator.system")`; the library is the sole source of the narrator's system
-prompt text, and the module SHALL NOT embed it as a Python constant. The user message SHALL
-serialize the event record (actor, skill key, targets, time cost, and every entry's
-kind/actor/target/data and canonical `text_template`) with stable, sorted serialization so
-identical input produces byte-identical prompts. The prompt SHALL be bounded: a fixed maximum
-entry count, per-field string-length caps, and a bounded total size, so a large combat round
-cannot produce an unbounded prompt. It SHALL contain only entity keys and plain JSON-compatible
-data — never live entity references — and SHALL instruct the model to narrate exactly the recorded
-events without inventing outcomes, numbers, or state.
+via `render_prompt("narrator.system")`. The user message SHALL serialize the event record with
+stable, sorted serialization so identical input produces byte-identical prompts.
 
 #### Scenario: Identical EventLogs produce identical prompts
 - **WHEN** `build_narrator_prompt()` is called twice with the same event data
@@ -64,8 +65,24 @@ events without inventing outcomes, numbers, or state.
 - **WHEN** the narrator system message is inspected
 - **THEN** it equals `render_prompt("narrator.system")` and the prompt-library file is the only place its text is defined
 
+#### Scenario: The library is the sole source, never a Python constant
+- **WHEN** the narrator module's source is inspected
+- **THEN** the system prompt text is embedded nowhere as a Python constant
+
+#### Scenario: The user message serializes the full event record
+- **WHEN** a user message is built for an event
+- **THEN** it serializes the actor, skill key, targets, time cost, and every entry's kind/actor/target/data and canonical `text_template`
+
+#### Scenario: The prompt carries bounded size parameters
+- **WHEN** any prompt is constructed
+- **THEN** it is bounded by a fixed maximum entry count, per-field string-length caps, and a bounded total size, so a large combat round cannot produce an unbounded prompt
+
+#### Scenario: The prompt instructs exact fidelity to the record
+- **WHEN** the system message instructs the model
+- **THEN** it directs narration of exactly the recorded events without inventing outcomes, numbers, or state
+
 ### Requirement: Narrator degrades to deterministic template rendering when the pipeline fails
-The `narrator` layer SHALL register a guardrail degrade fallback so that when the layer profile is disabled, a transport failure occurs, or validation retries are exhausted, `narrate_event_logs()` resolves to the deterministic template rendering of the same EventLogs via the injected template renderer, and SHALL NOT raise into the caller or leave the game blocked. The template renderer SHALL be injected through `register_narrator(template_renderer)` from a site that may import `world.rules`; `world/ai/narrator.py` itself SHALL NOT import any `world.rules` module.
+The `narrator` layer SHALL register a guardrail degrade fallback so that when the layer profile is disabled, a transport failure occurs, or validation retries are exhausted, `narrate_event_logs()` resolves to the deterministic template rendering of the same EventLogs via the injected template renderer, and SHALL NOT raise into the caller or leave the game blocked.
 
 #### Scenario: A disabled narrator profile returns template prose
 - **WHEN** the `narrator` profile is disabled and `narrate_event_logs()` is called
@@ -83,8 +100,16 @@ The `narrator` layer SHALL register a guardrail degrade fallback so that when th
 - **WHEN** the injected renderer is a join of `world.rules.event_log.render_plain_text` over the same EventLogs
 - **THEN** the degraded result is byte-identical to rendering each EventLog with `render_plain_text` and joining the lines
 
+#### Scenario: The renderer is injected from a world.rules-importing site
+- **WHEN** the template renderer is registered through `register_narrator(template_renderer)`
+- **THEN** registration happens from a site that may import `world.rules`
+
+#### Scenario: The narrator module never imports world.rules
+- **WHEN** the imports of `world/ai/narrator.py` are scanned
+- **THEN** the module imports no `world.rules` module
+
 ### Requirement: Narrator semantic validation keeps prose within safe bounds
-The `narrator` layer SHALL register semantic validators under stable names so the shared pipeline retries on shape violations and degrades on exhaustion. Validators SHALL reject empty or whitespace-only prose, prose exceeding a fixed length cap, prose containing no CJK Unified Ideograph (so obviously non-Chinese output is not accepted as Traditional Chinese prose), and prose containing template-placeholder syntax (a `{`-`}` brace pair wrapping a known field name such as `{actor}`, `{target}`, or `{data[...]}`) that indicates the model echoed the deterministic `text_template` formatting syntax. Each rejected attempt SHALL append a concrete validation message to the prompt before retrying.
+The `narrator` layer SHALL register semantic validators under stable names so the shared pipeline retries on shape violations and degrades on exhaustion. Validators SHALL reject prose that is empty or whitespace-only, exceeds a fixed length cap, contains no CJK Unified Ideograph, or contains template-placeholder syntax. Each rejected attempt SHALL append a concrete validation message to the prompt before retrying.
 
 #### Scenario: Empty prose is rejected and retried
 - **WHEN** a client returns whitespace-only text for a narrator call
@@ -102,8 +127,20 @@ The `narrator` layer SHALL register semantic validators under stable names so th
 - **WHEN** a client returns non-empty Traditional Chinese prose within the length cap containing no template-placeholder syntax
 - **THEN** the pipeline returns it as the narrated passage with no retry
 
+#### Scenario: Over-length prose is rejected and retried
+- **WHEN** a client returns prose exceeding the fixed length cap
+- **THEN** the pipeline rejects it as a validation failure rather than returning oversized prose
+
+#### Scenario: Placeholder syntax is defined by the brace-pair pattern
+- **WHEN** validators decide whether prose contains template-placeholder syntax
+- **THEN** they detect a `{`-`}` brace pair wrapping a known field name such as `{actor}`, `{target}`, or `{data[...]}`, indicating the model echoed the deterministic `text_template` formatting syntax
+
+#### Scenario: The CJK check guards the language contract
+- **WHEN** validators reject prose containing no CJK Unified Ideograph
+- **THEN** obviously non-Chinese output is not accepted as Traditional Chinese prose
+
 ### Requirement: Narrator preserves the single-writer and transport boundaries
-`world/ai/narrator.py` SHALL import no state writer, no live transport, and no socket, and SHALL consume the client and the template renderer through injected protocols. Every test of the narrator SHALL use `FakeLLMClient` or an equivalent recorded fixture and never contact a live endpoint, per design §10. `register_narrator()` SHALL install its hooks atomically and SHALL be idempotent (a second call keeps the first renderer). Calling `narrate_event_logs()` before the narrator hooks are registered in the guardrail's actual registry SHALL surface a named `NarratorNotRegisteredError` rather than silently degrading or reaching the guardrail's unregistered-fallback path.
+`world/ai/narrator.py` SHALL import no state writer, no live transport, and no socket, and SHALL consume the client and the template renderer through injected protocols. `register_narrator()` SHALL install its hooks atomically and SHALL be idempotent. Calling `narrate_event_logs()` before the narrator hooks are registered in the guardrail's actual registry SHALL surface a named `NarratorNotRegisteredError` rather than silently degrading or reaching the unregistered-fallback path.
 
 #### Scenario: The narrator module stays inside the transport boundary
 - **WHEN** the repository-wide transport-boundary contract scans `world/ai/narrator.py`
@@ -120,3 +157,7 @@ The `narrator` layer SHALL register semantic validators under stable names so th
 #### Scenario: Duplicate registration keeps the first renderer
 - **WHEN** `register_narrator()` is called twice with two different template renderers
 - **THEN** the second call is a no-op, the first renderer remains installed, and narrate behavior is unchanged
+
+#### Scenario: Narrator tests never contact a live endpoint
+- **WHEN** any test of the narrator runs
+- **THEN** it uses `FakeLLMClient` or an equivalent recorded fixture and never contacts a live endpoint, per design §10

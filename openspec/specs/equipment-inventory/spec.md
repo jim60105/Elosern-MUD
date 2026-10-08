@@ -22,8 +22,7 @@ structure (design doc §4: reference only, not its d20 formulas).
 
 ### Requirement: EquipmentHandler is mounted directly as entity.equipment
 `LivingEntity` SHALL expose `entity.equipment` as an `EquipmentHandler` instance bound to that
-entity — per design doc §5.2, `equipment` **is** the `EquipmentHandler`, the same relationship
-`traits` has to `TraitHandler` — replacing change 3's placeholder `AttributeProperty`. The handler
+entity, replacing change 3's placeholder `AttributeProperty`. The handler
 SHALL read the private `entity.db.equipment` attribute, holding the raw dict change 4's loader writes
 there (`entity.db.equipment = record["equipment"]`). Writes SHALL be performed by
 `world.rules.equipment` deterministic-core operations.
@@ -51,6 +50,11 @@ there (`entity.db.equipment = record["equipment"]`). Writes SHALL be performed b
 - **THEN** the assignment succeeds with no error, and `entity.equipment` subsequently reflects the
   newly assigned data
 
+#### Scenario: The mount mirrors the traits/TraitHandler relationship per design doc §5.2
+- **WHEN** `entity.equipment` is inspected against design doc §5.2
+- **THEN** `equipment` **is** the `EquipmentHandler` — the same relationship `traits` has to
+  `TraitHandler`
+
 ### Requirement: ACCESSORY is a bounded multi-item slot
 The equipment contract SHALL treat `ACCESSORY` as a list-valued slot capped at exactly five items by `ACCESSORY_MAX_SLOTS`, distinct from the three single-item slots. The cap SHALL be read from the read-only equipment package by every deterministic writer and presenter rather than duplicated.
 
@@ -66,11 +70,8 @@ The equipment contract SHALL treat `ACCESSORY` as a list-valued slot capped at e
 The read-only `world/skills/equipment.py` SHALL define `list_items(entity)`. The mutating
 `world/rules/equipment.py` SHALL define `plan_inventory_delta(entity, additions=(), removals=())`,
 `apply_inventory_plan(plan)`, and convenience `add_item(entity, item_key)` / `remove_item(entity,
-item_key)` operations over `entity.db.inventory`, the same flat repeated-key list populated by the import
-loader. Gameplay mutations SHALL validate item keys structurally (each key is a non-empty string, so
-unregistered but syntactically valid keys like `iron_ore` remain acceptable — see the appending
-scenario) and SHALL validate positive integer quantities, and SHALL use the planner. Import
-construction MAY populate the initial raw list without emitting acquisition progress.
+item_key)` operations over `entity.db.inventory`, the same flat repeated-key list populated by the
+import loader, and gameplay mutations SHALL use the planner.
 
 #### Scenario: add_item appends to the existing raw inventory list
 - **WHEN** `entity.db.inventory` is `["healing_potion"]` and `add_item(entity, "iron_ore")` is called
@@ -94,6 +95,16 @@ construction MAY populate the initial raw list without emitting acquisition prog
   `inventory` array
 - **THEN** `list_items(entity)` returns that same array's contents, unmodified
 
+#### Scenario: Gameplay mutations validate keys structurally and quantities positively
+- **WHEN** a gameplay mutation adds or removes inventory entries
+- **THEN** it validates item keys structurally (each key is a non-empty string, so unregistered
+  but syntactically valid keys like `iron_ore` remain acceptable — see the appending scenario)
+- **AND** it validates positive integer quantities
+
+#### Scenario: Import construction may skip acquisition progress
+- **WHEN** the import loader constructs an entity's initial raw inventory list
+- **THEN** it MAY populate that list without emitting acquisition progress
+
 ### Requirement: Inventory plans compose with larger atomic operations
 An InventoryPlan SHALL expose complete before/after item lists and positive additions without applying
 them. Reward and shop operations SHALL be able to combine its inventory write and computed ACQUIRE
@@ -113,7 +124,7 @@ quest-log replacement with wallet, merit, claims, or merchant-stock effects in o
 - **THEN** database and in-process inventory/quest-log values equal their pre-application state
 
 ### Requirement: The key list is the single canonical inventory record for registry items
-For every item whose key exists in `ITEM_REGISTRY`, `actor.db.inventory` SHALL be the canonical inventory representation consumed by economy, quests, rewards, NPC transfers, item use, and the `背包` command; any registry item the player legitimately holds SHALL be present in this list. Shop economy and localized item transfer commands SHALL maintain contained Evennia Object mirrors. A consumable use SHALL remove one existing matching contained mirror together with its one-key delta; a key-only item granted through a key-only flow SHALL be consumed without fabricating a mirror. Reusable use and equipment toggling SHALL leave both key quantity and mirrors unchanged.
+For every item whose key exists in `ITEM_REGISTRY`, `actor.db.inventory` SHALL be the canonical inventory representation consumed by economy, quests, rewards, NPC transfers, item use, and the `背包` command; any registry item the player legitimately holds SHALL be present in this list. Shop economy and localized item transfer commands SHALL maintain contained Evennia Object mirrors.
 
 #### Scenario: Bought item appears in the canonical inventory
 - **WHEN** a player buys an item from a shop
@@ -126,6 +137,18 @@ For every item whose key exists in `ITEM_REGISTRY`, `actor.db.inventory` SHALL b
 #### Scenario: Consuming a key-only reward fabricates nothing
 - **WHEN** a player successfully consumes a registry key granted without a contained mirror
 - **THEN** one canonical key is removed and no object is created or unrelated mirror removed
+
+#### Scenario: Consumable use pairs mirror removal with the key delta
+- **WHEN** a consumable registry item is used
+- **THEN** one existing matching contained mirror is removed together with its one-key delta
+
+#### Scenario: Key-only grants are consumed without fabricating a mirror
+- **WHEN** a key-only item granted through a key-only flow is consumed
+- **THEN** it is consumed without fabricating a mirror
+
+#### Scenario: Reusable use and equipment toggling leave both records unchanged
+- **WHEN** a reusable item is used or equipment is toggled
+- **THEN** both key quantity and mirrors remain unchanged
 
 ### Requirement: Localized item commands synchronize containment and the key list
 `拿`, `丟`, and `給` SHALL move the Evennia Object's containment AND apply the matching key-list delta
@@ -170,7 +193,7 @@ first materialize the missing mirror object and then transfer the key in the sam
 - **THEN** the object moves as today and no `db.inventory` entry is created or removed
 
 ### Requirement: Equipment toggle revalidates ownership and registry slot
-The deterministic equipment service SHALL expose a side-effect-free preflight shared by presentation and settlement. It SHALL accept only an entity and item key, resolve the item's exact slot from immutable registry mechanics, verify current canonical inventory ownership, compute the exact replacement or removal, and return stable reasons without writing. Mutation SHALL repeat this preflight and atomically apply its immutable plan. Unknown, inspect-only, usable-only, malformed, or unheld items SHALL reject without mutation. The caller SHALL NOT supply a slot. Equipped items SHALL remain in canonical inventory.
+The deterministic equipment service SHALL expose a side-effect-free preflight shared by presentation and settlement. It SHALL accept only an entity and item key, resolve the item's exact slot from immutable registry mechanics, verify current canonical inventory ownership, compute the exact replacement or removal, and return stable reasons without writing. Mutation SHALL repeat this preflight and atomically apply its immutable plan.
 
 #### Scenario: Client-supplied slot is unnecessary
 - **WHEN** a held main-hand weapon key is toggled
@@ -201,6 +224,18 @@ Stored equipment SHALL normalize fail-closed before any decision or projection: 
 #### Scenario: Slot mismatch against the registry fails closed
 - **WHEN** a stored key is registry-declared for a different slot than the one holding it, or is not registry equipment at all
 - **THEN** normalization returns malformed and neither toggle nor presentation accepts the stored state
+
+#### Scenario: Invalid items reject without mutation
+- **WHEN** toggle is requested for an unknown, inspect-only, usable-only, malformed, or unheld item
+- **THEN** the request rejects without mutation
+
+#### Scenario: The caller never supplies a slot
+- **WHEN** the toggle service is invoked
+- **THEN** the caller SHALL NOT supply a slot
+
+#### Scenario: Equipped items remain in canonical inventory
+- **WHEN** an item is equipped
+- **THEN** it remains present in canonical inventory
 
 ### Requirement: Singleton equipment toggles and replaces atomically
 For `WEAPON_MAIN`, `WEAPON_OFF`, and `ARMOR`, toggling the item already in its declared slot SHALL clear that slot. Toggling a held unequipped item SHALL atomically assign it to its declared slot and replace any prior occupant; the prior item SHALL remain held and become unequipped. Planning or write failure SHALL restore the complete prior equipment mapping.
@@ -244,14 +279,9 @@ A successful or rejected equipment toggle SHALL not advance the world clock or a
 Every successful equipment toggle SHALL recompute each gauge trait's
 non-literal ceiling adjustment from scratch as the sum of the currently
 worn items' gauge caps (positive-only by rulebook contract) inside the same
-transaction as the equipment write, with trait storage snapshotted and
-restored on failure. When a recompute lowers a ceiling, the same transaction
-SHALL settle the gauge's current value to the lowered ceiling (a
-deterministic resource cost of unequipping), so stored state can never
-exceed its effective maximum. The literal base maximum SHALL never be
-written, the recompute SHALL never accumulate, and reported maxima, heal
-clamps, full restores, and recovery SHALL consequently observe the effective
-maximum.
+transaction as the equipment write. When a recompute lowers a ceiling, the
+same transaction SHALL settle the gauge's current value to the lowered
+ceiling (a deterministic resource cost of unequipping).
 
 #### Scenario: Equipping a capped item raises the live maximum
 
@@ -279,8 +309,21 @@ maximum.
 - **THEN** both the equipment mapping and the gauge traits are restored to
   their pre-call state
 
+#### Scenario: The ceiling recompute never writes the literal base maximum
+
+- **WHEN** any gauge-ceiling recompute runs during a toggle
+- **THEN** the trait's literal base maximum is never written, and trait
+  storage is snapshotted and restored on failure
+
+#### Scenario: Every gauge reader observes the effective maximum
+
+- **WHEN** reported maxima, heal clamps, full restores, or recovery run
+  against a gauge with worn-item ceiling adjustments
+- **THEN** each observes the effective maximum, so stored state can never
+  exceed it
+
 ### Requirement: Attached buffs travel with the equipment toggle
-A successful `toggle_equipment()` SHALL recompute attached buffs from the worn-set diff inside the same transaction as the equipment write: instances for `worn_before − worn_after` items removed first, then instances for `worn_after − worn_before` items applied, each keyed by definition and item key with unique-per-source persistent stacking. The buff storage SHALL join the toggle's snapshot/restore set through attribute-handler snapshot and assignment-restore (live buff reads after restore SHALL match pre-call state). Repeated toggling SHALL never accumulate duplicate instances, only the toggle path SHALL create attached instances, and attached instances SHALL NOT carry gauge-ceiling modifiers (gauge headroom is owned by the equipment-cap recompute alone).
+A successful `toggle_equipment()` SHALL recompute attached buffs from the worn-set diff inside the same transaction as the equipment write: instances for `worn_before − worn_after` items removed first, then instances for `worn_after − worn_before` items applied, each keyed by definition and item key with unique-per-source persistent stacking.
 
 #### Scenario: Beads heal while worn
 - **WHEN** an actor equips 藥師珠串 and rounds pass under the existing tick engine
@@ -297,3 +340,19 @@ A successful `toggle_equipment()` SHALL recompute attached buffs from the worn-s
 #### Scenario: Failed toggle leaves no orphan and no ghost
 - **WHEN** a toggle transaction fails after an attached-buff apply or remove
 - **THEN** equipment, gauge ceilings, and buff storage are restored to their pre-call state, and live buff reads on the same object show the restored state
+
+#### Scenario: Buff storage joins the toggle's snapshot/restore set
+- **WHEN** a toggle transaction fails after buff mutation
+- **THEN** buff storage is restored through attribute-handler snapshot and assignment-restore, and live buff reads after restore match pre-call state
+
+#### Scenario: Repeated toggling never accumulates duplicate instances
+- **WHEN** the same buff-granting equipment is toggled on and off repeatedly
+- **THEN** no duplicate attached buff instances accumulate
+
+#### Scenario: Only the toggle path creates attached instances
+- **WHEN** attached buff instances are created anywhere in the system
+- **THEN** only the equipment toggle path creates them
+
+#### Scenario: Attached instances carry no gauge-ceiling modifiers
+- **WHEN** an attached buff instance is inspected
+- **THEN** it carries no gauge-ceiling modifiers — gauge headroom is owned by the equipment-cap recompute alone

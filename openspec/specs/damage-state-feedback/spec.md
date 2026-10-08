@@ -6,9 +6,7 @@ Define reusable passive reactions to actual damage and new negative buffs, and s
 ## Requirements
 
 ### Requirement: Damage feedback follows actual loss and newly accepted negative instances
-A qualified passive SHALL react once to each positive actual HP loss and each newly accepted negative buff instance, using an authored gain proportional to the harm actually suffered, applied through the canonical state writer. For an HP-loss event the gain SHALL be derived from the ratio of that event's actual loss to the recipient's maximum HP, scaled by the table's authored coefficient and floored to a whole number. For a newly accepted negative buff instance, which carries no HP loss, the gain SHALL be the same derivation applied to an authored flat fraction of maximum HP. Spell, item, rulebook and periodic-damage sources SHALL share this behavior and SHALL be priced identically for an identical loss: the source's tier, school and spell-or-not nature SHALL NOT affect the gain. A recipient whose maximum HP is unreadable or not positive SHALL produce no gain rather than a guessed one. Misses, zero loss, healing, resource costs, immunity and instance refresh SHALL not trigger.
-
-The retired source-tier gain mapping SHALL NOT be loadable: a `pleasure_gain` authored as a tier-keyed mapping SHALL fail closed at rule load naming the rule id. Source tier SHALL retain every other role it has, including capture at application for periodic effects and grant-time attribution for source-targeted actions.
+A qualified passive SHALL react once to each positive actual HP loss and each newly accepted negative buff instance, with an authored gain applied through the canonical state writer, proportional to the harm actually suffered. HP-loss gain SHALL be the event's actual loss over maximum HP, scaled by the table's authored coefficient and floored. A newly accepted negative instance carries no HP loss and SHALL gain the same derivation applied to an authored flat fraction of maximum HP.
 
 #### Scenario: Different damage sources share the reaction
 - **WHEN** a synthetic passive owner suffers direct spell, item and periodic damage of equal actual loss
@@ -42,6 +40,22 @@ The retired source-tier gain mapping SHALL NOT be loadable: a `pleasure_gain` au
 - **WHEN** a new damaging debuff is accepted and later ticks twice
 - **THEN** the new-instance event and each positive-loss tick independently trigger once
 
+#### Scenario: Source attributes never affect the gain
+- **WHEN** spell, item, rulebook and periodic-damage sources inflict an identical actual loss
+- **THEN** every source shares this behavior and is priced identically, and the source's tier, school and spell-or-not nature do not affect the gain
+
+#### Scenario: Non-loss events and non-acceptances do not trigger
+- **WHEN** the recipient suffers a miss, zero loss, healing or a resource cost, or a negative buff is refused by immunity or only refreshes an existing instance
+- **THEN** no feedback fires
+
+#### Scenario: The retired tier-keyed gain mapping is not loadable
+- **WHEN** a rule authors `pleasure_gain` as a source-tier-keyed mapping
+- **THEN** the retired mapping is not loadable and rule loading fails closed naming the rule id
+
+#### Scenario: Source tier keeps its other roles
+- **WHEN** a periodic effect is applied, or a source-targeted action grants its effect
+- **THEN** the source tier is still captured at application for the periodic effect and still used for grant-time attribution
+
 ### Requirement: Feedback cascades remain within the initiating transaction
 Feedback that changes arousal or phase SHALL use canonical transitions and phase reactions without recursive damage-event loops. The initiating action, item or world-clock transaction SHALL capture and restore every transitive state surface. A failed settlement SHALL leave neither the triggering loss/buff nor resulting pleasure/phase/marker changes.
 
@@ -65,7 +79,7 @@ A configured passive SHALL provide a state-derived recovery-only modifier indepe
 - **THEN** only the configured recovery profile receives the extra recovery-only modifier
 
 ### Requirement: A qualifying physical strike dispatches one source-attributed on-hit event
-The damage settlement SHALL dispatch exactly one `physical_hit` outcome reaction to the struck target when a physical-school strike lands positive actual HP loss, carrying the attack's source entity and the strike's captured source tier through the existing outcome-reaction dispatch path. A magic-school strike, a miss, a zero-actual-loss write, a buff rate tick, a divert leg and an already-dead target SHALL dispatch nothing new. Every existing outcome event (`hp_loss`, `mp_zero`, `negative_buff_added`) SHALL keep its dispatch points, payloads and exactly-once crossings byte-identically. Rule loading SHALL recognize `physical_hit` within a CLOSED `when.event` vocabulary (`hp_loss`, `mp_zero`, `negative_buff_added`, `physical_hit`) and reject any other event value fail-closed at load naming the rule — closing the enum that today loads unknown event values silently as never-firing rules.
+The damage settlement SHALL dispatch exactly one `physical_hit` outcome reaction to the struck target when a physical-school strike lands positive actual HP loss, carrying the attack's source entity and captured source tier through the existing outcome-reaction dispatch path. Rule loading SHALL recognize `physical_hit` within a CLOSED `when.event` vocabulary (`hp_loss`, `mp_zero`, `negative_buff_added`, `physical_hit`) and reject any other event value fail-closed at load naming the rule.
 
 #### Scenario: A landed physical hit fires the event once with its source
 - **WHEN** a synthetic physical strike from caster A lands positive HP loss on a target while a synthetic `physical_hit`-keyed reaction rule is loaded
@@ -83,8 +97,20 @@ The damage settlement SHALL dispatch exactly one `physical_hit` outcome reaction
 - **WHEN** a policy-declared double-strike lands both strikes physically on the reactor
 - **THEN** the event dispatches once per landing strike, each carrying the same source, and a first miss dispatches nothing for the missed strike
 
+#### Scenario: Existing outcome events are untouched
+- **WHEN** the `physical_hit` dispatch ships alongside the existing outcome events
+- **THEN** every existing outcome event (`hp_loss`, `mp_zero`, `negative_buff_added`) keeps its dispatch points, payloads and exactly-once crossings byte-identically
+
+#### Scenario: A dead target dispatches nothing
+- **WHEN** a physical strike settles against an already-dead target
+- **THEN** no `physical_hit` event dispatches
+
+#### Scenario: The closed event enum closes the silent-never-firing hole
+- **WHEN** a rule file declares an event value outside the closed vocabulary, which today loads silently as a never-firing rule
+- **THEN** rule loading rejects it fail-closed naming the rule
+
 ### Requirement: Source-targeted reaction actions settle once, in-transaction, without recursion
-The reaction `then` vocabulary SHALL grow exactly two source-targeted actions, both validated fail-closed at rule load (every existing `apply_buff`/`remove_buff`/`pleasure_gain` shape preserved verbatim): `counter_damage: <coefficient>` settling one immediate counter strike onto the event's source — physical magnitude from the holder's effective attack times the declared finite positive coefficient, defense subtracted ordinarily, no hit roll — and `apply_buff_to_source: <definition-key>` applying the named loaded definition to the source through the shipped public buff-application entry point with grant-time attribution from the event source. Both SHALL settle inside the initiating damage's commit transaction so a later settlement failure rolls the counter HP, the applied instance and the initiating loss back together. The counter strike SHALL dispatch the source's ordinary `hp_loss` outcome exactly once for its actual loss and SHALL NEVER dispatch `physical_hit`; the buff-application leg SHALL dispatch the shipped new-negative-instance reaction only. A source that is dead or unresolvable contributes no counter damage and no buff write; a source wearing debuff immunity receives no applied debuff; a protected (nonlethal) source floors through the existing knockout policy with at most one terminal settlement. Reaction dispatch for one `physical_hit` SHALL complete without re-entering `physical_hit` dispatch on any entity.
+The reaction `then` vocabulary SHALL grow exactly two source-targeted actions, both validated fail-closed at rule load: `counter_damage: <coefficient>` settling one immediate counter strike onto the event's source, and `apply_buff_to_source: <definition-key>` applying the named loaded definition to the source through the shipped public buff-application entry point with grant-time attribution from the event source.
 
 #### Scenario: A thorn-shaped counter returns coefficient-priced damage to the attacker
 - **WHEN** a synthetic reactor with a `physical_hit` + `counter_damage: 1.0` rule is hit for positive physical loss by a living attacker
@@ -106,17 +132,50 @@ The reaction `then` vocabulary SHALL grow exactly two source-targeted actions, b
 - **WHEN** rules declare `counter_damage: -1`, `counter_damage: abc`, a boolean coefficient, `apply_buff_to_source` naming an unknown definition, both source actions in one `then`, or a source action alongside a legacy action
 - **THEN** each raises at load time naming the offending rule id, and every previously valid rule file loads unchanged
 
+#### Scenario: The counter dispatches only the ordinary loss outcome
+
+- **WHEN** a counter strike moves actual HP on the event's source
+-- **THEN** the source's ordinary `hp_loss` outcome dispatches exactly once for that loss and `physical_hit` is never dispatched for it
+
+#### Scenario: The source-action growth preserves existing reaction shapes
+
+- **WHEN** the vocabulary grows the two source-targeted actions
+- **THEN** every existing `apply_buff`/`remove_buff`/`pleasure_gain` shape is preserved verbatim and both new actions are validated fail-closed at rule load
+
+#### Scenario: The counter strike's magnitude is fully specified
+
+- **WHEN** `counter_damage` settles
+- **THEN** its physical magnitude is the holder's effective attack times the declared finite positive coefficient, defense is subtracted ordinarily, and no hit roll is made
+
+#### Scenario: Both actions settle in the initiating transaction
+
+- **WHEN** either source-targeted action fires from a `physical_hit`
+- **THEN** it settles inside the initiating damage's commit transaction so a later settlement failure rolls the counter HP, the applied instance and the initiating loss back together
+
+#### Scenario: One event's dispatch never re-enters itself
+
+- **WHEN** reaction dispatch runs for one `physical_hit`
+- **THEN** it completes without re-entering `physical_hit` dispatch on any entity
+
+#### Scenario: The buff leg dispatches only the new-instance reaction
+- **WHEN** `apply_buff_to_source` applies its debuff to the event's source
+- **THEN** only the shipped new-negative-instance reaction dispatches for that write
+
+#### Scenario: A dead or unresolvable source contributes nothing
+- **WHEN** the event's source is dead or unresolvable
+- **THEN** no counter damage is contributed and no buff write occurs
+
+#### Scenario: A protected source floors through the knockout policy
+- **WHEN** a counter would drive a protected (nonlethal) source past zero
+- **THEN** the source floors through the existing knockout policy with at most one terminal settlement
+
 ### Requirement: The outcome-reaction vocabulary grows one declarative order-marker action
 The reaction `then` vocabulary SHALL grow exactly one order-operation action, `mark_order_op`,
-naming a buff definition that itself declares an in-round order operation — validated fail closed
-at rule load (an unknown definition, or a definition without the order clause, names the offending
-rule id; every existing `apply_buff`/`remove_buff`/`pleasure_gain`/`counter_damage`/
-`apply_buff_to_source` shape is preserved verbatim). At dispatch the action applies the named
-definition as a live instance onto the outcome event's source with the same grant-time attribution,
-in-transaction settlement, rollback coverage, sourceless-write no-op, and once-per-event semantics
-as the shipped source-targeted actions, and SHALL itself perform no initiative-sequence mutation —
-the round loop's declarative fold is the sole consumer of the mounted marker. The action SHALL NOT
-combine with the two shipped source-targeted actions in one `then`.
+naming a buff definition that itself declares an in-round order operation, validated fail closed
+at rule load. At dispatch the action applies the named definition as a live instance onto the
+outcome event's source with the same grant-time attribution, in-transaction settlement, rollback
+coverage, sourceless-write no-op, and once-per-event semantics as the shipped source-targeted
+actions.
 
 #### Scenario: A ward-shaped rule marks the strike's source
 - **WHEN** a synthetic reactor holding the gating buff is struck physically by a living attacker
@@ -138,17 +197,21 @@ combine with the two shipped source-targeted actions in one `then`.
 - **THEN** each raises at load time naming the offending rule id, and every previously valid rule
   file loads unchanged
 
+#### Scenario: Existing reaction shapes are preserved verbatim
+- **WHEN** the vocabulary grows `mark_order_op`
+- **THEN** every existing `apply_buff`/`remove_buff`/`pleasure_gain`/`counter_damage`/`apply_buff_to_source` shape is preserved verbatim
+
+#### Scenario: The mounted marker is consumed only by the declarative fold
+- **WHEN** `mark_order_op` dispatches and the mounted marker takes effect in the round
+- **THEN** the action itself performs no initiative-sequence mutation and the round loop's declarative fold is the sole consumer of the marker
+
+#### Scenario: The order-marker action cannot combine with the shipped source actions
+- **WHEN** a rule's `then` pairs `mark_order_op` with either shipped source-targeted action
+- **THEN** the rule is rejected at load, because the action SHALL NOT combine with the two shipped source-targeted actions in one `then`
+
 ### Requirement: A qualified passive self-recovers once on canonical climax entry
 
-A qualified passive SHALL restore its holder's HP when that holder canonically enters the in-progress climax phase. The restored amount SHALL be an authored fraction of the holder's maximum HP, floored to a whole number, and SHALL cost no resource of any kind — no MP, no SP, no action, no cast.
-
-The restoration SHALL occur exactly once per canonical entry into that phase: it SHALL be driven by the phase *transition*, never by the phase state, so a climax extension or any other event occurring while the holder is already in that phase SHALL restore nothing further. A holder who does not qualify for the passive SHALL receive nothing.
-
-The trigger SHALL be the phase entry alone. The restoration SHALL NOT depend on how the holder's arousal was accrued: a climax reached entirely outside combat, through stimulus carrying no HP loss, SHALL pay out exactly as one reached through damage. The passive is therefore both the damage loop's third leg and a deliberate out-of-combat recovery option, priced by the climax's own existing costs rather than by a provenance check.
-
-The restoration SHALL be clamped to the holder's missing HP, SHALL never raise HP above maximum, and SHALL never apply to a holder at or below zero HP — it restores, it does not revive. A holder whose maximum HP is unreadable or not positive SHALL receive nothing rather than a guessed amount.
-
-The restoration SHALL settle inside the transaction that performed the phase transition, so a later failure in that settlement restores the HP, the phase and the pleasure gauge together.
+A qualified passive SHALL restore its holder's HP when that holder canonically enters the in-progress climax phase. The restored amount SHALL be an authored fraction of the holder's maximum HP, floored to a whole number, and SHALL cost no resource of any kind. The restoration SHALL occur exactly once per canonical entry into that phase — driven by the phase *transition*, never by the phase state — and the trigger SHALL be the phase entry alone.
 
 #### Scenario: Entering climax restores the authored fraction
 
@@ -194,3 +257,23 @@ The restoration SHALL settle inside the transaction that performed the phase tra
 
 - **WHEN** a rule authors the self-recovery action with a fraction that is not a finite number in the open-closed range from zero to one
 - **THEN** rule loading raises naming that rule id
+
+#### Scenario: A climax extension restores nothing further
+
+- **WHEN** a climax extension or any other event occurs while the holder is already in the in-progress climax phase
+- **THEN** the passive restores nothing further
+
+#### Scenario: The restoration costs no cast either
+
+- **WHEN** the passive pays out on canonical climax entry
+- **THEN** no MP, no SP, no action and no cast is consumed
+
+#### Scenario: The payout is priced by the climax, not by provenance
+
+- **WHEN** the holder's arousal was accrued by any route
+- **THEN** the restoration does not depend on the provenance of the accrual and is priced by the climax's own existing costs rather than by a provenance check, making the passive both the damage loop's third leg and a deliberate out-of-combat recovery option
+
+#### Scenario: The restoration settles with its transition
+
+- **WHEN** the passive restores HP on a canonical climax entry
+- **THEN** the restoration settles inside the transaction that performed the phase transition, so a later failure in that settlement restores the HP, the phase and the pleasure gauge together

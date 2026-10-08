@@ -10,43 +10,10 @@ edit rather than a code edit across four files.
 ### Requirement: A place is the single authored record of one service location
 <!-- This block is written against the text `place-kind-vocabulary` leaves behind and MUST be
      archived after it. -->
-The system SHALL support place records. One place SHALL carry everything
-that distinguishes one service location: its stable key, the settlement it
-belongs to, its kind, the Traditional Chinese name and description of its
-interior room, the exterior coordinate the interior attaches to, the
-doorway naming, its host's identity, the host's profession and that
-profession's component identity kwargs, and the assortments the place
-sells.
-
-No part of a place SHALL be declared anywhere else. In particular a place's
-host SHALL NOT also require a separate roster row, and a place's interior
-SHALL NOT also require a code-side constant.
-
-A place SHALL declare assortments if and only if it declares a shop
-identity. A location that sells nothing and a location that sells something
-but names no goods are both authoring errors and SHALL fail load.
-
-A place's host SHALL be optional, and optional as one indivisible group:
-the host name, title, race, subrace, sex, profession, service id and
-component identity kwargs SHALL either all be authored or all be absent. A
-partially authored host SHALL fail load naming the place and the fields
-that break the set, because a location with a name but no profession, or a
-profession but no name, is an unfinished record rather than a deliberate
-empty room. A place that authors no host SHALL declare no assortments, no
-additions and no exclusions: goods require a merchant to sell them.
-
-A place's kind SHALL describe what the location is in the world, never what
-capability its host carries. A dwelling whose occupant happens to trade is a
-home, not a shop. The vocabulary SHALL be closed and SHALL cover the location
-types the world document defines, so that no authored place is forced to
-pick a value that misdescribes it; a location type the vocabulary cannot
-name is a reason to extend the vocabulary, not to approximate.
-
-Two places MAY share one exterior — a craft alley with a forge and a tailor
-on it is one street with two doors — but they SHALL NOT share a doorway
-name. Two identical doorway names on one exterior produce a single exit
-where two were authored, silently losing a location rather than failing, so
-the collision SHALL be a load error naming both places.
+The system SHALL support place records: one place SHALL carry everything
+that distinguishes one service location — key, settlement, kind, interior,
+doorway, host, and assortments — and no part of a place SHALL be declared
+anywhere else.
 
 #### Scenario: One record carries a whole location
 - **WHEN** a place record is loaded
@@ -92,19 +59,58 @@ the collision SHALL be a load error naming both places.
 - **WHEN** two places declare the same exterior and the same doorway name
 - **THEN** validation raises naming both places and the shared name
 
+#### Scenario: One record supplies every distinguishing field
+- **WHEN** a place's fields are enumerated
+- **THEN** the record alone carries the stable key, the settlement it belongs to, its kind, the
+  Traditional Chinese name and description of its interior room, the exterior coordinate the interior
+  attaches to, the doorway naming, the host's identity, the host's profession and that profession's
+  component identity kwargs, and the assortments the place sells
+
+#### Scenario: No host roster row and no code-side interior constant
+- **WHEN** a place's host and interior are authored
+- **THEN** the host requires no separate roster row and the interior requires no code-side constant
+
+#### Scenario: A shop identity and assortments are interdependent
+- **WHEN** a place declares assortments if and only if it declares a shop identity, and a location
+  that sells nothing or sells something but names no goods is authored
+- **THEN** both are authoring errors and SHALL fail load
+
+#### Scenario: The host group is indivisible
+- **WHEN** a place authors its host — optional, but as one indivisible group: host name, title, race,
+  subrace, sex, profession, service id and component identity kwargs
+- **THEN** the fields SHALL either all be authored or all be absent, and a partially authored host
+  SHALL fail load naming the place and the fields that break the set, because a location with a name
+  but no profession, or a profession but no name, is an unfinished record rather than a deliberate
+  empty room
+
+#### Scenario: A host-less place declares no goods configuration
+- **WHEN** a place authors no host
+- **THEN** it SHALL declare no assortments, no additions and no exclusions, because goods require a
+  merchant to sell them
+
+#### Scenario: Kind describes the location, never the host's capability
+- **WHEN** a place's kind is authored
+- **THEN** it describes what the location is in the world, never what capability its host carries — a
+  dwelling whose occupant happens to trade is a home, not a shop
+
+#### Scenario: The kind vocabulary is closed and complete
+- **WHEN** the kind vocabulary is compared against the location types the world document defines
+- **THEN** it is closed and covers them, so no authored place is forced to pick a value that
+  misdescribes it; a location type the vocabulary cannot name is a reason to extend the vocabulary,
+  not to approximate
+
+#### Scenario: A shared exterior may carry distinct doorways
+- **WHEN** two places author doorways on one exterior — a craft alley with a forge and a tailor is
+  one street with two doors
+- **THEN** they MAY share the exterior but SHALL NOT share a doorway name, because two identical
+  doorway names on one exterior produce a single exit where two were authored, silently losing a
+  location rather than failing, so the collision SHALL be a load error naming both places
+
 ### Requirement: A settlement declares its archetype and coordinate space
 The system SHALL support settlement records carrying a stable key matching
 the geographic anchor registry, an archetype drawn from a closed vocabulary
 of the six settlement archetypes the world defines, and the map coordinate
-space its places sit in.
-
-A place SHALL name a settlement that exists; its exterior coordinate SHALL
-be resolved within that settlement's coordinate space rather than being
-declared with one.
-
-The archetype vocabulary SHALL be distinct from the geographic anchor kind
-vocabulary. Anchor kinds classify geography and include non-settlements;
-archetypes classify how a settlement is built.
+space its places sit in. A place SHALL name a settlement that exists.
 
 #### Scenario: A place in an unknown settlement fails load
 - **WHEN** a place names a settlement key absent from the settlement
@@ -118,23 +124,21 @@ archetypes classify how a settlement is built.
 - **THEN** each interior attaches to its own settlement's exterior room, and
   neither attaches to the other's
 
+#### Scenario: Exterior coordinates resolve inside the settlement's space
+- **WHEN** a place's exterior coordinate is resolved
+- **THEN** it is resolved within that settlement's coordinate space rather than being declared with
+  one
+
+#### Scenario: Archetypes are not anchor kinds
+- **WHEN** the archetype vocabulary is compared with the geographic anchor kind vocabulary
+- **THEN** they are distinct: anchor kinds classify geography and include non-settlements; archetypes
+  classify how a settlement is built
+
 ### Requirement: Shop identities and the service-host roster are derived from places
 Shop identities SHALL be derived from the places that declare one, and the
 service-host roster SHALL be derived from every place. Neither SHALL be
-hand-authored.
-
-A place SHALL carry the component identity kwargs its profession's blueprint
-requires, whatever that profession is — a trading place supplies its shop
-identity, a guild hall supplies its branch and dialogue identities. A flat
-shop-only field SHALL NOT be used, because it cannot describe a
-non-trading service location.
-
-Blueprint coverage SHALL be enforced as it is for a hand-authored roster
-row: every component's identity fields except the row-level service anchor
-must be supplied, and a kwarg no component consumes SHALL be rejected.
-
-The authored-name uniqueness rule SHALL continue to hold across shops,
-guild branches and guild rank examiners, evaluated over the derived rows.
+hand-authored. A place SHALL carry the component identity kwargs its
+profession's blueprint requires, whatever that profession is.
 
 #### Scenario: A trading place and a non-trading place both derive hosts
 - **WHEN** the registry holds a place whose profession is a merchant and a
@@ -152,6 +156,21 @@ guild branches and guild rank examiners, evaluated over the derived rows.
 - **WHEN** two derived rows, or a derived row and a guild registry row,
   carry the same authored name
 - **THEN** load fails naming both holders
+
+#### Scenario: Identity kwargs follow the profession, not a shop-only field
+- **WHEN** a trading place and a guild hall author their hosts
+- **THEN** the trading place supplies its shop identity and the guild hall supplies its branch and
+  dialogue identities, and a flat shop-only field SHALL NOT be used because it cannot describe a
+  non-trading service location
+
+#### Scenario: Blueprint coverage is enforced like a hand-authored roster row
+- **WHEN** a place's derived roster row is validated against its profession's blueprint
+- **THEN** every component's identity fields except the row-level service anchor must be supplied,
+  and a kwarg no component consumes SHALL be rejected
+
+#### Scenario: Authored-name uniqueness spans the derived rows
+- **WHEN** the authored-name uniqueness rule is evaluated over the derived rows
+- **THEN** it continues to hold across shops, guild branches and guild rank examiners
 
 ### Requirement: A place's host profile reference is validated
 A place record SHALL be able to name its host's authored NPC profile by profile key. Place-registry validation SHALL reject a place that names a host profile key which does not resolve in the NPC profile registry, and SHALL reject a hostless place that names any host profile key, naming the place and the key in both cases. A host profile key SHALL count as host material, so a hostless place carrying one is never treated as hostless.

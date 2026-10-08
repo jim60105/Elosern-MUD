@@ -27,10 +27,7 @@ examination, wallet, merit, inventory, and rank mutation to deterministic-core A
 host. It SHALL read all eight trait keys through `get_display_value()`, persist the branch, current world
 tick, and displayed values in `guild_registration`, set `guild_rank` to `F`, and grant +1 affinity
 (`guild` source) with the GuildStaff host through the sole-writer affinity API
-(`world/rules/affinity.py`) — all in one atomic operation, with the host's affinity record included
-in the registration snapshot/restore surfaces so a failed registration restores it.
-The branch SHALL be derived exclusively from the validated GuildStaff component; callers SHALL NOT
-supply or override it. Registration SHALL NOT derive rank from either displayed or true stats.
+(`world/rules/affinity.py`) — all in one atomic operation.
 
 #### Scenario: Undisguised character registers at F
 - **WHEN** an unregistered character registers with local GuildStaff and has no `disguised_stats`
@@ -52,12 +49,23 @@ supply or override it. Registration SHALL NOT derive rank from either displayed 
 - **WHEN** registration occurs at Altoria GuildStaff
 - **THEN** the stored branch equals that component's branch and no caller-provided branch input exists
 
+#### Scenario: Callers cannot supply or override the branch
+- **WHEN** a caller attempts to pass or override the registration branch
+- **THEN** the branch is derived exclusively from the validated GuildStaff component
+
+#### Scenario: Rank is never derived from stats
+- **WHEN** registration sets the rank
+- **THEN** it never derives rank from either displayed or true stats; rank is always F
+
+#### Scenario: The host affinity record rides the snapshot surfaces
+- **WHEN** registration begins
+- **THEN** the host's affinity record is included in the registration snapshot/restore surfaces so
+  a failed registration restores it
+
 ### Requirement: Registration access is local, idempotent, and strict about persisted data
 Registration SHALL reject non-player entities, absent or remote staff, and ambiguous multiple
 local GuildStaff hosts. Local-host acceptance SHALL flow through
-`world/rules/service_gate.py::service_available` for the resolved staff component: `remote` keeps
-the existing remote-staff rejection, and an `off_anchor` or `malformed_binding` verdict SHALL
-refuse registration with the gate's fixed registry message and no guild field written.
+`world/rules/service_gate.py::service_available` for the resolved staff component.
 Re-registering a valid member SHALL return the original record without replacing its branch, tick,
 or snapshot. A partial or malformed existing record SHALL raise `GuildDataError` without repair or
 rank mutation.
@@ -78,6 +86,12 @@ rank mutation.
 #### Scenario: Partial membership data fails closed
 - **WHEN** `guild_rank` is F but `guild_registration` lacks its displayed-stat snapshot
 - **THEN** registration raises `GuildDataError` and writes nothing
+
+#### Scenario: Gate verdicts map to fixed refusals
+- **WHEN** the service gate returns a verdict for the resolved staff component
+- **THEN** `remote` keeps the existing remote-staff rejection, and an `off_anchor` or
+  `malformed_binding` verdict refuses registration with the gate's fixed registry message and no
+  guild field written
 
 ### Requirement: Guild service hosts teach their service commands through scripted dialogue
 The guild master host SHALL carry a `ScriptedDialogue` component whose `dialogue_key` resolves to
@@ -106,9 +120,7 @@ The registration transaction SHALL additionally grant the F-rank fixed title
 auto-equipping the empty fixed slot, inside the same all-or-nothing commit that
 grants F rank — no planner, no LLM. The starter epithet (「南門新客」) SHALL NOT
 be granted at registration; it is granted by the first guild reward claim
-(quest-reward-settlement). Re-registration SHALL leave title state
-byte-identical (the fixed-key dedupe rule makes it a no-op), and a
-rejected registration SHALL grant no title.
+(quest-reward-settlement).
 
 #### Scenario: Registration writes rank and the fixed title in one commit
 - **WHEN** a fresh member completes guild registration
@@ -118,20 +130,21 @@ rejected registration SHALL grant no title.
 - **WHEN** an already-registered member registers again
 - **THEN** `title_collection` and `title_equipped` are unchanged
 
+#### Scenario: Fixed-key dedupe makes re-registration a no-op
+- **WHEN** re-registration runs against the already-granted fixed title
+- **THEN** the fixed-key dedupe rule makes the grant a no-op, leaving title state byte-identical
+
+#### Scenario: A rejected registration grants no title
+- **WHEN** registration is rejected
+- **THEN** no title is granted
+
 ### Requirement: Service hosts are created and converged from a declarative YAML roster
 The service-host roster SHALL be derived from the place registry rather than hand-authored: each
 place yields one row declaring `name`, `title`, `profession`, the interior room tag it anchors to,
-`service_id`, and the authored component identity kwargs. `world/rules/guild_config.py` SHALL
-batch-validate the derived roster (config load never touches the database): missing fields, a
-`profession` naming no registry row, a blueprint component type whose identity kwargs the place
-fails to supply, or a non-string room tag each raise the catalog's named error and cache nothing.
-`world/rules/guild_economy.py::sync_service_content` SHALL be an interpreter of the roster: per
-row it resolves the room by tag, finds-or-creates the host NPC on the `service_id` anchor with
-the unchanged never-rename/never-retitle reuse contract, and assembles components through the
-shared `world/rules/profession_assembly.py` helper — never through a code-side component literal.
-The derived roster SHALL reproduce the pre-change two hosts exactly (same names, titles, rooms,
-`service_id`s `altoria_guild_master` / `altoria_merchant`, and component kwargs), keeping sync
-behavior-neutral.
+`service_id`, and the authored component identity kwargs.
+`world/rules/guild_economy.py::sync_service_content` SHALL interpret the roster and assemble
+components through the shared `world/rules/profession_assembly.py` helper, never a code-side
+component literal.
 
 #### Scenario: Shipped roster recreates today's two hosts bit-for-bit
 - **WHEN** sync runs against a database whose two service hosts were deleted
@@ -162,13 +175,27 @@ behavior-neutral.
 - **WHEN** the rulebook is searched for a hand-authored `service_hosts:` roster
 - **THEN** none remains, and every host's name, title and profession appear only on its place
 
+#### Scenario: The derived roster reproduces the pre-change hosts
+- **WHEN** the place-derived roster is compared with the pre-change configuration
+- **THEN** it reproduces the two hosts exactly — same names, titles, rooms, `service_id`s
+  `altoria_guild_master` / `altoria_merchant`, and component kwargs — keeping sync behavior-neutral
+
+#### Scenario: Config-time batch validation covers every named offense
+- **WHEN** a derived roster row has missing fields, a `profession` naming no registry row, a
+  blueprint component type whose identity kwargs the place fails to supply, or a non-string room tag
+- **THEN** `world/rules/guild_config.py` batch-validation raises the catalog's named error and
+  caches nothing, and config load never touches the database
+
+#### Scenario: Sync resolves rows and reuses hosts under the unchanged contract
+- **WHEN** `sync_service_content` processes one roster row
+- **THEN** it resolves the room by tag and finds-or-creates the host NPC on the `service_id`
+  anchor under the unchanged never-rename/never-retitle reuse contract
+
 ### Requirement: Roster convergence deletes service hosts absent from the roster
 Sync SHALL treat the roster as authoritative, and the roster's authority SHALL NOT depend on
 anchor-room resolution: the duplicate-anchor fail-closed probe and the convergence sweep run for
 every roster row on every sync. A live NPC whose EVERY service-component `service_id` matches no
-roster row is deleted; a host the roster still claims through ANY anchor is never destroyed —
-titled mixed residue is ambiguous, emits a named warning, and survives for manual repair. Each
-deletion emits one info event with the host and service identifiers.
+roster row is deleted. Each deletion emits one info event with the host and service identifiers.
 
 #### Scenario: A roster-shrunk host is deleted on next sync
 - **WHEN** a roster row is removed and sync runs
@@ -178,3 +205,12 @@ deletion emits one info event with the host and service identifiers.
 #### Scenario: An unrelated NPC sharing a retired key survives
 - **WHEN** an NPC without any service component shares a retired legacy key
 - **THEN** convergence leaves it untouched, exactly as the pre-change cleanup did
+
+#### Scenario: A host claimed through any anchor is never destroyed
+- **WHEN** a live NPC matches the roster through ANY anchor
+- **THEN** convergence never destroys it
+
+#### Scenario: Titled mixed residue survives for manual repair
+- **WHEN** convergence finds a host with titled mixed residue
+- **THEN** the situation is treated as ambiguous, a named warning is emitted, and the host survives
+  for manual repair

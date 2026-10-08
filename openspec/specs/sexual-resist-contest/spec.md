@@ -37,16 +37,7 @@ When no auto-comply condition applies, `resist_verdict()` SHALL compute
 where each participant's score is `agility_component * agility_weight + atk_phys_component *
 atk_phys_weight`, with `agility_weight` and `atk_phys_weight` read from
 `world/rules/rulebook/sexual_resist.yaml`. The two components use different, stat-specific
-adjustment treatments, matching each stat's sole existing production consumer exactly:
-`agility_component` is `effective_value("agility")` adjusted via `combat._apply_percent_mod`
-against `evaluate_combat_modifiers_no_create()`'s `"agility"` key, exactly as
-`world.rules.disengage._adjusted_agility` computes it; `atk_phys_component` is
-`effective_value("atk_phys")` plus `evaluate_combat_modifiers_no_create()`'s `"atk_phys"` key added
-as a flat integer, exactly as `world.rules.combat._adjusted_attack` computes it. Neither stat's
-adjustment is routed through the other stat's treatment. The no-create query is load-bearing:
-the live variant materializes the `sexual` handler, which persists traits on first access and
-would break Requirement 1's no-mutation contract, so every contest read SHALL use
-`evaluate_combat_modifiers_no_create()` and never the live `evaluate_combat_modifiers()`.
+adjustment treatments.
 
 #### Scenario: A resister with higher blended stats resists more often
 - **WHEN** `resist_verdict()` is computed for a resister whose blended `agility`/`atk_phys` score
@@ -74,13 +65,35 @@ would break Requirement 1's no-mutation contract, so every contest read SHALL us
   `effective_value("atk_phys")`, and no `TypeError` or other error occurs from attempting to parse
   the flat integer as a percentage string
 
+#### Scenario: The agility component reuses disengage's percent-adjustment treatment verbatim
+- **WHEN** `resist_verdict()` computes `agility_component`
+- **THEN** it is `effective_value("agility")` adjusted via `combat._apply_percent_mod` against
+  `evaluate_combat_modifiers_no_create()`'s `"agility"` key, exactly as
+  `world.rules.disengage._adjusted_agility` computes it
+
+#### Scenario: The atk_phys component reuses combat's flat-addition treatment verbatim
+- **WHEN** `resist_verdict()` computes `atk_phys_component`
+- **THEN** it is `effective_value("atk_phys")` plus `evaluate_combat_modifiers_no_create()`'s
+  `"atk_phys"` key added as a flat integer, exactly as `world.rules.combat._adjusted_attack`
+  computes it
+
+#### Scenario: Each stat follows its own sole production consumer's treatment
+- **WHEN** either blended-score component is computed
+- **THEN** neither stat's adjustment is routed through the other stat's treatment — each matches
+  its stat's sole existing production consumer exactly
+
+#### Scenario: Every contest read uses the no-create modifier query
+- **WHEN** `resist_verdict()` reads combat modifiers for a contest
+- **THEN** every contest read uses `evaluate_combat_modifiers_no_create()` and never the live
+  `evaluate_combat_modifiers()`
+- **AND** the no-create query is load-bearing: the live variant materializes the `sexual` handler,
+  which persists traits on first access and would break Requirement 1's no-mutation contract
+
 ### Requirement: An NPC resister's affinity stage can grant a resist modifier or auto_comply
 When `resister` is an `NPC` and `actor` resolves to a `PlayerCharacter`, `resist_verdict()` SHALL
 look up `resister.relations.stage_for(actor)` and apply the matching entry from
 `sexual_resist.yaml`'s `affinity_resist_modifier` table, keyed by the affinity stage's `id`. An
-entry that is a plain number SHALL be added to `resister_score` before the contest formula runs. An
-entry of the form `{auto_comply: true}` SHALL short-circuit `resist_verdict()` to
-`resisted=False, auto_comply=True, roll=None` without calling `rng()`.
+entry that is a plain number SHALL be added to `resister_score` before the contest formula runs.
 
 #### Scenario: A stranger-stage NPC gets an easier time resisting
 - **WHEN** `resist_verdict()` is computed for an `NPC` resister whose affinity stage toward the actor
@@ -103,6 +116,12 @@ entry of the form `{auto_comply: true}` SHALL short-circuit `resist_verdict()` t
   compared in ascending affinity-stage order
 - **THEN** each stage's `resister_score` contribution is monotonically non-increasing (a
   higher-affinity companion is never harder to force than a lower-affinity one)
+
+#### Scenario: An auto_comply affinity entry short-circuits without rolling
+- **WHEN** the resister's affinity stage maps to an entry of the form `{auto_comply: true}` in
+  `sexual_resist.yaml`'s `affinity_resist_modifier` table
+- **THEN** `resist_verdict()` short-circuits to `resisted=False, auto_comply=True, roll=None`
+  without calling `rng()`
 
 ### Requirement: A Monster resister never receives an affinity term and never auto-complies from affinity
 When `resister` is a `Monster`, `resist_verdict()` SHALL NOT read `resister.relations` and SHALL NOT
@@ -129,11 +148,7 @@ exactly `0`, and `auto_comply` from the affinity path SHALL never be `True` for 
 ### Requirement: A resister mid-climax auto-complies for the first five settlement points, then resists normally
 `resist_verdict()` SHALL short-circuit to `resisted=False, auto_comply=True, roll=None` (without
 calling `rng()`) whenever the resister's stored climax state reads as `climax_phase` level `進行中`
-with `climax_turns <= climax_turn_auto_comply_limit` (`5`, from `sexual_resist.yaml`). Both facts
-SHALL be read from persistent storage without materializing the `sexual` handler — materializing
-it persists traits on first access and would break Requirement 1's no-mutation contract; an entity
-whose sexual state has never been touched reads as not-in-進行中 and falls through to the ordinary
-contest.
+with `climax_turns <= climax_turn_auto_comply_limit` (`5`, from `sexual_resist.yaml`).
 From the resister's sixth consecutive settlement point in `進行中`
 (`climax_turns > climax_turn_auto_comply_limit`), the ordinary contest (including any affinity
 modifier) SHALL apply.
@@ -160,15 +175,21 @@ modifier) SHALL apply.
 - **THEN** this short circuit does not apply, though the affinity short circuit may still apply
   independently
 
+#### Scenario: An entity whose sexual state was never touched falls through
+- **WHEN** `resist_verdict()` is computed for a resister whose sexual state has never been touched
+- **THEN** it reads as not-in-進行中 and falls through to the ordinary contest
+
+#### Scenario: Climax state is read without materializing the sexual handler
+- **WHEN** `resist_verdict()` reads the resister's `climax_phase` and `climax_turns`
+- **THEN** both facts are read from persistent storage without materializing the `sexual` handler
+- **AND** materializing it persists traits on first access and would break Requirement 1's
+  no-mutation contract
+
 ### Requirement: sexual_resist.yaml validates its shape at load time
 `world/rules/rulebook/sexual_resist.yaml` SHALL declare `agility_weight` and `atk_phys_weight`, each
 a non-negative float, summing to exactly `1.0`, `climax_turn_auto_comply_limit` (a positive integer),
 and `affinity_resist_modifier`, a mapping whose key set SHALL equal exactly the seven stage `id`s
-`world.rules.affinity_config.get_config().stages` declares, with no extra or missing key. Each
-value SHALL be either a finite number or the single-key mapping `{auto_comply: true}`; any other
-shape SHALL raise at load time. The rulebook SHALL be loaded and validated exactly once through a
-module-level singleton on first access — never per call — so a malformed table can never produce a
-contest outcome.
+`world.rules.affinity_config.get_config().stages` declares, with no extra or missing key.
 
 #### Scenario: The weights sum to 1.0
 - **WHEN** `world/rules/rulebook/sexual_resist.yaml` is loaded
@@ -195,6 +216,16 @@ contest outcome.
   stage ids, or declares an eighth key not present in `get_config().stages`
 - **THEN** loading it raises, naming the mismatched key
 
+#### Scenario: Affinity table values are strictly numbers or auto_comply flags
+- **WHEN** each `affinity_resist_modifier` value's shape is validated at load time
+- **THEN** each value SHALL be either a finite number or the single-key mapping
+  `{auto_comply: true}`; any other shape SHALL raise at load time
+
+#### Scenario: The rulebook is a load-once module-level singleton
+- **WHEN** any code accesses the rulebook
+- **THEN** it is loaded and validated exactly once through a module-level singleton on first
+  access — never per call — so a malformed table can never produce a contest outcome
+
 ### Requirement: resist_verdict is deterministic under an injected RNG
 `resist_verdict()`'s default `rng` parameter SHALL be `world.rules.dice.roll_d100`, and every call
 site SHALL be able to substitute a fixed-value stub. Two calls with an identical stub RNG and
@@ -214,11 +245,7 @@ identical entity state SHALL return an identical `ResistVerdict`.
 category="sexual_state")` directly (never through `resister.sexual`, preserving the no-create
 contract) and, when `str(actor.id)` is a member of that set, SHALL short-circuit to `resisted=False,
 auto_comply=True, roll=None` without calling `rng()`, exactly as the existing affinity and climax-turn
-short circuits do. The check SHALL be keyed by `actor.id` (a guaranteed-unique per-instance database
-identifier), never by `actor.key`/`_entity_key(actor)`, since `.key` is not guaranteed unique across
-distinct entities. The check SHALL be keyed to the specific `(actor, resister)` pair — a mark naming
-one caster SHALL NOT short-circuit a contest against a different actor, even one sharing the marked
-caster's `.key`.
+short circuits do.
 
 #### Scenario: A caster named in the resister's submission_marks auto-complies
 - **WHEN** `resist_verdict(actor, resister)` is called and `resister`'s stored `submission_marks`
@@ -242,3 +269,13 @@ caster's `.key`.
 - **WHEN** `resist_verdict()`'s implementation is inspected for its `submission_marks` read
 - **THEN** it reads via `resister.attributes.get(..., category="sexual_state")`, never via
   `resister.sexual.submission_marks` or any other access that would construct a `SexualState` handler
+
+#### Scenario: The submission check is keyed by actor.id, never by .key
+- **WHEN** the submission-check key is inspected
+- **THEN** it is `actor.id` (a guaranteed-unique per-instance database identifier), never
+  `actor.key`/`_entity_key(actor)`, since `.key` is not guaranteed unique across distinct entities
+
+#### Scenario: The mark is keyed to the specific (actor, resister) pair
+- **WHEN** a submission mark names one caster and a contest is computed against a different actor,
+  even one sharing the marked caster's `.key`
+- **THEN** the mark SHALL NOT short-circuit that contest

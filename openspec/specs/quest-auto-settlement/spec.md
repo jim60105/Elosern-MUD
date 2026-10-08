@@ -12,12 +12,7 @@ and both settlement modes share one exactly-once claim ledger.
 
 `plan_auto_settlement(actor, completed_records)` SHALL compute, without performing any write and
 without reading the world clock, the settlement plan for every supplied record that has just reached
-`COMPLETED`. A record SHALL contribute to the plan only when its issuance resolves, that issuance's
-settlement mode is `AUTO`, and its quest ID is absent from the actor's reward-claim ledger. The plan
-SHALL carry the wallet delta, the inventory additions, and the claim identities to append, derived
-from the resolved issuance's immutable reward — never from a value stored on the record. A record
-under a `COUNTER` issuance, an already-claimed record, or a record whose issuance no longer resolves
-SHALL contribute nothing.
+`COMPLETED`.
 
 #### Scenario: An automatic commission contributes its registered reward
 - **WHEN** a record completing under an `AUTO` issuance with copper and item rewards is planned
@@ -40,16 +35,27 @@ SHALL contribute nothing.
 - **WHEN** the planner runs against an actor with completing records
 - **THEN** the actor's wallet, inventory, quest log, and reward claims are byte-for-byte unchanged
 
+#### Scenario: A record contributes only under a resolvable unclaimed AUTO issuance
+- **WHEN** the planner decides whether a record contributes to the plan
+- **THEN** it contributes only when its issuance resolves, that issuance's settlement mode is
+  `AUTO`, and its quest ID is absent from the actor's reward-claim ledger
+
+#### Scenario: The plan derives entirely from the issuance's immutable reward
+- **WHEN** a contributing record is planned
+- **THEN** the plan carries the wallet delta, the inventory additions, and the claim identities to
+  append, derived from the resolved issuance's immutable reward — never from a value stored on the
+  record
+
+#### Scenario: Non-contributing records are excluded
+- **WHEN** a record is under a `COUNTER` issuance, is already-claimed, or its issuance no longer
+  resolves
+- **THEN** it SHALL contribute nothing
+
 ### Requirement: Automatic settlement commits atomically with the completing transition
 
 Every quest-log write path SHALL commit the settlement plan inside the same transaction that writes
 the completing record, so a quest can never be observed complete but unpaid, nor paid but not
-complete. `apply_quest_log_replacement` SHALL commit it inside its existing transaction;
-`apply_quest_log_delta` SHALL commit it inside the caller's transaction, performing no nested
-transaction of its own; and `pending_effects_for_transition` SHALL expose it as additional
-`PendingEffect` values so the action resolver commits it with the originating action's own effects.
-A failure anywhere in the settlement SHALL roll back the completion together with the payout,
-restoring every snapshotted surface.
+complete.
 
 #### Scenario: Arrival completion settles in the same transaction
 - **WHEN** a REACH objective completes on room arrival under an `AUTO` issuance
@@ -79,6 +85,25 @@ restoring every snapshotted surface.
 - **WHEN** a counter turn-in's reward items complete an active ACQUIRE quest under an automatic
   issuance
 - **THEN** both quest IDs appear exactly once in the shared ledger and both rewards are paid
+
+#### Scenario: apply_quest_log_replacement commits inside its existing transaction
+- **WHEN** a completing automatic record arrives through `apply_quest_log_replacement`
+- **THEN** the settlement is committed inside that function's existing transaction
+
+#### Scenario: apply_quest_log_delta commits inside the caller's transaction
+- **WHEN** a completing automatic record arrives through `apply_quest_log_delta`
+- **THEN** the settlement is committed inside the caller's transaction, with no nested transaction
+  of its own
+
+#### Scenario: pending_effects_for_transition exposes the settlement as PendingEffects
+- **WHEN** an action-driven completion exposes its settlement via `pending_effects_for_transition`
+- **THEN** it is exposed as additional `PendingEffect` values so the action resolver commits it
+  with the originating action's own effects
+
+#### Scenario: Any settlement failure rolls back the completion
+- **WHEN** a failure occurs anywhere in the settlement
+- **THEN** the completion is rolled back together with the payout, restoring every snapshotted
+  surface
 
 ### Requirement: Automatic settlement never grants merit and never needs a host
 

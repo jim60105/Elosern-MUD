@@ -19,12 +19,10 @@ string literals in the command.
 
 ### Requirement: Custom creation mode explains its prompts
 When a pending player chooses custom creation, the game SHALL present each prompt with explanatory
-text: what the requested race represents, which subraces exist for the chosen race (with their
-display names and specialty descriptions), what the allocation axes mean, the total allocation
-budget, the number of allocatable axes, each axis's allowed range, and the rule that the
-allocations must sum exactly to the budget — in addition to the existing input validation
-messages. The custom flow SHALL also collect an optional bounded background (flavor) text through
-a dedicated prompt.
+text: what the requested race represents, which subraces exist for the chosen race, what the
+allocation axes mean, and the allocation budget and sum rules — in addition to the existing input
+validation messages. The custom flow SHALL also collect an optional bounded background (flavor)
+text through a dedicated prompt.
 
 #### Scenario: Custom prompts carry explanations
 - **WHEN** a pending player runs `character create`
@@ -58,7 +56,7 @@ restyled output.
 - **THEN** activation is still rejected and the character remains pending
 
 ### Requirement: The interactive creation wizard collects every unmatched reply
-The pending-character creation surface SHALL keep its interactive custom wizard usable end to end through the real command pipeline: while a wizard prompt is open, every player reply that does not match a command the pending-character gate exposes (for example `character`, `說明`, or `登出`, which remain available) SHALL reach the wizard generator, including empty input where the wizard accepts it (for example a blank background) and `cancel` at any step, which SHALL exit the wizard with the cancellation message and leave the character pending and unchanged. This SHALL hold for the `character create` wizard and for the interactive name-and-age continuation of `character concept <構想>` when its proposal resolves synchronously. A reply whose text equals a gate-exposed command key is executed as that command and is not delivered to the wizard.
+The pending-character creation surface SHALL keep its interactive custom wizard usable end to end through the real command pipeline: while a wizard prompt is open, every player reply that does not match a command the pending-character gate exposes SHALL reach the wizard generator, including empty input where the wizard accepts it and `cancel` at any step.
 
 #### Scenario: A name reply advances the custom wizard
 - **WHEN** a pending player runs `character create` and replies to the name prompt
@@ -84,23 +82,24 @@ The pending-character creation surface SHALL keep its interactive custom wizard 
 - **WHEN** a pending player replies to an open wizard prompt with the text `character`
 - **THEN** the `character` command runs instead of being delivered to the wizard, and no wizard prompt state is corrupted
 
+#### Scenario: Gate-exposed commands remain available during prompts
+- **WHEN** a wizard prompt is open
+- **THEN** commands the pending-character gate exposes (for example `character`, `說明`, or `登出`) remain available, and a reply whose text equals a gate-exposed command key is executed as that command and is not delivered to the wizard
+
+#### Scenario: Cancel at any step exits the wizard cleanly
+- **WHEN** a pending player replies `cancel` at any step of an open wizard prompt
+- **THEN** the wizard exits with the cancellation message and leaves the character pending and unchanged
+
+#### Scenario: The rule covers the concept continuation too
+- **WHEN** the reply-routing rule is applied to the interactive name-and-age continuation of `character concept <構想>` after its proposal resolves synchronously
+- **THEN** it holds there exactly as it does for the `character create` wizard
+
 ### Requirement: The creation surface offers a concept-driven custom entry
 The pending-character creation command surface SHALL provide `character concept <構想>` (aliases
 構想) as an additional entry into custom creation: a bounded free-form concept runs the guarded
-`character_creation` generative layer, and a validated proposal is presented as a summary —
-including the generated personality, life story, and habit prose and the proposal's display name,
-both ages, background, and affinity elements — while the display name, actual age, and apparent age
-are collected through the existing prompts as proposal-prefilled defaults: each prompt names the
-proposal's value for its field, an empty reply accepts that default, and any non-empty reply
-overrides it; a prompt whose proposal field is absent keeps the mandatory-input behaviour with
-no default, and an empty or whitespace-only name reply there re-prompts the same prompt (until a
-non-empty name or `cancel`) instead of proceeding to an activation doomed to be rejected. The completed request then flows through the ordinary `CharacterCreationRequest`
-preflight and all-or-nothing activation carrying the proposal's race, subrace, allocations, persona
-block, background, and affinity elements together with the accepted-or-entered name and ages. The
-concept path SHALL persist no wizard draft and SHALL NOT alter activation semantics, the age-range
-gate, subrace compatibility checks, display-name validation, or the all-or-nothing atomic
-activation in `world/rules.character_creation`. With the LLM offline the command SHALL return the
-stable unavailable message and the ordinary preset/custom flows SHALL remain fully usable.
+`character_creation` generative layer, and the completed request flows through the ordinary
+`CharacterCreationRequest` preflight and all-or-nothing activation. The concept path SHALL persist
+no wizard draft.
 
 #### Scenario: A concept-guided flow reaches the ordinary activation path
 - **WHEN** a pending player runs `character concept` and accepts the prefilled name and age
@@ -135,4 +134,39 @@ stable unavailable message and the ordinary preset/custom flows SHALL remain ful
 - **WHEN** every LLM profile is offline and a pending player runs `character concept`
 - **THEN** the player receives the stable unavailable message, and the preset and custom creation
   commands behave exactly as before
+
+#### Scenario: A validated proposal is presented as a summary
+- **WHEN** the generative layer returns a validated proposal
+- **THEN** it is presented as a summary — including the generated personality, life story, and
+  habit prose and the proposal's display name, both ages, background, and affinity elements
+
+#### Scenario: Name and ages are collected as proposal-prefilled defaults
+- **WHEN** the display name, actual age, and apparent age are collected through the existing
+  prompts after a proposal was presented
+- **THEN** each prompt names the proposal's value for its field, an empty reply accepts that
+  default, and any non-empty reply overrides it
+
+#### Scenario: An absent proposal field keeps mandatory-input behaviour
+- **WHEN** a prompt's proposal field is absent and the player answers it with an empty or
+  whitespace-only reply
+- **THEN** the prompt keeps the mandatory-input behaviour with no default and re-prompts the same
+  prompt (until a non-empty name or `cancel`) instead of proceeding to an activation doomed to be
+  rejected
+
+#### Scenario: The concept request carries every proposal value into activation
+- **WHEN** the completed concept request reaches activation
+- **THEN** it flows through the ordinary preflight and all-or-nothing activation carrying the
+  proposal's race, subrace, allocations, persona block, background, and affinity elements together
+  with the accepted-or-entered name and ages
+
+#### Scenario: The concept path leaves activation semantics untouched
+- **WHEN** the concept path runs alongside the existing creation flows
+- **THEN** it SHALL NOT alter activation semantics, the age-range gate, subrace compatibility
+  checks, display-name validation, or the all-or-nothing atomic activation in
+  `world/rules.character_creation`
+
+#### Scenario: Offline LLM yields the stable unavailable message
+- **WHEN** `character concept` runs with the LLM offline
+- **THEN** the command SHALL return the stable unavailable message and the ordinary preset/custom
+  flows SHALL remain fully usable
 

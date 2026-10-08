@@ -15,7 +15,7 @@ practice cost on any target's outcome.
 `world/rules/action.py`'s `ActionResolver.resolve()` SHALL call `resist_verdict(actor, target,
 rng=roll_d100)` (`world/rules/sexual_resist.py`, unmodified) exactly once for every entity in the
 resolved target list other than the acting entity, whenever the cast skill's key is present in
-`SEXUAL_ACT_REGISTRY` and the corresponding `SexualActDef.resistible` is `True`. A non-catalog skill explicitly declaring a resistible interaction policy SHALL use the same single contest per non-actor target. A skill without either entitlement, including ordinary non-catalog spells and non-resistible sexual acts, SHALL trigger no contest. Declaring both sources SHALL never cause duplicate rolls.
+`SEXUAL_ACT_REGISTRY` and the corresponding `SexualActDef.resistible` is `True`.
 
 #### Scenario: A resistible single-target act rolls one contest against its target
 - **WHEN** an actor casts a `resistible=True`, `TargetSpec.SINGLE` act against one target
@@ -34,6 +34,18 @@ resolved target list other than the acting entity, whenever the cast skill's key
 - **WHEN** a spell outside the sexual-act catalog declares a resistible contact policy
 - **THEN** it resolves one ordinary resist contest per non-actor target and emits the existing sexual_resist outcome contract
 
+#### Scenario: A non-catalog skill with a resistible policy uses the same single contest
+- **WHEN** a non-catalog skill explicitly declares a resistible interaction policy
+- **THEN** it SHALL use the same single contest per non-actor target
+
+#### Scenario: A skill without either entitlement triggers no contest
+- **WHEN** a skill has neither catalog membership with `resistible=True` nor an explicit resistible interaction policy — including ordinary non-catalog spells and non-resistible sexual acts
+- **THEN** it SHALL trigger no resist contest
+
+#### Scenario: Declaring both entitlement sources never duplicates rolls
+- **WHEN** a skill declares both catalog membership with `resistible=True` and an explicit resistible interaction policy
+- **THEN** declaring both sources SHALL never cause duplicate rolls
+
 ### Requirement: A resistible AREA-target act resolves one independent contest per resolved target
 `ActionResolver.resolve()` SHALL NOT branch its resist-contest logic on `SkillDef.target_spec`: for a
 `TargetSpec.AREA` cast resolving against more than one target, it SHALL call `resist_verdict()` once per
@@ -48,8 +60,7 @@ resolved target, independently, so each target's outcome depends only on that ta
 When a target's `resist_verdict()` call returns `resisted=True`, `ActionResolver.resolve()` SHALL exclude
 that target from the target list passed to the cast's `pleasure:`/`sexual_counter:`/`sexual_event:`
 effect handlers, so that target's `pleasure`, lifetime counters, and `SexualState` fields are unchanged by
-the cast. A target whose verdict returns `resisted=False` (whether by a rolled comply or an
-`auto_comply=True` short circuit) SHALL receive the act's effects exactly as it would without this change.
+the cast.
 
 #### Scenario: A resisted target's pleasure and counters are unchanged
 - **WHEN** an actor casts a `resistible=True` act against a target whose `resist_verdict()` call resolves
@@ -62,6 +73,11 @@ the cast. A target whose verdict returns `resisted=False` (whether by a rolled c
   `resisted=False`
 - **THEN** the target's `pleasure` and declared counters change exactly as they would for a
   `resistible=False` act with the same `base_pleasure`, part, and counter declarations
+
+#### Scenario: Every complied verdict receives effects unchanged
+- **WHEN** a target's verdict returns `resisted=False`, whether by a rolled comply or an
+  `auto_comply=True` short circuit
+- **THEN** the target SHALL receive the act's effects exactly as it would without this change
 
 ### Requirement: Every resist contest emits a sexual_resist EventLog entry matching the sexual-resist-turn-cost contract
 For every target a resist contest is rolled against, the returned `ActionResult.event_log.entries` SHALL
@@ -84,8 +100,7 @@ contain exactly one `EventEntry` with `kind == "sexual_resist"`, `target` equal 
 For acts declared in `SEXUAL_ACT_REGISTRY` (not generic contact spells), regardless of any target's `ResistVerdict`, `ActionResolver.resolve()` SHALL apply the cast's own
 `actor_counters` and the actor's own pleasure share to the acting entity, SHALL deduct the skill's
 declared resource cost from the actor, SHALL grant skill-practice XP to the actor, and SHALL return
-`ActionResult.outcome == "success"` — none of these SHALL depend on whether any target resisted, including
-when every target in the cast resists.
+`ActionResult.outcome == "success"` — none of these SHALL depend on whether any target resisted.
 
 #### Scenario: A fully-resisted single-target cast still succeeds and still costs the actor
 - **WHEN** an actor casts a `resistible=True`, `TargetSpec.SINGLE` act whose one target's contest
@@ -99,3 +114,8 @@ when every target in the cast resists.
   and `actor_pleasure_ratio` over the post-resist participant set (the actor remains a participant even
   when every target resists; the participant-count crowd multiplier is applied to the post-resist set,
   per design D-7), and the resisting target's `pleasure` is unchanged
+
+#### Scenario: A cast where every target resists still costs and rewards the actor fully
+- **WHEN** every target in a cast resists
+- **THEN** the actor's own effects, resource cost, practice XP, and `"success"` outcome are all
+  applied exactly as if no target had resisted

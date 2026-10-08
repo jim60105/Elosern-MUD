@@ -6,20 +6,9 @@ Declares exactly one immutable capability record per art subject kind — galler
 ### Requirement: One closed declaration states what every subject kind's gallery may do
 `world/art/gallery_kinds.py` SHALL declare exactly one immutable capability record per art subject
 kind, and that declaration SHALL be the single origin of every per-kind gallery rule. Each record
-SHALL carry at least: whether the kind has a gallery at all, the directory segment its stored
-identities use, the maximum number of cards one record may hold, whether the kind supports equipment
-bindings, whether a generation request for the kind requires the canonical-age precondition, whether
-the kind supports a prompt field selection, and whether the kind supports free-form prompt text. A
-kind without a gallery SHALL be declared explicitly as such rather than being represented by an absent
-entry, so "this kind has no gallery" is an assertion in the table and not an accident of a missing key.
-
-The character portrait kind SHALL declare the age precondition, field-selection support, binding
-support, free-text support, and no card maximum. The monster portrait kind SHALL declare none of those
-four capabilities and a maximum of one card: a monster's fewer capabilities are a declaration, not a
-special case in the code that serves it.
-
-The declaration SHALL be data only: it SHALL perform no I/O, read no settings, and hold no mutable
-state, so the same kind resolves the same capabilities in every process.
+SHALL carry at least a gallery-presence flag, the directory segment its stored identities use, the
+maximum number of cards one record may hold, and flags for equipment-binding support,
+canonical-age precondition, prompt-field selection, and free-form prompt-text support.
 
 #### Scenario: Every declared capability is readable from one place
 - **WHEN** the capability record for the character kind and for the monster kind are read
@@ -36,6 +25,22 @@ state, so the same kind resolves the same capabilities in every process.
 #### Scenario: The monster kind declares strictly fewer capabilities than the character kind
 - **WHEN** the character and monster capability records are compared
 - **THEN** the monster declares no binding support, no field selection, no free text, no age precondition, and a maximum of one card, while the character declares all four capabilities and no maximum
+
+#### Scenario: No-gallery is asserted in the table, never an absent key
+- **WHEN** the declaration is consulted for a kind that has no gallery
+- **THEN** the kind is declared explicitly as gallery-less rather than represented by an absent entry, so "this kind has no gallery" is an assertion in the table and not an accident of a missing key
+
+#### Scenario: The character portrait kind declares its full capability set
+- **WHEN** the character portrait capability record is read
+- **THEN** it declares the canonical-age precondition, prompt-field-selection support, equipment-binding support, free-form prompt-text support, and no card maximum
+
+#### Scenario: A monster's fewer capabilities are a declaration, not a code special case
+- **WHEN** the monster portrait capability record is read
+- **THEN** it declares none of the age precondition, field-selection, binding, and free-text capabilities and a maximum of one card, with no special case for monsters in the code that serves the kind
+
+#### Scenario: The declaration is data only
+- **WHEN** the declaration module is exercised in any process
+- **THEN** it performs no I/O, reads no settings, and holds no mutable state, so the same kind resolves the same capabilities in every process
 
 ### Requirement: The declaration covers every subject kind exhaustively
 A contract test SHALL assert that the declaration holds exactly one entry for every member of
@@ -54,9 +59,7 @@ degrade silently at runtime, which is what a missing key in the previous directo
 ### Requirement: The declaration module imports nothing and is keyed by the kind's declared value
 `world/art/gallery_kinds.py` SHALL import no module — neither from `world.art` nor from anywhere else
 in the project — and SHALL key its table by the subject kind's declared string value, exactly as
-`world/art/fallback_keys.py` does and for the same reason. `world/art/subjects.py` imports the gallery
-prompt layer at module level, so a capability table that imported `subjects` would close an import
-cycle as soon as the prompt layer needed to consult it. An import-boundary test SHALL enforce the
+`world/art/fallback_keys.py` does and for the same reason. An import-boundary test SHALL enforce the
 zero-import rule.
 
 #### Scenario: The module has no imports
@@ -66,6 +69,10 @@ zero-import rule.
 #### Scenario: Consulting the table from the prompt layer closes no cycle
 - **WHEN** the gallery prompt layer imports the capability table
 - **THEN** the package imports cleanly and no circular import is raised
+
+#### Scenario: Importing subjects from the capability table would close a cycle
+- **WHEN** one considers the capability table importing `world/art/subjects.py`
+- **THEN** the reason it must not is that `subjects` imports the gallery prompt layer at module level, so such an import would close an import cycle as soon as the prompt layer needed to consult the table
 
 ### Requirement: Gallery enforcement reads the declaration instead of comparing kinds
 The gallery modules SHALL decide every per-kind gallery rule by reading the declaration: whether a

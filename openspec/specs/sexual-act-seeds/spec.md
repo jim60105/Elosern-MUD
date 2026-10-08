@@ -11,12 +11,9 @@ first round of play; the full 62-act catalog ships in later proposals.
 
 ### Requirement: Seven seed acts are registered with an empty unlock mapping and are unconditionally owned
 `world/skills/sexual_acts/solo.py`, `shame.py`, `partner.py`, and `combat.py` SHALL each register at
-least one `SexualActDef` whose `unlock` mapping is empty: `solo_self_touch`, `solo_fondle_breasts`,
-and `solo_thigh_rub` in `solo.py`; `shame_hem_lift` in `shame.py`; `partner_caress` and
-`partner_hand_hold` in `partner.py`; `combat_tease` in `combat.py`. Each SHALL appear in
+least one `SexualActDef` whose `unlock` mapping is empty. Each SHALL appear in
 `SkillHandler.owned_keys()` for an entity whose `SexualState` counters are all zero and whose
-`base_owned_keys()` carries no `SexualMasteryEffect`-bearing skill. `world/skills/sexual_acts/
-interspecies.py` and `divine.py` SHALL remain empty tuples after this change.
+`base_owned_keys()` carries no `SexualMasteryEffect`-bearing skill.
 
 #### Scenario: A freshly created character owns every seed act
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with every `SexualState` lifetime
@@ -27,6 +24,16 @@ interspecies.py` and `divine.py` SHALL remain empty tuples after this change.
 - **WHEN** `world.skills.sexual_acts.interspecies.INTERSPECIES_ACTS` and
   `world.skills.sexual_acts.divine.DIVINE_ACTS` are inspected after this change
 - **THEN** both remain equal to `()`
+
+#### Scenario: The seven seed keys are spread across the four modules
+- **WHEN** the registrations are inspected
+- **THEN** `solo.py` carries `solo_self_touch`, `solo_fondle_breasts`, and `solo_thigh_rub`;
+  `shame.py` carries `shame_hem_lift`; `partner.py` carries `partner_caress` and
+  `partner_hand_hold`; `combat.py` carries `combat_tease`
+
+#### Scenario: interspecies and divine remain empty tuples
+- **WHEN** this change lands
+- **THEN** `world/skills/sexual_acts/interspecies.py` and `divine.py` SHALL remain empty tuples
 
 ### Requirement: The four SELF-target seeds are unresistable; the three SINGLE-target seeds are resistible
 `solo_self_touch`, `solo_fondle_breasts`, `solo_thigh_rub`, and `shame_hem_lift` SHALL declare
@@ -107,12 +114,8 @@ either side.
 A `SEXUAL_ACT`-category skill with `target_spec=SINGLE` SHALL declare, through the targeting
 requirement it produces, that the actor is not an acceptable target; the shared targeting pipeline
 (`world/rules/targeting.py`) SHALL enforce that declaration and reject a resolved target identical to
-the actor. The prohibition SHALL be owned by the skill definition rather than inferred by the pipeline
-from the skill's category, so the pipeline stays free of any skill-category knowledge. The three
-SINGLE-target seeds (`partner_caress`, `partner_hand_hold`, `combat_tease`) are two-participant acts by
-construction: their `participant_counters` and the resist contest assume a second party, so
-self-casting would credit lifetime counters (e.g. `duo_act_count`, `hostile_act_count`) with no partner
-present.
+the actor. The prohibition SHALL be owned by the skill definition rather than inferred by the
+pipeline from the skill's category.
 
 #### Scenario: Self-casting a partner seed is rejected without crediting counters
 - **WHEN** entity A casts `partner_caress` (or `partner_hand_hold`) with A itself as the target
@@ -127,3 +130,10 @@ present.
   inspected
 - **THEN** each one carries the self-target prohibition, and the targeting module imports no skill
   category vocabulary to reach the same result
+
+#### Scenario: The SINGLE-target seeds assume a second party by construction
+- **WHEN** the three SINGLE-target seeds (`partner_caress`, `partner_hand_hold`, `combat_tease`)
+  are considered
+- **THEN** they are two-participant acts by construction — their `participant_counters` and the
+  resist contest assume a second party, so self-casting would credit lifetime counters
+  (e.g. `duo_act_count`, `hostile_act_count`) with no partner present

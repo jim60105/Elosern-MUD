@@ -49,7 +49,7 @@ The dismiss adapter SHALL NOT send any message itself. Its success result SHALL 
 
 ### Requirement: Adapters receive the authenticated session through a fixed optional parameter
 
-Every registered adapter SHALL declare the callable signature `adapter(actor, payload, session=None)`, and the dispatcher SHALL invoke it with the authenticated session as the third positional argument. The dispatcher SHALL NOT use runtime signature introspection to decide what to pass. Two-argument invocations of an adapter (direct test calls) SHALL remain valid through the default. The session SHALL be used only for per-session presentation targeting (for example dismiss eviction); adapters SHALL NOT read or write character state through it.
+Every registered adapter SHALL declare the callable signature `adapter(actor, payload, session=None)`, and the dispatcher SHALL invoke it with the authenticated session as the third positional argument. The dispatcher SHALL NOT use runtime signature introspection to decide what to pass. Two-argument invocations of an adapter (direct test calls) SHALL remain valid through the default.
 
 #### Scenario: A proof adapter receives the session
 
@@ -65,3 +65,7 @@ Every registered adapter SHALL declare the callable signature `adapter(actor, pa
 
 - **WHEN** the dispatcher invokes any adapter
 - **THEN** it always passes the session positionally and never inspects the callable's signature
+
+#### Scenario: The session parameter is presentation-targeting only
+- **WHEN** an adapter receives its session argument
+- **THEN** it uses the session only for per-session presentation targeting (for example dismiss eviction) and never reads or writes character state through it

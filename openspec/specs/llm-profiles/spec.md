@@ -5,7 +5,11 @@ Defines the per-layer LLM profile registry contract: a frozen, strictly validate
 ## Requirements
 
 ### Requirement: Per-layer profile registry
-`world/ai/profiles.py` SHALL define a frozen `LLMProfile` dataclass and a `LLM_PROFILES` registry read from the Django settings. The registry SHALL map the seven layer names `narrator`, `npc_dialogue`, `scenario_director`, `scene_builder`, `character_creation`, `action_options`, and `title_nomination` to exactly one profile each. Each profile SHALL carry `base_url`, `path`, `headers`, `model`, `temperature`, `max_tokens`, `timeout_seconds`, `max_retries`, `supports_response_format`, and `enabled`, and additionally the optional endpoint-configuration fields `api_key`, `app_title`, and `app_url` (each a string defaulting to the empty string), `frequency_penalty`, `presence_penalty`, `top_p`, `repetition_penalty`, `min_p`, and `top_a` (each a float or `None`), `top_k` and `max_completion_tokens` (each an int or `None`), `reasoning_enabled` (bool or `None`), `reasoning_effort` (a closed-set string or `None`), and `reasoning_style` (a closed-set string defaulting to `openrouter`). Layer keys outside the fixed set SHALL be rejected. The `api_key` value SHALL be excluded from the dataclass `repr` so a profile can be logged or debugged without disclosing the credential. The `scenario_director` code default SHALL carry a 8,192-token `max_tokens` so a quest blueprint whose occupants carry complete compact cards fits one response.
+`world/ai/profiles.py` SHALL define a frozen `LLMProfile` dataclass and a `LLM_PROFILES` registry
+read from the Django settings. The registry SHALL map the seven layer names `narrator`,
+`npc_dialogue`, `scenario_director`, `scene_builder`, `character_creation`, `action_options`, and
+`title_nomination` to exactly one profile each. Layer keys outside the fixed set SHALL be
+rejected. The `api_key` value SHALL be excluded from the dataclass `repr`.
 
 #### Scenario: Every layer resolves to a complete profile
 - **WHEN** a consumer requests the profile for any of the seven layer names
@@ -27,8 +31,30 @@ Defines the per-layer LLM profile registry contract: a frozen, strictly validate
 - **WHEN** a profile is constructed with a non-empty `api_key` and formatted with `repr()` or `str()`
 - **THEN** the produced text does not contain the key value
 
+#### Scenario: Profiles carry the full field set
+- **WHEN** a profile is constructed
+- **THEN** it carries `base_url`, `path`, `headers`, `model`, `temperature`, `max_tokens`,
+  `timeout_seconds`, `max_retries`, `supports_response_format`, and `enabled`
+- **AND** additionally the optional endpoint-configuration fields `api_key`, `app_title`, and
+  `app_url` (each a string defaulting to the empty string), `frequency_penalty`,
+  `presence_penalty`, `top_p`, `repetition_penalty`, `min_p`, and `top_a` (each a float or
+  `None`), `top_k` and `max_completion_tokens` (each an int or `None`), `reasoning_enabled`
+  (bool or `None`), `reasoning_effort` (a closed-set string or `None`), and `reasoning_style`
+  (a closed-set string defaulting to `openrouter`)
+
+#### Scenario: The api key exclusion keeps profiles loggable
+- **WHEN** a profile is logged or debugged through its `repr`
+- **THEN** the exclusion lets this happen without disclosing the credential
+
+#### Scenario: The scenario_director default fits a full blueprint
+- **WHEN** the `scenario_director` code default is constructed
+- **THEN** it carries a 8,192-token `max_tokens` so a quest blueprint whose occupants carry
+  complete compact cards fits one response
+
 ### Requirement: Startup profile validation is strict
-Profile values SHALL be validated at settings/registry construction time. `temperature` SHALL be a finite number in `0..2`; `max_tokens`, `timeout_seconds`, `top_k`, and `max_completion_tokens` (when not `None`) SHALL be positive integers; `max_retries` SHALL be a non-negative integer; `base_url` and `path` SHALL be non-empty strings; `model` SHALL be a non-empty string; `enabled` and `supports_response_format` SHALL be booleans; `api_key`, `app_title`, and `app_url` SHALL be strings; `frequency_penalty` and `presence_penalty` SHALL be `None` or finite floats in `-2..2`; `top_p` SHALL be `None` or a finite float in `0 < x <= 1`; `repetition_penalty` SHALL be `None` or a finite float greater than 0; `min_p` SHALL be `None` or a finite float in `0..1`; `top_a` SHALL be `None` or a finite float not less than 0; `reasoning_enabled` SHALL be a bool or `None`; `reasoning_effort` SHALL be `None` or one of `minimal`, `low`, `medium`, `high`; `reasoning_style` SHALL be one of `openrouter`, `vllm`, `off`. `headers` SHALL be an immutable `Mapping[str, tuple[str, ...]]` (or equivalent frozen representation) whose keys and string values SHALL be validated at construction time; the profile SHALL NOT expose the caller's original mutable dict. A profile failing any bound SHALL fail closed at construction rather than being silently clamped, and SHALL report which layer and field failed.
+Profile values SHALL be validated at settings/registry construction time. A profile failing any
+bound SHALL fail closed at construction rather than being silently clamped, and SHALL report
+which layer and field failed.
 
 #### Scenario: Out-of-range sampling fails construction
 - **WHEN** a profile declares a temperature outside `0..2` or a negative timeout
@@ -49,6 +75,27 @@ Profile values SHALL be validated at settings/registry construction time. `tempe
 #### Scenario: Omitted optional fields construct cleanly
 - **WHEN** a profile is constructed without any of the optional endpoint-configuration fields
 - **THEN** construction succeeds and each optional field holds its omit default (`None`, or the empty string for the string fields)
+
+#### Scenario: Every field bound is enforced at construction
+- **WHEN** profile values are validated at construction time
+- **THEN** `temperature` SHALL be a finite number in `0..2`; `max_tokens`, `timeout_seconds`,
+  `top_k`, and `max_completion_tokens` (when not `None`) SHALL be positive integers;
+  `max_retries` SHALL be a non-negative integer; `base_url` and `path` SHALL be non-empty
+  strings; `model` SHALL be a non-empty string; `enabled` and `supports_response_format` SHALL
+  be booleans; `api_key`, `app_title`, and `app_url` SHALL be strings
+- **AND** `frequency_penalty` and `presence_penalty` SHALL be `None` or finite floats in
+  `-2..2`; `top_p` SHALL be `None` or a finite float in `0 < x <= 1`; `repetition_penalty`
+  SHALL be `None` or a finite float greater than 0; `min_p` SHALL be `None` or a finite float
+  in `0..1`; `top_a` SHALL be `None` or a finite float not less than 0
+- **AND** `reasoning_enabled` SHALL be a bool or `None`; `reasoning_effort` SHALL be `None` or
+  one of `minimal`, `low`, `medium`, `high`; `reasoning_style` SHALL be one of `openrouter`,
+  `vllm`, `off`
+
+#### Scenario: Headers are an immutable validated mapping
+- **WHEN** a profile's `headers` are constructed
+- **THEN** they are an immutable `Mapping[str, tuple[str, ...]]` (or equivalent frozen
+  representation) whose keys and string values are validated at construction time, and the
+  profile does not expose the caller's original mutable dict
 
 ### Requirement: Structured output is opt-in per layer
 A profile SHALL request `response_format` / json-schema structured output only when its `supports_response_format` flag is true. Profiles that do not declare the capability SHALL be called without any structured-output hint, so that backends which reject the field remain usable.
@@ -91,11 +138,8 @@ A profile with `enabled: false` SHALL be treated as offline without making any n
 The `headers` validation SHALL reject, case-insensitively, the sensitive header names
 `authorization`, `proxy-authorization`, `x-api-key`, and `api-key` with the standard
 named construction error, naming the layer and the `headers` field and stating that the
-`api_key` profile field is the sanctioned credential route. Credentials supplied through
-the dedicated field are excluded from the profile `repr`; a credential smuggled into the
-frozen header mapping — which the dataclass `repr` does include — would defeat that
-exclusion, so it fails closed instead. All other header names (including `X-Title` and
-`HTTP-Referer`) SHALL remain freely settable.
+`api_key` profile field is the sanctioned credential route. All other header names (including
+`X-Title` and `HTTP-Referer`) SHALL remain freely settable.
 
 #### Scenario: An Authorization header in the mapping fails construction
 - **WHEN** a profile supplies `headers` containing `Authorization` (in any casing) with a bearer-style value
@@ -105,8 +149,15 @@ exclusion, so it fails closed instead. All other header names (including `X-Titl
 - **WHEN** a profile supplies `headers` containing `X-Title` and a custom `X-Request-Tag`
 - **THEN** construction succeeds and both headers are present in the frozen mapping
 
+#### Scenario: Header smuggling would defeat the repr exclusion
+- **WHEN** the rejection rule is examined
+- **THEN** it exists because credentials supplied through the dedicated `api_key` field are
+  excluded from the profile `repr`, while a credential smuggled into the frozen header
+  mapping — which the dataclass `repr` does include — would defeat that exclusion, so it
+  fails closed instead
+
 ### Requirement: Secret-settings profile entries merge per layer over environment-resolved defaults
-When `server/conf/secret_settings.py` defines `LLM_PROFILES`, the effective profile map SHALL be resolved per layer: each layer named by the secret-settings map SHALL take its entry wholesale from the secret file (no field-level merge within that layer), and every layer NOT named SHALL keep its fully environment-resolved entry (per-layer override, then global override, then code default). A secret-settings map naming fewer than all layers SHALL NOT discard the environment configuration of the remaining layers. Validation of the merged map SHALL be as strict as today.
+When `server/conf/secret_settings.py` defines `LLM_PROFILES`, the effective profile map SHALL be resolved per layer: each layer named by the secret-settings map SHALL take its entry wholesale from the secret file (no field-level merge within that layer), and every layer NOT named SHALL keep its fully environment-resolved entry (per-layer override, then global override, then code default). Validation of the merged map SHALL be as strict as today.
 
 #### Scenario: A one-layer secret entry preserves other layers' environment values
 - **WHEN** `LLM_MODEL=llama3.2` is set in the environment, `LLM_CHARACTER_CREATION_MODEL=qwen2.5-32b-instruct` is set, and `secret_settings.py` defines an `LLM_PROFILES` map containing only a complete `character_creation` entry
@@ -119,3 +170,7 @@ When `server/conf/secret_settings.py` defines `LLM_PROFILES`, the effective prof
 #### Scenario: An unknown secret layer still fails the boot
 - **WHEN** `secret_settings.py` defines `LLM_PROFILES` containing a key outside the seven layer names
 - **THEN** settings import fails with the existing named unknown-layer error
+
+#### Scenario: A partial secret map preserves the rest of the environment chain
+- **WHEN** a secret-settings map names fewer than all layers
+- **THEN** it does not discard the environment configuration of the remaining layers

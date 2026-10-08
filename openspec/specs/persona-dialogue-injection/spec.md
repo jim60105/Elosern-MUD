@@ -10,7 +10,7 @@ value-passing across the single-writer boundary.
 ## Requirements
 
 ### Requirement: The NPC's own persona feeds the dialogue system message
-The NPC dialogue system message SHALL be rendered from the prompt library's `npc_dialogue.system` key with a `persona` value supplied from `PersonaStore.flatten()` on the speaking NPC called with the compact NPC card's render order — `identity`, `appearance`, `personality`, `speech_style`, `life_story`, `habit`, `social_connection` — so the NPC's own flattened block includes its hidden identity layer and its explicit speech style, with no truncation for a valid card; when a block is present it SHALL be wrapped by the prompt library's `npc_dialogue.persona_frame` text, which states that this is the NPC's current character setting governing subsequent replies and that earlier conversation and confirmed events are history that the current setting does not rewrite: the `{persona}` placeholder SHALL be substituted on every call — the flattened block when present, an empty string when not — and the empty-substitution output SHALL be byte-identical to today's pre-persona system message. The flattened block SHALL be capped by the `PersonaStore` contract before injection, the structural-key content SHALL never override mechanical values, and the module SHALL NOT embed the template or the persona text as a Python constant.
+The NPC dialogue system message SHALL be rendered from the prompt library's `npc_dialogue.system` key with a `persona` value supplied from `PersonaStore.flatten()` on the speaking NPC called with the compact NPC card's render order — `identity`, `appearance`, `personality`, `speech_style`, `life_story`, `habit`, `social_connection` — so the NPC's own flattened block includes its hidden identity layer and its explicit speech style, with no truncation for a valid card.
 
 #### Scenario: An NPC with persona speaks in character
 - **WHEN** a prompt is built for an NPC whose persona record contains personality, life story, and habits
@@ -27,8 +27,29 @@ The NPC dialogue system message SHALL be rendered from the prompt library's `npc
 #### Scenario: The NPC's speech style reaches the prompt beside its personality
 - **WHEN** a prompt is built for an NPC carrying a valid compact card
 - **THEN** the persona block contains every non-empty card section in render order with the 說話風格 section immediately after the 性格 section, no truncation marker, and the current-setting frame from the prompt library
+
+#### Scenario: The persona frame wraps a present block
+- **WHEN** a flattened persona block is present for the speaking NPC
+- **THEN** it is wrapped by the prompt library's `npc_dialogue.persona_frame` text, which states that this is the NPC's current character setting governing subsequent replies and that earlier conversation and confirmed events are history that the current setting does not rewrite
+
+#### Scenario: The persona placeholder is substituted on every call
+- **WHEN** a dialogue system message is rendered, with or without a persona block
+- **THEN** the `{persona}` placeholder is substituted on every call — the flattened block when present, an empty string when not — and the empty-substitution output is byte-identical to today's pre-persona system message
+
+#### Scenario: The injected block arrives already capped
+- **WHEN** a persona record would flatten past the `PersonaStore` contract's cap
+- **THEN** the flattened block is capped by that contract before injection
+
+#### Scenario: Persona content never overrides mechanical values
+- **WHEN** an injected persona block carries structural-key content
+- **THEN** that content never overrides mechanical values
+
+#### Scenario: No prompt template or persona constant lives in the module
+- **WHEN** the dialogue prompt-building module's source is inspected
+- **THEN** it embeds neither the template nor the persona text as a Python constant
+
 ### Requirement: The player's persona feeds the user payload as player.persona
-`build_npc_dialogue_prompt(...)` SHALL accept an optional `player_persona` block and serialize it as `player.persona` beside `player.affinity` when present. The block SHALL be flattened from a public view of the player's persona record with the field set limited to exactly `identity` (public layer only), `appearance`, and `social_connection`: when the record's `identity` is a mapping, its `hidden` entry SHALL be excluded from the block by construction before flattening, never by post-hoc text scrubbing; a plain-string `identity` renders as-is. The prose fields `personality`, `life_story`, and `habit` and the `background` key SHALL NOT be part of this field set — the NPC reads the player only through appearance, public identity, and the NPC's own social-connection notes. A player without a flattened block SHALL produce a payload byte-identical to today's output. Building the prompt SHALL never create, persist, or mutate a persona record — the block is read-only context.
+`build_npc_dialogue_prompt(...)` SHALL accept an optional `player_persona` block and serialize it as `player.persona` beside `player.affinity` when present. The block SHALL be flattened from a public view of the player's persona record with the field set limited to exactly `identity` (public layer only), `appearance`, and `social_connection`.
 
 #### Scenario: A player with persona is recognized by the NPC
 - **WHEN** a prompt is built for a speaking player whose persona record flattens to a block
@@ -46,19 +67,52 @@ The NPC dialogue system message SHALL be rendered from the prompt library's `npc
 - **WHEN** a prompt is built for a player with no persona record
 - **THEN** the user payload contains no `player.persona` key
 
+#### Scenario: Hidden identity is excluded by construction
+- **WHEN** the record's `identity` is a mapping
+- **THEN** its `hidden` entry is excluded from the block by construction before flattening, never by post-hoc text scrubbing
+
+#### Scenario: A plain-string identity renders as-is
+- **WHEN** the record's `identity` is a plain string rather than a mapping
+- **THEN** it renders as-is in the block
+
+#### Scenario: The field set reflects how the NPC reads the player
+- **WHEN** the player field set is applied
+- **THEN** the prose fields `personality`, `life_story`, and `habit` and the `background` key are not part of it — the NPC reads the player only through appearance, public identity, and the NPC's own social-connection notes
+
+#### Scenario: No block keeps the payload byte-identical
+- **WHEN** a player has no flattened block
+- **THEN** the produced payload is byte-identical to today's output
+
+#### Scenario: Prompt building never writes persona state
+- **WHEN** a prompt is built with a player persona block
+- **THEN** building the prompt never creates, persists, or mutates a persona record — the block is read-only context
+
 ### Requirement: The no-leak validator binds a per-call bounded secret set including disguise true values
 The reply no-leak check SHALL be installed for a call whenever its secret set is non-empty —
 independently of whether an affinity context exists — and SHALL validate speech against that
 per-call set: the affinity value and cap (when present) plus the true trait values of `atk_phys`,
 `agility`, `defense`, `magic_power`, and `hp` when the NPC has an active `disguised_stats` record
-whose value for that key differs from the true trait value. All five values SHALL be read from the
-traits' current `.value` (for `hp`, the current gauge value, not the maximum). A reply whose
-speech contains any bound secret as a decimal integer substring (fullwidth digit forms folded via
-NFKC normalization) SHALL be treated as a validation failure, retried within the budget, and on
-budget exhaustion degrade to `None` rather than present the leak. The binding SHALL be per call
-through the request descriptor so interleaved calls never cross-contaminate; stage names SHALL
-remain allowed; and when no disguise is active and no affinity context exists the set SHALL be
-empty and no leak check SHALL be installed.
+whose value for that key differs from the true trait value.
+
+#### Scenario: Secret values are read from the current trait values
+- **WHEN** the five disguise-comparable traits are bound as secrets
+- **THEN** all five values are read from the traits' current `.value` (for `hp`, the current gauge value, not the maximum)
+
+#### Scenario: A leaked secret fails, retries, and degrades to None
+- **WHEN** a reply's speech contains any bound secret as a decimal integer substring, with fullwidth digit forms folded via NFKC normalization
+- **THEN** the reply is treated as a validation failure and retried within the budget, and on budget exhaustion the call degrades to `None` rather than present the leak
+
+#### Scenario: Binding rides the per-call request descriptor
+- **WHEN** calls interleave
+- **THEN** each secret set is bound per call through the request descriptor so interleaved calls never cross-contaminate
+
+#### Scenario: Stage names stay allowed
+- **WHEN** a reply mentions stage names
+- **THEN** stage names remain allowed by the no-leak validator
+
+#### Scenario: No secrets means no installed check
+- **WHEN** no disguise is active and no affinity context exists
+- **THEN** the secret set is empty and no leak check is installed
 
 #### Scenario: A reply echoing a disguised true value is retried
 - **WHEN** an NPC with an active disguise (true `atk_phys` 88 disguised as 60) receives a reply

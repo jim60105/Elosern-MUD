@@ -9,17 +9,33 @@ Define the prerequisite-lineage graph, the single use-eligibility gate, use-driv
 `world/skills/registry.py` SHALL define the frozen, slotted dataclass
 `SkillPrerequisite(skill_key: str, min_proficiency: int)` with `min_proficiency >= 1`, and `SkillDef`
 SHALL carry `prerequisites: tuple[SkillPrerequisite, ...] = ()`. Registry load SHALL validate, in
-order and fail-closed (an exception names every violator): (1) every `prerequisites.skill_key`
-exists in `SKILL_REGISTRY`; (2) the prerequisite graph is acyclic — a topological sort that raises
-naming the offending cycle; (3) every `min_proficiency` is an integer >= 1; (4) a skill with no
-prerequisites is a tree root; (5) the reverse-edge map (skill -> consuming edges) is computed and
-cached at load. The structure is an n-ary DAG: a skill may be consumed by any number of edges
-(branching) and may declare any number of prerequisites (merging); every mechanical rule is
-degree-independent.
+order and fail-closed (an exception names every violator), the five checks of the following
+scenarios: key existence, graph acyclicity, threshold validity, root identification, and the
+load-time reverse-edge map.
 
 #### Scenario: A dangling prerequisite key fails the load
 - **WHEN** a registry entry declares `prerequisites=(SkillPrerequisite("not_a_skill", 3),)`
 - **THEN** registry load raises naming the entry and the unknown key
+
+#### Scenario: Load validates every prerequisite key exists
+- **WHEN** registry load runs its first check
+- **THEN** every `prerequisites.skill_key` is validated to exist in `SKILL_REGISTRY`
+
+#### Scenario: Load proves the graph acyclic
+- **WHEN** registry load runs its acyclicity check
+- **THEN** a topological sort runs and raises naming the offending cycle
+
+#### Scenario: Load validates every threshold
+- **WHEN** registry load runs its threshold check
+- **THEN** every `min_proficiency` is validated to be an integer >= 1
+
+#### Scenario: Load identifies tree roots
+- **WHEN** registry load runs its root check
+- **THEN** a skill with no prerequisites is a tree root
+
+#### Scenario: The reverse-edge map is computed at load
+- **WHEN** registry load completes
+- **THEN** the reverse-edge map (skill -> consuming edges) is computed and cached at load
 
 #### Scenario: A cycle names itself at load
 - **WHEN** entries `a` and `b` prereq each other
@@ -33,21 +49,20 @@ degree-independent.
 - **WHEN** the lineage tip-cap query asks which edges consume `fire_arrow`
 - **THEN** it resolves from the load-time cache without walking the registry again
 
+#### Scenario: Branching is unbounded
+- **WHEN** a skill is consumed by any number of edges (branching)
+- **THEN** every mechanical rule applies unchanged: the structure is an n-ary DAG, degree-independent
+
+#### Scenario: Merging is unbounded
+- **WHEN** a skill declares any number of prerequisites (merging)
+- **THEN** every mechanical rule applies unchanged: the structure is an n-ary DAG, degree-independent
+
 ### Requirement: The fire lineage ships as the authored branching tree with a two-parent canopy
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored fire tree of the node-data
-authority (`docs/lore/skill-trees/fire.md`): the first-round spine survives verbatim — `fire_ball`
-requires `fire_arrow` >= 3; `scorching_wave` requires `fire_ball` >= 3; `firestorm` requires
-`scorching_wave` >= 3; `lava_burst` requires `firestorm` >= 5; `dragon_flame` requires `lava_burst`
->= 8; `sacrificial_flame` requires `dragon_flame` >= 8 — and the sister spells keep their leaf edges
-onto the same spine: `flame_shroud` requires `scorching_wave` >= 3, `hellfire` requires `firestorm`
->= 5, and `final_blaze` requires `hellfire` >= 5. The catalog wave ADDS the branching edges:
-`scorching_armor` requires `scorching_wave` >= 3 (the third child of the branch point), and the
-two-parent capstone `crimson_apotheosis` requires `sacrificial_flame` >= 10 AND `final_blaze` >= 10.
-`fire_arrow` is a root with no prerequisites. The structure is therefore a branching DAG whose strict
-topological canopy is `crimson_apotheosis` (consuming both authored parents, itself consumed by no
-edge); `sacrificial_flame` is no longer a canopy node — its Lv.10 edge feeds the capstone. The five
-element-mastery passives SHALL NOT be tree nodes (PASSIVE skills are never consumed by edges and
-never accrue).
+authority (`docs/lore/skill-trees/fire.md`). `fire_arrow` is a root with no prerequisites. The
+structure is a branching DAG whose strict topological canopy is `crimson_apotheosis` (consuming both
+authored parents, itself consumed by no edge). The five element-mastery passives SHALL NOT be tree
+nodes (PASSIVE skills are never consumed by edges and never accrue).
 
 #### Scenario: The fire tree validates with the canopy last
 - **WHEN** the registry loads with the authored fire edges
@@ -59,19 +74,40 @@ never accrue).
 - **WHEN** the reverse-edge map is inspected for `fire_mastery`
 - **THEN** no entry is consumed by or consumes any prerequisite edge
 
+#### Scenario: The first-round spine survives verbatim
+- **WHEN** the authored fire edges are declared
+- **THEN** `fire_ball` requires `fire_arrow` >= 3
+- **AND** `scorching_wave` requires `fire_ball` >= 3
+- **AND** `firestorm` requires `scorching_wave` >= 3
+- **AND** `lava_burst` requires `firestorm` >= 5
+- **AND** `dragon_flame` requires `lava_burst` >= 8
+- **AND** `sacrificial_flame` requires `dragon_flame` >= 8
+
+#### Scenario: Sister spells keep their leaf edges onto the spine
+- **WHEN** the authored fire edges are declared
+- **THEN** `flame_shroud` requires `scorching_wave` >= 3
+- **AND** `hellfire` requires `firestorm` >= 5
+- **AND** `final_blaze` requires `hellfire` >= 5
+
+#### Scenario: The catalog wave adds the third branch child
+- **WHEN** the catalog wave extends the fire tree
+- **THEN** `scorching_armor` requires `scorching_wave` >= 3, the third child of the branch point
+
+#### Scenario: The capstone demands both authored parents
+- **WHEN** the catalog wave extends the fire tree
+- **THEN** the two-parent capstone `crimson_apotheosis` requires `sacrificial_flame` >= 10 AND
+  `final_blaze` >= 10
+
+#### Scenario: Sacrificial flame yields its canopy status
+- **WHEN** the reverse-edge map is inspected for `sacrificial_flame`
+- **THEN** it is no longer a canopy node: its Lv.10 edge feeds the capstone
+
 ### Requirement: can_use_skill is the single shared use-eligibility predicate
 `world/rules/progression.py` SHALL define `can_use_skill(entity, skill) -> bool` as a pure,
 side-effect-free query returning `False` unless `skill.key` is in `entity.skills.owned_keys()` and,
 for every declared `SkillPrerequisite`: the prereq key is in `owned_keys()` and
 `skill_proficiency_level(entity, prereq.skill_key) >= prereq.min_proficiency`. It SHALL gate every
-ACTIVE skill — spell and weapon skill alike — and SHALL be consumed by `ActionResolver`
-step-1/preflight/resolve, the shared action preview, submission revalidation, both skill menus, and
-`world/rules/combat.py`'s `default_attack_policy`, replacing the interim ownership+MP-only gate.
-An owned skill whose prerequisite chain is unmet SHALL be rejected by the resolver's step-1 with
-the SAME reason as an unowned skill (`UNKNOWN_SKILL`), its deterministic detail naming the first
-unmet edge in declared order. The deleted mastery-tier override SHALL NOT be reintroduced:
-主宰-tier entry is the prerequisite path (AND semantics over all declared edges). `cost_tiers`
-SHALL remain a display-only data label.
+ACTIVE skill — spell and weapon skill alike.
 
 #### Scenario: A mid-tree spell is gated by its own edge
 - **WHEN** an entity owning `firestorm` with `firestorm` practice level 0 and `scorching_wave`
@@ -90,28 +126,31 @@ SHALL remain a display-only data label.
 - **WHEN** an entity owns `fire_arrow` (no prerequisites)
 - **THEN** `can_use_skill` returns `True` regardless of proficiency
 
+#### Scenario: Every consumer reads the single gate
+- **WHEN** `ActionResolver` step-1/preflight/resolve, the shared action preview, submission
+  revalidation, both skill menus, and `world/rules/combat.py`'s `default_attack_policy` need use
+  eligibility
+- **THEN** all consume `can_use_skill`, replacing the interim ownership+MP-only gate
+
+#### Scenario: An unmet chain is rejected as an unknown skill
+- **WHEN** the resolver's step-1 sees an owned skill whose prerequisite chain is unmet
+- **THEN** it rejects with the SAME reason as an unowned skill (`UNKNOWN_SKILL`), its deterministic
+  detail naming the first unmet edge in declared order
+
+#### Scenario: No mastery-tier override returns
+- **WHEN** 主宰-tier entry is evaluated
+- **THEN** it is the prerequisite path (AND semantics over all declared edges); the deleted
+  mastery-tier override SHALL NOT be reintroduced
+
+#### Scenario: cost_tiers stays cosmetic
+- **WHEN** a skill declares `cost_tiers`
+- **THEN** it remains a display-only data label
+
 ### Requirement: Successful ACTIVE resolution accruses lineage practice XP
 Every successful ACTIVE skill resolution SHALL accrue to the actor, inside the existing action
 snapshot/restore face and the same transaction as the skill's own effects: `SKILL_PRACTICE_XP_PER_USE
-× RACE_REGISTRY[race].learning_multiplier × element_affinity_multiplier(entity, skill.element)`
-(physical or non-elemental skills multiply by `1.0`) `× growth_rate_multiplier(entity)` (the
-conferred-buff pull path) `× the owned-skill growth factor`. The owned-skill growth factor SHALL be
-the product of the multipliers of every scoped `growth_rate` effect carried by a skill the actor
-OWNS whose declared scope equals the element of the skill being practised; it SHALL be `1.0` for a
-skill of any other element and for a skill declaring no element, so an unscoped acceleration is not
-expressible. This factor is independent of the conferred-buff factor: the two multiply, and neither
-reads the other. The affinity factor SHALL apply only to a skill whose parsed effects
-include a magic-school damage of its own element — a physical skill carrying an element (e.g.
-`light_sword_style`) multiplies by `1.0`, and so does a physical skill declaring no element at all. Storage and derivation are unchanged:
-`db.skill_proficiency[skill_key]` float XP with `level = floor(xp / 50)`. PASSIVE skills SHALL NOT
-accrue. A resolution carrying the simulated marker (a guild examination's
-`event_context["simulated"]`) SHALL accrue nothing. Accrual SHALL NOT read the actor's school or any
-magic stat.
-
-Exactly one category-scoped exception SHALL exist: an ACTIVE skill in `SkillCategory.DIVINE_MYSTERY`
-additionally passes a per-world-calendar-day claim before accruing. That rule and its scenarios are
-owned by the `divine-mystery` capability and SHALL NOT be restated here; no other category carries a
-cadence of any kind.
+× RACE_REGISTRY[race].learning_multiplier × element_affinity_multiplier(entity, skill.element)
+× growth_rate_multiplier(entity) × the owned-skill growth factor`. PASSIVE skills SHALL NOT accrue.
 
 #### Scenario: A physical skill accrues like a spell
 - **WHEN** an ACTIVE sword skill resolves successfully for an elf (learning x10) with no affinity and no growth buff
@@ -161,16 +200,48 @@ cadence of any kind.
   across one world-calendar day on distinct ticks
 - **THEN** every resolution accrues, because the cadence applies to that one category only
 
+#### Scenario: The owned-skill growth factor is defined
+- **WHEN** the owned-skill growth factor is computed for a practised skill
+- **THEN** it is the product of the multipliers of every scoped `growth_rate` effect carried by a
+  skill the actor OWNS whose declared scope equals the element of the skill being practised, and
+  `1.0` for a skill of any other element and for a skill declaring no element, so an unscoped
+  acceleration is not expressible
+
+#### Scenario: Neither growth factor reads the other
+- **WHEN** the owned-skill growth factor and `growth_rate_multiplier(entity)` (the conferred-buff
+  pull path) are both in play
+- **THEN** the two factors are independent — they multiply, and neither reads the other
+
+#### Scenario: The affinity factor is magic-damage-scoped
+- **WHEN** the affinity factor is evaluated for a skill
+- **THEN** it applies only to a skill whose parsed effects include a magic-school damage of its own
+  element — a physical skill carrying an element (e.g. `light_sword_style`) multiplies by `1.0`,
+  and so does a physical skill declaring no element at all
+
+#### Scenario: Storage and derivation are unchanged
+- **WHEN** practice XP accrues
+- **THEN** it lands in `db.skill_proficiency[skill_key]` as float XP with `level = floor(xp / 50)`
+
+#### Scenario: A simulated resolution accrues nothing
+- **WHEN** a resolution carries the simulated marker (a guild examination's
+  `event_context["simulated"]`)
+- **THEN** it accrues nothing
+
+#### Scenario: Accrual ignores school and stats
+- **WHEN** any accrual is computed
+- **THEN** it reads neither the actor's school nor any magic stat
+
+#### Scenario: The one divine cadence exception
+- **WHEN** an ACTIVE skill in `SkillCategory.DIVINE_MYSTERY` resolves successfully — the exactly one
+  category-scoped exception that additionally passes a per-world-calendar-day claim before accruing
+- **THEN** that rule and its scenarios are owned by the `divine-mystery` capability and SHALL NOT be
+  restated here; no other category carries a cadence of any kind
+
 ### Requirement: Practice saturates at the derived tip cap
 For any skill `S`, `cap(S)` SHALL equal the maximum `min_proficiency` over all edges consuming `S`
 (read from the load-time reverse-edge map), or `PROFICIENCY_TIP_CAP` (from `progression.yaml`,
 initial value 10) when no edge consumes `S`. Practice accrual SHALL saturate: once
-`skill_proficiency_level(entity, S) >= cap(S)`, no further XP accrues to `S`. Saturation SHALL live
-in one shared award primitive (clamping storage at `cap(S)`) that is the sole accrual writer of
-`skill_proficiency` — the per-use grant and the booked-practice settlement of
-`declared-practice-skip` SHALL both route through it, so the two entry points cannot diverge at cap
-boundaries. `cap(S)` SHALL never fall below any single consuming edge's threshold, so a saturated
-prerequisite never blocks its child node.
+`skill_proficiency_level(entity, S) >= cap(S)`, no further XP accrues to `S`.
 
 #### Scenario: A fully consumed node stops at its edge
 - **WHEN** an entity at `fire_arrow` level 3 continues using `fire_arrow` (consumed by one edge requiring 3)
@@ -184,14 +255,25 @@ prerequisite never blocks its child node.
 - **WHEN** an entity's `firestorm` is capped at 5 and it practices to exactly 5
 - **THEN** `can_use_skill(..., lava_burst)` (edge requires `firestorm >= 5`) returns `True`
 
+#### Scenario: One shared award primitive clamps every writer
+- **WHEN** saturation is enforced
+- **THEN** it lives in one shared award primitive (clamping storage at `cap(S)`) that is the sole
+  accrual writer of `skill_proficiency`
+
+#### Scenario: Both accrual entry points route through the primitive
+- **WHEN** the per-use grant and the booked-practice settlement of `declared-practice-skip` award XP
+- **THEN** both route through the shared primitive, so the two entry points cannot diverge at cap
+  boundaries
+
+#### Scenario: The cap never starves a consuming edge
+- **WHEN** `cap(S)` is derived for a consumed skill
+- **THEN** it SHALL never fall below any single consuming edge's threshold, so a saturated
+  prerequisite never blocks its child node
+
 ### Requirement: Each (actor, skill, target) accrues once per world-clock tick
 Practice accrual SHALL dedupe by `(actor, skill_key, target)` per world-clock tick: at most one
 accrual per distinct triple per tick. Dedupe state SHALL live in a transient module-level dict
-cleared whenever the current tick changes; it SHALL NOT be persisted, snapshotted, or restored, and
-claims taken by a rolled-back commit SHALL be released explicitly so a legitimate same-tick retry
-still accrues. An AREA skill SHALL accrue once per distinct target. An out-of-combat cast SHALL
-advance the world clock (as existing cast settlement does), so consecutive casts by one actor land
-on different ticks.
+cleared whenever the current tick changes; it SHALL NOT be persisted, snapshotted, or restored.
 
 #### Scenario: Same target twice in one tick accrues once
 - **WHEN** an actor resolves the same skill against the same target twice within one tick
@@ -205,16 +287,24 @@ on different ticks.
 - **WHEN** the dedupe dict's contents are checked against snapshot registries and database attributes
 - **THEN** it appears in neither, and a world-clock tick change alone clears it
 
+#### Scenario: A rolled-back commit releases its claim
+- **WHEN** a commit takes a dedupe claim and later rolls back
+- **THEN** the claim is released explicitly so a legitimate same-tick retry still accrues
+
+#### Scenario: An AREA skill accrues per distinct target
+- **WHEN** an AREA skill resolves against multiple targets in one tick
+- **THEN** it accrues once per distinct target
+
+#### Scenario: Out-of-combat casts advance the clock
+- **WHEN** an actor casts out of combat
+- **THEN** the cast advances the world clock (as existing cast settlement does), so consecutive
+  casts by one actor land on different ticks
+
 ### Requirement: The freeform scale ladder is anchored to proficiency
 The set of freeform scales an actor may cast for a skill SHALL be derived by a ladder over the
 skill's OWN proficiency level, gated on the `<element>_mastery` key-presence entitlement: scale 0.25
 unconditionally for an entitled actor, 0.5 at level >= 1, 1.0 at level >= 3, 2.0 at level >= 6,
-4.0 at level >= 10 (thresholds and set SHALL be `progression.yaml` constants). The interaction with
-tip caps is intentional: a rung whose threshold exceeds the skill's derived cap NEVER unlocks, so
-no skill advertises a scale it can never practise to. The ladder SHALL be
-derived deterministically from registry + proficiency state with no hidden information, and the
-resolver gate, the preview, and the combat-panel advertisement SHALL all read the same
-skill-anchored `freeform_scales_for(entity, skill)` so they can never diverge.
+4.0 at level >= 10 (thresholds and set SHALL be `progression.yaml` constants).
 
 #### Scenario: A mastery holder at level 0 sees only the small rungs
 - **WHEN** `freeform_scales_for(entity, skill)` is called for a fire skill on an entity owning
@@ -234,22 +324,25 @@ skill-anchored `freeform_scales_for(entity, skill)` so they can never diverge.
 - **WHEN** an entity without `<element>_mastery` asks for any scale set
 - **THEN** it receives `()` regardless of proficiency
 
+#### Scenario: Tip caps prune unreachable rungs
+- **WHEN** a rung's threshold exceeds the skill's derived tip cap
+- **THEN** that rung NEVER unlocks — the interaction is intentional, so no skill advertises a scale
+  it can never practise to
+
+#### Scenario: The ladder is fully deterministic
+- **WHEN** the ladder is derived
+- **THEN** it comes deterministically from registry + proficiency state with no hidden information
+
+#### Scenario: All surfaces share one derivation
+- **WHEN** the resolver gate, the preview, and the combat-panel advertisement need the scale set
+- **THEN** all read the same skill-anchored `freeform_scales_for(entity, skill)` so they can never
+  diverge
+
 ### Requirement: Import and scene-build auto-seed prerequisite proficiency exactly
 The character loader SHALL, inside the existing all-or-nothing transaction, seed the practice
 proficiency of any prerequisite edge that is unsatisfied for an owned skill to EXACTLY the required
 value, never above, and SHALL extend the record's ownership with the transitive prerequisite
-closure so a deep import is gate-usable, not merely seeded. Auto-seed normalization SHALL run on
-the record before the semantic validation phase reads it (schema range checks included), so
-malformed imports still reject wholesale, and an explicit `skill_proficiency` entry in the import
-record SHALL always win over auto-seed, even when it leaves an edge unmet. Every explicit
-`skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` — the check runs against the RAW record
-before normalization, so an unregistered key names itself and rejects the whole record instead of
-being silently dropped or silently persisted by the seed.
-`world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper, and so SHALL
-`world/rules/character_creation.py`'s preset activation path, which composes
-`lineage_ownership_closure` and `seed_lineage_proficiency` directly over the preset's declared keys
-rather than through the import-record wrapper. The closure and seed helpers SHALL therefore have
-exactly three production callers, and no caller SHALL reimplement either algorithm.
+closure so a deep import is gate-usable, not merely seeded.
 
 #### Scenario: A deep imported skill arrives usable
 - **WHEN** an import record owns `firestorm` (prereq `scorching_wave >= 3`) and carries no proficiency for `scorching_wave`
@@ -275,8 +368,36 @@ exactly three production callers, and no caller SHALL reimplement either algorit
 - **WHEN** a preset activation seeds a prerequisite edge
 - **THEN** the seeded value equals what the import path would write for the same skill set, produced by the same two helpers rather than a parallel implementation
 
+#### Scenario: Normalization precedes semantic validation
+- **WHEN** the loader processes a record
+- **THEN** auto-seed normalization runs on the record before the semantic validation phase reads it
+  (schema range checks included), so malformed imports still reject wholesale
+
+#### Scenario: Explicit proficiency always wins
+- **WHEN** the import record carries an explicit `skill_proficiency` entry
+- **THEN** it always wins over auto-seed, even when it leaves an edge unmet
+
+#### Scenario: Explicit keys resolve in the registry against the raw record
+- **WHEN** every explicit `skill_proficiency` key is checked for resolution in `SKILL_REGISTRY`
+- **THEN** the check runs against the RAW record before normalization, so an unregistered key names
+  itself and rejects the whole record instead of being silently dropped or silently persisted by the
+  seed
+
+#### Scenario: The NPC spawn path shares the helper
+- **WHEN** `world/quests/scene_builder.py`'s NPC spawn path seeds lineage proficiency
+- **THEN** it shares the same helper as the character loader
+
+#### Scenario: Preset activation composes the helpers directly
+- **WHEN** `world/rules/character_creation.py`'s preset activation path seeds lineage proficiency
+- **THEN** it composes `lineage_ownership_closure` and `seed_lineage_proficiency` directly over the
+  preset's declared keys rather than through the import-record wrapper
+
+#### Scenario: Exactly three production callers
+- **WHEN** the closure and seed helpers are counted across production
+- **THEN** they have exactly three production callers, and no caller reimplements either algorithm
+
 ### Requirement: The wind lineage ships as the authored two-root branching tree with a two-parent canopy
-`SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored wind tree of the node-data authority (`docs/lore/skill-trees/wind.md`): TWO roots — `gale_step` (mobility) and `wind_blade` (destruction) — each with no prerequisites. The mobility chain is linear: `gale_chain_step` requires `gale_step` >= 3; `afterimage_step` requires `gale_chain_step` >= 3; `haste_domain` requires `afterimage_step` >= 5 (branch-terminal leaf). The destruction chain runs `tornado_blade` requires `wind_blade` >= 3 — the branch point feeding BOTH authored children: `storm_domain` requires `tornado_blade` >= 3 and `gale_dance_strike` requires `tornado_blade` >= 3. The storm branch runs `heavens_wrath_storm` requires `storm_domain` >= 5 and `sky_tempest` requires `heavens_wrath_storm` >= 8; the dance branch runs `sky_rending_slash` requires `gale_dance_strike` >= 8 and `vacuum_severance` requires `sky_rending_slash` >= 8. The two-parent 神格 canopy `sky_apotheosis` requires `sky_tempest` >= 10 AND `vacuum_severance` >= 10 — consuming both authored parents and itself consumed by no edge. The structure is therefore a two-root DAG whose strict topological canopy is `sky_apotheosis`; `wind_mastery` and `flight` SHALL NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
+`SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored wind tree of the node-data authority (`docs/lore/skill-trees/wind.md`): TWO roots — `gale_step` (mobility) and `wind_blade` (destruction) — each with no prerequisites. The structure is a two-root DAG whose strict topological canopy is `sky_apotheosis`; `wind_mastery` and `flight` SHALL NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
 
 #### Scenario: The wind tree validates with two roots and the canopy last
 - **WHEN** the registry loads with the authored wind edges
@@ -290,22 +411,39 @@ exactly three production callers, and no caller SHALL reimplement either algorit
 - **WHEN** the reverse-edge map is inspected for `wind_mastery` and `flight`
 - **THEN** no entry is consumed by or consumes any prerequisite edge
 
+#### Scenario: The mobility chain is linear
+- **WHEN** the authored wind edges are declared
+- **THEN** `gale_chain_step` requires `gale_step` >= 3
+- **AND** `afterimage_step` requires `gale_chain_step` >= 3
+- **AND** `haste_domain` requires `afterimage_step` >= 5, a branch-terminal leaf
+
+#### Scenario: The destruction branch point feeds both authored children
+- **WHEN** the authored wind edges are declared
+- **THEN** `tornado_blade` requires `wind_blade` >= 3 — the branch point feeding BOTH authored children
+- **AND** `storm_domain` requires `tornado_blade` >= 3
+- **AND** `gale_dance_strike` requires `tornado_blade` >= 3
+
+#### Scenario: The storm branch chain
+- **WHEN** the authored wind edges are declared
+- **THEN** `heavens_wrath_storm` requires `storm_domain` >= 5
+- **AND** `sky_tempest` requires `heavens_wrath_storm` >= 8
+
+#### Scenario: The dance branch chain
+- **WHEN** the authored wind edges are declared
+- **THEN** `sky_rending_slash` requires `gale_dance_strike` >= 8
+- **AND** `vacuum_severance` requires `sky_rending_slash` >= 8
+
+#### Scenario: The two-parent 神格 canopy demands both parents
+- **WHEN** the authored wind edges are declared
+- **THEN** the two-parent 神格 canopy `sky_apotheosis` requires `sky_tempest` >= 10 AND
+  `vacuum_severance` >= 10 — consuming both authored parents and itself consumed by no edge
+
 ### Requirement: The ice lineage ships as the authored two-root branching tree with a two-parent canopy
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored ice tree of the node-data
 authority (`docs/lore/skill-trees/ice.md`): TWO roots — `frost_breath` (遲緩路線) and `ice_shard`
-(監禁路線) — each with no prerequisites. The slow line runs `ice_wall` requires `frost_breath` >= 3
-— the branch point feeding BOTH authored children: `frost_mire` requires `ice_wall` >= 3 (branch-
-terminal leaf) and `permafrost_domain` requires `ice_wall` >= 3. The permafrost chain continues
-`absolute_tundra` requires `permafrost_domain` >= 8 and `eternal_ice_field` requires
-`absolute_tundra` >= 8. The imprisonment line runs `frost_arrow_rain` requires `ice_shard` >= 3;
-`ice_prison` requires `frost_arrow_rain` >= 3 — the second branch point feeding BOTH authored
-children: `blizzard` requires `ice_prison` >= 5 and `crystal_shatter` requires `ice_prison` >= 5
-(branch-terminal leaf). The blizzard chain continues `absolute_zero` requires `blizzard` >= 8. The
-two routes are otherwise independent chains; they converge ONLY at the strict topological canopy
-`eternal_frost_apotheosis`, requiring `eternal_ice_field` >= 10 AND `absolute_zero` >= 10
-(consuming both authored parents, itself consumed by no edge) — the lore's 匯合 of 遲緩 and 監禁 at
-the 神格 rung. The element-mastery passive SHALL NOT be a tree node (PASSIVE skills are never
-consumed by edges and never accrue).
+(監禁路線) — each with no prerequisites. The two routes are otherwise independent chains; they
+converge ONLY at the strict topological canopy `eternal_frost_apotheosis`. The element-mastery
+passive SHALL NOT be a tree node.
 
 #### Scenario: The ice tree validates with two roots and the canopy last
 - **WHEN** the registry loads with the authored ice edges
@@ -325,23 +463,48 @@ consumed by edges and never accrue).
 - **WHEN** the reverse-edge map is inspected for `ice_mastery`
 - **THEN** no entry is consumed by or consumes any prerequisite edge
 
+#### Scenario: The slow line branch point feeds both authored children
+- **WHEN** the authored ice edges are declared
+- **THEN** `ice_wall` requires `frost_breath` >= 3 — the branch point feeding BOTH authored children
+- **AND** `frost_mire` requires `ice_wall` >= 3, a branch-terminal leaf
+- **AND** `permafrost_domain` requires `ice_wall` >= 3
+
+#### Scenario: The permafrost chain continues
+- **WHEN** the authored ice edges are declared
+- **THEN** `absolute_tundra` requires `permafrost_domain` >= 8
+- **AND** `eternal_ice_field` requires `absolute_tundra` >= 8
+
+#### Scenario: The imprisonment line branch point feeds both authored children
+- **WHEN** the authored ice edges are declared
+- **THEN** `frost_arrow_rain` requires `ice_shard` >= 3
+- **AND** `ice_prison` requires `frost_arrow_rain` >= 3 — the second branch point feeding BOTH
+  authored children
+- **AND** `blizzard` requires `ice_prison` >= 5
+- **AND** `crystal_shatter` requires `ice_prison` >= 5, a branch-terminal leaf
+
+#### Scenario: The blizzard chain continues
+- **WHEN** the authored ice edges are declared
+- **THEN** `absolute_zero` requires `blizzard` >= 8
+
+#### Scenario: The canopy demands both authored parents
+- **WHEN** the authored ice edges are declared
+- **THEN** `eternal_frost_apotheosis` requires `eternal_ice_field` >= 10 AND `absolute_zero` >= 10
+
+#### Scenario: The canopy consumes both routes and nothing consumes it
+- **WHEN** the canopy's edges are inspected
+- **THEN** `eternal_frost_apotheosis` consumes both authored parents and is itself consumed by no
+  edge — the lore's 匯合 of 遲緩 and 監禁 at the 神格 rung
+
+#### Scenario: PASSIVE rationale for staying out of the graph
+- **WHEN** the element-mastery passive is considered as a tree node
+- **THEN** it is excluded because PASSIVE skills are never consumed by edges and never accrue
+
 ### Requirement: The lightning lineage ships as the authored two-root branching tree with a two-parent canopy
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored lightning tree of the node-data
 authority (`docs/lore/skill-trees/lightning.md`): TWO roots — `static_ward` (先制路線) and
-`spark_shock` (過載路線) — each with no prerequisites. The initiative line runs `lightning_flicker`
-requires `static_ward` >= 3; `thunder_combo` requires `lightning_flicker` >= 3 — the branch point
-feeding BOTH authored children: `thunder_gods_haste` requires `thunder_combo` >= 5 and
-`thunder_shatter_strike` requires `thunder_combo` >= 5 (branch-terminal leaf). The haste chain
-continues `judgement_thunder` requires `thunder_gods_haste` >= 8. The overload line runs
-`chain_lightning` requires `spark_shock` >= 3 AND `paralyzing_bolt` requires `spark_shock` >= 3 (the
-root's own branch point); `lightning_strike` requires `chain_lightning` >= 3; `thunder_prison`
-requires `paralyzing_bolt` >= 3 (branch-terminal leaf); `heavens_thunder` requires
-`lightning_strike` >= 5; `divine_lightning_slaughter` requires `heavens_thunder` >= 8. The two
-routes are otherwise independent chains; they converge ONLY at the strict topological canopy
-`thunder_apotheosis`, requiring `judgement_thunder` >= 10 AND `divine_lightning_slaughter` >= 10
-(consuming both authored parents, itself consumed by no edge) — the lore's 匯合 of 先制 and 過載 at
-the 神格 rung. The element-mastery passive SHALL NOT be a tree node (PASSIVE skills are never
-consumed by edges and never accrue).
+`spark_shock` (過載路線) — each with no prerequisites. The two routes are otherwise independent
+chains; they converge ONLY at the strict topological canopy `thunder_apotheosis`. The
+element-mastery passive SHALL NOT be a tree node.
 
 #### Scenario: The lightning tree validates with two roots and the canopy last
 - **WHEN** the registry loads with the authored lightning edges
@@ -362,3 +525,41 @@ consumed by edges and never accrue).
 #### Scenario: The mastery passive stays out of the graph
 - **WHEN** the reverse-edge map is inspected for `lightning_mastery`
 - **THEN** no entry is consumed by or consumes any prerequisite edge
+
+#### Scenario: The initiative line branch point feeds both authored children
+- **WHEN** the authored lightning edges are declared
+- **THEN** `lightning_flicker` requires `static_ward` >= 3
+- **AND** `thunder_combo` requires `lightning_flicker` >= 3 — the branch point feeding BOTH authored
+  children
+- **AND** `thunder_gods_haste` requires `thunder_combo` >= 5
+- **AND** `thunder_shatter_strike` requires `thunder_combo` >= 5, a branch-terminal leaf
+
+#### Scenario: The haste chain continues
+- **WHEN** the authored lightning edges are declared
+- **THEN** `judgement_thunder` requires `thunder_gods_haste` >= 8
+
+#### Scenario: The overload root branches at itself
+- **WHEN** the authored lightning edges are declared
+- **THEN** `chain_lightning` requires `spark_shock` >= 3 AND `paralyzing_bolt` requires
+  `spark_shock` >= 3 — the root's own branch point
+
+#### Scenario: The overload chains continue
+- **WHEN** the authored lightning edges are declared
+- **THEN** `lightning_strike` requires `chain_lightning` >= 3
+- **AND** `thunder_prison` requires `paralyzing_bolt` >= 3, a branch-terminal leaf
+- **AND** `heavens_thunder` requires `lightning_strike` >= 5
+- **AND** `divine_lightning_slaughter` requires `heavens_thunder` >= 8
+
+#### Scenario: The canopy demands both authored parents
+- **WHEN** the authored lightning edges are declared
+- **THEN** `thunder_apotheosis` requires `judgement_thunder` >= 10 AND
+  `divine_lightning_slaughter` >= 10
+
+#### Scenario: The canopy consumes both routes and nothing consumes it
+- **WHEN** the canopy's edges are inspected
+- **THEN** `thunder_apotheosis` consumes both authored parents and is itself consumed by no
+  edge — the lore's 匯合 of 先制 and 過載 at the 神格 rung
+
+#### Scenario: PASSIVE rationale for staying out of the graph
+- **WHEN** the element-mastery passive is considered as a tree node
+- **THEN** it is excluded because PASSIVE skills are never consumed by edges and never accrue

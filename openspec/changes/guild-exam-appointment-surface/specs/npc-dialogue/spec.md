@@ -75,3 +75,40 @@
 - **WHEN** validated local counter intent asks exact-next rank for a below-threshold member with absent host
 - **THEN** schedule information is returned without changing resources, exam state or affinity, and speech is retained
 
+#### Scenario: The AI cannot escalate through the exam gate
+- **WHEN** `request_guild_exam` is applied
+- **THEN** the AI cannot choose examiner stats, waive a gate, promote the player, or start combat directly
+
+#### Scenario: The exam gate performs its own rechecks
+- **WHEN** `apply_npc_intent` delegates `request_guild_exam` to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`
+- **THEN** that API itself rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination
+
+#### Scenario: Item transfers are all-or-nothing across both entities
+- **WHEN** a `give_item` or `take_item` transfer is applied after holdings are verified
+- **THEN** it transfers through the validated inventory-planning boundary as one all-or-nothing operation whose failure restores both entities' database and in-process state
+
+#### Scenario: Relation deltas route through the affinity-system writer
+- **WHEN** `adjust_relation` is applied
+- **THEN** the applier verifies the bounded `delta` payload and delegates to `world/rules/affinity.py::apply_affinity_change(npc, player, "ai_dialogue", delta)` from `affinity-system`
+- **AND** the AI cannot choose a delta outside 0–10
+
+#### Scenario: The applier reports the actually applied delta amount
+- **WHEN** an `adjust_relation` delta is partially budget-applied
+- **THEN** the applier reports it as applied with the applied amount in `IntentOutcome.delta_used`
+- **AND** a fully blocked or rejected delta (applied amount 0) is discarded as an intent with the speech kept
+
+#### Scenario: Accepted party invites route through party-core
+- **WHEN** `party_invite` with `accept: true` is applied
+- **THEN** the applier verifies the boolean `accept` payload and delegates to `world/rules/party.py::join_party(npc, player)` from `party-core`, which rechecks co-location, the NPC target, the absence of an existing binding, and the 4-companion bound
+- **AND** on `accept: false` the applier reports an applied no-op
+
+#### Scenario: Quest offers recheck authority and issue all-or-nothing
+- **WHEN** `offer_quest` is applied
+- **THEN** the applier verifies the bounded `quest_key` payload and delegates to the dialogue-offer-quest applier, which rechecks the speaker's authored issuing authority (`GuildStaff` or `QuestIssuer`) and the registered issuance for the speaker's resolved issuer key under that issuer kind's own eligibility rule
+- **AND** the quest is assigned through the quest runtime in one all-or-nothing operation with +1 guild affinity
+
+#### Scenario: Lore reveals record append-only with no affinity
+- **WHEN** `reveal_lore` is applied
+- **THEN** the applier verifies the bounded `category`/`key` payload and delegates to `world/rules/lore_knowledge.py::record_lore_reveal(player, category, key)`, which checks the category allowlist and registry resolvability and records the discovery append-only
+- **AND** a repeat reveal is an applied no-op and no affinity is granted
+

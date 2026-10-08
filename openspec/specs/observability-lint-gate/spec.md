@@ -9,11 +9,8 @@ Define the stdlib-AST lint gate (`tools/observability_lint`) that keeps the faca
 `tools.observability_lint` SHALL scan `world/`, `typeclasses/`, `commands/`,
 `server/`, and `web/` (excluding any `tests/` directory or `test_*.py` file)
 with AST-based rules and exit non-zero on any violation. R1 SHALL reject
-every access path to the Evennia logger in scanned files: `Import` or
-`ImportFrom` of module `evennia.utils.logger` (any imported name, including
-direct function imports such as `log_warn`), `from evennia import logger`,
-`from evennia.utils import logger` (with or without alias), and attribute
-calls `evennia.logger.*` after `import evennia`. The only permanent
+every access path to the Evennia logger in scanned files, as enumerated by
+the logger access-path scenario. The only permanent
 whitelist member is `world/observability/`. Unparseable files SHALL be
 reported as violations, never skipped.
 
@@ -34,20 +31,23 @@ reported as violations, never skipped.
 - **WHEN** a scanned file fails Python parsing
 - **THEN** the check reports a violation for that file and exits non-zero
 
+#### Scenario: R1 rejects every logger access path
+
+- **WHEN** a scanned file uses any of: `Import` or `ImportFrom` of module
+  `evennia.utils.logger` (any imported name, including direct function imports
+  such as `log_warn`), `from evennia import logger`,
+  `from evennia.utils import logger` (with or without alias), or attribute
+  calls `evennia.logger.*` after `import evennia`
+- **THEN** the check reports an R1 violation for that access path
+
 ### Requirement: Exception handlers must re-raise, log, or carry a reasoned exemption
 
 R2 SHALL apply to scanned files that import `world.observability` (module or
 named API import — a "facade adopter"), including frozen adopters. In every
-adopter file R2 SHALL require every `except` body to contain, anywhere in
-its AST
-subtree (recursively, excluding nested function/lambda definitions), a
-`raise` (bare re-raise, a new raise, or `raise ... from`), or a facade log
-call — or to carry an exemption comment
-`# observability: ignore <rule-id>: <reason>` with a non-empty reason,
-located on the `except` header line or immediately before the first body
-statement (resolved via tokenization, since comments are absent from the
-AST). An `except` body that silently swallows an exception without any of
-the three SHALL be a violation.
+adopter file R2 SHALL require every `except` body to contain, anywhere in its
+AST subtree and not inside a nested function or lambda, a `raise` or a facade
+log call — or to carry a reasoned exemption comment. An `except` body that silently swallows
+an exception without any of the three SHALL be a violation.
 
 #### Scenario: A bare swallowed exception fails the gate
 
@@ -83,6 +83,20 @@ the three SHALL be a violation.
 - **THEN** the check passes for that handler and the JSON report's exemption
   count includes it
 
+#### Scenario: Exemption comments are located by tokenization
+
+- **WHEN** R2 resolves an exemption comment
+  `# observability: ignore <rule-id>: <reason>` with a non-empty reason
+- **THEN** it accepts the comment only on the `except` header line or
+  immediately before the first body statement, resolved via tokenization
+  since comments are absent from the AST
+
+#### Scenario: Every raise form satisfies R2
+
+- **WHEN** a facade-adopter handler's body contains a bare re-raise, a new
+  raise, or `raise ... from` anywhere in its AST subtree
+- **THEN** the handler is not an R2 violation
+
 ### Requirement: Facade log calls must carry context
 
 R3 SHALL reject any facade call without a `context=` argument (other than a
@@ -101,10 +115,10 @@ the call line (trailing comment or the immediately preceding line).
 The gate SHALL read `tools/observability_freeze.json`, seeded at gate landing
 with exactly the generated set of production files carrying Evennia-logger
 import debt (the R1 inventory). A frozen entry suppresses R1 for that file
-only; R2/R3 continue to apply whenever the file imports the facade. The list
-SHALL only shrink: an entry naming a file that no longer exists, or that no
-longer has any R1 violation, SHALL itself be reported as a violation. The
-final migration batch SHALL drive the list to empty.
+only; R2/R3 still apply whenever the file imports the facade. The list
+SHALL only shrink: an entry naming a file that no longer exists or no longer
+has any R1 violation SHALL itself be reported as a violation. The final
+migration batch SHALL drive the list to empty.
 
 #### Scenario: A zombie freeze entry fails the gate
 

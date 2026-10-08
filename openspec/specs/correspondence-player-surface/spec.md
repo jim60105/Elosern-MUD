@@ -7,7 +7,7 @@ Provides branch-only letter sending and acquisition while keeping collected lett
 
 ### Requirement: Sending and collection require any branch
 
-Players SHALL send bounded free text to established recipients only at an authored 銀羽驛站 branch with letter service and a unique permanent room anchor. At any such branch they SHALL explicitly collect all due letters for their identity with no home-city restriction. Server authorization SHALL enforce these branch checks for both browser and text requests, including forged requests. Away from branches the personal surface SHALL expose only owned previously collected letters, including collected-but-unread letters, never uncollected bodies. Previously collected letters SHALL remain readable anywhere.
+Players SHALL send bounded free text to established recipients only at an authored 銀羽驛站 branch with letter service and a unique permanent room anchor. At any such branch they SHALL explicitly collect all due letters for their identity with no home-city restriction. Server authorization SHALL enforce these branch checks for both browser and text requests, including forged requests.
 
 #### Scenario: Collect at another settlement
 - **WHEN** a player has due letters and visits a different authorized branch
@@ -25,6 +25,14 @@ Players SHALL send bounded free text to established recipients only at an author
 #### Scenario: Invalid send
 - **WHEN** recipient resolution is invalid/ambiguous or body bounds fail
 - **THEN** no send, deadline or narrative source commits
+
+#### Scenario: Away from branches only collected letters are exposed
+- **WHEN** a player is away from any authorized branch
+- **THEN** the personal surface SHALL expose only owned previously collected letters, including collected-but-unread letters, never uncollected bodies
+
+#### Scenario: Collected letters remain readable anywhere
+- **WHEN** a letter has previously been collected
+- **THEN** it SHALL remain readable anywhere
 
 ### Requirement: Collection and reading remain distinct
 
@@ -48,7 +56,7 @@ Finite letter operations SHALL use server-authorized actions with text-client eq
 
 ### Requirement: Personal letters load once per opening
 
-The personal letters panel SHALL have no Reload or Refresh control. Each genuine opening SHALL request the first collected-letter page exactly once when dispatch is ready. An opening while a preceding request or global mutation/presentation lock prevents dispatch SHALL wait for readiness without submitting a refused request, then submit its one initial list request if still open. Closing SHALL cancel an unsent initial load. Ordinary presentation updates SHALL NOT schedule additional initial loads. Closing and reopening SHALL start a fresh first-page load; explicit next-page requests SHALL remain available through the server-provided cursor.
+The personal letters panel SHALL have no Reload or Refresh control. Each genuine opening SHALL request the first collected-letter page exactly once when dispatch is ready. Ordinary presentation updates SHALL NOT schedule additional initial loads.
 
 #### Scenario: Open and reopen
 - **WHEN** a player opens a dispatch-ready personal letters panel, leaves it open through ordinary presentation updates, then closes and reopens it
@@ -68,9 +76,21 @@ The personal letters panel SHALL have no Reload or Refresh control. Each genuine
 - **WHEN** a loaded page has a next cursor and the player explicitly requests the next page
 - **THEN** the panel submits a list request using that cursor and displays the returned collected-letter page without collecting or reading any letter
 
+#### Scenario: Opening while blocked waits for readiness
+- **WHEN** an opening occurs while a preceding request or global mutation/presentation lock prevents dispatch
+- **THEN** the panel SHALL wait for readiness without submitting a refused request, then submit its one initial list request if still open
+
+#### Scenario: Closing cancels an unsent initial load
+- **WHEN** the panel closes before its initial load dispatches
+- **THEN** closing SHALL cancel the unsent initial load
+
+#### Scenario: Reopen starts fresh; pagination persists
+- **WHEN** the panel is closed and reopened
+- **THEN** the reopening SHALL start a fresh first-page load, and explicit next-page requests SHALL remain available through the server-provided cursor
+
 ### Requirement: Letter panel state follows genuine lifecycle boundaries
 
-Ordinary presentation publications with unchanged transport generation and identity SHALL preserve the loaded page, opened letter prose, and unsent recipient/body draft. Disconnect, puppet detach, identity/epoch replacement, or transport-generation reset SHALL close the panel and discard its private local state and unsent initial load. Closing SHALL discard the unsent draft without persisting it. Only a result correlated to the current opening's pending request, identity epoch, and transport generation SHALL update the panel; late results from a previous opening or session SHALL NOT populate it or change its status message.
+Ordinary presentation publications with unchanged transport generation and identity SHALL preserve the loaded page, opened letter prose, and unsent recipient/body draft. Disconnect, puppet detach, identity/epoch replacement, or transport-generation reset SHALL close the panel and discard its private local state and unsent initial load.
 
 #### Scenario: Ordinary publication preserves private local state
 - **WHEN** an ordinary presentation publication replaces the client view with the same identity and transport generation after a page and letter body are loaded and a draft is entered
@@ -86,9 +106,17 @@ Ordinary presentation publications with unchanged transport generation and ident
 - **THEN** the old response neither populates the new panel nor changes its message
 - **AND** only the new opening's correlated result is accepted
 
+#### Scenario: Closing discards the unsent draft
+- **WHEN** the panel closes with an unsent recipient/body draft
+- **THEN** closing SHALL discard the unsent draft without persisting it
+
+#### Scenario: Only correlated results update the panel
+- **WHEN** a result arrives for the panel
+- **THEN** only a result correlated to the current opening's pending request, identity epoch, and transport generation SHALL update the panel
+
 ### Requirement: Letter loading has explicit recovery and authoritative response updates
 
-Opening or listing the panel SHALL NOT automatically collect letters or mark them read. The panel SHALL NOT poll or automatically retry any submitted request that fails. A failed list request SHALL present failure information and instruct the player to close and reopen to load the list again. Successful explicit collection or sending SHALL update the displayed page using the authoritative operation response without an additional browser list request. These behaviors SHALL be documented in both player command references without changing text-command syntax.
+Opening or listing the panel SHALL NOT automatically collect letters or mark them read. The panel SHALL NOT poll or automatically retry any submitted request that fails. A failed list request SHALL present failure information and instruct the player to close and reopen to load the list again.
 
 #### Scenario: Submitted load fails
 - **WHEN** a submitted list request fails and subsequent ordinary publications or lock releases occur while the panel remains open
@@ -108,3 +136,11 @@ Opening or listing the panel SHALL NOT automatically collect letters or mark the
 #### Scenario: Successful send reuses its response
 - **WHEN** an authorized explicit send succeeds
 - **THEN** its authoritative page updates the panel without another browser list request and the sent body draft clears
+
+#### Scenario: Success updates from the authoritative response
+- **WHEN** an explicit collection or send succeeds
+- **THEN** the displayed page SHALL update using the authoritative operation response without an additional browser list request
+
+#### Scenario: Behaviors documented in both references
+- **WHEN** these loading behaviors are shipped
+- **THEN** they SHALL be documented in both player command references without changing text-command syntax

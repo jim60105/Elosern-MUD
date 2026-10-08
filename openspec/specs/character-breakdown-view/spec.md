@@ -6,7 +6,7 @@ The deterministic stat-breakdown read model: a pure, fail-closed projection of e
 
 ### Requirement: Breakdown read model decomposes each panel stat by source
 
-The status read model SHALL expose, for every panel stat, a breakdown row of stored `base` (the literal, never skill-baked), accounting-complete named `layers`, and one `effective` value composed FROM those layers. Each layer SHALL be exactly `{source, name, kind, amount}` with `source` in the closed set `skill|condition|equipment`, `kind` in `mult|flat|pct`, a signed amount, and a `name` resolved through the corresponding registry label (skill registry label, `STATUS_DISPLAY` label, or item display name). Layer order SHALL be deterministic on fixed identity tuples: skill by skill key, then condition by (source kind, key), then equipment by (slot order, item key). Every non-empty contribution feeding the effective value SHALL appear as a layer; a contribution whose label cannot be resolved, or a stat exceeding the 16-layer bound, SHALL make the read model fail closed into the common unavailable panel form — never a silent skip or truncation. Gauge maximum rows SHALL decompose with the same layer structure (equipment gauge caps as equipment flat layers); gauge `current` is persisted resource state and carries no layers. Building a breakdown SHALL operate on validated stored snapshots and the no-create bundle, materialize no handlers, and mutate nothing.
+The status read model SHALL expose, for every panel stat, a breakdown row of stored `base` (the literal, never skill-baked), accounting-complete named `layers`, and one `effective` value composed FROM those layers. Each layer SHALL be exactly `{source, name, kind, amount}` with `source` in the closed set `skill|condition|equipment`, `kind` in `mult|flat|pct`, a signed amount, and a `name` resolved through the corresponding registry label.
 
 #### Scenario: Plate armor appears as its own layer
 
@@ -28,9 +28,40 @@ The status read model SHALL expose, for every panel stat, a breakdown row of sto
 - **WHEN** a breakdown is built for an entity whose equipment, buff, skills, or sexual handlers were never materialized
 - **THEN** no handlers or attributes are created and persisted attributes are byte-for-byte identical before and after the build
 
+#### Scenario: Layer labels resolve through their registries
+
+- **WHEN** a layer's `name` is resolved
+- **THEN** it comes from the corresponding registry label: the skill registry label, the
+  `STATUS_DISPLAY` label, or the item display name
+
+#### Scenario: Layer order is deterministic on fixed identity tuples
+
+- **WHEN** a row's layers are ordered
+- **THEN** skills sort by skill key, then conditions by (source kind, key), then equipment by
+  (slot order, item key)
+
+#### Scenario: Accounting is complete and bounded, failing closed
+
+- **WHEN** a non-empty contribution feeding the effective value has no resolvable label, or a
+  stat exceeds the 16-layer bound
+- **THEN** the read model fails closed into the common unavailable panel form — never a silent
+  skip or truncation — and every other non-empty contribution appears as a layer
+
+#### Scenario: Gauge rows decompose with the same layer structure
+
+- **WHEN** a gauge maximum row is built
+- **THEN** it decomposes with the same layer structure (equipment gauge caps as equipment flat
+  layers), while gauge `current` — persisted resource state — carries no layers
+
+#### Scenario: Breakdown building mutates nothing
+
+- **WHEN** a breakdown is built
+- **THEN** it operates on validated stored snapshots and the no-create bundle, materializes no
+  handlers, and mutates nothing
+
 ### Requirement: Each displayed stat matches its named authoritative computation
 
-For every displayed stat, the panel's `effective` SHALL equal the shipped authoritative computation named for it under identical inputs: attack/defense via the merged-bundle flat/pct with skill mults and single final rounding; agility identical plus the ≥ 0 floor (initiative's raw-agility exception is explicitly out of parity scope); `magic_power` via the shipped skill effective-value arithmetic's rounding form; gauge maximum via the shipped gauge reader form. Behavior tests SHALL pin each stat against ITS named computation; consumer-specific post-effective floors (to-hit, heal) are documented non-contradictions, not parity targets.
+For every displayed stat, the panel's `effective` SHALL equal the shipped authoritative computation named for it under identical inputs: attack/defense via the merged-bundle flat/pct with skill mults and single final rounding; agility identical plus the ≥ 0 floor (initiative's raw-agility exception is explicitly out of parity scope); `magic_power` via the shipped skill effective-value arithmetic's rounding form; gauge maximum via the shipped gauge reader form.
 
 #### Scenario: Panel defense equals the defense used in resolution
 
@@ -46,6 +77,12 @@ For every displayed stat, the panel's `effective` SHALL equal the shipped author
 
 - **WHEN** an actor wearing the `hp +15` plate requests the HP breakdown
 - **THEN** the maximum decomposes over the stored base plus an equipment flat layer of 15 and the panel maximum equals the heal-clamp ceiling
+
+#### Scenario: Parity tests pin each stat to its named computation
+
+- **WHEN** behavior tests verify displayed-stat parity
+- **THEN** each stat is pinned against ITS named computation, and consumer-specific
+  post-effective floors (to-hit, heal) are documented non-contradictions, not parity targets
 
 ### Requirement: Text client renders layers and compact surfaces stay totals-only
 

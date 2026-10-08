@@ -10,8 +10,7 @@ registry defined by this change (`RACE_REGISTRY`, `STATIC_TIER_REGISTRY`, `SUBRA
 `ELEMENT_REGISTRY`, `MAGIC_TIER_REGISTRY`, `NATION_REGISTRY`,
 `GUILD_RANK_REGISTRY`, `MONSTER_TIER_REGISTRY`, `ANCHOR_REGISTRY`, `PRICE_TABLE`), ensures a
 corresponding persistent DB record exists, addressable by a key derived from the registry's
-category and the entry's own `key`. The deleted `RANK_TITLE_REGISTRY` SHALL NOT be mirrored,
-and the `"rank_titles"` category key SHALL NOT exist in the sync category map.
+category and the entry's own `key`.
 
 #### Scenario: Every registry entry produces a DB record
 - **WHEN** `sync_all()` runs against a fresh database with no existing lore records
@@ -24,6 +23,10 @@ and the `"rank_titles"` category key SHALL NOT exist in the sync category map.
 - **THEN** its key includes both the registry category (`"races"` or equivalent) and the entry's
   own `key` (`"elf"`), so records from different registries never collide even if two registries
   happened to reuse the same entry key
+
+#### Scenario: The deleted rank-title registry is not mirrored
+- **WHEN** `sync_all()` mirrors the lore registries into the DB
+- **THEN** the deleted `RANK_TITLE_REGISTRY` is not mirrored and the `"rank_titles"` category key does not exist in the sync category map
 
 ### Requirement: Sync is idempotent across repeated server starts
 Running `sync_all()` more than once, including across separate Evennia server starts, SHALL NOT

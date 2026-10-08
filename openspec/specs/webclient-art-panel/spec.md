@@ -12,11 +12,7 @@ offline degradation, and keyboard-first desktop-bounded browser acceptance.
 The production presentation registry SHALL register `art` schema version 2. Its available payload
 SHALL contain exactly `schema_version`, `available`, `kind`, `scene`, and `portrait_catalog`;
 `available` SHALL be true and `kind` SHALL be `scene`. The panel SHALL be available in `exploration`
-and `combat` modes and SHALL use the registered common unavailable form in `creation` mode. The
-presenter SHALL strictly read the authenticated puppet's current location and (in combat) its active
-combat session, SHALL emit no live object reference, no filesystem path, no store root, and no
-rejected prompt content, and SHALL NOT mutate traits, resources, buffs, sexual state, combat
-session, map knowledge, quests, location, art records, or world time.
+and `combat` modes and SHALL use the registered common unavailable form in `creation` mode.
 
 #### Scenario: Exploration mode renders the current scene
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot for a room whose
@@ -40,17 +36,23 @@ session, map knowledge, quests, location, art records, or world time.
 - **THEN** only `art` becomes correlated unavailable, the other panels still render, and normal text
   output remains usable
 
+#### Scenario: Presenter reads state strictly and mutates none
+- **WHEN** the presenter builds the `art` payload
+- **THEN** it strictly reads the authenticated puppet's current location and (in combat) its
+  active combat session, and mutates no traits, resources, buffs, sexual state, combat session,
+  map knowledge, quests, location, art records, or world time
+
+#### Scenario: The payload carries no reference, path, or rejected content
+- **WHEN** the presenter emits the `art` payload
+- **THEN** it contains no live object reference, no filesystem path, no store root, and no
+  rejected prompt content
+
 ### Requirement: The scene payload resolves only validated archetypes with truthful placeholders
 The art panel scene SHALL resolve through `world.art.presenter.resolve_scene` from the current room's
 validated `scene_archetype` and SHALL contain the subject key, asset status, same-origin media URL,
 aspect ratio, and alternative text for a `done` record, or a truthful placeholder kind and
-explanatory label otherwise. The scene SHALL render as the client's full-bleed stage backdrop with
-cover-style cropping, and SHALL display its label and alternative text as text outside the bitmap.
-When the current scene is pending and a prior scene is already rendered, the client SHALL retain that
-prior image visibly dimmed and labelled `目前場景圖片生成中`; without a prior image, and for failed or
-invalid assets, it SHALL render the current mode's gradient stage together with the scene placeholder
-label. The panel SHALL NOT silently present old art as current, SHALL NOT expose `out_path` or the
-store root, and SHALL derive its URL only from a validated stored identity.
+explanatory label otherwise. The panel SHALL NOT silently present old art as current, SHALL NOT
+expose `out_path` or the store root, and SHALL derive its URL only from a validated stored identity.
 
 #### Scenario: Done scene serves the same-origin media URL
 - **WHEN** a room's scene archetype has a `done` asset record with an existing validated output
@@ -67,36 +69,25 @@ store root, and SHALL derive its URL only from a validated stored identity.
 - **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as
   text and no URL, and no stale image is substituted
 
+#### Scenario: The scene renders as the full-bleed stage backdrop
+- **WHEN** the client renders a resolved scene
+- **THEN** it renders as the full-bleed stage backdrop with cover-style cropping, and displays the
+  scene label and alternative text as text outside the bitmap
+
+#### Scenario: A pending scene with a prior image dims and labels it
+- **WHEN** the current scene is pending and a prior scene is already rendered
+- **THEN** the client retains that prior image visibly dimmed and labelled `目前場景圖片生成中`
+
+#### Scenario: No prior image degrades to the gradient stage
+- **WHEN** there is no prior image, or the asset is failed or invalid
+- **THEN** the client renders the current mode's gradient stage together with the scene placeholder
+  label
+
 ### Requirement: The portrait catalog is server-authored, age-checked, and bounded
 The art panel `portrait_catalog` SHALL be a bounded object keyed by the opaque IDs of currently
-present focusable entities: the combat-session participant identities in combat mode, and the
-dialogue hosts, explicit named-portrait-policy characters, and live party companions of the player
-character present in the current room in exploration mode, in deterministic order. Each catalog
-value SHALL contain the server-resolved subject key, asset status, same-origin media URL or
-placeholder, aspect ratio, alternative text, and bounded display context (name plus role/target
-label), and the resolved normalized face rectangle and stage triple, together with the server-authored
-portrait origin discriminator — the closed vocabulary established by `art-gallery-fallback`
-(`runtime | silhouette | placeholder`), extended with `official` (see the `official-art-resolution`
-capability) on every entry that carries a media value, so an official image, a runtime image, and a
-silhouette are distinguishable
-without inspecting the URL. Stage SHALL be an exact finite
-bounded `{scale, x, y}` mapping for assets and null for placeholders; malformed stored card stage
-SHALL degrade to identity rather than fail a snapshot. The face rectangle SHALL be a mapping of
-exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the entry carries a media URL, and SHALL be `null`
-whenever the entry is a placeholder, so a client never offsets a frame it has no image for. The
-catalog SHALL carry no face-detection result and no crop, and — beyond the decorative `fallback`
-field established by `art-gallery-fallback` — no second image reference. Portrait
-subject resolution SHALL dispatch by entity kind: a named character SHALL resolve
-`portrait:character:<stable-key>` only from an explicit named `portrait_policy` through the
-canonical-age check; a generic monster SHALL resolve `portrait:monster:<archetype>` from its
-bestiary `MONSTER_TIER_REGISTRY` archetype without any character age gate; and anything else SHALL
-be the unavailable placeholder. Eligibility SHALL NOT be inferred from display name, key shape, or
-LLM authorship. The canonical-age check SHALL reject a character when either `age` or
-`apparent_age` is missing or malformed (non-integer); a rejected subject SHALL appear as the
-unavailable placeholder with no subject key, no URL, and no prompt content, and SHALL NOT be
-enqueued or reach a worker. The catalog SHALL contain only currently present focusable identities
-and SHALL NOT contain persona text, disguised stats, combat resources, or any subject that is not
-currently present.
+present focusable entities, in deterministic order. Each catalog value SHALL contain the
+server-resolved subject key, asset status, same-origin media URL or placeholder, aspect ratio,
+alternative text, and bounded display context (name plus role/target label).
 
 #### Scenario: Combat catalog mirrors the context_actions participants
 - **WHEN** combat presentation resolves participants and the art panel resolves its portrait catalog
@@ -129,6 +120,11 @@ currently present.
   named policy, are not dialogue hosts, and are not live party companions
 - **THEN** none of them appears in the portrait catalog
 
+#### Scenario: The catalog carries no canonical or non-present data
+- **WHEN** the catalog payload is inspected
+- **THEN** it carries only currently present focusable identities and contains no persona text,
+  disguised stats, combat resources, or any subject that is not currently present
+
 #### Scenario: A resolved catalog entry carries its face rectangle
 - **WHEN** a present entity resolves to a gallery image
 - **THEN** its catalog entry carries a media URL and a face rectangle of exactly `x`, `y`, `w`, `h` in `[0, 1]`
@@ -153,17 +149,60 @@ currently present.
 - **WHEN** a catalog entry resolves an official image for a subject whose gallery is empty
 - **THEN** the entry presents the official media and origin, the subject's gallery state remains empty, and the payload reports no generated-portrait completion
 
+#### Scenario: Catalog membership follows the mode
+- **WHEN** the portrait catalog resolves
+- **THEN** in combat mode its keys are the combat-session participant identities, and in
+  exploration mode the dialogue hosts, explicit named-portrait-policy characters, and live party
+  companions of the player character present in the current room
+
+#### Scenario: Every media-bearing entry names its authored origin
+- **WHEN** a catalog entry carries a media value
+- **THEN** it carries the server-authored portrait origin discriminator — the closed vocabulary
+  established by `art-gallery-fallback` (`runtime | silhouette | placeholder`), extended with
+  `official` (see the `official-art-resolution` capability) — so an official image, a runtime
+  image, and a silhouette are distinguishable without inspecting the URL
+
+#### Scenario: Stage carries the exact bounded triple or null
+- **WHEN** a catalog entry resolves
+- **THEN** stage is an exact finite bounded `{scale, x, y}` mapping for assets and null for
+  placeholders, and malformed stored card stage degrades to identity rather than failing a
+  snapshot
+
+#### Scenario: The face rectangle is bounded for images and null for placeholders
+- **WHEN** a catalog entry resolves
+- **THEN** the face rectangle is a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the
+  entry carries a media URL, and `null` whenever the entry is a placeholder, so a client never
+  offsets a frame it has no image for
+- **AND** the resolved normalized face rectangle and stage triple accompany the other value
+  fields
+
+#### Scenario: The catalog carries no detection, crop, or second image
+- **WHEN** the catalog payload is inspected
+- **THEN** it carries no face-detection result and no crop, and — beyond the decorative
+  `fallback` field established by `art-gallery-fallback` — no second image reference
+
+#### Scenario: Subject resolution dispatches by entity kind
+- **WHEN** a present entity's portrait subject is resolved
+- **THEN** a named character resolves `portrait:character:<stable-key>` only from an explicit
+  named `portrait_policy` through the canonical-age check, a generic monster resolves
+  `portrait:monster:<archetype>` from its bestiary `MONSTER_TIER_REGISTRY` archetype without any
+  character age gate, and anything else is the unavailable placeholder
+
+#### Scenario: Eligibility is never inferred
+- **WHEN** the server decides portrait eligibility for an entity
+- **THEN** eligibility is not inferred from display name, key shape, or LLM authorship
+
+#### Scenario: The canonical-age check gate rejects before any job
+- **WHEN** a character's `age` or `apparent_age` is missing or malformed (non-integer)
+- **THEN** the canonical-age check rejects the character and the rejected subject appears as the
+  unavailable placeholder with no subject key, no URL, and no prompt content, and is not enqueued
+  and never reaches a worker
+
 ### Requirement: Contextual portrait focus is client-local and verified
 The browser SHALL maintain contextual portrait focus entirely client-side: the KeyboardRouter SHALL
 emit a focus event and the art renderer SHALL select a supplied catalog value, and there SHALL be no
-focus mutation message and no client-constructed subject key, URL, status, or alternative text. A
-full snapshot SHALL preserve the current focus only when the focused catalog ID survives the
-replacement; otherwise exploration SHALL have no portrait focus and combat SHALL select the first
-valid target in deterministic presenter order. No focus SHALL mean no portrait card; a focused
-character with a missing portrait SHALL show the portrait placeholder card rather than removal. Menu
-descriptors SHALL reference catalog entries by their opaque IDs; this delivery unit supplies the
-combat descriptors (its `portrait_ref`), while exploration-menu descriptors that reference the same
-catalog arrive with the exploration-menu delivery unit.
+focus mutation message and no client-constructed subject key, URL, status, or alternative text. Menu
+descriptors SHALL reference catalog entries by their opaque IDs.
 
 #### Scenario: Keyboard focus switches only among catalog entries
 - **WHEN** the browser moves focus among present menu descriptors that reference catalog IDs
@@ -179,50 +218,31 @@ catalog arrive with the exploration-menu delivery unit.
 - **WHEN** the browser has no contextual focus
 - **THEN** no portrait card is rendered and the scene remains the sole art content
 
+#### Scenario: A full snapshot preserves focus only across a surviving ID
+- **WHEN** a full snapshot replaces the catalog
+- **THEN** it preserves the current focus only when the focused catalog ID survives the
+  replacement; otherwise exploration has no portrait focus and combat selects the first valid
+  target in deterministic presenter order
+
+#### Scenario: A focused character with a missing portrait keeps a card
+- **WHEN** the focused character has no portrait
+- **THEN** the browser shows the portrait placeholder card rather than removal
+
+#### Scenario: Descriptor supply is split across delivery units
+- **WHEN** catalog-referencing menu descriptors are accounted for
+- **THEN** this delivery unit supplies the combat descriptors (its `portrait_ref`), while
+  exploration-menu descriptors that reference the same catalog arrive with the exploration-menu
+  delivery unit
+
 ### Requirement: Worker completion pushes a targeted art panel update
 
 Canonical requirement ID: `webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update`.
 
 When an art-worker asset or gallery job settles and emits `asset_completed`,
 the `world/art/` settle path SHALL emit a bounded server-side notification
-carrying only the completed subject key. For each connected WebClient session
-with an active puppet and an already-attached coordinator, the presentation
-layer SHALL independently re-render `art`, `gallery`, and `roster` from that
-session's current canonical state and current owned presentation selection.
-Each available panel SHALL qualify independently: art when its current scene
-subject or any portrait-catalog entry references the completed subject key;
-gallery when its rendered `selected` equals that key; roster when any rendered
-character row's portrait subject key equals that key. Gallery rail membership
-alone SHALL NOT qualify a gallery update, and roster qualification SHALL NOT be
-limited to the current puppet or characters present in its room.
-
-The presentation layer SHALL publish all qualifying freshly rendered panels
-together in one affected-panel `ui_update` at a newer revision per session per
-notification, even when art does not qualify or is unavailable. Unavailable
-panels SHALL be omitted independently without suppressing another qualifying
-panel. When no panel qualifies it SHALL publish nothing and SHALL NOT advance
-revision. Existing mode-coherence companion panels SHALL remain permitted.
-A non-WebClient session, a session with no active puppet, or a session with no
-attached coordinator SHALL receive no completion push.
-
-Late completions SHALL be gated on the freshly rendered current references,
-not remembered selections, rooms, sent payloads, or completed image identities.
-A completion for an old room, vanished entity, or no-longer-selected gallery
-SHALL NOT replace that panel's current content or restore an old selection;
-a different panel still referencing the same subject SHALL remain eligible.
-Room or present-entity-set changes SHALL continue to replace the art payload
-through ordinary presentation updates. Completion rendering SHALL NOT mutate
-canonical state, select a card, or set a default. Failed gallery settlement
-notifications SHALL refresh truthful pending/error rows under the same rules
-without fabricating a portrait or card. Each session SHALL remain isolated so
-its rendering/publication failure cannot stop the other sessions or propagate
-back into the worker. Delivery SHALL remain on the existing reactor-side
-notification path, not the worker thread.
-
-The notification SHALL NOT expose output paths, prompts, or worker internals,
-and the `world/art/` package SHALL remain free of any `web/` import. A missed
-notification SHALL be repaired by reconnect's current-store full snapshot,
-without replaying the missed push.
+carrying only the completed subject key. The presentation layer SHALL publish
+all qualifying freshly rendered panels together in one affected-panel
+`ui_update` at a newer revision per session per notification.
 
 #### Scenario: A done scene reaches sessions currently showing that scene
 
@@ -284,21 +304,48 @@ without replaying the missed push.
 - **WHEN** the notification is processed for a non-WebClient transport, a puppet-less session, or a session without an attached coordinator
 - **THEN** that session receives no update, and notification handling does not attach a coordinator or change canonical state to make it eligible
 
+#### Scenario: Each eligible session re-renders independently
+
+- **WHEN** a completion notification is processed for each connected WebClient session with an active puppet and an already-attached coordinator
+- **THEN** the presentation layer independently re-renders `art`, `gallery`, and `roster` from that session's current canonical state and current owned presentation selection
+
+#### Scenario: Each available panel qualifies independently
+
+- **WHEN** freshly rendered panels are evaluated against the completed subject key
+- **THEN** art qualifies when its current scene subject or any portrait-catalog entry references that key, gallery when its rendered `selected` equals that key, and roster when any rendered character row's portrait subject key equals that key
+- **AND** gallery rail membership alone does not qualify a gallery update, and roster qualification is not limited to the current puppet or characters present in its room
+
+#### Scenario: Publication proceeds without art and omits unavailable panels
+
+- **WHEN** art does not qualify or is unavailable while another panel qualifies
+- **THEN** the update publishes anyway, unavailable panels are omitted independently without suppressing another qualifying panel, and existing mode-coherence companion panels remain permitted
+- **AND** when no panel qualifies nothing is published and revision does not advance
+
+#### Scenario: Late completions gate on fresh references only
+
+- **WHEN** a completion notification is evaluated for staleness
+- **THEN** it is gated on the freshly rendered current references — not remembered selections, rooms, sent payloads, or completed image identities — a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+
+#### Scenario: Completion rendering is pure presentation
+
+- **WHEN** completion rendering runs
+- **THEN** it mutates no canonical state, selects no card, and sets no default, while room or present-entity-set changes continue to replace the art payload through ordinary presentation updates
+
+#### Scenario: Delivery stays reactor-side and leak-free
+
+- **WHEN** the completion notification is delivered
+- **THEN** it remains on the existing reactor-side notification path, not the worker thread, exposes no output paths, prompts, or worker internals, and the `world/art/` package remains free of any `web/` import
+
+#### Scenario: A missed notification is repaired, not replayed
+
+- **WHEN** a completion notification is missed by a session
+- **THEN** reconnect's current-store full snapshot repairs the view without replaying the missed push
+
 ### Requirement: Art degradation never blocks gameplay or leaks rejected content
 With the worker command fixed to fail and every LLM profile unavailable, movement, dialogue, combat,
 quests, and services SHALL proceed through their deterministic paths while every art state degrades
-to the approved placeholders. The scheduler disabled, worker unavailable or timed out, missing file
-for a done record, invalid output identity, OOB disconnect during completion, and browser image load
-failure SHALL each degrade presentation only and log bounded diagnostics. A browser image load
-failure SHALL show fallback text/placeholder and SHALL NOT repeatedly fetch without a new URL or
-user reload. OOB errors SHALL contain no traceback, local path, unescaped player content, or rejected
-prompt content. A missing/pending/failed scene SHALL degrade to a single truthful placeholder label
-on the stage backdrop, identified by a stable `data-testid` hook, with the mode gradient as the
-rendered stage. Because a snapshot refresh or a Vue re-render can open a transient double-node window
-under a loaded runner, the browser acceptance test SHALL gate its placeholder-count assertion on the
-shared bounded wait helper (the committed art-panel store state plus a DOM-readiness descriptor,
-within one bounded deadline) rather than a single raw `.count()` sample, so the assertion observes the
-single visible placeholder node deterministically.
+to the approved placeholders. OOB errors SHALL contain no traceback, local path, unescaped player
+content, or rejected prompt content.
 
 #### Scenario: Offline art never blocks play
 - **WHEN** the worker command is fixed to fail and the scheduler is disabled
@@ -321,19 +368,35 @@ single visible placeholder node deterministically.
   `data-testid` hook until it observes exactly one visible placeholder node, so the assertion is
   deterministic rather than a single raw `.count()` sample
 
+#### Scenario: Every enumerated failure degrades presentation only
+- **WHEN** the scheduler is disabled, the worker is unavailable or times out, a done record's file
+  is missing, the output identity is invalid, an OOB disconnect occurs during completion, or the
+  browser's image load fails
+- **THEN** each degrades presentation only and logs bounded diagnostics
+
+#### Scenario: A browser image load failure stops refetching
+- **WHEN** a browser image load fails
+- **THEN** the browser shows fallback text/placeholder and does not repeatedly fetch without a new
+  URL or user reload
+
+#### Scenario: A degraded scene shows one labelled placeholder
+- **WHEN** the scene is missing, pending, or failed
+- **THEN** it degrades to a single truthful placeholder label on the stage backdrop, identified by
+  a stable `data-testid` hook, with the mode gradient as the rendered stage
+
+#### Scenario: The placeholder gate uses the shared bounded wait helper
+- **WHEN** the browser acceptance test asserts the placeholder count and a snapshot refresh or Vue
+  re-render can open a transient double-node window under a loaded runner
+- **THEN** the test gates its assertion on the shared bounded wait helper (the committed art-panel
+  store state plus a DOM-readiness descriptor, within one bounded deadline) rather than a single
+  raw `.count()` sample, so the assertion observes the single visible placeholder node
+  deterministically
+
 ### Requirement: Art panel browser acceptance is keyboard-first, accessible, and desktop-bounded
 The scene full view SHALL open by click on the backdrop's scene control or Enter on that focused
-control and SHALL close on Escape. Portrait catalog entries SHALL render only inside the framed-portrait
-surfaces that consume them (the combat participant frame, the party strip and party drawer, the
-stage actors that stand the dialogue host and the combat foes in the `actor-right` anchor, the interact
-target avatars and dock target rows); the client SHALL render no
-standalone portrait catalog strip and no per-portrait full-view control. The
-scene label and alternative text SHALL remain visible as text outside the bitmap, alternative text
-SHALL be meaningful, and no required information SHALL exist only inside an image. Server-authored
-labels SHALL be inserted as text, not trusted HTML, and reduced-motion preference SHALL disable
-nonessential transitions. The stage backdrop and the framed portraits SHALL remain usable at both
-1451x790 and 2560x1440 without the backdrop covering the scene label, the HUD islands, or required
-status.
+control and SHALL close on Escape. The scene label and alternative text SHALL remain visible as
+text outside the bitmap, alternative text SHALL be meaningful, and no required information SHALL
+exist only inside an image.
 
 #### Scenario: Keyboard-only full view opens and closes
 - **WHEN** the player focuses the scene control and presses Enter, then Escape
@@ -346,6 +409,25 @@ status.
 #### Scenario: Player-authored text is not executed as markup
 - **WHEN** a display name or label contains HTML-like player text
 - **THEN** the browser renders it as literal text and creates no element or script from it
+
+#### Scenario: Catalog entries render only inside consuming surfaces
+- **WHEN** the browser renders portrait catalog entries
+- **THEN** they render only inside the framed-portrait surfaces that consume them — the combat
+  participant frame, the party strip and party drawer, the stage actors that stand the dialogue
+  host and the combat foes in the `actor-right` anchor, the interact target avatars and dock
+  target rows
+- **AND** the client renders no standalone portrait catalog strip and no per-portrait full-view
+  control
+
+#### Scenario: Labels are text and motion is reducible
+- **WHEN** server-authored labels render and the player prefers reduced motion
+- **THEN** labels are inserted as text, not trusted HTML, and reduced-motion preference disables
+  nonessential transitions
+
+#### Scenario: Both viewports keep the stage usable
+- **WHEN** the stage renders at 1451x790 and at 2560x1440
+- **THEN** the stage backdrop and the framed portraits remain usable without the backdrop
+  covering the scene label, the HUD islands, or required status
 
 ### Requirement: The art panel accepts the normalized in-flight state
 The Web art panel schema (Python and JavaScript) SHALL accept every status the presenter can emit —
@@ -363,22 +445,6 @@ shared pure mapping from the committed entry's normalized `face_rect` to a CSS `
 percentage pair, exported by `web/webclient-app/components/face-rect.js`, so the server's authored
 composition stays centered in a frame of any aspect ratio. Under cover fit the mapping SHALL align
 the image's p% point with the frame's p% point, which centers the rectangle's center.
-The mapping SHALL return the centered `50% 50%` pair — never a throw and never an off-frame
-percentage — for a `null` or `undefined` rectangle and for any rectangle with a non-finite field,
-a field outside `[0, 1]`, an `x + w` greater than 1, a `y + h` greater than 1, or a non-positive
-`w` or `h`, so one corrupt card cannot blank a portrait surface. A URL-bearing entry whose rectangle
-is missing or malformed SHALL still render its image with that centered crop; only a placeholder
-entry (a null URL) SHALL render its labelled placeholder with no image element.
-The small-avatar set — the top-bar character switcher's thumbnails and the party drawer's avatar
-thumbnails — additionally obeys the dedicated small-avatar zoom-crop requirement below, which
-refines this rule for those surfaces by enlarging the crop around the same rectangle while keeping
-the identical validation set and the identical centered-crop fallback; every other surface named
-here keeps the recenters-only treatment verbatim. Each avatar surface — the combat participant
-frame, the party strip and the party drawer's avatar thumbnails, the dialogue host avatar in the
-narrative feed, the interact target avatars and the dock's target rows, and the top-bar character
-switcher — SHALL apply the mapping to that entry's rectangle and SHALL ignore stage. The drawer's
-full-figure art slot uses the separate stage render contract and is excluded from this cover rule.
-Scene backdrops consume scene media, not portrait entries, and are outside this requirement.
 
 #### Scenario: A well-formed rectangle centers its face region
 - **WHEN** a framed portrait renders a catalog entry whose rectangle is `{x: 0.25, y: 0.06, w: 0.5, h: 0.5}`
@@ -396,23 +462,44 @@ Scene backdrops consume scene media, not portrait entries, and are outside this 
 - **WHEN** a gallery card, the gallery detail rail preview, or a ReferenceArtwork cover-mode image renders an entry with a well-formed rectangle
 - **THEN** it still renders the recenters-only `object-position` treatment exactly as before — the small-avatar zoom-crop requirement names it in neither its surface set nor its fallbacks
 
+#### Scenario: A malformed rectangle returns the centered pair
+- **WHEN** the mapping receives a `null` or `undefined` rectangle, or any rectangle with a
+  non-finite field, a field outside `[0, 1]`, an `x + w` greater than 1, a `y + h` greater than 1,
+  or a non-positive `w` or `h`
+- **THEN** it returns the centered `50% 50%` pair — never a throw and never an off-frame
+  percentage — so one corrupt card cannot blank a portrait surface
+
+#### Scenario: Malformed-rectangle entries still render truthfully
+- **WHEN** a URL-bearing entry's rectangle is missing or malformed, or an entry is a placeholder
+  (a null URL)
+- **THEN** the URL-bearing entry still renders its image with the centered crop, and only the
+  placeholder entry renders its labelled placeholder with no image element
+
+#### Scenario: The small-avatar set is refined by its dedicated requirement
+- **WHEN** the small-avatar set — the top-bar character switcher's thumbnails and the party
+  drawer's avatar thumbnails — crops a portrait
+- **THEN** it additionally obeys the dedicated small-avatar zoom-crop requirement, which refines
+  this rule for those surfaces by enlarging the crop around the same rectangle while keeping the
+  identical validation set and the identical centered-crop fallback
+- **AND** every other surface named here keeps the recenters-only treatment verbatim
+
+#### Scenario: Avatar surfaces apply the mapping and ignore stage
+- **WHEN** each avatar surface — the combat participant frame, the party strip and the party
+  drawer's avatar thumbnails, the dialogue host avatar in the narrative feed, the interact target
+  avatars and the dock's target rows, and the top-bar character switcher — renders an entry
+- **THEN** it applies the mapping to that entry's rectangle and ignores stage
+
+#### Scenario: The excluded surfaces stay outside the cover rule
+- **WHEN** the drawer's full-figure art slot renders, or a scene backdrop renders
+- **THEN** the drawer slot uses the separate stage render contract and is excluded from this cover
+  rule, and scene backdrops — consuming scene media, not portrait entries — are outside this
+  requirement
+
 ### Requirement: The reference artwork frame presents a portrait entry truthfully through cover fit and rect crop
 The ReferenceArtwork component SHALL retain separate cover and stage modes. Its cover mode SHALL
-render one URL-bearing image with the shared face_rect crop. The drawer's full-figure art slot
-SHALL explicitly use stage mode instead: contain fit, center-bottom positioning and bottom-center
-stage scale/translation, without a face_rect crop. A null entry or placeholder entry (null URL)
-SHALL render its truthful labelled placeholder with no image; a failed load SHALL degrade to
-that mode's labelled placeholder, and a changed URL SHALL re-attempt the new image without
-remounting the surface. Stage-mode placeholders SHALL render the attribute-selected built-in
-silhouette in place of the former inline standing SVG: the server-carried fallback media identity
-(see `art-gallery-fallback`) drawn as a CSS alpha mask of the committed built-in image — mask
-semantics explicit, RGB texture never displayed, aspect ratio preserved, the figure aligned to the
-stage floor, filled with the existing dark silhouette styling. The actor's name, targeting/focus
-behavior, and the accessible missing/pending/failed labels SHALL render outside the decorative
-mask, the pending shimmer and reduced-motion behavior SHALL be retained, and if even the bundled
-mask resource fails to load the frame SHALL retain the actor name and the truthful text
-placeholder with a usable interaction surface. The component SHALL remain manifest-listed as
-Core/ReferenceArtwork in the frozen required set and covered by the deterministic coverage gate.
+render one URL-bearing image with the shared face_rect crop. The component SHALL remain
+manifest-listed as Core/ReferenceArtwork in the frozen required set and covered by the
+deterministic coverage gate.
 
 #### Scenario: A resolved entry renders the cropped image
 - **WHEN** cover mode receives an entry with a media URL and a well-formed rectangle
@@ -442,8 +529,34 @@ Core/ReferenceArtwork in the frozen required set and covered by the deterministi
 - **WHEN** the fallback mask resource itself fails to load in stage mode
 - **THEN** the frame retains the actor name and the truthful text placeholder, and targeting/focus interaction remains usable
 
+#### Scenario: The drawer full-figure slot uses stage mode
+- **WHEN** the drawer's full-figure art slot renders a portrait
+- **THEN** it explicitly uses stage mode instead of cover mode: contain fit, center-bottom
+  positioning and bottom-center stage scale/translation, without a face_rect crop
+
+#### Scenario: Placeholders and load outcomes degrade per mode
+- **WHEN** a null entry or placeholder entry (null URL) reaches either mode, an image load fails,
+  or the frame receives a changed URL
+- **THEN** a null or placeholder entry renders its truthful labelled placeholder with no image, a
+  failed load degrades to that mode's labelled placeholder, and a changed URL re-attempts the new
+  image without remounting the surface
+
+#### Scenario: The stage silhouette replaces the inline standing SVG as an alpha mask
+- **WHEN** a stage-mode placeholder renders its silhouette
+- **THEN** the attribute-selected built-in silhouette renders in place of the former inline
+  standing SVG: the server-carried fallback media identity (see `art-gallery-fallback`) drawn as a
+  CSS alpha mask of the committed built-in image — mask semantics explicit, RGB texture never
+  displayed, aspect ratio preserved, the figure aligned to the stage floor, filled with the
+  existing dark silhouette styling
+
+#### Scenario: Identity, interaction, and motion stay outside the decorative mask
+- **WHEN** a stage-mode frame renders its silhouette
+- **THEN** the actor's name, targeting/focus behavior, and the accessible missing/pending/failed
+  labels render outside the decorative mask, and the pending shimmer and reduced-motion behavior
+  are retained
+
 ### Requirement: Resolved artwork carries stage without changing asset or placeholder truth
-Resolved gallery-card portraits SHALL carry validated card stage. A malformed stored stage reaching presentation SHALL degrade to `{scale: 1.0, x: 0.0, y: 0.0}` with one bounded `art_stage_invalid` warning carrying the subject. Classic done assets, fallback portraits and scene assets SHALL carry identity stage; placeholders SHALL carry null. Gallery/art/roster portrait production and stage/dialogue actor consumption SHALL retain this shape, with exact Python and dependency-free Node validators deployed together. Scene rendering SHALL ignore stage, and no new dialogue-host field SHALL be required when the host references the art catalog.
+Resolved gallery-card portraits SHALL carry validated card stage. A malformed stored stage reaching presentation SHALL degrade to `{scale: 1.0, x: 0.0, y: 0.0}` with one bounded `art_stage_invalid` warning carrying the subject. Placeholders SHALL carry null stage.
 
 #### Scenario: Gallery portrait carries its card placement
 - **WHEN** a subject resolves to a gallery card with stage `{scale: 0.6, x: 0.1, y: -0.2}`
@@ -461,27 +574,25 @@ Resolved gallery-card portraits SHALL carry validated card stage. A malformed st
 - **WHEN** an otherwise valid asset carries a valid stage triple or a placeholder carries null stage
 - **THEN** Python and dependency-free Node validators both accept; missing stage, wrong shape, non-finite/bool or out-of-bounds asset stage and non-null placeholder stage reject on both sides
 
+#### Scenario: Non-card assets carry identity stage
+- **WHEN** classic done assets, fallback portraits, or scene assets resolve
+- **THEN** each carries identity stage
+
+#### Scenario: Producers and consumers retain the stage shape
+- **WHEN** gallery/art/roster portrait production and stage/dialogue actor consumption run
+- **THEN** they retain this stage shape, with exact Python and dependency-free Node validators
+  deployed together
+
+#### Scenario: Scenes ignore stage and dialogue hosts need no new field
+- **WHEN** a scene renders, or a dialogue host references the art catalog
+- **THEN** scene rendering ignores stage, and no new dialogue-host field is required
+
 ### Requirement: Small avatar thumbnails zoom-crop their portrait image to the carried face rectangle through one shared pure function
-The small-avatar set — the top-bar character switcher's collapsed-pill thumbnail, the switcher
-popover's per-row thumbnails, and the party drawer's per-companion avatar image — SHALL render a
-URL-bearing portrait entry by cropping and zooming so the entry's marked face rectangle
-substantially fills the frame: through one shared pure mapping exported by
-`web/webclient-app/components/face-rect.js`, the image element SHALL be enlarged to `1/w` × `1/h`
-of the frame's size (w, h the rectangle's normalized extents) and anchored inside the frame —
-which clips the overflow — by the offsets `-x/w` and `-y/h` of the frame's width and height, so
-the rectangle's region of the image fills the frame's box. That window is exact for the
-pixel-square rectangle the authoring path enforces; for a legacy or hand-authored non-square
-rectangle the same enlarge-and-anchor composition fills the frame from the rectangle while
-cropping a bounded sliver on the overflowing axis, and it SHALL never blank the image. The
-enlargement factor SHALL be clamped to 8× per axis, and the anchor offsets SHALL be derived from the clamped factors so the
-rectangle window stays coherent under the clamp. The mapping SHALL validate the rectangle with
-exactly the same well-formedness set as the recenters-only mapping — rejecting `null`,
-`undefined`, non-finite fields, fields outside `[0, 1]`, `x + w` or `y + h` greater than 1, and
-non-positive `w` or `h` — and for any rejected rectangle it SHALL produce no zoom properties,
-leaving the image to render the same centered `50% 50%` cover crop it rendered before this
-requirement. A placeholder entry (a null URL) SHALL render its existing label or glyph placeholder
-with no image element, unchanged. The mapping SHALL ignore `stage`. The zoom is presentation-only:
-the server stores rectangles verbatim and SHALL NOT crop, resize, or derive any second image.
+The small-avatar set — the top-bar character switcher's collapsed-pill thumbnail, its popover's
+per-row thumbnails, and the party drawer's per-companion avatar image — SHALL crop a URL-bearing
+portrait through one shared pure mapping exported by `web/webclient-app/components/face-rect.js`:
+enlarge the image to `1/w` × `1/h` of the frame, anchored at `-x/w`/`-y/h` of the frame, so the
+face rectangle (extents w, h) substantially fills the frame.
 
 #### Scenario: A well-formed rectangle fills a small avatar frame
 - **WHEN** the switcher pill thumbnail, a switcher popover row thumbnail, or a party drawer avatar renders a URL-bearing entry whose rectangle is `{x: 0.3, y: 0.1, w: 0.4, h: 0.4}`
@@ -510,3 +621,27 @@ the server stores rectangles verbatim and SHALL NOT crop, resize, or derive any 
 #### Scenario: A degenerate skinny rectangle clamps at the cap
 - **WHEN** a small avatar renders an entry whose rectangle has a width or height below 1/8 of the image (e.g. `{x: 0.49, y: 0.49, w: 0.02, h: 0.02}`)
 - **THEN** the enlargement clamps to 800% on that axis, the anchor offset is derived from the clamped factor (e.g. `-392%`/`-392%`), and nothing throws
+
+#### Scenario: A legacy non-square rectangle still fills without blanking
+- **WHEN** the zoom renders a legacy or hand-authored non-square rectangle
+- **THEN** the same enlarge-and-anchor composition fills the frame from the rectangle while
+  cropping a bounded sliver on the overflowing axis, and never blanks the image — the exact window
+  holds for the pixel-square rectangle the authoring path enforces
+
+#### Scenario: The zoom validates with the shared well-formedness set
+- **WHEN** the zoom mapping validates a rectangle
+- **THEN** it uses exactly the same well-formedness set as the recenters-only mapping — rejecting
+  `null`, `undefined`, non-finite fields, fields outside `[0, 1]`, `x + w` or `y + h` greater than
+  1, and non-positive `w` or `h` — and for any rejected rectangle it produces no zoom properties,
+  leaving the image to render the same centered `50% 50%` cover crop it rendered before this
+  requirement
+
+#### Scenario: Placeholder avatars and stage are untouched
+- **WHEN** a small avatar receives a placeholder entry (a null URL), or an entry carrying `stage`
+- **THEN** the placeholder renders its existing label or glyph placeholder with no image element,
+  unchanged, and the mapping ignores `stage`
+
+#### Scenario: The zoom is presentation-only
+- **WHEN** the client zoom-crops a portrait
+- **THEN** the server stores rectangles verbatim and does not crop, resize, or derive any second
+  image

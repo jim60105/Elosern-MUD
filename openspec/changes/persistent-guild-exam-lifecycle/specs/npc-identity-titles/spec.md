@@ -30,6 +30,18 @@ GuildRank SHALL no longer own examiner name/title/profile fields. Qualification 
 - **WHEN** ranks and qualification records load
 - **THEN** ranks contain progression/reward/title metadata and person identity validates on qualification sources
 
+#### Scenario: The lore modules check cross-registry name uniqueness at load
+
+- **WHEN** the lore modules owning the registries load
+- **THEN** they check that authored NPC names do not repeat across the shop, guild-branch, and
+  guild-rank registries
+
+#### Scenario: The row validators are pure and explicitly callable
+
+- **WHEN** the row validators' shape is inspected
+- **THEN** they are pure functions callable with explicit rows, so violations are testable
+  without mutating the shipped registries
+
 ### Requirement: Exam examiners carry their authored identity
 Persistent qualified adventurer assembly SHALL establish authored name/title once through existing identity validators and collision-safe roster discipline. Exams SHALL reuse that identity and stable dbref without rank-derived spawn identities or card/title replacement.
 

@@ -8,10 +8,7 @@ Defines the prompt library: the top-level `prompts/` data folder as the sole sou
 The project SHALL store all LLM prompt text in YAML files under one top-level `prompts/` directory
 in the repo root, one file per layer or domain: `narrator.yaml`, `npc_dialogue.yaml`,
 `scenario_director.yaml`, `scene_builder.yaml`, `npc.yaml`, `art.yaml`, and `character_creation.yaml`.
-Each file SHALL
-declare `schema_version: 1` and a `prompts:` mapping of prompt key to text block. The folder SHALL
-be the only place prompt text is defined; Python modules SHALL NOT contain prompt text constants,
-and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
+The folder SHALL be the only place prompt text is defined.
 
 #### Scenario: Every generative layer has a prompt file
 - **WHEN** the `prompts/` directory is inspected
@@ -34,23 +31,20 @@ and the removed hardcoded strings SHALL NOT be duplicated anywhere in code.
   `scene_sentence`, `quest_context`, `room_name`, and `region`, and the scene-flavor layer renders
   it (a guarded test proves the registration and the consumer)
 
+#### Scenario: Each prompt file declares the v1 schema envelope
+- **WHEN** a prompt YAML file is read
+- **THEN** it SHALL declare `schema_version: 1` and a `prompts:` mapping of prompt key to text block
+
+#### Scenario: No prompt text constants in code
+- **WHEN** Python modules are inspected for prompt text
+- **THEN** they SHALL NOT contain prompt text constants, and the removed hardcoded strings SHALL NOT be duplicated anywhere in code
+
 ### Requirement: The loader validates every prompt key and bounds failures to the affected layer
 `world/prompts/loader.py` SHALL expose `load_prompt_library(root: str | None = None)` that reads
 every YAML file under `PROMPT_ROOT` (the Django setting, default `<GAME_DIR>/prompts`) or the
 explicit root, validates every key against the code-defined `PROMPT_SPECS` registry, and installs
-a frozen mapping used by `render_prompt()`. Validation SHALL reject unknown keys, duplicate keys,
-missing key files, empty or over-length text, and `{token}` placeholders outside the key's
-allowlist, each with a named `PromptLibraryError` naming the file, the key, and the problem;
-duplicate YAML mapping keys SHALL be detected by the loader's YAML parser rather than silently
-keeping the last value. `server/conf/at_server_startstop.py::at_server_start()` SHALL call
-`load_prompt_library()` before the AI layer registrations. A key that fails validation or is
-missing SHALL be marked unavailable without aborting server startup: the consuming generative
-layer SHALL resolve to its existing deterministic degrade path for as long as the key is
-unavailable, the named error SHALL be logged, and the deterministic game SHALL remain fully
-playable. The `character_creation.system` key SHALL be registered and validated, but its failure
-SHALL be a logged warning that never blocks startup. `render_prompt()` SHALL
-trigger a one-time auto-load on first use when no explicit load happened, and
-`reset_prompt_library()` SHALL clear the loaded registry for tests.
+a frozen mapping used by `render_prompt()`. A key that fails validation or is missing SHALL be
+marked unavailable without aborting server startup, keeping the deterministic game fully playable.
 
 #### Scenario: A valid library loads and renders deterministically
 - **WHEN** `load_prompt_library()` runs against the repo's `prompts/` directory
@@ -82,18 +76,34 @@ trigger a one-time auto-load on first use when no explicit load happened, and
 - **THEN** subsequent renders use the fixture library until the next explicit load, and no state
   leaks between tests
 
+#### Scenario: Validation rejects every named malformation with a PromptLibraryError
+- **WHEN** validation runs over the library
+- **THEN** it SHALL reject unknown keys, duplicate keys, missing key files, empty or over-length text, and `{token}` placeholders outside the key's allowlist, each with a named `PromptLibraryError` naming the file, the key, and the problem
+
+#### Scenario: Duplicate YAML mapping keys are caught by the parser
+- **WHEN** a YAML file repeats a mapping key
+- **THEN** duplicate YAML mapping keys SHALL be detected by the loader's YAML parser rather than silently keeping the last value
+
+#### Scenario: Startup loads the library before the AI layer registrations
+- **WHEN** `server/conf/at_server_startstop.py::at_server_start()` runs
+- **THEN** it SHALL call `load_prompt_library()` before the AI layer registrations
+
+#### Scenario: An unavailable key degrades only its layer with a logged error
+- **WHEN** a key is marked unavailable
+- **THEN** the consuming generative layer SHALL resolve to its existing deterministic degrade path for as long as the key is unavailable, the named error SHALL be logged, and the deterministic game SHALL remain fully playable
+
+#### Scenario: A character_creation.system failure warns and never blocks startup
+- **WHEN** the `character_creation.system` key is registered, validated, and fails
+- **THEN** its failure SHALL be a logged warning that never blocks startup
+
+#### Scenario: First use auto-loads once and tests can reset the registry
+- **WHEN** `render_prompt()` is used with no explicit load, or `reset_prompt_library()` is called
+- **THEN** `render_prompt()` SHALL trigger a one-time auto-load on first use when no explicit load happened, and `reset_prompt_library()` SHALL clear the loaded registry for tests
+
 ### Requirement: Prompt rendering substitutes only allowlisted placeholders deterministically
 `world/prompts` SHALL expose `render_prompt(key, **values) -> str` that returns the key's loaded
 text with only its allowlisted `{token}` placeholders replaced by the supplied string values,
-using exact `{token}` matching. A token SHALL NOT be substituted when it is adjacent to another
-brace, so `{{name}}` and JSON example braces such as `{"name": "…"}` pass through untouched.
-Supplied values whose names are not in the key's allowlist SHALL be rejected with a named error,
-never silently ignored, so a consumer typo such as `namme=` fails loudly. Identical text and
-values SHALL produce byte-identical output, and substitution SHALL be complete: every present
-allowlisted token SHALL be replaced exactly once. The `npc_dialogue.system` key's allowlist SHALL
-be exactly `name`, `desc`, `location`, and `persona`. Callers of `npc_dialogue.system` SHALL pass
-`persona` on every call — the flattened block when one exists, or an empty string when not — so
-the `{persona}` token is always substituted and never left literal in rendered output.
+using exact `{token}` matching. Identical text and values SHALL produce byte-identical output.
 
 #### Scenario: Allowlisted placeholders are substituted
 - **WHEN** `render_prompt("npc_dialogue.system", name="艾洛西亞", desc="…", location="王都",
@@ -126,6 +136,26 @@ the `{persona}` token is always substituted and never left literal in rendered o
 - **WHEN** `render_prompt()` is called with a value whose name is not in the key's allowlist
 - **THEN** a named error is raised and the value is never silently ignored
 
+#### Scenario: Tokens adjacent to another brace pass through untouched
+- **WHEN** a token is adjacent to another brace
+- **THEN** it SHALL NOT be substituted, so `{{name}}` and JSON example braces such as `{"name": "…"}` pass through untouched
+
+#### Scenario: A consumer typo in a value name fails loudly
+- **WHEN** a consumer passes a supplied value whose name is not in the key's allowlist, such as `namme=`
+- **THEN** it is rejected with a named error rather than silently ignored, so the typo fails loudly
+
+#### Scenario: Substitution is complete
+- **WHEN** a render supplies values for allowlisted tokens
+- **THEN** substitution is complete: every present allowlisted token is replaced exactly once
+
+#### Scenario: The npc_dialogue.system allowlist is exactly four tokens
+- **WHEN** the `npc_dialogue.system` key's allowlist is inspected
+- **THEN** it is exactly `name`, `desc`, `location`, and `persona`
+
+#### Scenario: Callers always pass persona
+- **WHEN** any caller invokes `npc_dialogue.system`
+- **THEN** it SHALL pass `persona` on every call — the flattened block when one exists, or an empty string when not — so the `{persona}` token is always substituted and never left literal in rendered output
+
 ### Requirement: A validate CLI checks the library without starting the server
 `world/prompts/validate.py` SHALL provide a module entry point (`uv run --locked python -m
 world.prompts.validate`) that loads the prompt library from `PROMPT_ROOT` and prints either a
@@ -144,13 +174,7 @@ success and 1 on failure, so an admin can verify prompt edits before restarting 
 ### Requirement: The scenario-director key is registered with the name-inspiration placeholder and carries the naming guidance
 `world/prompts/registry.py` SHALL register `scenario_director.system` with an allowlist containing
 exactly the `name_inspiration` placeholder, and `prompts/scenario_director.yaml` SHALL be the sole
-place defining both the naming-guidance sentence (the rolled names are 僅供靈感 — directly usable or
-adjustable to the character's sex and background, countering same-name bias — while every `npc_req`
-entry MUST carry the required identity fields `display_name` and `title`) and the
-`{name_inspiration}` token. The ScenarioDirector layer SHALL consume the key at runtime by rendering
-that placeholder with its deterministically rolled inspiration bank. An admin rewriting the `text`
-block without the token SHALL still load cleanly (a key renders with the tokens it declares), and a
-typo in a placeholder name SHALL be caught by the loader's existing allowlist validation.
+place defining both the naming-guidance sentence and the `{name_inspiration}` token.
 
 #### Scenario: The key is registered with its placeholder and consumed
 - **WHEN** the prompt registry is queried for `scenario_director.system`
@@ -170,8 +194,20 @@ typo in a placeholder name SHALL be caught by the loader's existing allowlist va
 - **THEN** the loader rejects that key with the named `PromptLibraryError` and the layer keeps
   degrading through the existing per-key failure path
 
+#### Scenario: The ScenarioDirector layer consumes the key at runtime
+- **WHEN** the ScenarioDirector layer builds its prompt
+- **THEN** it consumes the key at runtime by rendering the `name_inspiration` placeholder with its deterministically rolled inspiration bank
+
+#### Scenario: The naming-guidance sentence states the inspiration-only rule and required identity fields
+- **WHEN** the naming-guidance sentence is inspected
+- **THEN** it states that the rolled names are 僅供靈感 — directly usable or adjustable to the character's sex and background, countering same-name bias — while every `npc_req` entry MUST carry the required identity fields `display_name` and `title`
+
+#### Scenario: An admin rewriting the text block without the token still loads cleanly
+- **WHEN** an admin rewrites the `text` block without the `{name_inspiration}` token
+- **THEN** it SHALL still load cleanly — a key renders with the tokens it declares
+
 ### Requirement: The NPC persona frame key is registered with exactly the block placeholder
-The prompt registry SHALL register `npc_dialogue.persona_frame` in `prompts/npc_dialogue.yaml` with an allowlist of exactly `block`. Its text SHALL present `{block}` as the speaking NPC's current character setting that governs subsequent replies and SHALL state that earlier conversation and already confirmed events remain history the current setting does not rewrite. The NPC dialogue layer SHALL render it only when a persona block exists and SHALL pass the rendered frame as the `persona` value of `npc_dialogue.system`.
+The prompt registry SHALL register `npc_dialogue.persona_frame` in `prompts/npc_dialogue.yaml` with an allowlist of exactly `block`. The NPC dialogue layer SHALL render it only when a persona block exists and SHALL pass the rendered frame as the `persona` value of `npc_dialogue.system`.
 
 #### Scenario: The frame key is registered and consumed
 - **WHEN** the prompt registry is queried for `npc_dialogue.persona_frame`
@@ -180,3 +216,7 @@ The prompt registry SHALL register `npc_dialogue.persona_frame` in `prompts/npc_
 #### Scenario: No frame without a card
 - **WHEN** a prompt is built for an NPC with no persona block
 - **THEN** the frame is not rendered and the system message is byte-identical to the pre-persona rendering
+
+#### Scenario: The frame text frames the block as current setting over immutable history
+- **WHEN** the `npc_dialogue.persona_frame` text is authored
+- **THEN** it SHALL present `{block}` as the speaking NPC's current character setting that governs subsequent replies and SHALL state that earlier conversation and already confirmed events remain history the current setting does not rewrite

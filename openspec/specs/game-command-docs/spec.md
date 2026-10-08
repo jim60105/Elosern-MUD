@@ -6,7 +6,7 @@ Define the player-facing game command reference under `docs/` and the repository
 
 
 ### Requirement: Complete command reference
-The documentation SHALL provide a player-facing reference of every in-game keyboard command under `docs/game/`, covering every project-authored command mounted on the `CharacterCmdSet` in `commands/default_cmdsets.py`, the `character` command mounted on the `CharacterCreationCmdSet` in `commands/character_creation.py`, the project-owned XYZGrid cmdset, the localized zh-tw wrappers of the Evennia default commands (看, 說明, 說, 動作, 拿, 丟, 給, 回家, 耳語, 暱稱, 設定描述, 登出, 在線, 離開角色, 進入世界, 傳訊, 密碼, 選項, 連線, 色彩, 樣式, 降權, 地圖, 前往) as canonical entries with their retained English aliases, and an enumerated index of the Evennia default commands still retained untranslated through `super()` on the character and account cmdsets. Pre-login commands of the `UnloggedinCmdSet` are outside the in-game input surface and are not required.
+The documentation SHALL provide a player-facing reference of every in-game keyboard command under `docs/game/`, covering every project-authored command mounted on the `CharacterCmdSet` in `commands/default_cmdsets.py`, the `character` command mounted on the `CharacterCreationCmdSet` in `commands/character_creation.py`, and the project-owned XYZGrid cmdset.
 
 #### Scenario: Every mounted project command is documented
 
@@ -43,22 +43,28 @@ The documentation SHALL provide a player-facing reference of every in-game keybo
 - **WHEN** a player or contributor opens `docs/game/commands.md`
 - **THEN** the overview SHALL group the documented commands into categories such as exploration, dialogue, time skip, combat, skills, guild, economy, character creation, and admin
 
+#### Scenario: Localized zh-tw wrappers are canonical entries
+
+- **WHEN** the reference covers the Evennia default commands
+- **THEN** the localized zh-tw wrappers (看, 說明, 說, 動作, 拿, 丟, 給, 回家, 耳語, 暱稱, 設定描述, 登出, 在線, 離開角色, 進入世界, 傳訊, 密碼, 選項, 連線, 色彩, 樣式, 降權, 地圖, 前往) SHALL appear as canonical entries with their retained English aliases
+
+#### Scenario: Untranslated defaults get an enumerated index
+
+- **WHEN** the reference covers the Evennia default commands
+- **THEN** it SHALL include an enumerated index of the Evennia default commands still retained untranslated through `super()` on the character and account cmdsets
+
+#### Scenario: Pre-login commands are outside the reference
+
+- **WHEN** determining the scope of the in-game command reference
+- **THEN** pre-login commands of the `UnloggedinCmdSet` are outside the in-game input surface and are not required to be documented
+
 ### Requirement: Accurate command details
 
 The reference entry for each project-authored and contrib command SHALL state the command's
 primary key, its aliases (including Traditional Chinese aliases and, for localized wrappers, the
 retained full English alias set), its argument syntax, its availability context, and a non-empty
-Traditional Chinese description. The key and aliases SHALL match the command class definition, the
-syntax and context SHALL match the curated command manifest in `tests/test_command_docs.py`, and
-admin commands SHALL carry their permission requirement. The account character-management
-commands `charcreate` and `chardelete` SHALL be mounted on the project `AccountCmdSet` locked to
-`Developer` permission rather than Evennia's default player permission, so the documented 管理員
-context is enforced by the mounted classes and the character-creation wizard remains the single
-player-facing creation path. The `rest` entry's syntax SHALL document the optional declared-practice clause
-(`rest <duration> [practice <skill>]`) and its description SHALL state that a declared practice
-settles hourly proficiency for the owned, uncapped skill while an unlabeled rest advances time
-with no growth; the curated manifest and the `docs/game/commands.md` rest row SHALL carry the
-same clause.
+Traditional Chinese description. The key and aliases SHALL match the command class definition,
+and the syntax and context SHALL match the curated command manifest in `tests/test_command_docs.py`.
 
 #### Scenario: Key and aliases match the command class
 
@@ -106,6 +112,27 @@ same clause.
 - **THEN** the syntax row equals the manifest's `rest <duration> [practice <skill>]` form, the
   description mentions hourly declared-practice settlement and the zero-growth plain rest, and
   the overview's rest row agrees
+
+#### Scenario: Admin commands carry their permission requirement
+
+- **WHEN** the reference documents an admin command
+- **THEN** the entry SHALL carry its permission requirement
+
+#### Scenario: Account character-management commands are Developer-locked
+
+- **WHEN** the account character-management commands `charcreate` and `chardelete` are mounted
+- **THEN** they SHALL be mounted on the project `AccountCmdSet` locked to `Developer` permission
+  rather than Evennia's default player permission, so the documented 管理員 context is enforced by
+  the mounted classes and the character-creation wizard remains the single player-facing creation path
+
+#### Scenario: The rest clause obligations span reference, manifest, and overview
+
+- **WHEN** the `rest` documentation is authored
+- **THEN** the entry's syntax SHALL document the optional declared-practice clause
+  (`rest <duration> [practice <skill>]`) and its description SHALL state that a declared practice
+  settles hourly proficiency for the owned, uncapped skill while an unlabeled rest advances time
+  with no growth
+- **AND** the curated manifest and the `docs/game/commands.md` rest row SHALL carry the same clause
 
 ### Requirement: Docsify navigation
 
@@ -165,9 +192,7 @@ change.
 The reference entry for `cast` SHALL document the syntax `cast <skill_key>[@<scale>][=<target_key>]`
 where `<scale>` is one of `1/4`, `1/2`, `1`, `2`, `4` (default `1`) and SHALL state that the token
 adjusts the spell's MP cost and damage/heal magnitude proportionally, available only to holders of
-the matching element's mastery skill (all other uses are rejected). The curated manifest in
-`tests/test_command_docs.py` SHALL carry the same syntax, and `docs/game/commands.md` SHALL describe
-the capability in its cast row.
+the matching element's mastery skill (all other uses are rejected).
 
 #### Scenario: The reference matches the manifest
 - **WHEN** the drift contract test inspects the `cast` entry
@@ -180,18 +205,16 @@ the capability in its cast row.
 - **THEN** the cast row states that a mastery holder may adjust a spell's power and MP cost with the
   `@<scale>` token
 
+#### Scenario: The manifest and overview carry the scale token
+
+- **WHEN** the scale-token capability is documented
+- **THEN** the curated manifest in `tests/test_command_docs.py` SHALL carry the same syntax
+- **AND** `docs/game/commands.md` SHALL describe the capability in its cast row
+
 ### Requirement: The command reference documents the sexual act system
 The `cast` and `combat actions` entries in `docs/game/command-reference.md` SHALL document that
 性愛 (sexual act) skills are ordinary castable skills reached through the two existing commands, with
-no separate syntax or command of their own. The `cast` entry's 說明 field SHALL state that a
-character's unlocked 性愛 skills are cast through the same `cast <skill_key>[@<scale>][=<target_key>]`
-syntax — a few basic seed acts are available from character creation, the rest once unlocked by play —
-and SHALL contain the substrings `性愛` and `解鎖`. The `combat actions` entry's 說明 field SHALL
-state that owned skills are grouped by category and that unlocked 性愛 acts form their own category
-once their unlock requirement is met, and SHALL contain the substring `性愛`. This requirement adds
-documentation content only; it changes neither entry's `語法` nor `情境` field, and the curated
-manifest in `tests/test_command_docs.py` (`EXPECTED_COMMANDS["cast"]` and `["combat actions"]`) is
-unchanged.
+no separate syntax or command of their own.
 
 #### Scenario: The cast entry mentions unlocked sexual acts
 - **WHEN** the drift contract test inspects the `cast` canonical entry's 說明 field
@@ -203,26 +226,30 @@ unchanged.
 - **THEN** the field contains the substring `性愛` and states that owned skills are grouped by
   category, with unlocked sexual acts forming their own category
 
+#### Scenario: The cast 說明 states seed acts and substrings
+
+- **WHEN** the `cast` entry's 說明 field is authored
+- **THEN** it SHALL state that a character's unlocked 性愛 skills are cast through the same
+  `cast <skill_key>[@<scale>][=<target_key>]` syntax — a few basic seed acts are available from
+  character creation, the rest once unlocked by play
+- **AND** it SHALL contain the substrings `性愛` and `解鎖`
+
+#### Scenario: Sexual-act categories form once unlocked
+
+- **WHEN** the `combat actions` entry's 說明 field is authored
+- **THEN** unlocked 性愛 acts form their own category once their unlock requirement is met
+
+#### Scenario: Documentation content only
+
+- **WHEN** this requirement is implemented
+- **THEN** it adds documentation content only; it changes neither entry's `語法` nor `情境` field
+- **AND** the curated manifest in `tests/test_command_docs.py`
+  (`EXPECTED_COMMANDS["cast"]` and `["combat actions"]`) is unchanged
+
 ### Requirement: The command reference documents the resist, affinity, and status consequences
 `docs/game/command-reference.md` SHALL document, in prose placed under the existing `### cast`
-heading (not as a new canonical heading — a new heading with no corresponding mounted command would
-be an orphan canonical entry), the parts of the sexual act system a player must understand before
-casting one against another character: that unlock is per-act — a few basic acts are available from
-character creation while the rest are gained by meeting their unlock conditions in play (SHALL
-contain the substring `解鎖`); that a resistible act's target receives one resist roll, in or out of
-combat, where a successful resist leaves that target unaffected by the cast's target effects while
-the cast still consumes time and the skill's resource cost (if any), and a failed resist executes the
-act against the target (SHALL contain the substrings `抵抗` and `戰鬥`); that a forced act (a failed
-resist) against a companion NPC costs relationship affinity and can trigger the companion
-auto-leaving the party, with the caster notified when it happens — the consequence applies to forced
-acts in combat and out of combat alike, both halves shipped and archived
-(`sexual-resist-turn-cost`'s `_scan_sexual_coercion` and `sexual-resist-out-of-combat`'s
-`_scan_out_of_combat_sexual_coercion`) (SHALL contain the substring `好感度`); that sustained arousal,
-an in-progress climax, and high exposure appear as ordinary combat condition labels while active
-(SHALL contain the substrings `興奮`, `高潮`, and `露出`, matching the shipped 高度興奮敏捷與準度減損,
-高潮進行中鎖定行動, and 高露出防禦減損 labels); and that 神之秘法 (divine arts) acts require a
-race-eligible caster and have no counter unlock threshold (SHALL contain the substring `神之秘法`),
-without asserting which individual divine-arts acts exist and SHALL NOT name any of them.
+heading, the parts of the sexual act system a player must understand before casting one against
+another character.
 
 #### Scenario: The reference documents the unlock ladder
 - **WHEN** the drift contract test inspects the full text of the `### cast` section (its field table
@@ -248,6 +275,53 @@ without asserting which individual divine-arts acts exist and SHALL NOT name any
 - **THEN** it reports no new failure, because the new prose is not preceded by any new `### <key>`
   heading
 
+#### Scenario: The prose avoids orphan canonical headings
+
+- **WHEN** the player-facing prose is placed
+- **THEN** it is placed under the existing `### cast` heading, not as a new canonical heading —
+  a new heading with no corresponding mounted command would be an orphan canonical entry
+
+#### Scenario: The unlock ladder is per-act
+
+- **WHEN** the reference documents how sexual acts become available
+- **THEN** it states that unlock is per-act — a few basic acts are available from character
+  creation while the rest are gained by meeting their unlock conditions in play
+- **AND** the prose SHALL contain the substring `解鎖`
+
+#### Scenario: Resistible acts get one resist roll
+
+- **WHEN** the reference documents resistible acts
+- **THEN** it states that a resistible act's target receives one resist roll, in or out of combat,
+  where a successful resist leaves that target unaffected by the cast's target effects while the
+  cast still consumes time and the skill's resource cost (if any), and a failed resist executes the
+  act against the target
+- **AND** the prose SHALL contain the substrings `抵抗` and `戰鬥`
+
+#### Scenario: Forced acts against companions cost affinity
+
+- **WHEN** the reference documents forced acts (a failed resist) against a companion NPC
+- **THEN** it states that they cost relationship affinity and can trigger the companion
+  auto-leaving the party, with the caster notified when it happens — the consequence applies to
+  forced acts in combat and out of combat alike, both halves shipped and archived
+  (`sexual-resist-turn-cost`'s `_scan_sexual_coercion` and `sexual-resist-out-of-combat`'s
+  `_scan_out_of_combat_sexual_coercion`)
+- **AND** the prose SHALL contain the substring `好感度`
+
+#### Scenario: Arousal, climax, and exposure are combat condition labels
+
+- **WHEN** the reference documents ongoing sexual-act consequences
+- **THEN** it states that sustained arousal, an in-progress climax, and high exposure appear as
+  ordinary combat condition labels while active
+- **AND** the prose SHALL contain the substrings `興奮`, `高潮`, and `露出`, matching the shipped
+  高度興奮敏捷與準度減損, 高潮進行中鎖定行動, and 高露出防禦減損 labels
+
+#### Scenario: Divine-arts acts are race-gated with no counter unlock
+
+- **WHEN** the reference documents 神之秘法 (divine arts) acts
+- **THEN** it states that they require a race-eligible caster and have no counter unlock threshold
+- **AND** the prose SHALL contain the substring `神之秘法`, without asserting which individual
+  divine-arts acts exist and SHALL NOT name any of them
+
 ### Requirement: The overview page describes the sexual act system's discoverability
 `docs/game/commands.md`'s `cast` row (in its 技能施放 category table) SHALL state that sexual-act
 skills are included among castable skills, are unlocked through play, and are discoverable through
@@ -271,15 +345,7 @@ as `title list`, `title codex`, `title equip fixed <display|key>` /
 `title equip epithet <display>`, `title accept <1|2|3>`, `title decline`, and
 `title remove epithet <display>` with the literal `confirm` suffix to execute
 (other continuations cancel); no aliases) with availability in and out of combat
-and non-empty Traditional Chinese descriptions stating that 稱號冊 lists fixed
-titles and 異名, that equipping swaps one occupied slot for another and there is
-no unequip, that unknown displays are rejected, that `title accept` /
-`title decline` answer a pending 異名提名投票 (accepting records the 異名 and
-answers with the numbered choice only — free text is never used for ballots), and
-that 異名 removal is irreversible and refuses equipped or last-remaining 異名.
-The curated manifest in `tests/test_command_docs.py` SHALL carry the same syntax
-and context, and `docs/game/commands.md` SHALL carry a `title` row in its
-character-growth category table.
+and non-empty Traditional Chinese descriptions.
 
 #### Scenario: The title entries satisfy the drift contract
 - **WHEN** the drift contract test runs after the command is mounted
@@ -289,16 +355,43 @@ character-growth category table.
 - **WHEN** a player opens `docs/game/commands.md`
 - **THEN** the character-growth category table carries a `title` row covering list/codex/equip, ballot answers, and the two-step removal, and the overview link set gains exactly that documented key
 
+#### Scenario: The title descriptions state codex contents
+
+- **WHEN** the `title` entry's Traditional Chinese descriptions are authored
+- **THEN** they state that 稱號冊 lists fixed titles and 異名
+
+#### Scenario: Equipping swaps slots with no unequip
+
+- **WHEN** the `title` entry describes equipping
+- **THEN** the descriptions state that equipping swaps one occupied slot for another, that there is
+  no unequip, and that unknown displays are rejected
+
+#### Scenario: Ballot answers are numbered only
+
+- **WHEN** the `title` entry describes `title accept` / `title decline`
+- **THEN** the descriptions state that they answer a pending 異名提名投票, that accepting records the
+  異名, and that answers use the numbered choice only — free text is never used for ballots
+
+#### Scenario: Epithet removal is irreversible and guarded
+
+- **WHEN** the `title` entry describes 異名 removal
+- **THEN** the descriptions state that removal is irreversible and refuses equipped or
+  last-remaining 異名
+
+#### Scenario: The manifest and overview carry the title entry
+
+- **WHEN** the title documentation is authored
+- **THEN** the curated manifest in `tests/test_command_docs.py` SHALL carry the same syntax and
+  context
+- **AND** `docs/game/commands.md` SHALL carry a `title` row in its character-growth category table
+
 
 ### Requirement: The command reference documents the lineage command
 `docs/game/command-reference.md` SHALL carry a canonical entry for `lineage`
 (no aliases) with syntax `lineage`, availability context in and out of combat,
 and a non-empty Traditional Chinese description stating that the command prints
 the character's skill lineages with per-node proficiency, 見頂 saturation marks,
-and the prerequisite of each locked node. The curated manifest in
-`tests/test_command_docs.py` SHALL carry the same syntax and context, and
-`docs/game/commands.md` SHALL carry a `lineage` row in its skill-growth category
-table.
+and the prerequisite of each locked node.
 
 #### Scenario: The lineage entry satisfies the drift contract
 - **WHEN** the drift contract test runs after the command is mounted
@@ -308,16 +401,19 @@ table.
 - **WHEN** a player opens `docs/game/commands.md`
 - **THEN** the skill-growth category table carries a `lineage` row describing the tree, saturation, and prerequisite display, and the overview link set gains exactly that one documented key
 
+#### Scenario: The manifest and overview carry the lineage entry
+
+- **WHEN** the lineage documentation is authored
+- **THEN** the curated manifest in `tests/test_command_docs.py` SHALL carry the same syntax and
+  context
+- **AND** `docs/game/commands.md` SHALL carry a `lineage` row in its skill-growth category table
+
 ### Requirement: The command reference documents the delivery command
 
 `docs/game/command-reference.md` SHALL carry a canonical entry for the delivery command with its
 exact key, its declared aliases, its syntax naming the recipient and the item, its availability
 context (usable in exploration, refused during an active combat session), and a non-empty
-Traditional Chinese description stating that the command hands a quest item to the recipient the
-quest bound it to, that only the bound recipient satisfies a delivery, and that a refused delivery
-changes nothing. The curated manifest in `tests/test_command_docs.py` SHALL carry the same key,
-aliases, syntax, and context, and `docs/game/commands.md` SHALL carry a delivery row in the
-appropriate category table.
+Traditional Chinese description.
 
 #### Scenario: The delivery entry satisfies the drift contract
 - **WHEN** the drift contract test runs after the command is mounted
@@ -328,3 +424,16 @@ appropriate category table.
 - **WHEN** a player opens `docs/game/commands.md`
 - **THEN** the category table carries a delivery row describing the hand-over and the bound-recipient
   rule, and the overview link set gains exactly that one documented key
+
+#### Scenario: The delivery description states the binding rule
+
+- **WHEN** the delivery entry's Traditional Chinese description is authored
+- **THEN** it states that the command hands a quest item to the recipient the quest bound it to,
+  that only the bound recipient satisfies a delivery, and that a refused delivery changes nothing
+
+#### Scenario: The manifest and overview carry the delivery entry
+
+- **WHEN** the delivery documentation is authored
+- **THEN** the curated manifest in `tests/test_command_docs.py` SHALL carry the same key, aliases,
+  syntax, and context
+- **AND** `docs/game/commands.md` SHALL carry a delivery row in the appropriate category table

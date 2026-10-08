@@ -11,16 +11,9 @@ and explicit per-item exceptions.
 A place's offer for an item SHALL be resolved as either the per-item
 override the place declares for that item, or the item's assortment base
 adjusted by the place's price scale. An override SHALL take precedence and
-SHALL NOT be scaled.
-
-The price scale SHALL be an integer percentage where 100 is par. A place
-SHALL inherit its settlement's scale unless it declares its own. Scaling
-SHALL be integer arithmetic with deterministic half-up rounding; no
-floating-point value SHALL enter the money path at any step.
-
-Exactly one multiplication SHALL be applied to any base value, so the
-resolved price does not depend on the order in which adjustments are
-combined.
+SHALL NOT be scaled. The price scale SHALL be an integer percentage where
+100 is par, and scaling SHALL be integer arithmetic with deterministic
+half-up rounding.
 
 #### Scenario: One item carries two prices and stays one item
 - **WHEN** two places offer the same item key, one at the scaled assortment
@@ -40,6 +33,16 @@ combined.
 #### Scenario: A place inherits its settlement's scale
 - **WHEN** a place declares no scale of its own
 - **THEN** its offers resolve at its settlement's scale
+
+#### Scenario: No floating-point value ever enters the money path
+- **WHEN** any offer resolves, scaled or overridden
+- **THEN** no floating-point value SHALL enter the money path at any step
+
+#### Scenario: Adjustment order never changes the resolved price
+- **WHEN** adjustments on a base value are combined in any order
+- **THEN** exactly one multiplication is applied to any base value, so the
+  resolved price does not depend on the order in which adjustments are
+  combined
 
 ### Requirement: An override is complete or rejected
 A per-item override SHALL declare every field of an offer rule — buy price,
@@ -67,14 +70,6 @@ A place SHALL be able to stock an item outside its assortments, and to
 decline an item inside them. Its offered goods SHALL be the union of its
 assortments' items, plus its additions, minus its removals.
 
-An addition belongs to no assortment and therefore has no base rule, so
-every addition SHALL carry a complete override. An addition without one
-SHALL fail catalog load naming the place and the item.
-
-A removal naming an item none of the place's assortments contains SHALL fail
-catalog load, so a rename that orphans a removal is caught rather than
-silently doing nothing.
-
 #### Scenario: A stocked curiosity needs no assortment of its own
 - **WHEN** a place declares one addition with a complete override
 - **THEN** that item is purchasable at that place at the override price, and
@@ -89,19 +84,22 @@ silently doing nothing.
   contains
 - **THEN** catalog validation raises naming the place and the item
 
+#### Scenario: Every addition carries a complete override
+- **WHEN** a place declares an addition
+- **THEN** the addition must carry a complete override, because an addition
+  belongs to no assortment and therefore has no base rule
+
+#### Scenario: An orphaned removal is caught, not silently inert
+- **WHEN** a removal names an item none of the place's assortments contains
+  (e.g. after an item rename)
+- **THEN** catalog load fails rather than the removal silently doing nothing
+
 ### Requirement: Resolved prices are validated, not the bases
 Every rejection the catalog applies to a price SHALL be evaluated against
 the resolved value a player would be charged, not against the assortment
 base. The resolved buy price SHALL lie inside the item's price band, the
 resolved sell price SHALL NOT exceed the resolved buy price, and every
 resolved money value SHALL be a non-negative integer.
-
-A price scale SHALL be rejected unless it is an integer within a bounded
-sane range; a scale of zero or a negative scale SHALL be rejected.
-
-Every such rejection SHALL occur at catalog load, before any registry or
-merchant state changes, and SHALL NOT be deferred to the moment a player
-attempts the trade.
 
 #### Scenario: Scaling out of the price band fails load
 - **WHEN** a scale pushes a resolved buy price above the item's price-band
@@ -119,3 +117,14 @@ attempts the trade.
   maximum
 - **THEN** catalog validation raises naming the declaring settlement or
   place
+
+#### Scenario: A scale outside the bounded sane range is rejected
+- **WHEN** a declared price scale is not an integer within the bounded sane
+  range, or is zero, or is negative
+- **THEN** the scale is rejected
+
+#### Scenario: A price rejection lands at catalog load, never at trade time
+- **WHEN** the catalog rejects any price
+- **THEN** the rejection occurs at catalog load, before any registry or
+  merchant state changes, and is never deferred to the moment a player
+  attempts the trade

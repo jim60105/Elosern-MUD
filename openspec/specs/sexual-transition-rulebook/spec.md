@@ -20,13 +20,7 @@ non-empty `id`.
   `buff_active`
 
 ### Requirement: apply_event() is the single entry point, evaluating every rule to a fixed point
-`world/rules/sexual_transitions.py` SHALL expose `apply_event(entity, event, **event_context)`,
-running every loaded rule against an immutable pass-start snapshot of `entity.sexual` plus the
-given event name and non-reserved payload. Payload SHALL NOT override authoritative state, `event`,
-or `_changed`. It SHALL re-evaluate rules across successive passes so that one rule's
-effect can satisfy a second rule's condition within the same call, continuing until a pass produces
-no field change, and SHALL evaluate any `event`-keyed condition only on the first pass. Exhausting
-a positive `max_passes` SHALL raise `RuleConvergenceError`; a non-positive limit SHALL be rejected.
+`world/rules/sexual_transitions.py` SHALL expose `apply_event(entity, event, **event_context)` as the single entry point, running every loaded rule against an immutable pass-start snapshot of `entity.sexual` plus the given event name and non-reserved payload, re-evaluating rules across successive passes until a pass produces no field change. Exhausting a positive `max_passes` SHALL raise `RuleConvergenceError`.
 
 #### Scenario: A chained effect fires within one apply_event() call
 - **WHEN** `apply_event(entity, "extreme_stimulus_applied")` is called on an entity whose `arousal`
@@ -64,17 +58,24 @@ a positive `max_passes` SHALL raise `RuleConvergenceError`; a non-positive limit
 - **WHEN** synthetic rules continue producing changes through `max_passes`
 - **THEN** `apply_event()` raises `RuleConvergenceError` rather than returning partial settlement
 
-### Requirement: Ordered-level field rules write through the field's own live trait object, never through a second write path
-Every rule targeting `wetness`, `shame`, or `exposure` SHALL apply its `delta` or `set` effect by
-mutating the `OrderedLevelTrait` instance `entity.sexual.<field>` returns, never by constructing a
-new trait or writing anywhere else. A `delta` of the form `"+N..+M"` SHALL resolve to a random
-integer in `[N, M]` at apply time, using an injectable RNG so tests are deterministic. A `set` naming
-a string absent from the field's own vocabulary SHALL raise, not silently no-op.
+#### Scenario: Payload cannot override authoritative keys
+- **WHEN** the event payload carries keys naming authoritative state, `event`, or `_changed`
+- **THEN** the payload does not override authoritative state, `event`, or `_changed`
 
-`arousal` is no longer covered by this requirement: no rule targets it via `then.field` (its four
-former rules now target `pleasure`, a bounded counter, under the separate `bounded_counter` kind —
-see `sexual-state-handler`'s pleasure-construction and pleasure-decay requirements for that field's
-own contract).
+#### Scenario: Event-keyed conditions evaluate only on the first pass
+- **WHEN** a rule's condition is keyed on the `event` name and the call cascades through multiple passes
+- **THEN** the `event`-keyed condition is evaluated only on the first pass
+
+#### Scenario: A non-positive pass limit is rejected
+- **WHEN** `max_passes` is configured with a non-positive limit
+- **THEN** the limit is rejected
+
+#### Scenario: One rule's effect can satisfy a second rule's condition in the same call
+- **WHEN** rules are re-evaluated across successive passes within one `apply_event()` call
+- **THEN** one rule's effect can satisfy a second rule's condition within the same call
+
+### Requirement: Ordered-level field rules write through the field's own live trait object, never through a second write path
+Every rule targeting `wetness`, `shame`, or `exposure` SHALL apply its `delta` or `set` effect by mutating the `OrderedLevelTrait` instance `entity.sexual.<field>` returns, never by constructing a new trait or writing anywhere else. A `delta` of the form `"+N..+M"` SHALL resolve to a random integer in `[N, M]` at apply time, using an injectable RNG so tests are deterministic. A `set` naming a string absent from the field's own vocabulary SHALL raise, not silently no-op.
 
 #### Scenario: A fixed delta applies to the live trait
 - **WHEN** `apply_event(entity, "stimulus_applied")` fires `wetness_follows_arousal`
@@ -95,6 +96,10 @@ own contract).
   member of the target field's vocabulary
 - **THEN** applying that rule raises, naming the invalid level, rather than silently leaving the
   field unchanged
+
+#### Scenario: arousal is no longer covered by this requirement
+- **WHEN** the shipped `sexual.yaml` rules are inspected
+- **THEN** no rule targets `arousal` via `then.field` (its four former rules now target `pleasure`, a bounded counter, under the separate `bounded_counter` kind — see `sexual-state-handler`'s pleasure-construction and pleasure-decay requirements for that field's own contract)
 
 ### Requirement: Every climax_phase-targeting rule routes exclusively through change 7's _apply_climax_phase_set()
 No rule's effect SHALL write `entity.sexual.climax_phase`'s underlying value directly. Every
@@ -261,14 +266,7 @@ event-triggered transition table.
 
 
 ### Requirement: pleasure-targeting rules write through the bounded_counter kind, and report their arousal-level crossing under the field name arousal
-Every rule targeting `pleasure` SHALL apply its `delta` or `set` effect by mutating
-`entity.sexual.pleasure`'s bounded counter value, following the same `delta`/`set` resolution rules
-as `bounded_counter`'s `ordered_level` sibling (`"+N..+M"` resolves via an injectable RNG; `set`
-values are validated at load time). Because `field_changed: arousal` listeners
-(`wetness_follows_arousal`) key on the observable arousal level rather than the raw pleasure number,
-a `pleasure`-targeting rule's reported changed-field SHALL be `"arousal"`, computed by comparing the
-derived arousal ordinal before and after the mutation — not `"pleasure"`, and not by comparing raw
-pleasure numbers — so that a pleasure change remaining within one band reports no change at all.
+Every rule targeting `pleasure` SHALL apply its `delta` or `set` effect by mutating `entity.sexual.pleasure`'s bounded counter value, following the same `delta`/`set` resolution rules as `bounded_counter`'s `ordered_level` sibling. A `pleasure`-targeting rule's reported changed-field SHALL be `"arousal"`, computed by comparing the derived arousal ordinal before and after the mutation — not `"pleasure"`, and not by comparing raw pleasure numbers.
 
 #### Scenario: A pleasure delta that crosses an arousal band reports as an arousal change
 - **WHEN** `apply_event(entity, "stimulus_applied")` fires `arousal_up_on_stimulus`
@@ -296,6 +294,18 @@ pleasure numbers — so that a pleasure change remaining within one band reports
   within the same call and `entity.sexual.climax_phase.level` becomes `"接近"`, proving
   `arousal`-keyed `when` conditions continue to evaluate correctly against the derived view with no
   change to `climax_gate` itself
+
+#### Scenario: Delta and set resolution follow the ordered_level sibling
+- **WHEN** a `pleasure`-targeting rule uses `"+N..+M"` or a `set` value
+- **THEN** the range resolves via an injectable RNG and `set` values are validated at load time
+
+#### Scenario: Arousal listeners key on the observable level
+- **WHEN** `field_changed: arousal` listeners (`wetness_follows_arousal`) evaluate
+- **THEN** they key on the observable arousal level rather than the raw pleasure number
+
+#### Scenario: A within-band pleasure change reports no change
+- **WHEN** a pleasure change remains within one arousal band
+- **THEN** it reports no change at all
 
 ### Requirement: Transition rulebook rejects unbacked condition vocabulary
 

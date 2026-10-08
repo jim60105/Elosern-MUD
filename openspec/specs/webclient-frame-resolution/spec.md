@@ -6,7 +6,7 @@ Defines the store-owned frame resolver registry mapping frame descriptors to men
 
 ### Requirement: Frame descriptors resolve to committed-state menus at access time
 
-The store SHALL own a frame resolver registry that maps a frame descriptor `{source, params}` to a menu derived from the committed presentation state at the moment of the call. A resolver SHALL read only committed panels (the state the protocol reducer has atomically committed under the revision gate) and SHALL NOT read router frame copies, component state, or any other cached menu data. Resolving the same descriptor twice across two committed states SHALL return menus reflecting each state respectively; resolving the same descriptor twice against one committed state SHALL return deep-equal menus and SHALL NOT mutate store, panel, or committed state. The single permitted model-state exception is the combat resolver preserving combat selection (`focusSkillKey`, page, chosen scale, AREA candidates) inside the combat model through the unchanged `CombatMenu.rebuildForPanel` seam; repeat resolution of any combat descriptor against one committed state SHALL be idempotent. A resolver that throws SHALL be caught by the registry and reported as unresolvable rather than propagating to callers.
+The store SHALL own a frame resolver registry that maps a frame descriptor `{source, params}` to a menu derived from the committed presentation state at the moment of the call. A resolver SHALL read only committed panels — the state the protocol reducer has atomically committed under the revision gate — and SHALL NOT read router frame copies, component state, or any other cached menu data.
 
 #### Scenario: Resolution follows committed state
 
@@ -28,9 +28,19 @@ The store SHALL own a frame resolver registry that maps a frame descriptor `{sou
 - **WHEN** the combat panel is replaced and `combat.skill` for the focused skill is resolved twice against the new committed state
 - **THEN** the menu carries the selection state `rebuildForPanel` preserves and the second resolution returns the same menu with no further model change
 
+#### Scenario: Repeat resolution across committed states reflects each state
+
+- **WHEN** the same descriptor is resolved twice across two committed states, and again twice against one committed state
+- **THEN** the two menus reflect each state respectively, the repeat pair is deep-equal, and no resolution mutates store, panel, or committed state
+
+#### Scenario: Combat selection is the only permitted model-state exception
+
+- **WHEN** a combat descriptor resolves and combat selection state is at stake
+- **THEN** the only permitted model-state write is the combat resolver preserving combat selection (`focusSkillKey`, page, chosen scale, AREA candidates) inside the combat model through the unchanged `CombatMenu.rebuildForPanel` seam, and repeat resolution of any combat descriptor against one committed state is idempotent
+
 ### Requirement: The descriptor registry implements the exploration family as a finite table
 
-The registry SHALL implement exactly the exploration-family source table and nothing else in this change, each entry producing the menu its current push site produces today. Sources (panel `exploration`; `exploration.root` additionally reads `local_map.current_node`; `exploration.suggestions` reads `context_actions.suggestions`): `exploration.root` `{}`, `exploration.wait` `{}`, `exploration.target` `{identity}`, `exploration.keywords` `{identity}`, `exploration.suggestions` `{}` — resolvable only while the envelope status is `generating`, `ready`, or `degraded`; status `unavailable` resolves to the unresolvable marker so an open suggestions frame can honor the surface's no-pane rule. The services family (guild/board/quests/quest-detail/shop/stock/sell frames plus the abandon-confirm frame, keyed by `questIndex`), the combat family (`root`, `categories`, `category{categoryIndex}`, `group{categoryIndex, groupIndex}`, `skill{skillKey}`, `target{skillKey}`, `forfeit`), and the creation family (`root`, `presets`, `form{view}`, `confirm{kind, presetKey?}`) SHALL be added as further table rows by the later migration changes that cut their push sites over; a source absent from the implemented table SHALL resolve to the shared unresolvable marker without throwing, and every table addition SHALL be a spec-visible change.
+The registry SHALL implement exactly the exploration-family source table and nothing else in this change, each entry producing the menu its current push site produces today. A source absent from the implemented table SHALL resolve to the shared unresolvable marker without throwing, and every table addition SHALL be a spec-visible change.
 
 #### Scenario: Every table source resolves from a live snapshot
 
@@ -52,9 +62,24 @@ The registry SHALL implement exactly the exploration-family source table and not
 - **WHEN** `exploration.suggestions` is resolved while the committed envelope status is `unavailable`
 - **THEN** resolve returns the unresolvable marker so the consumer-side rule can leave the frame, and a `generating` status instead resolves to the muted generating row menu
 
+#### Scenario: Suggestions resolve only under the three live statuses
+
+- **WHEN** `exploration.suggestions` is resolved under any committed envelope status
+- **THEN** it is resolvable only while the status is `generating`, `ready`, or `degraded`, and status `unavailable` resolves to the unresolvable marker so an open suggestions frame can honor the surface's no-pane rule
+
+#### Scenario: The later families arrive as table rows from their migration changes
+
+- **WHEN** the services, combat, and creation families are cut over
+- **THEN** the services family (guild/board/quests/quest-detail/shop/stock/sell frames plus the abandon-confirm frame, keyed by `questIndex`), the combat family (`root`, `categories`, `category{categoryIndex}`, `group{categoryIndex, groupIndex}`, `skill{skillKey}`, `target{skillKey}`, `forfeit`), and the creation family (`root`, `presets`, `form{view}`, `confirm{kind, presetKey?}`) are added as further table rows by the later migration changes that cut their push sites over
+
+#### Scenario: The exploration table is exactly five sources
+
+- **WHEN** the exploration-family source table is declared
+- **THEN** its sources (panel `exploration`; `exploration.root` additionally reads `local_map.current_node`; `exploration.suggestions` reads `context_actions.suggestions`) are exactly `exploration.root` `{}`, `exploration.wait` `{}`, `exploration.target` `{identity}`, `exploration.keywords` `{identity}`, `exploration.suggestions` `{}`
+
 ### Requirement: Dynamic rows and payloads are verbatim from the panel while client-owned navigation rows are reproduced
 
-Domain rows — entity lists, exits, targets, quest/board/shop entries, skill descriptors, and every action identifier and payload — SHALL come verbatim from the committed panel exactly as the existing menu builders produce them: the resolver SHALL NOT invent, reorder, filter, or relabel domain content beyond what the named builder already does. Client-owned navigation and presentation rows that the shipped dock contract requires — the exploration overview's footer entries and its people/object chip builders' rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows — SHALL be reproduced by the same builders, and reproducing them SHALL NOT count as fabrication.
+Domain rows — entity lists, exits, targets, quest/board/shop entries, skill descriptors, and every action identifier and payload — SHALL come verbatim from the committed panel exactly as the existing menu builders produce them: the resolver SHALL NOT invent, reorder, filter, or relabel domain content beyond what the named builder already does.
 
 #### Scenario: A resolved submenu keeps its back row
 
@@ -66,9 +91,14 @@ Domain rows — entity lists, exits, targets, quest/board/shop entries, skill de
 - **WHEN** a look or target frame resolves against a panel whose rows carry server-authored labels and disabled reasons
 - **THEN** every domain row's label, sub-line, action identifier, payload, and disabled reason equal the committed panel's values
 
+#### Scenario: Required navigation rows are reproduced, not fabricated
+
+- **WHEN** a resolved menu needs the client-owned navigation and presentation rows that the shipped dock contract requires — the exploration overview's footer entries and its people/object chip builders' rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows
+- **THEN** those rows are reproduced by the same builders, and reproducing them does not count as fabrication
+
 ### Requirement: An unresolvable descriptor yields the shared degradation marker with the server-authored reason
 
-A descriptor whose identity or index is absent from the committed panel, whose panel is in an unavailable form, or whose resolver threw SHALL resolve to a shared unresolvable marker `{unresolvable: true, reason}`. Where the committed panel carries a server-authored `reason.message`, the marker's `reason` SHALL be that message verbatim; otherwise the marker's `reason` SHALL be null and the local fallback string 「畫面狀態已更新，請返回上層」 SHALL only be chosen by the consumer when rendering. The marker is data: resolving an unresolvable descriptor SHALL never throw, and pop-versus-disabled handling belongs to the consumer-side stack rules, not the registry.
+A descriptor whose identity or index is absent from the committed panel, whose panel is in an unavailable form, or whose resolver threw SHALL resolve to a shared unresolvable marker `{unresolvable: true, reason}`. The marker is data: resolving an unresolvable descriptor SHALL never throw, and pop-versus-disabled handling belongs to the consumer-side stack rules, not the registry.
 
 #### Scenario: Identity loss reports the server message
 
@@ -80,9 +110,19 @@ A descriptor whose identity or index is absent from the committed panel, whose p
 - **WHEN** an unresolvable descriptor's panel carries no authored message
 - **THEN** resolve returns the unresolvable marker with a null reason
 
+#### Scenario: An authored message becomes the marker reason verbatim
+
+- **WHEN** the committed panel carries a server-authored `reason.message`
+- **THEN** the marker's `reason` is that message verbatim
+
+#### Scenario: The local fallback is a consumer rendering choice
+
+- **WHEN** the marker's `reason` is null and the consumer renders the unresolvable frame
+- **THEN** the local fallback string 「畫面狀態已更新，請返回上層」 is chosen only by the consumer when rendering
+
 ### Requirement: Router frames store descriptors and a focus key and resolve at access time
 
-The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — the transitional legacy menu-copy shape SHALL no longer exist, and an unknown frame shape or an empty-stack read SHALL throw a programmer error rather than degrade silently. All menu reads — render, arrow navigation, geometry, breadcrumb, trail, pointer row, and activation payload — SHALL come from resolving the frame's descriptor through the store registry at the moment of the read, never from data captured when the frame was opened. A committed panel update SHALL require no router or store refresh action for any open frame to reflect the newer state on its next read. The action dock's derived views (`rootMenu`, `combatMenu`, breadcrumb trail) SHALL be produced from the frame stack with the same item shapes the components already render, and no commit-driven refresh, re-home, replace-as-refresh, copied-row map, or signature gate over menu content SHALL exist anywhere in the client.
+The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — the transitional legacy menu-copy shape SHALL no longer exist. All menu reads — render, arrow navigation, geometry, breadcrumb, trail, pointer row, and activation payload — SHALL come from resolving the frame's descriptor through the store registry at the moment of the read, never from data captured when the frame was opened.
 
 #### Scenario: An open move frame follows a committed move
 
@@ -99,9 +139,24 @@ The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — 
 - **WHEN** the skill frame for a focused skill is open and a combat panel update changes that skill's descriptors
 - **THEN** the frame's next read lists the updated rows with focus tracked by key, and the preserved selection state remains intact
 
+#### Scenario: Unknown frame shapes and empty-stack reads throw
+
+- **WHEN** the router is handed an unknown frame shape or an empty stack is read
+- **THEN** it throws a programmer error rather than degrading silently
+
+#### Scenario: Open frames need no refresh action after a commit
+
+- **WHEN** a committed panel update lands while frames are open
+- **THEN** no router or store refresh action is required for any open frame to reflect the newer state on its next read
+
+#### Scenario: Derived dock views come from the frame stack
+
+- **WHEN** the action dock derives its views (`rootMenu`, `combatMenu`, breadcrumb trail)
+- **THEN** they are produced from the frame stack with the same item shapes the components already render, and nowhere in the client does a commit-driven refresh, re-home, replace-as-refresh, copied-row map, or signature gate over menu content exist
+
 ### Requirement: Focus tracks the item key across re-resolution
 
-Each declarative frame SHALL carry the resolved item key of its focused row as `focusKey`. After any re-resolution the focus SHALL land on the row with the same key at its new geometry; when that key is absent the focus SHALL land on the nearest surviving row by index order, choosing the earlier row on equal distance; an empty menu SHALL have null focus. Any confirm — keyboard Enter or a pointer activation — SHALL write the activated item's key to the frame's `focusKey` before dispatching. A newly pushed declarative frame SHALL focus its first item.
+Each declarative frame SHALL carry the resolved item key of its focused row as `focusKey`. After any re-resolution the focus SHALL land on the row with the same key at its new geometry. Any confirm — keyboard Enter or a pointer activation — SHALL write the activated item's key to the frame's `focusKey` before dispatching. A newly pushed declarative frame SHALL focus its first item.
 
 #### Scenario: Same-key focus survives geometry change
 
@@ -118,9 +173,14 @@ Each declarative frame SHALL carry the resolved item key of its focused row as `
 - **WHEN** the player pointer-activates a row that is not the currently focused row
 - **THEN** the activated row's key becomes the frame's `focusKey` before the action dispatches
 
+#### Scenario: An absent focus key falls back to the nearest row
+
+- **WHEN** after re-resolution the frame's `focusKey` is absent from the menu
+- **THEN** focus lands on the nearest surviving row by index order, choosing the earlier row on equal distance, and an empty menu has null focus
+
 ### Requirement: Unresolvable frames pop one level; only the root frame renders a degraded reason row
 
-When a declarative frame resolves to the unresolvable marker as the current frame, the stack SHALL immediately pop one level and the parent frame SHALL restore focus to the key of the row that opened the popped frame; when consecutive top frames are unresolvable the pop SHALL cascade until a frame resolves, and when no frame resolves the stack SHALL end at the mode's root frame. The cascade is bounded by stack depth and completes without any timer, animation, or deferred check. Only when the root frame itself is unresolvable — with no parent to return to — SHALL the client render a single disabled row whose text is the marker's server-authored reason when present, otherwise the local fallback 「畫面狀態已更新，請返回上層」; that row is focusable and submits nothing. Resolution exceptions reaching the stack rules are indistinguishable from unresolvable markers.
+When a declarative frame resolves to the unresolvable marker as the current frame, the stack SHALL immediately pop one level and the parent frame SHALL restore focus to the key of the row that opened the popped frame; when consecutive top frames are unresolvable the pop SHALL cascade until a frame resolves, and when no frame resolves the stack SHALL end at the mode's root frame.
 
 #### Scenario: A vanished target pops back to its parent
 
@@ -137,9 +197,29 @@ When a declarative frame resolves to the unresolvable marker as the current fram
 - **WHEN** the exploration panel enters its unavailable form while the root frame is current
 - **THEN** the root renders one disabled row naming the server-authored reason, focus lands on it, and activating it submits nothing
 
+#### Scenario: Only the root frame renders the degraded row
+
+- **WHEN** a frame is unresolvable and the question is who shows a reason
+- **THEN** only when the root frame itself is unresolvable — with no parent to return to — does the client render a single degraded row; that row is focusable and submits nothing
+
+#### Scenario: The pop cascade is synchronous and bounded
+
+- **WHEN** unresolvable top frames force a pop cascade
+- **THEN** the cascade is bounded by stack depth and completes without any timer, animation, or deferred check
+
+#### Scenario: An unresolvable root without a server reason shows the fallback
+
+- **WHEN** the root frame is unresolvable and the marker carries no server-authored reason
+- **THEN** the single disabled row's text is the local fallback 「畫面狀態已更新，請返回上層」
+
+#### Scenario: Exceptions reach the stack rules as unresolvable
+
+- **WHEN** a resolution exception reaches the stack rules
+- **THEN** it is indistinguishable from an unresolvable marker
+
 ### Requirement: Suggestions frames are status-driven: generating never pops, unavailable exits to the root
 
-The suggestions frame SHALL be declarative but status-driven, never timer-driven. While the committed envelope status is `generating`, `ready`, or `degraded` the frame SHALL resolve to content under the suggestions surface's existing four-status contract (including the muted generating row) with in-place row replacement and key-surviving focus, and SHALL NOT pop. When an open suggestions frame's envelope becomes `unavailable` — the status under which the surface presents no root entry and no pane at all — the stack SHALL deterministically leave that frame by returning to the exploration root frame (restoring focus under the key rule) without rendering a degraded reason row; the root entry's own visibility rule is unchanged.
+The suggestions frame SHALL be declarative but status-driven, never timer-driven. While the committed envelope status is `generating`, `ready`, or `degraded` the frame SHALL resolve to content under the suggestions surface's existing four-status contract (including the muted generating row) with in-place row replacement and key-surviving focus, and SHALL NOT pop. When an open suggestions frame's envelope becomes `unavailable`, the stack SHALL deterministically leave that frame.
 
 #### Scenario: Generating status keeps the frame open
 
@@ -151,9 +231,19 @@ The suggestions frame SHALL be declarative but status-driven, never timer-driven
 - **WHEN** the suggestions frame is current and a committed update flips its envelope to `unavailable`
 - **THEN** the suggestions frame is gone, the exploration root renders with the 建議 entry absent, focus lands deterministically, no reason row appears, and no timer was involved
 
+#### Scenario: Unavailable is the no-pane status and root visibility is untouched
+
+- **WHEN** an open suggestions frame's envelope becomes `unavailable`
+- **THEN** `unavailable` is the status under which the surface presents no root entry and no pane at all, and the root entry's own visibility rule is unchanged by the deterministic exit
+
+#### Scenario: The deterministic exit returns to the exploration root
+
+- **WHEN** the stack deterministically leaves an open suggestions frame whose envelope became `unavailable`
+- **THEN** it returns to the exploration root frame, restoring focus under the key rule, without rendering a degraded reason row
+
 ### Requirement: Teardown resets the stack to the mode root from one decision point
 
-Mode switch (exploration / combat / dialogue / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode — the `exploration.root`, `combat.root`, or `creation.root` descriptor, the ordinary exploration root serving the dialogue mode — from the single existing teardown decision point. The stack SHALL never be empty in a live mode, and the wrapped empty-stack reset fuse SHALL no longer exist: an empty-stack read is a programmer error surfaced by the router, not a runtime re-home. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
+Mode switch (exploration / combat / dialogue / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode, from the single existing teardown decision point. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
 
 #### Scenario: Combat adoption resets to the combat root
 
@@ -186,6 +276,16 @@ Mode switch (exploration / combat / dialogue / creation), presentation epoch res
   open
 - **THEN** the stack holds exactly the `exploration.root` descriptor and no stale submenu row remains activatable
 
+#### Scenario: Each mode tears down to its named root descriptor
+
+- **WHEN** teardown selects the one declarative root frame of the new mode
+- **THEN** it is the `exploration.root`, `combat.root`, or `creation.root` descriptor, the ordinary exploration root serving the dialogue mode
+
+#### Scenario: The empty-stack reset fuse is gone
+
+- **WHEN** the stack would be empty in a live mode
+- **THEN** the stack never is — the wrapped empty-stack reset fuse no longer exists, and an empty-stack read is a programmer error surfaced by the router, not a runtime re-home
+
 ### Requirement: Activation payloads read committed state at dispatch time
 
 A row activation SHALL dispatch the server-authored action identifier and payload derived from the resolve that produced the currently rendered frame, so a frame that has already re-resolved submits the new state's payload. The server-side stale guards (`stale_location` rejection, `base_revision` admission gate) SHALL remain unchanged as backstops against multi-session and event races, not as the user-facing freshness mechanism.
@@ -197,7 +297,7 @@ A row activation SHALL dispatch the server-authored action identifier and payloa
 
 ### Requirement: The resolver table completes with the combat and creation families
 
-The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. The table SHALL NOT implement a services family: the committed `services` panel has no dock frame; every service surface renders in a frameless reference drawer or overlay. Any `services.*` descriptor is an unregistered source and resolves to the unresolvable marker. The table SHALL NOT implement a dialogue family: dialogue mode keeps the exploration root frame in the dock and presents its scripted picks in the narrative caption. Any `dialogue.*` descriptor is an unregistered source and resolves to the unresolvable marker.
+The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: the combat family — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; the creation family — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}`, `creation.confirm` `{kind, presetKey?}`.
 
 #### Scenario: Every completed-table source resolves from a live snapshot
 
@@ -214,3 +314,33 @@ The resolver table SHALL additionally implement, and produce the menus the migra
 - **WHEN** `dialogue.root` resolves against any committed state
 - **THEN** resolve returns the shared unresolvable marker (an unregistered source), and no router
   frame in any live mode ever holds a `dialogue.root` descriptor
+
+#### Scenario: Combat sources read the combat-form context_actions panel
+
+- **WHEN** a combat-family descriptor resolves
+- **THEN** it reads the panel `context_actions` in its combat form, with selection state owned by the combat model
+
+#### Scenario: Creation sources read the creation panel
+
+- **WHEN** a creation-family descriptor resolves
+- **THEN** it reads the panel `creation`
+
+#### Scenario: Creation form resolves to the wizard's empty marker frame
+
+- **WHEN** `creation.form` resolves with `{view: "custom" | "concept"}`
+- **THEN** it resolves to the wizard's empty marker frame
+
+#### Scenario: Services render outside the dock
+
+- **WHEN** any service surface is presented
+- **THEN** the committed `services` panel has no dock frame and every service surface renders in a frameless reference drawer or overlay, which is why no services family is implemented
+
+#### Scenario: Dialogue presents in the narrative caption
+
+- **WHEN** dialogue mode is live
+- **THEN** dialogue keeps the exploration root frame in the dock and presents its scripted picks in the narrative caption, which is why no dialogue family is implemented
+
+#### Scenario: Services and dialogue families are explicitly not implemented
+
+- **WHEN** the completed resolver table is declared
+- **THEN** it implements no services family and no dialogue family, and any `services.*` or `dialogue.*` descriptor is an unregistered source that resolves to the unresolvable marker
