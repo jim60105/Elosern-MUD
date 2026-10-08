@@ -388,9 +388,9 @@ The approved design is decomposed into ten one-workday-sized OpenSpec proposals.
 
 | OpenSpec change | Deliverable | Direct predecessors |
 |---|---|---|
-| [`shared-military-equipment`](../../../openspec/changes/shared-military-equipment/proposal.md) | Six real weapon/armor pairs, effects, price bands, finite stock and restocking | None |
-| [`weekly-npc-schedule-cycles`](../../../openspec/changes/weekly-npc-schedule-cycles/proposal.md) | Shared daily/seven-day parsing and absolute-tick occurrence arithmetic | None |
-| [`human-monster-balance-data`](../../../openspec/changes/human-monster-balance-data/proposal.md) | Twelve literal profiles and independent tier envelopes with open calamity upper references | None |
+| [`shared-military-equipment`](../../../openspec/changes/archive/2026-10-08-shared-military-equipment/proposal.md) | Six real weapon/armor pairs, effects, price bands, finite stock and restocking | None |
+| [`weekly-npc-schedule-cycles`](../../../openspec/changes/archive/2026-10-08-weekly-npc-schedule-cycles/proposal.md) | Shared daily/seven-day parsing and absolute-tick occurrence arithmetic | None |
+| [`human-monster-balance-data`](../../../openspec/changes/archive/2026-10-08-human-monster-balance-data/proposal.md) | Twelve literal profiles and independent tier envelopes with open calamity upper references | None |
 | [`guild-exam-schedule-hold`](../../../openspec/changes/guild-exam-schedule-hold/proposal.md) | Persisted exam schedule holds and ordered departure replay through real Exits without a second clock advance | `weekly-npc-schedule-cycles` |
 | [`persistent-human-guild-hosts`](../../../openspec/changes/persistent-human-guild-hosts/proposal.md) | Complete persistent Hok, Cassandra and Augustine, qualifications, skills, equipment, residences and daily/weekly routes | `shared-military-equipment`, `weekly-npc-schedule-cycles` |
 | [`guild-exam-restriction-policy`](../../../openspec/changes/guild-exam-restriction-policy/proposal.md) | Wearable reducing-only accessories and consistent skill/stat restrictions, including penalty ordering and the S domain | `shared-military-equipment` |
@@ -416,7 +416,7 @@ These batches are conservative synchronization points. A change may start once a
 
 ### 11.3 Shared-file conflicts and integration ownership
 
-The [whole-batch requirement ownership and conflict matrix](../../../openspec/changes/shared-military-equipment/design.md#whole-batch-requirement-ownership-and-conflict-matrix) records the approved-section owners. Parallel behavior slices still have shared integration boundaries.
+The [whole-batch requirement ownership and conflict matrix](../../../openspec/changes/archive/2026-10-08-shared-military-equipment/design.md#whole-batch-requirement-ownership-and-conflict-matrix) records the approved-section owners. Parallel behavior slices still have shared integration boundaries.
 
 | Shared area | Integration policy |
 |---|---|

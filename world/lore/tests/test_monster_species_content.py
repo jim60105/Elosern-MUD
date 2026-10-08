@@ -463,15 +463,18 @@ class BalanceSlotContentTests(unittest.TestCase):
                 profile = variant.combat_profile
                 self.assertIsNotNone(profile)
                 self.assertLessEqual(tier.hp_band[0], profile.hp)
-                self.assertLessEqual(profile.hp, tier.hp_band[1])
+                if tier.hp_band[1] is not None:
+                    self.assertLessEqual(profile.hp, tier.hp_band[1])
                 for axis in ("atk_phys", "agility", "defense"):
                     band = getattr(tier.static_band, axis)
                     value = getattr(profile, axis)
                     self.assertLessEqual(band[0], value, axis)
-                    self.assertLessEqual(value, band[1], axis)
+                    if band[1] is not None:
+                        self.assertLessEqual(value, band[1], axis)
                 magic_band = tier.static_band.magic_power
                 self.assertLessEqual(magic_band[0], profile.magic_power)
-                self.assertLessEqual(profile.magic_power, magic_band[1])
+                if magic_band[1] is not None:
+                    self.assertLessEqual(profile.magic_power, magic_band[1])
                 grade = GUILD_RANK_REGISTRY[variant.danger_grade]
                 bounds = [
                     GUILD_RANK_REGISTRY[rank].order
