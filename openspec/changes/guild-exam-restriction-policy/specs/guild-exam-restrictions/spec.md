@@ -40,6 +40,11 @@ E-B SHALL use section 4.2 ceilings and sword/body policy exactly, including perm
 
 ### Requirement: A and S examination kits retain real lineage effects
 A/S SHALL use section 4.3 normal bases and respective military pair/full usable sword lineage, sealing unrelated utility for comparability. S SHALL retain current domain attack bonus above its pre-active 36 attack. No artificial 100/1000 amplification SHALL be introduced.
+A/S SHALL permit body_enhancement_basic at its existing 1.2 multiplier to produce the reference pre-domain physical values A 30/25/29 and S 36/31/35, while sealing defense_instinct and unrelated utility effects.
+
+#### Scenario: A and S real-kit pre-domain baselines
+- **WHEN** their actual military pairs and permitted basic body enhancement apply before domain activation
+- **THEN** A has attack/agility/defense 30/25/29 and S 36/31/35 without hidden stat amplification
 
 #### Scenario: S domain
 - **WHEN** true_sword_saint domain activates under S kit
