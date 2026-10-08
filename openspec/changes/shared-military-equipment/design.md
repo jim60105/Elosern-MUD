@@ -43,7 +43,7 @@ Each scenario in specs/ needs substantive synthetic behavior coverage. Retain ex
 | 3.2-3.3 complete normal humans | persistent-human-guild-hosts | Gear, usable lineage/proficiency, cards, ages, homes/routes |
 | 4.1-4.3 caps/accessories/A-S | guild-exam-restriction-policy | Every consumer, negative ordering, S domain |
 | 4.4 atomic start/terminal/recovery | persistent-guild-exam-lifecycle | Cache rollback, HP0 simulation, identity survival |
-| 4.4 held schedule release | guild-exam-schedule-hold | Crossed weekly departure, no double time |
+| 4.4 held schedule release | guild-exam-schedule-hold core; lifecycle atomic wiring | Crossed weekly departure, no double time |
 | 5 all bonus/price/stock/band rows | shared-military-equipment | Real equipment and finite ordinary shops |
 | 6.1 cycle arithmetic | weekly-npc-schedule-cycles | Daily regression, seven-day tick-zero phase |
 | 6.1 actual authored visits | persistent-human-guild-hosts | Daily Hok, weekly A/S real Exit routes |
@@ -58,15 +58,15 @@ Each scenario in specs/ needs substantive synthetic behavior coverage. Retain ex
 | Shared implementation area | Changes | Conflict policy |
 |---|---|---|
 | Item registry/equipment effects | equipment, restrictions, hosts | equipment first; restriction and host touch different owned rows but coordinate shared file hunks |
-| npc_schedules and schedule YAML/tests | cycles, reader, hosts, hold | cycles first; reader/host may parallelize disjoint files; shared files serialize; hold follows lifecycle |
-| Guild config/economy/roster/profile inventories | hosts, lifecycle | hosts first; lifecycle removes obsolete sources/fields after persistent replacements exist |
-| guild_exams/combat_session/traits | restrictions, lifecycle, hold, appointment | restrictions then lifecycle then hold then appointment on shared mutations |
+| npc_schedules and schedule YAML/tests | cycles, reader, hosts, hold | cycles first; hold core then reader; host authoring may run on disjoint files; lifecycle consumes hold core |
+| Guild config/economy/roster/profile inventories | hosts, lifecycle | hosts adds person-source/profile acceptance while rank factories remain valid; lifecycle removes obsolete rank sources/fields |
+| guild_exams/combat_session/traits | restrictions, lifecycle, hold, appointment | restriction and hold cores precede lifecycle; lifecycle wires both atomically; appointment follows |
 | lore-registries spec/economy/monsters | equipment, monster data | Behavior independent; same spec.md hunks require serial integration |
 | Guild-rank-exams spec | lifecycle, appointment | appointment reads predecessor delta, modifies promotion request requirement only |
 | shard manifests/test freeze/traceability | all | Append exact owned entries in serialized integration; no broad freeze expansion |
 | master/schedule-design docs | appointment | Final integrated semantics amendment only |
 
-The runnable initial wave is equipment + weekly cycles + monster data (shared lore-registries delta edits require serial integration). Reader can run alongside hosts/restrictions after its prerequisite. Calibration and appointment can run after their prerequisites in parallel except shared test ownership manifests. Dependencies require predecessor apply/archive/sync completion, not merely its proposal existence. No branch/worktree is created by proposal work.
+The runnable initial wave is equipment + weekly cycles + monster data (shared lore-registries delta edits require serial integration). Hold core follows cycles; reader follows hold. Hosts and restrictions can run independently after their data prerequisites, coordinating shared item/schedule files. Lifecycle joins hosts, restrictions and hold core, activating no live persistent starts before complete deferral/release exists. Calibration and appointment can run after their prerequisites in parallel except shared test ownership manifests. Dependencies require predecessor apply/archive/sync completion, not merely proposal existence. No branch/worktree is created by proposal work.
 
 ## Approved Numeric and Evidence Reference
 
