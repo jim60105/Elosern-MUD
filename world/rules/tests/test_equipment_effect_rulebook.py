@@ -938,6 +938,9 @@ MILITARY_TABLE = (
 class MilitaryAuthoringContractTests(unittest.TestCase):
     """Approved section 5 rows, independently pinned to the design table."""
 
+    @covers_requirement(
+        "military-equipment::six-military-pairs-use-shared-registered-effects-and-approved-integer-prices"
+    )
     def test_exact_bonuses_prices_slots_and_finite_shared_offers(self):
         from world.quests.catalog import register_catalog
         register_catalog()
@@ -990,6 +993,9 @@ from evennia.utils.test_resources import EvenniaTest
 class MilitaryRuntimeSmokeTests(EvenniaTest):
     """Real registered gear on synthetic people through ordinary rule APIs."""
 
+    @covers_requirement(
+        "military-equipment::military-pairs-participate-in-ordinary-finite-commerce"
+    )
     def test_purchase_equip_sell_restock_and_rollback(self):
         from unittest.mock import patch
         from world.quests.catalog import register_catalog
