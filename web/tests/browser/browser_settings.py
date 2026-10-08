@@ -458,12 +458,18 @@ class _DeterministicOptionsClient:
                 Failure(LLMTransportError("connection", "simulated offline"))
             )
         if _room_matcher(PLAZA_ROOM_NAME)(descriptor):
-            if self._plaza_text is None:
+            plaza_text = self._plaza_text
+            if plaza_text is None:
+                try:
+                    plaza_text = _plaza_option_set_json()
+                except Exception:
+                    plaza_text = None
+            if plaza_text is None:
                 return defer.fail(Failure(MissingFixtureError("plaza unavailable")))
             result = defer.Deferred()
             reactor.callLater(
                 _GENERATION_DELAY_SECONDS,
-                lambda: result.callback(self._plaza_text),
+                lambda text=plaza_text: result.callback(text),
             )
             return result
         return defer.fail(Failure(MissingFixtureError("no fixture for this room")))
