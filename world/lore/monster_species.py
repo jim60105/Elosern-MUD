@@ -206,45 +206,25 @@ def _check_key(
             )
 
 
-#: One threat tier's band row as the band face carries it: the HP band, the
-#: tier's physical band, its magic band, and its guild rank range. The tier
-#: model declares *one* physical band shared by ``atk_phys``, ``agility`` and
-#: ``defense`` (``world/lore/monsters.py::_static_band``); a tier that declared
-#: asymmetric physical bands is rejected by the default projection rather than
-#: silently judged against the wrong axis, and supporting one is the change
-#: that widens this row.
-_TierBandRow = tuple[tuple[int, int], tuple[int, int], tuple[int, int], tuple[str, str]]
+#: HP, attack, agility, defense, magic, then ordered guild-rank endpoints.
+_MonsterBound = tuple[int, int | None]
+_TierBandRow = tuple[
+    _MonsterBound, _MonsterBound, _MonsterBound, _MonsterBound,
+    _MonsterBound, tuple[str, str],
+]
 
 
 def _default_tier_band_face(
     tiers: Mapping[str, MonsterTier] | None = None,
 ) -> dict[str, _TierBandRow]:
-    """Project threat tiers into the injectable band-face rows.
-
-    A tier declares one physical band for ``atk_phys``, ``agility`` and
-    ``defense``; if one ever declared different bounds per axis, the single
-    physical band this face carries would silently judge two of the three
-    against the wrong bound, so the projection raises instead. The shipped
-    tiers are projected through the validation that runs at import;
-    ``tiers`` defaults to ``MONSTER_TIER_REGISTRY`` and is injectable so
-    behavior tests can prove both readings with invented tiers.
-    """
+    """Project independent axes without imposing a physical symmetry."""
     face: dict[str, _TierBandRow] = {}
     for key, tier in (MONSTER_TIER_REGISTRY if tiers is None else tiers).items():
-        physical_bands = (
+        face[key] = (
+            tier.hp_band,
             tier.static_band.atk_phys,
             tier.static_band.agility,
             tier.static_band.defense,
-        )
-        if len(set(physical_bands)) != 1:
-            raise MonsterSpeciesRegistryError(
-                f"threat tier {key!r} declares asymmetric physical bands "
-                f"{physical_bands}, which the band face's single physical band "
-                "cannot express"
-            )
-        face[key] = (
-            tier.hp_band,
-            physical_bands[0],
             tier.static_band.magic_power,
             tier.guild_rank_range,
         )
@@ -286,15 +266,15 @@ def _check_profile_bands(
     inventing one would be unapproved balance content. The shipped zeros are
     pinned by the approved-literal contract instead.
     """
-    hp_band, physical_band, magic_band, _rank_range = bands
+    hp_band, attack_band, agility_band, defense_band, magic_band, _rank_range = bands
     for axis, value, band in (
         ("hp", profile.hp, hp_band),
-        ("atk_phys", profile.atk_phys, physical_band),
-        ("agility", profile.agility, physical_band),
-        ("defense", profile.defense, physical_band),
+        ("atk_phys", profile.atk_phys, attack_band),
+        ("agility", profile.agility, agility_band),
+        ("defense", profile.defense, defense_band),
         ("magic_power", profile.magic_power, magic_band),
     ):
-        if not band[0] <= value <= band[1]:
+        if value < band[0] or (band[1] is not None and value > band[1]):
             raise MonsterSpeciesRegistryError(
                 f"variant {mapping_key!r} declares {axis} {value} outside its "
                 f"threat tier {tier_key!r} band {band}; a combat profile must "
@@ -357,7 +337,7 @@ def validate_monster_species_registry(
     can exercise this function with invented keys.
 
     ``tier_band_face`` answers the band question: it maps a threat tier key to
-    that tier's ``(hp_band, physical_band, magic_band, guild_rank_range)`` and
+    that tier's ``(hp, attack, agility, defense, magic, guild_rank_range)`` and
     defaults to ``MONSTER_TIER_REGISTRY``'s own bands. Every variant's declared
     tier must be present in the face — a tier it does not carry raises the
     named error instead of skipping the check, so no rating can ever arrive
@@ -461,7 +441,7 @@ def validate_monster_species_registry(
                 mapping_key,
                 row.danger_grade,
                 row.threat_tier,
-                bands[3],
+                bands[5],
                 grade_positions,
             )
 
@@ -634,7 +614,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=55, mp=0, sp=0, atk_phys=4, agility=7, defense=3, magic_power=0
+            hp=30, mp=0, sp=0, atk_phys=4, agility=7, defense=3, magic_power=0
         ),
         "F",
     ),
@@ -646,7 +626,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=80, mp=0, sp=0, atk_phys=6, agility=8, defense=4, magic_power=0
+            hp=55, mp=0, sp=0, atk_phys=8, agility=10, defense=4, magic_power=0
         ),
         "E",
     ),
@@ -658,7 +638,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=70, mp=0, sp=0, atk_phys=5, agility=4, defense=8, magic_power=0
+            hp=30, mp=0, sp=0, atk_phys=5, agility=4, defense=5, magic_power=0
         ),
         "F",
     ),
@@ -670,7 +650,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=110, mp=0, sp=0, atk_phys=7, agility=3, defense=8, magic_power=0
+            hp=60, mp=0, sp=0, atk_phys=12, agility=4, defense=7, magic_power=0
         ),
         "E",
     ),
@@ -682,7 +662,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=60, mp=0, sp=0, atk_phys=4, agility=8, defense=3, magic_power=0
+            hp=30, mp=0, sp=0, atk_phys=4, agility=8, defense=3, magic_power=0
         ),
         "F",
     ),
@@ -694,7 +674,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=95, mp=0, sp=0, atk_phys=6, agility=5, defense=7, magic_power=0
+            hp=55, mp=0, sp=0, atk_phys=11, agility=6, defense=6, magic_power=0
         ),
         "E",
     ),
@@ -706,7 +686,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=240, mp=0, sp=0, atk_phys=14, agility=17, defense=13, magic_power=0
+            hp=130, mp=0, sp=0, atk_phys=20, agility=16, defense=12, magic_power=0
         ),
         "D",
     ),
@@ -718,7 +698,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=330, mp=0, sp=0, atk_phys=17, agility=13, defense=18, magic_power=0
+            hp=170, mp=0, sp=0, atk_phys=26, agility=14, defense=14, magic_power=0
         ),
         "C",
     ),
@@ -730,7 +710,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=220, mp=0, sp=0, atk_phys=16, agility=18, defense=12, magic_power=0
+            hp=115, mp=0, sp=0, atk_phys=20, agility=20, defense=10, magic_power=0
         ),
         "D",
     ),
@@ -742,7 +722,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=280, mp=0, sp=0, atk_phys=18, agility=19, defense=14, magic_power=0
+            hp=165, mp=0, sp=0, atk_phys=25, agility=22, defense=12, magic_power=0
         ),
         "C",
     ),
@@ -754,7 +734,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=340, mp=0, sp=0, atk_phys=18, agility=12, defense=17, magic_power=0
+            hp=140, mp=0, sp=0, atk_phys=22, agility=12, defense=14, magic_power=0
         ),
         "D",
     ),
@@ -766,7 +746,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=400, mp=0, sp=0, atk_phys=20, agility=12, defense=20, magic_power=0
+            hp=210, mp=0, sp=0, atk_phys=28, agility=12, defense=15, magic_power=0
         ),
         "C",
     ),

@@ -43,8 +43,8 @@ TIER = "t_fixture_band"
 STRONGER_TIER = "t_fixture_band_above"
 GRADE = "t_fixture_grade"
 
-# The invented band rows of the two invented tiers: (HP band, physical band,
-# magic band, guild rank range). They are wide enough for the invented profile
+# The invented band rows carry HP, attack, agility, defense, magic and ranks.
+# They are wide enough for the invented profile
 # the balance-slot tests build, and they are injected like every other face, so
 # the band invariant is exercised without reading a shipped tier's bands.
 TIER_HP_BAND = (10, 20)
@@ -94,9 +94,12 @@ def _faces(**overrides: object) -> dict[str, object]:
         "tier_face": (TIER, STRONGER_TIER),
         "grade_face": (GRADE,),
         "tier_band_face": {
-            TIER: (TIER_HP_BAND, TIER_PHYSICAL_BAND, TIER_MAGIC_BAND, TIER_RANK_RANGE),
+            TIER: (TIER_HP_BAND, TIER_PHYSICAL_BAND, TIER_PHYSICAL_BAND,
+                   TIER_PHYSICAL_BAND, TIER_MAGIC_BAND, TIER_RANK_RANGE),
             STRONGER_TIER: (
                 TIER_HP_BAND,
+                TIER_PHYSICAL_BAND,
+                TIER_PHYSICAL_BAND,
                 TIER_PHYSICAL_BAND,
                 TIER_MAGIC_BAND,
                 TIER_RANK_RANGE,

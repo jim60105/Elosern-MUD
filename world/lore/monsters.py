@@ -10,7 +10,14 @@ from dataclasses import dataclass
 
 from world.art.fallback_keys import validate_fallback_key
 
-from .races import StaticBand
+@dataclass(frozen=True)
+class MonsterStaticBand:
+    """Independent monster axes; None is an open upper authoring bound."""
+
+    atk_phys: tuple[int, int | None]
+    agility: tuple[int, int | None]
+    defense: tuple[int, int | None]
+    magic_power: tuple[int, int | None]
 
 
 @dataclass(frozen=True)
@@ -18,8 +25,8 @@ class MonsterTier:
     key: str
     display_name_zh: str
     guild_rank_range: tuple[str, str]
-    static_band: StaticBand
-    hp_band: tuple[int, int]
+    static_band: MonsterStaticBand
+    hp_band: tuple[int, int | None]
     example_monsters_zh: tuple[str, ...]
     description: str
     # The OPTIONAL built-in gallery fallback key (gallery-builtin-fallbacks).
@@ -29,12 +36,11 @@ class MonsterTier:
     fallback_key: str | None = None
 
 
-def _static_band(lower: int, upper: int) -> StaticBand:
-    band = (lower, upper)
-    return StaticBand(
-        atk_phys=band,
-        agility=band,
-        defense=band,
+def _static_band(attack, agility, defense) -> MonsterStaticBand:
+    return MonsterStaticBand(
+        atk_phys=attack,
+        agility=agility,
+        defense=defense,
         # Monster magic power is documented nowhere in lore; every tier
         # carries the zero band so monster construction reads the fourth
         # axis deterministically without inventing a value (D-A2).
@@ -44,24 +50,24 @@ def _static_band(lower: int, upper: int) -> StaticBand:
 
 MONSTER_TIER_REGISTRY: dict[str, MonsterTier] = {
     "low": MonsterTier(
-        "low", "低階", ("F", "E"), _static_band(3, 8), (50, 150),
+        "low", "低階", ("F", "E"), _static_band((3, 12), (3, 12), (2, 8)), (25, 70),
         ("史萊姆", "哥布林", "巨鼠"),
         "Threats a beginning adventurer can handle alone.",
     ),
     "mid": MonsterTier(
-        "mid", "中階", ("D", "C"), _static_band(12, 20), (200, 400),
+        "mid", "中階", ("D", "C"), _static_band((18, 28), (10, 24), (10, 16)), (110, 230),
         ("狼型魔獸", "食人魔", "地龍"),
         "Threats requiring a party of ordinary adventurers.",
     ),
     "high": MonsterTier(
-        "high", "高階", ("B", "A"), _static_band(22, 35), (400, 700),
+        "high", "高階", ("B", "A"), _static_band((26, 40), (16, 30), (18, 32)), (300, 750),
         ("雙頭龍", "魔法生物", "巨魔"),
         "Threats matching or exceeding the finest human fighters.",
     ),
     "calamity": MonsterTier(
-        "calamity", "災厄級", ("S", "S"), _static_band(60, 150), (1200, 3000),
+        "calamity", "災厄級", ("S", "S"), _static_band((60, None), (60, None), (60, None)), (1200, None),
         ("古龍", "魔神", "災獸"),
-        "Legendary threats beyond the human scale and above a typical elf.",
+        "Open-ended legendary threats; 3000 HP and 150 physical stats are references.",
     ),
 }
 

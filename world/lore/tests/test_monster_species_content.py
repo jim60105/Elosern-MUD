@@ -6,7 +6,7 @@ approved named variant directions (content-approved 2026-10-05), the approved
 zh-TW narrative landed in the published fields, the user-approved complete
 combat profile and guild danger grade of every shipped variant together with
 its membership in the tier band that variant declares (balance-approved
-2026-10-06), the values and numeric source a constructed individual stores, the
+2026-10-08), the values and numeric source a constructed individual stores, the
 shared stable-key contract, and the negative guarantee that the registries name
 no skill key, behaviour profile, or combat trait.
 """
@@ -84,7 +84,7 @@ APPROVED_VARIANTS = {
     "bay_warden": ("tide_devouring_crocodile", "守灣型", "mid", False),
 }
 
-# The user's balance approval (granted 2026-10-06, `monster-balance-profiles`):
+# The user's balance approval (2026-10-08, `human-monster-balance-data`):
 # variant key -> the approved complete combat profile and guild danger grade.
 # These are the approved literals verbatim; the registry must reproduce them
 # field for field, and a value that differs is a content defect, not a
@@ -92,7 +92,7 @@ APPROVED_VARIANTS = {
 # ability mechanic consumes a pool and every tier's magic band is (0, 0).
 APPROVED_BALANCE = {
     "grain_pecker": {
-        "hp": 55,
+        "hp": 30,
         "mp": 0,
         "sp": 0,
         "atk_phys": 4,
@@ -102,37 +102,37 @@ APPROVED_BALANCE = {
         "danger_grade": "F",
     },
     "flock_leader": {
-        "hp": 80,
+        "hp": 55,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 6,
-        "agility": 8,
+        "atk_phys": 8,
+        "agility": 10,
         "defense": 4,
         "magic_power": 0,
         "danger_grade": "E",
     },
     "shore_walker": {
-        "hp": 70,
+        "hp": 30,
         "mp": 0,
         "sp": 0,
         "atk_phys": 5,
         "agility": 4,
-        "defense": 8,
+        "defense": 5,
         "magic_power": 0,
         "danger_grade": "F",
     },
     "reef_warden": {
-        "hp": 110,
+        "hp": 60,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 7,
-        "agility": 3,
-        "defense": 8,
+        "atk_phys": 12,
+        "agility": 4,
+        "defense": 7,
         "magic_power": 0,
         "danger_grade": "E",
     },
     "burrow_maker": {
-        "hp": 60,
+        "hp": 30,
         "mp": 0,
         "sp": 0,
         "atk_phys": 4,
@@ -142,72 +142,72 @@ APPROVED_BALANCE = {
         "danger_grade": "F",
     },
     "nest_guard": {
-        "hp": 95,
+        "hp": 55,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 6,
-        "agility": 5,
-        "defense": 7,
+        "atk_phys": 11,
+        "agility": 6,
+        "defense": 6,
         "magic_power": 0,
         "danger_grade": "E",
     },
     "cliff_stepper": {
-        "hp": 240,
+        "hp": 130,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 14,
-        "agility": 17,
-        "defense": 13,
-        "magic_power": 0,
-        "danger_grade": "D",
-    },
-    "pass_warden": {
-        "hp": 330,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 17,
-        "agility": 13,
-        "defense": 18,
-        "magic_power": 0,
-        "danger_grade": "C",
-    },
-    "wood_stalker": {
-        "hp": 220,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 16,
-        "agility": 18,
+        "atk_phys": 20,
+        "agility": 16,
         "defense": 12,
         "magic_power": 0,
         "danger_grade": "D",
     },
-    "trail_hunter": {
-        "hp": 280,
+    "pass_warden": {
+        "hp": 170,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 18,
-        "agility": 19,
+        "atk_phys": 26,
+        "agility": 14,
         "defense": 14,
         "magic_power": 0,
         "danger_grade": "C",
     },
-    "bank_lurker": {
-        "hp": 340,
+    "wood_stalker": {
+        "hp": 115,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 18,
+        "atk_phys": 20,
+        "agility": 20,
+        "defense": 10,
+        "magic_power": 0,
+        "danger_grade": "D",
+    },
+    "trail_hunter": {
+        "hp": 165,
+        "mp": 0,
+        "sp": 0,
+        "atk_phys": 25,
+        "agility": 22,
+        "defense": 12,
+        "magic_power": 0,
+        "danger_grade": "C",
+    },
+    "bank_lurker": {
+        "hp": 140,
+        "mp": 0,
+        "sp": 0,
+        "atk_phys": 22,
         "agility": 12,
-        "defense": 17,
+        "defense": 14,
         "magic_power": 0,
         "danger_grade": "D",
     },
     "bay_warden": {
-        "hp": 400,
+        "hp": 210,
         "mp": 0,
         "sp": 0,
-        "atk_phys": 20,
+        "atk_phys": 28,
         "agility": 12,
-        "defense": 20,
+        "defense": 15,
         "magic_power": 0,
         "danger_grade": "C",
     },
