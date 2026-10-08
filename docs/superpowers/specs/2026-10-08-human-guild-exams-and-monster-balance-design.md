@@ -1,10 +1,10 @@
 # Human Guild Examinations and Monster Balance Design
 
 **Date:** 2026-10-08
-**Status:** Design decisions approved; written-spec review precedes implementation planning.
+**Status:** Design approved; ten OpenSpec proposals complete; implementation not started.
 **Scope:** Persistent human adventurer examination hosts, ability-limiting accessories, shared military equipment, human-based monster calibration, weekly NPC visits, and schedule-first examination requests.
 
-This document captures the approved brainstorming decisions. It authorizes a design, not an implementation. The existing `examiner-calibrated-combat-balance` OpenSpec proposal and design are incomplete earlier drafts; they must be reconciled with this document during subsequent proposal work. This documentation commit does not update those artifacts or the current main capability specs.
+This document captures the approved design decisions and the resulting OpenSpec proposal roadmap. The incomplete `examiner-calibrated-combat-balance` draft was removed before the ten proposals in section 11 were created. This document does not authorize implementation or amend current main capability specs outside the OpenSpec workflow.
 
 ## 1. Purpose and Architectural Boundaries
 
@@ -373,21 +373,63 @@ Implementation smoke evidence must exercise a real persistent host wearing actua
 
 Update `docs/game/commands.md` and `docs/game/command-reference.md` for changed examination semantics/availability, and preserve the command-doc contract. Update affected main/delta specs through the repository OpenSpec workflow. Main capability traceability uses canonical requirement IDs and substantive tests. Register any new test modules and browser methods in their exact shard manifests. Before implementation handoff, run the focused tests, observability/data lints when affected, and `uv run --locked python -m tools.contract_gate`; complete evidence verification remains CI-owned.
 
-## 11. Delivery Slices and Non-Goals
+## 11. OpenSpec Proposals, Dependencies, and Implementation Batches
 
-This is a parent design spanning connected subsystems. Subsequent implementation planning decomposes it into focused, verifiable changes, each with its own reconciled artifacts. No implementation starts from the stale two-file OpenSpec draft.
+### 11.1 Proposal inventory and direct dependencies
 
-| Slice | Deliverable | Dependency |
+The approved design is decomposed into ten one-workday-sized OpenSpec proposals. Each change has `proposal.md`, `design.md`, delta specs, and `tasks.md` under `openspec/changes/<change>/`. All ten proposal sets passed strict validation and were committed on `master`; none has been implemented or archived. The links below point to the active proposals. Their declared `depends-on` entries are the direct dependencies, including explicitly declared edges already implied by another predecessor.
+
+| OpenSpec change | Deliverable | Direct predecessors |
 |---|---|---|
-| Shared military equipment | All six real item pairs, effects, valid price bands and ordinary assortments | Existing equipment and commerce contracts |
-| Human-based monster data | Twelve approved literal profiles, independent/open-ended tier envelope semantics, recorded calibration | Military-equipment definitions for real-kit verification |
-| Persistent human hosts | Adventurer identity/qualification, normal skills, gear, residences, dialogue and stable roster | Military equipment and existing NPC assembly |
-| Examination restriction lifecycle | Real host participation, limits/seals, simulated restoration, atomic start/settlement and recovery | Persistent hosts and military equipment |
-| Weekly schedules and attendance reader | Shared daily/weekly cycles, real movement and read-only visit-window query | Existing schedule/clock contracts; parallel to equipment/balance work |
-| Appointment request surface | Schedule-first coordinator, UI/command/intent cutover and below-threshold access | Host qualification, restriction start API, attendance reader |
+| [`shared-military-equipment`](../../../openspec/changes/shared-military-equipment/proposal.md) | Six real weapon/armor pairs, effects, price bands, finite stock and restocking | None |
+| [`weekly-npc-schedule-cycles`](../../../openspec/changes/weekly-npc-schedule-cycles/proposal.md) | Shared daily/seven-day parsing and absolute-tick occurrence arithmetic | None |
+| [`human-monster-balance-data`](../../../openspec/changes/human-monster-balance-data/proposal.md) | Twelve literal profiles and independent tier envelopes with open calamity upper references | None |
+| [`guild-exam-schedule-hold`](../../../openspec/changes/guild-exam-schedule-hold/proposal.md) | Persisted exam schedule holds and ordered departure replay through real Exits without a second clock advance | `weekly-npc-schedule-cycles` |
+| [`persistent-human-guild-hosts`](../../../openspec/changes/persistent-human-guild-hosts/proposal.md) | Complete persistent Hok, Cassandra and Augustine, qualifications, skills, equipment, residences and daily/weekly routes | `shared-military-equipment`, `weekly-npc-schedule-cycles` |
+| [`guild-exam-restriction-policy`](../../../openspec/changes/guild-exam-restriction-policy/proposal.md) | Wearable reducing-only accessories and consistent skill/stat restrictions, including penalty ordering and the S domain | `shared-military-equipment` |
+| [`planned-npc-service-windows`](../../../openspec/changes/planned-npc-service-windows/proposal.md) | Read-only next planned service interval from actual location/state, including busy, missed-arrival and unknown-time outcomes | `weekly-npc-schedule-cycles`, `guild-exam-schedule-hold` |
+| [`persistent-guild-exam-lifecycle`](../../../openspec/changes/persistent-guild-exam-lifecycle/proposal.md) | Atomic persistent-host simulations, outfit/resource restoration, rollback, cold-start recovery and disposable-factory removal | `persistent-human-guild-hosts`, `guild-exam-restriction-policy`, `guild-exam-schedule-hold` |
+| [`human-combat-calibration-evidence`](../../../openspec/changes/human-combat-calibration-evidence/proposal.md) | Preserve conditional historical evidence and run bounded resolver probes with real gear, restrictions and hosts | `shared-military-equipment`, `human-monster-balance-data`, `persistent-guild-exam-lifecycle`, `guild-exam-schedule-hold` |
+| [`guild-exam-appointment-surface`](../../../openspec/changes/guild-exam-appointment-surface/proposal.md) | Presence-before-merit coordinator across text/browser/NPC intents and complete services-v5 action/field cutover | `planned-npc-service-windows`, `persistent-guild-exam-lifecycle`, `guild-exam-schedule-hold` |
 
-The exact OpenSpec change boundaries must follow the project's one-workday sizing and roadmap dependency rules when proposals are reconciled. The dependency table is design-level decomposition, not an implementation task list.
+Monster data has no equipment prerequisite. Actual-kit calibration owns that dependency separately. Schedule holds must exist before the lifecycle enables persistent examinations; the lifecycle activates and releases them atomically with exam state.
+
+### 11.2 Implementation batches
+
+The following batches are a dependency-safe execution order. Changes within a batch may be implemented concurrently only when their shared-file ownership is coordinated. Individual `tasks.md` files remain the implementation checklists. Proposal existence or an unmerged implementation branch does not satisfy a dependency.
+
+| Batch | Changes | Entry and completion boundary |
+|---|---|---|
+| 1: Shared data and schedule foundations | `shared-military-equipment`, `weekly-npc-schedule-cycles`, `human-monster-balance-data` | No new-change predecessors. Verify real equipment/commerce, daily/weekly occurrence behavior, and monster authoring independently; serialize shared lore-spec integration. |
+| 2: Hosts and exam policies | `guild-exam-schedule-hold`, `persistent-human-guild-hosts`, `guild-exam-restriction-policy` | Required batch-1 predecessors are applied, verified, archived, synced and merged. Verify hold/release APIs, complete normal adventurers, and all restriction consumers. No persistent examination starts are enabled in this batch. |
+| 3: Availability and persistent simulation | `planned-npc-service-windows`, `persistent-guild-exam-lifecycle` | Required batch-2 predecessors are complete. Verify read-only planned windows and real-host start/settlement/recovery independently; lifecycle integrates restrictions and schedule holds before enabling starts. |
+| 4: Runtime evidence and request surfaces | `human-combat-calibration-evidence`, `guild-exam-appointment-surface` | Required predecessors from batches 1–3 are complete. Record bounded actual-kit evidence and verify the actual appointment surface, including absent-host/below-merit replies, present-host merit rejection, and successful starts. |
+
+These batches are conservative synchronization points. A change may start once all of its direct predecessors have completed the apply, verification, archive/sync and primary-branch merge sequence, even if an unrelated change in an earlier batch is still running. For example, the availability reader can follow the hold change without waiting for host authoring or restriction policy.
+
+### 11.3 Shared-file conflicts and integration ownership
+
+The [whole-batch requirement ownership and conflict matrix](../../../openspec/changes/shared-military-equipment/design.md#whole-batch-requirement-ownership-and-conflict-matrix) records the approved-section owners. Parallel behavior slices still have shared integration boundaries.
+
+| Shared area | Integration policy |
+|---|---|
+| Item registry, equipment effects and settlement assortments | Equipment lands first. Restrictions and hosts coordinate shared item/effect and settlement hunks while retaining their own authored rows. |
+| Schedule model, YAML, occurrence helpers and tests | Cycles land before holds and the reader. Hosts coordinate authored routes; the reader consumes the completed hold contract. |
+| Guild roster, qualifications and profile inventories | Hosts first add complete normal persistent people while old rank factories remain valid. Lifecycle subsequently removes obsolete factory fields, provenance and cards. |
+| Examination, combat-session and trait consumers | Restriction and hold cores precede lifecycle. Lifecycle owns atomic activation/release wiring; appointment follows its authoritative start contract. |
+| `lore-registries` main/delta spec | Equipment and monster data are behaviorally independent, but same-file spec synchronization and merge are serialized. |
+| `guild-rank-exams` main/delta spec | Appointment preserves the completed lifecycle contract and changes the promotion-request contract after it. |
+| Shard manifests, traceability and data-contract registrations | Each change registers only its owned entries; shared manifest integration is serialized. No freeze-list expansion is permitted. |
+| Command references and earlier engine/schedule designs | Appointment owns the final integrated command documentation and earlier-design wording updates. |
+
+### 11.4 Per-change gates and authorization
+
+After implementation is authorized, apply each selected change on `feat/<change>` in `.worktrees/<change>` through the repository OpenSpec workflow. Read the completed predecessor contracts and the selected change's artifacts before editing. Follow its `tasks.md`; mark work complete only after verification.
+
+Each change must pass `openspec validate <change> --strict`, its focused tests, its actual changed-path smoke, and `uv run --locked python -m tools.contract_gate` before handoff. Section 10 defines the runtime, browser, traceability and shard obligations; complete evidence verification remains CI-owned. Archive only completed, verified changes, sync their delta specs, pass the archive/post-sync gates, merge into the primary branch, and run `openspec validate --all --strict` as required by the archive workflow. A dependent implementation then consumes the merged current contracts.
+
+This documentation update records the proposal plan without starting an apply or archive operation. The next execution gate is explicit authorization to implement selected proposals in dependency order.
+
+### 11.5 Non-goals
 
 Non-goals are difficulty selectors, race-specific combat exceptions, elf/beastfolk calibration, new F examinations, merit/reward changes, automatic reservations or queues, paid appointments, automatic waiting/teleportation/combat, new monster abilities, retreat kill credit, combat formula changes, general NPC strategy optimization, unrelated refactoring, database migrations, and backward-compatibility layers.
-
-The next gate is user review of this written document. After that approval, invoke `writing-plans` to create the implementation plan. Do not invoke an implementation skill or apply a change merely because the design document has been committed.
