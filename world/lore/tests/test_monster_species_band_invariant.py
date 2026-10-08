@@ -19,8 +19,7 @@ from world.lore.monster_species import (
     _default_tier_band_face,
     validate_monster_species_registry,
 )
-from world.lore.monsters import MonsterTier
-from world.lore.races import StaticBand
+from world.lore.monsters import MonsterStaticBand, MonsterTier
 
 HABITAT = "t_fixture_hollow"
 SPECIES = "t_fixture_species"
@@ -34,6 +33,8 @@ RANK_ABOVE = "t_rank_above"
 
 HP_BAND = (20, 40)
 PHYSICAL_BAND = (2, 9)
+AGILITY_BAND = (6, 13)
+DEFENSE_BAND = (1, 4)
 MAGIC_BAND = (0, 0)
 RANK_RANGE = (RANK_LOW, RANK_HIGH)
 
@@ -96,7 +97,7 @@ def _faces(**overrides: object) -> dict[str, object]:
         "tier_face": (TIER, UNBANDED_TIER),
         "grade_face": GRADES,
         "tier_band_face": {
-            TIER: (HP_BAND, PHYSICAL_BAND, MAGIC_BAND, RANK_RANGE),
+            TIER: (HP_BAND, PHYSICAL_BAND, AGILITY_BAND, DEFENSE_BAND, MAGIC_BAND, RANK_RANGE),
         },
     }
     faces.update(overrides)
@@ -104,15 +105,15 @@ def _faces(**overrides: object) -> dict[str, object]:
 
 
 def _tier(agility_band: tuple[int, int] | None = None) -> MonsterTier:
-    """One invented tier whose physical axes share a band unless told not to."""
+    """One invented tier with distinguishable physical bounds."""
     return MonsterTier(
         TIER,
         "試製層級",
         RANK_RANGE,
-        StaticBand(
+        MonsterStaticBand(
             atk_phys=PHYSICAL_BAND,
-            agility=PHYSICAL_BAND if agility_band is None else agility_band,
-            defense=PHYSICAL_BAND,
+            agility=AGILITY_BAND if agility_band is None else agility_band,
+            defense=DEFENSE_BAND,
             magic_power=MAGIC_BAND,
         ),
         HP_BAND,
@@ -127,20 +128,20 @@ class TierBandFaceProjectionTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
     )
-    def test_a_symmetric_tier_projects_its_bands(self):
+    def test_an_asymmetric_tier_projects_its_own_bands(self):
         face = _default_tier_band_face({TIER: _tier()})
         self.assertEqual(
-            face[TIER], (HP_BAND, PHYSICAL_BAND, MAGIC_BAND, RANK_RANGE)
+            face[TIER], (HP_BAND, PHYSICAL_BAND, AGILITY_BAND, DEFENSE_BAND, MAGIC_BAND, RANK_RANGE)
         )
 
     @covers_requirement(
         "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
     )
-    def test_a_tier_with_asymmetric_physical_bands_is_rejected(self):
+    def test_a_changed_axis_is_preserved_by_projection(self):
         skewed = (PHYSICAL_BAND[0] + 4, PHYSICAL_BAND[1] + 4)
-        with self.assertRaises(MonsterSpeciesRegistryError) as caught:
-            _default_tier_band_face({TIER: _tier(agility_band=skewed)})
-        self.assertIn(TIER, str(caught.exception))
+        face = _default_tier_band_face({TIER: _tier(agility_band=skewed)})
+        self.assertEqual(face[TIER][2], skewed)
+        self.assertEqual(face[TIER][1], PHYSICAL_BAND)
 
 
 class TierBandInvariantTests(unittest.TestCase):
@@ -173,8 +174,8 @@ class TierBandInvariantTests(unittest.TestCase):
                 combat_profile=_profile(
                     hp=HP_BAND[1],
                     atk_phys=PHYSICAL_BAND[0],
-                    agility=PHYSICAL_BAND[1],
-                    defense=PHYSICAL_BAND[0],
+                    agility=AGILITY_BAND[1],
+                    defense=DEFENSE_BAND[0],
                     magic_power=MAGIC_BAND[1],
                 ),
                 danger_grade=RANK_HIGH,
@@ -197,12 +198,15 @@ class TierBandInvariantTests(unittest.TestCase):
         "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
     )
     def test_each_physical_axis_outside_the_tier_band_is_rejected(self):
-        for axis in ("atk_phys", "agility", "defense"):
-            for value in (PHYSICAL_BAND[0] - 1, PHYSICAL_BAND[1] + 1):
+        for axis, band in (("atk_phys", PHYSICAL_BAND), ("agility", AGILITY_BAND), ("defense", DEFENSE_BAND)):
+            for value in (band[0] - 1, band[1] + 1):
                 with self.subTest(axis=axis, value=value):
-                    self._rejection(
+                    message = self._rejection(
                         _variant(combat_profile=_profile(**{axis: value}))
                     )
+                    self.assertIn(VARIANT, message)
+                    self.assertIn(axis, message)
+                    self.assertIn(str(value), message)
 
     @covers_requirement(
         "monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band"
@@ -234,7 +238,7 @@ class TierBandInvariantTests(unittest.TestCase):
         self._rejection(
             _variant(),
             tier_band_face={
-                TIER: (HP_BAND, PHYSICAL_BAND, MAGIC_BAND, (RANK_LOW, "t_rank_unknown")),
+                TIER: (HP_BAND, PHYSICAL_BAND, AGILITY_BAND, DEFENSE_BAND, MAGIC_BAND, (RANK_LOW, "t_rank_unknown")),
             },
         )
 
@@ -275,6 +279,25 @@ class TierBandInvariantTests(unittest.TestCase):
             )
         )
         self.assertIn(UNBANDED_TIER, message)
+
+    @covers_requirement("lore-registries::monstertier-registry-has-physical-stat-and-hp-bands-derived-from-guild-rank")
+    @covers_requirement("monster-species-registry::every-shipped-combat-profile-and-danger-grade-lies-inside-its-declared-tier-band")
+    def test_open_upper_bounds_accept_large_literals_and_keep_lower_and_magic_limits(self):
+        bands = {TIER: ((1200, None), (60, None), (60, None), (60, None), MAGIC_BAND, RANK_RANGE)}
+        profile = _profile(hp=5000, atk_phys=220, agility=190, defense=170)
+        self._validate(_variant(combat_profile=profile), tier_band_face=bands)
+        for axis, value in (("hp", 1199), ("atk_phys", 59), ("agility", 59), ("defense", 59), ("magic_power", 1)):
+            with self.subTest(axis=axis):
+                import dataclasses
+                message = self._rejection(
+                    _variant(combat_profile=dataclasses.replace(profile, **{axis: value})),
+                    tier_band_face=bands,
+                )
+                self.assertIn(axis, message)
+
+    @covers_requirement("lore-registries::monstertier-registry-has-physical-stat-and-hp-bands-derived-from-guild-rank")
+    def test_endurance_does_not_require_a_physical_ratio(self):
+        self._validate(_variant(combat_profile=_profile(hp=20, atk_phys=9, agility=13, defense=4)))
 
 
 if __name__ == "__main__":
