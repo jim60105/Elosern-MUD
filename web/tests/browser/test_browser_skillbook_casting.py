@@ -10,6 +10,8 @@ combat-menu journeys.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
+
 import os
 import time
 
@@ -103,6 +105,7 @@ class _SkillBookJourney:
 class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
     """Read-only SkillBook journeys on the shared managed server."""
 
+    @covers_requirement("webclient-skillbook-casting::skillbook-redesign-is-apply-owned-and-availability-is-truthful")
     def test_book_hierarchy_geometry_and_focus_at_both_viewports(self):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
@@ -150,6 +153,7 @@ class SkillBookCastingBrowserTest(_SkillBookJourney, BrowserAcceptanceTest):
                 ring = page.evaluate("() => getComputedStyle(document.activeElement).boxShadow")
                 self.assertNotEqual(ring, "none", "the focused action carries a visible focus ring")
 
+    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice")
     def test_cancel_back_returns_to_the_book_without_casting(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -263,6 +267,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
             what,
         )
 
+    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice")
     def test_keyboard_self_none_and_single_utility_casts(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -296,6 +301,7 @@ class SkillBookFieldCastJourneyTest(_SkillBookJourney, ManagedServerTearDownMixi
         self.assertEqual(store_state(page)["mode"], "exploration")
         self.assertEqual(len(self._actions(page, "explore.cast")), 3)
 
+    @covers_requirement("webclient-skillbook-casting::skillbook-use-shares-one-keyboard-owner-and-preserves-practice", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_area_opening_at_a_chosen_scale_starts_combat_then_book_hands_off(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

@@ -7,6 +7,7 @@ settlement), and the side-effect-free preview the ``skill_use`` panel renders
 (ordinary candidates, monster openings, NONE/SELF verdicts, scale costs).
 """
 
+from tools.spec_traceability import covers_requirement
 from dataclasses import replace
 from unittest.mock import patch
 
@@ -151,6 +152,7 @@ class CastInFieldRoutingTests(_FieldCase):
         request = settle.call_args.args[0]
         self.assertEqual(request.targets, [self.player, npc])
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_damage_aimed_elsewhere_is_refused_before_settlement_or_clock(self):
         npc = self._npc("damage npc")
         grant_lineage(self.player, [_T_DAMAGE])
@@ -170,6 +172,7 @@ class CastInFieldRoutingTests(_FieldCase):
         self.assertEqual(read_world_clock() is None, clock_before is None)
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("webclient-skillbook-casting::cast-settlement-is-atomic-and-publishes-the-complete-committed-view")
     def test_utility_cast_settles_once_with_command_time(self):
         npc = self._npc("healed npc")
         npc.traits.hp.current = 1
@@ -187,6 +190,7 @@ class CastInFieldRoutingTests(_FieldCase):
         self.assertGreater(int(npc.traits.hp.current), 1)
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_explicit_anchor_opens_combat(self):
         wolf = self._wolf("anchored wolf")
         grant_lineage(self.player, [_T_DAMAGE])
@@ -213,6 +217,7 @@ class PreviewFieldSkillTests(_FieldCase):
         self.assertTrue(preview.verdict.enabled)
         self.assertEqual([choice.entity for choice in preview.targets], [self.player])
 
+    @covers_requirement("webclient-skillbook-casting::field-previews-share-existing-deterministic-target-and-scale-rules")
     def test_single_heal_lists_ordinary_candidates_and_a_separate_opening(self):
         npc = self._npc("heal npc")
         wolf = self._wolf("heal wolf")
@@ -227,6 +232,7 @@ class PreviewFieldSkillTests(_FieldCase):
         self.assertEqual(preview.openings[0].line_up, (wolf,))
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("webclient-skillbook-casting::field-previews-share-existing-deterministic-target-and-scale-rules")
     def test_damage_skill_disables_ordinary_rows_but_enables_the_opening(self):
         self._npc("damage bystander")
         wolf = self._wolf("damage wolf")

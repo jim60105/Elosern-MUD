@@ -6,6 +6,7 @@ shared deterministic field entry, full-snapshot completion), plus the
 ``skill_use`` panel those publications carry.
 """
 
+from tools.spec_traceability import covers_requirement
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -96,6 +97,7 @@ class SkillUsePayloadValidationTests(EvenniaTest):
             with self.subTest(payload=bad), self.assertRaises(SkillUseActionError):
                 validate_skill_preview_payload(bad)
 
+    @covers_requirement("webclient-skillbook-casting::field-cast-payloads-express-one-authoritative-target-shape")
     def test_cast_rejects_every_tampered_shape(self):
         ok = validate_field_cast_payload({"skill_key": "t_a", "target_ids": [3, 1]})
         self.assertEqual(ok["target_ids"], (3, 1))
@@ -207,6 +209,7 @@ class _SkillUseCase(BattlefieldIsolation, EvenniaTest):
 
 
 class SkillPreviewActionTests(_SkillUseCase):
+    @covers_requirement("webclient-skillbook-casting::preview-selection-is-session-scoped-and-never-executes-gameplay")
     def test_preview_publishes_only_the_panel_and_mutates_nothing(self):
         npc = self._npc("preview npc")
         wolf = self._wolf("preview wolf")
@@ -254,6 +257,7 @@ class SkillPreviewActionTests(_SkillUseCase):
         result = self._act("explore.skill_preview", {"skill_key": _T_HEAL})
         self.assertEqual(result["code"], "not_in_exploration")
 
+    @covers_requirement("webclient-skillbook-casting::preview-selection-is-session-scoped-and-never-executes-gameplay", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_selection_is_epoch_scoped_and_never_crosses_sessions(self):
         self._act("explore.skill_preview", {"skill_key": _T_HEAL})
         other = _Session(self.player)
@@ -280,6 +284,7 @@ class SkillPreviewActionTests(_SkillUseCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_presentation_session")
 
+    @covers_requirement("webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_duplicate_names_keep_distinct_identities(self):
         first = self._npc("twin villager")
         second = self._npc("twin villager")
@@ -340,6 +345,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(result["outcome"], "success", result)
         self.assertEqual(settle.call_args.args[0].targets, [self.player, npc])
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_monster_in_ordinary_list_is_refused_before_settlement(self):
         wolf = self._wolf("listed wolf")
         with patch("world.rules.cast_settlement.settle_out_of_combat_cast") as settle:
@@ -348,6 +354,7 @@ class FieldCastActionTests(_SkillUseCase):
         settle.assert_not_called()
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_remote_or_vanished_identities_reject(self):
         elsewhere = create_object(Room, key="elsewhere")
         far_npc = create_object(NPC, key="far npc", location=elsewhere)
@@ -445,6 +452,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(self.player.traits.mp.value, mp_before)
         self.assertEqual(self._tick(), tick_before)
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_active_session_rejects_the_field_action(self):
         from world.rules.combat_session import engage
 
@@ -464,6 +472,7 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertNotEqual(result["code"], "internal_error")
         self.assertIsNone(read_session(self.player))
 
+    @covers_requirement("webclient-skillbook-casting::cast-settlement-is-atomic-and-publishes-the-complete-committed-view", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_duplicate_request_executes_once(self):
         envelope = {
             "protocol_version": 1,
@@ -512,9 +521,11 @@ class SkillUsePanelValidationTests(_SkillUseCase):
             },
         }
 
+    @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_valid_form_round_trips(self):
         self.assertEqual(validate_skill_use(self._valid())["skill"]["key"], _T_HEAL)
 
+    @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_malformed_forms_are_rejected(self):
         def mutate(change):
             payload = self._valid()
@@ -538,6 +549,7 @@ class SkillUsePanelValidationTests(_SkillUseCase):
             with self.subTest(case=name), self.assertRaises(Exception):
                 validate_skill_use(mutate(change))
 
+    @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_upper_bound_preview_fits_a_full_snapshot(self):
         for index in range(64):
             self._wolf(f"horde wolf {index:02d} " + "長" * 20)
