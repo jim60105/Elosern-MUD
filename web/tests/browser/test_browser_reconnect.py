@@ -218,31 +218,49 @@ class ReconnectTest(BrowserAcceptanceTest):
 
         state = store_state(page)
         self.assertEqual(state["generation"], generation_before + 1)
-        if state["phase"] == "active":
-            # The server re-auth won the race: the real new-epoch snapshot was
-            # adopted at a lower revision than the prior epoch's.
-            self.assertNotEqual(state["epoch"], epoch_before)
-            self.assertLess(state["revision"], revision_inflated)
+        outcome = page.evaluate(
+            """(args) => {
+              const store = window.__elosernBridge.store;
+              const view = store.view;
+              if (view.phase === 'active') {
+                return {
+                  wonRace: true,
+                  phase: view.phase,
+                  epoch: view.epoch,
+                  revision: view.revision,
+                };
+              }
+              const result = store.receive(
+                args.generation, 'ui_snapshot', [args.envelope], {}
+              );
+              const after = store.view;
+              return {
+                wonRace: false,
+                result: result,
+                phase: after.phase,
+                epoch: after.epoch,
+                revision: after.revision,
+              };
+            }""",
+            {
+                "generation": state["generation"],
+                "envelope": snapshot_envelope(
+                    fresh_epoch(),
+                    1,
+                    {"status": valid_status_panel("X", "y")},
+                ),
+            },
+        )
+        if outcome["wonRace"] or outcome.get("result", {}).get("reason") == "different_epoch":
+            # The real server's new-epoch snapshot was adopted.
+            self.assertEqual(outcome["phase"], "active")
+            self.assertNotEqual(outcome["epoch"], epoch_before)
+            self.assertLess(outcome["revision"], revision_inflated)
         else:
-            # The server re-auth lagged; drive the wired reducer to adopt the
-            # new generation's lower-revision snapshot (the rule under test).
-            adopted = page.evaluate(
-                "(args) => window.__elosernBridge.store.receive("
-                "args.generation, 'ui_snapshot', [args.envelope], {})",
-                {
-                    "generation": state["generation"],
-                    "envelope": snapshot_envelope(
-                        fresh_epoch(),
-                        1,
-                        {"status": valid_status_panel("X", "y")},
-                    ),
-                },
-            )
-            self.assertTrue(adopted["accepted"])
-            state = store_state(page)
-            self.assertEqual(state["phase"], "active")
-            self.assertLess(state["revision"], revision_inflated)
-            self.assertNotEqual(state["epoch"], epoch_before)
+            self.assertTrue(outcome["result"]["accepted"])
+            self.assertEqual(outcome["phase"], "active")
+            self.assertNotEqual(outcome["epoch"], epoch_before)
+            self.assertLess(outcome["revision"], revision_inflated)
 
     def test_rejects_prior_generation_and_different_epoch_on_active_socket(self):
         """The live active store discards foreign generations and epochs.
