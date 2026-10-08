@@ -261,7 +261,7 @@ class ReconnectTest(BrowserAcceptanceTest):
               const store = window.__elosernBridge.store;
               const before = store.view;
               const status = {
-                schema_version: 2, available: true,
+                schema_version: 3, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
@@ -307,7 +307,7 @@ class ReconnectTest(BrowserAcceptanceTest):
         result = page.evaluate(
             """() => {
               const status = {
-                schema_version: 2, available: true,
+                schema_version: 3, available: true,
                 actor: { name: 'X', identity: 'y', location: null },
                 resources: { hp: {current: 10, maximum: 10},
                              mp: {current: 10, maximum: 10},
