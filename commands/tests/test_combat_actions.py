@@ -358,10 +358,18 @@ class CastCommandSettlementSurfaceTests(unittest.TestCase):
         import inspect
 
         source = inspect.getsource(CmdCast._cast_out_of_combat)
-        self.assertIn("settle_out_of_combat_cast", source)
+        self.assertIn("cast_in_field", source)
         self.assertNotIn("get_world_clock", source)
         self.assertNotIn("ActionResolver.resolve", source)
         self.assertNotIn("AdvanceSource", source)
+
+        from world.rules.field_cast import cast_in_field
+
+        field_source = inspect.getsource(cast_in_field)
+        self.assertIn("settle_out_of_combat_cast", field_source)
+        self.assertNotIn("get_world_clock", field_source)
+        self.assertNotIn("ActionResolver.resolve", field_source)
+        self.assertNotIn("AdvanceSource", field_source)
 
     def test_in_combat_session_cast_path_is_unchanged(self):
         import inspect
