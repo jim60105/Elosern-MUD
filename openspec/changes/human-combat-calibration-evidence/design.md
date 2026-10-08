@@ -31,6 +31,8 @@ Apply only after shared-military-equipment, human-monster-balance-data, persiste
 
 ## Verification and Ownership
 
+The finite smoke matrix is E versus each six low variants (6); D solo, three D and C solo versus one ordinary mid representative wood_stalker (3); C solo and two C versus trail_hunter (2); restricted B versus bank_lurker (1); restricted B versus high-lower plus A/S/three-A versus high-upper (4); S and three-A versus calamity-lower (2). This is 18 matchup/policy combinations times seeds 0-3, at most 72 trials and 14400 resolver rounds. One F creation/equipment reference and one E/reef seed-zero backend parity case are separate. Use one focused module world.rules.tests.test_human_combat_calibration; upper probes remain synthetic unshipped objects. Historical full 0-15/0-7 tables remain preserved and are not claimed as this smaller real-kit sample.
+
 One focused calibration test file and bounded smoke command, seeds 0-3 and 200 rounds; one native/SQLite attribute parity case. No full 1554-trial rerun or CI suite. Assertions cover outcome semantics/resources/growth/rejects, not arbitrary fixture echo.
 
 Each scenario in specs/ needs substantive synthetic behavior coverage. Retain exact approved authoring checks separately. Record deterministic snapshots before and after reads/failures and host baseline/ownership before and after exams. Update owning game/development authoring documentation with implemented shapes and observed behavior. Appointment owns both command documents; other slices do not rename commands. Run only final focused checks and the contract gate once all owned implementation edits are complete. Full browser/evidence verification remains CI-owned.
