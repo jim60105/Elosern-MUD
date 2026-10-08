@@ -1,0 +1,37 @@
+## Context
+
+See proposal.md for motivation. Authority is docs/superpowers/specs/2026-10-08-human-guild-exams-and-monster-balance-design.md, approved commit 39d50b2b, together with the engine design. This slice owns sections 7.1-7.3; 6.2 presentation; 9 coordinator/adapters; 10 browser/command/intent acceptance. Existing production seams are world/rules/guild_exams.py or request sibling; world/rules/service_view.py; world/rules/npc_intents.py; world/rules/service_messages.py; commands/combat.py; web/webclient/actions/service_actions.py; web/webclient/presentation/services.py; panel registry/constants; web/static/webclient/js/elosern/protocol/panels/services.js; web/webclient-app/ guild components and stories; browser fixtures; command docs.
+
+## Goals / Non-Goals
+
+All state writes stay in world/rules; residences stay world/maps-owned; lore/skills remain immutable/read-only. No AI writer, compatibility alias, migration, new booking queue, difficulty selector, new F exam, reward/merit change, elf/beastfolk calibration, monster ability, retreat kill credit, combat formula change or unrelated refactor is authorized. The approved 2026-10-08 design supersedes disposable examiners and legacy HP/static ratio assumptions; preserve current simulated HP-to-zero and full pool restoration.
+Behavior tests use synthetic data and resolver-backed transitions/precedence/rollback, not wording/source assertions or copies of shipped rows. Authored rows use separate tagged data-contract checks under existing freeze discipline; never expand a freeze list to excuse missing behavior. Any new/moved non-browser module is registered exactly once in .github/evennia-shards.json; new browser class/method is registered exactly once in .github/browser-shards.json.
+Obtain canonical IDs with uv run --locked python -m tools.spec_traceability list after delta synchronization, never hand-build IDs. Maintain substantive covers_requirement annotations on discoverable tests; no skipped/empty claims. Every added requirement/scenario in this change has behavior coverage; unchanged requirements keep existing coverage. Remove obsolete tests/contracts/callers at their owning cutover.
+Changed persistent boundaries emit named-import world.observability info events with English snake_case names and available exam/host/branch/target/tick/session identifiers; exceptions re-raise, carry exc or existing reasoned exemption. Start/restriction/restore/terminal/hold/release/recovery trace events belong to their owning slice. No direct logging import or observability freeze expansion.
+
+## Decisions
+
+A shared rules-core request coordinator resolves canonical registration/branch/exact-next target/qualified persistent host and local functioning GuildStaff counter or qualified direct-host access before examining actual host presence. No generic local GuildExaminer lookup may reject the absent branch. Absent host invokes read-only attendance reader BEFORE merit/active-battle/resource/affinity checks and returns planned date/time or named unknown reason with zero mutations. A present host calls start_guild_exam, which rechecks authority/service/true merit/no-active gates. Busy present host reports service reason. No spawn, summon, teleport, auto-wait, reservation, queue or automatic retry.
+Text, browser and validated request_guild_exam NPC intent share coordinator/order. Intent derives speaking NPC counter/direct-host authorization server-side, preserves speech on rejection and cannot waive gates. Payload stays exactly target_rank; reject host/branch/tick/threshold fields. A changed/stale/non-next target rejects, with established dispatcher epoch/revision/idempotency protections unchanged.
+Clean schema cutover to services version 5, guild.exam_request action, rank.exam_request field and merit_qualified replacing eligible. Exact rank fields are rank,merit,next_rank,next_threshold,merit_qualified,exam_request. merit_qualified uses true cumulative merit independently of host attendance. Enabled request requires valid registered next target and local request service, independent of merit AND host presence. Unregistered/S members get stable target/registration reasons; no disguised merit gate. Keep unrelated panel field bounds/shapes/surface failure isolation unchanged.
+Migrate every producer, validator (Python/JS), action registration/constants, Vue rendering/story, payload fixture and test; remove all guild.exam_start/exam_start/eligible aliases. Exact visible label is 「預約升等考核」. Reply outcome exam_schedule is successful planned information, including below merit; exam_started is successful simulation start. Unknown time/failed start use established rejection shape. Calendar formats host and planned [start,end) interval; do not expose private route or claim saved booking. Start response explains simulation and full restoration. NPC authored speech remains in-character.
+Update both command docs and master engine §5.4/§7.4 request semantics (preserve HP0 current spec over legacy HP1), plus NPC schedule design §3.1/§8 references to predecessor weekly model. This successor modifies guild-rank-exams only request/eligibility distinction and preserves predecessor persistent lifecycle text without reverting it.
+
+The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
+
+## Risks / Trade-offs
+
+- Shared files can conflict. Integrate after required predecessors and serialize shared hunks/manifests as listed in the batch matrix.
+- Cached handlers can diverge from rolled-back storage. Snapshot both and assert deterministic before/after state where mutation occurs.
+- Planned attendance can fail under locks or future state changes. Report planned status and recheck actual start.
+- Projected balance does not establish runtime integration. Record only actual exercised evidence in the owning smoke.
+
+## Migration Plan
+
+Apply only after planned-npc-service-windows, persistent-guild-exam-lifecycle, guild-exam-schedule-hold are present. Read predecessor delta plus live source before editing. This unreleased project has no save migration or backward aliases. Land source, tests, docs and all caller cutovers as one coherent change. Revert the owned implementation commit to roll back deployment; never delete persistent hosts or manufacture data as repair.
+
+## Verification and Ownership
+
+Focused service-view/messages/action/command/intent and Python/Node/component tests; one bounded browser method/class at existing acceptance viewports 1451x790 and 2560x1440, registered exact shard ownership. Observe real host weekly traversal, enabled below-merit action, exam_schedule with byte-equal state, present BELOW_THRESHOLD then eligible exam_started. No full managed browser suite.
+
+Each scenario in specs/ needs substantive synthetic behavior coverage. Retain exact approved authoring checks separately. Record deterministic snapshots before and after reads/failures and host baseline/ownership before and after exams. Update owning game/development authoring documentation with implemented shapes and observed behavior. Appointment owns both command documents; other slices do not rename commands. Run only final focused checks and the contract gate once all owned implementation edits are complete. Full browser/evidence verification remains CI-owned.
