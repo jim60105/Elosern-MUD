@@ -24,7 +24,7 @@ Each guild host owned by the `altoria_guild` inventory slice SHALL name, through
 - **WHEN** the shipped place registry is validated against the profile registry
 - **THEN** each owned host's profile key resolves to a registered profile whose card validates
 
-#### Scenario: Every qualification names a resolvable persistent person profile
+#### Scenario: Every rank names a resolvable examiner profile
 - **WHEN** the guild qualification registry is validated, including a synthetic qualification naming an unregistered examiner profile key
 - **THEN** every shipped qualification's person profile key resolves to a profile with complete card and dialogue coverage, and the synthetic qualification fails load naming the qualification and the field
 

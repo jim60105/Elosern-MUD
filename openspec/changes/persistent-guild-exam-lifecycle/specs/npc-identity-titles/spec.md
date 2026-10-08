@@ -33,14 +33,18 @@ GuildRank SHALL no longer own examiner name/title/profile fields. Qualification 
 ### Requirement: Exam examiners carry their authored identity
 Persistent qualified adventurer assembly SHALL establish authored name/title once through existing identity validators and collision-safe roster discipline. Exams SHALL reuse that identity and stable dbref without rank-derived spawn identities or card/title replacement.
 
-#### Scenario: Persistent authored identity
+#### Scenario: A spawned examiner carries the authored title
 - **WHEN** a qualified host starts two exams
 - **THEN** authored name/title/dbref remain the same and no opponent spawns
 
 ### Requirement: Host and examiner creation emit boundary info events
 Service-host and persistent adventurer creation SHALL each emit one facade info event only on actual creation, never idempotent reuse, with char/service and profile/branch identifiers. Examination starts SHALL emit lifecycle boundary events with exam/host/target identifiers, without entity-creation events or player-facing prose.
 
-#### Scenario: Creation and reuse
+#### Scenario: Host creation logs once
 - **WHEN** a persistent adventurer is created then reused by sync and exams
 - **THEN** one entity-creation event emits and subsequent exam-start events identify the same dbref
+
+#### Scenario: Opponent spawn logs
+- **WHEN** persistent adventurer assembly creates the qualified person
+- **THEN** its creation event identifies char/profile/branch once, while examination reuse emits no opponent-spawn creation event
 

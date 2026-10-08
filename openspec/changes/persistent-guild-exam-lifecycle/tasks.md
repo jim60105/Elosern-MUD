@@ -4,6 +4,8 @@
 
 ## 2. Owned Implementation and Behavior
 
+- [ ] 2.0 Wire the predecessor begin/read/release hold APIs atomically into start and every terminal/recovery path; verify active host movement/state deferral and crossed departure once in world.rules.tests.test_guild_exams and world.rules.tests.test_guild_exam_schedule_hold, without double time.
+
 - [ ] 2.1 Preflight and select qualified persistent host; cut rank-owned identity fields/factory/deletion contracts and migrate every consumer/fixture/inventory reference. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
 - [ ] 2.2 Implement atomic snapshots, real kit/restriction activation, session publication and affinity rollback including ORM/handler mirrors. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.
 - [ ] 2.3 Implement terminal normal restoration, idempotent rank/title settlement and coherent/invalid cold-start recovery without host deletion. Verify with the matching scenarios in specs/ and focused checks described in design.md, collected in the final batch after all owned edits land.

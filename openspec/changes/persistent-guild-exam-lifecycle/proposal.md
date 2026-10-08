@@ -27,5 +27,6 @@ world/rules/guild_exams.py; world/rules/combat_session/{battlefield,lifecycle,se
 
 depends-on: persistent-human-guild-hosts
 depends-on: guild-exam-restriction-policy
+depends-on: guild-exam-schedule-hold
 
 Code-conflict notes: world/rules/guild_exams.py; world/rules/combat_session/{battlefield,lifecycle,settlement,snapshot,records}.py; world/lore/guild.py; world/rules/guild_config/; world/rules/npc_roster_validation.py; source inventory; service assembly; synthetic guild fixtures and consumers. Shared shard manifests and capability delta files require serialized integration. Full matrix and approved-section ownership are in shared-military-equipment/design.md.
