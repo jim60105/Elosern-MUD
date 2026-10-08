@@ -140,7 +140,7 @@ The server SHALL generate a bounded cryptographically unpredictable presentation
 
 The presentation registry SHALL reject duplicate panel names and SHALL expose
 only registered stable panel names to the coordinator. The registered production
-set SHALL include the `gallery` and `combat_beats` panels alongside the existing
+set SHALL include the `gallery`, `combat_beats` and `skill_use` panels alongside the existing
 registered panels; adding a registered panel SHALL remain a registry-registration
 act and SHALL NOT change any envelope schema. Each presenter SHALL receive
 session-derived read context, SHALL return JSON-safe panel data without invoking
@@ -161,6 +161,13 @@ schema's single server-side constant in its presenter module, and the client's
 panel allowlist and per-panel schema-version re-checks SHALL mirror the same
 value under a dual-direction parity contract so the two never diverge.
 
+The `skill_use` presenter SHALL receive only a copied skill/scale presentation
+selection belonging to the current transport-and-puppet epoch, never the transport
+session itself. It SHALL recompute current canonical availability without invoking
+a cast, creating a combat record or clock, or changing persistent state. An absent
+or retired selection SHALL produce its common unavailable form. This registration
+SHALL NOT change existing panel schema versions or the envelope protocol version.
+
 #### Scenario: Duplicate presenter registration fails
 
 - **WHEN** a second `PresenterSpec` is registered under an existing panel name
@@ -173,7 +180,7 @@ value under a dual-direction parity contract so the two never diverge.
 
 #### Scenario: The combat round record reaches only the completing publication
 
-- **WHEN** an admitted combat action settles an ordinary round and the dispatcher publishes its completion, and later a reconnect snapshot and a text-command refresh are published
+- **WHEN** an admitted combat action or field cast settles an ordinary combat round and the dispatcher publishes its completion, and later a reconnect snapshot and a text-command refresh are published
 - **THEN** only the completion publication's context carries the round record, the later publications' contexts carry none, and the sent `ui_action_result` contains no round-record field
 
 #### Scenario: One presenter exception is isolated
@@ -194,6 +201,11 @@ value under a dual-direction parity contract so the two never diverge.
 
 - **WHEN** the parity contract compares, for every registered panel, the presenter module's schema-version constant, the registry's registered value, the client allowlist's mirrored value, and the client per-panel available-form re-check literal
 - **THEN** all are numerically equal, and no registered panel stores a literal schema version that can drift from its module constant
+
+#### Scenario: Skill use selection is isolated presentation context
+
+- **WHEN** a selected skill is rendered and the session later adopts another puppet/epoch
+- **THEN** `skill_use` is registered at version 1, other registered versions remain unchanged, no gameplay state was mutated by rendering, and the new epoch receives no old selection
 
 ### Requirement: WebClient text commands refresh presentation after completion
 The project `text` input function SHALL preserve Evennia's ordinary command semantics and SHALL observe both callback and errback settlement without replacing the original Deferred value or Failure. It SHALL attempt a full snapshot from then-current canonical state only after a WebClient command settles and SHALL NOT emit graphical state for Telnet commands. Presentation failure SHALL be logged separately and SHALL NOT consume a command failure. Idle handling, nickname replacement, command output, session counters, and text access SHALL remain functional.
