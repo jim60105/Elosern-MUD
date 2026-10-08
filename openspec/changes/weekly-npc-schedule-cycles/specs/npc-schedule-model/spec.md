@@ -34,7 +34,7 @@ documented in the rulebook.
 - **WHEN** a template declares a `default_state` outside the bounded vocabulary
 - **THEN** validation rejects the template with a named error
 
-#### Scenario: An out-of-cycle tick_offset is rejected
+#### Scenario: An out-of-day tick_offset is rejected
 - **WHEN** an entry's `tick_offset` equals or exceeds the containing cycle's seconds, or is negative
 - **THEN** validation rejects it with a named error
 
