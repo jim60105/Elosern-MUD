@@ -13,6 +13,7 @@ import inspect
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from evennia.utils.create import create_object
@@ -82,6 +83,45 @@ class ShippedRulebookTests(unittest.TestCase):
 
 
 class RulebookValidationTests(unittest.TestCase):
+    @covers_requirement("npc-schedule-model::role-templates-are-immutable-rulebook-data-with-a-fixed-entry-shape")
+    def test_weekly_template_offsets_inheritance_and_override_bounds(self):
+        def mutate(data):
+            template = data["templates"]["guard"]
+            template["cycle_days"] = 7
+            template["entries"][0]["tick_offset"] = 7 * DAY_SECONDS - 1
+
+        rulebook = load_rulebook(path=_write_deviant(mutate))
+        with patch("world.rules.npc_schedules.get_rulebook", return_value=rulebook):
+            parsed = resolve_schedule({"schema_version": 1, "template": "guard"})
+            self.assertEqual(parsed.cycle_days, 7)
+            self.assertEqual(parsed.cycle_seconds, 7 * DAY_SECONDS)
+            self.assertEqual(parsed.entries[0].tick_offset, 7 * DAY_SECONDS - 1)
+            overridden = resolve_schedule({
+                "schema_version": 1, "template": "guard",
+                "overrides": {"0": {"tick_offset": 2 * DAY_SECONDS}},
+            })
+            self.assertEqual(overridden.entries[0].tick_offset, 2 * DAY_SECONDS)
+            for invalid in (
+                {"cycle_days": 7},
+                {"overrides": {"0": {"cycle_days": 1}}},
+                {"overrides": {"0": {"tick_offset": 7 * DAY_SECONDS}}},
+            ):
+                with self.subTest(invalid=invalid), self.assertRaises(ScheduleError):
+                    resolve_schedule({"schema_version": 1, "template": "guard", **invalid})
+
+    @covers_requirement("npc-schedule-model::role-templates-are-immutable-rulebook-data-with-a-fixed-entry-shape")
+    def test_invalid_template_cycles_and_end_offset_reject(self):
+        for invalid in (True, False, 0, 2, 7.0, "7", None):
+            def mutate(data):
+                data["templates"]["guard"]["cycle_days"] = invalid
+            with self.subTest(invalid=invalid):
+                self._assert_rulebook_rejected(mutate, ScheduleRulebookError)
+        for offset in (-1, 7 * DAY_SECONDS):
+            def mutate(data):
+                data["templates"]["guard"]["cycle_days"] = 7
+                data["templates"]["guard"]["entries"][0]["tick_offset"] = offset
+            self._assert_rulebook_rejected(mutate, ScheduleRulebookError)
+
     def _assert_rulebook_rejected(self, mutate, error):
         with self.assertRaises(error) as raised:
             load_rulebook(path=_write_deviant(mutate))
@@ -455,6 +495,9 @@ class AssignmentApiTests(EvenniaTest):
         for malformed in (
             {"schema_version": 2, "template": "guard"},
             {"schema_version": 1, "template": "guard", "entries": []},
+            {"schema_version": 1, "template": "guard", "cycle_days": 7},
+            {"schema_version": 1, "template": "guard",
+             "overrides": {"0": {"cycle_days": 7}}},
             ["guard"],
         ):
             with self.subTest(malformed=malformed):

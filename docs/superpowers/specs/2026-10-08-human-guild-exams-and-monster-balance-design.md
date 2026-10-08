@@ -146,6 +146,13 @@ E–C equipment uses the existing mundane weapon and armor price bands. B–S we
 
 ### 6.1 One schedule model
 
+The `weekly-npc-schedule-cycles` implementation exposes resolved
+`ParsedSchedule.cycle_days` and its configured `cycle_seconds` property.
+`world.rules.npc_schedules.due_occurrences` is the shared pure occurrence API
+used by the existing settlement source. The availability and examination-hold
+slices consume this API; this change does not implement those consumers or
+author guild visits.
+
 Extend the parsed schedule's cycle duration to distinguish one and seven game days. Templates and custom entry lists accept `cycle_days` equal to 1 or 7, defaulting to 1. A template reference inherits its template's cycle; per-entry overrides cannot change that cycle. Template schedules and custom schedules use the same cycle semantics. Entry offsets are bounded by their containing cycle; existing daily entries retain their current meaning, validation, ordering, and effective-from behavior. The model retains `schema_version: 1` with this explicitly amended optional-field contract.
 
 Cycle length is derived from the configured game-day seconds. The current day is 24 times 3,600 seconds; a seven-day cycle is therefore 604,800 ticks. Cycle phase is anchored to absolute world tick zero, not NPC spawn, query time, season start, or year start. Assigning or reloading a weekly schedule must not restart its week.

@@ -1,7 +1,9 @@
 # NPC schedule role templates (npc-schedule-model D1-D3).
 #
-# Entries repeat every world day. tick_offset is seconds since the world-day
-# start, resolved through the existing clock day math, in [0, day_seconds).
+# Templates accept optional cycle_days, exactly integer 1 or 7 (default 1).
+# Entries repeat from absolute world tick zero. tick_offset is seconds within
+# the cycle, in [0, cycle_days * configured_day_seconds). Template references
+# inherit the cycle; neither references nor entry overrides may change it.
 # A move entry carries a stable target key (resolved by the runtime through
 # the lore registries); a state entry carries a bounded state value from the
 # top-level `states` vocabulary. A template MAY declare a default_state (also
