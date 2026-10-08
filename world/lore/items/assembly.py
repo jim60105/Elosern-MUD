@@ -14,6 +14,7 @@ from world.lore.items.data_named_equipment import ROWS as NAMED_EQUIPMENT_ROWS
 from world.lore.items.data_inspect_only_codex import ROWS as INSPECT_ONLY_CODEX_ROWS
 from world.lore.items.data_regional_equipment import ROWS as REGIONAL_EQUIPMENT_ROWS
 from world.lore.items.data_intimacy_items import ROWS as INTIMACY_ITEMS_ROWS
+from world.lore.items.data_military_equipment import ROWS as MILITARY_EQUIPMENT_ROWS
 
 ITEM_REGISTRY: dict[str, ItemDefinition] = {
     definition.key: definition
@@ -24,5 +25,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
         *INSPECT_ONLY_CODEX_ROWS,
         *REGIONAL_EQUIPMENT_ROWS,
         *INTIMACY_ITEMS_ROWS,
+        *MILITARY_EQUIPMENT_ROWS,
     )
 }

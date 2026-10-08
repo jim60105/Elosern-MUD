@@ -67,7 +67,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 63)
+        self.assertEqual(len(loaded), 75)
         self.assertEqual(
             set(loaded),
             {
@@ -616,7 +616,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
 
 class EquipmentRosterCoverageTests(unittest.TestCase):
-    """The 63-key bijection plus the ten Church/Kingdom items' trade identity."""
+    """The equipment bijection and authored trade identities."""
 
     NEW_ITEM_KEYS = (
         "purified_pendant",
@@ -643,7 +643,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 63)
+        self.assertEqual(len(enum_values), 75)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():
@@ -923,6 +923,147 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         self.assertEqual(
             equipment_adjustment_text("sister_vestments"), "防禦 −4｜治療 +10%"
         )
+
+
+MILITARY_TABLE = (
+    ("e", 3, 0, 3, 0, 350, 300, ItemRarity.COMMON),
+    ("d", 4, 0, 5, 1, 800, 1800, ItemRarity.UNCOMMON),
+    ("c", 6, 1, 6, 1, 1600, 3200, ItemRarity.UNCOMMON),
+    ("b", 8, 1, 8, 2, 100000, 30000, ItemRarity.RARE),
+    ("a", 10, 3, 10, 2, 180000, 60000, ItemRarity.EPIC),
+    ("s", 12, 4, 12, 3, 300000, 120000, ItemRarity.LEGENDARY),
+)
+
+
+class MilitaryAuthoringContractTests(unittest.TestCase):
+    """Approved section 5 rows, independently pinned to the design table."""
+
+    def test_exact_bonuses_prices_slots_and_finite_shared_offers(self):
+        from world.quests.catalog import register_catalog
+        register_catalog()
+        from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
+        from world.rules.guild_config import get_catalog
+        from world.skills.equipment import EquipmentSlot
+
+        catalog = get_catalog()
+        for grade, attack, sword_agility, defense, armor_agility, sword_price, armor_price, rarity in MILITARY_TABLE:
+            for shape, stat, bonus, agility, price, slot, assortment in (
+                ("sword", "atk_phys", attack, sword_agility, sword_price, EquipmentSlot.WEAPON_MAIN, "common_arms"),
+                ("armor", "defense", defense, armor_agility, armor_price, EquipmentSlot.ARMOR, "common_outfits"),
+            ):
+                key = f"military_{grade}_{shape}"
+                with self.subTest(item=key):
+                    item = ITEM_REGISTRY[key]
+                    self.assertEqual(item.equipment_slot, slot)
+                    self.assertEqual(item.modifier_key.value, key)
+                    self.assertEqual(item.presentation.rarity, rarity)
+                    self.assertTrue(item.sellable)
+                    expected = {stat: bonus}
+                    if agility:
+                        expected["agility"] = agility
+                    self.assertEqual(dict(EQUIPMENT_EFFECT_RULES[item.modifier_key].adjustments), expected)
+                    self.assertIn(key, ASSORTMENT_REGISTRY[assortment].item_keys)
+                    offers = [
+                        offer for config in catalog.shop_configs.values()
+                        for offer in config.offers if offer.item_key == key
+                    ]
+                    self.assertTrue(offers)
+                    for offer in offers:
+                        self.assertEqual((offer.buy_copper, offer.sell_copper), (price, price // 2))
+                        self.assertEqual((offer.initial_stock, offer.max_stock, offer.restock_quantity), (2, 4, 1))
+        self.assertEqual((PRICE_TABLE["magic_armor"].min_copper, PRICE_TABLE["magic_armor"].max_copper), (10000, None))
+        self.assertEqual((PRICE_TABLE["armor"].min_copper, PRICE_TABLE["armor"].max_copper), (200, 5000))
+        self.assertEqual(PRICE_TABLE["magic_weapon"].min_copper, 100000)
+
+    def test_military_over_budget_rejected_without_budget_change(self):
+        document = _canonical_document()
+        before = {key: dict(value) for key, value in document["budgets"].items()}
+        document["effects"]["military_s_sword"]["adjustments"]["atk_phys"] = 13
+        with self.assertRaises(EquipmentEffectsRulebookError):
+            validate_equipment_effect_rules(document, ITEM_REGISTRY, BUFF_DEFINITIONS)
+        self.assertEqual(document["budgets"], before)
+
+
+from evennia.utils.test_resources import EvenniaTest
+
+
+class MilitaryRuntimeSmokeTests(EvenniaTest):
+    """Real registered gear on synthetic people through ordinary rule APIs."""
+
+    def test_purchase_equip_sell_restock_and_rollback(self):
+        from unittest.mock import patch
+        from world.quests.catalog import register_catalog
+        register_catalog()
+        from evennia.utils.create import create_object
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.components import Merchant
+        from typeclasses.npcs import NPC
+        from typeclasses.rooms import Room
+        from world.rules.clock import WorldClock
+        from world.rules.economy import buy, sell, parse_merchant_stock, TradeError, TradeReason
+        from world.rules.guild_config import get_catalog
+        from world.rules.equipment import toggle_equipment
+        from world.rules.equipment_effects import equipment_adjustments
+        from world.rules.caravan_arrivals import settle_caravan_arrivals
+
+        catalog = get_catalog()
+        room = create_object(Room, key="military smoke")
+        player = create_object(PlayerCharacter, key="synthetic buyer", location=room)
+        wearer = create_object(NPC, key="synthetic wearer", location=room)
+        for entity in (player, wearer):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        for grade, attack, sword_agility, defense, armor_agility, sword_price, armor_price, _ in MILITARY_TABLE:
+            keys = (f"military_{grade}_sword", f"military_{grade}_armor")
+            player.db.wallet = 2000000
+            player.db.inventory = []
+            wearer.db.inventory = list(keys)
+            for entity in (player, wearer):
+                entity.db.equipment = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []}
+            merchants = []
+            for key, price in zip(keys, (sword_price, armor_price)):
+                config = next(config for config in catalog.shop_configs.values() if any(o.item_key == key for o in config.offers))
+                offer = next(o for o in config.offers if o.item_key == key)
+                host = create_object(NPC, key=f"synthetic {key} vendor", location=room)
+                merchant = Merchant.create(host, service_id=key, shop_key=config.shop_key)
+                host.components.add(merchant)
+                merchant.merchant_stock = {o.item_key: o.initial_stock for o in config.offers}
+                merchant.last_restock_day = 0
+                merchants.append((host, merchant))
+                with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
+                    before = player.db.wallet
+                    result = buy(player, host, key, 2)
+                    self.assertEqual(result["total_copper"], price * 2)
+                    self.assertEqual(player.db.wallet, before - price * 2)
+                    snapshot = (player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant))
+                    with self.assertRaises(TradeError) as caught:
+                        buy(player, host, key, 1)
+                    self.assertEqual(caught.exception.args[0], TradeReason.INSUFFICIENT_STOCK)
+                    self.assertEqual((player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant)), snapshot)
+                    sold = sell(player, host, key, 1)
+                    self.assertEqual(sold["total_copper"], price // 2)
+                    snapshot = (player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant))
+                    with patch("world.rules.affinity.apply_affinity_change", side_effect=RuntimeError("persistence fault")):
+                        with self.assertRaises(RuntimeError):
+                            buy(player, host, key, 1)
+                    self.assertEqual((player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant)), snapshot)
+                self.assertEqual((offer.initial_stock, offer.max_stock), (2, 4))
+            for entity in (player, wearer):
+                entity.db.inventory = list(keys)
+                for key in keys:
+                    res = toggle_equipment(entity, key)
+                    assert res.outcome == "success", f"toggle {key} on {entity} failed: {res.outcome} {res.reason}"
+                bonuses = equipment_adjustments(entity)
+                self.assertEqual(bonuses["atk_phys"], attack)
+                self.assertEqual(bonuses["defense"], defense)
+                self.assertEqual(bonuses.get("agility_flat", 0), sword_agility + armor_agility)
+            end_tick = 86400 + 7 * 3600
+            with patch("world.rules.clock.get_world_clock", return_value=WorldClock(end_tick)):
+                settle_caravan_arrivals(12 * 3600, end_tick)
+            for key, (host, merchant) in zip(keys, merchants):
+                self.assertEqual(parse_merchant_stock(merchant)[key], 2)
+                self.assertEqual(merchant.last_restock_day, 1)
+                host.delete()
 
 
 if __name__ == "__main__":

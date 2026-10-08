@@ -52,6 +52,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "plain_sword", "iron_dagger", "hunting_throwing_axe",
                 "hunters_longbow", "apprentice_focus_staff", "knight_blade",
                 "magic_sword",
+                "military_e_sword", "military_d_sword", "military_c_sword",
+                "military_b_sword", "military_a_sword", "military_s_sword",
             ),
         ),
         AssortmentDefinition(
@@ -61,6 +63,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "leather_armor", "mage_robe", "chainmail", "iron_shield",
                 "knight_platemail", "archmage_mending_robe",
                 "enticing_lace_set", "sister_vestments", "saintess_vestments",
+                "military_e_armor", "military_d_armor", "military_c_armor",
+                "military_b_armor", "military_a_armor", "military_s_armor",
             ),
         ),
         AssortmentDefinition(
