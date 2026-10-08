@@ -303,45 +303,47 @@ through 7.
 - **THEN** every value is an `int`, never a `float`
 
 ### Requirement: MonsterTier registry has physical stat and HP bands derived from guild rank
-`world/lore/monsters.py` SHALL define a frozen `MonsterTier` dataclass with fields `key`,
-`display_name_zh`, `guild_rank_range`, `static_band` (a `StaticBand`), `hp_band`, and
-`example_monsters_zh`, and a module-level `MONSTER_TIER_REGISTRY: dict[str, MonsterTier]` with four
-entries corresponding to F-E, D-C, B-A, and 災厄級 (S and above), each carrying example monster
-names from `world_info.md`.
+The registry SHALL remain frozen keyed MonsterTier lore data with key, display_name_zh, guild_rank_range, independent-axis static_band, hp_band and example_monsters_zh. It SHALL contain exactly four tiers corresponding to F-E, D-C, B-A and S/calamity, preserving non-empty canonical examples and rank-range partitioning.
 
 #### Scenario: Registry has exactly the four threat bands
-- **WHEN** `MONSTER_TIER_REGISTRY` is inspected
-- **THEN** it contains exactly 4 entries whose `guild_rank_range` values partition
-  `GUILD_RANK_REGISTRY`'s keys without gaps (F-E, D-C, B-A, and S-and-calamity)
+- **WHEN** the keyed registry loads
+- **THEN** its four guild_rank_range values partition F-E, D-C, B-A and S/calamity without gaps
 
 #### Scenario: Example monsters are non-empty for every tier
-- **WHEN** every `MonsterTier` entry is inspected
-- **THEN** `example_monsters_zh` contains at least one name drawn from `world_info.md` (e.g.
-  史萊姆, 哥布林 for the lowest tier; 古龍, 魔神 for 災厄級)
+- **WHEN** each tier's example list is inspected
+- **THEN** it retains at least one canonical example from world_info.md
+MonsterTier SHALL retain four keyed threat tiers, their names/examples and guild-rank ranges, with independent HP/attack/agility/defense authoring bounds below and zero magic for current profiles. HP SHALL be independent endurance; no fixed 15-20-times relationship or elf/beastfolk calibration SHALL remain. Calamity upper reference values SHALL be open-ended (None upper limits), without altering human racial/static-tier bounds. Every future concrete monster SHALL have explicit literals and encounter evidence; maximum-axis Cartesian products SHALL NOT imply guaranteed balance.
+
+| Monster tier | HP | Physical attack | Agility | Defense |
+|---|---|---|---|---|
+| Low | 25–70 | 3–12 | 3–12 | 2–8 |
+| Mid | 110–230 | 18–28 | 10–24 | 10–16 |
+| High | 300–750 | 26–40 | 16–30 | 18–32 |
+| Calamity | 1,200–3,000+ | 60–150+ | 60–150+ | 60–150+ |
+
+These are authoring bounds and reference envelopes, not a guarantee for every Cartesian combination. Taking every axis at its maximum can exceed the intended encounter difficulty. Calamity upper reference values are open-ended for monster classification; this does not open human racial validation bounds. Every future concrete monster still needs explicit literal values and encounter evidence.
+
+High and calamity tiers have no approved existing species in this roster. Their probes below are unshipped representative monsters, not newly authored species. Newly constructed instances use the updated authoritative variant data. No live-instance migration is introduced.
+
+#### Scenario: No ratio requirement
+- **WHEN** valid independent axis/HP values do not satisfy legacy HP ratio
+- **THEN** they validate under their own ranges
+
+#### Scenario: No new species
+- **WHEN** updated envelopes load
+- **THEN** no high/calamity species are shipped solely from representative probes
 
 #### Scenario: Each monster tier's static band is beatable by the guild rank that handles it
-- **WHEN** each `MonsterTier` entry's `static_band` is compared against the corresponding
-  `StaticTier` band from `STATIC_TIER_REGISTRY`
-- **THEN** `low`'s band overlaps `human_adventurer`'s band, with its 3-4 range below the
-  adventurer floor (a novice still handles it solo); `mid`'s
-  band exceeds `human_elite`'s band (stronger than one veteran, needs a party); `high`'s band
-  reaches or exceeds `human_swordmaster`'s band (matches or exceeds the human ceiling); and
-  `calamity`'s band exceeds `elf_common`'s band (beyond human scale entirely) — this
-  guild-rank-to-monster-tier correspondence, not any single literal number, is the property under
-  test
+- **WHEN** authoring classifies encounters relative to the listed equipped skilled human builds
+- **THEN** section 8.1 solo/party expectations govern conditional evidence, with no bare-human-band overlap test or universal maximum-axis guarantee
 
 #### Scenario: Calamity-tier monsters deliberately exceed the elf band and this is not corrected away
-- **WHEN** `MONSTER_TIER_REGISTRY["calamity"].static_band` is compared against
-  `RACE_REGISTRY["elf"].static_baseline`
-- **THEN** `calamity`'s band overlaps and extends above the elf band, reflecting `world_info.md`'s
-  explicit statement that 古龍/魔神-tier threats are beyond what any human — or even a typical elf —
-  can face alone
+- **WHEN** an explicit calamity monster has values beyond the upper reference envelopes
+- **THEN** open-ended monster bounds accept valid literals without consulting elf/beastfolk targets or changing finite human bounds
 
 #### Scenario: HP bands scale with static bands at the documented ratio
-- **WHEN** each `MonsterTier` entry's `hp_band` is compared against its own `static_band`
-- **THEN** the HP band is within roughly 15-20× the static band at both ends, matching
-  `world_info.md`'s stated ratio (and the human reference point: Lidzia's `atk_phys` 8 to `hp` 120
-  is 15×)
+- **WHEN** an authored monster HP is compared with its independent physical axes
+- **THEN** the superseded fixed-ratio rule is not enforced; independent endurance and resolver encounter evidence govern authoring
 
 ### Requirement: Anchor registry covers capitals, elven villages, and known dungeons
 `world/lore/anchors.py` SHALL define an `AnchorKind` string enum (`CAPITAL`, `ELVEN_VILLAGE`,
