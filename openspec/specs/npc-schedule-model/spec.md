@@ -14,8 +14,8 @@ the `npc-schedule-runtime` capability.
 list of exactly `{tick_offset, kind}` entries plus per-kind required fields: a `move` entry SHALL
 carry a `target` and SHALL NOT carry `state`; a `state` entry SHALL carry a `state` value and
 SHALL NOT carry a `target`. `tick_offset` SHALL be a non-negative integer strictly below the
-world day's seconds (resolved through the existing clock day math), and entries SHALL repeat
-every world day. A template MAY declare an optional `default_state` from the bounded state
+containing cycle's seconds (resolved through the existing clock day math), and entries SHALL repeat
+every configured cycle. A template MAY declare an optional `default_state` from the bounded state
 vocabulary; a successful `move` settlement writes that value, and `default_state` SHALL NOT be
 settable on individual entries. The declared state vocabulary for `state` SHALL be bounded and
 documented in the rulebook.
@@ -42,12 +42,18 @@ documented in the rulebook.
 - **THEN** validation rejects the template with a named error
 
 #### Scenario: An out-of-day tick_offset is rejected
-- **WHEN** an entry's `tick_offset` equals or exceeds the world day's seconds, or is negative
+- **WHEN** an entry's `tick_offset` equals or exceeds the containing cycle's seconds, or is negative
 - **THEN** validation rejects it with a named error
 
 #### Scenario: Unknown template keys are rejected
 - **WHEN** an NPC references a template key absent from the rulebook
 - **THEN** validation rejects the reference with a named error
+
+Templates SHALL accept optional cycle_days exactly 1 or 7 (non-boolean integers), defaulting to 1. Cycle seconds SHALL derive from configured day seconds; schema_version SHALL remain 1.
+
+#### Scenario: Weekly template validates cycle offsets
+- **WHEN** a seven-day template has an offset past one day but below seven days
+- **THEN** it validates, while an offset at the cycle end rejects
 
 ### Requirement: Per-NPC schedules are assigned through one validated API and stored in exactly
 two validated shapes
@@ -91,6 +97,12 @@ a malformed stored value resolves to "no schedule".
 #### Scenario: Clearing a schedule removes the tag
 - **WHEN** `set_npc_schedule(npc, None)` is called on a previously scheduled NPC
 - **THEN** `db.schedule` is `None` and the schedule tag is removed
+
+Custom lists SHALL accept optional cycle_days exactly 1 or 7, default 1; template references SHALL inherit their template cycle and SHALL NOT override it at reference or entry level. Parsed schedules SHALL carry the resolved cycle duration.
+
+#### Scenario: Cycle override cannot alter a template
+- **WHEN** a template reference or its entry override supplies cycle_days
+- **THEN** validation rejects it without assigning a schedule
 
 ### Requirement: Schedule state is a declared attribute contract
 
