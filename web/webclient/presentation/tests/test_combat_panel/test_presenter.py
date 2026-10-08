@@ -470,6 +470,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "lore_codex",
                     "combat_beats",
                     "dream",
+                    "skill_use",
                 }
             ),
         )
