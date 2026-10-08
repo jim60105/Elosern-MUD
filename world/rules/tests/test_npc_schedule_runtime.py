@@ -35,6 +35,10 @@ from world.rules.npc_schedules import (
     ScheduleEntry,
     ScheduleRulebook,
     ScheduleTemplate,
+    ParsedSchedule,
+    due_occurrences,
+    parse_stored_schedule,
+    resolve_schedule,
     interaction_reason,
     set_npc_schedule,
     settle_npc_schedules,
@@ -43,6 +47,145 @@ from world.rules.npc_schedules import (
 from world.tests.raw_attributes import raw_attribute_value
 
 DAY_SECONDS = 86400
+
+
+class CycleArithmeticTests(unittest.TestCase):
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_absolute_cycles_match_bounded_integer_oracle(self):
+        for days in (1, 7):
+            period = days * DAY_SECONDS
+            entries = (
+                ScheduleEntry(period - 1, "state", state="busy"),
+                ScheduleEntry(0, "state", state="duty"),
+                ScheduleEntry(0, "state", state="resting"),
+            )
+            for effective in (-period, 0, period, period + 1):
+                parsed = ParsedSchedule(entries, effective_from_tick=effective, cycle_days=days)
+                bounds = (-period - 1, -1, 0, 1, period - 1, period, period + 1, 3 * period)
+                for start in bounds:
+                    for end in bounds:
+                        expected = sorted(
+                            (cycle * period + entry.tick_offset, index, entry)
+                            for cycle in range(-2, 5)
+                            for index, entry in enumerate(entries)
+                            if start <= cycle * period + entry.tick_offset <= end
+                            and cycle * period + entry.tick_offset >= effective
+                            and (
+                                cycle * period + entry.tick_offset > start
+                                or effective == start
+                            )
+                        )
+                        with self.subTest(days=days, effective=effective, start=start, end=end):
+                            self.assertEqual(due_occurrences(parsed, start, end), expected)
+
+    @covers_requirement("npc-schedule-model::per-npc-schedules-are-assigned-through-one-validated-api-and-stored-in-exactly")
+    def test_custom_cycle_validation_and_defaults(self):
+        for days in (1, 7):
+            for offset in (0, days * DAY_SECONDS - 1):
+                parsed = resolve_schedule({
+                    "schema_version": 1, "cycle_days": days,
+                    "entries": [{"tick_offset": offset, "kind": "state", "state": "duty"}],
+                })
+                self.assertEqual(parsed.cycle_seconds, days * DAY_SECONDS)
+            for offset in (-1, days * DAY_SECONDS):
+                with self.assertRaises(ScheduleError):
+                    resolve_schedule({
+                        "schema_version": 1, "cycle_days": days,
+                        "entries": [{"tick_offset": offset, "kind": "state", "state": "duty"}],
+                    })
+        base = {"schema_version": 1, "entries": [
+            {"tick_offset": 0, "kind": "state", "state": "duty"},
+        ]}
+        self.assertEqual(resolve_schedule(base).cycle_days, 1)
+        for invalid in (True, False, 0, 2, 7.0, "7", None):
+            with self.subTest(invalid=invalid), self.assertRaises(ScheduleError):
+                resolve_schedule({**base, "cycle_days": invalid})
+
+
+class WeeklySettlementTests(EvenniaTestCase):
+    def setUp(self):
+        super().setUp()
+        self.home = create_object(Room, key="cycle_home")
+        self.work = create_object(Room, key="cycle_work")
+        self.out = create_object(Exit, key="out", location=self.home, destination=self.work)
+        create_object(Exit, key="back", location=self.work, destination=self.home)
+        self.npc = create_object(NPC, key="cycle_worker", location=self.home)
+        self.clock = get_world_clock()
+        self.rulebook = ScheduleRulebook(1, ("duty", "resting", "busy"), (
+            ScheduleTemplate("cycle_role", (
+                ScheduleEntry(DAY_SECONDS, "move", target="cycle_work"),
+                ScheduleEntry(DAY_SECONDS, "state", state="busy"),
+                ScheduleEntry(2 * DAY_SECONDS, "move", target="cycle_home"),
+                ScheduleEntry(2 * DAY_SECONDS, "state", state="resting"),
+            ), default_state="duty", cycle_days=7),
+        ))
+        self.book_patch = patch("world.rules.npc_schedules.get_rulebook", return_value=self.rulebook)
+        self.book_patch.start()
+        self.addCleanup(self.book_patch.stop)
+        self.destination_patch = patch(
+            "world.rules.npc_schedules._resolve_destination",
+            side_effect={"cycle_work": self.work, "cycle_home": self.home}.get,
+        )
+        self.destination_patch.start()
+        self.addCleanup(self.destination_patch.stop)
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_bulk_matches_daily_windows_across_calendar_boundaries_and_reload(self):
+        from world.rules.clock import CLOCK_YAML
+
+        season = CLOCK_YAML["days_per_season"] * DAY_SECONDS
+        year = CLOCK_YAML["seasons_per_year"] * season
+        for boundary in (7 * DAY_SECONDS, season, year):
+            start = boundary - 3 * DAY_SECONDS
+            end = boundary + 12 * DAY_SECONDS
+            self.clock.tick = start
+            self.clock._persist(start)
+            self.npc.location = self.home
+            self.npc.db.schedule_state = None
+            set_npc_schedule(self.npc, {"schema_version": 1, "template": "cycle_role"})
+            before_tick = self.clock.tick
+            bulk = settle_npc_schedules(start, end)
+            final = (self.npc.location.pk, self.npc.db.schedule_state)
+            self.npc.location = self.home
+            self.npc.db.schedule_state = None
+            consecutive = []
+            for tick in range(start, end, DAY_SECONDS):
+                # Re-read persisted schedule each window, including startup sync.
+                sync_npc_schedules()
+                self.assertEqual(parse_stored_schedule(self.npc).effective_from_tick, start)
+                consecutive.extend(settle_npc_schedules(tick, min(tick + DAY_SECONDS, end)))
+            with self.subTest(boundary=boundary):
+                self.assertEqual(bulk, consecutive)
+                self.assertEqual((self.npc.location.pk, self.npc.db.schedule_state), final)
+                self.assertEqual(self.clock.tick, before_tick)
+                self.assertTrue(any(event.kind == "npc_arrived" for event in bulk))
+                self.assertEqual(
+                    [event.due_tick for event in bulk],
+                    sorted(event.due_tick for event in bulk),
+                )
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_assignment_at_due_tick_keeps_absolute_phase_and_order(self):
+        assignment = 8 * DAY_SECONDS
+        self.clock.tick = assignment
+        self.clock._persist(assignment)
+        set_npc_schedule(self.npc, {"schema_version": 1, "template": "cycle_role"})
+        events = settle_npc_schedules(assignment, assignment + 1)
+        self.assertEqual([event.kind for event in events],
+                         ["npc_departed", "npc_arrived", "npc_state_changed"])
+        self.assertEqual([event.due_tick for event in events], [assignment] * 3)
+        self.assertEqual(self.npc.db.schedule_state, "busy")
+        self.assertEqual(settle_npc_schedules(assignment + 1, assignment + 2), [])
+
+    @covers_requirement("npc-schedule-runtime::a-failed-entry-settles-as-a-per-entry-skip-without-blocking-settlement")
+    def test_weekly_locked_exit_does_not_block_same_tick_state(self):
+        self.out.locks.add("traverse:false()")
+        set_npc_schedule(self.npc, {"schema_version": 1, "template": "cycle_role"})
+        with patch("world.rules.npc_schedules.log_warn"):
+            events = settle_npc_schedules(0, DAY_SECONDS)
+        self.assertEqual([event.kind for event in events], ["npc_state_changed"])
+        self.assertEqual(self.npc.location, self.home)
+        self.assertEqual(self.npc.db.schedule_state, "busy")
 
 # A locally authored rulebook for the template-resolution settlement test:
 # the mechanism (a successful move writes the template's default_state) is
@@ -342,6 +485,21 @@ class SettlementSilenceTests(EvenniaTest):
         set_npc_schedule(self.clerk, schedule)
         self.guard = create_object(NPC, key="沉默對照衛", location=self.room1)
         set_npc_schedule(self.guard, schedule)
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_weekly_traveling_companion_stays_silenced(self):
+        schedule = {
+            "schema_version": 1, "cycle_days": 7,
+            "entries": [{"tick_offset": 2 * DAY_SECONDS, "kind": "state", "state": "busy"}],
+        }
+        set_npc_schedule(self.clerk, schedule)
+        set_npc_schedule(self.guard, schedule)
+        events = settle_npc_schedules(0, 15 * DAY_SECONDS)
+        self.assertEqual([event.due_tick for event in events],
+                         [2 * DAY_SECONDS, 9 * DAY_SECONDS])
+        self.assertTrue(all(event.payload["npc_id"] == self.guard.pk for event in events))
+        self.assertIsNone(self.clerk.db.schedule_state)
+        self.assertEqual(self.clerk.location, self.wild)
 
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
     def test_traveling_place_bound_companion_settles_nothing(self):

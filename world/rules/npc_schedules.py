@@ -92,7 +92,7 @@ class ScheduleEntry:
     ``kind`` is ``move`` or ``state``; a ``move`` entry carries ``target``
     (resolved through the lore registries by the runtime) and a ``state``
     entry carries a ``state`` value from the rulebook vocabulary. Entries
-    repeat every world day at ``tick_offset`` seconds after the day start.
+    repeat at ``tick_offset`` seconds after their containing cycle starts.
     """
 
     tick_offset: int
@@ -108,6 +108,7 @@ class ScheduleTemplate:
     key: str
     entries: tuple[ScheduleEntry, ...]
     default_state: str | None = None
+    cycle_days: int = 1
 
 
 @dataclass(frozen=True)
@@ -139,13 +140,28 @@ class ParsedSchedule:
     entries: tuple[ScheduleEntry, ...]
     default_state: str | None = None
     effective_from_tick: int | None = None
+    cycle_days: int = 1
+
+    @property
+    def cycle_seconds(self) -> int:
+        """Duration of the absolute-tick-zero anchored cycle."""
+        return self.cycle_days * _DAY_SECONDS
 
 
 def _rulebook_error(message: str) -> ScheduleRulebookError:
     return ScheduleRulebookError(f"npc_schedules.yaml: {message}")
 
 
-def _validate_entry(raw: Any, *, context: str) -> ScheduleEntry:
+def _validate_cycle_days(raw: Any) -> int:
+    """Validate the closed cycle vocabulary without accepting boolean integers."""
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw not in (1, 7):
+        raise ScheduleShapeError("cycle_days must be an integer equal to 1 or 7")
+    return raw
+
+
+def _validate_entry(
+    raw: Any, *, context: str, cycle_seconds: int = _DAY_SECONDS
+) -> ScheduleEntry:
     """Validate one entry's shape and return it as a frozen record.
 
     Raises :class:`ScheduleEntryError` on any shape violation. Vocabulary
@@ -164,9 +180,9 @@ def _validate_entry(raw: Any, *, context: str) -> ScheduleEntry:
     tick_offset = raw["tick_offset"]
     if isinstance(tick_offset, bool) or not isinstance(tick_offset, int):
         raise ScheduleEntryError(f"{context}: tick_offset must be an integer")
-    if not 0 <= tick_offset < _DAY_SECONDS:
+    if not 0 <= tick_offset < cycle_seconds:
         raise ScheduleEntryError(
-            f"{context}: tick_offset must be in [0, {_DAY_SECONDS}), got {tick_offset!r}"
+            f"{context}: tick_offset must be in [0, {cycle_seconds}), got {tick_offset!r}"
         )
     kind = raw["kind"]
     if kind not in _KINDS:
@@ -226,9 +242,10 @@ def _load_templates(
         if not isinstance(value, Mapping):
             raise _rulebook_error(f"template {key!r} must be a mapping")
         value = dict(value)
-        unknown = set(value) - {"default_state", "entries"}
+        unknown = set(value) - {"default_state", "entries", "cycle_days"}
         if unknown:
             raise _rulebook_error(f"template {key!r} has unknown fields {sorted(unknown)}")
+        cycle_days = _validate_cycle_days(value.get("cycle_days", 1))
         entries_raw = value.get("entries")
         if not isinstance(entries_raw, list):
             raise _rulebook_error(f"template {key!r} requires an entries list")
@@ -237,7 +254,10 @@ def _load_templates(
         if len(entries_raw) > MAX_ENTRIES:
             raise _rulebook_error(f"template {key!r} exceeds {MAX_ENTRIES} entries")
         entries = tuple(
-            _validate_entry(entry, context=f"templates.{key}") for entry in entries_raw
+            _validate_entry(
+                entry, context=f"templates.{key}",
+                cycle_seconds=cycle_days * _DAY_SECONDS,
+            ) for entry in entries_raw
         )
         _check_state_vocabulary(entries, states, context=f"templates.{key}")
         default_state = value.get("default_state")
@@ -252,7 +272,10 @@ def _load_templates(
                     "the state vocabulary"
                 )
         templates.append(
-            ScheduleTemplate(key=key, entries=entries, default_state=default_state)
+            ScheduleTemplate(
+                key=key, entries=entries, default_state=default_state,
+                cycle_days=cycle_days,
+            )
         )
     return tuple(templates)
 
@@ -298,7 +321,7 @@ def load_rulebook(path: Path | None = None) -> ScheduleRulebook:
     try:
         states = _load_states(raw["states"])
         templates = _load_templates(raw["templates"], states)
-    except ScheduleEntryError as exc:
+    except (ScheduleEntryError, ScheduleShapeError) as exc:
         raise _rulebook_error(str(exc)) from exc
     if not templates:
         raise _rulebook_error("templates must contain at least one template")
@@ -361,13 +384,17 @@ def _apply_overrides(
             if not isinstance(override, Mapping):
                 raise ScheduleTemplateError(f"override {index!r} must be a mapping")
             fields.update(dict(override))
-        merged.append(_validate_entry(fields, context=f"overrides.{index}"))
+        merged.append(_validate_entry(
+            fields, context=f"overrides.{index}",
+            cycle_seconds=template.cycle_days * _DAY_SECONDS,
+        ))
     _check_state_vocabulary(tuple(merged), states, context="overrides")
     return tuple(merged)
 
 
 def _load_custom_entries(
-    raw_entries: Any, states: tuple[str, ...], *, context: str
+    raw_entries: Any, states: tuple[str, ...], *, context: str,
+    cycle_seconds: int = _DAY_SECONDS,
 ) -> tuple[ScheduleEntry, ...]:
     if not isinstance(raw_entries, MutableSequence):
         raise ScheduleShapeError(f"{context} must be a list")
@@ -375,7 +402,10 @@ def _load_custom_entries(
         raise ScheduleShapeError(f"{context} must not be empty")
     if len(raw_entries) > MAX_ENTRIES:
         raise ScheduleShapeError(f"{context} exceeds {MAX_ENTRIES} entries")
-    entries = tuple(_validate_entry(entry, context=context) for entry in raw_entries)
+    entries = tuple(
+        _validate_entry(entry, context=context, cycle_seconds=cycle_seconds)
+        for entry in raw_entries
+    )
     _check_state_vocabulary(entries, states, context=context)
     return entries
 
@@ -394,7 +424,7 @@ def resolve_schedule(
     if not isinstance(raw, Mapping):
         raise ScheduleShapeError("schedule must be a mapping or None")
     raw = dict(raw)
-    unknown = set(raw) - {"schema_version", "template", "overrides", "entries"}
+    unknown = set(raw) - {"schema_version", "template", "overrides", "entries", "cycle_days"}
     if unknown:
         raise ScheduleShapeError(f"unknown schedule fields {sorted(unknown)}")
     if raw.get("schema_version") != SCHEMA_VERSION:
@@ -409,6 +439,8 @@ def resolve_schedule(
         raise ScheduleShapeError("overrides require a template reference")
     rulebook = get_rulebook()
     if has_template:
+        if "cycle_days" in raw:
+            raise ScheduleShapeError("template references cannot override cycle_days")
         template_key = raw["template"]
         if not isinstance(template_key, str) or not template_key.strip():
             raise ScheduleShapeError("template must be a non-empty string key")
@@ -420,11 +452,17 @@ def resolve_schedule(
             entries=entries,
             default_state=template.default_state,
             effective_from_tick=effective_from_tick,
+            cycle_days=template.cycle_days,
         )
     if has_entries:
-        entries = _load_custom_entries(raw["entries"], rulebook.states, context="entries")
+        cycle_days = _validate_cycle_days(raw.get("cycle_days", 1))
+        entries = _load_custom_entries(
+            raw["entries"], rulebook.states, context="entries",
+            cycle_seconds=cycle_days * _DAY_SECONDS,
+        )
         return ParsedSchedule(
-            entries=entries, effective_from_tick=effective_from_tick
+            entries=entries, effective_from_tick=effective_from_tick,
+            cycle_days=cycle_days,
         )
     raise ScheduleShapeError("schedule requires a template reference or an entries list")
 
@@ -808,14 +846,15 @@ def _settle_occurrence(
     ]
 
 
-def _due_occurrences(
+def due_occurrences(
     parsed: ParsedSchedule, start_tick: int, end_tick: int
 ) -> list[tuple[int, int, ScheduleEntry]]:
     """Every ``(due_tick, entry_index, entry)`` occurrence in the settle window.
 
     Boundary arithmetic only -- never per-second iteration. Entries repeat
-    every world day; each day from the start boundary through the end
-    boundary contributes occurrences with ``start_tick < due_tick <=
+    every configured cycle, anchored to absolute tick zero. Each cycle from
+    the start boundary through the end boundary contributes occurrences with
+    ``start_tick < due_tick <=
     end_tick``, except that an occurrence due exactly at ``start_tick``
     settles when ``effective_from_tick == start_tick``: the assignment
     happened at that same moment, so no earlier window could have settled it.
@@ -826,12 +865,12 @@ def _due_occurrences(
     """
     occurrences: list[tuple[int, int, ScheduleEntry]] = []
     effective = parsed.effective_from_tick or 0
-    first_day = start_tick // _DAY_SECONDS
-    last_day = end_tick // _DAY_SECONDS
-    for day in range(first_day, last_day + 1):
-        day_start = day * _DAY_SECONDS
+    first_cycle = max(start_tick, effective) // parsed.cycle_seconds
+    last_cycle = end_tick // parsed.cycle_seconds
+    for cycle in range(first_cycle, last_cycle + 1):
+        cycle_start = cycle * parsed.cycle_seconds
         for index, entry in enumerate(parsed.entries):
-            due_tick = day_start + entry.tick_offset
+            due_tick = cycle_start + entry.tick_offset
             if due_tick < start_tick or due_tick > end_tick:
                 continue
             if due_tick == start_tick and effective != due_tick:
@@ -839,6 +878,7 @@ def _due_occurrences(
             if due_tick < effective:
                 continue
             occurrences.append((due_tick, index, entry))
+    occurrences.sort(key=lambda occurrence: (occurrence[0], occurrence[1]))
     return occurrences
 
 
@@ -849,7 +889,7 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     the persistent ``schedule`` tag (maintained by ``set_npc_schedule`` and
     the startup sync -- no stale index, no fallback scan) and settles every
     occurrence with ``start_tick < due_tick <= end_tick`` (plus the
-    same-tick assignment rule in ``_due_occurrences``) and ``due_tick >=
+    same-tick assignment rule in ``due_occurrences``) and ``due_tick >=
     effective_from_tick`` in ``(due_tick, npc_stable_id, entry_index)``
     order, so one multi-day ``advance()`` produces the same locations as
     repeated day-by-day advances. The stable NPC identity for ordering and
@@ -899,7 +939,7 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
             parsed = parse_stored_schedule(npc)
             if parsed is None:
                 continue
-            for due_tick, entry_index, entry in _due_occurrences(
+            for due_tick, entry_index, entry in due_occurrences(
                 parsed, start_tick, end_tick
             ):
                 work.append((due_tick, int(npc.pk), entry_index, npc, parsed, entry))

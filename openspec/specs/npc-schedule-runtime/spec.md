@@ -7,7 +7,6 @@ schedule-state interaction gating.
 
 ## Requirements
 
-
 ### Requirement: The npc_schedules clock source settles due schedule entries
 
 `world/rules/npc_schedules.py` SHALL provide `settle_npc_schedules(start_tick, end_tick)` and
@@ -26,7 +25,7 @@ and emit `npc_departed` / `npc_arrived` events; a `state` entry SHALL update
 `npc.db.schedule_state` and emit `npc_state_changed`. Multi-day skips SHALL use boundary
 arithmetic, not per-second iteration. An NPC with no schedule SHALL produce no entries and no
 events. Every event SHALL carry a JSON-safe payload (the stable `npc_id`, a display `npc` key,
-and `state` or `from`/`to` target) and `due_tick = day_start + tick_offset`. Settlement SHALL
+and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`. Settlement SHALL
 first skip every NPC for which `world/rules/service_gate.py::schedule_silenced(npc)` is true —
 a bound party companion carrying a `place`-bound service component outside its anchor room —
 producing no entries, no events, and no state change for it, exactly as a schedule-less NPC;
@@ -85,6 +84,12 @@ every other NPC SHALL settle byte-identically to the pre-change settlement.
 - **WHEN** the guard and resident NPCs (place-unbound) settle across the same window as the
   silenced clerk
 - **THEN** their entries, events, and state match the pre-change settlement exactly
+
+The same source SHALL settle daily and weekly cycles phase-anchored to absolute tick zero, using shared occurrence arithmetic. Assignment/reload/calendar boundaries SHALL NOT restart the cycle.
+
+#### Scenario: Weekly bulk and bounded advances agree
+- **WHEN** bulk and consecutive bounded advances cross a week, season and year for identical schedules
+- **THEN** ordered events and final locations/states agree with no duplicates or clock charges
 
 ### Requirement: NPC movement through settlement never charges the clock, records map knowledge,
 or triggers companion follow

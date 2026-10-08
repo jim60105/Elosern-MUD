@@ -182,6 +182,38 @@ set_npc_schedule(npc, {"schema_version": 1, "template": "resident"})
 
 ### Step 7 — 補測試與驗證
 
+#### Daily and weekly schedule authoring
+
+Templates in `npc_schedules.yaml` and full custom schedules accept optional
+`cycle_days`, an integer equal to `1` or `7`, with `1` as the default. Boolean
+values are rejected. Template references inherit the template cycle and cannot
+declare `cycle_days`; entry overrides cannot change it either. Schema version
+remains `1`.
+
+Offsets must satisfy `0 <= tick_offset < cycle_days * configured_day_seconds`.
+Cycles start at absolute world tick zero, including across seasons and years.
+Assignment records the current effective tick without restarting the cycle;
+reload preserves that tick. An occurrence exactly at assignment settles on the
+next window, while earlier occurrences are excluded.
+
+```python
+set_npc_schedule(npc, {
+    "schema_version": 1,
+    "cycle_days": 7,
+    "entries": [
+        {"tick_offset": 172800, "kind": "state", "state": "busy"},
+        {"tick_offset": 176400, "kind": "state", "state": "duty"},
+    ],
+})
+```
+
+`ParsedSchedule.cycle_seconds` derives the duration from clock configuration.
+`due_occurrences(parsed, start_tick, end_tick)` is the shared pure arithmetic
+API, returning occurrences ordered by absolute due tick and entry index.
+Settlement additionally orders by persistent NPC identity and retains real Exit
+traversal, failure isolation, and companion service silencing. It does not charge
+the clock.
+
 依順序跑最小聚焦集：
 
 ```sh
