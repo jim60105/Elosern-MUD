@@ -11,6 +11,8 @@ Changed persistent boundaries emit named-import world.observability info events 
 
 ## Decisions
 
+Canonical requirement/scenario headings are retained for delta synchronization, including legacy ratio/race-comparison labels. Their updated WHEN/THEN bodies explicitly replace those superseded behaviors with independent endurance and human-only conditional encounter evidence. These headings grant no gameplay aliases or compatibility behavior.
+
 Set all twelve variants to the approved literal HP/attack/agility/defense below, with MP/SP/magic zero. Retain species/variant keys, names, grades, ecology and behavior identities, and add no spells/abilities. Newly constructed instances read authoritative new rows; existing live instances are not migrated.
 Replace the symmetric band projection in _default_tier_band_face with independent per-axis bands, validate each axis and HP separately with named errors, and migrate all registry/constructor/synthetic/export consumers. Calamity HP and physical upper limits are None/open-ended, with 3000/150 as reference points. Keep finite human RaceProfile/StaticTier validation unchanged and monster zero-magic policy. No static-to-HP ratio or elf/beastfolk equivalence remains in classification.
 Envelopes express authored boundaries, not universal Cartesian balance. Future concrete monsters need complete literals and encounter evidence; no shipped high/calamity species are added. §8.1 human encounter expectations are policy context; resolver verification using actual military kits is separately owned by calibration evidence, which depends on this and equipment. Data can land independently of gear because no runtime dependency exists.
