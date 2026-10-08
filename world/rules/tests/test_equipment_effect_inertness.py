@@ -48,8 +48,12 @@ _ALLOWLIST = frozenset(
         # The status read model is the world/rules/status_query/ package: the
         # breakdown replay consumes the merged-bundle/layer accessors and the
         # condition context/intimate readers consume the exposure overlay.
+        # assembly consumes condition equipment inputs, and provenance consumes
+        # attached buff declarations for read-only condition attribution.
+        Path("world/rules/status_query/assembly.py"),
         Path("world/rules/status_query/breakdown.py"),
         Path("world/rules/status_query/context.py"),
+        Path("world/rules/status_query/provenance.py"),
         Path("world/rules/status_query/sexual.py"),
         # The action pipeline is the world/rules/action/ package: the buff
         # staging gate consumes the immunity accessor and the act handlers
@@ -58,7 +62,6 @@ _ALLOWLIST = frozenset(
         Path("world/rules/action/effects/sexual.py"),
         Path("world/rules/buffs/rates.py"),
         Path("world/rules/buffs/surface.py"),
-        Path("world/rules/equipment.py"),
         Path("world/rules/items/planning.py"),
         Path("commands/economy.py"),
         Path("commands/items.py"),
