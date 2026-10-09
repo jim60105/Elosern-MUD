@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:gm": "vite build --config vite.gm.config.js",
+    "favicon": "npx --yes realfavicon@0.9.3 generate web/brand/elosern-mark.svg web/brand/realfavicon-settings.json web/brand/favicon-markups.json web/static/favicon",
     "test": "vitest run",
     "test:gm-boundary": "node --test scripts/tests/gm-import-boundary.test.mjs",
     "build-storybook": "STORYBOOK_TELEMETRY_DISABLED=1 storybook build -o .storybook-out",
