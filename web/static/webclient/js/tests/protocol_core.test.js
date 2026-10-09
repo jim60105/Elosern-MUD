@@ -263,7 +263,17 @@ test("enforces status field-specific bounds", () => {
       })
     )
   );
-  // Zero maximum and current > maximum are rejected.
+  // Zero maximum with current 0 is accepted; current > maximum is rejected.
+  const zeroMaxStatus = validStatusPanel({
+    resources: {
+      hp: { current: 80, maximum: 100 },
+      mp: { current: 0, maximum: 0 },
+      sp: { current: 12, maximum: 40 },
+    },
+  });
+  assert.doesNotThrow(() => Protocol.validateStatusPanel(zeroMaxStatus));
+
+  // Current > maximum (including on zero maximum) is rejected.
   assert.throws(() =>
     Protocol.validateStatusPanel(
       validStatusPanel({ resources: { hp: { current: 5, maximum: 0 }, mp: { current: 1, maximum: 2 }, sp: { current: 1, maximum: 2 } } })

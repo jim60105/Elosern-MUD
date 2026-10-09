@@ -203,7 +203,7 @@ def _validate_trait_row(value: Any) -> dict[str, Any]:
     )
     maximum = value["max"]
     if maximum is not None:
-        maximum = _require_int(value, "max", minimum=1, maximum=MAX_SAFE_INTEGER)
+        maximum = _require_int(value, "max", minimum=0, maximum=MAX_SAFE_INTEGER)
         if current > maximum:
             raise ProtocolValidationError("trait current must not exceed maximum")
     effective = _require_number(

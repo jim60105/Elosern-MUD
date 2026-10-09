@@ -191,6 +191,26 @@ class CharacterSchemaTests(unittest.TestCase):
 
 
     def test_trait_max_consistency(self):
+        # Gauge row {current: 0, max: 0, effective: 0} validates
+        normalized = validate_character(
+            _valid_panel(traits=[_trait(current=0, max=0, effective=0)])
+        )
+        self.assertEqual(normalized["traits"][0]["max"], 0)
+        self.assertEqual(normalized["traits"][0]["current"], 0)
+        self.assertEqual(normalized["traits"][0]["effective"], 0)
+
+        # {current: 3, max: 0} still rejects
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(
+                _valid_panel(traits=[_trait(current=3, max=0, effective=0)])
+            )
+
+        # effective != max still rejects
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(
+                _valid_panel(traits=[_trait(current=0, max=0, effective=1)])
+            )
+
         with self.assertRaises(ProtocolValidationError):
             validate_character(
                 _valid_panel(traits=[_trait(current=11, max=10)])

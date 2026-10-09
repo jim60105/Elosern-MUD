@@ -133,7 +133,7 @@ function validateStatusPanel(payload) {
     var gauge = resources[key];
     requireExactFields(gauge, "resource " + key, ["current", "maximum"], []);
     requireInt(gauge.current, "resource " + key + ".current", 0, MAX_SAFE_INTEGER);
-    requireInt(gauge.maximum, "resource " + key + ".maximum", 1, MAX_SAFE_INTEGER);
+    requireInt(gauge.maximum, "resource " + key + ".maximum", 0, MAX_SAFE_INTEGER);
     if (gauge.current > gauge.maximum) {
       throw new Error(
         "resource " + key + ".current must not exceed its maximum"

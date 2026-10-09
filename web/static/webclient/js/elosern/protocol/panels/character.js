@@ -111,7 +111,7 @@ function validateCharacterTraitRow(value) {
   requireInt(value.base, "base", 0, MAX_SAFE_INTEGER);
   requireNumber(value.current, "current", 0, MAX_SAFE_INTEGER);
   if (value.max !== null) {
-    requireInt(value.max, "max", 1, MAX_SAFE_INTEGER);
+    requireInt(value.max, "max", 0, MAX_SAFE_INTEGER);
     if (value.current > value.max) {
       throw new Error("trait current must not exceed maximum");
     }

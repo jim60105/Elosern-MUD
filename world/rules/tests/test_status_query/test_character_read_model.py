@@ -117,6 +117,34 @@ class CharacterReadModelTests(EvenniaTestCase):
             with self.assertRaises(StatusQueryError):
                 self._model()
 
+    def test_zero_maximum_gauge_renders_and_breaks_down(self):
+        traits = self._traits()
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        model = self._model()
+        mp_trait = next(trait for trait in model.traits if trait.key == "mp")
+        self.assertEqual(mp_trait.current, 0)
+        self.assertEqual(mp_trait.maximum, 0)
+        mp_breakdown = next(row for row in model.breakdown if row.key == "mp")
+        self.assertEqual(mp_breakdown.base, 0)
+        self.assertEqual(mp_breakdown.current, 0)
+        self.assertEqual(mp_breakdown.effective, 0)
+        self.assertEqual(mp_breakdown.layers, ())
+
+    def test_zero_maximum_gauge_negative_and_nonzero_current_fail_closed(self):
+        traits = self._traits()
+        # negative maximum via negative base
+        traits["mp"] = {"base": -1, "mod": 0, "mult": 1, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
+        # nonzero current on zero maximum
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": 5}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            self._model()
+
     def test_malformed_static_and_counter_traits_fail_closed(self):
         traits = self._traits()
         del traits["atk_phys"]

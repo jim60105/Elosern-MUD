@@ -167,6 +167,31 @@ test("enforces character D10 bounds and disguise honesty", () => {
       })
     )
   );
+  // Zero-maximum gauge row {current: 0, max: 0, effective: 0} is valid.
+  const zeroGauge = validCharacterTraitRow({ current: 0, max: 0, effective: 0 });
+  const validWithZero = validCharacterPanel({ traits: [zeroGauge] });
+  const normalizedZero = Protocol.validateCharacterPanel(validWithZero);
+  assert.equal(normalizedZero.traits[0].max, 0);
+  assert.equal(normalizedZero.traits[0].current, 0);
+  assert.equal(normalizedZero.traits[0].effective, 0);
+
+  // Nonzero current on zero maximum rejects.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [validCharacterTraitRow({ current: 3, max: 0, effective: 0 })],
+      })
+    )
+  );
+
+  // Inconsistent effective vs zero maximum rejects.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [validCharacterTraitRow({ current: 0, max: 0, effective: 1 })],
+      })
+    )
+  );
   // An inactive disguise must not carry displayed rows.
   assert.throws(() =>
     Protocol.validateCharacterPanel(
