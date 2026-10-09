@@ -158,7 +158,12 @@ function validServicesBoardRow(overrides) {
       definition_key: "introductory_hunt",
       display_name: "討伐低階魔物",
       objective_summary: "討伐 1 隻低階魔物",
-      reward_summary: "獎勵：銅 50、功績 25、治療藥水 × 2",
+      category: "defeat",
+      objective_note: null,
+      deadline_line: null,
+      rationale: null,
+      flavor: null,
+      reward: { copper: 50, merit: 25, items: [] },
       rank: "F",
       accept: validServicesAction({ action_id: "guild.quest_accept", label: "接取" }),
     },
@@ -222,7 +227,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "services",
       host: null,
@@ -235,6 +240,8 @@ function validServicesPanel(overrides) {
         next_threshold: null,
       },
       guild: {
+        branch_label: "合成公會分行",
+        rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
         registration: {
           registered: false,
           register: validServicesAction(),

@@ -2,6 +2,7 @@
 
 var C = require("../constants.js");
 var core = require("../core.js");
+var questFacts = require("./quest_log.js");
 
 var isPlainObject = core.isPlainObject;
 var codePoints = core.codePoints;
@@ -137,7 +138,7 @@ function validateServicesBoardRow(value) {
   requireExactFields(
     value,
     "board row",
-    ["definition_key", "display_name", "objective_summary", "reward_summary", "rank", "accept"],
+    ["definition_key", "display_name", "category", "objective_summary", "objective_note", "deadline_line", "rationale", "flavor", "reward", "rank", "accept"],
     []
   );
   var definitionKey = requireString(value.definition_key, "definition_key", SERVICES_MAX_KEY);
@@ -152,10 +153,17 @@ function validateServicesBoardRow(value) {
   if (!objectiveSummary.trim()) {
     throw new Error("board objective_summary must be non-empty");
   }
-  var rewardSummary = requireString(value.reward_summary, "reward_summary", SERVICES_MAX_SUMMARY);
-  if (!rewardSummary.trim()) {
-    throw new Error("board reward_summary must be non-empty");
-  }
+  questFacts.validateQuestCategory(value.category, "board");
+  questFacts.validateQuestReward(value.reward, "board");
+  [["objective_note", SERVICES_MAX_SUMMARY],
+   ["deadline_line", SERVICES_MAX_DEADLINE_LINE],
+   ["rationale", C.SERVICES_MAX_BOARD_PROSE],
+   ["flavor", C.SERVICES_MAX_BOARD_PROSE]].forEach(function (bound) {
+    if (value[bound[0]] !== null) {
+      var line = requireString(value[bound[0]], bound[0], bound[1]);
+      if (!line.trim()) throw new Error(bound[0] + " must be non-empty when set");
+    }
+  });
   var boardRank = requireString(value.rank, "rank", SERVICES_MAX_RANK_KEY);
   if (!boardRank.trim()) {
     throw new Error("board rank must be non-empty");
@@ -270,7 +278,18 @@ function validateServicesRank(value) {
 }
 
 function validateServicesGuild(value) {
-  requireExactFields(value, "guild", ["registration", "board", "quests", "rank"], []);
+  requireExactFields(value, "guild", ["branch_label", "rank_ladder", "registration", "board", "quests", "rank"], []);
+  var branchLabel = requireString(value.branch_label, "branch_label", SERVICES_MAX_HOST_DISPLAY_NAME);
+  if (!branchLabel.trim()) throw new Error("branch_label must be non-empty");
+  if (!Array.isArray(value.rank_ladder) || value.rank_ladder.length < 1 || value.rank_ladder.length > C.SERVICES_MAX_RANK_LADDER) {
+    throw new Error("rank_ladder exceeds its bounded list");
+  }
+  value.rank_ladder.forEach(function (key, index) {
+    requireString(key, "rank_ladder key", SERVICES_MAX_RANK_KEY);
+    if (!key.trim() || value.rank_ladder.indexOf(key) !== index) {
+      throw new Error("rank_ladder keys must be non-empty and unique");
+    }
+  });
   validateServicesRegistration(value.registration);
   if (!Array.isArray(value.board) || value.board.length > SERVICES_MAX_BOARD_ROWS) {
     throw new Error("board must be a list of at most " + SERVICES_MAX_BOARD_ROWS + " rows");
@@ -283,6 +302,11 @@ function validateServicesGuild(value) {
   if (value.rank !== null) {
     validateServicesRank(value.rank);
   }
+  var rankKeys = value.board.map(function (row) { return row.rank; });
+  if (value.rank !== null) rankKeys.push(value.rank.rank, value.rank.next_rank);
+  rankKeys.forEach(function (key) {
+    if (key !== null && value.rank_ladder.indexOf(key) === -1) throw new Error("guild ranks must belong to rank_ladder");
+  });
   return value;
 }
 
@@ -473,7 +497,7 @@ function validateServicesPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 5) {
+  if (payload.schema_version !== 6) {
     throw new Error("unsupported services schema_version");
   }
   if (payload.available !== true || payload.kind !== "services") {
@@ -544,7 +568,7 @@ function validateServicesPanel(payload) {
   validateServicesPaginationTotals(pagination, guild, shop, inventory);
 
   var result = {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "services",
     host: payload.host,

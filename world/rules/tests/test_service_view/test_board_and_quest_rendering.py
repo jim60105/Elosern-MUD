@@ -41,6 +41,8 @@ from world.rules.tests._guild_service_probes import (
     a_live_monster_tier_key,
     install_synthetic_catalog,
     live_item_registry,
+    live_guild_branch_registry,
+    live_guild_rank_registry,
     live_monster_tier_keys,
     price_band,
     rank_reward_band,
@@ -58,7 +60,6 @@ from world.tests.synthetic_data import (
     synthetic_registries,
 )
 from world.quests.describe import describe_objective
-from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.rules.service_view import (
     ACTION_ACCEPT,
     ACTION_BUY,
@@ -107,9 +108,9 @@ class BoardFilteringTests(ServiceRegistryIsolation):
                 "quantity": 2,
             }],
         })
-        self.assertEqual(guild.branch_label, GUILD_BRANCH_REGISTRY[BRANCH].display_name_zh)
+        self.assertEqual(guild.branch_label, live_guild_branch_registry()[BRANCH].display_name_zh)
         self.assertEqual(guild.rank_ladder, tuple(
-            rank.key for rank in sorted(GUILD_RANK_REGISTRY.values(), key=lambda rank: rank.order)
+            rank.key for rank in sorted(live_guild_rank_registry().values(), key=lambda rank: rank.order)
         ))
 
     def test_species_hunt_splits_note_and_discloses_authored_deadline_and_prose(self):

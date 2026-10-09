@@ -177,13 +177,11 @@ keys, an objective line and note composing to `describe_objective`, the offer-de
 `rationale` and `flavor`, and the quest log's non-null `reward` shape. The board SHALL never disagree with the
 quest book.
 
-`objective_note` SHALL be null or a non-empty string of at most 128 Unicode code points;
-`deadline_line` SHALL be null or a non-empty string of at most 64 code points.
-`rationale` and `flavor` SHALL each be null or a non-empty string of at most 55 code points,
-preserved verbatim. `reward.items` SHALL retain the quest log's one-item ceiling.
-`branch_label` SHALL be a non-empty string of at most 256 code points. `rank_ladder`
-SHALL contain 1..16 unique non-empty rank keys of at most eight code points, and every
-board rank and non-null rank-section rank or next rank SHALL belong to it.
+#### Scenario: Structured facts have closed bounds
+- **WHEN** a guild section carries structured board facts
+- **THEN** `objective_note` is null or a non-empty string of at most 128 Unicode code points, `deadline_line` is null or a non-empty string of at most 64 code points, and verbatim `rationale` and `flavor` are each null or non-empty strings of at most 55 code points
+- **AND** `reward.items` retains the quest log's one-item ceiling
+- **AND** `branch_label` is non-empty and at most 256 code points, and `rank_ladder` contains 1..16 unique non-empty keys of at most eight code points, including every board rank and non-null rank-section rank and next rank
 
 #### Scenario: Twelve maximal board rows fit the existing maximal-section envelope
 - **WHEN** twelve board rows carry every board string at its bound and one maximal reward item apiece alongside the existing realistic maximal quest, shop, and inventory sections

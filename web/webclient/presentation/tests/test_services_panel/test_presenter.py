@@ -22,7 +22,7 @@ from ._support import BRANCH, T_SHOP, _T_SPRAY, _T_THORN
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
-from world.lore.guild import GUILD_BRANCH_REGISTRY
+from world.rules.tests._guild_service_probes import live_guild_branch_registry
 
 
 class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
@@ -113,10 +113,10 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_cross_branch_acceptance_matches_board_reward_and_quest_issuer(self):
         destination_key = "synthetic_visiting_branch"
         destination = replace(
-            GUILD_BRANCH_REGISTRY[BRANCH], key=destination_key,
+            live_guild_branch_registry()[BRANCH], key=destination_key,
             display_name_zh="合成旅途分會",
         )
-        with patch.dict(GUILD_BRANCH_REGISTRY, {destination_key: destination}):
+        with patch.dict(live_guild_branch_registry(), {destination_key: destination}):
             visiting_staff = create_object(NPC, key="visiting counter", location=self.store)
             visiting_staff.components.add(GuildStaff.create(
                 visiting_staff, service_id="visiting_staff", branch_key=destination_key,
@@ -136,7 +136,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertEqual(board_row["reward"], row["reward"])
             self.assertEqual(services["guild"]["branch_label"], destination.display_name_zh)
             self.assertEqual(services["guild"]["branch_label"], row["issuer"]["label"])
-            self.assertNotEqual(services["guild"]["branch_label"], GUILD_BRANCH_REGISTRY[BRANCH].display_name_zh)
+            self.assertNotEqual(services["guild"]["branch_label"], live_guild_branch_registry()[BRANCH].display_name_zh)
 
 
     def test_shop_renders_exact_copper_and_open_state(self):

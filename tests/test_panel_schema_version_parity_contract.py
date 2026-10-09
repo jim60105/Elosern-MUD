@@ -64,6 +64,20 @@ _PANEL_MODULES = (
 
 
 class PanelSchemaVersionParityContract(unittest.TestCase):
+    def test_structured_services_version_and_shared_bounds(self):
+        self.assertEqual(self._module_value("services.py", "SERVICES_SCHEMA_VERSION"), 6)
+        self.assertEqual(self._js_allowlist_value(protocol_client_source(), "services"), 6)
+        js_source = protocol_client_source()
+        shared_source = (REPO_ROOT / "web/webclient/presentation/quest_facts.py").read_text()
+        for python_name, js_name, expected in (
+            ("MAX_RANK_LADDER", "SERVICES_MAX_RANK_LADDER", 16),
+            ("MAX_BOARD_PROSE_CODE_POINTS", "SERVICES_MAX_BOARD_PROSE", 55),
+        ):
+            self.assertEqual(self._module_value("services.py", python_name), expected)
+            self.assertRegex(js_source, rf"var {js_name}\s*=\s*{expected};")
+        self.assertRegex(shared_source, r"MAX_REWARD_ITEMS\s*=\s*1")
+        self.assertRegex(js_source, r"var QUEST_LOG_MAX_REWARD_ITEMS\s*=\s*1;")
+
     def test_structured_quest_log_is_version_two(self):
         self.assertEqual(self._module_value("quest_log.py", "QUEST_LOG_SCHEMA_VERSION"), 2)
         self.assertEqual(self._js_allowlist_value(protocol_client_source(), "quest_log"), 2)

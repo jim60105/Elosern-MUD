@@ -22,7 +22,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 5,
+    schema_version: 6,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };

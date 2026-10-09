@@ -1,10 +1,10 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The full `services` v5 payload (guild, shop, and inventory sections all
+// The full `services` v6 payload (guild, shop, and inventory sections all
 // present). Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -17,6 +17,8 @@ export const SERVICES_PANEL_SAMPLE = {
     next_threshold: 300,
   },
   guild: {
+    branch_label: "埃洛西恩冒險者公會 阿爾托利亞分會",
+    rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
     registration: {
       registered: true,
       register: {
@@ -29,19 +31,56 @@ export const SERVICES_PANEL_SAMPLE = {
     },
     board: [
       {
-        definition_key: "quest_mill_grain",
-        display_name: "磨坊糧運",
-        objective_summary: "將十袋糧食運往磨坊",
-        reward_summary: "400 銅＋公會功績 25",
-        rank: "C",
+        definition_key: "eastern_plains_sway_whistle_sparrow",
+        display_name: "驅除東部平原穗鳴雀",
+        category: "defeat",
+        objective_summary: "在東部大平原討伐 2 隻穗鳴雀",
+        objective_note: "計數變體：啄穗型、領群型",
+        deadline_line: null,
+        rationale: "低階群居鳥類，較強個體會自不同方向干擾驅趕者；個體不難應付，但數量分散，取巧不易。",
+        flavor: "收穫已近尾聲，東側田區每天清晨仍有成群穗鳴雀來訪。農戶請公會處理持續侵入的族群，以免今年最後一批穀物留不下來。",
+        reward: { copper: 50, merit: 25, items: [] },
+        rank: "F",
         accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
       },
       {
-        definition_key: "quest_harbor_light",
-        display_name: "燈塔值守",
-        objective_summary: "為渡口燈塔補足燈油",
-        reward_summary: "220 銅＋公會功績 15",
-        rank: "B",
+        definition_key: "southwest_coast_tide_lamp_crab",
+        display_name: "清理西南海岸潮燈蟹",
+        category: "defeat",
+        objective_summary: "在西南海岸討伐 1 隻潮燈蟹",
+        objective_note: "計數變體：行灘型、守礁型",
+        deadline_line: null,
+        rationale: "低階甲殼類，但守礁型占據狹窄洞口，防禦遠高於同階個體；礁隙與潮池讓隊伍無法展開，只能逐處清理。",
+        flavor: "港外的候船燈附近聚集了一批潮燈蟹，已有夜歸小船認錯泊岸方向。碼頭請公會清理這處聚集地，恢復燈號辨識。",
+        reward: { copper: 120, merit: 45, items: [] },
+        rank: "E",
+        accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
+      },
+      {
+        definition_key: "northwest_highland_forest_fog_mane_lynx",
+        display_name: "討伐西北高地森林霧鬃山貓",
+        category: "defeat",
+        objective_summary: "在西北高地森林討伐 1 隻霧鬃山貓",
+        objective_note: "計數變體：潛林型、逐徑型",
+        deadline_line: null,
+        rationale: "中階獵食者會反覆試探隊伍邊緣，避開完整隊列；高地森林的晨霧讓接近方向難以判斷，落單的人風險明顯上升。",
+        flavor: "高地運輸隊連續在晨霧中失去馱獸，獵人找到的足跡始終沿道路外緣移動。部族請公會處理已開始追逐運輸隊的個體。",
+        reward: { copper: 500, merit: 100, items: [] },
+        rank: "D",
+        accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
+      },
+      {
+        // Story-only deadline variation of the real introductory offer.
+        definition_key: "introductory_hunt",
+        display_name: "討伐低階魔物",
+        category: "defeat",
+        objective_summary: "討伐 1 隻低階魔物",
+        objective_note: null,
+        deadline_line: "接取後 3 日",
+        rationale: null,
+        flavor: null,
+        reward: { copper: 50, merit: 25, items: [{ item_key: "healing_potion", display_name: "治療藥水", quantity: 2 }] },
+        rank: "F",
         accept: { action_id: "guild.quest_accept", label: "接取任務", enabled: true, disabled_reason: null, quantity: null },
       },
     ],
@@ -124,7 +163,7 @@ export const SERVICES_PANEL_SAMPLE = {
     wallet: 3240,
   },
   pagination: {
-    board_total: 2,
+    board_total: 4,
     quest_total: 1,
     stock_total: 2,
     sellable_total: 1,
@@ -269,7 +308,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -277,7 +316,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop/inventory sections
 // (all null with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: true,
   kind: "services",
   host: null,
@@ -300,7 +339,7 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
       inventory_total: 0,
     },
 };
-// Guild rank-block variants (services v5): each swaps only the guild
+// Guild rank-block variants (services v6): each swaps only the guild
 // section's `rank` object (and, for the unregistered holder, the
 // registration row) on top of the full sample. `merit_qualified` is the
 // merit verdict; `exam_request.enabled` is independent of it.

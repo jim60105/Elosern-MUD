@@ -165,7 +165,7 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
             page,
             {
                 "services": {
-                    "schema_version": 5,
+                    "schema_version": 6,
                     "available": False,
                     "reason": {
                         "code": "services_unavailable",
