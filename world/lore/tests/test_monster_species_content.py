@@ -594,10 +594,17 @@ class AbilitySeamNegativeTests(unittest.TestCase):
         ):
             for key, row in registry.items():
                 with self.subTest(registry=source, row=key):
-                    strings: set[str] = set()
-                    _string_values(row, set(), strings)
-                    self.assertTrue(strings)
-                    self.assertEqual(strings & faces, set())
+                    if source == "variants" and key in ("bank_lurker", "bay_warden"):
+                        # The crocodile variants carry their validated authored kit and profile
+                        narrative = {row.display_name_zh, row.description_zh}
+                        self.assertEqual(narrative & faces, set())
+                        self.assertEqual(row.active_skill_keys, ("tide_devouring_bite",))
+                        self.assertEqual(row.behaviour_profile_key, "ambush_predator")
+                    else:
+                        strings: set[str] = set()
+                        _string_values(row, set(), strings)
+                        self.assertTrue(strings)
+                        self.assertEqual(strings & faces, set())
 
     @covers_requirement(
         "monster-species-registry::special-abilities-are-narrative-boundaries-with-a-named-mechanics-prerequisite-never-fake-skills"
