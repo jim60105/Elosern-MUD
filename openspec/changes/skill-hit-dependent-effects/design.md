@@ -35,3 +35,11 @@ Existing textual event logs remain for presentation, but are never dependency ev
 ## Migration Plan
 
 No data migration or compatibility layer. Ship independently using synthetic consumers; existing declarations require no rewrite because absent metadata preserves semantics. Serialize after eligibility for shared-file safety, even though no logical dependency exists. Verify and archive before the production crocodile consumer. Rollback removes the isolated policy/result extension as a unit. See proposal.md for physical conflicts.
+
+## Planning validation evidence
+
+On 2026-10-09, `openspec validate skill-hit-dependent-effects --strict` passed. Artifact writing-style checks passed with zero errors. The single full-set critique found no blocker in this prerequisite.
+
+The final repository-root `uv run --locked python -m tools.contract_gate` passed, with 2028/2028 main requirements covered, zero traceability errors, zero observability and test-data violations, valid manifests and all 18 contract tests passing. This validates the planning checkout's existing contracts; it does not claim implemented dependency behavior or runtime tests.
+
+Main owns final directory-scoped commits under the revised assignment. Before commits, `os-phase skill-hit-dependent-effects` returned exit 2, unknown change; Main must record the expected proposed phase after committing. No unrelated tracked edit was changed or staged.

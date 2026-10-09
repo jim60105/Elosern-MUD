@@ -45,3 +45,11 @@ Pre-release clean replacement, with no migration, legacy field or adapter. Persi
 ## Planning assumptions
 
 The one-engineer-day estimate in proposal.md is a planning assumption rather than measured feasibility evidence. This is a single deployment unit because a partial divine marker cutover would leave parallel qualification paths. The final full-set review found no eligibility blocker; its two crocodile main-contract findings are resolved in that consumer's registry delta.
+
+## Planning validation evidence
+
+On 2026-10-09, `openspec validate shared-skill-identity-eligibility --strict` and the explicitly requested `openspec validate shared-skill-identity-eligibility --type change` both passed. The initial strict run identified a renamed retained scenario; its original matching title was restored before the passing run. Artifact writing-style checks have zero errors; warnings in retained main-contract wording were accepted as existing technical labels.
+
+The final repository-root `uv run --locked python -m tools.contract_gate` passed, reporting 2028 requirements and 8277 associations, 2028 covered, zero uncovered/errors; observability scanned 668 with zero violations; test-data scanned 1231 with zero violations; manifests passed and all 18 contract tests passed. This is planning/checkout evidence, not implementation or runtime smoke evidence. No builds or gameplay tests were run.
+
+Final commits are owned by Main under the revised assignment; proposal files remain uncommitted for that handoff. Before commits, `os-phase shared-skill-identity-eligibility` returned exit 2, unknown change. Main must record the expected proposed phase after its directory-scoped commit. The unrelated human_guild_hosts.py edit was left intact.

@@ -54,12 +54,20 @@ No automatic existing-object migration or compatibility surface. New constructio
 
 | Pair | Logical relationship | Physical conflict and sequencing |
 |---|---|---|
-| shared-skill-identity-eligibility / skill-hit-dependent-effects | Neither depends on the other; each has standalone synthetic acceptance | registry/vocab.py, action validation/resolution seams, shared effect/preview/atomicity fixtures, docs/development/adding-spells.md and .github/evennia-shards.json require serialized integration |
-| shared-skill-identity-eligibility / tide-devouring-crocodile-resource-skill | Crocodile depends on completed eligibility | Registry metadata/builders/validation, ownership and passive/catalog tests, adding-spells.md, monster construction's qualification imports and shard/data-contract manifests require prerequisite completion before consumer integration |
-| skill-hit-dependent-effects / tide-devouring-crocodile-resource-skill | Crocodile depends on completed hit dependencies | Effect policy/registry metadata, damage-transfer integration and atomicity fixtures, adding-spells.md and shard/data-contract manifests require prerequisite completion before consumer integration |
+| shared-skill-identity-eligibility / skill-hit-dependent-effects | Neither depends on the other; each has standalone synthetic acceptance | Both plan edits to world/skills/registry/vocab.py, world/rules/tests/test_action_preview.py, world/rules/tests/test_action_pipeline_atomicity.py, docs/development/adding-spells.md and .github/evennia-shards.json; serialize |
+| shared-skill-identity-eligibility / tide-devouring-crocodile-resource-skill | Crocodile depends on completed eligibility | Both plan edits to docs/development/adding-spells.md and .github/evennia-shards.json; shipped-data registration may also share tools/test_data_freeze.json. Construction consumes the new qualification contract without requiring concurrent changes to its prerequisite implementation |
+| skill-hit-dependent-effects / tide-devouring-crocodile-resource-skill | Crocodile depends on completed hit dependencies | Both plan edits to docs/development/adding-spells.md and .github/evennia-shards.json and coverage in world/rules/tests/test_gauge_transfer and test_action_pipeline_atomicity.py. Crocodile declarations consume the new policy field after its prerequisite is complete |
 
 Safe order is apply, verify and archive eligibility; apply, verify and archive hit dependencies; then apply, verify and archive crocodile integration. The first two are logically interchangeable, but this fixed recommended order avoids concurrent edits. Do not run archive before that change's implementation and evidence are complete. All three proposals remain planning-only now.
 
 ## Final planning critique disposition
 
 The single full-set rubber-duck review found two blocking contradictions in retained monster-species main requirements. Both are resolved in the delta. The complete numeric-profile requirement now permits only the explicitly approved crocodile MP/SP exceptions while preserving its other approval and tier-band scenarios. The narrative-behavior deferral scenario now applies only to the five deferred abilities, with a crocodile scenario tying execution to validated authored configuration. The reviewer found no other blockers or nonblocking issues. This disposition records the remedies; it does not claim a second independent review or runtime verification.
+
+## Planning validation evidence
+
+On 2026-10-09, `openspec validate tide-devouring-crocodile-resource-skill --strict` passed after the two critique fixes. Artifact writing-style checks passed with zero errors; a retained technical-label warning was accepted.
+
+The final repository-root `uv run --locked python -m tools.contract_gate` passed, with 2028 main requirements and 8277 associations, every requirement covered, zero traceability errors, zero observability/test-data violations, valid manifests and all 18 contracts passing. This is planning checkout evidence. The crocodile combat smoke, focused gameplay tests and implementation lint evidence remain required implementation tasks and were not exercised during proposal creation.
+
+Main owns final directory-scoped commits under the revised assignment; no proposal commit was made by this worker. Before commits, `os-phase tide-devouring-crocodile-resource-skill` returned exit 2, unknown change; Main must record the expected proposed phase after committing. The unrelated active proposal and human_guild_hosts.py edit remain untouched.
