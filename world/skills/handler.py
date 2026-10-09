@@ -104,8 +104,9 @@ class SkillHandler:
 
     def stored_effective_value(self, trait_key: str) -> int:
         """Read the identical static fold without mounting a trait handler."""
-        traits = self.entity.attributes.get("traits", category="traits")
-        raw = traits[trait_key]
+        attributes = getattr(self.entity, "attributes", None)
+        traits = attributes.get("traits", default={}, category="traits") if attributes is not None else {}
+        raw = (traits or {}).get(trait_key, {})
         base = raw.get("value", raw.get("current", (raw.get("base", 0) + raw.get("mod", 0)) * raw.get("mult", 1)))
         return self._effective_value_from_base(trait_key, base)
 

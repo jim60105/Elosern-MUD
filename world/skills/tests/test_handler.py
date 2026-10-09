@@ -4,6 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 import ast
 import inspect
+from types import SimpleNamespace
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -162,6 +163,19 @@ class SkillHandlerTests(EvenniaTestCase):
         )
         with self.assertRaises(ValueError):
             _matching_multiplier(duplicate, "atk_phys")
+
+    def test_stored_effective_value_matches_effective_value(self):
+        entity = self._entity()
+        entity.db.skills = {
+            "active": [_T_STOIC.key],
+            "passive": [],
+        }
+        self.assertEqual(
+            entity.skills.stored_effective_value("atk_phys"),
+            entity.skills.effective_value("atk_phys"),
+        )
+        traitless = SimpleNamespace(db=SimpleNamespace(skills=None, skill_grants=None))
+        self.assertEqual(handler.SkillHandler(traitless).stored_effective_value("atk_phys"), 0)
 
     def test_handler_source_never_assigns_to_traits(self):
         tree = ast.parse(inspect.getsource(handler))
