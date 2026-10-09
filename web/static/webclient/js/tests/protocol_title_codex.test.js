@@ -535,7 +535,7 @@ test("quest_log is in the production panel allowlist and rejects atomically", ()
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
 });
 
-test("maximal structured quest book fits a snapshot alongside tracker and unavailable services", () => {
+test("maximal structured quest book fits a snapshot alongside populated tracker and counter", () => {
   const C = require("../elosern/protocol/constants.js");
   const rows = Array.from({length: C.QUEST_LOG_MAX_ROWS}, (_, i) => validQuestLogRow({
     quest_id: String(i).padStart(64, "0"), definition_key: "k".repeat(64),
@@ -558,6 +558,17 @@ test("maximal structured quest book fits a snapshot alongside tracker and unavai
       services: {schema_version: C.PANEL_ALLOWLIST.services, available: false,
         reason: {code: "services_unavailable", message: "目前無法辦理服務"}}},
   };
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  const fixtures = require("./protocol_fixtures.js");
+  const services = fixtures.validServicesPanel();
+  services.guild.quests = rows.map((row) => fixtures.validServicesQuestRow({
+    quest_id: row.quest_id, definition_key: row.definition_key,
+  }));
+  services.pagination.quest_total = rows.length;
+  envelope.panels.services = services;
+  envelope.panels.objectives = validObjectivesPanel(rows.slice(0, 3).map(
+    (row) => validObjectivesRow({quest_id: row.quest_id})
+  ));
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
 });
 

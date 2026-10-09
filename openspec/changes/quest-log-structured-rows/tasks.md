@@ -33,5 +33,7 @@ Acceptance evidence: 74 focused Evennia tests, 14 Node tests, 9 parity tests, 63
 
 ## Workflow follow-up
 
+Post-implementation duck found no blocking issues. Both non-blocking findings were adopted: the snapshot test now includes three populated tracker rows and twelve matching available counter rows, and the service delta explicitly permits exactly one client-owned reward label. The same reviewer then completed its critique against the supplied complete base diff and found no remaining findings; its initial missing-diff limitation is resolved.
+
 - At archive sync, re-point `covers_requirement` annotations from the two renamed requirement IDs (`webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel`, `...::an-unresolvable-issuance-yields-no-reward-line-rather-than-a-fabricated-one`) to their new IDs from `tools.spec_traceability list`. Annotate the tests from 2.2 for the new claim-disclosure requirement, then run `tools.spec_traceability check`.
 - Do not apply, archive, or merge until the user asks.

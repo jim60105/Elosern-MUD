@@ -78,7 +78,7 @@ from world.rules.guild_config import load_guild_catalog
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-class StructuredDescribeCatalogContract(unittest.TestCase):
+class StructuredDescribeCatalogContract(RegistryIsolationMixin, unittest.TestCase):
     def test_catalog_parts_compose_identically_and_rewards_fit_the_panel(self):
         """Data-contract test: all published quest prose and reward item bounds."""
         from world.quests.describe import (

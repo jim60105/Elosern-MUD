@@ -30,6 +30,8 @@ The visual target is the approved prototype at `docs/design/quest-drawer-redesig
 6. **Bounds reuse existing constants.** `objective_note` uses `MAX_OBJECTIVE_LINE_CODE_POINTS`. `rationale` and `flavor` use `MAX_DEFINITION_PROSE_LENGTH` (240). Item `display_name` uses `MAX_DISPLAY_NAME_CODE_POINTS`, and `item_key` uses `MAX_KEY_CODE_POINTS`. The envelope test builds twelve rows with maximal CJK prose and one maximal item each. A client snapshot test includes accompanying tracker/services panels and metadata. Code-point bounds alone do not guarantee byte size for every Unicode/JSON-escaped combination; the unchanged closing byte check rejects oversized combinations.
 7. **Interim `QuestLog.vue`.** The current component renders `flavor` where `detail` was, renders `rationale` under it when present, and formats `reward` client-side. The redesign replaces this component in `quest-drawer-book-tab`. Keeping it rendering on v2 keeps `master` shippable between changes.
 
+Claim disclosure follows ledger membership even if manually corrupted lifecycle state pairs an in-progress record with a claim. The in-progress/unclaimed scenario assumes the canonical settlement-produced ledger. No presenter state gate overrides the canonical claims reader.
+
 ## Risks / Trade-offs
 
 - [Max-size payload exceeds the envelope] → Decision 6's test runs first. If it fails, lower `QUEST_LOG_MAX_REWARD_ITEMS` and record the new value in the spec before continuing.
