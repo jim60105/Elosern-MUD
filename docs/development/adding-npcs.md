@@ -214,6 +214,18 @@ Settlement additionally orders by persistent NPC identity and retains real Exit
 traversal, failure isolation, and companion service silencing. It does not charge
 the clock.
 
+#### Planned service window reader
+
+`world.rules.service_windows.read_next_planned_service_interval(npc, destination, current_tick=None)`
+exposes read-only projection of planned NPC attendance intervals. Given a persistent
+NPC and destination room (or anchor key), it returns a `PlannedServiceWindowResult`
+carrying either `PlannedServiceInterval(start_tick, end_tick)` or a named unavailable
+reason (e.g. `invalid_host`, `missing_world_clock`, `schedule_silenced`, `active_exam_hold`,
+`missing_schedule`, `indeterminate_schedule`, `unconfirmable`).
+
+Intervals are start-inclusive and end-exclusive `[start_tick, end_tick)`. The reader
+never mutates clock, NPC attributes, locations, or examination records.
+
 #### Examination schedule holds
 
 `world.rules.exam_schedule_holds` owns the runtime APIs
