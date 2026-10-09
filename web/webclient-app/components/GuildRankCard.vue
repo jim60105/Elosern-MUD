@@ -1,15 +1,15 @@
 <script setup>
 // GuildRankCard (quest-drawer-ui-primitives, design Decision 6): the guild
-// rank block, extracted verbatim from GuildCounter.vue so the redesigned
-// quest drawer can host it at the top of the counter list column. It shows
+// rank block, extracted verbatim from the retired GuildCounter so the quest
+// drawer's guild counter tab hosts it at the top of the board list column. It shows
 // the rank crest, the merit meter with an explicit met / short status
 // (merit_qualified), and the 預約升等考核 request, whose enabled state is
 // independent of merit. It renders only the committed `services` v5
 // payload's `guild.rank` object and invents nothing; the exam request emits
 // the exact OOB action intent.
 //
-// It keeps every `guild-counter__*` class name and data-testid, so the
-// counter's tests and browser selectors keep matching.
+// It keeps every `guild-counter__*` class name and data-testid, so the rank
+// card's tests and browser selectors keep matching.
 import { computed, useId } from "vue";
 
 const props = defineProps({
@@ -174,10 +174,7 @@ function requestExam() {
 
 <style scoped>
 /* ---- Guild rank / promotion examination -------------------------------
-   The exam button and rank card use their own class names (not
-   guild-counter__action) so the shared `.elosern-root .guild-counter__action`
-   skin in styles/app-shell.css does not override them; the gold-ruled
-   button below follows that same live idiom. */
+   The rank card carries its whole look here; no global skin styles it. */
 .guild-counter__rank-card {
   display: flex;
   flex-direction: column;

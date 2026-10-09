@@ -139,6 +139,8 @@ test("services panel pagination must match shipped rows and null surfaces", () =
   );
   const withRows = validServicesPanel({
     guild: {
+      branch_label: "合成公會分行",
+      rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
       board: [validServicesBoardRow()],
       quests: [validServicesQuestRow()],

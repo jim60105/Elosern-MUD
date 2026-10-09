@@ -621,17 +621,3 @@ quest book.
 #### Scenario: The client mirror rejects a stale board row
 - **WHEN** a board row carrying `reward_summary`, an unknown category, or a ninth reward item reaches the client validator
 - **THEN** the client rejects the services payload rather than rendering it
-
-### Requirement: The guild counter renders the structured board offer
-
-The guild counter's board SHALL render each offer's reward from its `reward` object (copper, merit when
-non-zero, and each item with its quantity) under one reward label, SHALL render `objective_note` and
-`deadline_line` when present, and SHALL add no prefix or text the payload does not carry.
-
-#### Scenario: An offer shows its reward once
-- **WHEN** a board row with copper 120 and merit 45 renders
-- **THEN** the counter shows both figures under a single reward label
-
-#### Scenario: Null optional facts render nothing
-- **WHEN** a board row's `objective_note`, `deadline_line`, `rationale`, and `flavor` are null
-- **THEN** the counter renders no placeholder for any of them

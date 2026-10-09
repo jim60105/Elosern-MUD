@@ -6,9 +6,20 @@ import {
   bookActions,
   bookDetail,
   bookListRow,
+  boardBasis,
   bookStatus,
   counterRowsById,
   counterTab,
+  defaultGrade,
+  emptyGradeLine,
+  gradeLocked,
+  gradeTabs,
+  holderRank,
+  lockedGradeLine,
+  offerActions,
+  offerDetail,
+  offerListRow,
+  offersByGrade,
   rowsByState,
   stateCounts,
   turninHot,
@@ -21,6 +32,7 @@ import {
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_SAMPLE,
   QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
+  SERVICES_PANEL_GUILD_BOARD_SAMPLE,
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
@@ -268,7 +280,7 @@ describe("quest-drawer-model: the action bar", () => {
 
   it("states that a failed quest pays nothing and offers no tracking", () => {
     const actions = bookActions(rowById("q_0099"), counterRow("q_0099"));
-    expect(actions).toEqual({ track: null, abandon: null, turnin: null, reason: "此委託已失敗，沒有報酬。" });
+    expect(actions).toEqual({ track: null, abandon: null, turnin: null, accept: null, reason: "此委託已失敗，沒有報酬。" });
   });
 
   it("names the quest in the abandon warning", () => {
@@ -288,5 +300,160 @@ describe("quest-drawer-memory", () => {
     expect(fresh.top).toBe("book");
     expect(fresh.bookState).toBe("in_progress");
     expect(fresh.selectedByTab).toEqual({});
+  });
+});
+
+// quest-drawer-guild-board-tab: the grade-tabbed board.
+const BOARD_GUILD = SERVICES_PANEL_GUILD_BOARD_SAMPLE.guild;
+const LADDER = BOARD_GUILD.rank_ladder;
+const offerByKey = (key) => BOARD_GUILD.board.find((row) => row.definition_key === key);
+const keysOf = (rows) => rows.map((row) => row.definition_key);
+
+describe("quest-drawer-model: board grades", () => {
+  it("groups offers under every ladder grade in ladder order", () => {
+    const groups = offersByGrade(BOARD_GUILD.board, LADDER);
+    expect(Object.keys(groups)).toEqual(LADDER);
+    expect(keysOf(groups.F)).toEqual(keysOf(BOARD_GUILD.board.filter((row) => row.rank === "F")));
+    expect(groups.F).toHaveLength(2);
+    expect(groups.E).toHaveLength(2);
+    expect(groups.D).toEqual([]);
+  });
+
+  it("drops an offer whose grade is not on the ladder", () => {
+    const stray = { ...BOARD_GUILD.board[0], rank: "Z" };
+    const groups = offersByGrade([stray], LADDER);
+    expect(Object.values(groups).flat()).toEqual([]);
+  });
+
+  it("locks only grades above the holder's rank", () => {
+    expect(LADDER.map((grade) => gradeLocked(LADDER, "E", grade))).toEqual([false, false, true, true, true, true, true]);
+  });
+
+  it("locks nothing when the holder's rank is missing from the ladder", () => {
+    expect(LADDER.some((grade) => gradeLocked(LADDER, null, grade))).toBe(false);
+    expect(LADDER.some((grade) => gradeLocked(LADDER, "Z", grade))).toBe(false);
+  });
+
+  it("reads the holder's rank from the player summary", () => {
+    const disagreeing = { ...SERVICES_PANEL_GUILD_BOARD_SAMPLE, guild: { ...BOARD_GUILD, rank: { ...BOARD_GUILD.rank, rank: "F" } } };
+    expect(holderRank(disagreeing)).toBe("E");
+    expect(holderRank(SERVICES_PANEL_MINIMAL_SAMPLE)).toBe(null);
+    expect(holderRank(null)).toBe(null);
+  });
+
+  it("defaults to the highest grade at or below the rank that has offers", () => {
+    const groups = offersByGrade(BOARD_GUILD.board, LADDER);
+    expect(defaultGrade(LADDER, "E", groups)).toBe("E");
+    const onlyF = offersByGrade(BOARD_GUILD.board.filter((row) => row.rank === "F"), LADDER);
+    expect(defaultGrade(LADDER, "E", onlyF)).toBe("F");
+  });
+
+  it("defaults to the holder's own grade when no eligible grade has offers", () => {
+    expect(defaultGrade(LADDER, "E", offersByGrade([], LADDER))).toBe("E");
+  });
+
+  it("defaults without a ladder rank to the highest grade with offers, else the first", () => {
+    const groups = offersByGrade(BOARD_GUILD.board, LADDER);
+    expect(defaultGrade(LADDER, null, groups)).toBe("E");
+    expect(defaultGrade(LADDER, null, offersByGrade([], LADDER))).toBe("F");
+  });
+
+  it("builds one rail tab per grade with counts, the own mark, dim, and lock", () => {
+    const tabs = gradeTabs(LADDER, "E", offersByGrade(BOARD_GUILD.board, LADDER));
+    expect(tabs.map((tab) => tab.key)).toEqual(LADDER);
+    const [f, e, d] = tabs;
+    expect(f).toMatchObject({ label: "F 級", count: 2, mark: false, dim: false, locked: false, reason: undefined });
+    expect(e).toMatchObject({ label: "E 級", count: 2, mark: true, locked: false, reason: "你的等級" });
+    expect(d).toMatchObject({ label: "D 級", count: undefined, mark: false, dim: false, locked: true, reason: "尚未開放" });
+  });
+
+  it("dims an eligible grade with no offers", () => {
+    const tabs = gradeTabs(LADDER, "E", offersByGrade([], LADDER));
+    expect(tabs[1]).toMatchObject({ count: 0, dim: true, locked: false });
+  });
+
+  it("keys the remembered grade to the ladder and the holder's rank", () => {
+    expect(boardBasis(LADDER, "E")).not.toBe(boardBasis(LADDER, "D"));
+    expect(boardBasis(LADDER, "E")).not.toBe(boardBasis(LADDER.slice(0, 3), "E"));
+    expect(boardBasis(LADDER, null)).toBe(boardBasis(LADDER, undefined));
+  });
+
+  it("words the locked and empty grade lines", () => {
+    expect(lockedGradeLine("D")).toBe("D 級委託要等你的公會等級提升後才會開放。");
+    expect(emptyGradeLine("E")).toBe("目前沒有 E 級委託。");
+  });
+});
+
+describe("quest-drawer-model: board offers", () => {
+  const withDeadline = BOARD_GUILD.board.find((row) => row.deadline_line && row.accept.enabled);
+  const withProse = BOARD_GUILD.board.find((row) => row.rationale && row.flavor && !row.deadline_line);
+  const disabled = BOARD_GUILD.board.find((row) => !row.accept.enabled);
+
+  it("lists an offer by its definition key with the guild summary", () => {
+    expect(offerListRow(withDeadline)).toEqual({
+      id: withDeadline.definition_key,
+      name: withDeadline.display_name,
+      state: "offer",
+      glyph: "cat_defeat",
+      tracked: false,
+      grade: withDeadline.rank,
+      progress: null,
+      sub: `公會委託 · ${withDeadline.deadline_line}`,
+    });
+    expect(offerListRow(withProse).sub).toBe("公會委託");
+  });
+
+  it("shows an offer's condition, deadline, branch letter, and counter reward without progress", () => {
+    const detail = offerDetail(withProse, BOARD_GUILD.branch_label);
+    expect(detail).toMatchObject({
+      kind: "offer",
+      id: withProse.definition_key,
+      ribbon: { glyph: "cat_defeat", label: "討伐委託" },
+      objective: withProse.objective_summary,
+      note: withProse.objective_note,
+      grade: withProse.rank,
+      stamp: null,
+      progress: null,
+      rationale: null,
+      condition: { line: `公會等級 ${withProse.rank} 級以上`, text: withProse.rationale },
+      deadline: { line: "無期限", open: true },
+      issuer: { kind: "guild", label: BOARD_GUILD.branch_label, letter: withProse.flavor, fallback: null },
+    });
+    expect(detail.reward.settlement).toBe("回公會櫃檯領取");
+    expect(detail.reward.cells.map((cell) => cell.kind)).toEqual(["copper", "merit"]);
+  });
+
+  it("states a deadline, the item with quantity, and the letter fallback", () => {
+    const detail = offerDetail(withDeadline, BOARD_GUILD.branch_label);
+    expect(detail.deadline).toEqual({ line: withDeadline.deadline_line, note: "超過期限即判定失敗。", open: false });
+    const item = withDeadline.reward.items[0];
+    expect(detail.reward.cells.at(-1)).toMatchObject({ kind: "item", name: item.display_name, quantity: item.quantity });
+    expect(detail.condition.text).toBe(null);
+    expect(detail.issuer).toMatchObject({ letter: null, fallback: "委託人沒有留下說明。" });
+  });
+
+  it("makes the accept descriptor the primary action with exactly the definition key", () => {
+    expect(offerActions(withDeadline)).toEqual({
+      track: null,
+      abandon: null,
+      turnin: null,
+      accept: {
+        enabled: true,
+        label: withDeadline.accept.label,
+        action_id: "guild.quest_accept",
+        payload: { definition_key: withDeadline.definition_key },
+      },
+      reason: null,
+    });
+  });
+
+  it("keeps a disabled accept with its reason", () => {
+    const actions = offerActions(disabled);
+    expect(actions.accept.enabled).toBe(false);
+    expect(actions.reason).toBe(disabled.accept.disabled_reason.message);
+  });
+
+  it("offers nothing without a row", () => {
+    expect(offerActions(null)).toEqual({ track: null, abandon: null, turnin: null, accept: null, reason: null });
   });
 });

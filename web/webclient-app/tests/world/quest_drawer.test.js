@@ -7,6 +7,9 @@ import {
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_SAMPLE,
   QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
+  SERVICES_PANEL_GUILD_BOARD_SAMPLE,
+  SERVICES_PANEL_GUILD_TOP_RANK_SAMPLE,
+  SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE,
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
@@ -311,23 +314,249 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
   });
 
   describe("the guild counter tab", () => {
-    it("carries registration, the board, and the rank block, and lists no accepted quest", async () => {
-      mountDrawer();
+    const BOARD = SERVICES_PANEL_GUILD_BOARD_SAMPLE;
+    const LADDER = BOARD.guild.rank_ladder;
+    const offersOf = (grade) => BOARD.guild.board.filter((row) => row.rank === grade);
+    const gradeTab = (key) => wrapper.get(`[data-testid="quest-drawer__grade-rail"] [data-tab-key="${key}"]`);
+    const withBoard = (board, extra = {}) => ({ ...BOARD, guild: { ...BOARD.guild, board, ...extra } });
+
+    async function openCounter(props = {}) {
+      mountDrawer({ services: BOARD, ...props });
       await topTab("counter").trigger("click");
-      const counter = wrapper.get('[data-testid="quest-drawer__counter"]');
-      expect(counter.find('[data-testid="guild-counter__registration"]').exists()).toBe(true);
-      expect(counter.find('[data-testid^="guild-counter__board-row--"]').exists()).toBe(true);
-      expect(counter.find('[data-testid="guild-counter__rankblock"]').exists()).toBe(true);
-      expect(counter.find('[data-testid^="quest-drawer__row--"]').exists()).toBe(false);
-      expect(counter.find('[data-testid^="guild-counter__quest-row--"]').exists()).toBe(false);
+    }
+
+    it("renders one fixed grade tab per ladder key, in ladder order", async () => {
+      await openCounter();
+      const keys = () => wrapper.findAll('[data-testid="quest-drawer__grade-rail"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
+      expect(keys()).toEqual(LADDER);
+      expect(wrapper.findAll('[data-testid="quest-drawer__grade-rail"] .grade-gem').map((gem) => gem.attributes("data-grade"))).toEqual(LADDER);
+      await wrapper.setProps({ services: withBoard(offersOf("F")) });
+      expect(keys()).toEqual(LADDER);
+    });
+
+    it("lists only the selected grade's offers", async () => {
+      await openCounter();
+      await gradeTab("F").trigger("click");
+      expect(rowIds()).toEqual(offersOf("F").map((row) => row.definition_key));
+      expect(gradeTab("F").attributes("aria-label")).toBe(`F 級（${offersOf("F").length}）`);
+      expect(find("list-count").text()).toBe(String(offersOf("F").length));
+    });
+
+    it("defaults to the highest eligible grade that has offers", async () => {
+      await openCounter({ services: withBoard(offersOf("F")) });
+      expect(gradeTab("F").attributes("aria-selected")).toBe("true");
+    });
+
+    it("defaults to the holder's own grade when no eligible grade has offers", async () => {
+      await openCounter({ services: withBoard([]) });
+      expect(gradeTab("E").attributes("aria-selected")).toBe("true");
+      expect(find("empty").text()).toContain("目前沒有 E 級委託。");
+    });
+
+    it("keeps the shown grade when a commit empties it", async () => {
+      await openCounter({ services: withBoard(offersOf("F")) });
+      expect(gradeTab("F").attributes("aria-selected")).toBe("true");
+      await wrapper.setProps({ services: withBoard([...offersOf("E")]) });
+      expect(gradeTab("F").attributes("aria-selected")).toBe("true");
+      expect(rowIds()).toEqual([]);
+    });
+
+    it("keeps an explicitly chosen empty grade across a reopen", async () => {
+      await openCounter({ services: withBoard(offersOf("E")) });
+      await gradeTab("F").trigger("click");
+      reopen({ services: withBoard(offersOf("E")) });
+      expect(gradeTab("F").attributes("aria-selected")).toBe("true");
+    });
+
+    it("drops the remembered grade when the holder is promoted", async () => {
+      await openCounter();
+      await gradeTab("F").trigger("click");
+      const promoted = { ...BOARD, player: { ...BOARD.player, guild_rank: "D" } };
+      await wrapper.setProps({ services: promoted });
+      expect(gradeTab("E").attributes("aria-selected")).toBe("true");
+      expect(gradeTab("D").classes()).not.toContain("is-locked");
+    });
+
+    it("locks grades above the holder's rank with the promotion line and no rows", async () => {
+      await openCounter();
+      expect(gradeTab("D").classes()).toContain("is-locked");
+      expect(gradeTab("D").attributes("aria-disabled")).toBeUndefined();
+      await gradeTab("D").trigger("click");
+      expect(gradeTab("D").attributes("aria-selected")).toBe("true");
+      expect(find("empty").text()).toContain("D 級委託要等你的公會等級提升後才會開放。");
+      expect(rowIds()).toEqual([]);
+    });
+
+    it("never implies hidden offers behind a locked grade", async () => {
+      await openCounter();
+      await gradeTab("D").trigger("click");
+      expect(find("detail").exists()).toBe(false);
+      expect(find("accept").exists()).toBe(false);
+      expect(gradeTab("D").find('[data-testid="icon-tabs__count"]').exists()).toBe(false);
+      expect(gradeTab("D").attributes("aria-label")).toBe("D 級");
+      expect(gradeTab("D").classes()).not.toContain("is-dim");
+    });
+
+    it("dims an eligible empty grade and says so", async () => {
+      await openCounter({ services: withBoard(offersOf("F")) });
+      expect(gradeTab("E").classes()).toContain("is-dim");
+      await gradeTab("E").trigger("click");
+      expect(find("empty").text()).toContain("目前沒有 E 級委託。");
+    });
+
+    it("marks the holder's own grade and names it in the tooltip", async () => {
+      await openCounter();
+      expect(gradeTab("E").classes()).toContain("is-mark");
+      expect(gradeTab("E").attributes("data-tip")).toBe("E 級 · 你的等級");
+      expect(gradeTab("F").classes()).not.toContain("is-mark");
+    });
+
+    it("shows the rank card above the offer list, in every grade state", async () => {
+      await openCounter();
+      const list = find("list");
+      const card = list.get('[data-testid="guild-rank-card"]');
+      expect(card.element.compareDocumentPosition(list.get('[role="listbox"]').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(card.find('[data-testid="guild-counter__merit-meter"]').exists()).toBe(true);
+      await gradeTab("D").trigger("click");
+      expect(find("list").find('[data-testid="guild-rank-card"]').exists()).toBe(true);
+    });
+
+    it("submits the examination request unchanged", async () => {
+      await openCounter();
+      await wrapper.get('[data-testid="guild-counter__exam"]').trigger("click");
+      expect(wrapper.emitted("action")).toEqual([
+        [{ action_id: "guild.exam_request", payload: { target_rank: BOARD.guild.rank.next_rank } }],
+      ]);
+    });
+
+    it("renders no rank card when the guild section carries none", async () => {
+      await openCounter({ services: withBoard(BOARD.guild.board, { rank: null }) });
+      expect(wrapper.find('[data-testid="guild-rank-card"]').exists()).toBe(false);
+      expect(rowIds().length).toBeGreaterThan(0);
+    });
+
+    it("shows what accepting an offer commits to", async () => {
+      await openCounter();
+      await gradeTab("F").trigger("click");
+      const offer = offersOf("F").find((row) => row.deadline_line && row.reward.items.length > 0);
+      await wrapper.get(`[data-testid="quest-drawer__row--${offer.definition_key}"]`).trigger("click");
+      expect(detailId()).toBe(offer.definition_key);
+      const detail = find("detail").text();
+      expect(detail).toContain(offer.objective_summary);
+      expect(find("deadline").text()).toContain(offer.deadline_line);
+      expect(find("issuer").text()).toContain(BOARD.guild.branch_label);
+      expect(find("condition").text()).toContain(`公會等級 ${offer.rank} 級以上`);
+      const item = offer.reward.items[0];
+      expect(find("reward").text()).toContain(item.display_name);
+      expect(find("reward").text()).toContain(`× ${item.quantity}`);
+      expect(find("settlement").text()).toBe("回公會櫃檯領取");
+      expect(find("progress").exists()).toBe(false);
+    });
+
+    it("shows the offer's note and flavor", async () => {
+      await openCounter();
+      const offer = offersOf("E").find((row) => row.flavor && row.accept.enabled);
+      await wrapper.get(`[data-testid="quest-drawer__row--${offer.definition_key}"]`).trigger("click");
+      expect(find("detail").text()).toContain(offer.objective_note);
+      expect(find("issuer").text()).toContain(offer.flavor);
+    });
+
+    it("dispatches the accept descriptor exactly once", async () => {
+      await openCounter();
+      const offer = offersOf("E").find((row) => row.accept.enabled);
+      await wrapper.get(`[data-testid="quest-drawer__row--${offer.definition_key}"]`).trigger("click");
+      await find("accept").trigger("click");
+      expect(wrapper.emitted("action")).toEqual([
+        [{ action_id: offer.accept.action_id, payload: { definition_key: offer.definition_key } }],
+      ]);
+    });
+
+    it("shows a disabled accept's reason and no enabled accept control", async () => {
+      await openCounter();
+      const offer = offersOf("E").find((row) => !row.accept.enabled);
+      await wrapper.get(`[data-testid="quest-drawer__row--${offer.definition_key}"]`).trigger("click");
+      expect(find("action-reason").text()).toBe(offer.accept.disabled_reason.message);
+      expect(find("accept").attributes("aria-disabled")).toBe("true");
+      expect(find("accept").attributes("aria-describedby")).toBe(find("action-reason").attributes("id"));
+      await find("accept").trigger("click");
+      expect(wrapper.emitted("action")).toBeUndefined();
+    });
+
+    it("lists no held quest in the counter tab", async () => {
+      await openCounter({ services: SERVICES_PANEL_SAMPLE });
+      const held = new Set(QUEST_LOG_PANEL_SAMPLE.rows.map((row) => row.quest_id));
+      expect(rowIds().length).toBeGreaterThan(0);
+      expect(rowIds().some((id) => held.has(id))).toBe(false);
+      expect(find("grade-rail").exists()).toBe(true);
+      expect(wrapper.find('[data-testid="guild-rank-card"]').exists()).toBe(true);
+      expect(find("registration").exists()).toBe(false);
       expect(find("state-rail").exists()).toBe(false);
     });
 
-    it("forwards the counter's intents as actions", async () => {
-      mountDrawer();
-      await topTab("counter").trigger("click");
-      await wrapper.get('[data-testid="guild-counter__accept"]').trigger("click");
-      expect(wrapper.emitted("action")[0][0].action_id).toBe("guild.quest_accept");
+    it("shows an accepted offer in the book once the commit lands", async () => {
+      const offer = offersOf("F")[0];
+      const accepted = {
+        ...QUEST_LOG_PANEL_SAMPLE.rows[0],
+        quest_id: `${offer.definition_key}:1`,
+        display_name: offer.display_name,
+      };
+      await openCounter();
+      await wrapper.setProps({ questLog: bookWith([...QUEST_LOG_PANEL_SAMPLE.rows, accepted]) });
+      expect(rowIds()).not.toContain(accepted.quest_id);
+      await topTab("book").trigger("click");
+      expect(rowIds().filter((id) => id === accepted.quest_id)).toHaveLength(1);
+    });
+
+    it("replaces the board with the registration card for an unregistered holder", async () => {
+      await openCounter({ services: SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE });
+      const card = find("registration");
+      expect(card.text()).toContain("未加入公會");
+      expect(find("register").text()).toBe(SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE.guild.registration.register.label);
+      expect(find("grade-rail").exists()).toBe(false);
+      expect(rowIds()).toEqual([]);
+      expect(wrapper.find('[data-testid="guild-rank-card"]').exists()).toBe(false);
+    });
+
+    it("dispatches registration once and shows the board only after the commit", async () => {
+      await openCounter({ services: SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE });
+      find("register").element.focus();
+      await find("register").trigger("click");
+      expect(wrapper.emitted("action")).toEqual([[{ action_id: "guild.register", payload: {} }]]);
+      expect(find("grade-rail").exists()).toBe(false);
+      await wrapper.setProps({ services: BOARD });
+      await nextTick();
+      expect(find("grade-rail").exists()).toBe(true);
+      // The register button left the DOM; focus returns to the grade rail.
+      expect(wrapper.get('[data-testid="quest-drawer__grade-rail"]').element.contains(document.activeElement)).toBe(true);
+    });
+
+    it("never pulls focus into the drawer from outside on a commit", async () => {
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      await openCounter({ services: SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE });
+      outside.focus();
+      await wrapper.setProps({ services: BOARD });
+      await nextTick();
+      expect(document.activeElement).toBe(outside);
+    });
+
+    it("states a disabled registration's reason", async () => {
+      const guild = SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE.guild;
+      const reason = { code: "x", message: "暫停受理" };
+      const services = {
+        ...SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE,
+        guild: { ...guild, registration: { registered: false, register: { ...guild.registration.register, enabled: false, disabled_reason: reason } } },
+      };
+      await openCounter({ services });
+      expect(find("register").exists()).toBe(false);
+      expect(find("register-reason").text()).toBe(reason.message);
+    });
+
+    it("renders the top rank's board with nothing locked above it", async () => {
+      await openCounter({ services: { ...SERVICES_PANEL_GUILD_TOP_RANK_SAMPLE, player: { ...SERVICES_PANEL_GUILD_TOP_RANK_SAMPLE.player, guild_rank: "S" } } });
+      expect(wrapper.findAll('[data-testid="quest-drawer__grade-rail"] .is-locked')).toHaveLength(0);
+      expect(gradeTab("S").classes()).toContain("is-mark");
+      expect(wrapper.find('[data-testid="guild-counter__rank-top"]').exists()).toBe(true);
     });
 
     it("keeps the book working while services are unavailable", () => {

@@ -143,7 +143,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/LocalMap",
     "World/ShopPanel",
     "World/QuestDrawer",
-    "World/GuildCounter",
     "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",

@@ -20,7 +20,7 @@ None.
 
 ### Modified Capabilities
 
-- `webclient-quest-drawer`: adds the grade-tabbed board, the rank card placement, offer detail and acceptance, and the unregistered registration card.
+- `webclient-quest-drawer`: adds the grade-tabbed board, the rank card placement, offer detail and acceptance, and the unregistered registration card, and narrows "The guild counter tab presents counter business only" so registration shows only to an unregistered holder.
 - `webclient-service-menus`: removes "The guild counter renders the structured board offer", which `guild-board-structured-offers` adds for the legacy component this change deletes.
 
 ## Impact

@@ -162,6 +162,10 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-contextual-hud::mutations-issued-from-a-drawer-keep-the-dispatch-and-confirmation-contract"
     )
+    @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
+    @covers_requirement("webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board")
+    @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_drawer_mutations_dispatch_and_confirmation(self):
         # Drawer affordances emit the server-authored action id + payload through
         # the single dispatch entry, locked with in-flight / epoch / revision
@@ -169,7 +173,6 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
          # the quantity entry clamps on change to the server-advertised bounds.
         _assert_vitest_passes(
             _run_vitest(
-                 TESTS_DIR / "world" / "guild_counter.test.js",
                  TESTS_DIR / "world" / "guild_rank_card.test.js",
                  TESTS_DIR / "world" / "quest_detail.test.js",
                  TESTS_DIR / "world" / "quest_drawer.test.js",

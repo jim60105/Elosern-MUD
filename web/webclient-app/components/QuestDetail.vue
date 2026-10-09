@@ -7,11 +7,17 @@
 // rationale and deadline pair, the issuer letter, and the reward cells with
 // their settlement note. The action bar is pinned to the bottom.
 //
+// A guild board offer (quest-drawer-guild-board-tab, `offerDetail` /
+// `offerActions`) uses the same layout: no progress or stamp, the 接取條件
+// cell in place of 評價, and the accept descriptor as the primary action. A
+// disabled accept stays focusable (aria-disabled) beside its reason and
+// emits nothing.
+//
 // Every action emits `action` with the exact `{action_id, payload}` the
 // server descriptor (or the row's track descriptor) names. Abandon needs a
 // second confirmation; the armed state belongs to one quest and disarms when
 // the selection changes or the abandon descriptor goes away.
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import GradeGem from "./GradeGem.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { ABANDON_WARNING } from "./quest-drawer-model.js";
@@ -20,7 +26,7 @@ const props = defineProps({
   // bookDetail view model, or null for an empty detail.
   detail: { type: Object, default: null },
   // { track, abandon, turnin, reason } from bookActions.
-  actions: { type: Object, default: () => ({ track: null, abandon: null, turnin: null, reason: null }) },
+  actions: { type: Object, default: () => ({ track: null, abandon: null, turnin: null, accept: null, reason: null }) },
 });
 
 const emit = defineEmits(["action"]);
@@ -58,6 +64,7 @@ function dispatch(descriptor) {
 }
 
 const trackButton = ref(null);
+const reasonId = `quest-detail-reason-${useId()}`;
 
 async function confirmAbandon() {
   const abandon = props.actions?.abandon;
@@ -67,6 +74,11 @@ async function confirmAbandon() {
   // tracking toggle until the commit replaces the row.
   await nextTick();
   trackButton.value?.focus();
+}
+
+function accept() {
+  const descriptor = props.actions?.accept;
+  if (descriptor?.enabled) dispatch(descriptor);
 }
 
 function toggleTrack() {
@@ -117,7 +129,12 @@ function toggleTrack() {
       </section>
 
       <div class="quest-detail__cond">
-        <section v-if="detail.rationale" class="quest-detail__cell" data-testid="quest-drawer__rationale">
+        <section v-if="detail.condition" class="quest-detail__cell" data-testid="quest-drawer__condition">
+          <h4 class="quest-detail__label">接取條件</h4>
+          <p class="quest-detail__line">{{ detail.condition.line }}</p>
+          <p v-if="detail.condition.text" class="quest-detail__text">{{ detail.condition.text }}</p>
+        </section>
+        <section v-else-if="detail.rationale" class="quest-detail__cell" data-testid="quest-drawer__rationale">
           <h4 class="quest-detail__label">評價</h4>
           <p class="quest-detail__text">{{ detail.rationale }}</p>
         </section>
@@ -186,7 +203,12 @@ function toggleTrack() {
         >確認放棄</button>
       </template>
       <template v-else>
-        <p v-if="actions.reason" class="quest-detail__why" data-testid="quest-drawer__action-reason">{{ actions.reason }}</p>
+        <p
+          v-if="actions.reason"
+          :id="reasonId"
+          class="quest-detail__why"
+          data-testid="quest-drawer__action-reason"
+        >{{ actions.reason }}</p>
         <button
           v-if="actions.abandon"
           ref="abandonButton"
@@ -219,6 +241,16 @@ function toggleTrack() {
           data-testid="quest-drawer__turnin"
           @click="dispatch(actions.turnin)"
         >{{ actions.turnin.label }}</button>
+        <button
+          v-if="actions.accept"
+          type="button"
+          class="quest-detail__btn quest-detail__btn--primary"
+          :class="{ 'is-disabled': !actions.accept.enabled }"
+          :aria-disabled="actions.accept.enabled ? undefined : 'true'"
+          :aria-describedby="!actions.accept.enabled && actions.reason ? reasonId : undefined"
+          data-testid="quest-drawer__accept"
+          @click="accept"
+        >{{ actions.accept.label }}</button>
       </template>
     </footer>
   </article>
@@ -588,7 +620,8 @@ function toggleTrack() {
   box-shadow: var(--focus);
 }
 
-.quest-detail__btn:disabled {
+.quest-detail__btn:disabled,
+.quest-detail__btn.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -612,7 +645,7 @@ function toggleTrack() {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 14px var(--seal-glow);
 }
 
-.quest-detail__btn--primary:hover:not(:disabled) {
+.quest-detail__btn--primary:hover:not(:disabled):not(.is-disabled) {
   background: linear-gradient(180deg, var(--seal-500), var(--seal-600));
 }
 
