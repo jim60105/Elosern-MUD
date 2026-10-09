@@ -202,6 +202,15 @@ def describe_deadline(deadline_tick: int | None, current_tick: int) -> str | Non
     return _deadline_line(deadline_tick, current_tick)
 
 
+def describe_offer_deadline(hours: int | None) -> str | None:
+    """Render an authored offer deadline relative to acceptance."""
+    if hours is None:
+        return None
+    if hours % 24 == 0:
+        return f"接取後 {hours // 24} 日"
+    return f"接取後 {hours} 小時"
+
+
 def describe_quest_detail(
     record: Any,
     definition: QuestDefinition,

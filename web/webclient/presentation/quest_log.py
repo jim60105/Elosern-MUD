@@ -50,6 +50,11 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from web.webclient.presentation.quest_facts import (
+    MAX_REWARD_ITEMS as QUEST_LOG_MAX_REWARD_ITEMS,
+    QUEST_CATEGORIES,
+    describe_reward_parts,
+)
 from web.webclient.presentation.services import (
     MAX_KEY_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
@@ -62,9 +67,8 @@ from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.quests.describe import (
     describe_deadline,
     describe_objective_parts,
-    describe_reward_parts,
 )
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY, MAX_DEFINITION_PROSE_LENGTH, QuestType
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY, MAX_DEFINITION_PROSE_LENGTH
 from world.quests.runtime import QuestDataError, read_records
 from world.rules.clock import read_world_clock
 from world.rules.guild import RewardClaimError, parse_reward_claims
@@ -77,8 +81,6 @@ from world.rules.quest_issuance import (
 )
 
 QUEST_LOG_SCHEMA_VERSION = 2
-QUEST_LOG_MAX_REWARD_ITEMS = 1
-QUEST_CATEGORIES = {kind: kind.name.lower() for kind in QuestType}
 
 # Mirrors ``services.MAX_QUEST_ROWS`` (imported, so the two row caps cannot
 # drift); the cap is pinned in the spec.
