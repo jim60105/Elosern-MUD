@@ -15,7 +15,7 @@ class ServicesSchemaTests(unittest.TestCase):
         payload = _realistic_maximal_payload()
         payload["guild"]["board"] = _all_ceilings_payload()["guild"]["board"]
         payload["guild"]["rank_ladder"].append(payload["guild"]["board"][0]["rank"])
-        self.assertEqual(json_byte_size(payload), 57616)
+        self.assertEqual(json_byte_size(payload), 63784)
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
         self.assertEqual(len(validate_services(payload)["guild"]["board"]), MAX_BOARD_ROWS)
 

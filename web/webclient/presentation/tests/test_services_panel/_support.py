@@ -4,6 +4,7 @@ from world.quests.tests._fixtures import quest, register_catalog_once
 from world.rules.tests._guild_service_probes import synthetic_branch_key
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
 from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 
 
 # The shipped affinity rulebook cross-references one catalog quest by key, so
@@ -165,14 +166,19 @@ def _all_ceilings_payload():
             "deadline_line": _max_string(64),
             "rationale": _max_string(MAX_BOARD_PROSE_CODE_POINTS),
             "flavor": _max_string(MAX_BOARD_PROSE_CODE_POINTS),
-            "reward": {"copper": 0, "merit": 0, "items": [{
+            "reward": {"copper": MAX_SAFE_INTEGER, "merit": MAX_SAFE_INTEGER, "items": [{
                 "item_key": _max_string(MAX_KEY_CODE_POINTS),
-                "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS), "quantity": 1,
+                "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS), "quantity": MAX_SAFE_INTEGER,
             }]},
             "rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
             "accept": _action(
                 "guild.quest_accept",
                 label=_max_string(MAX_LABEL_CODE_POINTS),
+                enabled=False,
+                disabled_reason={
+                    "code": "x" * MAX_KEY_CODE_POINTS,
+                    "message": _max_string(MAX_REASON_MESSAGE_CODE_POINTS),
+                },
             ),
         }
         for _ in range(MAX_BOARD_ROWS)
