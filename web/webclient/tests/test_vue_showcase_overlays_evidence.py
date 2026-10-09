@@ -142,7 +142,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/CharacterStatusDrawer",
     "World/LocalMap",
     "World/ShopPanel",
-    "World/QuestLog",
+    "World/QuestDrawer",
     "World/GuildCounter",
     "World/LoreCodexDrawer",
     "World/InventoryPanel",
@@ -211,6 +211,10 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/IconTabs",
     "World/GradeGem",
     "World/GuildRankCard",
+    # The quest drawer's list and detail columns joined with
+    # quest-drawer-book-tab, when World/QuestDrawer replaced World/QuestLog.
+    "World/QuestList",
+    "World/QuestDetail",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the

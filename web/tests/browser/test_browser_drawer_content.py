@@ -223,6 +223,10 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement("webclient-contextual-hud::empty-drawer-guidance-preserves-unavailable-reasons")
+    @covers_requirement(
+        "webclient-quest-drawer::the-quest-drawer-degrades-honestly",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+    )
     def test_empty_quest_guidance_gives_way_to_the_unavailable_reason(self):
         """An available empty quest book shows the shared guidance card; a
         committed unavailable panel replaces it with its registry reason."""
@@ -234,9 +238,9 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
         _open_drawer(page, "quest")
-        empty = page.locator('[data-testid="quest-log__empty"]')
+        empty = page.locator('[data-testid="quest-drawer__empty"]')
         empty.wait_for(timeout=15000)
-        self.assertEqual(empty.locator(".empty-state__headline").inner_text(), "目前沒有任務紀錄")
+        self.assertEqual(empty.locator(".empty-state__headline").inner_text(), "這裡還沒有任務。")
         self.assertEqual(empty.locator("button").count(), 0)
 
         inject_update(page, {
@@ -246,13 +250,13 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                 "reason": {"code": "quest_log_unavailable", "message": "任務簿目前無法顯示"},
             },
         })
-        page.wait_for_selector('[data-testid="quest-log__unavailable"]', timeout=15000)
-        self.assertEqual(page.locator('[data-testid="quest-log__empty"]').count(), 0)
-        self.assertEqual(page.locator('[data-testid="quest-log"] .empty-state').count(), 0)
+        page.wait_for_selector('[data-testid="quest-drawer__unavailable"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__empty"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer"] .empty-state').count(), 0)
         self.assertEqual(
-            page.locator('[data-testid="quest-log__unavailable"]').inner_text().strip(), "任務簿目前無法顯示"
+            page.locator('[data-testid="quest-drawer__unavailable"]').inner_text().strip(), "任務簿目前無法顯示"
         )
-        self.assertEqual(page.locator('[data-testid^="quest-log__row--"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
         _close_drawer(page)
 
         # The codex with nothing discovered shares the same guidance form.

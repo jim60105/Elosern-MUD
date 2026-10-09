@@ -410,3 +410,31 @@ export const SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE = withGuildRank(
     },
   },
 );
+
+// The counter can settle the holder's completed q_0301 right now: its guild
+// quest row carries an enabled turn-in (quest-drawer-book-tab's hot
+// completed badge). q_1042 keeps its in-progress row.
+export const SERVICES_PANEL_GUILD_TURNIN_READY_SAMPLE = {
+  ...SERVICES_PANEL_SAMPLE,
+  guild: {
+    ...SERVICES_PANEL_SAMPLE.guild,
+    quests: [
+      ...SERVICES_PANEL_SAMPLE.guild.quests,
+      {
+        quest_id: "q_0301",
+        definition_key: "quest_mill_grain",
+        display_name: "磨坊糧運",
+        state: "completed",
+        stage_index: 2,
+        stage_progress: 10,
+        objective_summary: "將十袋糧食運往磨坊",
+        deadline_line: null,
+        detail: "糧食已送達磨坊，等著回去回報。",
+        abandon: { action_id: "guild.quest_abandon", label: "放棄任務", enabled: false, disabled_reason: { code: "quest_not_active", message: "任務已結束" }, quantity: null },
+        turnin: { action_id: "guild.quest_turnin", label: "交付委託", enabled: true, disabled_reason: null, quantity: null },
+        tracked: false,
+      },
+    ],
+  },
+  pagination: { ...SERVICES_PANEL_SAMPLE.pagination, quest_total: 2 },
+};

@@ -25,7 +25,7 @@ The quest drawer stacks a text-heavy quest book above the guild counter, groups 
 
 ## Impact
 
-New `web/webclient-app/components/QuestDrawer.vue`, `QuestList.vue`, `QuestDetail.vue`, and `quest-drawer-model.js`; `AppClient.vue` (and its composable that exposes `questGuildAvailable` / `questServicesPanel`); deleted `QuestLog.vue`, `stories/World/QuestLog.stories.js`, and `tests/world/quest_log.test.js`; `styles/app-shell.css`; `component-manifest.json` and the showcase evidence key sets; Vitest `app_client_drawers.test.js` and `drawer_content_polish.test.js`; browser tests `test_browser_services_quest_drawer.py`, `test_browser_services_guild.py` (book-side journeys), `test_browser_drawer_content.py`, and `test_browser_contextual_hud_drawers.py`.
+New `web/webclient-app/components/QuestDrawer.vue`, `QuestList.vue`, `QuestDetail.vue`, `quest-drawer-model.js`, and `quest-drawer-memory.js`; `IconTabs.vue` (an optional per-tab `reasonAttrs`); `AppClient.vue` (and its composable that exposes `questGuildAvailable` / `questServicesPanel`); deleted `QuestLog.vue`, `stories/World/QuestLog.stories.js`, and `tests/world/quest_log.test.js`; `styles/app-shell.css`; `component-manifest.json` and the showcase evidence key sets; Vitest `app_client_drawers.test.js`, `drawer_content_polish.test.js`, and `app_client_frameless_bag.test.js`; the frozen-contract audit `docs/development/webclient-vue-frozen-contract-audit.md`; browser tests `test_browser_services_base.py` (a counter-tab helper), `test_browser_services_quest_drawer.py`, `test_browser_services_guild.py`, `test_browser_pointer.py` (the register journey), `test_browser_drawer_content.py`, and `test_browser_contextual_hud_drawers.py`.
 
 ## Non-goals
 

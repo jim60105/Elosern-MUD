@@ -24,8 +24,7 @@ import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapOverlay from "./components/MapOverlay.vue";
 import RestForm from "./components/RestForm.vue";
-import GuildCounter from "./components/GuildCounter.vue";
-import QuestLog from "./components/QuestLog.vue";
+import QuestDrawer from "./components/QuestDrawer.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
@@ -77,8 +76,7 @@ const {
   waitOpen, skipDisabled, activateWait, practiceOpen, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
-  drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, questServicesPanel,
-  questGuildAvailable, questServicesUnavailable, skillBookSubtitle,
+  drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
   overviewShown, overviewActive, overviewMenu, overviewFocusKey,
@@ -543,6 +541,7 @@ function onFoeLineupGone() {
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
+      :body-flush="store.view.hudDrawer === 'quest'"
       @close="onHudDrawerClose"
     >
       <!-- Only a drawer about the current character stands its portrait
@@ -584,44 +583,13 @@ function onFoeLineupGone() {
         @buy="onShopBuy"
         @sell="onShopSell"
       />
-      <div
+      <QuestDrawer
         v-else-if="store.view.hudDrawer === 'quest'"
-        class="quest-drawer"
-        data-testid="quest-drawer"
-      >
-        <QuestLog
-          :quest-log="panel('quest_log')"
-          :services="panel('services') || {}"
-          @quest_track="onQuestAction"
-          @quest_abandon="onQuestAction"
-          @quest_turnin="onQuestAction"
-        />
-        <GuildCounter
-          v-if="questGuildAvailable"
-          :services="panel('services') || {}"
-          @quest_register="onQuestAction"
-          @quest_accept="onQuestAction"
-          @exam_request="onQuestAction"
-        />
-        <!-- The counter's two honest absence forms: the services panel's own
-             registry reason when the panel degraded, otherwise the explicit
-             no-clerk marker. -->
-        <p
-          v-else-if="questServicesUnavailable"
-          class="quest-drawer__counter-unavailable"
-          data-testid="quest-drawer__counter-unavailable"
-          :data-reason-code="questServicesPanel?.reason?.code"
-        >
-          {{ questServicesPanel?.reason?.message }}
-        </p>
-        <p
-          v-else
-          class="quest-drawer__counter-absent"
-          data-testid="quest-drawer__counter-absent"
-        >
-          公會櫃台需在公會職員面前才能辦理。
-        </p>
-      </div>
+        :quest-log="panel('quest_log')"
+        :services="panel('services')"
+        :memory-scope="`${store.view.generation}|${store.view.epoch}`"
+        @action="onQuestAction"
+      />
       <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
       <CharacterStatusDrawer
         v-else-if="store.view.hudDrawer === 'status'"
@@ -837,25 +805,5 @@ function onFoeLineupGone() {
   flex: 1;
   min-height: 0;
   align-items: flex-start;
-}
-
-/* quest-drawer-split: the drawer body's wrapper for the two quest surfaces.
-   It stacks the quest book above the guild counter (or the counter's honest
-   absence marker). */
-.quest-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  min-width: 0;
-}
-
-.quest-drawer__counter-absent,
-.quest-drawer__counter-unavailable {
-  margin: 0;
-  padding: var(--sp-1) var(--sp-2);
-  color: var(--paper-500);
-  font-size: max(var(--text-xs), 0.85em);
-  border: 1px dashed var(--ink-700);
-  border-radius: var(--radius-sm);
 }
 </style>

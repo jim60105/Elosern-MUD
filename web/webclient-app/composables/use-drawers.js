@@ -1,6 +1,6 @@
 // The reference-drawer layer (H4): the drawer chrome's derived head copy, the
-// quest-drawer split honesty rules, the skill/inventory subtitles, the wallet
-// figure, and the drawer close route. Extracted verbatim from AppClient.vue so
+// skill/inventory subtitles, the wallet figure, and the drawer close route.
+// The quest drawer's counter honesty rules live in quest-drawer-model.js. Extracted verbatim from AppClient.vue so
 // the SFC stays a passive renderer.
 import { computed } from "vue";
 import { formatCopper } from "../components/character-identity.js";
@@ -54,22 +54,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   function onHudDrawerClose() {
     store.closeHudDrawer();
   }
-
-  // quest-drawer-split: the quest drawer hosts the player's quest book
-  // (QuestLog, host-free) above the guild counter (GuildCounter, host-gated).
-  // The counter mounts only when the guild section is available; an
-  // unavailable services panel renders its registry-owned reason verbatim
-  // (a read-model failure is never mislabeled as clerk absence) and an
-  // available panel with no guild section renders the explicit clerk-needed
-  // marker — the away-from-clerk honesty the split exists for.
-  const questServicesPanel = computed(() => panel("services") || null);
-  const questGuildAvailable = computed(() => {
-    const services = questServicesPanel.value;
-    return !!services && services.available !== false && services.guild != null;
-  });
-  const questServicesUnavailable = computed(
-    () => questServicesPanel.value?.available === false,
-  );
 
   // The skill drawer's head subtitle: the owner's active/passive skill counts,
   // counted from the `character` panel exactly the way `SkillBook` counts its
@@ -160,9 +144,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
     onHudDrawerClose,
     onOpenDrawer,
     partyReason,
-    questGuildAvailable,
-    questServicesPanel,
-    questServicesUnavailable,
     skillBookSubtitle,
   };
 }

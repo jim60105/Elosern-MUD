@@ -17,7 +17,7 @@ import InventoryPanel from "../components/InventoryPanel.vue";
 import LineagePanel from "../components/LineagePanel.vue";
 import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
 import PartyDrawer from "../components/PartyDrawer.vue";
-import QuestLog from "../components/QuestLog.vue";
+import QuestDrawer from "../components/QuestDrawer.vue";
 import { glyphPath } from "../components/dock-icons.js";
 import { useElosernStore } from "../stores/elosern.js";
 import {
@@ -48,18 +48,20 @@ describe("EmptyState", () => {
 
 describe("available-empty versus unavailable drawer lists", () => {
   it("replaces the quest book's empty guidance with the registered reason", async () => {
-    const w = mount(QuestLog, { props: { questLog: QUEST_LOG_PANEL_EMPTY_SAMPLE, services: SERVICES_PANEL_SAMPLE } });
-    const empty = w.get('[data-testid="quest-log__empty"]');
+    const w = mount(QuestDrawer, { props: { questLog: QUEST_LOG_PANEL_EMPTY_SAMPLE, services: SERVICES_PANEL_SAMPLE } });
+    const empty = w.get('[data-testid="quest-drawer__empty"]');
     expect(empty.classes()).toContain("empty-state");
-    expect(w.find('[data-testid="quest-log__unavailable"]').exists()).toBe(false);
+    expect(w.find('[data-testid="quest-drawer__unavailable"]').exists()).toBe(false);
 
     await w.setProps({ questLog: QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE });
-    expect(w.find('[data-testid="quest-log__empty"]').exists()).toBe(false);
+    expect(w.find('[data-testid="quest-drawer__empty"]').exists()).toBe(false);
     expect(w.find(".empty-state").exists()).toBe(false);
-    const reason = w.get('[data-testid="quest-log__unavailable"]');
+    const reason = w.get('[data-testid="quest-drawer__unavailable"]');
     expect(reason.text()).toBe(QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE.reason.message);
-    // No invented quest row or action.
-    expect(w.find("button").exists()).toBe(false);
+    // No invented quest row or action: only the tab controls remain.
+    expect(w.findAll('[data-testid^="quest-drawer__row--"]')).toHaveLength(0);
+    expect(w.find('[data-testid="quest-drawer__actions"]').exists()).toBe(false);
+    expect(w.findAll("button").every((button) => button.attributes("role") === "tab")).toBe(true);
   });
 
   it("keeps the codex's empty guidance and its unavailable reason distinct", () => {

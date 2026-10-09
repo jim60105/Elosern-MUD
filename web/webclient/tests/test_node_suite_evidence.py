@@ -544,7 +544,8 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::the-quest-browser-exposes-the-tracking-toggle",
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
     )
     def test_quest_book_tracking_toggle_node_suite_passes(self):
         result = subprocess.run(
@@ -553,7 +554,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer_model.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_detail.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -563,25 +566,29 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "quest-log tracking toggle Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "quest drawer tracking toggle Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::counter-only-quest-actions-appear-on-a-book-row-only-when-the-counter-offers-them",
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+        "webclient-quest-drawer::the-quest-drawer-degrades-honestly",
     )
     def test_quest_book_merge_rule_vitest_evidence_passes(self):
-        """The quest_log merge-rule suite is the executed evidence for the
-        counter-only action join: tracking always offered, abandon/turn-in
-        only on a quest_id match mirroring the counter's descriptor, never
-        synthesized or re-enabled."""
+        """The quest drawer model, detail, and drawer suites are the executed
+        evidence for the counter-only action join: tracking on in-progress
+        rows, abandon/turn-in only on a quest_id match mirroring the counter's
+        descriptor, never synthesized or re-enabled."""
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer_model.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_detail.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -591,24 +598,25 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "quest-log merge rule Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "quest drawer merge rule Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::the-quest-book-discloses-each-quest-s-commissioner-and-settlement",
+        "webclient-quest-drawer::selecting-a-quest-shows-its-full-detail-beside-the-list",
     )
     def test_quest_book_disclosure_vitest_evidence_passes(self):
-        """The same suite pins the disclosure contract: issuer label and
-        settlement indication on every row, reward line only when the panel
-        carries one, nothing in its place when null."""
+        """The model and detail suites pin the disclosure contract: issuer
+        label and letter, the settlement note, and reward cells only when the
+        panel carries a reward, nothing in their place when null."""
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer_model.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_detail.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -618,7 +626,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "quest-log disclosure Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "quest drawer disclosure Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

@@ -15,7 +15,7 @@ import { glyphAttrs, glyphPath } from "./dock-icons.js";
 
 const props = defineProps({
   // [{ key, label, glyph?, count?, hot?, disabled?, reason?, locked?, dim?,
-  //    mark?, controls? }]
+  //    mark?, controls?, reasonAttrs? }]
   tabs: { type: Array, required: true },
   modelValue: { type: String, default: null },
   orientation: {
@@ -187,7 +187,9 @@ function onFocusin(event) {
         <path :d="glyphPath('lock')" stroke="currentColor" stroke-width="2" v-bind="glyphAttrs('lock')" />
       </svg>
       <span v-if="tab.mark" class="icon-tabs__mark" aria-hidden="true"></span>
-      <span v-if="tab.reason" :id="reasonId(tab)" class="icon-tabs__reason">{{ tab.reason }}</span>
+      <!-- `reasonAttrs` (e.g. a host's data-testid) binds first, so the id
+           the description points at always wins. -->
+      <span v-if="tab.reason" v-bind="tab.reasonAttrs" :id="reasonId(tab)" class="icon-tabs__reason">{{ tab.reason }}</span>
     </button>
   </div>
 </template>
