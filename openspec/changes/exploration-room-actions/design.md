@@ -6,7 +6,7 @@ Source of truth: `docs/superpowers/specs/2026-10-10-scene-overview-redesign-desi
 
 Observed today (after the first two changes):
 - The command panel holds the compass, the readout, and `SceneOverview` reduced to the footer chips; the router root is the footer-only overview with `geometry: "sections"`.
-- `exploration.wait` and `exploration.suggestions` are pushed router frames; `AppClient.vue` renders the wait frame as the `waiting-screen` block (three `waiting-card` articles, an extra `睡眠並進入夢境協作` button inside the sleep card, `RestForm`), and the suggestions frame as the `cards` dock pane (`OptionCard` rows plus `✕ 清除建議`).
+- `exploration.wait` and `exploration.suggestions` are pushed router frames; `AppClient.vue` renders the wait frame as the `waiting-screen` block (three `waiting-card` articles, an extra `睡眠並進入夢境協作` button inside the sleep card, which this change replaces with the dream question (D5), `RestForm`), and the suggestions frame as the `cards` dock pane (`OptionCard` rows plus `✕ 清除建議`).
 - `onDockActivate` special-cases `explore.wait` to open `RestForm`.
 - `PlaceCard.vue` is display-first with no control.
 
@@ -34,11 +34,13 @@ Two real `<button>`s inside `PlaceCard`, each a tab stop, emitting `look-room` a
 
 ### D4. Suggestions card rows
 
-Rows come from the same builder as the old pane, rendered as `ChoiceCard` rows (label, optional second line for `hint`), so `ChoiceCard` gains an optional per-row `hint`. The envelope an activated row dispatches stays the one `OptionCard` builds; extract that mapping into a pure helper both use if `OptionCard` is still used elsewhere (the narrative choice-point), otherwise delete `OptionCard`/`ChoiceCardRow` and their manifest entries with the story evidence. The generating and degraded notes render as non-selectable lines in the card. `✕ 清除建議` stays as a row above `✕ 返回` (the redesign does not drop dismiss; assumption recorded here).
+Rows come from the same builder as the old pane, rendered as `ChoiceCard` rows (label, optional second line for `hint`), so `ChoiceCard` gains an optional per-row `hint`. The envelope an activated row dispatches stays the one `OptionCard` builds; extract that mapping into a pure helper both use if `OptionCard` is still used elsewhere (the narrative choice-point), otherwise delete `OptionCard`/`ChoiceCardRow` and their manifest entries with the story evidence. The generating and degraded notes render as non-selectable lines in the card. The dismiss row stays above `✕ 返回` (the redesign does not drop dismiss) and keeps the label 清除建議, but its leading mark is a trash-can glyph in the dock icon vocabulary (an `aria-hidden` SVG, not the ✕ character), so it no longer looks like the adjacent `✕ 返回` (user decision, 2026-10-10).
 
 ### D5. Wait card rows
 
-Rows: 等待直到黎明, 睡眠至完全恢復, 睡眠並進入夢境協作 (kept from the current sleep card; the redesign text lists three rows and is silent on this one, so it is kept to avoid removing reachable behavior, assumption recorded here), 休息 N 小時 (opens `RestForm` exactly as today), then `✕ 返回`. Disabled while a mutation is in flight or awaiting revision, with the same reason text as the old controls.
+Rows: 等待直到黎明, 睡眠至完全恢復, 休息 N 小時 (opens `RestForm` exactly as today), then `✕ 返回`. Disabled while a mutation is in flight or awaiting revision, with the same reason text as the old controls.
+
+The dream-collaboration variant is no longer a row. Choosing 睡眠至完全恢復 opens a small modal question, 進入夢境協作？, with 是 and 否 buttons and a ✕ close at its top right (user decision, 2026-10-10): 是 dispatches `explore.wait` with `{sleep: true, dream: true}`, 否 dispatches `explore.wait` with `{sleep: true}`, and ✕ (also Escape) cancels the sleep, dispatches nothing, closes the question and returns to the wait card. The server cannot enter the dream after a plain sleep (`CmdSleep` records the start tick before advancing and `enter_after_sleep` consumes it), so the question is asked BEFORE the single request is sent; no protocol change. The modal uses the same card frame as `ChoiceCard` but its own two-button layout, traps focus on 是, and is locked like the other wait rows while a mutation is in flight.
 
 ### D6. Readout priority is one pure function
 
@@ -57,9 +59,9 @@ The two MODIFIED deltas here validate against current main. The previous change'
 - **Empty router root.** Mitigated by D2 and a Node router test.
 - **Suggestions behavior drift.** Row envelopes must stay byte-identical; a Vitest test compares every card kind's emitted intent with the pre-change `OptionCard` output.
 - **Tests that reach the old frames.** Many Vitest and browser tests open wait or suggestions through the footer; tasks 4 and 5 list them.
-- **Dream-sleep row and dismiss row are assumptions.** Both preserve reachable behavior the redesign text does not mention; the user can drop them in review.
+- **Dream question and dismiss row.** Both preserve reachable behavior the redesign text did not mention; the user decided their forms (a yes/no question before sleeping, and a trash-can icon on the dismiss row).
 - **Spec text spread.** `webclient-desktop-shell` and `webclient-pointer-activation` name the overview footer, the waiting frame, and the pane host; task 5.2 authors those MODIFIED deltas.
 
 ## Open Questions
 
-None blocking; D4 and D5 name the two assumptions.
+None.

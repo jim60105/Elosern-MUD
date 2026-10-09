@@ -1,11 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: The waiting surface offers exactly three operations
-The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, submitting `explore.wait` with the exact `sleep` flag, together with its existing dream-collaboration variant 睡眠並進入夢境協作 (`sleep` and `dream` flags); and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
+The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, which first asks 進入夢境協作？ and then submits `explore.wait` with the exact `sleep` flag, plus the `dream` flag when the player answers 是; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
 
 #### Scenario: The waiting frame renders the three operations
 - **WHEN** the player activates 等待 on the place card in exploration mode
-- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, 睡眠並進入夢境協作, and 休息 N 小時 followed by `✕ 返回`, with no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
+- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, and 休息 N 小時 followed by `✕ 返回`, with no separate dream row and no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
 
 #### Scenario: The hours form dispatches whole seconds exactly once
 - **WHEN** the player enters `1.5` hours in the 休息 form and confirms

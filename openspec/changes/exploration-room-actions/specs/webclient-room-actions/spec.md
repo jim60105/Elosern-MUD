@@ -74,6 +74,25 @@ Activating 等待 SHALL open the centred `ChoiceCard` with the wait rows and a t
 - **WHEN** an action is in flight or the client awaits its declared presentation revision
 - **THEN** the wait rows are disabled and activating them submits nothing
 
+### Requirement: Sleeping asks whether to enter dream collaboration first
+Activating 睡眠至完全恢復 in the wait card SHALL open a modal question, 進入夢境協作？, with 是, 否, and a close control at its top right, without a server request. 是 SHALL submit one `explore.wait` with the `sleep` and `dream` flags, 否 SHALL submit one with only `sleep`, and the close control or Escape SHALL cancel the sleep and submit nothing. The wait card SHALL NOT carry a separate dream row.
+
+#### Scenario: 是 sleeps into the dream
+- **WHEN** the player activates 睡眠至完全恢復 and then 是
+- **THEN** exactly one `ui_action` is submitted, `explore.wait` with `sleep: true` and `dream: true`, and the question and the wait card close
+
+#### Scenario: 否 is a plain sleep
+- **WHEN** the player activates 睡眠至完全恢復 and then 否
+- **THEN** exactly one `ui_action` is submitted, `explore.wait` with `sleep: true` and no `dream` flag
+
+#### Scenario: Closing cancels the sleep
+- **WHEN** the player activates 睡眠至完全恢復 and then the close control, or presses Escape
+- **THEN** no `ui_action` is emitted, the question closes, and focus returns to the wait card's 睡眠至完全恢復 row
+
+#### Scenario: The question traps focus and honours the lock
+- **WHEN** the question is open, or a mutation is in flight or awaiting revision
+- **THEN** focus stays inside the question on 是, and 是 and 否 are disabled with the same reason text as the other wait rows while locked
+
 ### Requirement: The 建議 pill opens the suggestions card
 The command panel SHALL render a 建議 pill at its top right whenever the committed suggestions status is not `unavailable`, labelled `建議 N` with N the number of cards the suggestions card lists when that number is positive, and the pill SHALL be absent otherwise. Activating it SHALL open the centred suggestions `ChoiceCard` locally, without a server request, with a trailing `✕ 返回`.
 

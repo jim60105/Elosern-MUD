@@ -29,7 +29,7 @@ The 建議 pill in the exploration command panel SHALL open the centred suggesti
   anywhere else
 
 #### Scenario: Dismiss keeps the committed-state invariant
-- **WHEN** the player activates `✕ 清除建議` while a mutation is in flight or the request is
+- **WHEN** the player activates the 清除建議 row while a mutation is in flight or the request is
   rejected as stale/busy
 - **THEN** no `options.dismiss` is admitted and the card remains exactly as last committed;
   only the next accepted commit decides removal
@@ -61,7 +61,7 @@ The 建議 pill in the exploration command panel SHALL open the centred suggesti
 
 #### Scenario: The pane carries dismiss and the chip names the count
 - **WHEN** the suggestions card is presented and the 建議 pill is rendered
-- **THEN** the card carries the `✕ 清除建議` row, above the trailing `✕ 返回` row, dispatching `options.dismiss` under the existing confirmation contract, and the pill names the committed card count (`建議 N`) whenever that count is positive
+- **THEN** the card carries the 清除建議 row, marked with a trash-can icon rather than a ✕ and placed above the trailing `✕ 返回` row, dispatching `options.dismiss` under the existing confirmation contract, and the pill names the committed card count (`建議 N`) whenever that count is positive
 
 #### Scenario: A transport reset retires the epoch's cards
 - **WHEN** a transport generation reset (`beginTransport`) occurs

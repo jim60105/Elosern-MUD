@@ -187,13 +187,14 @@ The focus state is client-local. It sends no server request and pushes no router
 
 - **查看房間** (magnifier icon, `aria-label="查看房間"`) beside the location heading. It submits the existing `look-room` payload.
 - **等待** (hourglass icon plus label) beside the world time. It opens the centred `ChoiceCard` with the wait submenu rows: 等待直到黎明, 睡眠至完全恢復, and 休息 N 小時, which opens the existing `RestForm`. Then `✕ 返回`.
+  - **Dream collaboration.** There is no separate dream row. Choosing 睡眠至完全恢復 opens a modal question, 進入夢境協作？, with 是 (sleep with the `dream` flag), 否 (plain sleep), and a ✕ at the top right that cancels the sleep and closes the question. The question comes before the single request because the server records the sleep's start tick and can only enter the dream as part of that same sleep.
 
 The buttons are rendered only in exploration and while the exploration panel is available.
 
 ### 5.2 Command panel (exploration)
 
 - The panel keeps its 1/3 width, so the message window never jumps between modes.
-- The compass fills the panel height on the left. The right column holds the 建議 N pill (top right, hidden while suggestions are `unavailable`; it opens the suggestions `ChoiceCard`) and the shared readout at the bottom.
+- The compass fills the panel height on the left. The right column holds the 建議 N pill (top right, hidden while suggestions are `unavailable`; it opens the suggestions `ChoiceCard`, whose 清除建議 row sits above `✕ 返回` and carries a trash-can icon so it is not mistaken for the back row) and the shared readout at the bottom.
 - The panel shows no key hints.
 
 ### 5.3 Shared readout
