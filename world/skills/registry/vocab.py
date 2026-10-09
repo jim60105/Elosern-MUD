@@ -370,6 +370,27 @@ class SkillDef:
                 raise ValueError(
                     f"skill {self.key!r} target_spec is NONE and cannot declare {policy.audience} audience"
                 )
+            if policy.requires_hit_from is not None:
+                if policy.requires_hit_from >= len(self.effects):
+                    raise ValueError(
+                        f"skill {self.key!r} requires_hit_from index {policy.requires_hit_from} "
+                        f"out of range (total effects: {len(self.effects)})"
+                    )
+        for i, (policy, parsed, effect_id) in enumerate(
+            zip(self.effect_policies, self.parsed_effects, self.effects)
+        ):
+            if policy.requires_hit_from is not None:
+                if policy.requires_hit_from >= i:
+                    raise ValueError(
+                        f"skill {self.key!r} effect {i} ({effect_id!r}) requires_hit_from "
+                        f"index {policy.requires_hit_from} must refer to an earlier occurrence (0 <= ref < {i})"
+                    )
+                ref_effect = self.parsed_effects[policy.requires_hit_from]
+                if not isinstance(ref_effect, DamageEffect):
+                    raise ValueError(
+                        f"skill {self.key!r} effect {i} ({effect_id!r}) requires_hit_from "
+                        f"index {policy.requires_hit_from} refers to non-damage effect {ref_effect!r}"
+                    )
         for policy, parsed, effect_id in zip(
             self.effect_policies, self.parsed_effects, self.effects
         ):

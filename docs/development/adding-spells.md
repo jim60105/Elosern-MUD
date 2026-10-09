@@ -70,6 +70,19 @@ and topological order. Excluded entries affect no counts. Eligible racial nodes
 remain discoverable without ownership or sufficient MP; ordinary usability
 checks still report those separate limitations. Isolated skills create no tree.
 
+## Effect occurrence dependencies
+
+A skill effect may declare a dependency on an earlier damage occurrence in the same
+ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
+
+- **Occurrence indexing**: `requires_hit_from` is a non-negative, strictly earlier
+  integer index (`0 <= requires_hit_from < i`) pointing into the skill's ordered
+  `effects` list. Self-references, forward references, out-of-range indices, and
+  references to non-damage effects fail at construction/registry load before play.
+  Repeated identical damage effect strings remain distinct occurrences identified
+  unambiguously by their numeric index. Unconfigured effects retain normal independent
+  behavior.
+
 ## 2. 事前決定：這個魔法是哪一種形狀？
 
 新增前先回答三個問題，決定寫法：

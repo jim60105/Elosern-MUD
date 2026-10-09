@@ -312,8 +312,16 @@ class EffectPolicy:
     stimulus_bonus: StateMagnitude | None = None
     transfer: "GaugeTransferPolicy | None" = None
     audience_condition: str | None = None
+    requires_hit_from: int | None = None
 
     def __post_init__(self) -> None:
+        if self.requires_hit_from is not None:
+            if isinstance(self.requires_hit_from, bool) or not isinstance(
+                self.requires_hit_from, int
+            ) or self.requires_hit_from < 0:
+                raise ValueError(
+                    f"EffectPolicy requires_hit_from must be a non-negative integer, got {self.requires_hit_from!r}"
+                )
         if isinstance(self.coefficient, bool) or not isinstance(
             self.coefficient, (int, float)
         ):
