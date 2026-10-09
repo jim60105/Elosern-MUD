@@ -17,6 +17,7 @@ class RejectReason(StrEnum):
     """Stable rejection identifiers for every action-pipeline failure."""
 
     UNKNOWN_SKILL = "unknown_skill"
+    EXAM_SKILL_SEALED = "exam_skill_sealed"
     SKILL_NOT_ACTIVE = "skill_not_active"
     SKILL_NOT_USABLE_OUT_OF_COMBAT = "skill_not_usable_out_of_combat"
     DAMAGE_REQUIRES_MONSTER_TARGET = "damage_requires_monster_target"

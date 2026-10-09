@@ -18,6 +18,7 @@ from world.skills.registry import (
 )
 
 from ._constants import PROFICIENCY_TIP_CAP, SKILL_PROFICIENCY_XP_PER_LEVEL
+from world.skills.restrictions import skill_effect_allowed
 
 
 def skill_proficiency_level(entity: Any, skill_key: str) -> int:
@@ -59,7 +60,7 @@ def can_use_skill(entity: Any, skill: SkillDef) -> bool:
     lineage eligibility only.
     """
     owned = entity.skills.owned_keys()
-    if skill.key not in owned:
+    if skill.key not in owned or not skill_effect_allowed(entity, skill.key):
         return False
     for prereq in skill.prerequisites:
         if prereq.skill_key not in owned:

@@ -691,8 +691,12 @@ def _passive_percent_bonus(entity: Any, effect_key: str) -> int:
         raw = getattr(getattr(entity, "db", None), "skills", None) or {}
         owned = set(raw.get("passive", [])) | set(raw.get("active", []))
 
+    from world.skills.restrictions import skill_effect_allowed
+
     total = 0
     for row in get_church_rules().passive_effects:
+        if not skill_effect_allowed(entity, row.skill_key):
+            continue
         if row.skill_key not in owned:
             continue
         if row.skill_key == "public_devotion" and not _in_public_venue(entity):
@@ -719,8 +723,12 @@ def scaled_merit_gain(entity: Any, base_merit: int) -> int:
     ) // 100
     from world.rules.church_rulebook import get_church_rules
 
+    from world.skills.restrictions import skill_effect_allowed
+
     rules = get_church_rules()
     for row in rules.passive_effects:
+        if not skill_effect_allowed(entity, row.skill_key):
+            continue
         if not _owns_skill(entity, row.skill_key):
             continue
         multiplier = row.effects.get("multiplier")

@@ -13,6 +13,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.rules.combat_modifiers import (
     _merge_adjustments,
     _PERCENT_RE,
+    _restriction_aware_merge,
 )
 from world.rules.equipment_effects import (
     equipment_adjustments,
@@ -21,6 +22,9 @@ from world.rules.equipment_effects import (
 from world.rules.status_display import display_for
 from world.skills.effects import StatMultiplyEffect
 from world.skills.registry import SKILL_REGISTRY, SkillDef
+from world.skills.restrictions import (
+    exam_restriction, restricted_neutral_value, skill_effect_allowed,
+)
 
 from .assembly import _Assembly
 from .models import (
@@ -122,10 +126,9 @@ def _merged_bundle(assembly: _Assembly) -> dict[str, Any]:
     ``assembly.matches`` (the shipped matches) plus
     ``equipment_adjustments`` (the shipped pure gear read).
     """
-    merged: dict[str, Any] = {}
-    for _, adjustments in assembly.matches:
-        merged = _merge_adjustments(merged, dict(adjustments))
-    return _merge_adjustments(merged, dict(equipment_adjustments(assembly.entity)))
+    return _restriction_aware_merge(
+        assembly.entity, [dict(adjustments) for _, adjustments in assembly.matches]
+    )
 
 
 def _skill_layers(entity: Any, stat_key: str) -> tuple[list[StatLayer], float]:
@@ -140,6 +143,8 @@ def _skill_layers(entity: Any, stat_key: str) -> tuple[list[StatLayer], float]:
     product = 1.0
     keyed: list[tuple[str, str, StatLayer]] = []
     for skill_key in _stored_skill_fold(entity):
+        if not skill_effect_allowed(entity, skill_key):
+            continue
         skill = SKILL_REGISTRY.get(skill_key)
         if skill is None:
             continue
@@ -154,6 +159,8 @@ def _skill_layers(entity: Any, stat_key: str) -> tuple[list[StatLayer], float]:
         if fields is None:
             continue
         source_key, skill_key, scale = fields
+        if not skill_effect_allowed(entity, skill_key):
+            continue
         source_skill = SKILL_REGISTRY.get(skill_key)
         if source_skill is None:
             continue
@@ -348,6 +355,12 @@ def _gauge_breakdown(assembly: _Assembly, key: str) -> StatBreakdownRow:
         )
     layers = _equipment_layers(assembly, key)
     equipment_total = sum(layer.amount for layer in layers)
+    record = exam_restriction(assembly.entity)
+    if record is not None and key in record["ceilings"]:
+        restriction_total = min(base + equipment_total, record["ceilings"][key]) - base - equipment_total
+        if restriction_total:
+            layers.append(StatLayer("condition", "公會考核上限", "flat", restriction_total))
+        equipment_total += restriction_total
     if equipment_total != mod:
         raise StatusQueryError(
             f"gauge {key!r} stored modifier is not explained by worn equipment caps"
@@ -380,6 +393,10 @@ def _flat_stat_breakdown(assembly: _Assembly, stat_key: str) -> StatBreakdownRow
     base_literal = _stored_literal(assembly.traits_data, stat_key, base)
     skill_layers, product = _skill_layers(assembly.entity, stat_key)
     after_skill = round(base * product)
+    reduced = restricted_neutral_value(assembly.entity, stat_key, after_skill)
+    if reduced != after_skill:
+        skill_layers.append(StatLayer("condition", "公會考核基準", "flat", reduced - after_skill))
+    after_skill = reduced
     condition_layers = _condition_layers(assembly, stat_key)
     equipment_layers = _equipment_layers(assembly, stat_key)
     merged_flat = _merged_bundle(assembly).get(stat_key, 0)
@@ -387,9 +404,14 @@ def _flat_stat_breakdown(assembly: _Assembly, stat_key: str) -> StatBreakdownRow
         raise StatusQueryError(
             f"bundle percentage for {stat_key!r} has no shipped consumer"
         )
-    if merged_flat != sum(layer.amount for layer in condition_layers) + sum(
+    accounted = sum(layer.amount for layer in condition_layers) + sum(
         layer.amount for layer in equipment_layers
-    ):  # pragma: no cover - per-source layering is exhaustive by construction
+    )
+    record = exam_restriction(assembly.entity)
+    if record is not None and stat_key in record["ceilings"] and merged_flat != accounted:
+        condition_layers.append(StatLayer("condition", "公會考核上限", "flat", merged_flat - accounted))
+        accounted = merged_flat
+    if merged_flat != accounted:  # pragma: no cover - per-source layering is exhaustive by construction
         raise StatusQueryError(
             f"stat {stat_key!r} flat amounts are not accounting-complete"
         )
@@ -421,6 +443,10 @@ def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
     base_literal = _stored_literal(assembly.traits_data, "agility", base)
     skill_layers, product = _skill_layers(assembly.entity, "agility")
     after_skill = round(base * product)
+    reduced = restricted_neutral_value(assembly.entity, "agility", after_skill)
+    if reduced != after_skill:
+        skill_layers.append(StatLayer("condition", "公會考核基準", "flat", reduced - after_skill))
+    after_skill = reduced
     bundle = _merged_bundle(assembly)
     agility = float(after_skill)
     percent = bundle.get("agility")
@@ -432,6 +458,15 @@ def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
     effective = max(0.0, agility)
     condition_layers = _condition_layers(assembly, "agility")
     equipment_layers = _equipment_layers(assembly, "agility")
+    if exam_restriction(assembly.entity) is not None:
+        raw_bundle = {}
+        for _, adjustments in assembly.matches:
+            raw_bundle = _merge_adjustments(raw_bundle, dict(adjustments))
+        raw_bundle = _merge_adjustments(raw_bundle, equipment_adjustments(assembly.entity))
+        raw_total = after_skill * (1 + float(raw_bundle.get("agility", "+0%")[:-1]) / 100)
+        raw_total += raw_bundle.get("agility_flat", 0)
+        if agility != raw_total:
+            condition_layers.append(StatLayer("condition", "公會考核上限", "flat", agility - raw_total))
     return StatBreakdownRow(
         key="agility",
         base=base_literal,

@@ -13,6 +13,14 @@ budgets:
   epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20}
   legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25}
 effects:
+  guild_limit_e:
+    adjustments: {}
+  guild_limit_d:
+    adjustments: {}
+  guild_limit_c:
+    adjustments: {}
+  guild_limit_b:
+    adjustments: {}
   military_e_sword:
     adjustments: {atk_phys: 3}
   military_e_armor:

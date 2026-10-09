@@ -133,6 +133,10 @@ def plan_inventory_delta(
     removals = tuple(removals)
     _validate_quantities(additions, "additions")
     _validate_quantities(removals, "removals")
+    for key in (*additions, *removals):
+        definition = ITEM_REGISTRY.get(key)
+        if definition is not None and definition.guild_property:
+            raise InventoryError("guild property cannot be acquired or transferred")
 
     before = tuple(entity.db.inventory or [])
     after = list(before)
@@ -231,6 +235,8 @@ class EquipmentToggleReason(StrEnum):
 
     UNKNOWN_ITEM = "unknown_item"
     NOT_EQUIPMENT = "not_equipment"
+    GUILD_PROPERTY = "guild_property"
+    EXAM_KIT_LOCKED = "exam_kit_locked"
     ITEM_NOT_HELD = "item_not_held"
     ACCESSORY_SLOTS_FULL = "accessory_slots_full"
     MALFORMED_STORAGE = "malformed_equipment"
@@ -433,6 +439,16 @@ def preflight_equipment_toggle(
         return EquipmentTogglePreflight(
             allowed=False, reason=EquipmentToggleReason.UNKNOWN_ITEM
         )
+    if definition.guild_property:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.GUILD_PROPERTY
+        )
+    from world.skills.restrictions import exam_restriction
+
+    if exam_restriction(entity) is not None:
+        return EquipmentTogglePreflight(
+            allowed=False, reason=EquipmentToggleReason.EXAM_KIT_LOCKED
+        )
     slot = definition.equipment_slot
     if slot is None:
         return EquipmentTogglePreflight(
@@ -512,11 +528,17 @@ def sync_equipment_gauge_limits(entity: Any) -> None:
     from world.rules.equipment_effects import equipment_gauge_caps
 
     caps = equipment_gauge_caps(entity)
+    from world.skills.restrictions import exam_restriction
+
+    restriction = exam_restriction(entity)
     for key in ("hp", "mp", "sp"):
         gauge = entity.traits.get(key)
         if gauge is None or gauge.trait_type != "gauge":
             continue
         total = int(caps.get(key, 0))
+        if restriction is not None and key in restriction["ceilings"]:
+            ceiling = restriction["ceilings"][key]
+            total = min(total, ceiling / gauge.mult - gauge.base)
         if gauge.mod != total:
             gauge.mod = total
         ceiling = gauge.max

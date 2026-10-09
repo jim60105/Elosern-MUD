@@ -73,6 +73,10 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
                 raise _commerce_error(
                     f"assortments.{assortment_key}.item_keys contains unknown item_key {item_key!r}"
                 )
+            if ITEM_REGISTRY[item_key].guild_property:
+                raise _commerce_error(
+                    f"assortments.{assortment_key} contains guild property {item_key!r}"
+                )
             if ITEM_REGISTRY[item_key].price_table_key == KEEPSAKE_BAND_KEY:
                 raise _commerce_error(
                     f"assortments.{assortment_key} contains keepsake-band item "
