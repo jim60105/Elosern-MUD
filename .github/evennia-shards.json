@@ -325,6 +325,7 @@
         "web.webclient.presentation.tests.test_gallery_panel",
         "web.webclient.presentation.tests.test_art_push",
         "web.webclient.presentation.tests.test_character_panel",
+        "web.webclient.presentation.tests.test_status_panel",
         "web.webclient.presentation.tests.test_combat_panel",
         "web.webclient.presentation.tests.test_combat_beats_panel",
         "web.webclient.presentation.tests.test_exploration_panel",

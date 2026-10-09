@@ -152,6 +152,18 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, before_wallet)
         self.assertEqual(self.player.db.equipment, before_equipment)
 
+    def test_character_renders_zero_maximum_gauge_as_available(self):
+        traits = dict(self.player.attributes.get("traits", category="traits"))
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": 0}
+        self.player.attributes.add("traits", traits, category="traits")
+        payload = self._render()
+        self.assertTrue(payload["available"])
+        mp_row = next(row for row in payload["traits"] if row["key"] == "mp")
+        self.assertEqual(mp_row["max"], 0)
+        self.assertEqual(mp_row["current"], 0)
+        self.assertEqual(mp_row["effective"], 0)
+        self.assertEqual(mp_row["layers"], [])
+
 
     def test_innate_active_skills_are_visible_for_the_first_time(self):
         self.player.db.skills = {"active": [], "passive": []}
