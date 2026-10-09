@@ -5,6 +5,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.clock import get_world_clock

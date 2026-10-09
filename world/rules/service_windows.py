@@ -33,9 +33,9 @@ from typing import Any
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from world.rules import npc_schedules
 from world.rules.clock import read_world_clock
 from world.rules.exam_schedule_holds import read_exam_schedule_hold
-from world.rules import npc_schedules
 from world.rules.npc_schedules import (
     _BLOCKING_STATES,
     due_occurrences,
@@ -108,122 +108,126 @@ def read_next_planned_service_interval(
     Returns:
         PlannedServiceWindowResult with interval or a named reason.
     """
-    # 1. Validate NPC
-    if not isinstance(npc, NPC) or not isinstance(getattr(npc, "pk", None), int) or npc.pk <= 0:
-        return PlannedServiceWindowResult(reason=REASON_INVALID_HOST)
+    try:
+        # 1. Validate NPC
+        if not isinstance(npc, NPC) or not isinstance(getattr(npc, "pk", None), int) or npc.pk <= 0:
+            return PlannedServiceWindowResult(reason=REASON_INVALID_HOST)
 
-    # 2. Validate current tick
-    if current_tick is None:
-        clock = read_world_clock()
-        if clock is None:
-            return PlannedServiceWindowResult(reason=REASON_MISSING_WORLD_CLOCK)
-        current_tick = clock.tick
-    elif not isinstance(current_tick, int) or isinstance(current_tick, bool) or current_tick < 0:
-        return PlannedServiceWindowResult(reason=REASON_INVALID_TICK)
+        # 2. Validate current tick
+        if current_tick is None:
+            clock = read_world_clock()
+            if clock is None:
+                return PlannedServiceWindowResult(reason=REASON_MISSING_WORLD_CLOCK)
+            current_tick = clock.tick
+        elif not isinstance(current_tick, int) or isinstance(current_tick, bool) or current_tick < 0:
+            return PlannedServiceWindowResult(reason=REASON_INVALID_TICK)
 
-    # 3. Resolve destination room
-    dest_room: Any = None
-    if isinstance(destination, Room):
-        dest_room = destination
-    elif isinstance(destination, str) and destination.strip():
-        dest_room = npc_schedules._resolve_destination(destination.strip())
-    if dest_room is None:
-        return PlannedServiceWindowResult(reason=REASON_UNRESOLVED_DESTINATION)
+        # 3. Resolve destination room
+        dest_room: Any = None
+        if isinstance(destination, Room):
+            dest_room = destination
+        elif isinstance(destination, str) and destination.strip():
+            dest_room = npc_schedules._resolve_destination(destination.strip())
+        if dest_room is None:
+            return PlannedServiceWindowResult(reason=REASON_UNRESOLVED_DESTINATION)
 
-    # 4. Check schedule silencing (companion off-anchor or possessed)
-    if schedule_silenced(npc):
-        return PlannedServiceWindowResult(reason=REASON_SCHEDULE_SILENCED)
+        # 4. Check schedule silencing (companion off-anchor or possessed)
+        if schedule_silenced(npc):
+            return PlannedServiceWindowResult(reason=REASON_SCHEDULE_SILENCED)
 
-    # 5. Check schedule existence & validity
-    raw_schedule = getattr(getattr(npc, "db", None), "schedule", None)
-    if raw_schedule is None:
-        return PlannedServiceWindowResult(reason=REASON_MISSING_SCHEDULE)
+        # 5. Check schedule existence & validity
+        raw_schedule = getattr(getattr(npc, "db", None), "schedule", None)
+        if raw_schedule is None:
+            return PlannedServiceWindowResult(reason=REASON_MISSING_SCHEDULE)
 
-    parsed = parse_stored_schedule(npc)
-    if parsed is None:
+        parsed = parse_stored_schedule(npc)
+        if parsed is None:
+            return PlannedServiceWindowResult(reason=REASON_INDETERMINATE_SCHEDULE)
+
+        # 6. Check exam schedule hold
+        hold_read = read_exam_schedule_hold(npc)
+        if not hold_read.known:
+            return PlannedServiceWindowResult(reason=hold_read.reason or "exam_hold_unreadable")
+        if hold_read.hold is not None and not hold_read.hold.released:
+            # Active hold defers settlement indefinitely with no knowable end
+            return PlannedServiceWindowResult(reason=REASON_ACTIVE_EXAM_HOLD)
+
+        # 7. Bounded projection
+        cycle_seconds = parsed.cycle_seconds
+        current_cycle = current_tick // cycle_seconds
+        projection_end_tick = (current_cycle + 2) * cycle_seconds
+
+        # Actual current location and schedule_state
+        sim_location = getattr(npc, "location", None)
+        sim_state = getattr(getattr(npc, "db", None), "schedule_state", None)
+
+        # Cache target room resolutions to avoid repeated DB/model scans
+        resolved_rooms: dict[str, Any] = {}
+
+        def get_room(target: str | None) -> Any:
+            if not target:
+                return None
+            if target not in resolved_rooms:
+                resolved_rooms[target] = npc_schedules._resolve_destination(target)
+            return resolved_rooms[target]
+
+        # An arrival due at the exact current tick remains planned until actual location confirms it.
+        # If the host is already at dest_room, any move entry leaving dest_room due at current_tick
+        # relocates the host away, ending presence.
+        if current_tick > 0:
+            occurrences_at_current = due_occurrences(parsed, current_tick - 1, current_tick)
+            for _, _, entry in occurrences_at_current:
+                if entry.kind == "state":
+                    sim_state = entry.state
+                elif entry.kind == "move" and sim_location is dest_room:
+                    sim_location = get_room(entry.target)
+                    sim_state = parsed.default_state
+
+        # Check if host is currently present and service-capable right now
+        active_window_start: int | None = None
+        if sim_location is dest_room and sim_state not in _BLOCKING_STATES:
+            active_window_start = current_tick
+
+        # Collect due occurrences in (current_tick, projection_end_tick]
+        occurrences = due_occurrences(parsed, current_tick, projection_end_tick)
+
+        # Group occurrences by due_tick to evaluate intra-tick state transitions
+        grouped_occurrences: dict[int, list[Any]] = {}
+        for due_tick, entry_idx, entry in occurrences:
+            grouped_occurrences.setdefault(due_tick, []).append((entry_idx, entry))
+
+        sorted_ticks = sorted(grouped_occurrences.keys())
+
+        for tick in sorted_ticks:
+            tick_entries = grouped_occurrences[tick]
+
+            # Traverse entries at this tick in entry_index order
+            for entry_idx, entry in tick_entries:
+                if entry.kind == "state":
+                    sim_state = entry.state
+                elif entry.kind == "move":
+                    sim_location = get_room(entry.target)
+                    sim_state = parsed.default_state
+
+                now_capable = (sim_location is dest_room) and (sim_state not in _BLOCKING_STATES)
+
+                if active_window_start is not None:
+                    if not now_capable:
+                        # An active window ended at this tick
+                        if active_window_start < tick:
+                            return PlannedServiceWindowResult(
+                                interval=PlannedServiceInterval(active_window_start, tick)
+                            )
+                        # Instantaneous or closed at same start tick
+                        active_window_start = None
+                else:
+                    if now_capable:
+                        # A new window opened at this tick
+                        active_window_start = tick
+
+        # If an active window opened but didn't close before the projection end,
+        # the search window cannot confirm its end.
+        return PlannedServiceWindowResult(reason=REASON_UNCONFIRMABLE)
+    except Exception:
+        # Total fail-closed reader safety
         return PlannedServiceWindowResult(reason=REASON_INDETERMINATE_SCHEDULE)
-
-    # 6. Check exam schedule hold
-    hold_read = read_exam_schedule_hold(npc)
-    if not hold_read.known:
-        return PlannedServiceWindowResult(reason=hold_read.reason or "exam_hold_unreadable")
-    if hold_read.hold is not None and not hold_read.hold.released:
-        # Active hold defers settlement indefinitely with no knowable end
-        return PlannedServiceWindowResult(reason=REASON_ACTIVE_EXAM_HOLD)
-
-    # 7. Bounded projection
-    cycle_seconds = parsed.cycle_seconds
-    current_cycle = current_tick // cycle_seconds
-    projection_end_tick = (current_cycle + 2) * cycle_seconds
-
-    # Actual current location and schedule_state
-    sim_location = getattr(npc, "location", None)
-    sim_state = getattr(getattr(npc, "db", None), "schedule_state", None)
-
-    # Cache target room resolutions to avoid repeated DB/model scans
-    resolved_rooms: dict[str, Any] = {}
-
-    def get_room(target: str | None) -> Any:
-        if not target:
-            return None
-        if target not in resolved_rooms:
-            resolved_rooms[target] = npc_schedules._resolve_destination(target)
-        return resolved_rooms[target]
-
-    # An arrival due at the exact current tick remains planned until actual location confirms it.
-    # If the host is already at dest_room, any move entry leaving dest_room due at current_tick
-    # relocates the host away, ending presence.
-    if current_tick > 0:
-        occurrences_at_current = due_occurrences(parsed, current_tick - 1, current_tick)
-        for _, _, entry in occurrences_at_current:
-            if entry.kind == "state":
-                sim_state = entry.state
-            elif entry.kind == "move" and sim_location is dest_room:
-                sim_location = get_room(entry.target)
-                sim_state = parsed.default_state
-
-    # Check if host is currently present and service-capable right now
-    active_window_start: int | None = None
-    if sim_location is dest_room and sim_state not in _BLOCKING_STATES:
-        active_window_start = current_tick
-
-    # Collect due occurrences in (current_tick, projection_end_tick]
-    occurrences = due_occurrences(parsed, current_tick, projection_end_tick)
-
-    # Group occurrences by due_tick to evaluate intra-tick state transitions
-    grouped_occurrences: dict[int, list[Any]] = {}
-    for due_tick, entry_idx, entry in occurrences:
-        grouped_occurrences.setdefault(due_tick, []).append((entry_idx, entry))
-
-    sorted_ticks = sorted(grouped_occurrences.keys())
-
-    for tick in sorted_ticks:
-        tick_entries = grouped_occurrences[tick]
-
-        # Traverse entries at this tick in entry_index order
-        for entry_idx, entry in tick_entries:
-            if entry.kind == "state":
-                sim_state = entry.state
-            elif entry.kind == "move":
-                sim_location = get_room(entry.target)
-                sim_state = parsed.default_state
-
-            now_capable = (sim_location is dest_room) and (sim_state not in _BLOCKING_STATES)
-
-            if active_window_start is not None:
-                if not now_capable:
-                    # An active window ended at this tick
-                    if active_window_start < tick:
-                        return PlannedServiceWindowResult(
-                            interval=PlannedServiceInterval(active_window_start, tick)
-                        )
-                    # Instantaneous or closed at same start tick
-                    active_window_start = None
-            else:
-                if now_capable:
-                    # A new window opened at this tick
-                    active_window_start = tick
-
-    # If an active window opened but didn't close before the projection end,
-    # the search window cannot confirm its end.
-    return PlannedServiceWindowResult(reason=REASON_UNCONFIRMABLE)
