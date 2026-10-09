@@ -131,7 +131,9 @@ class OutOfCombatAvailabilityPolicyTests(unittest.TestCase):
                 if not SKILL_REGISTRY[key].usable_out_of_combat
             ),
             ["grain_shaking_peck"],
-            "the monster-only damage exception is a named, single-entry record",
+            "only the False side of the monster-only damage population is "
+            "pinned by name here; a monster-only damage entry declaring True "
+            "stays legal and is pinned by its own skill data contract",
         )
 
     @covers_requirement(

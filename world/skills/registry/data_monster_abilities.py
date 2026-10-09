@@ -60,6 +60,14 @@ ROWS: tuple[SkillDef, ...] = (
         SkillKind.ACTIVE,
         TargetSpec.SINGLE,
         cost={"mp": 10, "sp": 2},
+        # False is deliberate and differs from the crocodile's True: the
+        # approved declaration (2026-10-10 remaining-monster-resource-skills
+        # design §2/§3) makes every new monster ability combat-only, and its
+        # eligibility admits only the ``monster`` actor kind, for which no
+        # out-of-combat path can select a skill at all — the stated exception
+        # of the one written ``usable_out_of_combat`` policy (see
+        # world/skills/tests/test_skill_registry/_support.py). The crocodile's
+        # flag stays untouched as recorded in that design's §2.
         usable_out_of_combat=False,
         element="wind",
         effects=["damage:wind:physical", "buff_apply:grain_rattle"],
