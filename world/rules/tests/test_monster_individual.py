@@ -308,6 +308,8 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
                         "species": SPECIES,
                         "variant": variant_key,
                         "numeric_source": expected_source,
+                        "kit": (),
+                        "profile": None,
                     },
                 )
 
@@ -360,6 +362,76 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
             str(construct_species_individual(SPECIES, ORDINARY).key),
             ORDINARY_ROW.display_name_zh,
         )
+
+    @covers_requirement(
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_kit_and_behaviour_profile_validation_and_assignment(self):
+        from world.tests.synthetic_data import make_skill
+        from world.skills.registry import SkillKind, TargetSpec
+
+        # Valid active skill
+        valid_skill = make_skill("t_test_active_monster", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE)
+        invalid_kind = make_skill("t_test_passive_as_active", kind=SkillKind.PASSIVE)
+
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {valid_skill.key: valid_skill, invalid_kind.key: invalid_kind},
+        ):
+            # Case 1: Unknown skill key
+            bad_variant_1 = replace(ORDINARY_ROW, active_skill_keys=("t_nonexistent_skill",))
+            base_variants = {ORDINARY: ORDINARY_ROW, STRONGER: STRONGER_ROW, ORPHAN: ORPHAN_ROW}
+            mapping_1 = dict(base_variants, **{ORDINARY: bad_variant_1})
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping_1):
+                with self.assertRaises(MonsterConstructionError):
+                    construct_species_individual(SPECIES, ORDINARY)
+
+            # Case 2: Wrong kind (passive declared as active)
+            bad_variant_2 = replace(ORDINARY_ROW, active_skill_keys=(invalid_kind.key,))
+            mapping_2 = dict(base_variants, **{ORDINARY: bad_variant_2})
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping_2):
+                with self.assertRaises(MonsterConstructionError):
+                    construct_species_individual(SPECIES, ORDINARY)
+
+            # Case 3: Unknown behaviour profile key
+            bad_variant_3 = replace(ORDINARY_ROW, behaviour_profile_key="unknown_profile")
+            mapping_3 = dict(base_variants, **{ORDINARY: bad_variant_3})
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping_3):
+                with self.assertRaises(MonsterConstructionError):
+                    construct_species_individual(SPECIES, ORDINARY)
+
+            # Case 4: Successful construction with kit and profile
+            good_variant = replace(
+                ORDINARY_ROW,
+                active_skill_keys=(valid_skill.key,),
+                behaviour_profile_key="ambush_predator",
+            )
+            mapping_good = dict(base_variants, **{ORDINARY: good_variant})
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping_good):
+                with (
+                    patch("world.rules.monster_individual.log_info") as info,
+                    self.captureOnCommitCallbacks(execute=True),
+                ):
+                    individual = construct_species_individual(SPECIES, ORDINARY)
+                self.assertEqual(individual.db.skills["active"], [valid_skill.key])
+                self.assertEqual(individual.db.behaviour_tree, "ambush_predator")
+                self.assertEqual(
+                    info.call_args.kwargs["context"]["kit"], (valid_skill.key,)
+                )
+                self.assertEqual(
+                    info.call_args.kwargs["context"]["profile"], "ambush_predator"
+                )
+
+            # Case 5: Rollback suppresses boundary event
+            with patch("world.rules.monster_individual.log_info") as info:
+                try:
+                    with transaction.atomic():
+                        construct_species_individual(SPECIES, ORDINARY)
+                        raise RuntimeError("rollback injection")
+                except RuntimeError:
+                    pass
+            self.assertEqual(info.call_count, 0)
 
 
 if __name__ == "__main__":

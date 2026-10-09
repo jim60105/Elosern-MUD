@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 from world.rules import combat_modifiers
@@ -78,6 +79,22 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
         )
         entity.skills._owned = [_T_FLIGHT.key]
         self.assertEqual(_owned_damage_skills(entity), [])
+
+    @covers_requirement(
+        "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected",
+        "monster-action-policy::authored-crocodile-behavior-uses-the-existing-first-owned-strategy",
+    )
+    def test_ineligible_skill_filtered_from_damage_candidates(self):
+        from world.skills.registry import SkillEligibility
+        ineligible_skill = replace(
+            synth_damage_skill("t_ineligible_dmg", "不合身分傷害"),
+            eligibility=SkillEligibility(allowed_actor_kinds=("player",))
+        )
+        with patch.dict("world.skills.registry.SKILL_REGISTRY", {ineligible_skill.key: ineligible_skill}):
+            entity = FakeEntity("monster_actor", owned=[ineligible_skill.key, _T_CLAW.key])
+            entity.traits.sp = FakeGauge(18, 18)
+            entity.traits.mp = FakeGauge(20, 20)
+            self.assertEqual([s.key for s in _owned_damage_skills(entity)], [_T_CLAW.key])
 
     def test_living_enemies_excludes_dead_and_fled(self):
         actor = FakeEntity("actor")

@@ -71,6 +71,7 @@ class MonsterFleeProfileTests(unittest.TestCase):
                 "brute": 0.10,
                 "tactical_caster": 0.25,
                 "apex_predator": None,
+                "ambush_predator": 0.20,
             },
         )
         for tier, key in MONSTER_BEHAVIOUR_YAML[

@@ -12,6 +12,7 @@ from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.disengage import FLEE_SKILL_KEY
+from world.rules.progression import can_use_skill
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
@@ -173,6 +174,7 @@ def _owned_damage_skills(entity: Any) -> list[SkillDef]:
         for key in entity.skills.owned_keys()
         if key in SKILL_REGISTRY
         and SKILL_REGISTRY[key].kind is SkillKind.ACTIVE
+        and can_use_skill(entity, SKILL_REGISTRY[key])
         and any(
             effect.startswith("damage:")
             for effect in SKILL_REGISTRY[key].effects

@@ -30,3 +30,8 @@ archetypes:
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
     flee_hp_fraction: null
+  ambush_predator:
+    target_strategy: lowest_hp
+    skill_choice: first_owned
+    prefer_area_when_multiple_enemies: false
+    flee_hp_fraction: 0.20
