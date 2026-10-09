@@ -16,6 +16,17 @@ The existing schedule source consults this hold before executing movement or sta
 Lifecycle, which depends on this core, owns atomic activation with exam start and release after normal host restoration for every terminal/recovery path. This predecessor tests those API sequences with synthetic examination identities and timing; it does not edit guild_exams or activate an incomplete production cutover. A crash/retry can distinguish pending and consumed release; core snapshot hooks restore location/state/hold/caches on transactional failure.
 The read API reports a known hold or named indeterminate state. The availability reader depends on this change and owns its query integration; this core does not depend on or edit a future reader. Startup schedule registration remains before recovery advances.
 
+Begin requires the current persisted world tick; release covers the held interval
+at or before the persisted world tick. Lifecycle allocates globally unique exam
+IDs, because the retained released marker remembers only the latest identity.
+Commit-sensitive hold start/extension/release info events use `transaction.on_commit`.
+An enclosing lifecycle transaction snapshots/restores the core surfaces around
+its own rollback, in addition to the core's local savepoint rollback.
+
+Mutation APIs are serialized deterministic-game-loop operations, following the
+clock source's existing caller contract. Active records have no consumed cursor;
+the cursor and released flag commit atomically.
+
 The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
 
 ## Risks / Trade-offs

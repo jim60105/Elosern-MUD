@@ -647,7 +647,10 @@ def snapshot_npc_schedule_surfaces(
     for npc in tagged:
         location = npc.location
         registry[id(npc)] = SurfaceSnapshot(
-            attributes={("schedule_state", None): attribute_snapshot(npc, "schedule_state")},
+            attributes={
+                (key, None): attribute_snapshot(npc, key)
+                for key in ("schedule_state", "exam_schedule_hold")
+            },
             location=(location is not None, int(location.pk)) if location is not None else None,
         )
     return registry
@@ -909,6 +912,7 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     like a schedule-less NPC: no entries, no events, no state change.
     """
     from evennia.utils.search import search_object_by_tag
+    from world.rules.exam_schedule_holds import consult_exam_schedule_hold
     from world.rules.service_gate import (
         off_anchor_place_service,
         schedule_silenced,
@@ -939,9 +943,22 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
             parsed = parse_stored_schedule(npc)
             if parsed is None:
                 continue
-            for due_tick, entry_index, entry in due_occurrences(
-                parsed, start_tick, end_tick
-            ):
+        except Exception as exc:
+            log_warn(
+                "schedule_settlement_npc_read_failed",
+                exc=exc,
+                context={"npc": npc.key or "?", "action": "skip_npc"},
+            )
+            continue
+        # Hold persistence is part of the clock transaction, not a per-entry
+        # skip: failure must roll back the tick and every discovered surface.
+        deferred, consumed = consult_exam_schedule_hold(npc, end_tick)
+        if deferred:
+            continue
+        try:
+            for due_tick, entry_index, entry in due_occurrences(parsed, start_tick, end_tick):
+                if consumed is not None and (due_tick, entry_index) <= consumed:
+                    continue
                 work.append((due_tick, int(npc.pk), entry_index, npc, parsed, entry))
         except Exception as exc:
             log_warn(

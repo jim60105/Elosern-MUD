@@ -214,6 +214,49 @@ Settlement additionally orders by persistent NPC identity and retains real Exit
 traversal, failure isolation, and companion service silencing. It does not charge
 the clock.
 
+#### Examination schedule holds
+
+`world.rules.exam_schedule_holds` owns the runtime APIs
+`begin_exam_schedule_hold(npc, exam_id, start_tick)`,
+`read_exam_schedule_hold(npc)` and
+`release_exam_schedule_hold(npc, exam_id, through_tick)`. These APIs are complete
+independently of production examination activation. The persistent lifecycle
+change owns that activation and the availability-reader change owns query use.
+
+Mutation APIs require serialized calls from the deterministic game loop.
+Worker/web threads must route requests through that boundary; these APIs do not
+provide concurrent host locking. An active marker cannot carry a consumed cursor,
+because release commits cursor and released status together.
+
+Begin requires the current persisted world tick and a persistent NPC. The caller
+allocates globally unique exam IDs; the single retained record remembers only the
+latest completed identity. An identical active begin is idempotent. A different
+active owner or reuse of the retained completed ID rejects without mutation.
+`npc.db.exam_schedule_hold` stores schema version 1, host primary key, exam ID,
+start tick, held-through tick, consumed-through `(due_tick, entry_index)` or
+`None`, and a released flag. Do not author or directly edit this runtime record.
+
+The registered schedule source checks service silencing first. An active hold
+defers host movement and state while extending the held interval; unrelated NPC
+ordering remains unchanged. An indeterminate hold protects the host without
+routine writes. A read returns `known=False` with a named `exam_hold_*` reason
+for corrupt or unreadable records, and known absence has `hold=None`.
+
+Restore the normal host state before release. Release must cover the held
+interval without exceeding the persisted world tick. It derives occurrences
+from the authoritative schedule and traverses real Exits in due/index order
+without advancing time. Locks, movement vetoes and per-entry skips remain in
+force. Silenced release consumes the interval without movement/state changes.
+Corrupt schedule storage rejects release and retains the pending hold. A retained
+released record makes retries and the same-tick assignment boundary idempotent.
+
+Release rolls back its storage, location and handler caches on failure.
+An enclosing lifecycle transaction must call
+`snapshot_exam_schedule_hold_surfaces(npc)` before any host writes and
+`restore_exam_schedule_hold_surfaces(npc, snapshot)` after its own database
+rollback. The clock source includes the hold marker in its existing surface
+registry. Hold start/extension/release events are emitted on the outer commit.
+
 依順序跑最小聚焦集：
 
 ```sh
