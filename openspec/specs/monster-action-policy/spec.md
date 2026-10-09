@@ -119,11 +119,10 @@ and every decision it produces SHALL be a pure function of `entity`/`battlefield
 
 ### Requirement: Skill selection differs by archetype, comparing owned skills by a dice-free expected
 damage estimate when configured to
-`world/rules/monster_behaviour.py` SHALL select one affordable owned `ACTIVE` skill whose `effects`
+`world/rules/monster_behaviour.py` SHALL select one affordable owned `ACTIVE` skill passing shared identity and prerequisite qualification whose `effects`
 include a `damage:`-prefixed ID, filtered to `TargetSpec.SINGLE` or `TargetSpec.AREA` per the decided
-action shape, using the acting monster's `BehaviourProfile.skill_choice` — `"first_owned"` (no
-comparison) or `"highest_expected_damage"` (compares `SkillHandler.effective_value()` for the skill's
-attacking stat) — breaking an exact tie via `dice.roll_d100()`.
+action shape, using the acting monster's `BehaviourProfile.skill_choice`, `"first_owned"` (no
+comparison) or `"highest_expected_damage"`.
 
 #### Scenario: first_owned selects the first matching skill in the entity's own owned order
 - **WHEN** skill selection runs with `skill_choice: first_owned` against an entity owning two or more
@@ -147,7 +146,7 @@ attacking stat) — breaking an exact tie via `dice.roll_d100()`.
 #### Scenario: Skill-choice comparison never rolls dice
 - **WHEN** `_choose_skill()`'s implementation is inspected
 - **THEN** it contains no call to `dice.roll_d100()` except inside its own tie-break branch, and no call
-  to `ActionResolver.resolve()` or any effect-handler function — the actual to-hit and damage rolls
+  to `ActionResolver.resolve()` or any effect-handler function; the actual to-hit and damage rolls
   happen only once resolution is invoked on the returned `ActionRequest`
 
 #### Scenario: The estimate subtracts the known target's defense
@@ -158,6 +157,19 @@ attacking stat) — breaking an exact tie via `dice.roll_d100()`.
 - **WHEN** the policy evaluates which target shape to commit to
 - **THEN** affordability is evaluated before the area-versus-single decision, so an unavailable
   preferred shape can fall back to an affordable one
+
+#### Scenario: Ineligible preferred skill falls back without rolling a cast
+- **WHEN** the first owned damage skill fails shared identity or prerequisite eligibility and an ordinary attack is available
+- **THEN** selection returns the available ordinary attack, while final resolution remains authoritative if initiative changes eligibility or affordability
+
+### Requirement: Highest-expected-damage comparison uses effective value and one tie-breaking roll
+The `"highest_expected_damage"` comparison SHALL compare `SkillHandler.effective_value()` for the skill's
+attacking stat, and an exact tie SHALL be broken via one `dice.roll_d100()` roll.
+
+#### Scenario: The comparison stat and the single tie-break roll
+- **WHEN** `"highest_expected_damage"` compares two eligible owned skills and their estimates are exactly equal
+- **THEN** the greater `effective_value(attacking_stat)` is selected, and only an exact tie consumes one
+  `dice.roll_d100()` roll
 
 ### Requirement: Area-versus-single-target shape is decided before target/skill selection, reusing the
 existing all-enemies shorthand
@@ -268,3 +280,14 @@ eligibility gates.
 #### Scenario: A malformed spell never raises the policy
 - **WHEN** `default_attack_policy` encounters a malformed spell
 - **THEN** the policy does not raise
+
+### Requirement: Authored crocodile behavior uses the existing first-owned strategy
+The crocodile kit SHALL bind a reusable existing-vocabulary profile using first-owned skill choice, lowest-current-HP targets, no area preference and flee fraction 0.20. The bite SHALL precede innate attack. Ineligible or MP/SP-unaffordable bites SHALL fall back to an available ordinary attack.
+
+#### Scenario: Resource exhaustion is ordinary fallback
+- **WHEN** formal crocodile combat exhausts either payable bite resource
+- **THEN** the next policy action resolves an ordinary attack without a new utility planner
+
+#### Scenario: Current combat boundaries remain authoritative
+- **WHEN** targets move, die or are knocked out before resolution or the crocodile reaches its flee threshold
+- **THEN** existing close-range/displacement, living-target, knockout and flee rules apply; other profiles and target choices remain unchanged

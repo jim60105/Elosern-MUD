@@ -287,6 +287,8 @@ class SkillHitDependenciesTests(EvenniaTestCase):
 
     @covers_requirement(
         "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
     )
     def test_synthetic_transfer_partial_zero_mp_and_caster_cap(self):
         """Scenario: Target partial/zero MP and caster full/partial cap."""
@@ -386,6 +388,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
 
     @covers_requirement(
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
     )
     def test_critical_defeat_crossing_and_second_species_reuse(self):
         """Scenario: Critical hit does not multiply drain; defeat crossing transfers before settlement; second species reuse."""

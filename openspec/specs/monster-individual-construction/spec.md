@@ -14,7 +14,7 @@ The existing `Monster` typeclass SHALL carry persistent `species_key` and `varia
 alongside its existing traits, state, and location data. Exactly one construction entry point owned
 by the deterministic core SHALL create a species-backed individual: it SHALL validate that both keys
 resolve in the species/variant registries and that the variant belongs to the species before any
-persistence, and only then SHALL it apply the approved combat configuration.
+persistence.
 
 #### Scenario: A mismatched species and variant pair builds nothing
 - **WHEN** construction is asked for a variant whose owning species differs from the supplied species key
@@ -30,11 +30,24 @@ persistence, and only then SHALL it apply the approved combat configuration.
 
 #### Scenario: Identity is never inferred from incidental strings or roles
 - **WHEN** species or variant identity would have to come from a display name, an object key string, a threat tier, a quest role, or generative output
-- **THEN** it is NOT inferred from any of these — only the validated persistent keys carry identity
+- **THEN** it is NOT inferred from any of these; only the validated persistent keys carry identity
 
 #### Scenario: A failed construction leaves nothing behind
 - **WHEN** a construction fails validation
 - **THEN** it leaves no partially built individual behind
+
+### Requirement: The construction entry point validates the declared kit and behavior binding
+The construction entry point SHALL validate the complete ordered active/passive kit, matching skill kinds,
+identity qualification, prerequisite usability, supported effects and optional behavior-profile reference.
+Identity, literal traits, ownership and behavior binding SHALL be applied atomically; failures leave no individual.
+
+#### Scenario: An invalid declared kit or behavior reference creates nothing
+- **WHEN** a variant declares an unknown or wrong-kind skill key, an identity-ineligible skill, an unusable prerequisite, an unsupported effect, or an unknown behavior-profile key
+- **THEN** construction fails before persistence and leaves no partial individual or ownership
+
+#### Scenario: The declared kit and binding are applied atomically
+- **WHEN** a construction with a declared kit and behavior binding fails during or after assignment
+- **THEN** no partial individual, ownership or bound configuration remains
 
 ### Requirement: Threat tier and individual danger resolve from the variant, never as independent truth
 For a species-backed individual, the threat tier and the individual danger grade SHALL resolve from the
@@ -133,3 +146,18 @@ already counted by that record SHALL add no progress.
 - **WHEN** recovery, room recycling, or site recovery produces a different individual
 - **THEN** that individual gets a fresh identity which is NOT credited against bindings or counted
   sets of the old individual
+
+### Requirement: Constructed kits and depleted resources survive reload without registry resets
+Individual persistence SHALL retain identity, owned kit, bound behavior profile and current gauge values. Registry changes SHALL NOT refill or rescale live individuals. Variants without special kits SHALL retain innate actions and tier-default behavior.
+
+#### Scenario: Reload is not reconstruction
+- **WHEN** a formally constructed individual spends MP/SP and is reloaded
+- **THEN** identity, owned order and behavior binding persist and current depleted gauges are unchanged
+
+#### Scenario: Registry changes leave live state alone
+- **WHEN** a variant profile or kit is edited after creation
+- **THEN** existing ownership and gauges are not reset by startup or reload; an authorized GM workflow is required for live changes
+
+#### Scenario: Other species retain their defaults
+- **WHEN** a variant has no authored special kit or behavior binding
+- **THEN** construction keeps basic_attack/flee and tier-default policy with no inferred spells or pools

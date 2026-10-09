@@ -39,8 +39,13 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
 
     @covers_requirement(
         "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected",
+        "monster-action-policy::authored-crocodile-behavior-uses-the-existing-first-owned-strategy",
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
+        "monster-individual-construction::constructed-kits-and-depleted-resources-survive-reload-without-registry-resets",
         "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
+        "monster-resource-abilities::production-crocodile-delivery-includes-real-combat-and-persistence-evidence",
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
         "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
     )

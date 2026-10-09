@@ -135,6 +135,9 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
             )
         roller.assert_called_once_with()
 
+    @covers_requirement(
+        "monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll",
+    )
     def test_skill_strategies_and_expected_damage(self):
         entity = FakeEntity(
             "actor",

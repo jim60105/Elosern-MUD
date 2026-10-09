@@ -323,7 +323,8 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
             )
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently",
+        "monster-resource-abilities::crocodile-ecology-documents-implemented-limits",
     )
     def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
         for key in APPROVED_SPECIES:

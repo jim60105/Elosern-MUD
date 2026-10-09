@@ -537,6 +537,8 @@ class SkillRegistryTests(unittest.TestCase):
     @covers_requirement(
         "skill-identity-eligibility::stored-identity-determines-actor-qualification",
         "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
+        "monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill",
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
     )
     def test_tide_devouring_bite_data_contract(self):
         from world.skills.effects import EffectAudience
