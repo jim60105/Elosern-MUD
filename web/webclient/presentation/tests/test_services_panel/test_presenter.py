@@ -110,6 +110,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(row["rationale"])
         self.assertIsNone(row["flavor"])
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_cross_branch_acceptance_matches_board_reward_and_quest_issuer(self):
         destination_key = "synthetic_visiting_branch"
         destination = replace(

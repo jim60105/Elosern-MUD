@@ -126,6 +126,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel"
     )
+    @covers_requirement(
+        "webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams"
+    )
     def test_services_panel_node_suite_passes(self):
         suite = [
             str(REPO_ROOT / "web/static/webclient/js/tests/protocol_services_a.test.js"),
@@ -616,6 +619,35 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
             result.returncode,
             0,
             "quest-log disclosure Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-service-menus::the-guild-counter-renders-the-structured-board-offer",
+    )
+    def test_guild_counter_structured_board_vitest_evidence_passes(self):
+        """The guild_counter suite is the executed evidence for the counter's
+        structured board rendering: each offer's reward from its `reward`
+        object under one label, and no placeholder for a null optional fact."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/world/guild_counter.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "guild counter structured board Vitest evidence failed:\n"
+            + result.stdout
+            + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

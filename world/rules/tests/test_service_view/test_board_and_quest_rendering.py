@@ -88,6 +88,7 @@ from ._support import (
 
 
 class BoardFilteringTests(ServiceRegistryIsolation):
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_board_discloses_nullable_prose_and_item_reward(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))
         player = actor(location=room, registration=registration(), guild_rank="F")
@@ -113,6 +114,7 @@ class BoardFilteringTests(ServiceRegistryIsolation):
             rank.key for rank in sorted(live_guild_rank_registry().values(), key=lambda rank: rank.order)
         ))
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_species_hunt_splits_note_and_discloses_authored_deadline_and_prose(self):
         with synthetic_registries("regions", "monster_species", "monster_variants"):
             species = next(iter(SYNTH_MONSTER_SPECIES))

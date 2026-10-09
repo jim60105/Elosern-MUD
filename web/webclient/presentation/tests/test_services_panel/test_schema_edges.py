@@ -158,6 +158,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             validate_services(payload)
 
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_board_row_branch_rejections(self):
         base = {
             "definition_key": "introductory_hunt",

@@ -1,5 +1,6 @@
 """Services panel schema tests: guild/store/giver envelope validation."""
 import unittest
+from tools.spec_traceability import covers_requirement
 from copy import deepcopy
 from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS, MAX_RANK_LADDER
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
@@ -11,6 +12,7 @@ from ._support import UNREGISTERED_PLAYER, _T_MEAL, _T_MEAL_DISPLAY, _action, _a
 class ServicesSchemaTests(unittest.TestCase):
     """Exact D4 bounds and envelope gate at the validator level."""
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_twelve_maximal_board_rows_fit_existing_maximal_sections(self):
         payload = _realistic_maximal_payload()
         payload["guild"]["board"] = _all_ceilings_payload()["guild"]["board"]
@@ -19,6 +21,7 @@ class ServicesSchemaTests(unittest.TestCase):
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
         self.assertEqual(len(validate_services(payload)["guild"]["board"]), MAX_BOARD_ROWS)
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_structured_board_exact_fields_and_optional_bounds(self):
         guild = _valid_guild()
         row = guild["board"][0]
@@ -40,6 +43,7 @@ class ServicesSchemaTests(unittest.TestCase):
         self.assertNotIn("reward_summary", row)
         self.assertEqual(set(row), {"definition_key", "display_name", "category", "rank", "objective_summary", "objective_note", "deadline_line", "rationale", "flavor", "reward", "accept"})
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_structured_reward_rejects_drift_and_item_overflow(self):
         item = {"item_key": "synthetic_item", "display_name": "合成物品", "quantity": 2}
         good = {"copper": 120, "merit": 45, "items": [item]}
@@ -62,6 +66,7 @@ class ServicesSchemaTests(unittest.TestCase):
                     with self.assertRaises(ProtocolValidationError):
                         validate_services(payload)
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_guild_branch_and_ladder_bounds_uniqueness_and_membership(self):
         for changes in (
             {"branch_label": ""}, {"branch_label": "獎" * 257},
