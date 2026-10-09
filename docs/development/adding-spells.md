@@ -95,6 +95,13 @@ ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
   For multi-strike source damage, a dependent effect executes once per target when
   any strike lands (any-hit semantics); multiple hits on the same target do not multiply
   the rider.
+- **Settlement and atomicity**: Hit dependencies participate in the existing atomic
+  action transaction with effects-before-cost order. A missed source strike skips the
+  dependent rider while normal costs and successful-action practice semantics are
+  still paid and awarded. If a commit fails late, all participant gauges and touched
+  surfaces restore to pre-action values, and same-tick practice claims are released.
+  Dependency resolution does not recheck post-damage living state between damage and
+  riders, nor does it reorder existing settlement or defeat processing.
 
 ## 2. 事前決定：這個魔法是哪一種形狀？
 
