@@ -76,6 +76,32 @@ export const GLYPHS = {
   // The drawer chrome's close glyph (the reference's `.closebtn` X,
   // docs/design/elosern-redesign/index.html).
   close: "M6 6l12 12M18 6 6 18",
+  // Quest drawer redesign glyphs (quest-drawer-ui-primitives, design
+  // Decision 7), copied from the approved prototype's `ICONS` map
+  // (docs/design/quest-drawer-redesign/QuestDrawerPrototype.vue). First-level
+  // tabs: the quest book and the guild counter.
+  quest_book: "M6 3.5h11a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zM6 3.5a2 2 0 0 0-2 2V8h2M9.5 8.5h6M9.5 12h6M9.5 15.5h3.5",
+  guild_counter: "M12 2.8 4.5 5.6v6c0 4.8 3.2 8 7.5 9.6 4.3-1.6 7.5-4.8 7.5-9.6v-6zM12 7v9.5M8.5 10.5h7",
+  // The quest book's state rail: hourglass, circled check, circled cross.
+  quest_in_progress: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9M10 18.5h4",
+  quest_completed: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.4l2.8 2.8 5.4-5.6",
+  quest_failed: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 9l6 6M15 9l-6 6",
+  // One glyph per quest category (採集, 討伐, 護衛, 探索, 緊急).
+  cat_gather: "M6 18c0-7 5-12 13-12 0 8-5 13-12 13M6 18l7-7",
+  cat_defeat: "M19.5 4.5v3.2L10.4 16.8 7.2 13.6l9.1-9.1zM5.3 11.7l7 7M8.8 15.2l-4.3 4.3",
+  cat_escort: "M12 3 5 6v5.5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z",
+  cat_explore: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM15.5 8.5l-2 5-5 2 2-5z",
+  cat_emergency: "M12 3 2.5 20h19zM12 9.5v5M12 17.2v.3",
+  // The tracked-quest flag, the reward cells (copper coin, merit star,
+  // item flask), and the deadline clock.
+  track_flag: "M6.5 21V4h11l-2.4 4 2.4 4h-11",
+  reward_copper: "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+  reward_merit: "M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z",
+  reward_item: "M9 3h6M10 3v4.5L6 15a4 4 0 0 0 3.6 6h4.8A4 4 0 0 0 18 15l-4-7.5V3",
+  deadline: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2",
+  // A padlock (shackle, body, keyhole): the prototype drew its locked-grade
+  // mark as a CSS box, so this path is new, drawn at the set's weight.
+  lock: "M8 11V8a4 4 0 0 1 8 0v3M5.5 11h13v9.5h-13zM12 14.5v2.5",
 };
 
 // Per-key stroke attributes copied selectively from the reference: `move`
@@ -98,6 +124,16 @@ const STROKE_ATTRS = {
   help: { "stroke-linecap": "round" },
   shop: { "stroke-linejoin": "round" },
 };
+
+// The quest drawer redesign glyphs: the prototype rendered every one of them
+// with round caps and joins.
+for (const key of [
+  "quest_book", "guild_counter", "quest_in_progress", "quest_completed", "quest_failed",
+  "cat_gather", "cat_defeat", "cat_escort", "cat_explore", "cat_emergency",
+  "track_flag", "reward_copper", "reward_merit", "reward_item", "deadline", "lock",
+]) {
+  STROKE_ATTRS[key] = { "stroke-linecap": "round", "stroke-linejoin": "round" };
+}
 
 // Return the reference's per-key stroke attributes for a stable key, or an
 // empty object when the reference sets none for that glyph.
