@@ -50,6 +50,8 @@ def _validate_variant_kit_and_behaviour(variant: MonsterVariant, species_key: st
     from world.rules.action.contracts import _EFFECT_HANDLERS, _effect_prefix
 
     for skill_key in variant.active_skill_keys:
+        if variant.active_skill_keys.count(skill_key) > 1:
+            raise MonsterConstructionError(f"duplicate active skill {skill_key!r}")
         if skill_key not in SKILL_REGISTRY:
             raise MonsterConstructionError(f"unknown active skill {skill_key!r}")
         skill = SKILL_REGISTRY[skill_key]
@@ -67,6 +69,8 @@ def _validate_variant_kit_and_behaviour(variant: MonsterVariant, species_key: st
                 raise MonsterConstructionError(f"unusable prerequisite {prereq.skill_key!r}")
 
     for skill_key in variant.passive_skill_keys:
+        if variant.passive_skill_keys.count(skill_key) > 1:
+            raise MonsterConstructionError(f"duplicate passive skill {skill_key!r}")
         if skill_key not in SKILL_REGISTRY:
             raise MonsterConstructionError(f"unknown passive skill {skill_key!r}")
         skill = SKILL_REGISTRY[skill_key]
@@ -293,7 +297,8 @@ def construct_species_individual(
                     "active": list(variant.active_skill_keys),
                     "passive": list(variant.passive_skill_keys),
                 }
-            individual.db.behaviour_tree = variant.behaviour_profile_key
+            if variant.behaviour_profile_key is not None:
+                individual.db.behaviour_tree = variant.behaviour_profile_key
     except Exception as error:
         raise MonsterConstructionError(
             f"failed to build variant {variant_key!r} of species {species_key!r}"

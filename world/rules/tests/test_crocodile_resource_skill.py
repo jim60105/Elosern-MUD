@@ -23,6 +23,7 @@ from world.rules.combat_session.policies import (
 )
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.combat_session.lifecycle import engage
+from world.rules.combat_session.lifecycle import clear_session
 from world.rules.combat_session.records import read_session
 from world.rules.combat_session.battlefield import _context_for
 from world.rules.action import (
@@ -148,4 +149,24 @@ class CrocodileResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(reloaded_croc.db.behaviour_tree, "ambush_predator")
 
         reloaded_player = PlayerCharacter.objects.get(pk=player.pk)
+        self.assertEqual(reloaded_player.traits.hp.current, player.traits.hp.current)
         self.assertEqual(reloaded_player.traits.mp.current, 80)
+
+        # 8. Bay warden combat resolution smoke
+        clear_session(player)
+        croc_bay.location = room
+        engage(player, croc_bay)
+        record_bay = read_session(player)
+        battlefield_bay = Battlefield(
+            {"party": frozenset({player.key}), "foes": frozenset({croc_bay.key})},
+            {player.key: player, croc_bay.key: croc_bay},
+        )
+        action_bay = _enemy_policy(croc_bay, battlefield_bay, record_bay)
+        self.assertEqual(action_bay.skill_key, "tide_devouring_bite")
+        # Bay warden starts at 50 MP, 60 SP. Hit from 50 clamps at 50, pays 10 MP -> 40 MP, pays 5 SP -> 55 SP
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            res_bay = ActionResolver.resolve(action_bay)
+        self.assertEqual(res_bay.outcome, "success")
+        self.assertEqual(croc_bay.traits.mp.current, 40)
+        self.assertEqual(croc_bay.traits.sp.current, 55)
+        self.assertEqual(player.traits.mp.current, 70)
