@@ -33,6 +33,15 @@ For attendance, the selected approach extends the existing NPC schedule engine a
 
 ### 3.1 Identity and qualification
 
+Implementation reference (`persistent-human-guild-hosts`): normal identities and
+branch/target bindings live in `world/lore/guild_adventurers.py`; persistent
+assembly and fail-closed dbref selection live in `world/rules/human_guild_hosts.py`.
+The three hostless residences share the existing guild frontage at `(4,3)` and
+use reciprocal ordinary Exits. Daily/weekly templates own the concrete offsets
+documented in `docs/development/adding-npcs.md`; assembly binds route roles to room
+dbrefs. This additive slice retains silent legacy rank factories until the
+lifecycle owner cuts examination starts over atomically.
+
 A character's profession is **adventurer**. Examination authority is a separate capability attached to that person for a named branch and supported target ranks. An adventurer can have normal dialogue, a residence, a schedule, equipment, learned skills, and relationships outside an examination.
 
 Rank definitions retain rank order, rewards, titles, and progression meaning. Host identity moves to branch/rank qualification data instead of being a global per-rank opponent factory. Selection uses stable authored identity and persistent object identity, never a display-name search or the first NPC carrying an examiner component.

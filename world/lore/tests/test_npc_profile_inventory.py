@@ -31,12 +31,13 @@ OWNER_LABELS = frozenset(
     }
 )
 
-# The six closed source kinds (design.md D1).
+# The closed source vocabulary, including persistent normal people.
 SOURCE_KINDS = frozenset(
     {
         "place_host",
         "dialogue_table",
         "guild_examiner",
+        "persistent_adventurer",
         "starting_companion",
         "quest_template_occupant",
         "import_example",
@@ -69,7 +70,7 @@ class NpcSourceInventoryContractTests(unittest.TestCase):
             with self.subTest(kind=row.kind, key=row.key):
                 self.assertIn(row.owner, OWNER_LABELS)
 
-    def test_every_row_names_one_of_the_six_kinds(self):
+    def test_every_row_names_a_registered_source_kind(self):
         for row in NPC_SOURCE_INVENTORY:
             with self.subTest(kind=row.kind, key=row.key):
                 self.assertIn(row.kind, SOURCE_KINDS)
@@ -135,5 +136,15 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
                 self.assertTrue(0 <= prof.age <= 10000)
                 self.assertTrue(0 <= prof.apparent_age <= 10000)
 
-        # Total 32 shipped profiles
-        self.assertEqual(len(host_keys | examiner_keys), 32)
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+
+        person_profiles = {row.profile_key for row in ADVENTURER_REGISTRY.values()}
+        self.assertEqual(len(person_profiles), 3)
+        self.assertFalse(person_profiles & (host_keys | examiner_keys))
+        for key in person_profiles:
+            profile = NPC_PROFILE_REGISTRY[key]
+            self.assertIs(type(profile.age), int)
+            self.assertIs(type(profile.apparent_age), int)
+            self.assertTrue(0 <= profile.age <= 10000)
+            self.assertTrue(0 <= profile.apparent_age <= 10000)
+        self.assertEqual(len(host_keys | examiner_keys | person_profiles), 35)

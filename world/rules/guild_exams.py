@@ -22,7 +22,7 @@ from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
 from world.observability import log_info, log_warn
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.rules.npc_persona import initialize_npc_persona
-from world.rules.npc_identity import validate_npc_title
+from world.rules.npc_identity import live_key_taken_by_other, validate_npc_title
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC, ensure_npc_canonical_age
@@ -235,13 +235,6 @@ def _rank_row(target_rank: str):
     return rank
 
 
-def _key_taken_by_other(entity: Any) -> bool:
-    """True when any other persisted entity already carries this display key."""
-    from evennia.objects.models import ObjectDB
-
-    return ObjectDB.objects.filter(db_key=entity.key).exclude(pk=entity.pk).exists()
-
-
 def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
     profile = _profile_for(target_rank)
     rank = _rank_row(target_rank)
@@ -308,7 +301,7 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         # Occupancy check inside the same start_guild_exam transaction: no
         # check-then-create window. A later same-rank spawn always sees the
         # earlier committed same-named opponent and takes the suffixed form.
-        if _key_taken_by_other(opponent):
+        if live_key_taken_by_other(opponent):
             opponent.key = f"{rank.examiner_name}-{opponent.pk}"
         opponent.save()
         log_context = {

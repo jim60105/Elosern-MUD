@@ -121,6 +121,35 @@ def sync_service_interiors() -> None:
             )
 
 
+def resolve_residence_route(home_key: str, guild_key: str) -> dict:
+    """Resolve materialized place/grid identities, rejecting disconnected routes."""
+    from evennia.utils.search import search_object_by_tag
+
+    home_place = PLACE_REGISTRY[home_key]
+    guild_place = PLACE_REGISTRY[guild_key]
+    if (
+        home_place.settlement_key != guild_place.settlement_key
+        or home_place.exterior_xy != guild_place.exterior_xy
+    ):
+        raise ValueError(f"residence {home_key!r} and guild {guild_key!r} need one frontage")
+    rooms = {}
+    for role, key in (("home", home_key), ("guild", guild_key)):
+        matches = [obj for obj in search_object_by_tag(key) if isinstance(obj, Room)]
+        if len(matches) != 1:
+            raise ValueError(f"place {key!r} resolves to {len(matches)} rooms")
+        rooms[role] = matches[0]
+    zcoord = SETTLEMENT_REGISTRY[home_place.settlement_key].zcoord
+    frontage = list(GridRoom.objects.filter_xyz(xyz=(*home_place.exterior_xy, zcoord)))
+    if len(frontage) != 1:
+        raise ValueError(f"residence {home_key!r} frontage resolves to {len(frontage)} rooms")
+    rooms["frontage"] = frontage[0]
+    for source, target in (("home", "frontage"), ("frontage", "guild"),
+                           ("guild", "frontage"), ("frontage", "home")):
+        if not any(exit_obj.destination == rooms[target] for exit_obj in rooms[source].exits):
+            raise ValueError(f"residence {home_key!r} route lacks {source}->{target} Exit")
+    return rooms
+
+
 def sync_limbo() -> None:
     """Converge the starting room (Limbo) onto its zh-tw identity idempotently.
 

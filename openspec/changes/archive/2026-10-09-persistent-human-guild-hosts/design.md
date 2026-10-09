@@ -91,3 +91,62 @@ The A/S upper-tier probes in section 8 are reference builds. They establish init
 | S | 200/120/120 | 20/20/19 | 35 | 36/31/35 | `true_sword_saint` |
 
 The A and S hosts use their respective rank's configured examination kit and usable sword lineage, rather than increasing Hok's capabilities. Standard examination selection seals unrelated utility effects for comparability. The S reference includes the current sword-saint lineage's domain effect, including its attack bonus; 36 is its pre-active-effect attack value, not a ceiling that removes the measured domain effect. No 100-times or 1000-times body multiplier is introduced to inflate these ranks.
+
+## Apply Verification Evidence
+
+The final focused host/roster batch passed 59 tests in 26.431 seconds:
+
+```sh
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_human_guild_hosts world.rules.tests.test_npc_roster_validation world.lore.tests.test_npc_profile_inventory world.lore.tests.test_npc_profile_slice_content world.maps.tests.test_service_interiors world.rules.tests.test_shop_clock_sources.StageOrderAndRegistrationTests.test_sources_register_in_sync_guild_economy
+```
+
+The schedule/shard/frozen-contract batch passed 60 tests in 8.021 seconds:
+
+```sh
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_npc_schedule_runtime tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract
+```
+
+The real three-host smoke starts all three at their materialized residences,
+then observes `npc_departed`/`npc_arrived` through real Exits without assigning
+locations. Test-db snapshots were Hok dbref 208/home 124, Cassandra 209/home 127,
+Augustine 210/home 130, public frontage 19 and guild 133. Hok's first traversal
+was frontage at 28770, guild at 28800, frontage at 43200 and home at 43230.
+Cassandra followed those four route roles at 122370/122400/144000/144030;
+Augustine at 381570/381600/403200/403230. These dbrefs are observations from the
+isolated test database, not authored production identities.
+
+Observed literal bases match all three approved rows. Normal physical
+attack/agility/defense were Hok 25/20/29, Cassandra 30/25/34 and Augustine
+36/31/40. The A/S normal defense includes the shared defensive-instinct passive;
+the preserved 29/35 pair-only reference excludes that passive. This smoke
+establishes normal-person assembly and traversal, not examination restrictions
+or balance outcomes. All normal owned skills passed the shared use gate and all
+three resource pools were full at creation. Synthetic tests additionally cover
+occupied names, unchanged live reuse, qualification ambiguity/wrong branches,
+resolver preflight, creation rollback and locked weekly arrival.
+
+An initial 118-test request was blocked by the repository's 100-test discovery
+guard and was split into the bounded batches above. Initial implementation
+iterations exposed missing required validation-record fields, a missing
+`guild_merit` trait input and incomplete synthetic resolver context/target
+fixtures; those were corrected before the final passing batches.
+
+Preimplementation duck findings were dispositioned by authoring and validating
+both offline replies and adding the real three-host smoke. The recommendation
+to test later `participant_name_collision` is owned by the lifecycle cutover;
+this additive slice exposes the shared live occupancy predicate and never
+renames reused people. No persistent exam-start behavior is enabled here.
+
+Final `uv run --locked python -m tools.contract_gate` passed with 2009 covered
+requirements, 8218 associations, zero traceability errors, zero observability
+violations, zero test-data violations, valid manifests and all 18 contract tests.
+`openspec validate persistent-human-guild-hosts --strict` passed. No freeze-list
+entries, browser methods or browser surface contracts changed. Full browser and
+complete evidence verification remain CI-owned.
+
+Postimplementation duck `PersistentHostFinalDuck` completed with no blocking
+issues, non-blocking issues or suggestions. It reviewed the current worktree
+source, tests, documentation and recorded verification evidence. Its reported
+limitation was inability to independently inspect the requested git diff with
+its available tools; its verdict relies on current source rather than a
+separate diff audit. Every preimplementation finding is dispositioned above.

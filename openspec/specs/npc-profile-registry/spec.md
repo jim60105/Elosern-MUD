@@ -46,9 +46,19 @@ A machine-readable inventory SHALL list every shipped NPC source with the slice 
 - **WHEN** a new hosted place is added to a settlement slice without an inventory row
 - **THEN** the inventory check fails naming that place's service identity
 
+Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+
 #### Scenario: The inventory enumerates every source kind
 - **WHEN** the shipped NPC sources are inventoried
 - **THEN** the inventory lists each place host, each dialogue table, each guild examiner rank, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
+
+#### Scenario: Persistent adventurer sources are inventoried kinds
+- **WHEN** the shipped NPC sources are inventoried
+- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, guild examiner rank, starting-companion declaration, offline quest template occupant, and shipped NPC import example
 
 ### Requirement: Altoria lower-terrace hosts carry individual authored profiles and rewritten dialogue
 Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
@@ -105,7 +115,7 @@ Each middle-terrace trade host owned by the `altoria_trade` inventory slice SHAL
 - **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
 
 ### Requirement: Guild branch master and rank examiners carry individual authored profiles and rewritten dialogue
-Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
+Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting.
 
 #### Scenario: Every owned host references its own valid profile
 - **WHEN** the shipped place registry is validated against the profile registry
@@ -123,6 +133,12 @@ Each guild host owned by the `altoria_guild` inventory slice SHALL name, through
 - **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
 - **THEN** no test fails, because no test pins the authored prose
 
+Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+
 #### Scenario: Every rank names a valid examiner profile key
 - **WHEN** a guild rank is loaded
 - **THEN** it names an examiner profile key that resolves to a profile with a complete card and no voice lines, and a missing or unresolved key fails load naming the rank
@@ -138,6 +154,10 @@ Each guild host owned by the `altoria_guild` inventory slice SHALL name, through
 #### Scenario: Rewrite quality is editorially reviewed
 - **WHEN** the authored prose is assessed
 - **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
+
+#### Scenario: Tables keep identifiers and freshly authored lines
+- **WHEN** the owned dialogue tables are rewritten
+- **THEN** each table keeps its keyword identifiers and its greeting, and every greeting and keyword response is newly authored against the host's card
 
 ### Requirement: Altoria upper-terrace hosts carry individual authored profiles and rewritten dialogue
 Each upper-terrace host owned by the `altoria_upper` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
@@ -244,12 +264,18 @@ Before any world synchronization at server start, the system SHALL validate the 
 - **THEN** validation fails naming each profile or preset and the missing voice field
 
 #### Scenario: An orphan profile is reported
-- **WHEN** a synthetic profile is registered that no hosted place or examiner rank references
+- **WHEN** a synthetic profile is registered that no hosted place, examiner rank or persistent-adventurer source references
 - **THEN** validation fails naming the orphan profile
 
 #### Scenario: All violations are reported together
 - **WHEN** a synthetic registry set has an inventory mismatch and an invalid template card
 - **THEN** one failure lists both violations
+
+Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
 
 #### Scenario: Inventory and derived sources must agree both ways
 - **WHEN** the roster validation derives sources from the live registries and example files
@@ -275,8 +301,12 @@ Before any world synchronization at server start, the system SHALL validate the 
 - **WHEN** the roster validation checks voice authorship
 - **THEN** every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), and every companion partner preset authors a non-empty `speech_style` and `greeting`
 
+#### Scenario: Persistent adventurers must resolve to valid cards
+- **WHEN** the roster validation walks every persistent-adventurer source
+- **THEN** each must resolve to a profile with a valid compact card
+
 ### Requirement: Every shipped host and examiner profile authors a bounded age pair
-Each shipped place-host and guild-examiner profile SHALL author explicit canonical `age` and `apparent_age` integers, rejecting booleans and values outside inclusive 0..10000. Invalid authored ages SHALL reject source loading/preflight before creation writes and name the owning profile.
+Each shipped persistent-adventurer, place-host and guild-examiner profile SHALL author explicit canonical `age` and `apparent_age` integers, rejecting booleans and values outside inclusive 0..10000. Invalid authored ages SHALL reject source loading/preflight before creation writes and name the owning profile.
 
 #### Scenario: The complete roster has age authorship
 - **WHEN** the shipped place-host and examiner registries are checked against the authored age inventory
@@ -289,6 +319,12 @@ Each shipped place-host and guild-examiner profile SHALL author explicit canonic
 #### Scenario: Long-lived identity differs from appearance
 - **WHEN** an authored host profile declares age 980 and apparent age 42 with matching long-lived characterization
 - **THEN** both values remain distinct canonical identity facts and the card remains independently editable
+
+Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
 
 #### Scenario: The age inventory assigns every source
 - **WHEN** the data contract checks the complete shipped host/examiner inventory

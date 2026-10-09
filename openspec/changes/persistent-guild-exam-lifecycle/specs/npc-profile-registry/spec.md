@@ -21,6 +21,14 @@ Rank-owned temporary examiner sources SHALL be removed from inventory and roster
 - **WHEN** the shipped NPC sources are inventoried
 - **THEN** the inventory lists each place host, each dialogue table, each guild examiner rank, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
 
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+
+#### Scenario: Persistent adventurer sources are inventoried kinds
+- **WHEN** the shipped NPC sources are inventoried
+- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, guild examiner rank, starting-companion declaration, offline quest template occupant, and shipped NPC import example
+
 ### Requirement: Guild branch master and rank examiners carry individual authored profiles and rewritten dialogue
 Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Every guild qualification SHALL name a persistent person whose profile contains a complete bounded card and in-character dialogue coverage; missing person/profile keys SHALL fail load naming branch and target. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card. Every greeting, response and voice line SHALL be spoken in character and SHALL NOT name a command, a game mechanic, or an interface element. Rewritten dialogue SHALL keep every service semantic its settlement and dialogue specifications require and SHALL NOT state fixed prices, stock counts, or availability that live service data owns. Tests SHALL NOT pin the authored prose: rewording a line SHALL NOT break any test; prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review.
 
@@ -61,6 +69,14 @@ Rank-owned temporary examiner sources SHALL be removed from inventory and roster
 #### Scenario: Rewrite quality is editorially reviewed
 - **WHEN** the authored prose is assessed
 - **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+
+#### Scenario: Tables keep identifiers and freshly authored lines
+- **WHEN** the owned dialogue tables are rewritten
+- **THEN** each table keeps its keyword identifiers and its greeting, and every greeting and keyword response is newly authored against the host's card
 
 ### Requirement: The shipped NPC roster is validated as complete before the game starts
 Before any world synchronization at server start, the system SHALL validate the complete shipped NPC roster and SHALL abort startup when any check fails, reporting every violation with its source kind, source key, and profile or preset key. The checks SHALL be: the inventory equals the sources derived from the live registries and example files in both directions; every place host and guild examiner resolves to a profile with a valid compact card; every starting-companion declaration derives a valid compact card from its partner preset's persona through the shared companion derivation with a maximum-length synthetic owner name; every offline quest template occupant and every shipped NPC import example carries a valid compact card; every dialogue table is answered by exactly one profiled hosted place; every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), and every companion partner preset authors a non-empty `speech_style` and `greeting`; and no profile exists that no hosted place or persistent examiner identity references. The same validation SHALL be runnable in tests without a server.
@@ -115,6 +131,14 @@ Rank-owned temporary examiner sources SHALL be removed from inventory and roster
 - **WHEN** the roster validation checks voice authorship
 - **THEN** every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), and every companion partner preset authors a non-empty `speech_style` and `greeting`
 
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+
+#### Scenario: Persistent adventurers must resolve to valid cards
+- **WHEN** the roster validation walks every persistent-adventurer source
+- **THEN** each must resolve to a profile with a valid compact card
+
 ### Requirement: Every shipped host and examiner profile authors a bounded age pair
 Each shipped place-host and guild-examiner profile SHALL author explicit canonical `age` and `apparent_age` integers, rejecting booleans and values outside inclusive 0..10000. Invalid authored ages SHALL reject source loading/preflight before creation writes and name the owning profile. The complete shipped host/examiner inventory SHALL associate each source with its profile and age pair; missing or stale source assignments SHALL fail the data contract. Initial mechanical ages SHALL be consistent with each profile's appearance and life-story constraints, allowing deliberate narrative ambiguity and different actual/apparent ages for long-lived characters. Edited instance prose SHALL NOT become an age source.
 
@@ -147,4 +171,8 @@ Rank-owned temporary examiner sources SHALL be removed from inventory and roster
 #### Scenario: Edited instance prose is not an age source
 - **WHEN** an instance's prose is edited
 - **THEN** it does not become an age source
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
+- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
 

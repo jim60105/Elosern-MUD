@@ -41,6 +41,7 @@ def derive_shipped_sources(
     player_presets: Mapping[str, PlayerPreset] | None = None,
     quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
+    adventurers: Mapping | None = None,
 ) -> frozenset[tuple[str, str]]:
     """Derive the complete set of shipped NPC source (kind, key) pairs.
 
@@ -53,6 +54,10 @@ def derive_shipped_sources(
         from world.lore.settlements.places import PLACE_REGISTRY
 
         places = PLACE_REGISTRY
+    if adventurers is None:
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+
+        adventurers = ADVENTURER_REGISTRY
     if dialogue_rows is None:
         from world.lore.dialogue import DIALOGUE_ROWS
 
@@ -85,6 +90,8 @@ def derive_shipped_sources(
 
     for key in guild_ranks:
         sources.add(("guild_examiner", key))
+    for key in adventurers:
+        sources.add(("persistent_adventurer", key))
 
     for preset in player_presets.values():
         for companion in preset.starting_companions:
@@ -113,6 +120,7 @@ def validate_npc_roster(
     examples_dir: Path | None = None,
     profile_registry: Mapping[str, NpcProfile] | None = None,
     inventory: Iterable[NpcSource] | None = None,
+    adventurers: Mapping | None = None,
 ) -> None:
     """Validate the complete shipped NPC roster and raise NpcRosterError on failure.
 
@@ -132,6 +140,10 @@ def validate_npc_roster(
         from world.lore.settlements.places import PLACE_REGISTRY
 
         places = PLACE_REGISTRY
+    if adventurers is None:
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+
+        adventurers = ADVENTURER_REGISTRY
     if dialogue_rows is None:
         from world.lore.dialogue import DIALOGUE_ROWS
 
@@ -164,6 +176,7 @@ def validate_npc_roster(
     from typeclasses.npcs import NPC
     from world.imports.validate import validate_character
     from world.lore.npc_card import NpcCardError, normalize_card
+    from world.lore.npc_card import normalize_offline_greeting
     from world.lore.player_presets import derive_companion_card
     from world.quests.characterization import (
         characterize_errors,
@@ -173,6 +186,7 @@ def validate_npc_roster(
 
     violations: list[str] = []
     referenced_profiles: set[str] = set()
+    inventory = tuple(inventory)
 
     # 1. Inventory equality check (both directions)
     actual_sources = derive_shipped_sources(
@@ -182,8 +196,11 @@ def validate_npc_roster(
         player_presets=player_presets,
         quest_templates=quest_templates,
         examples_dir=examples_dir,
+        adventurers=adventurers,
     )
     inventory_sources = {(row.kind, row.key) for row in inventory}
+    if len(inventory_sources) != len(inventory):
+        violations.append("NPC source inventory contains duplicate source assignments")
 
     missing_from_inventory = sorted(actual_sources - inventory_sources)
     for kind, key in missing_from_inventory:
@@ -196,6 +213,46 @@ def validate_npc_roster(
         violations.append(
             f"source kind={kind!r} key={key!r} is present in inventory but missing from registries"
         )
+
+    # Persistent people have distinct profiles and both offline reply paths.
+    person_profiles: set[str] = set()
+    other_profiles = {
+        place.host_profile_key for place in places.values() if place.service_id is not None
+    } | {rank.examiner_profile_key for rank in guild_ranks.values()}
+    for person_key, person in adventurers.items():
+        profile_key = person.profile_key
+        referenced_profiles.add(profile_key)
+        label = f"source kind='persistent_adventurer' key={person_key!r} profile {profile_key!r}"
+        if profile_key in person_profiles or profile_key in other_profiles:
+            violations.append(f"{label} must have a distinct normal-person profile")
+        person_profiles.add(profile_key)
+        profile = profile_registry.get(profile_key)
+        if profile is None:
+            violations.append(f"{label} references missing profile")
+            continue
+        assignments = [row for row in inventory
+                       if row.kind == "persistent_adventurer" and row.key == person_key]
+        if len(assignments) != 1 or (
+            assignments[0].profile_key, assignments[0].age, assignments[0].apparent_age
+        ) != (profile_key, profile.age, profile.apparent_age):
+            violations.append(f"{label} has missing or stale profile/age inventory assignment")
+        try:
+            normalize_card(profile.card.to_record())
+        except (NpcCardError, ValueError) as err:
+            violations.append(f"{label} has invalid card: {err}")
+        for field in ("age", "apparent_age"):
+            value = getattr(profile, field)
+            if type(value) is not int or not 0 <= value <= 10000:
+                violations.append(f"{label} has invalid {field}")
+        for field in ("greeting", "misunderstood"):
+            value = getattr(profile.voice, field)
+            if not isinstance(value, str) or not value.strip():
+                violations.append(f"{label} missing {field}")
+                continue
+            try:
+                normalize_offline_greeting(value)
+            except (NpcCardError, ValueError) as err:
+                violations.append(f"{label} invalid {field}: {err}")
 
     # 2. Place hosts: must resolve to a valid profile with a valid compact card
     for place in places.values():
@@ -429,7 +486,7 @@ def validate_npc_roster(
     orphan_keys = sorted(set(profile_registry) - referenced_profiles)
     for prof_key in orphan_keys:
         violations.append(
-            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place or examiner rank"
+            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place, examiner rank or persistent adventurer"
         )
 
     if violations:
