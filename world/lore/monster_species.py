@@ -147,6 +147,9 @@ class MonsterVariant:
     ordinary_variant: bool
     combat_profile: MonsterCombatProfile | None
     danger_grade: str | None
+    active_skill_keys: tuple[str, ...] = ()
+    passive_skill_keys: tuple[str, ...] = ()
+    behaviour_profile_key: str | None = None
 
 
 def _faces(habitat_face, tier_face, grade_face) -> tuple[frozenset, frozenset, frozenset]:
@@ -734,9 +737,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=140, mp=0, sp=0, atk_phys=22, agility=12, defense=14, magic_power=0
+            hp=140, mp=30, sp=40, atk_phys=22, agility=12, defense=14, magic_power=0
         ),
         "D",
+        active_skill_keys=("tide_devouring_bite",),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "bay_warden",
@@ -746,9 +751,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=210, mp=0, sp=0, atk_phys=28, agility=12, defense=15, magic_power=0
+            hp=210, mp=50, sp=60, atk_phys=28, agility=12, defense=15, magic_power=0
         ),
         "C",
+        active_skill_keys=("tide_devouring_bite",),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

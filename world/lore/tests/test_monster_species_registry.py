@@ -376,6 +376,9 @@ class RecordShapeTests(unittest.TestCase):
                 "ordinary_variant",
                 "combat_profile",
                 "danger_grade",
+                "active_skill_keys",
+                "passive_skill_keys",
+                "behaviour_profile_key",
             },
         )
 

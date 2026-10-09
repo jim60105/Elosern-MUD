@@ -193,8 +193,8 @@ APPROVED_BALANCE = {
     },
     "bank_lurker": {
         "hp": 140,
-        "mp": 0,
-        "sp": 0,
+        "mp": 30,
+        "sp": 40,
         "atk_phys": 22,
         "agility": 12,
         "defense": 14,
@@ -203,8 +203,8 @@ APPROVED_BALANCE = {
     },
     "bay_warden": {
         "hp": 210,
-        "mp": 0,
-        "sp": 0,
+        "mp": 50,
+        "sp": 60,
         "atk_phys": 28,
         "agility": 12,
         "defense": 15,
