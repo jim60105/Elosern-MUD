@@ -18,7 +18,7 @@ Ordered effects are `damage:earth:physical` and `self_buff_apply:ridge_brace`. O
 
 ### Timed modifier content
 
-Add buff `ridge_brace` with duration 20 world seconds, stacking refresh, polarity buff, modifiers empty, no tick interval/marker/round_order. Add combat-modifier id `ridge_brace_defense`, when buff_active equals `ridge_brace`, then `defense: 3`. This follows existing earth defense/accuracy and ice agility_flat mounts. The caster gains guard even on a resolved miss; a source-enemy-hit dependency would incorrectly intersect away the caster. Refresh changes expiry without stacking the magnitude. Existing tick/removal infrastructure removes the modifier, with no new timer.
+Add buff `ridge_brace` with duration 20 world seconds, stacking refresh, polarity buff, modifiers empty, no tick interval/marker/round_order. Add combat-modifier id `ridge_brace_defense`, when buff_active equals `ridge_brace`, then `defense: 3`. This follows existing earth defense/accuracy and ice agility_flat mounts. With a valid selected contact target, the caster gains guard even on a resolved miss; rejected or no-target requests grant nothing. A source-enemy-hit dependency would incorrectly intersect away the caster, as shown in action/routing.py's audience/hit intersection. The SINGLE/ANY composite precedent is data_martial_sword.py's true_sword_saint. Refresh changes expiry without stacking the magnitude. Existing tick/removal infrastructure removes the modifier, with no new timer.
 
 ### Literal profiles and policy binding
 
@@ -43,3 +43,9 @@ Environmental expectations differ from combat implementation; explicit published
 ## Migration Plan
 
 After explicit approval and listed predecessor completion, implement this single content unit and required docs/tests. New construction receives the approved row and kit; existing individuals retain state until authorized GM action. No automatic reset/migration/shim. Rollback reverts the content unit through the normal reviewed workflow, without recalculating persisted current gauges. No apply/archive/sync occurs during proposal authoring.
+
+## Full-set critique disposition
+
+Adopted the self-guard target-boundary finding: only affordable resolved casts with a valid selected contact target grant guard, including misses; rejected/no-target requests grant nothing. The ability delta adds an explicit rejection scenario. The SINGLE/ANY composite and audience/hit-intersection sources are cited above.
+
+Rejected the reported pre-cutover band blocker because current monster_species.py:666–728 already carries hare HP30/55 at low and lynx HP115/165 at mid; the reviewer used the historical Previous HP column and wrong cat tiers. No gameplay checks were rerun to confirm it and no band exception is proposed. Approval-record clarification is in the authority §11. This is the disposition of the single full-set critique.
