@@ -23,6 +23,7 @@ from typing import Mapping
 
 from world.lore.sex import SEX_VALUES
 from world.lore.sexual_vocab import BODY_PARTS, GENERIC_BODY_PART
+from world.skills.registry.vocab import SkillEligibility
 from world.skills.registry import (
     SkillCategory,
     SkillDef,
@@ -148,7 +149,7 @@ def _act_family(
         bool,
         tuple[tuple[tuple[str, str], str], ...],
     ],
-    requires_divine_arts: bool = False,
+    eligibility: SkillEligibility = SkillEligibility(),
 ) -> tuple[tuple[SkillDef, SexualActDef], ...]:
     """Build one line's paired ``SkillDef``/``SexualActDef`` rows.
 
@@ -207,7 +208,7 @@ def _act_family(
             or not isfinite(actor_pleasure_ratio)
         ):
             raise ValueError(f"act {key!r}: actor_pleasure_ratio must be a finite number")
-        if not requires_divine_arts and actor_pleasure_ratio <= 0:
+        if "can_use_divine_arts" not in eligibility.required_capabilities and actor_pleasure_ratio <= 0:
             raise ValueError(
                 f"act {key!r}: actor_pleasure_ratio must be positive "
                 "unless the family requires divine arts"
@@ -320,7 +321,7 @@ def _act_family(
             ],
             category=SkillCategory.SEXUAL_ACT,
             group=line,
-            requires_divine_arts=requires_divine_arts,
+            eligibility=eligibility,
         )
         act = SexualActDef(
             key=key,

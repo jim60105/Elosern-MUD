@@ -60,7 +60,7 @@ class PlayerPresetTests(unittest.TestCase):
             with self.subTest(preset=preset.key):
                 race = RACE_REGISTRY[preset.race]
                 for key in (*preset.active_skills, *preset.passive_skills):
-                    if SKILL_REGISTRY[key].requires_divine_arts:
+                    if ("can_use_divine_arts" in SKILL_REGISTRY[key].eligibility.required_capabilities):
                         self.assertTrue(race.can_use_divine_arts)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
@@ -214,7 +214,7 @@ class PlayerPresetTests(unittest.TestCase):
         )
         skill = SKILL_REGISTRY["divine_sexual_arts"]
         self.assertIs(skill.kind, SkillKind.ACTIVE)
-        self.assertTrue(skill.requires_divine_arts)
+        self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
         self.assertTrue(RACE_REGISTRY[preset.race].can_use_divine_arts)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
@@ -235,7 +235,7 @@ class PlayerPresetTests(unittest.TestCase):
             (make(active_skills=("body_enhancement_basic",)), "classifies it as"),
             (make(active_skills=("dual_wield_style",)), "classifies it as"),
             (make(passive_skills=("light_sword_style",)), "classifies it as"),
-            (make(passive_skills=("divine_sexual_mastery",)), "divine-arts"),
+            (make(passive_skills=("divine_sexual_mastery",)), "identity-ineligible"),
         )
         for preset, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):

@@ -47,7 +47,7 @@
 
 1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。
 2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 的 `magic_power` 項目就是該卡的開局魔力字面值（成長重設計 D-A5 已刪除種族平均取樣器），模板的魔力全部由作者手寫決定。
-3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。kit 裡若有 `requires_divine_arts` 的技能，種族必須 `can_use_divine_arts`，否則載入即爆。
+3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。技能若宣告必要種族能力 `can_use_divine_arts`，種族設定檔就必須提供該能力，否則載入時拒絕。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
 
 ---
@@ -158,9 +158,21 @@ uv run --locked python -m tools.spec_traceability check
 | 驗證函式 | 觸發於 | 何時爆 | 錯誤訊息（節錄） |
 |---|---|---|---|
 | `_check_disguised_stats_race` | 匯入驗證 | 非空 `disguised_stats` 落在無神性或無法解析的種族 | `disguised_stats requires a race that can use divine arts` |
-| `_check_skills`（延伸） | 匯入驗證 | `skills`／`passives` 點名 `requires_divine_arts` 的技能鍵，但種族無神性或無法解析 | `requires a race that can use divine arts` |
+| `_check_skills`（延伸） | 匯入驗證 | `skills`／`passives` 的技能鍵不符合行動者類型或種族／亞種資格 | `is ineligible for authored identity` |
 
 這兩個檢查與既有的 `_check_disguised_stats_subset`（偽裝鍵須是 `stats` 子集）互相獨立，同一筆記錄可能同時違反兩者，回報也會同時列出兩筆問題。
+
+### Shared identity-qualified ownership
+
+Preset skill validation uses intended `player` identity, the preset's authored
+race/subrace, and shared `SkillEligibility` semantics. Both declared
+`active_skills`/`passive_skills` and their prerequisite closure must qualify.
+Failures name the preset, field and offending key at registry load, before
+activation can persist ownership. The race-profile `can_use_divine_arts` field
+and its values remain the divine authority; skills declare that requirement in
+`eligibility.required_capabilities`. No legacy skill flag or alias remains.
+When a preset is referenced by `starting_companions`, its complete skill kit
+must also qualify for intended `npc` identity before any companion is created.
 
 ---
 

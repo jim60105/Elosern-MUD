@@ -26,7 +26,6 @@ from world.rules.action import (
     _EFFECT_HANDLER_REQUIRED_CONTEXT,
     _conferral_empty_set_failure,
     _effect_prefix,
-    _step1_divine_arts_gate,
     _stored_trait_value,
     plan_effect_audiences,
 )
@@ -140,6 +139,10 @@ def _skill_wide_failure(
     skill = SKILL_REGISTRY.get(skill_key)
     if skill is None or skill_key not in actor.skills.owned_keys():
         return RejectReason.UNKNOWN_SKILL, skill_key
+    from world.skills.eligibility import skill_identity_eligible
+
+    if not skill_identity_eligible(actor, skill):
+        return RejectReason.IDENTITY_INELIGIBLE, skill_key
     from world.skills.restrictions import skill_effect_allowed
 
     if not skill_effect_allowed(actor, skill_key):
@@ -166,10 +169,6 @@ def _skill_wide_failure(
     # same one of the two out-of-combat reasons.
     if damage_requires_battlefield(skill, context):
         return RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, skill_key
-    try:
-        _step1_divine_arts_gate(actor, skill)
-    except RejectedAction as rejection:
-        return rejection.reason, rejection.detail
     freeform_failure = _freeform_gate_failure(actor, skill, scale)
     if freeform_failure is not None:
         return freeform_failure

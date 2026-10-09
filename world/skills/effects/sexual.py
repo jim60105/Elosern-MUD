@@ -85,7 +85,7 @@ class PairEventEffect:
 
 # 神之秘法 act effects (divine-sexual-arts-reuse): hand-built acts declare
 # these instead of the ordinary pleasure:/sexual_counter: triad. Each is a
-# general dispatch-table entry — no handler reads ``requires_divine_arts``
+# general dispatch-table entry; no handler reads identity eligibility
 # or the caller's line.
 @dataclass(frozen=True)
 class DivinePleasureMaxEffect:

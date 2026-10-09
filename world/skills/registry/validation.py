@@ -5,7 +5,7 @@ the fail-closed prerequisite-graph validator the registry assembly and the
 sexual-act sidecar both run after extending the registry.
 """
 
-from world.skills.registry.vocab import SkillDef, SkillPrerequisite
+from world.skills.registry.vocab import SkillCategory, SkillDef, SkillPrerequisite
 # ---------------------------------------------------------------------------
 # Skill-lineage graph validation (use-driven-progression design §9.3)
 # ---------------------------------------------------------------------------
@@ -56,7 +56,21 @@ def validate_prerequisite_graph(
     """
     consumers: dict[str, list[tuple[str, int]]] = {}
     prereqs: dict[str, tuple[SkillPrerequisite, ...]] = {}
+    from world.skills.eligibility import validate_skill_eligibility
+
     for key, skill in registry.items():
+        validate_skill_eligibility(skill.eligibility)
+        if skill.category is SkillCategory.DIVINE_MYSTERY:
+            if "can_use_divine_arts" not in skill.eligibility.required_capabilities:
+                raise ValueError(f"skill {key!r}: divine mystery requires divine capability")
+            if skill.cost or any(
+                not effect.startswith((
+                    "confer_skill_partial", "confer_growth_rate", "revoke_grants",
+                    "set_disguise", "reveal_disguise", "divine_mystery:",
+                ))
+                for effect in skill.effects
+            ):
+                raise ValueError(f"skill {key!r}: invalid divine mystery cost/effects")
         if not skill.prerequisites:
             continue
         prereqs[key] = tuple(skill.prerequisites)

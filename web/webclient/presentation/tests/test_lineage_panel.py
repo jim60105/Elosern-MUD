@@ -290,6 +290,25 @@ class PresenterTests(InjectedRegistryMixin):
                 )
         return tuple(registry_extras)
 
+    @covers_requirement(
+        "skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
+    def test_identity_ineligible_ladder_is_absent_from_payload_and_counts(self):
+        from world.skills.registry import SkillEligibility
+
+        keys = self._inject_ladder_chains(1, 2)
+        registry = _live_skill_registry()
+        for key in keys:
+            registry[key] = dataclasses.replace(
+                registry[key], eligibility=SkillEligibility(allowed_actor_kinds=("monster",)),
+            )
+        payload = lineage_presenter(_context(_entity(keys)))
+        self.assertEqual(payload["total_count"], self.baseline_chains)
+        self.assertNotIn("lr0_0", [chain["root_skill_key"] for chain in payload["chains"]])
+
     @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_malformed_proficiency_fails_closed_as_unavailable(self):
         registry = build_production_registry()

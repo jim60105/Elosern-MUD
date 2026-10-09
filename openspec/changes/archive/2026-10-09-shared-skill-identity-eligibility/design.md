@@ -52,4 +52,50 @@ On 2026-10-09, `openspec validate shared-skill-identity-eligibility --strict` an
 
 The final repository-root `uv run --locked python -m tools.contract_gate` passed, reporting 2028 requirements and 8277 associations, 2028 covered, zero uncovered/errors; observability scanned 668 with zero violations; test-data scanned 1231 with zero violations; manifests passed and all 18 contract tests passed. This is planning/checkout evidence, not implementation or runtime smoke evidence. No builds or gameplay tests were run.
 
-Final commits are owned by Main under the revised assignment; proposal files remain uncommitted for that handoff. Before commits, `os-phase shared-skill-identity-eligibility` returned exit 2, unknown change. Main must record the expected proposed phase after its directory-scoped commit. The unrelated human_guild_hosts.py edit was left intact.
+At the planning handoff, Main owned the proposal commits. Before those commits,
+`os-phase shared-skill-identity-eligibility` returned exit 2, unknown change.
+The unrelated human_guild_hosts.py edit was left intact.
+
+## Implementation acceptance evidence
+
+The standalone eligibility cutover was implemented on
+`feat/shared-skill-identity-eligibility`, based on
+`f0e6b1b9b853b4337b52f5865a50993f794789ee`, without applying either other batch
+change. All focused runs used the approved `MUD_TEST_SETTINGS=1` environment
+file and `uv run --locked … evennia test --settings test_settings.py --keepdb`.
+The following focused groups passed; counts are per command, not unique tests:
+
+| Labels (under their existing package prefixes) | Passing tests |
+|---|---:|
+| Skill registry package and import validation semantics | 89 |
+| Sexual-act registry structure package | 74 |
+| Movement, divine gate/cadence, sexual unlock, divine core/mutator catalogs | 94 |
+| Player presets, skill handler/conferral, conferral cast/revocation | 78 |
+| Identity, lineage query/presenter, lineage use/graph/seed cases | 76 |
+| Action preview, status skill grouping, character presenter | 53 |
+| Combat modifiers | 94 |
+| Status character read model and Evennia optimization contract | 31 |
+| Identity, player presets and starting companions | 72 |
+| Import batch atomicity, trait/profession loading and registry self-arming | 79 |
+| Final synthetic identity matrix, including companion intended kind | 14 |
+
+The new identity module belongs exactly to `rules-c` (index 3). Reusable
+behavior tests use synthetic identities; shipped definition assertions remain
+in the existing registered data-contract modules. Future synchronized
+requirement names are recorded beside the new assertions, while active
+requirements retain stable decorators: the traceability checker intentionally
+indexes only `openspec/specs/`, not pending change deltas.
+
+`uv run --locked python -m tools.contract_gate` passed with 2028 requirements,
+8280 associations, zero uncovered/errors; observability scanned 669 with zero
+violations; test-data scanned 1232 with zero violations; manifest checks and
+all 18 contract tests passed. Strict change validation and staged whitespace
+checking passed. Earlier focused failures exposed fixture capabilities, stale
+rejection assertions, a missing test import and direct catalog references;
+these were corrected before the passing runs. Commands exceeding the local
+100-test guard were split, not used as passing evidence.
+
+The pre-implementation duck found no blockers; its immutable-container concern
+was addressed with tuple-only metadata and a regression. Command syntax and
+payload shapes are unchanged, so both command docs are intentionally unchanged.
+This evidence makes no live-runtime, crocodile integration or balance claim.

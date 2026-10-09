@@ -47,6 +47,25 @@ def _fresh_entity_owned_keys():
     },
 )
 class SkillHandlerTests(EvenniaTestCase):
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
+    def test_identity_ineligible_stored_multiplier_is_inert(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from world.skills.registry import SkillEligibility
+        from world.rules.tests._combat_session_helpers import live_skill_registry
+
+        entity = self._entity()
+        entity.db.skills = {"active": [], "passive": [_T_TITAN.key]}
+        baseline = entity.traits.atk_phys.value
+        restricted = replace(_T_TITAN, eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+        ))
+        with patch.dict(live_skill_registry(), {_T_TITAN.key: restricted}):
+            self.assertEqual(entity.skills.effective_value("atk_phys"), baseline)
+            self.assertEqual(entity.traits.atk_phys.value, baseline)
+
     def _entity(self):
         entity = create_object(PlayerCharacter, key="skill tester")
         entity.race = "t_duskmari"

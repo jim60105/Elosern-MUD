@@ -89,7 +89,7 @@ def unlocked_act_keys_for(
     the owned set names.
 
     The mastery blanket excludes every act whose paired ``SkillDef`` declares
-    ``requires_divine_arts=True`` (divine design doc §1.1: "The 性魔法主宰
+    the required divine capability (divine design doc §1.1: "The 性魔法主宰
     blanket unlock does not reach them"). The blanket covers the counter-gated
     catalogue only; mastery and divine arts are two unrelated acquisition
     paths. The counter-driven branch below keeps the shipped empty-unlock
@@ -111,7 +111,7 @@ def unlocked_act_keys_for(
         return frozenset(
             key
             for key, act in SEXUAL_ACT_REGISTRY.items()
-            if not SKILL_REGISTRY[key].requires_divine_arts
+            if not ("can_use_divine_arts" in SKILL_REGISTRY[key].eligibility.required_capabilities)
             and not act.ownership_gated
         )
     return frozenset(

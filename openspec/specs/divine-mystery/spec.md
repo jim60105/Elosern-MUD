@@ -8,8 +8,8 @@ than silently missing content.
 
 ### Requirement: Divine Mystery skills are gated by RaceProfile.can_use_divine_arts
 The six 神之秘法 family skills (`divine_sexual_mastery`, `divine_sexual_arts`, and the four
-unmechanized mysteries) SHALL declare `SkillDef.requires_divine_arts=True` and be ownable/castable
-only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. Skills without the marker
+unmechanized mysteries) SHALL declare the shared eligibility requirement for race capability `can_use_divine_arts` and be ownable/castable
+only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. Skills without identity restrictions
 (including the generic `sexual_event` mechanism) SHALL NOT be race-gated by this change.
 
 #### Scenario: A non-elf cannot cast a Divine Mystery skill even if granted ownership
@@ -25,12 +25,12 @@ only by an entity whose race's `RaceProfile.can_use_divine_arts` is `True`. Skil
 
 #### Scenario: The integrated act's gate order is race first, then resist
 - **WHEN** a non-divine-capable actor owning `divine_sexual_arts` casts it at a valid target
-- **THEN** `_step1_divine_arts_gate` rejects the cast before any resist contest runs, exactly as for
+- **THEN** `the shared identity-eligibility gate` rejects the cast before any resist contest runs, exactly as for
   the `divine.py` acts
 
 #### Scenario: The change adds only consumers of the existing field
 - **WHEN** this change lands
-- **THEN** it SHALL NOT modify `can_use_divine_arts` itself or its existing per-race values — it only
+- **THEN** it SHALL NOT modify `can_use_divine_arts` itself or its existing per-race values; it only
   adds consumers gated by the already-landed field
 
 ### Requirement: Divine Mystery practice accrues at most once per world-calendar day
@@ -54,7 +54,7 @@ nothing and report that nothing was claimed.
 - **THEN** both accrue, because the claim is keyed by skill as well as by day
 
 #### Scenario: A divine-arts skill outside the category is unaffected
-- **WHEN** an actor resolves a skill that declares `requires_divine_arts=True` but whose category is
+- **WHEN** an actor resolves a skill that declares required race capability `can_use_divine_arts` but whose category is
   not `DIVINE_MYSTERY` (the 情慾秘術 divine line) twice on one calendar day, on distinct ticks
 - **THEN** both resolutions accrue, exactly as before this change
 
@@ -80,7 +80,7 @@ nothing and report that nothing was claimed.
 
 #### Scenario: The claim scopes to skill category only
 - **WHEN** the cadence's claim scope is set
-- **THEN** it SHALL be scoped by skill category only: a skill that declares `requires_divine_arts`
+- **THEN** it SHALL be scoped by skill category only: a skill that declares the required `can_use_divine_arts` race capability
   but is NOT in the `DIVINE_MYSTERY` category SHALL accrue exactly as it does today
 
 #### Scenario: The claim persists with the actor and unwinds on rollback
@@ -95,7 +95,7 @@ nothing and report that nothing was claimed.
 
 ### Requirement: The divine-mystery family takes no element verb and costs nothing
 Every skill in `SkillCategory.DIVINE_MYSTERY` SHALL declare an empty resource cost, SHALL declare
-`requires_divine_arts=True`, and SHALL NOT declare any damage or healing effect. The family's effects
+the shared eligibility requirement for race capability `can_use_divine_arts`, and SHALL NOT declare any damage or healing effect. The family's effects
 SHALL come only from the conferral, revocation, veil and reveal vocabulary.
 
 #### Scenario: No divine-mystery skill carries a cost
@@ -108,7 +108,7 @@ SHALL come only from the conferral, revocation, veil and reveal vocabulary.
 
 #### Scenario: Every divine-mystery skill is bloodline-gated
 - **WHEN** every registered skill in the `DIVINE_MYSTERY` category is inspected
-- **THEN** each declares `requires_divine_arts=True`, so a race without divine affinity is refused at
+- **THEN** each declares required race capability `can_use_divine_arts`, so a race without divine affinity is refused at
   cast time by the shipped gate
 
 #### Scenario: A race without divine affinity cannot cast any of them

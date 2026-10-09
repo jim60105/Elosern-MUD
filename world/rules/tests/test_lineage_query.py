@@ -116,6 +116,27 @@ class _TreeScopeMixin:
 
 
 class LineageViewShapeTests(_TreeScopeMixin, unittest.TestCase):
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
+    @covers_requirement(
+        "skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains"
+    )
+    def test_identity_ineligible_tree_has_no_nodes_or_counts(self):
+        from dataclasses import replace
+        from world.skills.registry import SkillEligibility
+
+        registry = live_skill_registry()
+        for key in TREE:
+            registry[key] = replace(
+                registry[key], eligibility=SkillEligibility(allowed_actor_kinds=("monster",)),
+            )
+        view = build_lineage_view(_entity(TREE_CLOSURE))
+        self.assertFalse(any(
+            chain.root_skill_key == "t_tree_root" for chain in view.chains
+        ))
+        self.assertEqual(view.total_count, len(view.chains))
+
     @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_tree_chain_is_one_chain_in_topological_order(self):
         view = build_lineage_view(_entity(TREE_CLOSURE))

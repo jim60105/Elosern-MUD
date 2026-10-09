@@ -50,6 +50,10 @@ class _StoredSkillsFacade:
         self._grants = tuple(entity.db.skill_grants or [])
 
     @property
+    def _skill_identity_subject(self) -> Any:
+        return self.entity
+
+    @property
     def db(self) -> Any:
         return self.entity.db
 

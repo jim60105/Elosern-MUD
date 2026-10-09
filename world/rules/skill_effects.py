@@ -81,6 +81,12 @@ def record_conferred_grant(
     stored representation stays deterministic.
     """
     validate_conferrable_skill(skill_key)
+    from world.skills.eligibility import skill_identity_eligible
+    from world.rules.action import RejectReason, RejectedAction
+
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is not None and not skill_identity_eligible(entity, skill):
+        raise RejectedAction(RejectReason.IDENTITY_INELIGIBLE, skill_key)
     grants = list(entity.db.skill_grants or [])
     identity = (source_key, skill_key)
     for index, grant in enumerate(grants):
@@ -124,6 +130,11 @@ def validate_source_owns_skill(actor: Any, skill_key: str) -> None:
             RejectReason.EFFECT_RESOLUTION_FAILED,
             f"source does not directly own skill {skill_key!r}",
         )
+    from world.skills.eligibility import skill_identity_eligible
+
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is not None and not skill_identity_eligible(actor, skill):
+        raise RejectedAction(RejectReason.IDENTITY_INELIGIBLE, skill_key)
 
 
 def derive_conferrable_skills(actor: Any) -> list[str]:
@@ -141,6 +152,11 @@ def derive_conferrable_skills(actor: Any) -> list[str]:
 
     conferrable: list[str] = []
     for skill_key in actor.skills.owned_keys():
+        from world.skills.eligibility import skill_identity_eligible
+
+        skill = SKILL_REGISTRY.get(skill_key)
+        if skill is not None and not skill_identity_eligible(actor, skill):
+            continue
         try:
             validate_conferrable_skill(skill_key)
         except RejectedAction:

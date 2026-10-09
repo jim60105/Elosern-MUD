@@ -20,6 +20,7 @@ is synced to ``openspec/specs/divine-mystery/spec.md`` and is carried across
 the six cadence-scenario tests below beside the lineage IDs they establish.
 """
 
+from world.skills.registry.vocab import SkillEligibility
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -42,7 +43,7 @@ from world.rules.progression import (
     reset_practice_dedupe,
 )
 from world.skills.registry import SkillCategory, TargetSpec, validate_prerequisite_graph
-from world.tests.synthetic_data import make_skill
+from world.tests.synthetic_data import make_race, make_skill
 
 from ._combat_session_helpers import live_skill_registry, open_synthetic_scope
 
@@ -50,7 +51,7 @@ from ._combat_session_helpers import live_skill_registry, open_synthetic_scope
 # --- synthetic rows under test ----------------------------------------------
 #
 # Two distinct divine-mystery skills (the category the cadence gates) and one
-# 情慾秘術-shaped row: it declares the ``requires_divine_arts`` blood marker
+# 情慾秘術-shaped row: it requires the divine race capability
 # while living OUTSIDE the cadence's category and must keep today's unlimited
 # accrual, byte-for-byte.
 
@@ -58,6 +59,7 @@ _T_MYSTERY_1 = make_skill(
     "t_mystery_echo",
     label="回響神言",
     category=SkillCategory.DIVINE_MYSTERY,
+    eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)),
     target_spec=TargetSpec.SELF,
     cost={},
     effects=[],
@@ -66,23 +68,25 @@ _T_MYSTERY_2 = make_skill(
     "t_mystery_veil",
     label="幔之神言",
     category=SkillCategory.DIVINE_MYSTERY,
+    eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)),
     target_spec=TargetSpec.SELF,
     cost={},
     effects=[],
 )
-_T_DIVINE_LINE = make_skill(
-    "t_divine_sensual_rite",
-    label="性愛系統探針",
-    category=SkillCategory.SEXUAL_ACT,
-    requires_divine_arts=True,
-    target_spec=TargetSpec.SELF,
-    cost={},
-    effects=[],
-)
+_T_DIVINE_LINE = make_skill("t_divine_sensual_rite",
+label="性愛系統探針",
+category=SkillCategory.SEXUAL_ACT, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), target_spec=TargetSpec.SELF,
+cost={},
+effects=[],)
 _ALL_ROWS = {
     _T_MYSTERY_1.key: _T_MYSTERY_1,
     _T_MYSTERY_2.key: _T_MYSTERY_2,
     _T_DIVINE_LINE.key: _T_DIVINE_LINE,
+}
+_CAPABLE_RACE = make_race("t_duskmari", can_use_divine_arts=True)
+_CADENCE_EXTRA = {
+    "skills": _ALL_ROWS,
+    "races": {_CAPABLE_RACE.key: _CAPABLE_RACE},
 }
 
 
@@ -98,6 +102,7 @@ def _entity(
         key="stub",
         skills=SimpleNamespace(owned_keys=lambda: set(owned)),
         db=SimpleNamespace(
+            race=race,
             skill_proficiency=dict(proficiency or {}),
             affinity_elements=[],
             skills={"active": list(owned), "passive": []},
@@ -168,8 +173,13 @@ class _Scoped(unittest.TestCase):
             "skills",
             "races",
             "elements",
-            extra={"skills": _ALL_ROWS},
+            extra=_CADENCE_EXTRA,
         )
+        # These pure cadence actors model characters; runtime typeclass
+        # classification has its own integration matrix.
+        identity_patch = patch("world.skills.eligibility.actor_kind_for", return_value="player")
+        identity_patch.start()
+        self.addCleanup(identity_patch.stop)
         validate_prerequisite_graph(live_skill_registry())
 
 
@@ -257,6 +267,9 @@ class DigestionCadenceTests(_Scoped):
         "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
         "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
     )
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_divine_arts_skill_outside_the_category_accrues_twice_in_one_day(self):
         actor = _entity((_T_DIVINE_LINE.key,), race="t_duskmari")
         first = SimpleNamespace(pk=200, key="t1")
@@ -339,7 +352,7 @@ class DigestionCadenceResolveRollbackTests(EvenniaTest):
             "skills",
             "races",
             "elements",
-            extra={"skills": _ALL_ROWS},
+            extra=_CADENCE_EXTRA,
         )
         reset_practice_dedupe()
         self.char1.race = "t_duskmari"

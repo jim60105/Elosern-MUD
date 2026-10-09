@@ -162,7 +162,12 @@ class MovementCostMixin:
         if skills is None:
             return False
         owned = set(skills.owned_keys())
-        return bool(owned & self.movement_waiver_skill_keys)
+        from world.skills.restrictions import skill_effect_allowed
+
+        return any(
+            skill_effect_allowed(traversing_object, key)
+            for key in owned & self.movement_waiver_skill_keys
+        )
 
     def _has_lock_bypass(self, accessing_obj, no_superuser_bypass: bool) -> bool:
         """Mirror Evennia's stock lock-bypass (superuser) semantics.

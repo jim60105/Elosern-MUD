@@ -1,5 +1,6 @@
 """Slice of ``test_registry_structure``: ActFamilyTests.
 """
+from world.skills.registry.vocab import SkillEligibility
 from tools.spec_traceability import covers_requirement
 import inspect
 from dataclasses import replace
@@ -66,12 +67,9 @@ class ActFamilyTests(unittest.TestCase):
 
     @covers_requirement("sexual-act-registry::every-act-applying-pleasure-to-another-participant-applies-non-zero-pleasure-to-its-own-actor-unless-it-requires-divine-arts")
     def test_zero_actor_pleasure_ratio_is_accepted_for_a_divine_family(self):
-        skill, act = _seed_act_row(
-            "divine_row",
-            actor_pleasure_ratio=0.0,
-            requires_divine_arts=True,
-        )
-        self.assertTrue(skill.requires_divine_arts)
+        skill, act = _seed_act_row("divine_row",
+        actor_pleasure_ratio=0.0, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), )
+        self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
         self.assertEqual(act.actor_pleasure_ratio, 0.0)
 
     @covers_requirement("sexual-act-registry::every-act-applying-pleasure-to-another-participant-applies-non-zero-pleasure-to-its-own-actor-unless-it-requires-divine-arts")
@@ -83,11 +81,8 @@ class ActFamilyTests(unittest.TestCase):
                 self.assertIn("bad_finite_ratio", str(caught.exception))
             with self.subTest(ratio=bad, divine=True):
                 with self.assertRaises(ValueError):
-                    _seed_act_row(
-                        "bad_finite_ratio_divine",
-                        actor_pleasure_ratio=bad,
-                        requires_divine_arts=True,
-                    )
+                    _seed_act_row("bad_finite_ratio_divine",
+                    actor_pleasure_ratio=bad, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), )
 
     def test_non_integer_unlock_threshold_is_rejected(self):
         for bad in (True, 1.5, "1"):
@@ -120,12 +115,9 @@ class ActFamilyTests(unittest.TestCase):
     @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")
     def test_divine_act_declaring_a_target_part_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
-            _seed_act_row(
-                "bad_divine",
-                line="神之秘法",
-                target_part="私處",
-                requires_divine_arts=True,
-            )
+            _seed_act_row("bad_divine",
+            line="神之秘法",
+            target_part="私處", eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), )
         self.assertIn("bad_divine", str(caught.exception))
 
     @covers_requirement("sexual-act-registry::no-act-declares-the-generic-body-part-channel-only-異種-and-神之秘法-acts-may-omit-a-target-part")

@@ -82,10 +82,13 @@ class DivineMysteryFamilyInvariantTests(unittest.TestCase):
         ]
 
     @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_every_member_is_bloodline_gated(self):
         for key, skill in self._members():
             with self.subTest(skill=key):
-                self.assertTrue(skill.requires_divine_arts, key)
+                self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities), key)
 
     @covers_requirement(
         "divine-mystery::the-divine-mystery-family-takes-no-element-verb-and-costs-nothing",

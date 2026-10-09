@@ -256,7 +256,9 @@ class SemanticValidationTests(TestCase):
     @covers_requirement("import-validation::race-and-subrace-must-resolve-in-the-lore-registries-with-subrace-cross-checked-against-race", "import-validation::skills-and-passives-use-a-pluggable-registry-with-explicit-degraded-state-reporting")
     def test_skill_check_rejects_unknown_once_registry_exists(self):
         record = {"skills": ["known", "unknown"], "passives": ["passive"]}
-        non_divine_row = SimpleNamespace(requires_divine_arts=False)
+        from world.skills.registry import SkillEligibility
+
+        non_divine_row = SimpleNamespace(eligibility=SkillEligibility())
         with patch(
             "world.imports.validate._resolve_skill_registry",
             return_value={"known": non_divine_row, "passive": non_divine_row},
@@ -408,16 +410,19 @@ class DivineArtsSeedingGuardTests(TestCase):
             self.assertIn("disguised_stats", fields)
 
     @covers_requirement("import-validation::skill-ownership-requiring-divine-arts-is-rejected-for-a-non-divine-record")
+    @covers_requirement(
+        "import-validation::imports-validate-complete-closed-kits-against-authored-identity"
+    )
     def test_skill_ownership_race_guard(self):
         divine_race = make_race("t_divine_skill_race", can_use_divine_arts=True)
         with synthetic_registries(
             "races", "skills", extra={"races": {divine_race.key: divine_race}}
         ):
             divine_skill = next(
-                key for key, row in SYNTH_SKILLS.items() if row.requires_divine_arts
+                key for key, row in SYNTH_SKILLS.items() if ("can_use_divine_arts" in row.eligibility.required_capabilities)
             )
             mundane_skill = next(
-                key for key, row in SYNTH_SKILLS.items() if not row.requires_divine_arts
+                key for key, row in SYNTH_SKILLS.items() if not ("can_use_divine_arts" in row.eligibility.required_capabilities)
             )
             non_divine = sorted(SYNTH_RACES)[0]
 

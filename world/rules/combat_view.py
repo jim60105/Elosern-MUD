@@ -360,6 +360,10 @@ def _build_skills(
         skill = SKILL_REGISTRY.get(key)
         if skill is None or skill.kind is not SkillKind.ACTIVE:
             continue
+        from world.skills.eligibility import skill_identity_eligible
+
+        if not skill_identity_eligible(actor, skill):
+            continue
         if len(descriptors) >= MAX_SKILLS:
             raise CombatViewError("active-skill count exceeds presentation bounds")
         preview = preview_skill(actor, key, context, list(candidate_entities))

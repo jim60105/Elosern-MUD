@@ -410,6 +410,10 @@ def grant_owned_skill(
     definition = registry.get(skill_key)
     if definition is None:
         raise ValueError(f"cannot grant unknown skill {skill_key!r}")
+    from world.skills.eligibility import skill_identity_eligible
+
+    if not skill_identity_eligible(entity, definition):
+        raise ValueError(f"cannot grant identity-ineligible skill {skill_key!r}")
     list_name = "active" if definition.kind is SkillKind.ACTIVE else "passive"
     stored = dict(entity.db.skills or {})
     owned = list(stored.get(list_name, []))
@@ -440,6 +444,13 @@ def evaluate_cross_lineage_unlocks(
         if all(key in entity.skills.owned_keys() for key in rule.grants):
             continue
         if not all(clause_satisfied(entity, clause) for clause in rule.requires):
+            continue
+        from world.skills.eligibility import skill_identity_eligible
+
+        if not all(
+            skill_identity_eligible(entity, rulebook.registry[key])
+            for key in rule.grants
+        ):
             continue
         for grant_key in rule.grants:
             if grant_owned_skill(entity, grant_key, rulebook.registry):

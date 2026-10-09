@@ -2,6 +2,7 @@
 """
 
 from __future__ import annotations
+from world.skills.registry.vocab import SkillEligibility
 
 from world.lore.sexual_vocab import BODY_PARTS
 from world.skills.cost_tiers import CostTier
@@ -161,19 +162,15 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
     # divine affinity, mirroring the shipped fixture's human casting a divine
     # row (the carrier keeps its place as the panel's first-owned utility
     # row).
-    "t_rock_quietus": SkillDef(
-        key="t_rock_quietus",
-        label="岩中授語",
-        description="以岩層深處的寂靜，將沉穩的步伐授與目標。",
-        kind=SkillKind.ACTIVE,
-        target_spec=TargetSpec.SINGLE,
-        cost={},
-        usable_out_of_combat=True,
-        element=None,
-        requires_divine_arts=True,
-        effects=["confer_skill_partial"],
-        category=SkillCategory.UTILITY,
-    ),
+    "t_rock_quietus": SkillDef(key="t_rock_quietus",
+    label="岩中授語",
+    description="以岩層深處的寂靜，將沉穩的步伐授與目標。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={},
+    usable_out_of_combat=True,
+    element=None, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), effects=["confer_skill_partial"],
+    category=SkillCategory.UTILITY,),
 }
 
 # One synthetic sexual act: the paired SkillDef shares the act key and lives

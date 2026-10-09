@@ -6,6 +6,7 @@ Module-level fixtures moved verbatim from the original flat module (not a
 collected test module).
 """
 
+from world.skills.registry.vocab import SkillEligibility
 from tools.spec_traceability import covers_requirement
 import inspect
 from dataclasses import replace
@@ -150,7 +151,7 @@ def _seed_act_row(
     sexual_events: tuple[str, ...] = (),
     resistible: bool = True,
     pair_events: tuple[tuple[tuple[str, str], str], ...] = (),
-    requires_divine_arts: bool = False,
+    eligibility: SkillEligibility = SkillEligibility(),
 ) -> tuple[SkillDef, SexualActDef]:
     """Build one synthetic act row for contract tests without catalog content.
 
@@ -177,7 +178,7 @@ def _seed_act_row(
     (skill, act), = _act_family(
         line,
         row,
-        requires_divine_arts=requires_divine_arts,
+        eligibility=eligibility,
     )
     return skill, act
 
