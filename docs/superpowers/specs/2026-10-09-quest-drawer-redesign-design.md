@@ -1,7 +1,7 @@
 # Quest Drawer Redesign Design
 
 **Date:** 2026-10-09
-**Status:** Visual design approved through the Storybook prototype; written specification pending review; implementation not started.
+**Status:** Visual design approved through the Storybook prototype. Split into five OpenSpec changes (§9); implementation not started.
 **Scope:** Replace the quest drawer's stacked 我的任務簿 and 公會櫃台 sections with one two-level tabbed master/detail surface, and give the `quest_log` and `services` guild-board payloads the structured fields that surface needs.
 
 The current drawer stacks two text-heavy cards. In the live client every quest-book row repeats itself: `detail` is the multi-line `describe_quest_detail()` blob (name, state, stage, objective, progress, grade, rationale, flavor, reward), which the client renders as one run-on paragraph under fields that already show the same facts. `reward_line` already starts with 獎勵：, so the client prints 獎勵：獎勵：. The client renders the 0-based `stage_index` as 第 0 階段 while the blob says 階段：1. The board shows only a name, one objective line, and a reward string, so a player cannot judge an offer before accepting it.
@@ -59,7 +59,7 @@ Two icon-only tabs: 任務簿 (scroll glyph) and 公會櫃檯 (guild-shield glyp
 A vertical icon tablist (`aria-orientation="vertical"`). The active tab joins the list column (the list background, no right border, a 3px seal-red marker on its left edge). Each tab shows a count badge when its count is non-zero, and a tooltip on hover and focus.
 
 - **任務簿 rail:** 進行中 (hourglass), 已完成 (circled check), 失敗 (circled cross). Badges are ink-and-gold. The 已完成 badge turns seal-red ("hot") only when at least one completed row has an enabled counter `turnin` descriptor, which marks it as the one actionable state. Default tab: 進行中.
-- **公會櫃檯 rail:** seven difficulty gems, F E D C B A S, always in that order so positions never move. A small gold dot marks the player's own rank. A grade with no listed offers is dimmed. Grades above the player's rank are shown locked (dimmed, lock treatment), because `list_guild_offers()` only lists offers at or below the actor's rank. Their empty state says the grade opens after promotion, a fact the server rule guarantees, so it is not an invention. Default tab: the highest grade at or below the player's rank that has offers, or else the player's own rank.
+- **公會櫃檯 rail:** one difficulty gem per key of the guild section's `rank_ladder` (today F E D C B A S), always in ladder order so positions never move. The client never hardcodes the ladder. A small gold dot marks the player's own rank. A grade with no listed offers is dimmed. Grades above the player's rank are shown locked (dimmed, lock treatment), because `list_guild_offers()` only lists offers at or below the actor's rank. Their empty state says the grade opens after promotion, a fact the server rule guarantees, so it is not an invention. Default tab: the highest grade at or below the player's rank that has offers, or else the player's own rank.
 
 Unregistered holder: the counter tab renders no rail. The content area shows a centered registration card: 未加入公會, plus the `registration.register` descriptor's button, or its disabled reason when the descriptor is disabled.
 
@@ -132,13 +132,13 @@ Row fields removed: `detail` and `reward_line`. Row fields added:
 | `rationale` | string or null | `definition.rating_rationale_zh`, verbatim |
 | `flavor` | string or null | `definition.background_flavor_zh`, verbatim |
 | `reward` | `{copper, merit, items: [{item_key, display_name, quantity}]}` or null | the resolved issuance's `QuestReward`; item names from `ITEM_REGISTRY` |
-| `reward_claimed` | boolean | `quest_id in parse_reward_claims(owner)`; true for completed auto-settled rows |
+| `reward_claimed` | boolean | `quest_id in parse_reward_claims(owner)`; counter turn-in and auto settlement write the same ledger |
 
-`objective_line` now excludes the variant clause. `settlement` and `reward` are null together or present together, the existing coherence rule moved from `reward_line` to `reward`. `stage_index` stays 0-based on the wire. The client renders `stage_index + 1`. The prose fields reuse the definition-registration bounds (`MAX_DEFINITION_PROSE_LENGTH`). The item list is bounded by the offer's own item count. The canonical-JSON envelope check is unchanged and must still pass at `QUEST_LOG_MAX_ROWS` rows with maximal prose; the presenter tests cover that case.
+`objective_line` now excludes the variant clause. `settlement` and `reward` are null together or present together, the existing coherence rule moved from `reward_line` to `reward`. `stage_index` stays 0-based on the wire. The client renders `stage_index + 1`. The prose fields reuse the definition-registration bounds (`MAX_DEFINITION_PROSE_LENGTH`). The item list is capped at eight entries at the panel (`QUEST_LOG_MAX_REWARD_ITEMS`), guarded by a tagged data-contract test over every registered offer and issuance. The canonical-JSON envelope check is unchanged and must still pass at `QUEST_LOG_MAX_ROWS` rows with maximal prose; the presenter tests cover that case.
 
 ### 4.2 `services` v5 → v6 (guild board rows only)
 
-Board row fields removed: `reward_summary`. Added: `category`, `objective_note`, `deadline_line` (string or null, from §4.3's offer-deadline seam), `rationale`, `flavor`, `reward` (the same object shape as §4.1, never null on a board row). The guild section gains `branch_label`, the local branch's `display_name_zh`, which is the issuer label of every board row. `objective_summary` keeps its name and drops the variant clause. The `quests` rows and the registration and rank objects are unchanged.
+Board row fields removed: `reward_summary`. Added: `category`, `objective_note`, `deadline_line` (string or null, from §4.3's offer-deadline seam), `rationale`, `flavor`, `reward` (the same object shape as §4.1, never null on a board row). The guild section gains `branch_label`, the local branch's `display_name_zh` and the issuer label of every board row, and `rank_ladder`, every guild rank key in ascending order, which the grade rail and the lock rule read. The board still never carries offers above the holder's rank. `objective_summary` keeps its name and drops the variant clause. The `quests` rows and the registration and rank objects are unchanged.
 
 ### 4.3 Describe seams (`world/quests/describe.py`)
 
@@ -157,7 +157,7 @@ The Python validators (`web/webclient/presentation/quest_log.py`, `services.py`)
 |---|---|
 | `components/quest-drawer-model.js` | Pure functions: rows per state, counts, hot-badge flag, the board grouped by grade, the default grade, grade lock, the `quest_id` counter merge, and the normalized detail view model (book row and board row → one shape). Fully unit-tested. |
 | `components/QuestDrawer.vue` | Frame, first-level tabs, tab memory, rail selection, and composition of the units below. Emits the existing intents (`quest_track`, `quest_abandon`, `quest_turnin`, `quest_register`, `quest_accept`, `exam_request`). |
-| `components/IconTabRail.vue` | Generic vertical icon tablist: roving tabindex, arrow keys, tooltip, badge, and locked/dim states. Used by both rails. |
+| `components/IconTabs.vue` | Generic icon tablist, horizontal or vertical: roving tabindex, arrow keys, tooltip, badge, and locked/dim states. Used by the first-level tabs and both rails. |
 | `components/QuestList.vue` | Heading plus listbox rows, and the empty states. |
 | `components/QuestDetail.vue` | Hero, progress, conditions, letter, rewards, and the action bar (actions passed in as resolved descriptors). |
 | `components/GradeGem.vue` | The grade seal (§3.4). |
@@ -188,6 +188,57 @@ The Python validators (`web/webclient/presentation/quest_log.py`, `services.py`)
 - No grade-ladder page or per-rank thresholds beyond what the rank card already shows.
 - No board category filter; category is shown per row only.
 
-## 9. OpenSpec
+## 9. OpenSpec Changes and Batch Order
 
-Implementation ships as one OpenSpec change, `redesign-quest-drawer`, with delta specs for the quest-log panel, services panel, and webclient drawer capabilities. This document records the approved design. It does not change any main capability spec by itself.
+Implementation ships as five OpenSpec changes under `openspec/changes/`. Each one is sized for one engineer-day and keeps `master` deployable on its own. This document records the approved design; it changes no main capability spec by itself.
+
+| # | Change | Delivers | Spec deltas | Size | Worker |
+|---|---|---|---|---|---|
+| 1 | `quest-log-structured-rows` | `quest_log` v2 (§4.1), the objective-parts and reward-parts seams (§4.3), the JS mirror and parity contracts, realistic quest-log fixtures, and an interim `QuestLog.vue` adaptation | MODIFIED/RENAMED `webclient-quest-log-panel`; MODIFIED `webclient-service-menus` | ~7h | Logic |
+| 2 | `guild-board-structured-offers` | `services` v6 (§4.2) with `branch_label` and `rank_ladder`, the offer-deadline seam, the JS mirror, realistic services fixtures, and an interim `GuildCounter.vue` board adaptation | MODIFIED/ADDED `webclient-service-menus` | ~6h | Logic |
+| 3 | `quest-drawer-ui-primitives` | `IconTabs`, `GradeGem`, the new glyphs (§3.9), and the `GuildRankCard` extraction (§3.7), each with Storybook stories and manifest entries | none (`skip_specs`) | ~6h | **Visual** |
+| 4 | `quest-drawer-book-tab` | `QuestDrawer` shell, `quest-drawer-model.js`, `QuestList`, `QuestDetail`, the live quest book tab; deletes `QuestLog.vue`; the counter tab hosts the legacy counter | ADDED new capability `webclient-quest-drawer`; REMOVED four `webclient-service-menus` requirements | ~8h | **Visual** |
+| 5 | `quest-drawer-guild-board-tab` | The grade-tabbed board, the rank card above the list, offer detail and accept, the registration card; deletes `GuildCounter.vue` and its skin rules | ADDED `webclient-quest-drawer`; REMOVED one `webclient-service-menus` requirement | ~7h | **Visual** |
+
+**Worker:** *Logic* changes are payload, validator, and contract work with no visual judgment. *Visual* changes need a worker with visual ability that can read screenshots, drive `agent-browser`, and match the `Design/QuestDrawerRedesign` prototype pixel for pixel. Their tasks include side-by-side visual parity reviews.
+
+### 9.1 Dependencies
+
+- 2 depends on 1 (shared seams, reward shape, category keys).
+- 4 depends on 1 and 3.
+- 5 depends on 2, 3, and 4.
+- 1 and 3 have no dependencies.
+
+### 9.2 Apply batch order
+
+```text
+Batch 1 (parallel):  1 quest-log-structured-rows    3 quest-drawer-ui-primitives
+Batch 2 (parallel):  2 guild-board-structured-offers 4 quest-drawer-book-tab
+Batch 3:             5 quest-drawer-guild-board-tab
+```
+
+Start each batch only after every change in the previous batch has merged.
+
+### 9.3 Archive order
+
+Archive strictly 1 → 2 → 4 → 5. Change 3 has no deltas and can archive any time after it merges. Any other order fails `openspec archive`:
+
+- Change 4 REMOVES a requirement that change 1 MODIFIES.
+- Change 5 adds to the capability that change 4 creates.
+- Change 5 REMOVES a requirement that change 2 adds.
+
+### 9.4 Code conflicts
+
+| Changes | Shared files | Handling |
+|---|---|---|
+| 1 ↔ 2 | `world/quests/describe.py`, protocol `constants.js`, protocol fixtures | Sequenced: 2 starts after 1 merges. |
+| 2 ↔ 3 | `GuildCounter.vue` | Unordered within the plan. If 3 merges first, 2 edits only the board markup, because the rank block already lives in `GuildRankCard.vue`. |
+| 2 ↔ 4 | `web/tests/browser/test_browser_services_quest_drawer.py` | Parallel. 2 bumps one injected services payload; 4 rewrites the journeys. Rebase whichever lands second. |
+| 2 ↔ 5 | `test_browser_services_guild.py`, services browser seed, services story fixtures, `GuildCounter.vue` | Sequenced. |
+| 3 ↔ 4 ↔ 5 | `component-manifest.json`, the showcase evidence key sets | Sequenced. Each change adds or removes its own titles following the `World/LettersPanel` precedent. |
+| 4 ↔ 5 | `QuestDrawer.vue`, `quest-drawer-model.js`, drawer stories, `test_node_suite_evidence.py` | Sequenced. 5 extends what 4 builds. |
+
+### 9.5 Notes
+
+- Sizing risk: 4 is the tightest. Its visual parity review (task 5.2) is the only deferrable item, and any deferral is recorded in tasks.md.
+- The prototype under `docs/design/quest-drawer-redesign/` stays as reference until 5 is archived. Whether to retire it, together with its Storybook glob, is left to the user.
