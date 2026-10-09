@@ -2,6 +2,8 @@
 
 The later guild-exam lifecycle calls preflight against its proposed real kit,
 then activates inside its start transaction. This module never starts an exam.
+The module-level profile map is validated at import (rulebook tests re-seat it
+through the idempotent ``reload_restriction_profiles`` re-validation).
 """
 
 from collections.abc import Mapping
@@ -109,7 +111,28 @@ def load_restriction_profiles(document: Mapping) -> Mapping[str, RestrictionProf
     return MappingProxyType(profiles)
 
 
-PROFILES = load_restriction_profiles(yaml.safe_load((Path(__file__).parent / "rulebook" / "guild_exam_restrictions.yaml").read_text()))
+#: The shipped rulebook this module validates at import and on every reload.
+_RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "guild_exam_restrictions.yaml"
+
+#: The live restriction profile map, keyed by examination rank. Preflight reads
+#: it through the module attribute at call time; ``reload_restriction_profiles``
+#: rebinds it so a rulebook test or synthetic scope can re-seat the shipped
+#: rows.
+PROFILES: Mapping[str, RestrictionProfile] = load_restriction_profiles(
+    yaml.safe_load(_RULEBOOK_PATH.read_text())
+)
+
+
+def reload_restriction_profiles(path: Path | None = None) -> None:
+    """Re-validate and rebind the profile map (idempotent startup sync).
+
+    Reload outside any open synthetic scope: it rebinds the live map to the
+    production rows, so profiles a still-open exam scope patched in are dropped
+    mid-test (the scope's restore closure then reverts them).
+    """
+    global PROFILES
+    document = yaml.safe_load((path or _RULEBOOK_PATH).read_text())
+    PROFILES = load_restriction_profiles(document)
 
 
 def _permitted_neutral(host, profile, key):

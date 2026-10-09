@@ -48,6 +48,7 @@ def _late(module: str, name: str):
 STARTUP_STEP_ORDER: tuple[str, ...] = (
     "world_clock_init",
     "equipment_rulebook_validation",
+    "guild_exam_restriction_validation",
     "starting_companion_validation",
     "state_reaction_rules",
     "npc_persona_roster_validation",
@@ -453,6 +454,16 @@ def at_server_start():
     _startup_step(
         "equipment_rulebook_validation",
         lambda: importlib.import_module("world.rules.equipment_effects"),
+    )
+    # Fail-loud guild-exam restriction rulebook validation
+    # (guild-exam-restriction-policy): importing the module validates every
+    # authored restriction row against the shipped items and skills, and the
+    # exam command path is its only other consumer. Without this eager import a
+    # malformed rulebook would surface mid-examination instead of aborting boot
+    # before any world sync, exactly like the equipment gate above.
+    _startup_step(
+        "guild_exam_restriction_validation",
+        lambda: importlib.import_module("world.rules.guild_exam_restrictions"),
     )
     # Fail-loud starting-companion bounds validation (preset-companion-
     # activation): importing the module runs its registry sweep against the

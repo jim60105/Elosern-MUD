@@ -136,6 +136,7 @@ class StartupStepEventTests(_StubbedStartup):
             [
                 "world_clock_init",
                 "equipment_rulebook_validation",
+                "guild_exam_restriction_validation",
                 "starting_companion_validation",
                 "state_reaction_rules",
                 "npc_persona_roster_validation",
@@ -164,21 +165,43 @@ class StartupStepEventTests(_StubbedStartup):
             [
                 "world_clock_init",
                 "equipment_rulebook_validation",
+                "guild_exam_restriction_validation",
                 "starting_companion_validation",
                 "state_reaction_rules",
             ],
         )
 
-    def test_starting_companion_import_failure_aborts_boot(self):
+    def test_fail_loud_import_gate_failures_abort_boot_at_their_step(self):
+        # guild-exam-restriction-policy: the guild-exam restriction rulebook is
+        # validated at import of an otherwise command-path-only module, so the
+        # boot gate must import it eagerly instead of letting a malformed
+        # rulebook surface mid-examination.
+        self._assert_import_gate(
+            "world.rules.guild_exam_restrictions",
+            "guild_exam_restriction_validation",
+            preceding=("world_clock_init", "equipment_rulebook_validation"),
+        )
         # preset-companion-activation: the bounds sweep is a boot gate. The
         # name-aware side effect raises only for the companion module, so the
         # abort is provably attributed to that step, not to the generic
         # import seam.
+        self._assert_import_gate(
+            "world.rules.starting_companions",
+            "starting_companion_validation",
+            preceding=(
+                "world_clock_init",
+                "equipment_rulebook_validation",
+                "guild_exam_restriction_validation",
+            ),
+        )
+
+    def _assert_import_gate(self, module, step, *, preceding):
+        """Assert a fail-loud import gate aborts boot at its own catalog step."""
         from unittest.mock import MagicMock
 
         def import_module(name, *args, **kwargs):
-            if name == "world.rules.starting_companions":
-                raise RuntimeError("bad companion bounds")
+            if name == module:
+                raise RuntimeError(f"invalid {module}")
             return MagicMock()
 
         info, warn, error = self._run(
@@ -187,13 +210,11 @@ class StartupStepEventTests(_StubbedStartup):
         )
         error.assert_called_once()
         self.assertEqual(error.call_args.args[0], "startup_step_failed")
-        self.assertEqual(
-            error.call_args.kwargs["context"],
-            {"step": "starting_companion_validation"},
-        )
+        self.assertEqual(error.call_args.kwargs["context"], {"step": step})
         warn.assert_not_called()
-        # The failure is fail-loud and precedes every sync step.
-        self.assertEqual(self._steps(info), ["world_clock_init", "equipment_rulebook_validation"])
+        # The failure is fail-loud and precedes every sync step; the failing
+        # step itself emits only ``startup_step_failed``, never ``startup_step``.
+        self.assertEqual(self._steps(info), list(preceding))
 
     def test_tolerant_registration_failure_degrades_and_startup_continues(self):
         from world.ai.guardrail import GuardrailRegistrationError

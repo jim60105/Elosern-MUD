@@ -8,10 +8,11 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.npcs import NPC
 from typeclasses.characters import PlayerCharacter
+from world.rules import guild_exam_restrictions
 from world.lore.items import EquipmentModifierKey
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.action_preview import preview_skill
@@ -22,7 +23,8 @@ from world.rules.equipment import InventoryError, materialize_registry_object, p
 from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.guild_exam_restrictions import (
     RestrictionError, RestrictionProfile, activate_exam_restriction,
-    preflight_exam_restriction, remove_exam_restriction,
+    preflight_exam_restriction, reload_restriction_profiles,
+    remove_exam_restriction,
 )
 from world.rules.progression import can_use_skill
 from world.rules.cross_lineage_unlock import UnlockRulebook
@@ -259,3 +261,16 @@ class RestrictionBehaviorTests(EvenniaTest):
     def test_player_is_not_eligible_for_host_restriction(self):
         with self.assertRaisesRegex(RestrictionError, "NPC host"):
             preflight_exam_restriction(self.player, "T")
+
+
+class RestrictionRulebookReloadTests(EvenniaTestCase):
+    """The reload hook re-seats the shipped rows for rulebook tests."""
+
+    def test_reload_reseats_the_shipped_profiles(self):
+        shipped = dict(guild_exam_restrictions.PROFILES)
+        with patch.object(guild_exam_restrictions, "PROFILES", {"T": _PROFILE}):
+            reload_restriction_profiles()
+            reload_restriction_profiles()
+            self.assertEqual(dict(guild_exam_restrictions.PROFILES), shipped)
+        # The scope's restore closure reverts the reload, per the hook contract.
+        self.assertEqual(dict(guild_exam_restrictions.PROFILES), shipped)
