@@ -496,6 +496,7 @@ class PointerServiceAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptance
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"
     )
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_pointer_service_submenu_submission(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

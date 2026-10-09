@@ -149,6 +149,7 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_keyboard_service_journey_frameless_drawer(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

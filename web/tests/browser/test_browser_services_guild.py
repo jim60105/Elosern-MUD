@@ -38,6 +38,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_register_and_idempotent_reregister(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -78,6 +79,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_viewport_reference_keeps_controls_visible(self):
         page = self.logged_in_page((1451, 790))
         panel = self._wait_services_available(page)
@@ -99,6 +101,9 @@ class GuildBoardJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
+    @covers_requirement("webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board")
+    @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
     def test_board_list_to_accept(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -138,6 +143,8 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
+    @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
     def test_board_frame_refreshes_on_committed_update(self):
         """The guild counter's board re-renders on a committed update."""
         page = self.logged_in_page()
@@ -170,6 +177,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
 
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
     def test_grade_rail_reaches_a_locked_grade_by_keyboard(self):
         """The grade above the holder's rank is locked: selecting it by
         keyboard lists no offer, shows no detail or accept, and says the grade

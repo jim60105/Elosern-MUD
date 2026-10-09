@@ -162,6 +162,10 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-contextual-hud::mutations-issued-from-a-drawer-keep-the-dispatch-and-confirmation-contract"
     )
+    @covers_requirement("webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs")
+    @covers_requirement("webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board")
+    @covers_requirement("webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action")
+    @covers_requirement("webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board")
     def test_drawer_mutations_dispatch_and_confirmation(self):
         # Drawer affordances emit the server-authored action id + payload through
         # the single dispatch entry, locked with in-flight / epoch / revision

@@ -630,11 +630,11 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
-    # Until archive sync removes this requirement (re-pointed to the
-    # webclient-quest-drawer board requirements), the offer detail carries
-    # the structured board offer's reward and null optional facts.
     @covers_requirement(
-        "webclient-service-menus::the-guild-counter-renders-the-structured-board-offer",
+        "webclient-quest-drawer::the-guild-board-is-organized-by-difficulty-grade-tabs",
+        "webclient-quest-drawer::the-counter-tab-shows-the-rank-card-above-the-board",
+        "webclient-quest-drawer::selecting-a-board-offer-shows-its-detail-and-the-accept-action",
+        "webclient-quest-drawer::an-unregistered-holder-sees-registration-instead-of-the-board",
     )
     def test_guild_board_tab_vitest_evidence_passes(self):
         """The quest drawer model and drawer suites are the executed evidence
