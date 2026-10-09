@@ -32,7 +32,10 @@ from world.quests.describe import (
     QuestDescribeError,
     describe_destination,
     describe_objective,
+    describe_objective_parts,
     describe_quest_detail,
+    describe_reward,
+    describe_reward_parts,
 )
 from world.quests.runtime import QuestRecord, QuestState
 from world.rules.guild_offers import (
@@ -104,6 +107,10 @@ def _offer() -> GuildQuestOffer:
 
 @synthetic_registries("monster_tiers", "anchors", "anchor_placements", "items")
 class DescribeObjectiveTests(unittest.TestCase):
+    def test_non_hunt_parts_have_no_note(self):
+        objective = defeat(bound=True, quantity=3)
+        self.assertEqual(describe_objective_parts(objective), ("討伐綁定的目標 3 個", None))
+
     @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
     def test_defeat_tier_renders_tier_and_quantity(self):
         tier = SYNTH_MONSTER_TIERS[_T_TIER]
@@ -350,6 +357,19 @@ def _grade_text(definition: QuestDefinition) -> str:
 class SpeciesHuntDescribeTests(unittest.TestCase):
     """The hunt's requirement line is registry-resolved and deterministic."""
 
+    def test_parts_preserve_the_legacy_requirement(self):
+        objective = _hunt_objective()
+        line = (
+            f"在{SYNTH_REGIONS[_HUNT_REGION].display_name_zh}討伐 2 隻"
+            f"{SYNTH_MONSTER_SPECIES[_HUNT_SPECIES].display_name_zh}"
+        )
+        note = "計數變體：" + "、".join(
+            SYNTH_MONSTER_VARIANTS[key].display_name_zh
+            for key in sorted((_HUNT_ORDINARY, _HUNT_STRONGER))
+        )
+        self.assertEqual(describe_objective_parts(objective), (line, note))
+        self.assertEqual(describe_objective(objective), f"{line}（{note}）")
+
     @covers_requirement(
         "quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive"
     )
@@ -505,6 +525,34 @@ class AuthoredProseDescribeTests(unittest.TestCase):
         definition = self._definition(rank="t_absent_rank")
         text = describe_quest_detail(_record(), definition, None, 0)
         self.assertIn("階級：t_absent_rank", text)
+
+
+@synthetic_registries("items")
+class DescribeRewardPartsTests(unittest.TestCase):
+    def test_empty_and_ordered_item_rewards_preserve_text(self):
+        keys = list(SYNTH_ITEMS)[:2]
+        for quantities in ((), tuple(ItemQuantity(key, index + 2) for index, key in enumerate(keys))):
+            with self.subTest(items=quantities):
+                reward = QuestReward(copper=50, merit=0, items=quantities)
+                parts = describe_reward_parts(reward)
+                self.assertEqual(parts, {
+                    "copper": 50, "merit": 0,
+                    "items": [
+                        {"item_key": item.item_key,
+                         "display_name": SYNTH_ITEMS[item.item_key].display_name_zh,
+                         "quantity": item.quantity}
+                        for item in quantities
+                    ],
+                })
+                from types import SimpleNamespace
+                expected = "獎勵：銅 50、功績 0"
+                for item in quantities:
+                    expected += f"、{SYNTH_ITEMS[item.item_key].display_name_zh} × {item.quantity}"
+                self.assertEqual(describe_reward(SimpleNamespace(reward=reward)), expected)
+
+    def test_unknown_reward_item_raises_describe_error(self):
+        with self.assertRaises(QuestDescribeError):
+            describe_reward_parts(QuestReward(copper=0, merit=0, items=(ItemQuantity("t_absent_item", 1),)))
 
 
 if __name__ == "__main__":

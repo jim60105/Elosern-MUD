@@ -69,29 +69,35 @@ def describe_destination(locator: RoomLocator | None) -> str:
 
 def describe_objective(objective: QuestObjective) -> str:
     """Render one objective into a single Traditional Chinese requirement line."""
+    line, note = describe_objective_parts(objective)
+    return line if note is None else f"{line}（{note}）"
+
+
+def describe_objective_parts(objective: QuestObjective) -> tuple[str, str | None]:
+    """Return the requirement and optional counted-variant note separately."""
     if objective.kind is ObjectiveKind.DEFEAT:
         if objective.region_key is not None:
             return _describe_species_hunt(objective)
         if objective.requires_bound_targets:
-            return f"討伐綁定的目標 {objective.quantity} 個"
+            return f"討伐綁定的目標 {objective.quantity} 個", None
         tier = MONSTER_TIER_REGISTRY.get(objective.monster_tier)
         if tier is None:
             raise QuestDescribeError(f"unknown monster tier {objective.monster_tier!r}")
-        return f"討伐 {objective.quantity} 隻{tier.display_name_zh}魔物"
+        return f"討伐 {objective.quantity} 隻{tier.display_name_zh}魔物", None
     if objective.kind is ObjectiveKind.REACH:
-        return f"抵達{describe_destination(objective.destination)}"
+        return f"抵達{describe_destination(objective.destination)}", None
     if objective.kind is ObjectiveKind.ESCORT:
-        return f"護送所有保護對象至{describe_destination(objective.destination)}"
+        return f"護送所有保護對象至{describe_destination(objective.destination)}", None
     if objective.kind is ObjectiveKind.ACQUIRE:
         item = ITEM_REGISTRY.get(objective.item_key)
         if item is None:
             raise QuestDescribeError(f"unknown item {objective.item_key!r}")
-        return f"收集 {objective.quantity} 個{item.display_name_zh}"
+        return f"收集 {objective.quantity} 個{item.display_name_zh}", None
     if objective.kind is ObjectiveKind.DELIVER:
         item = ITEM_REGISTRY.get(objective.item_key)
         if item is None:
             raise QuestDescribeError(f"unknown item {objective.item_key!r}")
-        return f"交付 {objective.quantity} 個{item.display_name_zh}"
+        return f"交付 {objective.quantity} 個{item.display_name_zh}", None
     raise QuestDescribeError(f"unknown ObjectiveKind {objective.kind!r}")
 
 
@@ -106,7 +112,7 @@ def _countable_variant_names(objective: QuestObjective) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _describe_species_hunt(objective: QuestObjective) -> str:
+def _describe_species_hunt(objective: QuestObjective) -> tuple[str, str | None]:
     """Render one regional species-hunt objective from the shared registries."""
     region = WILDERNESS_REGION_REGISTRY.get(objective.region_key)
     if region is None:
@@ -121,7 +127,8 @@ def _describe_species_hunt(objective: QuestObjective) -> str:
     variants = "、".join(_countable_variant_names(objective))
     return (
         f"在{region.display_name_zh}討伐 {objective.quantity} 隻"
-        f"{species.display_name_zh}（計數變體：{variants}）"
+        f"{species.display_name_zh}",
+        f"計數變體：{variants}",
     )
 
 
@@ -154,14 +161,29 @@ def _deadline_line(deadline_tick: int | None, current_tick: int) -> str | None:
     return f"期限：剩餘 {hours} 小時"
 
 
+def describe_reward_parts(reward: Any) -> dict[str, Any]:
+    """Return reward values with registry-owned item names in declared order."""
+    items = []
+    for quantity in reward.items:
+        item = ITEM_REGISTRY.get(quantity.item_key)
+        if item is None:
+            raise QuestDescribeError(f"unknown item {quantity.item_key!r}")
+        items.append({
+            "item_key": quantity.item_key,
+            "display_name": item.display_name_zh,
+            "quantity": quantity.quantity,
+        })
+    return {"copper": reward.copper, "merit": reward.merit, "items": items}
+
+
 def describe_reward(offer: Any) -> str:
     """Render one offer's reward into a single Traditional Chinese line."""
-    reward = offer.reward
+    reward = describe_reward_parts(offer.reward)
     item_text = "、".join(
-        f"{ITEM_REGISTRY[quantity.item_key].display_name_zh} × {quantity.quantity}"
-        for quantity in reward.items
+        f"{item['display_name']} × {item['quantity']}"
+        for item in reward["items"]
     )
-    line = f"獎勵：銅 {reward.copper}、功績 {reward.merit}"
+    line = f"獎勵：銅 {reward['copper']}、功績 {reward['merit']}"
     if item_text:
         line += f"、{item_text}"
     return line
