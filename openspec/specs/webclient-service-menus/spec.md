@@ -6,9 +6,9 @@ The read-only version-2 `services` panel payload (host resolution, player summar
 
 ### Requirement: The services panel is an exact read-only exploration-mode panel
 
-The production presentation registry SHALL register `services` schema version 5. Its available payload SHALL
+The production presentation registry SHALL register `services` schema version 6. Its available payload SHALL
 contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and
-`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 5.
+`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 6.
 The presenter SHALL strictly read canonical records and registries through the no-mutation service read model.
 
 #### Scenario: Exploration snapshot carries the full services panel
@@ -138,10 +138,11 @@ host, `rank` the hall's `GuildExaminer` exam counter (never the qualified persis
 
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
 
-The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and `rank` and SHALL be present only
-when exactly one local `GuildStaff` host resolves. `board` and `quests` SHALL be bounded lists of at most 12
-deterministic rows with server-rendered text; `rank` SHALL report true-merit `merit_qualified` separately from its
-`guild.exam_request` descriptor, whose enabledness never depends on merit or host attendance.
+The `guild` section SHALL contain exactly `branch_label`, `rank_ladder`, `registration`, `board`, `quests`, and
+`rank`, and SHALL require exactly one local `GuildStaff` host. `branch_label` SHALL name that host's branch,
+`rank_ladder` every guild rank key in ascending order. `board` and `quests` SHALL be bounded lists of at most 12
+deterministic server-rendered rows. `rank` SHALL report true-merit `merit_qualified` separately from its merit- and
+host-independent `guild.exam_request` descriptor.
 
 #### Scenario: Unregistered player can register
 - **WHEN** an unregistered actor stands in the guild hall
@@ -184,7 +185,8 @@ deterministic rows with server-rendered text; `rank` SHALL report true-merit `me
 #### Scenario: Board rows carry their exact fields in board API order
 - **WHEN** the `board` list ships
 - **THEN** it holds at most 12 offer rows in the deterministic rank/key order returned by the board API, each
-  containing exactly `definition_key`, `display_name`, `objective_summary`, `reward_summary`, `rank`, and `accept`
+  containing exactly `definition_key`, `display_name`, `category`, `rank`, `objective_summary`, `objective_note`,
+  `deadline_line`, `rationale`, `flavor`, `reward`, and `accept`, and no `reward_summary`
 
 #### Scenario: Board accept gates on eligibility and no active record
 - **WHEN** a board offer row's `accept` descriptor is computed
@@ -692,3 +694,66 @@ Each quest book row SHALL render the issuer label from its `quest_log` row and S
 #### Scenario: The reward renders from the structured object exactly once
 - **WHEN** a row's `reward` carries copper 50, merit 25, and two of one item
 - **THEN** the row shows the copper amount, the merit amount, and the item name with quantity two, and the reward label appears once
+
+### Requirement: Board offers carry structured facts from the canonical seams
+
+Each board row SHALL describe its offer through the quest log's seams and vocabularies: the closed `category`
+keys, an objective line and note composing to `describe_objective`, the offer-deadline seam, verbatim authored
+`rationale` and `flavor`, and the quest log's non-null `reward` shape. The board SHALL never disagree with the
+quest book.
+
+#### Scenario: Structured facts have closed bounds
+- **WHEN** a guild section carries structured board facts
+- **THEN** `objective_note` is null or a non-empty string of at most 128 Unicode code points, `deadline_line` is null or a non-empty string of at most 64 code points, and verbatim `rationale` and `flavor` are each null or non-empty strings of at most 55 code points
+- **AND** `reward.items` retains the quest log's one-item ceiling
+- **AND** `branch_label` is non-empty and at most 256 code points, and `rank_ladder` contains 1..16 unique non-empty keys of at most eight code points, including every board rank and non-null rank-section rank and next rank
+
+#### Scenario: Twelve maximal board rows fit the existing maximal-section envelope
+- **WHEN** twelve board rows carry every board string at its bound and one maximal reward item apiece alongside the existing realistic maximal quest, shop, and inventory sections
+- **THEN** the services payload remains within the 65,536-byte envelope, while an over-bound board prose field is rejected without truncation
+
+#### Scenario: A species-hunt offer splits its variant clause
+- **WHEN** the board lists a regional species-hunt offer
+- **THEN** `objective_summary` names the region, quantity, and species, `objective_note` carries the counted-variant clause, and the two compose to `describe_objective`
+
+#### Scenario: An offer with a deadline discloses it before acceptance
+- **WHEN** the board lists an offer whose definition carries a 72-hour deadline
+- **THEN** its `deadline_line` reads 接取後 3 日, and an offer with no deadline carries null
+
+#### Scenario: The board reward matches the accepted quest's reward
+- **WHEN** a player accepts a board offer and the quest log row for the new record is built
+- **THEN** the board row's `reward` and the quest log row's `reward` are equal
+
+#### Scenario: Authored prose reaches the board verbatim
+- **WHEN** a definition carries a rating rationale and background flavor
+- **THEN** the board row's `rationale` and `flavor` equal them exactly, and a definition without them yields null
+
+#### Scenario: The branch label names the issuing guild
+- **WHEN** the guild section is built at a branch's counter
+- **THEN** `branch_label` equals the label the quest log renders as the issuer of a quest accepted from that board
+
+#### Scenario: The board never carries offers above the holder's rank
+- **WHEN** a registered E-rank holder's board is built in a hall that also holds D offers
+- **THEN** no board row's `rank` sits above E in `rank_ladder`
+
+#### Scenario: The rank ladder lists every rank in order
+- **WHEN** the guild section is built
+- **THEN** `rank_ladder` lists every registered guild rank key exactly once, ordered from the lowest rank to the highest, and every board row's `rank` and the rank block's `rank` and `next_rank` appear in it
+
+#### Scenario: The client mirror rejects a stale board row
+- **WHEN** a board row carrying `reward_summary`, an unknown category, or a ninth reward item reaches the client validator
+- **THEN** the client rejects the services payload rather than rendering it
+
+### Requirement: The guild counter renders the structured board offer
+
+The guild counter's board SHALL render each offer's reward from its `reward` object (copper, merit when
+non-zero, and each item with its quantity) under one reward label, SHALL render `objective_note` and
+`deadline_line` when present, and SHALL add no prefix or text the payload does not carry.
+
+#### Scenario: An offer shows its reward once
+- **WHEN** a board row with copper 120 and merit 45 renders
+- **THEN** the counter shows both figures under a single reward label
+
+#### Scenario: Null optional facts render nothing
+- **WHEN** a board row's `objective_note`, `deadline_line`, `rationale`, and `flavor` are null
+- **THEN** the counter renders no placeholder for any of them

@@ -30,6 +30,8 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from web.webclient.presentation.quest_facts import MAX_REWARD_ITEMS, QUEST_CATEGORIES
+from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS as MAX_REWARD_DISPLAY_NAME_CODE_POINTS
 from world.rules.service_view import (
     ActionDescriptorView,
     BoardRowView,
@@ -48,7 +50,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 5
+SERVICES_SCHEMA_VERSION = 6
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -62,6 +64,8 @@ MAX_SUMMARY_CODE_POINTS = 128
 MAX_DETAIL_CODE_POINTS = 512
 MAX_DEADLINE_LINE_CODE_POINTS = 64
 MAX_RANK_KEY_CODE_POINTS = 8
+MAX_RANK_LADDER = 16
+MAX_BOARD_PROSE_CODE_POINTS = 55
 MAX_HOST_DISPLAY_NAME_CODE_POINTS = 256
 MAX_LABEL_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 128
@@ -188,6 +192,26 @@ def _validate_registration(value: Any) -> dict[str, Any]:
     return {"registered": registered, "register": register}
 
 
+def _validate_board_reward(value: Any) -> dict[str, Any]:
+    _require_exact_fields(value, "board reward", {"copper", "merit", "items"}, {})
+    copper = _require_int(value, "copper", minimum=0, maximum=MAX_SAFE_INTEGER)
+    merit = _require_int(value, "merit", minimum=0, maximum=MAX_SAFE_INTEGER)
+    if not isinstance(value["items"], list) or len(value["items"]) > MAX_REWARD_ITEMS:
+        raise ProtocolValidationError("reward items exceed the bounded list")
+    items = []
+    for item in value["items"]:
+        _require_exact_fields(item, "reward item", {"item_key", "display_name", "quantity"}, {})
+        key = _require_str(item, "item_key", maximum=MAX_KEY_CODE_POINTS)
+        name = _require_str(item, "display_name", maximum=MAX_REWARD_DISPLAY_NAME_CODE_POINTS)
+        if not key.strip() or not name.strip():
+            raise ProtocolValidationError("reward item strings must be non-empty")
+        items.append({
+            "item_key": key, "display_name": name,
+            "quantity": _require_int(item, "quantity", minimum=1, maximum=MAX_SAFE_INTEGER),
+        })
+    return {"copper": copper, "merit": merit, "items": items}
+
+
 def _validate_board_row(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
@@ -196,7 +220,7 @@ def _validate_board_row(value: Any) -> dict[str, Any]:
             "definition_key",
             "display_name",
             "objective_summary",
-            "reward_summary",
+            "category", "objective_note", "deadline_line", "rationale", "flavor", "reward",
             "rank",
             "accept",
         },
@@ -215,11 +239,25 @@ def _validate_board_row(value: Any) -> dict[str, Any]:
     objective_summary = _require_str(
         value, "objective_summary", maximum=MAX_SUMMARY_CODE_POINTS
     )
-    reward_summary = _require_str(
-        value, "reward_summary", maximum=MAX_SUMMARY_CODE_POINTS
-    )
-    if not objective_summary.strip() or not reward_summary.strip():
+    if not objective_summary.strip():
         raise ProtocolValidationError("board summaries must be non-empty")
+    category = value["category"]
+    if not isinstance(category, str) or category not in QUEST_CATEGORIES.values():
+        raise ProtocolValidationError("board category is not a stable value")
+    optional = {}
+    for field, maximum in (
+        ("objective_note", MAX_SUMMARY_CODE_POINTS),
+        ("deadline_line", MAX_DEADLINE_LINE_CODE_POINTS),
+        ("rationale", MAX_BOARD_PROSE_CODE_POINTS),
+        ("flavor", MAX_BOARD_PROSE_CODE_POINTS),
+    ):
+        line = value[field]
+        if line is not None:
+            line = _require_str(value, field, maximum=maximum)
+            if not line.strip():
+                raise ProtocolValidationError(f"{field} must be non-empty when set")
+        optional[field] = line
+    reward = _validate_board_reward(value["reward"])
     rank = _require_str(value, "rank", maximum=MAX_RANK_KEY_CODE_POINTS)
     if not rank.strip():
         raise ProtocolValidationError("board rank must be non-empty")
@@ -230,7 +268,9 @@ def _validate_board_row(value: Any) -> dict[str, Any]:
         "definition_key": definition_key,
         "display_name": display_name,
         "objective_summary": objective_summary,
-        "reward_summary": reward_summary,
+        "category": category,
+        **optional,
+        "reward": reward,
         "rank": rank,
         "accept": accept,
     }
@@ -344,7 +384,19 @@ def _validate_rank(value: Any) -> dict[str, Any]:
 
 
 def _validate_guild(value: Any) -> dict[str, Any]:
-    _require_exact_fields(value, "guild", {"registration", "board", "quests", "rank"}, {})
+    _require_exact_fields(value, "guild", {"branch_label", "rank_ladder", "registration", "board", "quests", "rank"}, {})
+    branch_label = _require_str(value, "branch_label", maximum=256)
+    if not branch_label.strip():
+        raise ProtocolValidationError("branch_label must be non-empty")
+    ladder = value["rank_ladder"]
+    if not isinstance(ladder, list) or not 1 <= len(ladder) <= MAX_RANK_LADDER:
+        raise ProtocolValidationError("rank_ladder exceeds its bounded list")
+    for key in ladder:
+        _require_str({"key": key}, "key", maximum=MAX_RANK_KEY_CODE_POINTS)
+        if not key.strip():
+            raise ProtocolValidationError("rank_ladder keys must be non-empty")
+    if len(set(ladder)) != len(ladder):
+        raise ProtocolValidationError("rank_ladder keys must be unique")
     registration = _validate_registration(value["registration"])
     board = value["board"]
     if not isinstance(board, list) or len(board) > MAX_BOARD_ROWS:
@@ -357,7 +409,12 @@ def _validate_guild(value: Any) -> dict[str, Any]:
     rank = value["rank"]
     if rank is not None:
         rank = _validate_rank(rank)
-    return {"registration": registration, "board": board, "quests": quests, "rank": rank}
+    rank_keys = [row["rank"] for row in board]
+    if rank is not None:
+        rank_keys.extend(key for key in (rank["rank"], rank["next_rank"]) if key is not None)
+    if any(key not in ladder for key in rank_keys):
+        raise ProtocolValidationError("guild ranks must belong to rank_ladder")
+    return {"branch_label": branch_label, "rank_ladder": list(ladder), "registration": registration, "board": board, "quests": quests, "rank": rank}
 
 
 def _validate_stock_row(value: Any) -> dict[str, Any]:
@@ -709,7 +766,12 @@ def _serialize_board_row(row: BoardRowView) -> dict[str, Any]:
         "definition_key": row.definition_key,
         "display_name": row.display_name,
         "objective_summary": row.objective_summary,
-        "reward_summary": row.reward_summary,
+        "category": QUEST_CATEGORIES[row.category],
+        "objective_note": row.objective_note,
+        "deadline_line": row.deadline_line,
+        "rationale": row.rationale,
+        "flavor": row.flavor,
+        "reward": row.reward,
         "rank": row.rank,
         "accept": _serialize_action(row.accept),
     }
@@ -745,6 +807,8 @@ def _serialize_rank(rank: RankView) -> dict[str, Any]:
 
 def _serialize_guild(guild: GuildSectionView) -> dict[str, Any]:
     return {
+        "branch_label": guild.branch_label,
+        "rank_ladder": list(guild.rank_ladder),
         "registration": _serialize_registration(guild.registration),
         "board": [_serialize_board_row(row) for row in guild.board],
         "quests": [_serialize_quest_row(row) for row in guild.quests],

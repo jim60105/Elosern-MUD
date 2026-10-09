@@ -3,7 +3,7 @@
 // surface of the split quest drawer — what genuinely belongs to the counter
 // itself: registration, the quest board (接取), and guild rank with the
 // promotion examination (the GuildRankCard). It is a host, not a data
-// source: it renders only the committed `services` v5 payload's guild
+// source: it renders only the committed `services` v6 payload's guild
 // section and invents nothing.
 //
 // It deliberately does NOT render the guild section's `quests` rows: the
@@ -13,7 +13,7 @@ import { computed } from "vue";
 import GuildRankCard from "./GuildRankCard.vue";
 
 const props = defineProps({
-  // The committed `services` v5 panel payload.
+  // The committed `services` v6 panel payload.
   services: { type: Object, required: true },
 });
 
@@ -91,7 +91,11 @@ const rank = computed(() => guild.value?.rank ?? null);
             <span class="guild-counter__row-rank">等級 {{ row.rank }}</span>
           </div>
           <p class="guild-counter__row-objective">{{ row.objective_summary }}</p>
-          <p class="guild-counter__row-reward">獎勵：{{ row.reward_summary }}</p>
+          <p v-if="row.objective_note" class="guild-counter__row-objective" data-testid="guild-counter__objective-note">{{ row.objective_note }}</p>
+          <p v-if="row.deadline_line" class="guild-counter__row-objective" data-testid="guild-counter__deadline">{{ row.deadline_line }}</p>
+          <p class="guild-counter__row-reward">
+            獎勵：銅 {{ row.reward.copper }}<template v-if="row.reward.merit">、功績 {{ row.reward.merit }}</template><template v-for="item in row.reward.items" :key="item.item_key">、{{ item.display_name }} × {{ item.quantity }}</template>
+          </p>
           <button
             v-if="row.accept && row.accept.enabled"
             type="button"

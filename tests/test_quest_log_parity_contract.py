@@ -32,7 +32,7 @@ _OWNED_BOUNDS = (
     ("world/quests/definitions.py", "MAX_DEFINITION_PROSE_LENGTH", "QUEST_LOG_MAX_RATIONALE"),
     ("world/quests/definitions.py", "MAX_DEFINITION_PROSE_LENGTH", "QUEST_LOG_MAX_FLAVOR"),
     ("web/webclient/presentation/objectives.py", "MAX_OBJECTIVE_LINE_CODE_POINTS", "QUEST_LOG_MAX_OBJECTIVE_NOTE"),
-    ("web/webclient/presentation/quest_log.py", "QUEST_LOG_MAX_REWARD_ITEMS", "QUEST_LOG_MAX_REWARD_ITEMS"),
+    ("web/webclient/presentation/quest_facts.py", "MAX_REWARD_ITEMS", "QUEST_LOG_MAX_REWARD_ITEMS"),
     ("web/webclient/presentation/services.py", "MAX_LABEL_CODE_POINTS", "QUEST_LOG_MAX_TRACK_LABEL"),
     ("web/webclient/presentation/services.py", "MAX_RANK_KEY_CODE_POINTS", "SERVICES_MAX_RANK_KEY"),
     ("world/rules/quest_issuance.py", "MAX_ISSUER_KEY_LENGTH", "QUEST_LOG_MAX_ISSUER_KEY"),

@@ -177,6 +177,16 @@ keys, an objective line and note composing to `describe_objective`, the offer-de
 `rationale` and `flavor`, and the quest log's non-null `reward` shape. The board SHALL never disagree with the
 quest book.
 
+#### Scenario: Structured facts have closed bounds
+- **WHEN** a guild section carries structured board facts
+- **THEN** `objective_note` is null or a non-empty string of at most 128 Unicode code points, `deadline_line` is null or a non-empty string of at most 64 code points, and verbatim `rationale` and `flavor` are each null or non-empty strings of at most 55 code points
+- **AND** `reward.items` retains the quest log's one-item ceiling
+- **AND** `branch_label` is non-empty and at most 256 code points, and `rank_ladder` contains 1..16 unique non-empty keys of at most eight code points, including every board rank and non-null rank-section rank and next rank
+
+#### Scenario: Twelve maximal board rows fit the existing maximal-section envelope
+- **WHEN** twelve board rows carry every board string at its bound and one maximal reward item apiece alongside the existing realistic maximal quest, shop, and inventory sections
+- **THEN** the services payload remains within the 65,536-byte envelope, while an over-bound board prose field is rejected without truncation
+
 #### Scenario: A species-hunt offer splits its variant clause
 - **WHEN** the board lists a regional species-hunt offer
 - **THEN** `objective_summary` names the region, quantity, and species, `objective_note` carries the counted-variant clause, and the two compose to `describe_objective`

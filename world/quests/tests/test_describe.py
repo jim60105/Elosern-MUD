@@ -33,6 +33,7 @@ from world.quests.describe import (
     describe_destination,
     describe_objective,
     describe_objective_parts,
+    describe_offer_deadline,
     describe_quest_detail,
     describe_reward,
     describe_reward_parts,
@@ -53,6 +54,18 @@ from ._fixtures import (
     grid_locator,
     quest,
 )
+
+class OfferDeadlineTests(unittest.TestCase):
+    def test_authored_deadline_uses_whole_days_or_hours(self):
+        for hours, expected in (
+            (None, None),
+            (24, "接取後 1 日"),
+            (72, "接取後 3 日"),
+            (36, "接取後 36 小時"),
+        ):
+            with self.subTest(hours=hours):
+                self.assertEqual(describe_offer_deadline(hours), expected)
+
 
 _HOUR = CLOCK_YAML["seconds_per_hour"]
 

@@ -1,6 +1,7 @@
 """Slice of ``test_service_view``: BoardFilteringTests, QuestRenderingTests.
 """
 import unittest
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
@@ -40,6 +41,8 @@ from world.rules.tests._guild_service_probes import (
     a_live_monster_tier_key,
     install_synthetic_catalog,
     live_item_registry,
+    live_guild_branch_registry,
+    live_guild_rank_registry,
     live_monster_tier_keys,
     price_band,
     rank_reward_band,
@@ -50,8 +53,13 @@ from world.rules.tests._guild_service_probes import (
 )
 from world.tests.synthetic_data import (
     SYNTH_ITEMS,
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+    SYNTH_REGIONS,
     SYNTH_SHOPS,
+    synthetic_registries,
 )
+from world.quests.describe import describe_objective
 from world.rules.service_view import (
     ACTION_ACCEPT,
     ACTION_BUY,
@@ -80,6 +88,60 @@ from ._support import (
 
 
 class BoardFilteringTests(ServiceRegistryIsolation):
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
+    def test_board_discloses_nullable_prose_and_item_reward(self):
+        room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))
+        player = actor(location=room, registration=registration(), guild_rank="F")
+        with patch("world.rules.service_view.read_world_clock", return_value=SimpleNamespace(tick=TICK_NOON)):
+            guild = build_services_view(player).guild
+        row = guild.board[0]
+        self.assertEqual(row.category, QuestType.DEFEAT)
+        self.assertIsNone(row.objective_note)
+        self.assertIsNone(row.deadline_line)
+        self.assertIsNone(row.rationale)
+        self.assertIsNone(row.flavor)
+        self.assertEqual(row.reward, {
+            "copper": self.board_reward.copper,
+            "merit": 25,
+            "items": [{
+                "item_key": SYNTH_ITEMS["t_ember_spray"].key,
+                "display_name": SYNTH_ITEMS["t_ember_spray"].display_name_zh,
+                "quantity": 2,
+            }],
+        })
+        self.assertEqual(guild.branch_label, live_guild_branch_registry()[BRANCH].display_name_zh)
+        self.assertEqual(guild.rank_ladder, tuple(
+            rank.key for rank in sorted(live_guild_rank_registry().values(), key=lambda rank: rank.order)
+        ))
+
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
+    def test_species_hunt_splits_note_and_discloses_authored_deadline_and_prose(self):
+        with synthetic_registries("regions", "monster_species", "monster_variants"):
+            species = next(iter(SYNTH_MONSTER_SPECIES))
+            variants = tuple(key for key, variant in SYNTH_MONSTER_VARIANTS.items() if variant.species_key == species)
+            objective = QuestObjective(
+                kind=ObjectiveKind.DEFEAT, quantity=2,
+                region_key=next(iter(SYNTH_REGIONS)), species_key=species,
+                countable_variant_keys=variants,
+            )
+            definition = replace(
+                QUEST_DEFINITION_REGISTRY[BOARD_QUEST],
+                stages=(QuestStage(index=0, objective=objective),),
+                deadline_hours=72,
+                rating_rationale_zh="合成評價理由。",
+                background_flavor_zh="合成委託背景。",
+            )
+            with patch.dict(QUEST_DEFINITION_REGISTRY, {BOARD_QUEST: definition}):
+                room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))
+                player = actor(location=room, registration=registration(), guild_rank="F")
+                with patch("world.rules.service_view.read_world_clock", return_value=SimpleNamespace(tick=TICK_NOON)):
+                    row = build_services_view(player).guild.board[0]
+            self.assertTrue(row.objective_note)
+            self.assertEqual(f"{row.objective_summary}（{row.objective_note}）", describe_objective(objective))
+            self.assertEqual(row.deadline_line, "接取後 3 日")
+            self.assertEqual(row.rationale, definition.rating_rationale_zh)
+            self.assertEqual(row.flavor, definition.background_flavor_zh)
+
     def _register_e_quest(self):
         definition = QuestDefinition(
             key=E_QUEST,

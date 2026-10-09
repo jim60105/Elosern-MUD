@@ -11,7 +11,7 @@ import * as fx from "./protocol_fixtures.js";
 // A minimal services panel exposing a guild quest log.
 function servicesPanel() {
   return {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "services",
     host: null,
@@ -24,6 +24,8 @@ function servicesPanel() {
       next_threshold: 10,
     },
     guild: {
+      branch_label: "合成公會分行",
+      rank_ladder: ["novice", "adept"],
       registration: {
         registered: true,
         register: {

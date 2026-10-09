@@ -36,14 +36,14 @@ describe("GuildCounter (quest-drawer-split)", () => {
     expect(reg.attributes("data-registered")).toBe("true");
     expect(reg.text()).toContain("已加入公會");
     expect(reg.text()).toContain("你已經是公會成員");
-    const mill = w.get('[data-testid="guild-counter__board-row--quest_mill_grain"]');
-    expect(mill.text()).toContain("磨坊糧運");
-    expect(mill.text()).toContain("將十袋糧食運往磨坊");
-    expect(mill.text()).toContain("400 銅＋公會功績 25");
+    const mill = w.get('[data-testid="guild-counter__board-row--eastern_plains_sway_whistle_sparrow"]');
+    expect(mill.text()).toContain("驅除東部平原穗鳴雀");
+    expect(mill.text()).toContain("在東部大平原討伐 2 隻穗鳴雀");
+    expect(mill.text()).toContain("銅 50、功績 25");
     const accept = mill.get('[data-testid="guild-counter__accept"]');
     await accept.trigger("click");
     expect(w.emitted("quest_accept")).toEqual([
-      [{ action_id: "guild.quest_accept", payload: { definition_key: "quest_mill_grain" } }],
+      [{ action_id: "guild.quest_accept", payload: { definition_key: "eastern_plains_sway_whistle_sparrow" } }],
     ]);
     expect(w.get('[data-testid="guild-counter__rankblock"]').exists()).toBe(true);
     expect(w.get('[data-testid="guild-counter__rank-level"]').text()).toContain("C");
@@ -52,6 +52,34 @@ describe("GuildCounter (quest-drawer-split)", () => {
     expect(w.emitted("exam_request")).toEqual([
       [{ action_id: "guild.exam_request", payload: { target_rank: "B" } }],
     ]);
+  });
+
+  it("renders structured rewards under one label with optional facts verbatim", () => {
+    const services = structuredClone(SERVICES_PANEL_SAMPLE);
+    const row = services.guild.board[0];
+    row.reward = { copper: 120, merit: 45, items: [{ item_key: "synthetic_item", display_name: "合成物品", quantity: 2 }] };
+    row.deadline_line = "接取後 3 日";
+    const w = mountCounter({ services });
+    const board = w.get(`[data-testid="guild-counter__board-row--${row.definition_key}"]`);
+    expect(board.get(".guild-counter__row-reward").text()).toBe("獎勵：銅 120、功績 45、合成物品 × 2");
+    expect(board.get('[data-testid="guild-counter__objective-note"]').text()).toBe(row.objective_note);
+    expect(board.get('[data-testid="guild-counter__deadline"]').text()).toBe(row.deadline_line);
+    expect(board.text().match(/獎勵：/g)).toHaveLength(1);
+  });
+
+  it("omits zero merit and null optional facts without placeholders", () => {
+    const services = structuredClone(SERVICES_PANEL_SAMPLE);
+    const row = services.guild.board[0];
+    row.reward = { copper: 120, merit: 0, items: [] };
+    row.objective_note = row.deadline_line = row.rationale = row.flavor = null;
+    const w = mountCounter({ services });
+    const board = w.get(`[data-testid="guild-counter__board-row--${row.definition_key}"]`);
+    expect(board.get(".guild-counter__row-reward").text()).toBe("獎勵：銅 120");
+    expect(board.find('[data-testid="guild-counter__objective-note"]').exists()).toBe(false);
+    expect(board.find('[data-testid="guild-counter__deadline"]').exists()).toBe(false);
+    expect(board.text()).not.toContain("功績");
+    expect(board.text()).not.toContain("無期限");
+    expect(board.text()).not.toContain("null");
   });
 
   it("hosts the rank card and forwards its exam request (rank details: guild_rank_card.test.js)", async () => {

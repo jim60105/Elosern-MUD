@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-5 services panel.
+"""Frozen no-mutation read model for the version-6 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -32,14 +32,16 @@ from dataclasses import dataclass
 from typing import Any
 
 from typeclasses.components import GuildExaminer, GuildStaff, Merchant
-from world.lore.guild import GUILD_RANK_REGISTRY
+from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY, ItemPresentation
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestType
 from world.quests.describe import (
     describe_deadline,
     describe_objective,
+    describe_objective_parts,
+    describe_offer_deadline,
     describe_quest_detail,
-    describe_reward,
+    describe_reward_parts,
 )
 from world.quests.runtime import QuestDataError, QuestState, read_records
 from world.rules.clock import read_world_clock
@@ -167,8 +169,13 @@ class BoardRowView:
 
     definition_key: str
     display_name: str
+    category: QuestType
     objective_summary: str
-    reward_summary: str
+    objective_note: str | None
+    deadline_line: str | None
+    rationale: str | None
+    flavor: str | None
+    reward: dict[str, Any]
     rank: str
     accept: ActionDescriptorView
 
@@ -213,6 +220,8 @@ class RankView:
 class GuildSectionView:
     """The guild surface (registration, board, quest log, rank)."""
 
+    branch_label: str
+    rank_ladder: tuple[str, ...]
     registration: RegistrationView
     board: tuple[BoardRowView, ...]
     quests: tuple[QuestRowView, ...]
@@ -409,12 +418,18 @@ def _build_board(
             continue
         has_active = offer.definition_key in active_definitions
         reason = None if not has_active else "quest_already_active"
+        objective_summary, objective_note = describe_objective_parts(definition.stages[0].objective)
         rows.append(
             BoardRowView(
                 definition_key=offer.definition_key,
                 display_name=definition.display_name,
-                objective_summary=describe_objective(definition.stages[0].objective),
-                reward_summary=describe_reward(offer),
+                category=definition.quest_type,
+                objective_summary=objective_summary,
+                objective_note=objective_note,
+                deadline_line=describe_offer_deadline(definition.deadline_hours),
+                rationale=definition.rating_rationale_zh,
+                flavor=definition.background_flavor_zh,
+                reward=describe_reward_parts(offer.reward),
                 rank=definition.rank,
                 accept=ActionDescriptorView(
                     action_id=ACTION_ACCEPT,
@@ -587,6 +602,12 @@ def _build_guild(
     rank = _build_rank(actor, examiner, registration, catalog)
     register_reason = None if not registered else "already_registered"
     section = GuildSectionView(
+        branch_label=GUILD_BRANCH_REGISTRY[
+            staff.components.get(GuildStaff.get_component_slot()).branch_key
+        ].display_name_zh,
+        rank_ladder=tuple(
+            key for key, rank in sorted(GUILD_RANK_REGISTRY.items(), key=lambda entry: entry[1].order)
+        ),
         registration=RegistrationView(
             registered=registered,
             register=ActionDescriptorView(

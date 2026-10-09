@@ -24,6 +24,8 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
 
     def _guild(self, **overrides):
         value = {
+            "branch_label": "合成公會分行",
+            "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
             "registration": {"registered": False, "register": self._action()},
             "board": [],
             "quests": [],
@@ -156,12 +158,18 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             validate_services(payload)
 
 
+    @covers_requirement("webclient-service-menus::board-offers-carry-structured-facts-from-the-canonical-seams")
     def test_board_row_branch_rejections(self):
         base = {
             "definition_key": "introductory_hunt",
             "display_name": "討伐低階魔物",
             "objective_summary": "討伐 1 隻低階魔物",
-            "reward_summary": "獎勵：銅 50",
+            "category": "defeat",
+            "objective_note": None,
+            "deadline_line": None,
+            "rationale": None,
+            "flavor": None,
+            "reward": {"copper": 50, "merit": 0, "items": []},
             "rank": "F",
             "accept": self._action("guild.quest_accept"),
         }
@@ -169,7 +177,9 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             ({"definition_key": ""}, "def key"),
             ({"display_name": ""}, "display"),
             ({"objective_summary": ""}, "objective"),
-            ({"reward_summary": ""}, "reward"),
+            ({"reward_summary": ""}, "legacy reward"),
+            ({"category": "unknown"}, "category"),
+            ({"reward": None}, "null reward"),
             ({"rank": ""}, "rank"),
             ({"accept": self._action("guild.register")}, "accept action"),
         ):

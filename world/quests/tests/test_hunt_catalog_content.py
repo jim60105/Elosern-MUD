@@ -88,9 +88,15 @@ class StructuredDescribeCatalogContract(RegistryIsolationMixin, unittest.TestCas
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
         from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
         from web.webclient.presentation.quest_log import QUEST_LOG_MAX_REWARD_ITEMS
+        from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS
 
         register_catalog()
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        for offer in (*catalog.quest_offers, *GUILD_OFFER_REGISTRY.values()):
+            definition = QUEST_DEFINITION_REGISTRY[offer.definition_key]
+            for field in ("rating_rationale_zh", "background_flavor_zh"):
+                with self.subTest(offer=offer.definition_key, field=field):
+                    self.assertLessEqual(len(getattr(definition, field) or ""), MAX_BOARD_PROSE_CODE_POINTS)
         for definition in QUEST_DEFINITION_REGISTRY.values():
             for stage in definition.stages:
                 with self.subTest(definition=definition.key, stage=stage.index):

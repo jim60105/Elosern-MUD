@@ -14,6 +14,33 @@ const Protocol = require("../elosern/protocol.js");
 const { T_MEAL, T_MEAL_LABEL, T_MEAL_SUMMARY, VALID_EPOCH, serverTime } = require("./protocol_support.js");
 const { validServicesAction, validServicesBoardRow, validServicesPanel, validServicesQuestRow, validServicesSellableRow, validServicesStockRow } = require("./protocol_fixtures.js");
 
+test("services v6 rejects stale facts and reward overflow", () => {
+  const item = { item_key: "synthetic_item", display_name: "合成物品", quantity: 1 };
+  for (const overrides of [
+    { reward_summary: "舊獎勵" },
+    { category: "unknown" },
+    { reward: null },
+    { reward: { copper: 0, merit: 0, items: [item, item] } },
+    { reward: { copper: 0, merit: 0, items: Array(9).fill(item) } },
+    { rationale: "獎".repeat(Protocol.SERVICES_MAX_BOARD_PROSE + 1) },
+  ]) {
+    const panel = validServicesPanel();
+    panel.guild.board = [validServicesBoardRow(overrides)];
+    panel.pagination.board_total = 1;
+    assert.throws(() => Protocol.validateServicesPanel(panel));
+  }
+});
+
+test("services v6 validates ladder bounds and all section rank memberships", () => {
+  for (const ladder of [[], ["F", "F"], ["E"], ["F", "x".repeat(9)], Array.from({ length: 17 }, (_, i) => String(i))]) {
+    const panel = validServicesPanel();
+    panel.guild.board = [validServicesBoardRow()];
+    panel.pagination.board_total = 1;
+    panel.guild.rank_ladder = ladder;
+    assert.throws(() => Protocol.validateServicesPanel(panel));
+  }
+});
+
 
 test("a structurally maximal realistic services payload fits the envelope", () => {
   const board = [];
@@ -50,6 +77,8 @@ test("a structurally maximal realistic services payload fits the envelope", () =
   }
   const panel = validServicesPanel({
     guild: {
+      branch_label: "合成公會分行",
+      rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: { registered: true, register: validServicesAction({ enabled: false, disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" } }) },
       board: board,
       quests: quests,
@@ -93,7 +122,12 @@ test("services payload maximizing every string field fails the byte gate", () =>
       definition_key: max64,
       display_name: max128,
       objective_summary: max128,
-      reward_summary: max128,
+      category: "defeat",
+      objective_note: max128,
+      deadline_line: max64,
+      rationale: "獎".repeat(Protocol.SERVICES_MAX_BOARD_PROSE),
+      flavor: "獎".repeat(Protocol.SERVICES_MAX_BOARD_PROSE),
+      reward: { copper: 0, merit: 0, items: [{ item_key: max64, display_name: max128, quantity: 1 }] },
       rank: max64.slice(0, Protocol.SERVICES_MAX_RANK_KEY),
       accept: validServicesAction({ action_id: "guild.quest_accept" }),
     });
@@ -172,6 +206,8 @@ test("services payload maximizing every string field fails the byte gate", () =>
       next_threshold: 1,
     },
     guild: {
+      branch_label: "獎".repeat(256),
+      rank_ladder: ["F", "E", max64.slice(0, Protocol.SERVICES_MAX_RANK_KEY)],
       registration: {
         registered: true,
         register: validServicesAction({
@@ -398,7 +434,7 @@ test("services v3 validates inventory row actions exactly", () => {
 });
 
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 5);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 6);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -422,6 +458,8 @@ test("services is in the production panel allowlist and a bad panel rejects atom
 function rankedServicesPanel(rank) {
   return validServicesPanel({
     guild: {
+      branch_label: "合成公會分行",
+      rank_ladder: ["F", "E", "D", "C", "B", "A", "S"],
       registration: {
         registered: true,
         register: validServicesAction({

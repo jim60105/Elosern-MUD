@@ -42,6 +42,29 @@ function validateQuestLogBoundedLine(value, name, field, maximum) {
   return line;
 }
 
+function validateQuestCategory(category, name) {
+  if (["gather", "defeat", "escort", "explore", "emergency"].indexOf(category) === -1) {
+    throw new Error(name + " category is not a stable value");
+  }
+  return category;
+}
+
+function validateQuestReward(reward, name) {
+  requireExactFields(reward, "quest reward", ["copper", "merit", "items"], []);
+  requireInt(reward.copper, "copper", 0, MAX_SAFE_INTEGER);
+  requireInt(reward.merit, "merit", 0, MAX_SAFE_INTEGER);
+  if (!Array.isArray(reward.items) || reward.items.length > QUEST_LOG_MAX_REWARD_ITEMS) {
+    throw new Error(name + " reward items exceed the bounded list");
+  }
+  reward.items.forEach(function (item) {
+    requireExactFields(item, "reward item", ["item_key", "display_name", "quantity"], []);
+    validateQuestLogBoundedLine(item.item_key, name, "item_key", QUEST_LOG_MAX_KEY);
+    validateQuestLogBoundedLine(item.display_name, name, "item display_name", QUEST_LOG_MAX_DISPLAY_NAME);
+    requireInt(item.quantity, "quantity", 1, MAX_SAFE_INTEGER);
+  });
+  return reward;
+}
+
 function validateQuestLogIssuer(value, name) {
   requireExactFields(value, name + " issuer", ["kind", "key", "label"], []);
   if (value.kind !== "guild" && value.kind !== "npc") {
@@ -165,9 +188,7 @@ function validateQuestLogRow(value, index) {
   if (QUEST_LOG_STATES.indexOf(value.state) === -1) {
     throw new Error(name + " state is not a stable value");
   }
-  if (["gather", "defeat", "escort", "explore", "emergency"].indexOf(value.category) === -1) {
-    throw new Error(name + " category is not a stable value");
-  }
+  validateQuestCategory(value.category, name);
   validateQuestLogBoundedLine(value.grade, name, "grade", C.SERVICES_MAX_RANK_KEY);
   requireInt(value.stage_index, "stage_index", 0, MAX_SAFE_INTEGER);
   requireInt(value.stage_total, "stage_total", 1, MAX_SAFE_INTEGER);
@@ -205,18 +226,7 @@ function validateQuestLogRow(value, index) {
     throw new Error(name + " settlement is not a stable value");
   }
   if (value.reward !== null) {
-    requireExactFields(value.reward, "quest_log reward", ["copper", "merit", "items"], []);
-    requireInt(value.reward.copper, "copper", 0, MAX_SAFE_INTEGER);
-    requireInt(value.reward.merit, "merit", 0, MAX_SAFE_INTEGER);
-    if (!Array.isArray(value.reward.items) || value.reward.items.length > QUEST_LOG_MAX_REWARD_ITEMS) {
-      throw new Error(name + " reward items exceed the bounded list");
-    }
-    value.reward.items.forEach(function (item) {
-      requireExactFields(item, "reward item", ["item_key", "display_name", "quantity"], []);
-      validateQuestLogBoundedLine(item.item_key, name, "item_key", QUEST_LOG_MAX_KEY);
-      validateQuestLogBoundedLine(item.display_name, name, "item display_name", QUEST_LOG_MAX_DISPLAY_NAME);
-      requireInt(item.quantity, "quantity", 1, MAX_SAFE_INTEGER);
-    });
+    validateQuestReward(value.reward, name);
   }
   if (typeof value.reward_claimed !== "boolean") {
     throw new Error(name + " reward_claimed must be a boolean");
@@ -279,5 +289,7 @@ function validateQuestLogPanel(payload) {
 
 
 module.exports = {
+  validateQuestCategory: validateQuestCategory,
+  validateQuestReward: validateQuestReward,
   validateQuestLogPanel: validateQuestLogPanel,
 };
