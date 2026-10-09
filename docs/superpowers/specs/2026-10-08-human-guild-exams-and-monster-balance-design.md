@@ -39,8 +39,9 @@ assembly and fail-closed dbref selection live in `world/rules/human_guild_hosts.
 The three hostless residences share the existing guild frontage at `(4,3)` and
 use reciprocal ordinary Exits. Daily/weekly templates own the concrete offsets
 documented in `docs/development/adding-npcs.md`; assembly binds route roles to room
-dbrefs. This additive slice retains silent legacy rank factories until the
-lifecycle owner cuts examination starts over atomically.
+dbrefs. The `persistent-guild-exam-lifecycle` slice removed the silent legacy
+rank factories, rank-owned examiner identity fields and `guild_examiner_*`
+profiles; every examination now fights the qualified persistent person.
 
 A character's profession is **adventurer**. Examination authority is a separate capability attached to that person for a named branch and supported target ranks. An adventurer can have normal dialogue, a residence, a schedule, equipment, learned skills, and relationships outside an examination.
 
@@ -149,9 +150,16 @@ Its begin/read/release APIs persist the host ID, unique exam ID, start and
 held-through ticks, consumed occurrence identity and released marker.
 Begin uses the current persisted tick; release cannot consume future time.
 Lifecycle callers restore the normal host before release and snapshot the hold,
-location and schedule state around their enclosing transaction. This predecessor
-provides synthetic terminal/recovery API-sequence evidence; production exam
-activation and recovery wiring remain owned by `persistent-guild-exam-lifecycle`.
+location and schedule state around their enclosing transaction.
+
+Implementation reference (`persistent-guild-exam-lifecycle`):
+`world.rules.guild_exams.start_guild_exam` begins the hold, persists the host's
+normal outfit/effects in `guild_exam_normal_state`, issues the target's military
+pair with an empty accessory loadout and activates the restriction inside one
+transaction. Every terminal or invalid-recovery settlement calls
+`restore_exam_host`, which removes only that exam's restriction, restores the
+normal outfit/effects and full pools, then releases the hold through elapsed
+time. A coherent cold start resumes with the hold retained.
 The read result distinguishes known absence/active/released state from a named
 indeterminate hold; `planned-npc-service-windows` owns its availability use.
 

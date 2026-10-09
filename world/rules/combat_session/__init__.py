@@ -80,7 +80,6 @@ from world.rules.combat_session.scans import (  # noqa: F401
 )
 from world.rules.combat_session.settlement import (  # noqa: F401
     _continue_or_settle,
-    _delete_exam_opponent,
     _find_exam_opponent,
     _restore_exam_participants,
     _round_cap,
@@ -131,7 +130,6 @@ __all__ = [
     "_context_for",
     "_continue_or_settle",
     "_current_tick",
-    "_delete_exam_opponent",
     "_enemy_policy",
     "_find_exam_opponent",
     "_knocked_out_ids",

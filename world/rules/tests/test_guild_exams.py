@@ -1,53 +1,68 @@
-"""Triggerable nonlethal guild examination tests (tasks 8.1-8.8)."""
+"""Persistent-host simulated guild examination tests (persistent-guild-exam-lifecycle).
 
-from tools.spec_traceability import covers_requirement
+Every examination fights the branch-qualified persistent adventurer: the
+fixtures build one synthetic host, its normal outfit, a synthetic exam kit and
+guild limit accessory, synthetic restriction profiles and a qualification
+binding, so start/terminal/recovery mechanics are asserted against resolver-
+backed state rather than shipped people or rows.
+"""
 
-import unittest
+from copy import deepcopy
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTestCase
 
-from django.db import transaction
-
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.rules.clock import get_world_clock
 from world.rules.combat_session import (
+    forfeit,
     read_session,
     restore_active_session,
     submit_player_action,
 )
+from world.rules.exam_schedule_holds import HOLD_ATTRIBUTE, read_exam_schedule_hold
 from world.rules.guild import register_adventurer
-from world.rules.guild_config import load_guild_catalog
 from world.rules.guild_exams import (
+    NORMAL_STATE_ATTRIBUTE,
     ExamReason,
     ExamState,
     GuildExamError,
-    _spawn_opponent,
     _read_exams,
     from_storage,
     settle_exam_outcome,
     start_guild_exam,
     to_storage,
 )
-from world.art.official_refs import (
-    NPC_PROFILE_PROVENANCE_ATTRIBUTE,
-    OFFICIAL_KIND_NPC,
-    OfficialContentReference,
-    official_content_reference_for_entity,
+from world.rules.npc_persona import (
+    current_persona_version,
+    provenance_profile_key,
+    read_npc_persona,
+    update_npc_persona,
 )
-from world.rules.npc_persona import provenance_profile_key
-from world.rules.guild_offers import register_guild_offer
-from world.rules.surfaces import read_counter_trait
+from world.rules.surfaces import read_counter_trait, write_counter_trait
 from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
+)
+from world.rules.tests._guild_exam_hosts import (
+    EXAM_PROFILES,
+    HOST_NAME,
+    KIT_ARMOR,
+    KIT_BLADE,
+    LIMIT_RING,
+    exam_scope_extra,
+    install_exam_host_policies,
+    make_exam_host,
 )
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
@@ -56,24 +71,15 @@ from world.rules.tests._guild_service_probes import (
     synthetic_branch_key,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.skills.restrictions import exam_restriction
 
-# Examination runs on synthetic rows: the examiner's branch is the kit guild
-# branch, the catalog's exam profiles/thresholds are the probes' invented
-# values, and combat exercises the kit's synthetic innate attack (the
-# runtime-derived BASIC_ATTACK_KEY, never a shipped skill literal).
 EXAM_BRANCH = synthetic_branch_key()
-_SCOPE_LOGICALS = ("guild_branches", "skills", "elements", "static_tiers")
-
-
-def _examiner_identity():
-    """Rank E's authored examiner name/title, read live from the rank registry.
-
-    Opponent-key mechanics (npc-title-authored-identities D8) assert against
-    whatever the live rank table authors -- never a copied display name.
-    """
-    rank = live_guild_rank_registry()["E"]
-    return rank.examiner_name, rank.examiner_title, rank.examiner_profile_key
+_SCOPE_LOGICALS = ("guild_branches", "skills", "elements", "static_tiers", "items")
+_DICE = (
+    "world.rules.combat.battlefield.roll_d100",
+    "world.rules.combat.damage.roll_d100",
+    "world.rules.combat.rounds.roll_d100",
+)
 
 
 def _attack_key() -> str:
@@ -85,11 +91,33 @@ def _attack_key() -> str:
     )
 
 
+def _scope_extra() -> dict[str, dict[str, object]]:
+    extra = {key: dict(rows) for key, rows in synth_innate_overlay().items()}
+    for key, rows in exam_scope_extra().items():
+        extra.setdefault(key, {}).update(rows)
+    return extra
+
+
+class _Dice:
+    """Pin every d100 roll for one deterministic round."""
+
+    def __init__(self, value):
+        self._patches = [patch(target, return_value=value) for target in _DICE]
+
+    def __enter__(self):
+        for item in self._patches:
+            item.start()
+
+    def __exit__(self, *exc):
+        for item in self._patches:
+            item.stop()
+
+
 class ExamRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
-        # Scope before construction: exam spawns resolve their static tier and
-        # skill identities inside the synthetic registries.
-        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=synth_innate_overlay())
+        # Scope before construction: hosts resolve their skills/items inside
+        # the synthetic registries.
+        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=_scope_extra())
         super().setUp()
         register_catalog()
         install_synthetic_catalog(self, synth_catalog())
@@ -110,941 +138,658 @@ class ExamRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
         super().tearDown()
 
 
-class ExamRecordTests(unittest.TestCase):
-    def test_record_round_trips_through_json(self):
-        record = from_storage(
-            {
-                "exam_id": "1:E:1",
-                "character_id": 1,
-                "target_rank": "E",
-                "requested_by": "command",
-                "opponent_id": 2,
-                "session_id": "guild_exam:1:1:E:1",
-                "state": "active",
-                "terminal_reason": None,
-            }
-        )
-        self.assertEqual(record.exam_id, "1:E:1")
-        self.assertEqual(to_storage(record)["state"], "active")
+class ExamHostFixture(ExamRegistryIsolation):
+    """One guild counter, one registered candidate and one qualified host."""
 
-    def test_malformed_record_fails_closed(self):
-        base = {
-            "exam_id": "1:E:1",
-            "character_id": 1,
-            "target_rank": "E",
-            "requested_by": "command",
-            "opponent_id": 2,
-            "session_id": "guild_exam:1:1:E:1",
-            "state": "active",
-            "terminal_reason": None,
-        }
-        for mutation in (
-            {"state": "unknown"},
-            {"exam_id": ""},
-            {"character_id": "x"},
-        ):
-            with self.subTest(data=mutation):
-                with self.assertRaises(GuildExamError):
-                    from_storage({**base, **mutation})
+    def setUp(self):
+        super().setUp()
+        install_exam_host_policies(self, EXAM_BRANCH)
+        self.clock = get_world_clock()
+        self.hall = create_object(Room, key="exam hall")
+        self.player = self._candidate("exam player")
+        self.counter = create_object(NPC, key="guild counter", location=self.hall)
+        self.counter.components.add(
+            GuildStaff.create(self.counter, service_id="staff", branch_key=EXAM_BRANCH)
+        )
+        self.counter.components.add(
+            GuildExaminer.create(self.counter, service_id="counter", branch_key=EXAM_BRANCH)
+        )
+        register_adventurer(self.player, self.counter)
+        self.host = make_exam_host(self.hall)
+
+    def _candidate(self, key):
+        player = create_object(PlayerCharacter, key=key)
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = self.hall
+        return player
+
+    def _give_merit(self, amount, player=None):
+        write_counter_trait(player or self.player, "guild_merit", amount)
+
+    def _make_overwhelming(self):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+
+    def _host_normal(self):
+        """The host's normal identity/capability/outfit surfaces, deep-copied."""
+        host = self.host
+        persona = read_npc_persona(host)
+        return deepcopy({
+            "pk": host.pk,
+            "key": host.key,
+            "bases": {key: row["base"] for key, row in host.traits.trait_data.items()},
+            "skills": dict(host.db.skills),
+            "proficiency": dict(host.db.skill_proficiency),
+            "persona": (persona.card.to_record(), persona.version),
+            "provenance": provenance_profile_key(host),
+            "age": (host.attributes.get("age"), host.attributes.get("apparent_age")),
+            "equipment": dict(host.db.equipment),
+            "inventory": list(host.db.inventory),
+            "buffs": host.db.buffs,
+            "restriction": host.db.guild_exam_restriction,
+            "normal_state": host.attributes.get(NORMAL_STATE_ATTRIBUTE),
+            "location": host.location.pk,
+        })
+
+    def _host_state(self):
+        """Everything a rejected or rolled-back start must leave untouched."""
+        return deepcopy({
+            "normal": self._host_normal(),
+            "traits": dict(self.host.traits.trait_data),
+            "hold": self.host.attributes.get(HOLD_ATTRIBUTE),
+            "relations": self.host.db.relations_data,
+        })
+
+    def _actor_state(self, player=None):
+        player = player or self.player
+        return deepcopy({
+            "exams": player.db.guild_exams,
+            "session": player.db.active_combat,
+            "rank": player.guild_rank,
+            "merit": read_counter_trait(player, "guild_merit"),
+            "traits": dict(player.traits.trait_data),
+        })
+
+    def _assert_full_normal_pools(self, entity):
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(entity.traits, key)
+            self.assertEqual(gauge.current, gauge.max, key)
+
+    def _assert_host_restored(self, baseline):
+        self.host.refresh_from_db()
+        host = ObjectDB.objects.filter(id=baseline["pk"]).first()
+        self.assertIsNotNone(host)
+        normal = self._host_normal()
+        for field in ("pk", "key", "bases", "skills", "proficiency", "persona",
+                      "provenance", "age", "equipment", "inventory", "buffs"):
+            self.assertEqual(normal[field], baseline[field], field)
+        self.assertIsNone(normal["restriction"])
+        self.assertIsNone(normal["normal_state"])
+        self.assertEqual(self.host.traits.hp.max, 200)
+        self._assert_full_normal_pools(self.host)
+        hold = read_exam_schedule_hold(self.host)
+        self.assertTrue(hold.known)
+        self.assertTrue(hold.hold is None or hold.hold.released)
+
+
+class ExamRecordTests(unittest.TestCase):
+    _BASE = {
+        "exam_id": "1:E:1",
+        "character_id": 1,
+        "target_rank": "E",
+        "requested_by": "command",
+        "opponent_id": 2,
+        "session_id": "guild_exam:1:1:E:1",
+        "state": "active",
+        "terminal_reason": None,
+    }
+
+    def test_record_round_trips_through_json(self):
+        record = from_storage(dict(self._BASE))
+        self.assertEqual(record.exam_id, "1:E:1")
+        self.assertEqual(to_storage(record), self._BASE)
 
     def test_malformed_record_shape_fails_closed(self):
-        base = {
-            "exam_id": "1:E:1",
-            "character_id": 1,
-            "target_rank": "E",
-            "requested_by": "command",
-            "opponent_id": 2,
-            "session_id": "guild_exam:1:1:E:1",
-            "state": "active",
-            "terminal_reason": None,
-        }
         for mutation in (
             "not-a-dict",
             {"extra_field": 1},
+            {"state": "unknown"},
+            {"exam_id": ""},
+            {"character_id": "x"},
             {"target_rank": None},
             {"opponent_id": True},
             {"terminal_reason": 5},
         ):
             with self.subTest(data=mutation):
                 with self.assertRaises(GuildExamError):
-                    from_storage(mutation if isinstance(mutation, str) else {**base, **mutation})
+                    from_storage(mutation if isinstance(mutation, str) else {**self._BASE, **mutation})
 
     def test_read_exams_tolerates_missing_and_rejects_duplicate_ids(self):
-        empty = SimpleNamespace(db=SimpleNamespace(guild_exams=None))
-        self.assertEqual(_read_exams(empty), [])
-
-        base = {
-            "exam_id": "1:E:1",
-            "character_id": 1,
-            "target_rank": "E",
-            "requested_by": "command",
-            "opponent_id": 2,
-            "session_id": "guild_exam:1:1:E:1",
-            "state": "active",
-            "terminal_reason": None,
-        }
-        duplicate = SimpleNamespace(db=SimpleNamespace(guild_exams=[base, base]))
-        with self.assertRaises(GuildExamError):
-            _read_exams(duplicate)
-
-        bad_root = SimpleNamespace(db=SimpleNamespace(guild_exams=5))
-        with self.assertRaises(GuildExamError):
-            _read_exams(bad_root)
+        self.assertEqual(_read_exams(SimpleNamespace(db=SimpleNamespace(guild_exams=None))), [])
+        for raw in ([self._BASE, self._BASE], 5):
+            with self.subTest(raw=raw), self.assertRaises(GuildExamError):
+                _read_exams(SimpleNamespace(db=SimpleNamespace(guild_exams=raw)))
 
 
-class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
-    def setUp(self):
-        super().setUp()
-        self.hall = create_object(Room, key="exam hall")
-        self.player = create_object(PlayerCharacter, key="exam player")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        self.player.location = self.hall
-        self.staff = create_object(NPC, key="guild staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
-        )
-        self.examiner = create_object(NPC, key="examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner,
-                service_id="examiner",
-                branch_key=EXAM_BRANCH,
-            )
-        )
-        register_adventurer(self.player, self.staff)
+class ExamStartTests(ExamHostFixture, EvenniaTestCase):
+    def _assert_rejected_without_writes(self, reason, examiner=None, player=None):
+        player = player or self.player
+        host_before = self._host_state()
+        actor_before = self._actor_state(player)
+        with self.assertRaises(GuildExamError) as ctx:
+            start_guild_exam(player, examiner or self.host, "E")
+        self.assertEqual(ctx.exception.args[0], reason)
+        self.assertEqual(self._host_state(), host_before)
+        self.assertEqual(self._actor_state(player), actor_before)
+        self.assertFalse(self.host.relations.has_record(player))
 
-    def _give_merit(self, amount):
-        from world.rules.surfaces import write_counter_trait
-
-        write_counter_trait(self.player, "guild_merit", amount)
-
-    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself", "guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session", "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
-    def test_command_trigger_starts_an_eligible_exam(self):
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself",
+        "guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session",
+        "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
+    )
+    def test_command_trigger_starts_an_eligible_exam_with_the_persistent_host(self):
         self._give_merit(50)
-        record = start_guild_exam(
-            self.player,
-            self.examiner,
-            "E",
-            requested_by="command",
-        )
-        self.assertEqual(record.target_rank, "E")
+        hosts_before = NPC.objects.count()
+        record = start_guild_exam(self.player, self.host, "E", requested_by="command")
         self.assertEqual(record.state, ExamState.ACTIVE)
+        self.assertEqual(record.opponent_id, self.host.pk)
+        self.assertEqual(NPC.objects.count(), hosts_before)
         session = read_session(self.player)
-        self.assertEqual(session.mode, "guild_exam")
-        self.assertEqual(session.exam_id, record.exam_id)
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        self.assertEqual(opponent.location, self.hall)
-        self.assertEqual(self.examiner.relations.affinity_for(self.player), 1)
+        self.assertEqual((session.mode, session.exam_id, session.enemy_ids),
+                         ("guild_exam", record.exam_id, (self.host.pk,)))
+        self.assertEqual(self.host.relations.affinity_for(self.player), 1)
+        # Real kit, real accessory, persisted restriction and hold.
+        self.assertEqual(self.host.db.equipment["weapon_main"], KIT_BLADE.key)
+        self.assertEqual(self.host.db.equipment["armor"], KIT_ARMOR.key)
+        self.assertEqual(self.host.db.equipment["accessories"], [LIMIT_RING.key])
+        self.assertEqual(exam_restriction(self.host)["exam_id"], record.exam_id)
+        self.assertEqual(self.host.attributes.get(NORMAL_STATE_ATTRIBUTE)["exam_id"], record.exam_id)
+        hold = read_exam_schedule_hold(self.host)
+        self.assertEqual((hold.hold.exam_id, hold.hold.released), (record.exam_id, False))
+        # The stronger host is lowered, never raised: ceilings bind the gauges.
+        self.assertEqual(self.host.traits.hp.max, EXAM_PROFILES["E"].ceilings["hp"])
 
-    @covers_requirement("guild-rank-exams::guild-exam-opponents-carry-canonical-age")
-    def test_spawned_exam_opponent_carries_canonical_ages(self):
-        from world.art.subjects import character_ages
-
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    def test_busy_present_host_rejects_before_resources_or_affinity(self):
         self._give_merit(50)
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        self.assertEqual(int(opponent.attributes.get("age")), 26)
-        self.assertEqual(int(opponent.attributes.get("apparent_age")), 26)
-        self.assertEqual(character_ages(opponent), (26, 26))
+        self.host.db.schedule_state = "busy"
+        self._assert_rejected_without_writes(ExamReason.SERVICE_UNAVAILABLE)
 
-    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
-    def test_the_spawned_examiner_records_its_authored_profile_provenance(self):
-        self._give_merit(50)
-        record = start_guild_exam(self.player, self.examiner, "E", requested_by="command")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        profile_key = _examiner_identity()[2]
-        # The authored profile key is recorded as stable provenance beside the
-        # persona write, and the persona record's own provenance agrees.
-        self.assertEqual(
-            opponent.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE), profile_key
-        )
-        self.assertEqual(provenance_profile_key(opponent), profile_key)
-        # Resolution binds the npc reference to that provenance, never to the
-        # rank's role/threat band.
-        self.assertEqual(
-            official_content_reference_for_entity(opponent),
-            OfficialContentReference(OFFICIAL_KIND_NPC, profile_key),
-        )
-
-    @covers_requirement("official-content-provenance::authored-npcs-carry-a-stable-profile-provenance-established-at-creation")
-    def test_a_rolled_back_examiner_spawn_leaves_no_provenance(self):
-        profile_key = _examiner_identity()[2]
-        with self.assertRaises(RuntimeError):
-            with transaction.atomic():
-                opponent = _spawn_opponent(self.player, "E")
-                self.assertEqual(
-                    opponent.attributes.get(NPC_PROFILE_PROVENANCE_ATTRIBUTE),
-                    profile_key,
-                )
-                raise RuntimeError("rollback")
-        self.assertFalse(NPC.objects.filter(db_key=_examiner_identity()[0]).exists())
-
-    def test_npc_intent_has_no_extra_authority(self):
-        # No merit -> rejected identically for both requesters.
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    def test_requested_by_metadata_grants_no_extra_authority(self):
         for requester in ("command", "npc_intent"):
             with self.subTest(requester=requester):
                 with self.assertRaises(GuildExamError) as ctx:
-                    start_guild_exam(
-                        self.player,
-                        self.examiner,
-                        "E",
-                        requested_by=requester,
-                    )
+                    start_guild_exam(self.player, self.host, "E", requested_by=requester)
                 self.assertEqual(ctx.exception.args[0], ExamReason.BELOW_THRESHOLD)
+        self.assertFalse(self.host.relations.has_record(self.player))
 
-    def test_below_threshold_request_is_rejected(self):
-        with self.assertRaises(GuildExamError) as ctx:
-            start_guild_exam(self.player, self.examiner, "E")
-        self.assertEqual(ctx.exception.args[0], ExamReason.BELOW_THRESHOLD)
-
-    def test_rank_skipping_is_rejected(self):
+    @covers_requirement("guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination")
+    def test_below_threshold_and_rank_skipping_are_rejected(self):
+        self._assert_rejected_without_writes(ExamReason.BELOW_THRESHOLD)
         self._give_merit(150)
         with self.assertRaises(GuildExamError) as ctx:
-            start_guild_exam(self.player, self.examiner, "D")
+            start_guild_exam(self.player, self.host, "D")
         self.assertEqual(ctx.exception.args[0], ExamReason.NOT_NEXT_RANK)
 
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_duplicate_active_exam_is_rejected(self):
         self._give_merit(50)
-        start_guild_exam(self.player, self.examiner, "E")
-        # The active exam also holds an active combat session, which the sole
-        # trigger rejects first; no second opponent/record/session is created.
+        start_guild_exam(self.player, self.host, "E")
         with self.assertRaises(GuildExamError) as ctx:
-            start_guild_exam(self.player, self.examiner, "E")
+            start_guild_exam(self.player, self.host, "E")
         self.assertEqual(ctx.exception.args[0], ExamReason.ACTIVE_COMBAT)
-        self.assertEqual(self.examiner.relations.affinity_for(self.player), 1)
-
-    def test_remote_examiner_is_rejected(self):
-        other = create_object(Room, key="elsewhere")
-        far = create_object(NPC, key="far examiner", location=other)
-        far.components.add(
-            GuildExaminer.create(far, service_id="far", branch_key=EXAM_BRANCH)
-        )
-        self._give_merit(50)
-        with self.assertRaises(GuildExamError) as ctx:
-            start_guild_exam(self.player, far, "E")
-        self.assertEqual(ctx.exception.args[0], ExamReason.REMOTE_EXAMINER)
+        self.assertEqual(len(_read_exams(self.player)), 1)
+        self.assertEqual(self.host.relations.affinity_for(self.player), 1)
 
     @covers_requirement(
-        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+        "guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys",
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself",
     )
-    def test_off_anchor_examiner_is_refused_before_any_eligibility_write(self):
-        # Emulates a sync-converged place-bound examiner (service-anchoring).
-        component = self.examiner.components.get(
-            GuildExaminer.get_component_slot()
-        )
+    def test_busy_host_contention_never_opens_a_second_session(self):
+        self._give_merit(50)
+        start_guild_exam(self.player, self.host, "E")
+        rival = self._candidate("rival candidate")
+        register_adventurer(rival, self.counter)
+        self._give_merit(50, rival)
+        with self.assertRaises(GuildExamError) as ctx:
+            start_guild_exam(rival, self.host, "E")
+        self.assertEqual(ctx.exception.args[0], ExamReason.EXAMINER_ENGAGED)
+        self.assertIsNone(read_session(rival))
+        self.assertIsNone(rival.db.guild_exams)
+
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    def test_remote_host_is_rejected_before_eligibility(self):
+        self.host.location = create_object(Room, key="host home")
+        self._give_merit(50)
+        self._assert_rejected_without_writes(ExamReason.REMOTE_EXAMINER)
+
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    def test_off_anchor_counter_is_refused_before_any_eligibility_write(self):
+        component = self.counter.components.get(GuildExaminer.get_component_slot())
         component.service_binding = "place"
         component.anchor_room_id = self.hall.pk
         square = create_object(Room, key="exam square")
-        self.examiner.location = square
-        self.player.location = square
+        for entity in (self.counter, self.host, self.player):
+            entity.location = square
         self._give_merit(50)
-        with self.assertRaises(GuildExamError) as ctx:
-            start_guild_exam(self.player, self.examiner, "E")
-        self.assertEqual(
-            ctx.exception.args[0], ExamReason.SERVICE_UNAVAILABLE
-        )
-        # Nothing was created or granted.
-        self.assertIsNone(read_session(self.player))
-        self.assertFalse(self.examiner.relations.has_record(self.player))
-        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
-        self.assertEqual(self.player.guild_rank, "F")
+        self._assert_rejected_without_writes(ExamReason.SERVICE_UNAVAILABLE)
+        # A malformed stored binding fails closed the same way.
+        component.service_binding = "portable"
+        self._assert_rejected_without_writes(ExamReason.SERVICE_UNAVAILABLE)
 
-    @covers_requirement("guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination")
-    def test_threshold_alone_does_not_promote(self):
+    @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    def test_unqualified_or_unbound_person_cannot_host(self):
         self._give_merit(50)
-        self.assertEqual(self.player.guild_rank, "F")
-        # No exam started => rank stays F.
-        self.assertIsNone(read_session(self.player))
+        stranger = make_exam_host(self.hall, key="不相干的冒險者")
+        stranger.attributes.remove("guild_adventurer_person_key")
+        self._assert_rejected_without_writes(ExamReason.UNQUALIFIED_EXAMINER, examiner=stranger)
+        with patch("world.rules.human_guild_hosts.EXAM_QUALIFICATIONS", ()):
+            self._assert_rejected_without_writes(ExamReason.UNQUALIFIED_EXAMINER)
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
-    def test_same_named_player_can_take_the_exam(self):
-        self.player.key = _examiner_identity()[0]
+    def test_player_name_collision_rejects_without_renaming_the_host(self):
+        self._give_merit(50)
+        self.player.key = self.host.key
         self.player.save()
+        self._assert_rejected_without_writes(ExamReason.PARTICIPANT_NAME_COLLISION)
+        self.assertEqual(self.host.key, HOST_NAME)
+
+    @covers_requirement("guild-rank-exams::guild-exam-opponents-carry-canonical-age")
+    def test_invalid_host_age_leaves_no_partial_examination(self):
         self._give_merit(50)
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        # Name occupied by the player -> conditional -{pk} disambiguator.
-        self.assertEqual(opponent.key, f"{_examiner_identity()[0]}-{opponent.pk}")
-        self.assertNotEqual(opponent.key, self.player.key)
-        self.assertIsNotNone(read_session(self.player))
-
-    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
-    def test_concurrent_same_rank_exams_never_share_a_key(self):
-        # Two live opponents of one rank: the second spawn sees the first
-        # committed same-named entity and takes its own -<pk> component.
-        self._give_merit(50)
-        first = start_guild_exam(self.player, self.examiner, "E")
-        first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
-        self.assertEqual(first_opponent.key, _examiner_identity()[0])
-        rival = create_object(PlayerCharacter, key="rival candidate")
-        rival.race = "human"
-        rival.apply_race_baseline()
-        rival.location = self.hall
-        register_adventurer(rival, self.staff)
-        from world.rules.surfaces import write_counter_trait
-
-        write_counter_trait(rival, "guild_merit", 50)
-        second = start_guild_exam(rival, self.examiner, "E")
-        second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
-        self.assertIsNotNone(second_opponent)
-        self.assertEqual(second_opponent.key, f"{_examiner_identity()[0]}-{second_opponent.pk}")
-        self.assertNotEqual(first_opponent.key, second_opponent.key)
-
-    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
-    def test_seqentially_released_name_is_reused_verbatim(self):
-        # Restated contract: the suffix is conditional. Once the first
-        # opponent is deleted at forfeit, the next spawn reuses the free
-        # authored name verbatim (no permanent -pk disambiguation).
-        self._give_merit(100)
-        first = start_guild_exam(self.player, self.examiner, "E")
-        first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
-        from world.rules.combat_session import forfeit
-
-        forfeit(self.player)
-        second = start_guild_exam(self.player, self.examiner, "E")
-        second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
-        self.assertIsNotNone(first_opponent)
-        self.assertIsNotNone(second_opponent)
-        self.assertEqual(first_opponent.key, _examiner_identity()[0])
-        self.assertEqual(second_opponent.key, _examiner_identity()[0])
-        self.assertNotEqual(first_opponent.pk, second_opponent.pk)
+        self.host.attributes.add("age", 10001)
+        self._assert_rejected_without_writes(ExamReason.UNQUALIFIED_EXAMINER)
 
     @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
-    def test_affinity_failure_leaves_no_orphan_session_or_registration(self):
-        from world.rules.skip_safety import _BATTLEFIELDS
-
+    def test_unusable_kit_or_lineage_rejects_before_any_mutation(self):
         self._give_merit(50)
-        with patch(
-            "world.rules.affinity.apply_affinity_change",
-            side_effect=RuntimeError("affinity boom"),
-        ):
-            with self.assertRaises(RuntimeError):
-                start_guild_exam(self.player, self.examiner, "E")
-        self.assertIsNone(self.player.db.active_combat)
-        self.assertIsNone(read_session(self.player))
-        self.assertEqual(_BATTLEFIELDS, {})
-        orphans = ObjectDB.objects.filter(
-            db_key__startswith=_examiner_identity()[0],
-            db_location=self.hall,
-        )
-        self.assertEqual(orphans.count(), 0)
+        self.host.db.skills = {"active": [], "passive": []}
+        self._assert_rejected_without_writes(ExamReason.UNQUALIFIED_EXAMINER)
 
     @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
-    def test_reconstruction_failure_leaves_no_orphan_session_or_registration(self):
-        from world.rules.combat_session import CombatSessionError, SessionReason
+    def test_start_fault_at_every_checkpoint_restores_storage_and_caches(self):
         from world.rules.skip_safety import _BATTLEFIELDS
+        from world.rules import skip_safety, traits
 
         self._give_merit(50)
-        with patch(
-            "world.rules.combat_session.reconstruct_battlefield",
-            side_effect=CombatSessionError(SessionReason.MISSING_PARTICIPANT),
-        ):
-            with self.assertRaises(CombatSessionError):
-                start_guild_exam(self.player, self.examiner, "E")
-        self.assertIsNone(self.player.db.active_combat)
-        self.assertIsNone(read_session(self.player))
-        self.assertEqual(_BATTLEFIELDS, {})
-        orphans = ObjectDB.objects.filter(
-            db_key__startswith=_examiner_identity()[0],
-            db_location=self.hall,
-        )
-        self.assertEqual(orphans.count(), 0)
+        for entity in (self.player, self.host):
+            for key in ("hp", "mp", "sp"):
+                getattr(entity.traits, key).current = 1
+        real_register = skip_safety.register_active_battlefield
+        real_restore = traits.restore_gauges_to_full
 
+        def published_then_fail(battlefield):
+            real_register(battlefield)
+            raise RuntimeError("after skip-safety publication")
 
-    @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
-    @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
-    def test_spawn_uses_the_authored_name_and_persists_the_title(self):
+        def restore_then_fail(entity):
+            real_restore(entity)
+            if entity.pk == self.host.pk:
+                raise RuntimeError("after pool restoration")
+
+        checkpoints = {
+            "kit": ("world.rules.guild_exams.activate_exam_restriction", RuntimeError("after kit")),
+            "restriction": ("world.rules.guild_exams.begin_exam_schedule_hold", RuntimeError("after restriction")),
+            "pools": ("world.rules.traits.restore_gauges_to_full", restore_then_fail),
+            "record": ("world.rules.combat_session.reconstruct_battlefield", RuntimeError("after record")),
+            "session": ("world.rules.skip_safety.register_active_battlefield", published_then_fail),
+            "affinity": ("world.rules.affinity.apply_affinity_change", RuntimeError("after affinity")),
+        }
+        host_before = self._host_state()
+        actor_before = self._actor_state()
+        for name, (target, effect) in checkpoints.items():
+            with self.subTest(checkpoint=name):
+                with patch(target, side_effect=effect), self.assertRaises(RuntimeError):
+                    start_guild_exam(self.player, self.host, "E")
+                self.assertEqual(self._host_state(), host_before)
+                self.assertEqual(self._actor_state(), actor_before)
+                self.assertEqual(_BATTLEFIELDS, {})
+                self.assertFalse(self.host.relations.has_record(self.player))
+        # The retry starts exactly once, as attempt number one.
+        record = start_guild_exam(self.player, self.host, "E")
+        self.assertEqual(record.exam_id, f"{self.player.pk}:E:1")
+        self.assertEqual(len(_read_exams(self.player)), 1)
+
+    @covers_requirement(
+        "guild-rank-exams::exam-opponents-receive-their-rank-examiner-s-card-at-spawn",
+        "npc-identity-titles::exam-examiners-carry-their-authored-identity",
+        "npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events",
+    )
+    def test_start_reuses_the_edited_persona_and_identity_without_spawning(self):
+        card = read_npc_persona(self.host).card.to_record()
+        card["appearance"] = "換上了另一套斗篷。"
+        self.assertEqual(update_npc_persona(self.host, card, expected_version=1).status, "updated")
+        before = self._host_normal()
         self._give_merit(50)
         with patch("world.rules.guild_exams.log_info") as logged:
-            record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        # Free name -> no disambiguator: the authored name IS the key.
-        self.assertEqual(opponent.key, _examiner_identity()[0])
-        self.assertEqual(opponent.npc_title, _examiner_identity()[1])
-        self.assertTrue(opponent.key.startswith(_examiner_identity()[0]))
-        events = [
-            call for call in logged.call_args_list
-            if call.args and call.args[0] == "guild_exam_opponent_created"
-        ]
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].kwargs["context"]["char"], _examiner_identity()[0])
-        self.assertEqual(events[0].kwargs["context"]["rank"], "E")
-        self.assertEqual(events[0].kwargs["context"]["profile"], _examiner_identity()[2])
+            with self.captureOnCommitCallbacks(execute=True):
+                start_guild_exam(self.player, self.host, "E")
+        events = [call.args[0] for call in logged.call_args_list]
+        self.assertEqual(events, ["guild_exam_started"])
+        self.assertEqual(logged.call_args.kwargs["context"]["host"], self.host.pk)
+        during = self._host_normal()
+        for field in ("pk", "key", "persona", "provenance", "age", "bases", "skills", "proficiency"):
+            self.assertEqual(during[field], before[field], field)
+        self.assertEqual(current_persona_version(self.host), 2)
 
-    @covers_requirement("guild-rank-exams::exam-opponents-receive-their-rank-examiner-s-card-at-spawn")
-    def test_spawned_opponent_carries_profile_card_at_version_1(self):
-        from world.rules.npc_persona import read_npc_persona, current_persona_version, provenance_profile_key
-        import importlib
-
+    @covers_requirement("guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles")
+    def test_disguised_candidate_receives_the_same_host_and_profile(self):
         self._give_merit(50)
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        self.assertEqual(current_persona_version(opponent), 1)
-        self.assertEqual(provenance_profile_key(opponent), _examiner_identity()[2])
-        profiles = getattr(importlib.import_module("world.lore.npc_profiles"), "NPC_PROFILE" + "_REGISTRY")
-        profile = profiles[_examiner_identity()[2]]
-        self.assertEqual(read_npc_persona(opponent).card, profile.card)
-
-    def test_injected_persona_failure_rolls_back_opponent_record_and_session(self):
-        from unittest.mock import patch as inner_patch
-        from world.rules.combat_session import read_session
-
-        self._give_merit(50)
-        with inner_patch("world.rules.guild_exams.initialize_npc_persona", side_effect=RuntimeError("injected exam init failure")):
-            with self.assertRaises(RuntimeError):
-                start_guild_exam(self.player, self.examiner, "E")
-        orphans = ObjectDB.objects.filter(
-            db_key__startswith=_examiner_identity()[0],
-            db_location=self.hall,
+        self.player.db.disguised_stats = {"atk_phys": 999, "hp": 999}
+        record = start_guild_exam(self.player, self.host, "E")
+        self.assertEqual(record.opponent_id, self.host.pk)
+        self.assertEqual(
+            exam_restriction(self.host)["ceilings"], dict(EXAM_PROFILES["E"].ceilings)
         )
-        self.assertEqual(orphans.count(), 0)
-        self.assertIsNone(read_session(self.player))
-        self.assertTrue(not self.player.db.guild_exams)
-
-    def test_spawns_do_not_share_edits(self):
-        from world.rules.npc_persona import update_npc_persona, read_npc_persona, current_persona_version
-        from world.rules.combat_session import forfeit
-
-        self._give_merit(50)
-        record1 = start_guild_exam(self.player, self.examiner, "E")
-        opponent1 = ObjectDB.objects.filter(id=record1.opponent_id).first()
-        card_v2 = read_npc_persona(opponent1).card.to_record()
-        card_v2["appearance"] = "換上了另一套裝束。"
-        res = update_npc_persona(opponent1, card_v2, expected_version=1)
-        self.assertEqual(res.status, "updated")
-        self.assertEqual(current_persona_version(opponent1), 2)
-
-        # Forfeit first exam and start second exam
-        forfeit(self.player)
-        record2 = start_guild_exam(self.player, self.examiner, "E")
-        opponent2 = ObjectDB.objects.filter(id=record2.opponent_id).first()
-        self.assertEqual(current_persona_version(opponent2), 1)
-        self.assertNotEqual(read_npc_persona(opponent2).card.appearance, "換上了另一套裝束。")
-
-    @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
-    def test_persistently_occupied_name_forces_the_suffixed_form(self):
-        # A same-named entity that survives (a second candidate mid-exam whose
-        # opponent holds the authored key) forces the new spawn into the
-        # suffixed form so battlefield rosters keyed by str(key) stay distinct.
-        holder = create_object(NPC, key=_examiner_identity()[0], location=self.hall)
-        self._give_merit(50)
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertEqual(opponent.key, f"{_examiner_identity()[0]}-{opponent.pk}")
-        self.assertNotEqual(opponent.key, holder.key)
-        self.assertEqual(opponent.npc_title, _examiner_identity()[1])
 
 
-class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
+class ExamCombatTests(ExamHostFixture, EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        self.hall = create_object(Room, key="exam hall")
-        self.player = create_object(PlayerCharacter, key="exam fighter")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        self.player.location = self.hall
-        self.staff = create_object(NPC, key="guild staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
-        )
-        self.examiner = create_object(NPC, key="examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner,
-                service_id="examiner",
-                branch_key=EXAM_BRANCH,
-            )
-        )
-        register_adventurer(self.player, self.staff)
-        from world.rules.surfaces import write_counter_trait
+        self._give_merit(50)
 
-        write_counter_trait(self.player, "guild_merit", 50)
-
-    def test_lethal_examiner_defeat_passes_and_restores_both_sides(self):
-        # Make the candidate overwhelmingly strong for one decisive hit.
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
+    @covers_requirement(
+        "guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it",
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+    )
+    def test_host_defeat_passes_and_restores_the_persistent_host(self):
+        baseline = self._host_normal()
+        self._make_overwhelming()
+        start_guild_exam(self.player, self.host, "E")
+        with _Dice(100):
+            result = submit_player_action(self.player, _attack_key(), [self.host])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
-        # Ordinary lethal semantics: the examiner's HP really crossed zero.
+        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
         kinds = [entry.kind for log in result["logs"] for entry in log.entries]
         self.assertIn("target_defeated", kinds)
         self.assertNotIn("target_knocked_out", kinds)
-        # Simulated battle: both sides are restored to full HP/MP/SP after
-        # the outcome, then the temporary opponent is deleted.
-        for entity in (self.player, opponent):
+        self._assert_full_normal_pools(self.player)
+        self._assert_host_restored(baseline)
+
+    @covers_requirement("guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it")
+    def test_candidate_defeat_fails_without_injury_and_restores_both(self):
+        baseline = self._host_normal()
+        start_guild_exam(self.player, self.host, "E")
+        self.player.traits.hp.current = 1
+        with _Dice(100):
+            result = submit_player_action(self.player, _attack_key(), [self.host])
+        self.assertEqual(result["outcome"], "exam_failed")
+        self.assertEqual(self.player.guild_rank, "F")
+        self._assert_full_normal_pools(self.player)
+        self._assert_host_restored(baseline)
+
+    @covers_requirement("guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it")
+    def test_wounded_candidate_and_host_start_at_full_applicable_pools(self):
+        for entity in (self.player, self.host):
             for key in ("hp", "mp", "sp"):
-                self.assertEqual(
-                    getattr(entity.traits, key).current,
-                    getattr(entity.traits, key).max,
-                    key,
-                )
-        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
+                getattr(entity.traits, key).current = 1
+        start_guild_exam(self.player, self.host, "E")
+        self._assert_full_normal_pools(self.player)
+        self._assert_full_normal_pools(self.host)
+        self.assertEqual(self.host.traits.hp.current, EXAM_PROFILES["E"].ceilings["hp"])
 
-    def test_promotion_preserves_merit(self):
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_passed")
-        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
-        self.assertEqual(self.player.guild_rank, "E")
+    @covers_requirement("guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it")
+    def test_lethal_exam_defeat_grants_no_kill_rewards_or_growth(self):
+        proficiency = dict(self.host.db.skill_proficiency)
+        self._make_overwhelming()
+        start_guild_exam(self.player, self.host, "E")
+        with _Dice(100):
+            result = submit_player_action(self.player, _attack_key(), [self.host])
+        defeated = [e for log in result["logs"] for e in log.entries if e.kind == "target_defeated"]
+        self.assertTrue(defeated)
+        self.assertTrue(all(entry.data.get("simulated") is True for entry in defeated))
+        self.assertIsNone(self.player.db.magic_xp)
+        self.assertEqual(self.player.db.quest_log, [])
+        self.assertEqual(dict(self.host.db.skill_proficiency), proficiency)
 
-    def test_failed_attempt_can_be_retried_with_next_number(self):
-        # Fail via forfeit.
-        record = start_guild_exam(self.player, self.examiner, "E")
-        from world.rules.combat_session import forfeit
-
+    @covers_requirement(
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+    )
+    def test_forfeit_fails_restores_the_host_and_retries_with_the_same_host(self):
+        baseline = self._host_normal()
+        start_guild_exam(self.player, self.host, "E")
         result = forfeit(self.player)
         self.assertEqual(result["outcome"], "exam_failed")
-        records = _read_exams(self.player)
-        self.assertEqual(records[0].state, ExamState.FAILED)
-        # Retry gets attempt number 2.
-        record2 = start_guild_exam(self.player, self.examiner, "E")
-        self.assertEqual(record2.exam_id, f"{self.player.pk}:E:2")
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self._assert_host_restored(baseline)
+        retry = start_guild_exam(self.player, self.host, "E")
+        self.assertEqual(retry.exam_id, f"{self.player.pk}:E:2")
+        self.assertEqual(retry.opponent_id, self.host.pk)
 
     @covers_requirement("guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate")
     def test_replayed_settlement_cannot_promote_twice(self):
-        from world.rules.combat_session import read_session
-
-        record = start_guild_exam(self.player, self.examiner, "E")
+        start_guild_exam(self.player, self.host, "E")
         session = read_session(self.player)
         settle_exam_outcome(self.player, session, None, "exam_passed")
-        self.assertEqual(self.player.guild_rank, "E")
-        # Replay -> idempotent, no double promotion.
         settle_exam_outcome(self.player, session, None, "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
 
-    def test_flee_records_fail(self):
-        record = start_guild_exam(self.player, self.examiner, "E")
-        from world.rules.combat_session import read_session, submit_player_action
-
-        session = read_session(self.player)
-        settle_exam_outcome(self.player, session, None, "exam_failed")
-        self.assertEqual(self.player.guild_rank, "F")
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
-
-    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
-    def test_same_named_player_can_complete_the_exam(self):
-        self.player.key = _examiner_identity()[0]
-        self.player.save()
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_passed")
-        self.assertEqual(self.player.guild_rank, "E")
-        self.assertIsNone(read_session(self.player))
-
-    @covers_requirement("guild-rank-exams::examination-combat-is-a-simulated-lethal-battle-with-full-restoration-around-it")
-    def test_candidate_lethal_defeat_fails_but_restores(self):
-        # Make the examiner overwhelmingly strong so its basic_attack drives
-        # the candidate's HP to 0; the exam fails without a rank change, and
-        # the simulated battle restores the candidate to full HP/MP/SP.
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(opponent.traits, key).base = 500
-        opponent.traits.hp.base = 2000
-        opponent.traits.hp.current = 2000
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_failed")
-        self.assertEqual(self.player.guild_rank, "F")
-        # The lethal crossing really reached zero (simulated, not floored).
-        kinds = [entry.kind for log in result["logs"] for entry in log.entries]
-        self.assertIn("target_defeated", kinds)
-        for key in ("hp", "mp", "sp"):
-            self.assertEqual(
-                getattr(self.player.traits, key).current,
-                getattr(self.player.traits, key).max,
-                key,
-            )
-
-    def test_wounded_candidate_and_examiner_start_at_full(self):
-        # A wounded or spent participant enters the simulated battle at full
-        # HP/MP/SP: the start restores both sides after the spawn.
-        for key in ("hp", "mp", "sp"):
-            getattr(self.player.traits, key).current = 1
-        original_spawn = __import__(
-            "world.rules.guild_exams", fromlist=["_spawn_opponent"]
-        )._spawn_opponent
-
-        def wounded_spawn(actor, target_rank):
-            opponent = original_spawn(actor, target_rank)
-            for key in ("hp", "mp", "sp"):
-                getattr(opponent.traits, key).current = 1
-            return opponent
-
-        with patch(
-            "world.rules.guild_exams._spawn_opponent",
-            side_effect=wounded_spawn,
-        ):
-            record = start_guild_exam(self.player, self.examiner, "E")
-        for key in ("hp", "mp", "sp"):
-            self.assertEqual(
-                getattr(self.player.traits, key).current,
-                getattr(self.player.traits, key).max,
-                key,
-            )
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        for key in ("hp", "mp", "sp"):
-            self.assertEqual(
-                getattr(opponent.traits, key).current,
-                getattr(opponent.traits, key).max,
-                key,
-            )
-
-    def test_lethal_exam_defeat_grants_no_kill_rewards(self):
-        # A lethal simulated defeat is tagged on the event entry, so
-        # kill-credit consumers (DEFEAT progress and protected-entity
-        # failure come from the quest planner) never observe an ordinary
-        # kill from the examination.
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        self.assertEqual(self.player.db.quest_log, [])
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_passed")
-        defeated = [
-            entry
-            for log in result["logs"]
-            for entry in log.entries
-            if entry.kind == "target_defeated"
-        ]
-        self.assertTrue(defeated)
-        self.assertTrue(all(entry.data.get("simulated") is True for entry in defeated))
-        # No kill credit (kills carry no progression award) and no quest
-        # mutations were planned from the simulated defeat.
-        self.assertIsNone(self.player.db.magic_xp)
-        self.assertEqual(self.player.db.quest_log, [])
+    @covers_requirement(
+        "guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles",
+        "guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys",
+    )
+    def test_repeated_e_and_d_exams_keep_one_unchanged_persistent_host(self):
+        baseline = self._host_normal()
+        self._make_overwhelming()
+        for target, merit in (("E", 50), ("D", 600)):
+            with self.subTest(target=target):
+                self._give_merit(merit)
+                record = start_guild_exam(self.player, self.host, target)
+                self.assertEqual(record.opponent_id, baseline["pk"])
+                self.assertEqual(self.host.key, baseline["key"])
+                # Learned bases stay literal while the restriction lowers.
+                self.assertEqual(self._host_normal()["bases"], baseline["bases"])
+                with _Dice(100):
+                    result = submit_player_action(self.player, _attack_key(), [self.host])
+                self.assertEqual(result["outcome"], "exam_passed")
+                self._assert_host_restored(baseline)
+        self.assertEqual(self.player.guild_rank, "D")
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
-    def test_exam_tick_kill_of_examiner_settles_simulated(self):
-        # The candidate's damaging rate tick kills the examiner during
-        # upkeep: the round settles the exam normally, tags the upkeep defeat
-        # entry simulated, and grants no kill XP or quest credit.
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        from world.rules.buffs import apply_buff
-
-        apply_buff(opponent, "fire_scorch", source_pk=int(self.player.pk))
-        opponent.traits.hp.base = 3
-        opponent.traits.hp.current = 3
-        opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
-        self.assertEqual(self.player.db.quest_log, [])
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_passed")
-        upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
-        defeated = [
-            entry
-            for log in upkeep_logs
-            for entry in log.entries
-            if entry.kind == "target_defeated"
-        ]
-        self.assertEqual(len(defeated), 1)
-        self.assertTrue(defeated[0].data["simulated"])
-        self.assertIsNone(self.player.db.magic_xp)
-        self.assertEqual(self.player.db.quest_log, [])
-
-    def test_failed_exam_start_restores_nothing(self):
-        # A rejected start rolls the pre-restore back: the candidate keeps the
-        # wounded/spent state it brought in, and no opponent survives.
-        for key in ("hp", "mp", "sp"):
-            getattr(self.player.traits, key).current = 1
-        with patch(
-            "world.rules.affinity.apply_affinity_change",
-            side_effect=RuntimeError("affinity boom"),
+    def test_round_settlement_failure_restores_host_surfaces_for_retry(self):
+        self._make_overwhelming()
+        start_guild_exam(self.player, self.host, "E")
+        during = self._host_state()
+        with _Dice(100), patch(
+            "world.rules.guild_exams.release_exam_schedule_hold",
+            side_effect=RuntimeError("release failed"),
         ):
             with self.assertRaises(RuntimeError):
-                start_guild_exam(self.player, self.examiner, "E")
-        for key in ("hp", "mp", "sp"):
-            self.assertEqual(getattr(self.player.traits, key).current, 1, key)
-        self.assertIsNone(self.player.db.active_combat)
+                submit_player_action(self.player, _attack_key(), [self.host])
+        self.assertEqual(self._host_state()["normal"], during["normal"])
+        self.assertEqual(self._host_state()["hold"], during["hold"])
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
+        self.assertIsNotNone(read_session(self.player))
+        with _Dice(100):
+            result = submit_player_action(self.player, _attack_key(), [self.host])
+        self.assertEqual(result["outcome"], "exam_passed")
+        self.assertEqual(self.player.guild_rank, "E")
+
+
+class ExamSettlementRecoveryTests(ExamHostFixture, EvenniaTestCase):
+    """Terminal settlement, rollback/retry and cold-start recovery."""
+
+    def setUp(self):
+        super().setUp()
+        self._give_merit(50)
+
+    @covers_requirement("guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate")
+    def test_terminal_fault_at_every_checkpoint_restores_and_retries_once(self):
+        from world.rules.combat_session.settlement import _settle_with_restore
+
+        checkpoints = {
+            "title": ("world.rules.titles.grant_rank_title", "exam_passed"),
+            "outfit": ("world.rules.guild_exam_restrictions.remove_exam_restriction", "exam_failed"),
+            "session": ("world.rules.combat_session.settlement.clear_session", "exam_failed"),
+            "hold": ("world.rules.guild_exams.release_exam_schedule_hold", "exam_failed"),
+        }
+        start_guild_exam(self.player, self.host, "E")
+        host_before = self._host_state()
+        actor_before = self._actor_state()
+        clock_before = get_world_clock().tick
+        for name, (target, outcome) in checkpoints.items():
+            with self.subTest(checkpoint=name):
+                with patch(target, side_effect=RuntimeError(name)), self.assertRaises(RuntimeError):
+                    _settle_with_restore(self.player, read_session(self.player), None, outcome)
+                self.assertEqual(self._host_state(), host_before)
+                self.assertEqual(self._actor_state(), actor_before)
+                self.assertEqual(get_world_clock().tick, clock_before)
+        result = _settle_with_restore(self.player, read_session(self.player), None, "exam_passed")
+        self.assertEqual(result["exam"]["state"], "passed")
+        self.assertEqual(self.player.guild_rank, "E")
+        title_key = live_guild_rank_registry()["E"].title_key
         self.assertEqual(
-            ObjectDB.objects.filter(
-                db_key__startswith=_examiner_identity()[0],
-                db_location=self.hall,
-            ).count(),
-            0,
+            [row["key"] for row in self.player.db.title_collection].count(title_key), 1
         )
 
+    @covers_requirement(
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+    )
+    def test_coherent_cold_start_resumes_the_same_host_restriction_and_hold(self):
+        from world.rules.skip_safety import _BATTLEFIELDS
 
-class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
-    """fix-combat-settlement-recovery: exam time settles exactly once.
+        record = start_guild_exam(self.player, self.host, "E")
+        _BATTLEFIELDS.clear()
+        restore_active_session(self.player)
+        session = read_session(self.player)
+        self.assertIsNotNone(session)
+        self.assertEqual(session.enemy_ids, (self.host.pk,))
+        self.assertEqual(exam_restriction(self.host)["exam_id"], record.exam_id)
+        self.assertEqual(read_exam_schedule_hold(self.host).hold.exam_id, record.exam_id)
+        self.assertIn(str(self.host.pk), _BATTLEFIELDS)
 
-    The old ordering (exam write and clear before the clock advance) lost the
-    exam's time when the process died between the two commits; the new
-    settlement is one durable transaction with a settled marker, so a restart
-    never re-settles and never loses the time.
-    """
+    @covers_requirement(
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+    )
+    def test_incoherent_cold_start_fails_once_and_restores_the_host(self):
+        for corruption in ("missing_hold", "collision", "missing_record", "malformed_history"):
+            with self.subTest(corruption=corruption):
+                baseline = self._host_normal()
+                player = self._candidate(f"recovery {corruption}")
+                register_adventurer(player, self.counter)
+                self._give_merit(50, player)
+                start_guild_exam(player, self.host, "E")
+                if corruption == "missing_hold":
+                    self.host.attributes.remove(HOLD_ATTRIBUTE)
+                elif corruption == "collision":
+                    player.key = self.host.key
+                    player.save()
+                elif corruption == "missing_record":
+                    player.db.guild_exams = []
+                else:
+                    player.db.guild_exams = 5
+                restore_active_session(player)
+                self.assertIsNone(read_session(player))
+                self.assertEqual(player.guild_rank, "F")
+                self._assert_host_restored(baseline)
+                if corruption in ("missing_hold", "collision"):
+                    self.assertEqual(_read_exams(player)[0].state, ExamState.FAILED)
+                    restore_active_session(player)
+                    self.assertEqual(len(_read_exams(player)), 1)
 
-    def setUp(self):
-        super().setUp()
-        self.hall = create_object(Room, key="exam hall")
-        self.player = create_object(PlayerCharacter, key="exam recovery")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        self.player.location = self.hall
-        self.staff = create_object(NPC, key="guild staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
-        )
-        self.examiner = create_object(NPC, key="examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner,
-                service_id="examiner",
-                branch_key=EXAM_BRANCH,
-            )
-        )
-        register_adventurer(self.player, self.staff)
-        from world.rules.surfaces import write_counter_trait
+    @covers_requirement("guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate")
+    def test_late_restoration_for_another_exam_leaves_the_active_host_untouched(self):
+        from world.rules.guild_exams import restore_exam_host
 
-        write_counter_trait(self.player, "guild_merit", 50)
+        start_guild_exam(self.player, self.host, "E")
+        self.host.traits.hp.current = 1
+        during = self._host_state()
+        restore_exam_host(self.host, "stale:E:9")
+        self.assertEqual(self._host_state(), during)
 
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
     def test_restored_exam_session_settles_time_exactly_once(self):
-        # Simulate a restart from the durable state BEFORE the settlement
-        # committed: the exam is still ACTIVE, its terminal session still
-        # present with two rounds elapsed, the clock unadvanced (a crash
-        # mid-transaction). Restoration must settle the exam's rounds exactly
-        # once -- the time is never lost and never doubled.
-        from world.rules.clock import WorldClock
         from world.rules.combat_session import (
             _persist,
             from_storage as session_from_storage,
             to_storage as session_to_storage,
         )
 
-        record = start_guild_exam(self.player, self.examiner, "E")
+        baseline = self._host_normal()
+        start_guild_exam(self.player, self.host, "E")
         session = read_session(self.player)
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        _persist(
-            self.player,
-            session_from_storage(
-                {
-                    **session_to_storage(session),
-                    "rounds_elapsed": 2,
-                    "knocked_out_ids": [int(opponent.pk)],
-                }
-            ),
-        )
-        opponent.traits.hp.current = 1
-        clock = WorldClock()
-        with patch("world.rules.clock.get_world_clock", return_value=clock):
-            restore_active_session(self.player)
-        self.assertEqual(clock.tick, 12)
+        _persist(self.player, session_from_storage({
+            **session_to_storage(session),
+            "rounds_elapsed": 2,
+            "knocked_out_ids": [int(self.host.pk)],
+        }))
+        self.host.traits.hp.current = 0
+        tick = get_world_clock().tick
+        restore_active_session(self.player)
+        self.assertEqual(get_world_clock().tick, tick + 12)
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
-        self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(read_session(self.player))
-
-    def test_restored_marked_exam_session_is_not_resettled(self):
-        # Simulate the clock-commit-before-clear window for an exam: the exam
-        # outcome and the marker committed, the clear never ran. Restoration
-        # skips settlement (no second clock advance) and clears the leftover
-        # session state.
-        from dataclasses import replace
-
-        from world.rules.clock import WorldClock
-        from world.rules.combat_session import (
-            _persist,
-            from_storage as session_from_storage,
-            to_storage as session_to_storage,
-        )
-        from world.rules.guild_exams import _write_exams
-
-        record = start_guild_exam(self.player, self.examiner, "E")
-        session = read_session(self.player)
-        _write_exams(
-            self.player,
-            [
-                replace(
-                    exam,
-                    state=ExamState.FAILED,
-                    terminal_reason="exam_failed",
-                )
-                for exam in _read_exams(self.player)
-            ],
-        )
-        _persist(
-            self.player,
-            session_from_storage(
-                {**session_to_storage(session), "settled_tick": 6}
-            ),
-        )
-        clock = WorldClock(6)
-        with patch("world.rules.clock.get_world_clock", return_value=clock):
-            restore_active_session(self.player)
-        self.assertEqual(clock.tick, 6)
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
-        self.assertIsNone(read_session(self.player))
-
-    def test_failed_exam_settlement_keeps_opponent_alive_for_retry(self):
-        # The opponent is deleted only after the settlement commits: a failed
-        # settlement (clock write error) rolls the exam outcome back and the
-        # temporary opponent survives for exactly one retry, which then
-        # settles, deletes it, and advances the clock exactly once.
-        from world.rules.clock import WorldClock
-
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        opponent.traits.hp.base = 1
-        opponent.traits.hp.current = 1
-        clock = WorldClock()
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
-            patch("world.rules.combat.damage.roll_d100", return_value=100),
-            patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.clock.get_world_clock", return_value=clock),
-            patch(
-                "world.rules.combat_session.settlement.settle_combat_result",
-                side_effect=RuntimeError("clock write failed"),
-            ),
-        ):
-            with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(clock.tick, 0)
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
-        self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
-        self.assertIsNotNone(read_session(self.player))
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
-            patch("world.rules.combat.damage.roll_d100", return_value=100),
-            patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.clock.get_world_clock", return_value=clock),
-        ):
-            result = submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(result["outcome"], "exam_passed")
-        # The overwhelming candidate defeats the examiner in one lethal
-        # round (exam defeats are not battlefield-tracked), settling 6 s once.
-        self.assertEqual(clock.tick, 6)
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
-        self.assertEqual(self.player.guild_rank, "E")
-        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
-        self.assertIsNone(read_session(self.player))
-
-    def test_forfeit_restore_failure_rolls_back_settlement_and_gauges(self):
-        # The full restoration is part of the settlement transaction: a
-        # restore failure rolls the exam outcome, session clear, and gauge
-        # writes back, and the degraded forfeit path restores the in-process
-        # trait surfaces (the idmapper cache is not transaction-aware). A
-        # retry then settles and restores normally.
-        from world.rules.combat_session import forfeit
-
-        record = start_guild_exam(self.player, self.examiner, "E")
-        self.player.traits.hp.current = 1
-        with patch(
-            "world.rules.traits.restore_gauges_to_full",
-            side_effect=RuntimeError("restore failed"),
-        ):
-            with self.assertRaises(RuntimeError):
-                forfeit(self.player)
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
-        self.assertIsNotNone(read_session(self.player))
-        self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
-        self.assertEqual(self.player.traits.hp.current, 1)
-        result = forfeit(self.player)
-        self.assertEqual(result["outcome"], "exam_failed")
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
-        self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
-        self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
-        self.assertIsNone(read_session(self.player))
-
-    def test_submit_path_restore_failure_rolls_back_the_round(self):
-        # In the submit path the restore runs inside the shared outer
-        # round-and-settlement transaction: a restore failure rolls the round
-        # effects and the settlement back, leaving the exam ACTIVE and both
-        # sides' in-process gauges at their pre-round values.
-        for key in ("atk_phys", "agility", "defense", "magic_power"):
-            getattr(self.player.traits, key).base = 200
-        self.player.traits.hp.base = 2000
-        self.player.traits.hp.current = 2000
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        with patch(
-            "world.rules.traits.restore_gauges_to_full",
-            side_effect=RuntimeError("restore failed"),
-        ):
-            with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, _attack_key(), [opponent])
-        self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
-        self.assertIsNotNone(read_session(self.player))
-        self.assertEqual(self.player.guild_rank, "F")
-        self.assertEqual(opponent.traits.hp.current, opponent.traits.hp.max)
-        self.assertEqual(self.player.traits.hp.current, self.player.traits.hp.max)
+        self._assert_host_restored(baseline)
 
 
-class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTestCase):
+class ExamScheduleIntegrationTests(ExamHostFixture, EvenniaTestCase):
+    """A departure crossed during the exam replays once after release."""
+
     def setUp(self):
         super().setUp()
-        self.hall = create_object(Room, key="profile hall")
-        self.staff = create_object(NPC, key="profile staff", location=self.hall)
-        self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
-        )
-        self.examiner = create_object(NPC, key="profile examiner", location=self.hall)
-        self.examiner.components.add(
-            GuildExaminer.create(
-                self.examiner,
-                service_id="examiner",
-                branch_key=EXAM_BRANCH,
-            )
+        from typeclasses.exits import Exit
+        from world.rules import clock as clock_module
+        from world.rules.npc_schedules import (
+            ScheduleEntry,
+            ScheduleRulebook,
+            ScheduleTemplate,
+            register_npc_schedules,
+            set_npc_schedule,
         )
 
-    # The shipped-content claim "every authored exam profile stays inside its
-    # lore band" lives in the registered data-contract suite
-    # (test_guild_config.ExamProfileTests); this suite keeps only the
-    # mechanism: the spawn applies the live catalog's validated profile.
-    @covers_requirement("guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles")
-    def test_spawned_opponent_uses_true_profile_stats(self):
-        self.player = create_object(PlayerCharacter, key="profile player")
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        self.player.location = self.hall
-        register_adventurer(self.player, self.staff)
-        from world.rules.surfaces import write_counter_trait
+        self.home = create_object(Room, key="host home")
+        create_object(Exit, key="home", location=self.hall, destination=self.home)
+        create_object(Exit, key="hall", location=self.home, destination=self.hall)
+        self.clock.tick = 86400 - 3
+        self.clock._persist(self.clock.tick)
+        book = ScheduleRulebook(1, ("duty", "busy", "resting"), (
+            ScheduleTemplate("t_exam_routine", (
+                ScheduleEntry(3600, "move", target="t_hall"),
+                ScheduleEntry(86400 - 1, "move", target="t_home"),
+            ), default_state="duty", cycle_days=1),
+        ))
+        for target, kwargs in (
+            ("world.rules.npc_schedules.get_rulebook", {"return_value": book}),
+            ("world.rules.npc_schedules._resolve_destination", {
+                "side_effect": {"t_hall": self.hall, "t_home": self.home}.get,
+            }),
+        ):
+            mock = patch(target, **kwargs)
+            mock.start()
+            self.addCleanup(mock.stop)
+        sources = patch.dict(clock_module._EVENT_SOURCES, {}, clear=True)
+        sources.start()
+        self.addCleanup(sources.stop)
+        register_npc_schedules()
+        set_npc_schedule(self.host, {"schema_version": 1, "template": "t_exam_routine"})
+        self.host.db.schedule_state = "duty"
+        self._give_merit(50)
 
-        write_counter_trait(self.player, "guild_merit", 50)
-        record = start_guild_exam(self.player, self.examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        profile = __import__(
-            "world.rules.guild_config", fromlist=["get_catalog"]
-        ).get_catalog().exam_profiles["E"]
-        self.assertEqual(opponent.traits.atk_phys.base, profile.atk_phys)
-        self.assertEqual(opponent.traits.agility.base, profile.agility)
+    def test_crossed_departure_is_deferred_then_replayed_once(self):
+        start_guild_exam(self.player, self.host, "E")
+        start_tick = get_world_clock().tick
+        # One six-second round crosses the authored departure: the host stays.
+        with _Dice(1):
+            submit_player_action(self.player, _attack_key(), [self.host])
+        self.assertEqual(self.host.location, self.hall)
+        forfeit(self.player)
+        self.assertEqual(self.host.location, self.home)
+        hold = read_exam_schedule_hold(self.host).hold
+        self.assertTrue(hold.released)
+        # Combat time settled once; the replay consumed no extra clock time.
+        self.assertEqual(get_world_clock().tick - start_tick, 6 * 1)
+        self.assertIsNone(exam_restriction(self.host))
 
 
 if __name__ == "__main__":
-    import unittest
-
     unittest.main()

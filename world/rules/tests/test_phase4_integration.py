@@ -101,6 +101,15 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         self.player.apply_race_baseline()
         self.player.db.wallet = 0
 
+    def _present_qualified_host(self, target_rank):
+        """The shipped branch's qualified persistent host, standing at the counter."""
+        from world.rules.guild_exams import qualified_exam_host
+
+        get_world_clock()
+        host = qualified_exam_host(self.player, target_rank)
+        host.location = self.guild_hall
+        return host
+
     def _register(self):
         self.call(CmdGuildRegister(), "", "你已註冊為冒險者")
         self.assertEqual(self.player.guild_rank, "F")
@@ -202,6 +211,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         from commands.combat import CmdGuildExam
 
         self.player.location = self.guild_hall
+        host = self._present_qualified_host("E")
         # Give the player decisive power so the simulated exam resolves.
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
@@ -223,13 +233,13 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(self.player.db.active_combat)
 
-        # 6. No active session or orphan opponent remains.
+        # 6. No active session remains; the persistent host survives with its
+        # normal outfit and no examination restriction.
         self.assertIsNone(self.player.db.active_combat)
-        from evennia.objects.models import ObjectDB
-
-        self.assertIsNone(
-            ObjectDB.objects.filter(id=session.enemy_ids[0]).first()
-        )
+        self.assertEqual(session.enemy_ids, (host.pk,))
+        self.assertIsNotNone(ObjectDB.objects.filter(id=host.pk).first())
+        self.assertIsNone(host.db.guild_exam_restriction)
+        self.assertEqual(host.traits.hp.current, host.traits.hp.max)
 
     def test_true_combat_stats_used_despite_disguise(self):
         self._register()
@@ -247,20 +257,14 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
 
     def test_future_npc_intent_contract(self):
         from world.rules.guild_exams import ExamReason, GuildExamError, start_guild_exam
-        from typeclasses.components import GuildExaminer
-        from typeclasses.npcs import NPC
 
-        branch_key = next(iter(_live_registry("world.lore.guild", "GUILD_BRANCH_REGISTRY")))
-        staff = create_object(NPC, key="exam staff", location=self.guild_hall)
-        staff.components.add(
-            GuildExaminer.create(staff, service_id="exam", branch_key=branch_key)
-        )
         self._register()
+        host = self._present_qualified_host("E")
         # Below-threshold request via npc_intent is rejected identically.
         with self.assertRaises(GuildExamError) as ctx:
             start_guild_exam(
                 self.player,
-                staff,
+                host,
                 "E",
                 requested_by="npc_intent",
             )

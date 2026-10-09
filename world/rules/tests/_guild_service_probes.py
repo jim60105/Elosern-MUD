@@ -19,7 +19,6 @@ import importlib
 from unittest.mock import patch
 
 from world.rules.guild_config import (
-    ExamProfile,
     GuildCatalog,
     ItemOfferRule,
     ShopConfig,
@@ -69,16 +68,6 @@ def live_guild_branch_registry():
 def live_dialogue_table():
     """The CURRENT dialogue-table mapping (kit rows inside a scope)."""
     return _live_registry("world.rules.dialogue", "DIALOGUE" + "_TABLE")
-
-
-def first_live_skill_key() -> str:
-    """One live skill key for synthetic rows that need a real skill identity.
-
-    Capability probe: inside a kit ``skills`` scope the kit row wins; outside
-    one the live registry's first row wins. Selection follows registry order
-    deliberately (the caller needs *a* resolvable skill, not a specific one).
-    """
-    return next(iter(live_skill_registry()))
 
 
 def first_live_dialogue_key() -> str:
@@ -193,42 +182,6 @@ def synth_shop_config(
     )
 
 
-def synth_exam_profile(target_rank: str, *, hp: int = 100, **stats: int) -> ExamProfile:
-    """One synthetic examination profile for one target rank.
-
-    The static-tier identity names the kit's static tier; every skill slot
-    resolves through the live skill registry at build time. Construction is
-    a plain value build — the shipped rulebook's band validator is not part
-    of the direct-construction contract.
-    """
-    defaults = {
-        "mp": 100,
-        "sp": 100,
-        "atk_phys": 8,
-        "agility": 8,
-        "defense": 7,
-        "magic_power": 10,
-    }
-    defaults.update(stats)
-    return ExamProfile(
-        target_rank=target_rank,
-        static_tier_key="t_duskmari_warden",
-        hp=hp,
-        skills=(first_live_skill_key(),),
-        **defaults,
-    )
-
-
-def synth_exam_profiles(**overrides: ExamProfile) -> dict[str, ExamProfile]:
-    """A complete E-through-S examination profile map with invented stats."""
-    profiles = {
-        rank: synth_exam_profile(rank, hp=100 + position * 10)
-        for position, rank in enumerate(_EXAM_RANK_ORDER)
-    }
-    profiles.update(overrides)
-    return profiles
-
-
 def synth_merit_thresholds() -> dict[str, int]:
     """Strictly increasing E-through-S merit thresholds (invented numbers)."""
     return {rank: 50 * (position + 1) for position, rank in enumerate(_EXAM_RANK_ORDER)}
@@ -258,20 +211,16 @@ def synth_catalog(
     shop_configs: dict[str, ShopConfig] | None = None,
     quest_offers: tuple | None = None,
     merit_thresholds: dict[str, int] | None = None,
-    exam_profiles: dict[str, ExamProfile] | None = None,
     service_hosts: tuple = (),
 ) -> GuildCatalog:
     """One fully synthetic guild-economy catalog.
 
-    Defaults: no shops, kit quest offers, invented thresholds, synthetic exam
-    profiles, empty service-host roster (sync tests pass their own roster).
+    Defaults: no shops, kit quest offers, invented thresholds, empty
+    service-host roster (sync tests pass their own roster).
     """
     return GuildCatalog(
         merit_thresholds=(
             synth_merit_thresholds() if merit_thresholds is None else merit_thresholds
-        ),
-        exam_profiles=(
-            synth_exam_profiles() if exam_profiles is None else exam_profiles
         ),
         shop_configs={} if shop_configs is None else shop_configs,
         quest_offers=list(synth_quest_offers() if quest_offers is None else quest_offers),

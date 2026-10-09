@@ -60,41 +60,43 @@ class ShopNPCIdentityTests(unittest.TestCase):
         validate_shop_npc_identities()
 
     def test_cross_registry_uniqueness_passes_on_shipped_rows(self):
-        # Nine authored names (1 shop + 1 branch + 7 examiners) must be distinct.
+        # Every shop host, branch host and persistent adventurer name is distinct.
         validate_shipped_identity_uniqueness()
 
     @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_duplicate_cross_registry_names_reject_on_substituted_rows(self):
         # The pure checker accepts explicit row sets, so collisions are proven
-        # without mutating the shipped registries: shop-vs-examiner and
-        # branch-vs-rank duplicates both raise naming both holders.
+        # without mutating the shipped registries: shop-vs-person and
+        # branch-vs-person duplicates both raise naming both holders.
         from dataclasses import replace as dc_replace
 
-        from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
+        from world.lore.guild import GUILD_BRANCH_REGISTRY
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 
         shop_row = SHOP_REGISTRY["altoria_general_store"]
-        rank = GUILD_RANK_REGISTRY["F"]
+        person = next(iter(ADVENTURER_REGISTRY.values()))
         branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
+        holder = f"persistent_adventurer:{person.key}"
 
-        shop_vs_examiner = dc_replace(shop_row, host_name=rank.examiner_name)
+        shop_vs_person = dc_replace(shop_row, host_name=person.name)
         with self.assertRaises(Exception) as caught:
             validate_registry_identity_uniqueness(
-                {"s": shop_vs_examiner},
+                {"s": shop_vs_person},
                 {"b": branch},
-                {"F": rank},
+                {person.key: person},
             )
         self.assertIn("shop:altoria_general_store", str(caught.exception))
-        self.assertIn("guild_rank:F", str(caught.exception))
+        self.assertIn(holder, str(caught.exception))
 
-        branch_vs_rank = dc_replace(branch, host_name=rank.examiner_name)
+        branch_vs_person = dc_replace(branch, host_name=person.name)
         with self.assertRaises(Exception) as caught:
             validate_registry_identity_uniqueness(
                 {"s": shop_row},
-                {"b": branch_vs_rank},
-                {"F": rank},
+                {"b": branch_vs_person},
+                {person.key: person},
             )
         self.assertIn("guild_branch:guild_branch_altoria", str(caught.exception))
-        self.assertIn("guild_rank:F", str(caught.exception))
+        self.assertIn(holder, str(caught.exception))
 
     def test_shipped_registry_carries_the_seven_capital_and_six_village_shops(self):
         # The capital shops arrive in terrace-slice order (altoria-place-slices):

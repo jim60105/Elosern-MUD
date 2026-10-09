@@ -47,7 +47,7 @@ from world.rules.guild import (
     resolve_local_service_host,
     turn_in_quest,
 )
-from world.rules.guild_exams import GuildExamError, start_guild_exam
+from world.rules.guild_exams import GuildExamError, qualified_exam_host, start_guild_exam
 from world.rules.guild_offers import (
     BoardAccessError,
     GuildOfferError,
@@ -437,7 +437,10 @@ def _exam_start_adapter(actor: Any, payload: dict[str, Any], session: Any = None
     if expected is None or target_rank != expected:
         return _rejected("not_next_rank")
     try:
-        record = start_guild_exam(actor, examiner, target_rank, requested_by="webclient")
+        # The counter authorizes the request; the qualified persistent
+        # adventurer for this exact target is the one who fights.
+        host = qualified_exam_host(actor, target_rank)
+        record = start_guild_exam(actor, host, target_rank, requested_by="webclient")
     except GuildExamError as error:
         return _rejected(error)
     message = (

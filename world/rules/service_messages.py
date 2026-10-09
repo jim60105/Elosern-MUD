@@ -80,6 +80,9 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "unknown_profile": "考核資料有誤。",
     "malformed_record": "考核記錄有誤。",
     "already_settled": "這次考核已經結束了。",
+    "unqualified_examiner": "這裡沒有能主持這個階級考核的考官。",
+    "participant_name_collision": "無法與同名的考官進行考核。",
+    "examiner_engaged": "考官正在主持另一場考核。",
     "not_settlable": "這次考核無法結算。",
     "unknown_exam": "找不到這次考核。",
     # Trade.

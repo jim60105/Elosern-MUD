@@ -41,8 +41,6 @@ SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
         400,
         "Synthetic bronze-rank tasks.",
         "t_synth_bronze_badge",
-        "灰鱗‧銅徽",
-        "合成公會銅階考官",
     ),
     "t_silver": GuildRank(
         "t_silver",
@@ -51,8 +49,6 @@ SYNTH_GUILD_RANKS: dict[str, GuildRank] = {
         4_000,
         "Synthetic silver-rank tasks.",
         "t_synth_silver_badge",
-        "霜鬃‧銀環",
-        "合成公會銀階考官",
     ),
 }
 

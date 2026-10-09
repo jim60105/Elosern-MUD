@@ -18,7 +18,6 @@ from pathlib import Path
 from tools.spec_traceability import covers_requirement
 from world.ai.director_templates import QUEST_TEMPLATE_POOL
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
-from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.npc_card import NpcCard, NpcCardIdentity
 from world.lore.npc_profiles.inventory import NpcSource
 from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
@@ -44,16 +43,6 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         social_connection="無特殊派系關聯。",
     )
 
-    examiner_card = NpcCard(
-        identity=NpcCardIdentity(public="公會考核官身分", hidden=""),
-        appearance="身材魁梧，身穿重甲。",
-        personality="嚴肅專注，不苟言笑。",
-        speech_style="冷硬簡短。",
-        life_story="退役冒險者，現任公會考核官。",
-        habit="戰鬥時目光銳利。",
-        social_connection="",
-    )
-
     profile_registry = {
         "t_host_prof": NpcProfile(
             key="t_host_prof",
@@ -61,13 +50,6 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
             age=40,
             apparent_age=40,
             voice=NpcVoiceLines(greeting=None, misunderstood="「我聽不懂你在說什麼。」"),
-        ),
-        "t_examiner_prof": NpcProfile(
-            key="t_examiner_prof",
-            card=examiner_card,
-            age=35,
-            apparent_age=35,
-            voice=NpcVoiceLines(greeting=None, misunderstood=None),
         ),
     }
 
@@ -89,15 +71,6 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         "t_dialogue": DialogueDefinition(
             greeting="「歡迎光臨，客人。」",
             responses=(KeywordResponse("買賣", "「要買什麼請看架上。」"),),
-        )
-    }
-
-    base_rank = GUILD_RANK_REGISTRY["F"]
-    guild_ranks = {
-        "F": replace(
-            base_rank,
-            examiner_title="公會考核官",
-            examiner_profile_key="t_examiner_prof",
         )
     }
 
@@ -132,7 +105,6 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
     derived = derive_shipped_sources(
         places=places,
         dialogue_rows=dialogue_rows,
-        guild_ranks=guild_ranks,
         player_presets=player_presets,
         quest_templates=quest_templates,
         examples_dir=tmp_dir,
@@ -144,7 +116,6 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         "adventurers": {},
         "places": places,
         "dialogue_rows": dialogue_rows,
-        "guild_ranks": guild_ranks,
         "player_presets": player_presets,
         "quest_templates": quest_templates,
         "examples_dir": tmp_dir,
@@ -245,6 +216,124 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
         print("PERSISTENT_HOST_SMOKE=" + json.dumps(snapshots, sort_keys=True))
 
 
+class ShippedPersistentExamLifecycleSmokeTests(EvenniaTest):
+    """Data-contract test: shipped hosts, real military pairs and limit accessories.
+
+    Exercises the authored Altoria roster end to end: every qualified person
+    preflights its real exam kit for every target it hosts, and the B-rank
+    senior hosts two consecutive real examinations (E then D), returning to
+    the same normal base/skill/proficiency/persona/dbref with full normal pools.
+    """
+
+    def setUp(self):
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+        from world.quests.bootstrap import sync_quest_runtime
+        from world.quests.catalog import register_catalog
+        from world.rules.guild_economy import sync_guild_economy
+        from world.rules.skip_safety import _BATTLEFIELDS
+        from world.maps.bootstrap import sync_grid, sync_service_interiors
+
+        super().setUp()
+        self._battlefields = dict(_BATTLEFIELDS)
+        _BATTLEFIELDS.clear()
+        register_catalog()
+        sync_quest_runtime()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_service_interiors()
+        sync_guild_economy()
+
+    def tearDown(self):
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        _BATTLEFIELDS.clear()
+        _BATTLEFIELDS.update(self._battlefields)
+        super().tearDown()
+
+    def test_real_hosts_preflight_kits_and_senior_hosts_two_real_exams(self):
+        from unittest.mock import patch
+
+        from evennia.utils.create import create_object
+        from evennia.utils.search import search_object_by_tag
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.components import GuildStaff
+        from world.lore.guild_adventurers import EXAM_QUALIFICATIONS
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session import submit_player_action
+        from world.rules.guild import register_adventurer, resolve_local_service_host
+        from world.rules.guild_config import get_catalog
+        from world.rules.guild_exam_restrictions import PROFILES, preflight_exam_restriction
+        from world.rules.guild_exams import _exam_kit, start_guild_exam
+        from world.rules.human_guild_hosts import qualified_host
+        from world.rules.npc_persona import read_npc_persona
+        from world.rules.surfaces import write_counter_trait
+
+        for row in EXAM_QUALIFICATIONS:
+            host = qualified_host(row.branch_key, row.target_rank)
+            preflight_exam_restriction(host, row.target_rank, equipment=_exam_kit(row.target_rank))
+
+        get_world_clock()
+        hall = search_object_by_tag("altoria_guild_hall")[0]
+        player = create_object(PlayerCharacter, key="t_exam_smoke_candidate", location=hall)
+        player.race = "human"
+        player.apply_race_baseline()
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
+            getattr(player.traits, key).base = 200
+        player.traits.hp.base = 2000
+        player.traits.hp.current = 2000
+        register_adventurer(player, resolve_local_service_host(player, GuildStaff))
+        host = qualified_host("guild_branch_altoria", "E")
+        host.location = hall
+
+        def normal():
+            return {
+                "pk": host.pk, "key": host.key,
+                "bases": {key: row["base"] for key, row in host.traits.trait_data.items()},
+                "skills": dict(host.db.skills),
+                "proficiency": dict(host.db.skill_proficiency or {}),
+                "persona": read_npc_persona(host).card.to_record(),
+                "equipment": dict(host.db.equipment),
+                "inventory": list(host.db.inventory),
+            }
+
+        baseline = normal()
+        normal_hp_max = host.traits.hp.max
+        snapshots = []
+        for target in ("E", "D"):
+            write_counter_trait(player, "guild_merit", get_catalog().merit_thresholds[target])
+            record = start_guild_exam(player, host, target)
+            profile = PROFILES[target]
+            self.assertEqual(record.opponent_id, baseline["pk"])
+            self.assertEqual(
+                (host.db.equipment["weapon_main"], host.db.equipment["armor"],
+                 list(host.db.equipment["accessories"])),
+                (profile.weapon, profile.armor, [profile.accessory]),
+            )
+            self.assertEqual(host.traits.hp.max, profile.ceilings["hp"])
+            during = {"target": target, "hp_max": host.traits.hp.max,
+                      "equipment": dict(host.db.equipment)}
+            with patch("world.rules.combat.battlefield.roll_d100", return_value=100), \
+                    patch("world.rules.combat.damage.roll_d100", return_value=100), \
+                    patch("world.rules.combat.rounds.roll_d100", return_value=100):
+                result = submit_player_action(player, "basic_attack", [host])
+            self.assertEqual(result["outcome"], "exam_passed")
+            self.assertEqual(normal(), baseline)
+            self.assertIsNone(host.db.guild_exam_restriction)
+            for key in ("hp", "mp", "sp"):
+                gauge = getattr(host.traits, key)
+                self.assertEqual(gauge.current, gauge.max)
+            self.assertEqual(host.traits.hp.max, normal_hp_max)
+            snapshots.append({**during, "rank_after": player.guild_rank,
+                              "restored_equipment": dict(host.db.equipment),
+                              "hp_after": host.traits.hp.current})
+        self.assertEqual(player.guild_rank, "D")
+        print("GUILD_EXAM_LIFECYCLE_SMOKE=" + json.dumps(
+            {"host": baseline["pk"], "attempts": snapshots}, sort_keys=True, ensure_ascii=False,
+            default=lambda value: dict(value) if hasattr(value, "items") else list(value),
+        ))
+
+
 class SyntheticNpcRosterValidationTests(unittest.TestCase):
     """Synthetic registries exercise every violation class individually and in combination."""
 
@@ -276,16 +365,13 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
 
     @covers_requirement("npc-profile-registry::the-shipped-npc-source-inventory-enumerates-every-source-with-an-owner")
     @covers_requirement("npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue")
-    def test_persistent_person_passes_with_silent_rank_and_no_scripted_home_table(self):
+    def test_persistent_person_passes_with_no_scripted_home_table(self):
         self._add_persistent_person()
         validate_npc_roster(**self.synth)
         self.assertIn(("persistent_adventurer", "t_person"), derive_shipped_sources(
             **{key: value for key, value in self.synth.items()
                if key not in {"profile_registry", "inventory"}}
         ))
-        examiner = self.synth["profile_registry"]["t_examiner_prof"]
-        self.assertIsNone(examiner.voice.greeting)
-        self.assertIsNone(examiner.voice.misunderstood)
 
     @covers_requirement("npc-profile-registry::every-shipped-host-and-examiner-profile-authors-a-bounded-age-pair")
     @covers_requirement("npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts")
@@ -338,35 +424,30 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self.assertIn("t_host_prof", msg)
 
     @covers_requirement(
-        "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
+        "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts",
+        "npc-profile-registry::the-shipped-npc-source-inventory-enumerates-every-source-with-an-owner",
     )
-    def test_examiner_missing_profile_is_reported(self):
-        broken_rank = replace(self.synth["guild_ranks"]["F"], examiner_profile_key="unregistered_exam")
-        self.synth["guild_ranks"] = {"F": broken_rank}
-
+    def test_stale_temporary_rank_examiner_source_fails(self):
+        # Rank-owned temporary examiners were cut over to persistent people:
+        # an inventory row still naming one is a stale source.
+        self.synth["inventory"] += (NpcSource("guild_examiner", "F", "test_slice"),)
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
         self.assertIn("guild_examiner", msg)
-        self.assertIn("F", msg)
-        self.assertIn("unregistered_exam", msg)
+        self.assertIn("missing from registries", msg)
 
     @covers_requirement(
-        "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
+        "npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue"
     )
-    def test_examiner_with_voice_lines_is_reported(self):
-        voiced_prof = replace(
-            self.synth["profile_registry"]["t_examiner_prof"],
-            voice=NpcVoiceLines(greeting="「來領教我的鐵拳吧。」", misunderstood=None),
-        )
-        self.synth["profile_registry"]["t_examiner_prof"] = voiced_prof
-
+    def test_qualified_person_missing_profile_is_reported(self):
+        self._add_persistent_person()
+        self.synth["adventurers"]["t_person"] = SimpleNamespace(profile_key="unregistered_person")
         with self.assertRaises(NpcRosterError) as caught:
             validate_npc_roster(**self.synth)
         msg = str(caught.exception)
-        self.assertIn("guild_examiner", msg)
-        self.assertIn("F", msg)
-        self.assertIn("examiners do not speak", msg)
+        self.assertIn("persistent_adventurer", msg)
+        self.assertIn("unregistered_person", msg)
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"

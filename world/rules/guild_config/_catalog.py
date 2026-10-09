@@ -7,7 +7,7 @@ idempotent offer registration.
 
 from world.rules.guild_offers import GuildQuestOffer
 
-from ._types import ExamProfile, ServiceHostRow, ShopConfig
+from ._types import ServiceHostRow, ShopConfig
 
 
 class GuildCatalog:
@@ -16,13 +16,11 @@ class GuildCatalog:
     def __init__(
         self,
         merit_thresholds: dict[str, int],
-        exam_profiles: dict[str, ExamProfile],
         shop_configs: dict[str, ShopConfig],
         quest_offers: list[GuildQuestOffer],
         service_hosts: tuple[ServiceHostRow, ...],
     ):
         self.merit_thresholds = {**merit_thresholds}
-        self.exam_profiles = {**exam_profiles}
         self.shop_configs = {**shop_configs}
         self.quest_offers = tuple(quest_offers)
         self.service_hosts = tuple(service_hosts)

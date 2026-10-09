@@ -18,6 +18,7 @@ from world.rules.combat_view import (
 from world.rules.guild_exams import (
     ExamReason,
     GuildExamError,
+    qualified_exam_host,
     start_guild_exam,
 )
 from world.rules.event_log import render_plain_text
@@ -161,9 +162,11 @@ class CmdGuildExam(Command):
             return
         target_rank = self.args.strip().partition(" ")[0] or "E"
         try:
+            # The counter authorizes the request; the qualified persistent
+            # adventurer for this exact target is the one who fights.
             record = start_guild_exam(
                 self.caller,
-                examiner,
+                qualified_exam_host(self.caller, target_rank),
                 target_rank,
                 requested_by="command",
             )
@@ -178,6 +181,11 @@ class CmdGuildExam(Command):
                 ExamReason.ACTIVE_COMBAT: "你已經在戰鬥中。",
                 ExamReason.DUPLICATE_ACTIVE: "你已經有一場進行中的考核。",
                 ExamReason.ALREADY_SETTLED: "你已經通過這個階級的考核。",
+                ExamReason.NO_EXAMINER: "這裡沒有考核官。",
+                ExamReason.REMOTE_EXAMINER: "考核官不在這裡。",
+                ExamReason.UNQUALIFIED_EXAMINER: "這裡沒有能主持這個階級考核的考官。",
+                ExamReason.EXAMINER_ENGAGED: "考官正在主持另一場考核。",
+                ExamReason.PARTICIPANT_NAME_COLLISION: "無法與同名的考官進行考核。",
             }.get(reason, "無法開始考核。")
             self.caller.msg(message)
             return

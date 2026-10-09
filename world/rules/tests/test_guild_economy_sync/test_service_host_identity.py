@@ -239,7 +239,6 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         )
         patched = guild_config.GuildCatalog(
             merit_thresholds=catalog.merit_thresholds,
-            exam_profiles=catalog.exam_profiles,
             shop_configs=catalog.shop_configs,
             quest_offers=catalog.quest_offers,
             service_hosts=rows,
@@ -640,7 +639,6 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
         )
         patched = guild_config.GuildCatalog(
             merit_thresholds=catalog.merit_thresholds,
-            exam_profiles=catalog.exam_profiles,
             shop_configs=catalog.shop_configs,
             quest_offers=catalog.quest_offers,
             service_hosts=rows,

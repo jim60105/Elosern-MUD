@@ -22,6 +22,15 @@ The scheduler hold/replay core is a prerequisite. This slice atomically calls be
 
 The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
 
+## Implementation Notes
+
+- Authority split: the co-located `GuildExaminer` component holder (the branch counter) owns the place gate and branch identity; the qualified persistent person is the `examiner` argument and carries no service component. `qualified_exam_host(actor, target_rank, speaker=None)` is the shared read-only resolver for command, browser and NPC-intent adapters; a speaking NPC must be the co-located counter or the qualified person and grants no extra authority.
+- Gate order before any write: player/active session/registration, counter gate (`remote_examiner`, `service_unavailable`, `wrong_branch`), host co-location, exact next rank, qualification (`unqualified_examiner`), host `service_guild` schedule state (`service_unavailable`), `participant_name_collision`, host engagement in another exam/battle (`examiner_engaged`), canonical host age, true merit, own duplicate/passed exam, kit preflight and an existing world clock (never created by start).
+- The exam kit is the target's military pair with an empty accessory loadout (the restriction then adds the guild limit accessory). The host's normal equipment, inventory and effects are persisted host-side in `guild_exam_normal_state` keyed by exam ID, so restoration never depends on the candidate's exam history.
+- `restore_exam_host(host, exam_id)` is the single terminal restoration used by every settlement and invalid recovery: remove only this exam's restriction, restore normal outfit/effects, refill full normal pools, then release this exam's hold through elapsed time. Foreign or unreadable restriction/hold state is left untouched with a warning.
+- The shared `snapshot_exam_host_surfaces`/`restore_exam_host_surfaces` pair covers start rollback, `_settle_with_restore` and the round transaction.
+- The obsolete catalog `exam_profiles` section (the removed factory's stat source), its loader, registry-index entry and synthetic probes were removed with the factory.
+
 ## Risks / Trade-offs
 
 - Shared files can conflict. Integrate after required predecessors and serialize shared hunks/manifests as listed in the batch matrix.

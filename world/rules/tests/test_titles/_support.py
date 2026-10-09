@@ -141,10 +141,10 @@ _PAIR_TITLES[_T_PROBE_KEY] = _PROBE_TITLE
 # Rank letters are production ladder identifiers (never catalog tokens); the
 # rows themselves are authored here, so the ladder content is fully local.
 _PAIR_RANKS = {
-    "F": GuildRank("F", 1, 50, 400, "合成 F 階委託。", "t_pair_first_hunt", "霧鱗‧初獵", "合成公會考官"),
-    "E": GuildRank("E", 2, 400, 4_000, "合成 E 階委託。", "t_pair_woodland", "苔徑‧巡林", "合成公會考官乙"),
-    "t_bronze": GuildRank("t_bronze", 3, 4_000, 40_000, "合成銅階委託。", "t_pair_bronze_badge", "灰鱗‧銅徽", "合成公會銅階考官"),
-    "t_silver": GuildRank("t_silver", 4, 40_000, 400_000, "合成銀階委託。", "t_pair_silver_badge", "霜鬃‧銀環", "合成公會銀階考官"),
+    "F": GuildRank("F", 1, 50, 400, "合成 F 階委託。", "t_pair_first_hunt"),
+    "E": GuildRank("E", 2, 400, 4_000, "合成 E 階委託。", "t_pair_woodland"),
+    "t_bronze": GuildRank("t_bronze", 3, 4_000, 40_000, "合成銅階委託。", "t_pair_bronze_badge"),
+    "t_silver": GuildRank("t_silver", 4, 40_000, 400_000, "合成銀階委託。", "t_pair_silver_badge"),
 }
 
 

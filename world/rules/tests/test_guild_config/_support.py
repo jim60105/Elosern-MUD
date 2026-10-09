@@ -50,7 +50,6 @@ from world.rules.guild_config import (
     load_commerce_config,
     load_guild_catalog,
     validate_assortment_configs,
-    validate_exam_profiles,
     validate_merit_thresholds,
     validate_price_scales,
     validate_quest_rewards,

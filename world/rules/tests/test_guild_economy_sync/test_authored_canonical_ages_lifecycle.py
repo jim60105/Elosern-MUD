@@ -1,21 +1,15 @@
 """Lifecycle and smoke verification for authored canonical ages."""
 
 from evennia.utils.create import create_object
-from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import Character
-from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.rules.guild_economy import sync_service_content
-from world.rules.guild_exams import start_guild_exam
-from world.rules.guild import register_adventurer
-from world.rules.surfaces import write_counter_trait, read_counter_trait
 from typeclasses.components import GuildStaff
 from world.rules.npc_persona import update_npc_persona, read_npc_persona, current_persona_version
 from tools.spec_traceability import covers_requirement
 from world.rules.tests.test_guild_economy_sync._support import ServiceContentIsolation
 from world.rules.tests.test_guild_economy_sync._support import _guild_host_name, _merchant_host_name
-from world.rules.tests.test_guild_economy_sync._support import _guild_ranks, _npc_profiles
 
 
 class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTestCase):
@@ -61,57 +55,3 @@ class NpcAuthoredCanonicalAgesLifecycleTests(ServiceContentIsolation, EvenniaTes
             meta_before_ver,
         )
 
-    @covers_requirement(
-        "guild-rank-exams::guild-exam-opponents-carry-canonical-age"
-    )
-    def test_exam_opponent_age_and_rollback_on_invalid_identity(self):
-        sync_service_content()
-        examiner = NPC.objects.filter(db_key=_guild_host_name()).first()
-        self.assertIsNotNone(examiner)
-
-        # 1. Successful exam opponent carries authored age pair
-        player = create_object(PlayerCharacter, key="t_exam_tester", location=examiner.location)
-        player.race = "human"
-        player.apply_race_baseline()
-        register_adventurer(player, examiner)
-        write_counter_trait(player, "guild_merit", 100)
-        # E rank examiner: the rank's own authored profile (registry-derived).
-        record = start_guild_exam(player, examiner, "E")
-        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertIsNotNone(opponent)
-        self.assertEqual(int(opponent.attributes.get("age")), 26)
-        self.assertEqual(int(opponent.attributes.get("apparent_age")), 26)
-
-        # 2. Invalid age rollback: fresh eligible player, no active combat
-        from unittest.mock import patch
-        from dataclasses import replace
-        rank_e = _guild_ranks()["E"]
-        self.assertEqual(opponent.key, rank_e.examiner_name)
-        examiner_profile_key = rank_e.examiner_profile_key
-        player2 = create_object(PlayerCharacter, key="t_exam_tester2", location=examiner.location)
-        player2.race = "human"
-        player2.apply_race_baseline()
-        register_adventurer(player2, examiner)
-        write_counter_trait(player2, "guild_merit", 100)
-        initial_merit = 100
-        initial_affinity = examiner.relations.affinity_for(player2)
-
-        profiles = _npc_profiles()
-        fake_registry = dict(profiles)
-        bad_profile = replace(profiles[examiner_profile_key])
-        object.__setattr__(bad_profile, "age", 10001)
-        fake_registry[examiner_profile_key] = bad_profile
-        with patch("world.rules.guild_exams.NPC_PROFILE_REGISTRY", fake_registry):
-            with self.assertRaises(ValueError) as caught:
-                start_guild_exam(player2, examiner, "E")
-            self.assertIn("10001", str(caught.exception))
-            self.assertIn(examiner_profile_key, str(caught.exception))
-
-        # Assert rollback of opponent, merit, affinity, and no session created for player2
-        from world.rules.combat_session import read_session
-        self.assertEqual(read_session(player2), None)
-        self.assertEqual(read_counter_trait(player2, "guild_merit"), initial_merit)
-        self.assertEqual(examiner.relations.affinity_for(player2), initial_affinity)
-        # The only examiner opponent in the DB is opponent 1 from step 1
-        self.assertEqual(ObjectDB.objects.filter(db_key=rank_e.examiner_name).count(), 1)
-        self.assertEqual(ObjectDB.objects.filter(db_key=rank_e.examiner_name).first().pk, opponent.pk)

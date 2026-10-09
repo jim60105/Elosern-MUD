@@ -17,14 +17,6 @@ class GuildRank:
     description: str
     # The paired fixed-title key (title-system D3); every rank row carries one.
     title_key: str
-    # Authored NPC identity of the rank examiner (npc-title-authored-identities).
-    examiner_name: str
-    examiner_title: str
-    # The examiner's authored persona card in the NPC profile registry
-    # (npc-persona-content-altoria-guild D6). Defaulted so synthetic test
-    # ranks stay terse; validate_guild_npc_identities requires it on every
-    # rank it validates, which includes every shipped row at import.
-    examiner_profile_key: str | None = None
 
     @property
     def display_name_zh(self) -> str:
@@ -45,13 +37,13 @@ class GuildBranch:
 
 
 GUILD_RANK_REGISTRY: dict[str, GuildRank] = {
-    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks.", "g_f_rank", "雷加‧鐵拳", "公會見習考官", "guild_examiner_f"),
-    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts.", "g_e_rank", "薇拉‧晨風", "公會初階考官", "guild_examiner_e"),
-    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs.", "g_d_rank", "巴德‧石肩", "公會中階考官", "guild_examiner_d"),
-    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone.", "g_c_rank", "賽琳‧夜鶯", "公會高階考官", "guild_examiner_c"),
-    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions.", "g_b_rank", "霍克‧赤刃", "公會資深考官", "guild_examiner_b"),
-    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments.", "g_a_rank", "卡珊卓‧銀輝", "公會首席考官", "guild_examiner_a"),
-    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale.", "g_s_rank", "奧古斯丁‧無名", "公會傳說考官", "guild_examiner_s"),
+    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks.", "g_f_rank"),
+    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts.", "g_e_rank"),
+    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs.", "g_d_rank"),
+    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone.", "g_c_rank"),
+    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions.", "g_b_rank"),
+    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments.", "g_a_rank"),
+    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale.", "g_s_rank"),
 }
 
 GUILD_BRANCH_REGISTRY: dict[str, GuildBranch] = {
@@ -82,46 +74,17 @@ def _validated_identity(
         raise ValueError(f"{what} {row_key} has an invalid {title_field}: {error}") from error
 
 
-def _validated_examiner_profile(rank: GuildRank) -> None:
-    """The rank names a registered examiner profile with no voice lines."""
-    # Function-local import: the profile registry imports only its own card
-    # and slice modules, never world.lore.guild or settlements, so loading
-    # either registry first stays cycle-free. Keep it that way.
-    from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
-
-    key = rank.examiner_profile_key
-    if not isinstance(key, str) or not key:
-        raise ValueError(f"guild rank {rank.key} has no examiner_profile_key")
-    profile = NPC_PROFILE_REGISTRY.get(key)
-    if profile is None:
-        raise ValueError(
-            f"guild rank {rank.key} has an unregistered examiner_profile_key {key!r}"
-        )
-    if profile.voice.greeting is not None or profile.voice.misunderstood is not None:
-        raise ValueError(
-            f"guild rank {rank.key} examiner_profile_key {key!r} names a profile "
-            "with voice lines; examiners do not speak"
-        )
-
 
 def validate_guild_npc_identities(
-    ranks: dict[str, GuildRank] | None = None,
     branches: dict[str, GuildBranch] | None = None,
 ) -> None:
-    """Fail closed on the shipped examiner/host authored identities (design D4).
+    """Fail closed on the shipped branch-host authored identities (design D4).
 
-    Pure checker callable with explicit dicts (tests); defaults to the shipped
-    registries. Raises ValueError naming the offending row and rule. Each
-    rank's examiner profile key is checked after its name and title, and must
-    name a registered profile that authors no voice lines (the examiner is a
-    combat opponent with no dialogue capability).
+    Pure checker callable with an explicit dict (tests); defaults to the
+    shipped registry. Raises ValueError naming the offending row and rule.
+    Ranks carry no examiner identity: the people who host examinations are
+    persistent adventurers validated by ``world.rules.human_guild_hosts``.
     """
-    for rank in (GUILD_RANK_REGISTRY if ranks is None else ranks).values():
-        _validated_identity(
-            "guild rank", rank.key, rank.examiner_name, rank.examiner_title,
-            name_field="examiner_name", title_field="examiner_title",
-        )
-        _validated_examiner_profile(rank)
     for branch in (GUILD_BRANCH_REGISTRY if branches is None else branches).values():
         _validated_identity(
             "guild branch", branch.key, branch.host_name, branch.host_title,
@@ -138,4 +101,4 @@ validate_guild_npc_identities()
 
 from world.lore.settlements.shops import validate_registry_identity_uniqueness  # noqa: E402
 
-validate_registry_identity_uniqueness(branch_rows=GUILD_BRANCH_REGISTRY, rank_rows=GUILD_RANK_REGISTRY)
+validate_registry_identity_uniqueness(branch_rows=GUILD_BRANCH_REGISTRY)
