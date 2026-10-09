@@ -27,15 +27,19 @@ Both `tide_lamp_crab` variants SHALL own `lamp_carapace_claw` (燈甲螯擊) as 
 - **THEN** ordinary target gates reject invalid contact; ANY faction keeps candidate selection unrestricted but enemy components deliver nothing to allies
 
 ### Requirement: 潮燈蟹 timed modifier follows its authored recipient and lifetime
-The `lamp_carapace_guard` mount SHALL last 20 world seconds, refresh without accumulating magnitude and apply `defense: 2` to its caster on each affordable resolved attempt. It SHALL have buff polarity and no DoT, ground/positional marker or action lock. Expiry/removal SHALL restore the control modifier result.
+The `lamp_carapace_guard` mount SHALL last 20 world seconds, refresh without accumulating magnitude and apply `defense: 2` to its caster on each affordable resolved attempt with a valid selected contact target, including a miss. Rejected or no-target requests SHALL grant nothing. It SHALL have buff polarity and no DoT, ground/positional marker or action lock. Expiry/removal SHALL restore the control modifier result.
 
 #### Scenario: Hit and miss separate delivery from payment
-- **WHEN** deterministic hit and miss attempts resolve
+- **WHEN** deterministic hit and miss attempts against a valid selected enemy resolve
 - **THEN** both attempts mount caster guard once and both pay 10 MP/3 SP exactly once under unmodified costs
 
 #### Scenario: Refresh and expiry
 - **WHEN** the mount is reapplied before expiry then world time passes its refreshed lifetime
 - **THEN** magnitude never accumulates and the modifier is absent after expiry
+
+#### Scenario: Missing or invalid contact cannot grant guard
+- **WHEN** the SINGLE request has no selected target or its target fails ordinary contact validation
+- **THEN** the ordinary target gate rejects before guard, damage, resource payment or practice
 
 ### Requirement: 潮燈蟹 payment and atomicity retain the shared transaction
 Affordability SHALL precede dice/effects, with normal modifiers and effects-before-cost payment. Any failure SHALL restore all touched gauges, buffs and practice claims. Ecological fog, light, grain, soil or rock descriptions SHALL NOT change any combat result.
