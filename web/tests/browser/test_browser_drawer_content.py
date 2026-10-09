@@ -223,6 +223,10 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                 page.close()
 
     @covers_requirement("webclient-contextual-hud::empty-drawer-guidance-preserves-unavailable-reasons")
+    @covers_requirement(
+        "webclient-quest-drawer::the-quest-drawer-degrades-honestly",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+    )
     def test_empty_quest_guidance_gives_way_to_the_unavailable_reason(self):
         """An available empty quest book shows the shared guidance card; a
         committed unavailable panel replaces it with its registry reason."""

@@ -57,6 +57,10 @@ class QuestBookAwayFromClerkJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "guild.quest_track"), 1)
 
     @covers_requirement("webclient-quest-log-panel::the-quest-log-panel-is-host-independent")
+    @covers_requirement(
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
+    )
     def test_away_from_clerk_renders_book_with_no_clerk_marker(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -80,6 +84,11 @@ class QuestBookAwayFromClerkJourneys(ServicesBrowserTest):
         self._wait_track_sent(page)
 
     @covers_requirement("webclient-quest-log-panel::the-quest-log-panel-is-host-independent")
+    @covers_requirement(
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+        "webclient-quest-drawer::selecting-a-quest-shows-its-full-detail-beside-the-list",
+    )
     def test_keyboard_reaches_both_tablists_and_the_list(self):
         """quest-drawer-book-tab: Tab reaches each icon tablist once, the arrow
         keys move focus without selecting, a disabled counter tab is focusable
@@ -220,6 +229,9 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
     SERVICES_MODE = ""
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement(
+        "webclient-quest-drawer::the-guild-counter-tab-presents-counter-business-only",
+    )
     def test_unavailable_services_drawer_renders_reason_only(self):
         page = self.logged_in_page()
         unavailable_reason = "服務選單目前無法顯示"

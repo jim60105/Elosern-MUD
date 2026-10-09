@@ -544,7 +544,8 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::the-quest-browser-exposes-the-tracking-toggle",
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
     )
     def test_quest_book_tracking_toggle_node_suite_passes(self):
         result = subprocess.run(
@@ -570,7 +571,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::counter-only-quest-actions-appear-on-a-book-row-only-when-the-counter-offers-them",
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+        "webclient-quest-drawer::the-quest-drawer-degrades-honestly",
     )
     def test_quest_book_merge_rule_vitest_evidence_passes(self):
         """The quest drawer model, detail, and drawer suites are the executed
@@ -600,7 +603,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-service-menus::the-quest-book-discloses-each-quest-s-commissioner-and-settlement",
+        "webclient-quest-drawer::selecting-a-quest-shows-its-full-detail-beside-the-list",
     )
     def test_quest_book_disclosure_vitest_evidence_passes(self):
         """The model and detail suites pin the disclosure contract: issuer

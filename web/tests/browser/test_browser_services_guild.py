@@ -148,6 +148,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement(
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+    )
     def test_abandon_requires_confirmation(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -185,6 +188,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement(
+        "webclient-quest-drawer::selecting-a-quest-shows-its-full-detail-beside-the-list",
+    )
     def test_quest_vanishes_book_drops_row_drawer_stays_open(self):
         """Frameless drawer retention: when a committed update removes a quest,
         the quest book drops the row and the drawer stays open without a frame pop."""
@@ -221,7 +227,8 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
     @covers_requirement(
-        "webclient-service-menus::the-quest-drawer-separates-the-player-s-quest-book-from-the-guild-counter",
+        "webclient-quest-drawer::the-guild-counter-tab-presents-counter-business-only",
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
     )
     def test_drawer_renders_book_and_counter_without_duplication(self):
         """quest-drawer-split, re-shaped by quest-drawer-book-tab: in front of
@@ -254,6 +261,10 @@ class GuildTurninJourneys(ServicesBrowserTest):
 
     @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
     @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
+    @covers_requirement(
+        "webclient-quest-drawer::the-detail-action-bar-mirrors-server-descriptors",
+        "webclient-quest-drawer::the-quest-book-shows-one-quest-state-at-a-time",
+    )
     def test_completed_quest_turnin(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
