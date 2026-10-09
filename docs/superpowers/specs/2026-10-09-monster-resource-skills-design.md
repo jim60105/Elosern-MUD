@@ -171,6 +171,20 @@ Run the focused affected tests, observability lint when logging changes, data li
 
 Keep one design document for the shared eligibility and effect contracts plus their crocodile consumer. The implementation planning step must size repository OpenSpec changes to the project convention. Eligibility cutover and hit-dependency work are prerequisite units; the crocodile integration consumes both and supplies the end-to-end acceptance evidence. A prerequisite alone does not complete this feature.
 
+### OpenSpec proposal set
+
+All three changes have complete proposal, design, delta-spec, and task artifacts. Implementation has not started.
+
+| Order | Proposal | Scope | Dependencies | Proposal commit |
+|---|---|---|---|---|
+| 1 | [shared-skill-identity-eligibility](../../../openspec/changes/shared-skill-identity-eligibility/proposal.md) | Shared race, subrace, species, actor-kind, and race-capability qualification; complete divine-marker cutover | None | `d33f993a` |
+| 2 | [skill-hit-dependent-effects](../../../openspec/changes/skill-hit-dependent-effects/proposal.md) | Typed invocation-local hit dependencies, audience intersection, and existing atomic settlement | Logically independent of the eligibility change; serialize because of shared files | `2c0d92ae` |
+| 3 | [tide-devouring-crocodile-resource-skill](../../../openspec/changes/tide-devouring-crocodile-resource-skill/proposal.md) | Approved bite and resource profiles, atomic construction, minimal existing-policy integration, persistence, and complete combat-loop verification | Both preceding changes | `753d065a` |
+
+Apply, verify, and archive each change in the listed order before starting the next. The two prerequisite changes overlap in skill definition, action tests, authoring documentation, and shard ownership. The crocodile integration also shares documentation and test-registration surfaces with its prerequisites. Avoid concurrent implementation despite the prerequisites' logical independence.
+
+### Non-goals
+
 Excluded work includes other species abilities, new beastfolk content, a second skill engine, artificial monster race records, arbitrary rule expressions, creature-specific resolver branches, combat AI redesign, new battle formulas, global cost-order changes, difficulty scaling, automatic existing-object resets, and recalibration of human references or monster grades.
 
 The written specification must be reviewed and approved before implementation planning proceeds.
