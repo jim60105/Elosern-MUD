@@ -2,7 +2,7 @@
 
 ## 1. Approved ability and immutable configuration
 
-- [ ] 1.1 Add data_monster_abilities.py to the existing registry assembly and declare the exact prerequisite-free tide_devouring_bite eligibility, water physical coefficient/one-strike shape, enemy component audiences, hit-dependent 10-MP fixed drain/share 1.0 and cost 10 MP plus 5 SP; add tagged data-contract definition assertions registered in tools/test_data_freeze.json and document the separate monster slice in docs/development/adding-spells.md, verifying no player catalog/lineage leak, no freeform scale and unchanged apprentice cost classification.
+- [x] 1.1 Add data_monster_abilities.py to the existing registry assembly and declare the exact prerequisite-free tide_devouring_bite eligibility, water physical coefficient/one-strike shape, enemy component audiences, hit-dependent 10-MP fixed drain/share 1.0 and cost 10 MP plus 5 SP; add tagged data-contract definition assertions registered in tools/test_data_freeze.json and document the separate monster slice in docs/development/adding-spells.md, verifying no player catalog/lineage leak, no freeform scale and unchanged apprentice cost classification.
 - [ ] 1.2 Extend frozen variant kit/profile references and author only bank_lurker (140/30/40/22/12/14/0, D) and bay_warden (210/50/60/28/12/15/0, C) with bite before innate actions; extend existing registered species/profile data-contract assertions and docs/lore/monster-creation-guidelines.md, verifying the other ten complete profiles, all grades and five deferred ability boundaries are unchanged and no passive or fabricated prerequisite is added.
 
 ## 2. Formal construction and existing policy

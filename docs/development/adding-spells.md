@@ -118,6 +118,23 @@ ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
 
 ---
 
+### 2.6 魔物專屬技能切片（Monster Ability Slice）
+
+魔物專用技能（如吞潮鱷的 `tide_devouring_bite` 吞潮咬擊）獨立宣告於 `world/skills/registry/data_monster_abilities.py`，並於 `assembly.py` 統一掛載：
+
+1. **身分資格（SkillEligibility）**：魔物專屬技能宣告 `SkillEligibility(allowed_actor_kinds=("monster",), allowed_species=("tide_devouring_crocodile",))`，防止進入玩家目錄、系譜樹或未授權的魔物種類。
+2. **雙資源與無前置**：可同時宣告 MP 與 SP（例如 `{mp: 10, sp: 5}`），獨立孤立技能宣告 `prerequisites=()`，不建立造假系譜或虛構被動。
+3. **命中相依固定吸取（Hit-Dependent Drain）**：
+   - 物理水屬性傷害 `damage:water:physical`（係數 1.0，單擊）。
+   - 第二項效果 `gauge_transfer:mp:drain:fixed:10`，其 `EffectPolicy` 宣告 `requires_hit_from=0` 與 `transfer=GaugeTransferPolicy(caster_recovery_share=1.0)`。
+4. **結算順序（Payment and Recovery Order）**：
+   - 於擲骰前檢驗可負擔性（affordability），吸取無法提前資助未達標的施法。
+   - 動作管線結算時：傷害結算 → 目標魔力扣減 → 施法者魔力恢復（受施法者上限限制並捨棄溢出） → 扣除 MP 與 SP 成本。
+   - 舉例（`bank_lurker`，上限 30 MP）：
+     - 初始 30 MP 命中並吸取 10 MP：恢復受限於 30，隨後支付 10 MP / 5 SP，最終為 20 MP / 35 SP。
+     - 初始 20 MP 命中並吸取 10 MP：先恢復至 30，隨後支付 10 MP / 5 SP，最終為 20 MP / 35 SP。
+     - 未命中（miss）：不吸取魔力，但仍需支付 10 MP 與 5 SP。
+
 ## 3. Step by Step
 
 ### Step 0 — 從設計文件取得數值

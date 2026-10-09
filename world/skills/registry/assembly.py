@@ -22,6 +22,7 @@ from world.skills.registry.data_shadow_martial import ROWS as SHADOW_MARTIAL_ROW
 from world.skills.registry.data_utility_passives import ROWS as UTILITY_PASSIVES_ROWS
 from world.skills.registry.data_divine_mystery import ROWS as DIVINE_MYSTERY_ROWS
 from world.skills.registry.data_church import ROWS as CHURCH_ROWS
+from world.skills.registry.data_monster_abilities import ROWS as MONSTER_ABILITIES_ROWS
 
 SKILL_REGISTRY: dict[str, SkillDef] = {
     skill.key: skill
@@ -40,5 +41,6 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         *UTILITY_PASSIVES_ROWS,
         *DIVINE_MYSTERY_ROWS,
         *CHURCH_ROWS,
+        *MONSTER_ABILITIES_ROWS,
     )
 }
