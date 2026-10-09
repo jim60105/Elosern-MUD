@@ -103,6 +103,9 @@ class ChargeMovementTests(EvenniaTest):
         charge_movement(self.char1, "wilderness_move")
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_identity_ineligible_flight_owner_pays_and_cannot_waive_exit(self):
         from dataclasses import replace
         from typeclasses.exits import Exit

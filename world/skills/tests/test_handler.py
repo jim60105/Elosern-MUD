@@ -47,6 +47,9 @@ def _fresh_entity_owned_keys():
     },
 )
 class SkillHandlerTests(EvenniaTestCase):
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_identity_ineligible_stored_multiplier_is_inert(self):
         from dataclasses import replace
         from unittest.mock import patch

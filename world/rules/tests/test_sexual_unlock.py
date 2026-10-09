@@ -111,7 +111,9 @@ class UnlockQueryTests(EvenniaTestCase):
         entity = self._actor()
         self.assertIn(act.key, entity.sexual.unlocked_act_keys())
 
-    # Future requirement: skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_eligible_race_mastery_still_excludes_divine_and_ownership_gated_acts(self):
         from dataclasses import replace
         from world.skills.registry import SkillEligibility

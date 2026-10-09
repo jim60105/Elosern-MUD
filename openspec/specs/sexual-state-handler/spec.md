@@ -321,8 +321,8 @@ own named method, which SHALL increment it by exactly `1`.
 ### Requirement: SexualState.unlocked_act_keys() gates the sexual act catalogue by counter thresholds, or unlocks it entirely for a mastery holder
 `SexualState` SHALL expose `unlocked_act_keys() -> frozenset[str]`, returning every key in
 `SEXUAL_ACT_REGISTRY` whose `unlock` mapping's thresholds are all met by the entity's own lifetime
-counters **and which does not declare `SexualActDef.ownership_gated=True`**, **or** — when the
-entity directly owns any skill whose parsed effects include a `SexualMasteryEffect` — the entire
+counters **and which does not declare `SexualActDef.ownership_gated=True`**, **or**, when the
+entity directly owns any skill whose parsed effects include a `SexualMasteryEffect`, the entire
 `SEXUAL_ACT_REGISTRY` keyset minus the divine-arts and ownership-gated exclusions stated in the
 mastery scenarios.
 
@@ -342,8 +342,8 @@ mastery scenarios.
   set
 
 #### Scenario: An ownership-gated row with an empty unlock mapping is never derived
-- **WHEN** `unlocked_act_keys()` is read on any entity — fresh or counter-saturated, mastery holder
-  or not — that does not own the key
+- **WHEN** `unlocked_act_keys()` is read on any entity (fresh or counter-saturated, mastery holder
+  or not) that does not own the key
 - **THEN** `divine_sexual_arts` is absent from the returned set even though its `unlock` mapping is
   empty
 
@@ -351,7 +351,7 @@ mastery scenarios.
 - **WHEN** `unlocked_act_keys()` is read on an entity whose `entity.skills.base_owned_keys()` includes
   a skill carrying `SexualMasteryEffect`, regardless of that entity's counter values
 - **THEN** the returned set equals the full `SEXUAL_ACT_REGISTRY` keyset minus every act whose paired
-  `SkillDef` declares `requires_divine_arts=True` and minus every `ownership_gated=True` row
+  `SkillDef` declares required race capability `can_use_divine_arts` and minus every `ownership_gated=True` row
 
 #### Scenario: A conferred, not directly owned, mastery grant does not unlock the catalogue
 - **WHEN** an entity's `entity.skills.conferred_grants()` includes a fractional grant of a
@@ -373,7 +373,7 @@ mastery scenarios.
 #### Scenario: Ownership-gated rows require actual base ownership
 - **WHEN** the derivation path computes an entity's unlocked set
 - **THEN** ownership-gated rows are reachable only through actual base ownership
-  (`base_owned_keys()` — the sole input `_step1_ownership` effectively sees through
+  (`base_owned_keys()`, the sole input `_step1_ownership` effectively sees through
   `owned_keys()`), which the derivation path never supplies
 
 #### Scenario: The shipped divine row is excluded by both markers

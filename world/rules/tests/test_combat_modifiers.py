@@ -44,6 +44,9 @@ VESSEL_KEY = next(
 
 
 class CombatModifierTests(EvenniaTestCase):
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_ineligible_rule_table_grant_has_zero_scale(self):
         from world.rules.combat_modifiers import _conferred_rule_scale
         from world.skills.registry import SkillEligibility

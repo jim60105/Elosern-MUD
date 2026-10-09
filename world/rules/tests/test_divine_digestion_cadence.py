@@ -267,6 +267,9 @@ class DigestionCadenceTests(_Scoped):
         "divine-mystery::divine-mystery-practice-accrues-at-most-once-per-world-calendar-day",
         "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
     )
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_divine_arts_skill_outside_the_category_accrues_twice_in_one_day(self):
         actor = _entity((_T_DIVINE_LINE.key,), race="t_duskmari")
         first = SimpleNamespace(pk=200, key="t1")

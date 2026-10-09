@@ -95,6 +95,9 @@ class DivineActRegistrationTests(unittest.TestCase):
         return {skill.key: (skill, act) for skill, act in DIVINE_ACTS if skill.key in _DIVINE_KEYS}
 
     @covers_requirement("sexual-catalog-divine-core::three-hand-built-acts-are-registered-gated-exclusively-by-requires-divine-arts-with-no-counter-unlock")
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_three_acts_registered_with_shared_field_values(self):
         pairs = self._c7a_pairs()
         self.assertEqual(set(pairs), set(_DIVINE_KEYS))
@@ -214,6 +217,9 @@ class DivineCastTests(EvenniaTest):
         )
 
     @covers_requirement("sexual-catalog-divine-core::three-hand-built-acts-are-registered-gated-exclusively-by-requires-divine-arts-with-no-counter-unlock")
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_non_divine_race_cannot_cast_any_of_the_three(self):
         human = _entity("human caster")
         human.location = self.room1
@@ -520,6 +526,9 @@ class DivineHandlerDirectTests(EvenniaTest):
         self.assertEqual(caught.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
 
     @covers_requirement("sexual-catalog-divine-core::the-three-new-effect-prefixes-are-line-agnostic-dispatch-table-entries")
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_effect_dispatch_is_identity_agnostic(self):
         # A hypothetical non-divine SkillDef naming the divine_pleasure_max
         # prefix resolves through the same handler without rejection: the

@@ -290,6 +290,12 @@ class PresenterTests(InjectedRegistryMixin):
                 )
         return tuple(registry_extras)
 
+    @covers_requirement(
+        "skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
     def test_identity_ineligible_ladder_is_absent_from_payload_and_counts(self):
         from world.skills.registry import SkillEligibility
 

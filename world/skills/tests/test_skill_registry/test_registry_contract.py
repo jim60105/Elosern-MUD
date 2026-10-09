@@ -28,6 +28,9 @@ from world.rules.progression import proficiency_cap
 from ..test_spell_catalogs import _CATALOG_EFFECTS
 
 class SkillRegistryTests(unittest.TestCase):
+    @covers_requirement(
+        "skill-identity-eligibility::identity-restrictions-are-immutable-closed-declarative-data"
+    )
     def test_identity_authoring_is_validated_before_registry_acceptance(self):
         from world.skills.registry import SkillEligibility
         from world.tests.synthetic_data import make_skill
@@ -38,6 +41,9 @@ class SkillRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "allowed_actor_kinds"):
             validate_prerequisite_graph({row.key: row})
 
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_unrestricted_identity_preserves_the_definition_and_rejects_legacy_keyword(self):
         from world.skills.registry import SkillEligibility
         from world.tests.synthetic_data import make_skill
@@ -48,6 +54,9 @@ class SkillRegistryTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             make_skill("t_legacy_identity", **{"requires_" + "divine_arts": True})
 
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_registry_uses_the_exact_forward_declared_contract(self):
         self.assertTrue(SKILL_REGISTRY)
         self.assertEqual(

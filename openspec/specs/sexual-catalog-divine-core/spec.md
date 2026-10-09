@@ -15,18 +15,18 @@ counter-gated catalogue but none of the three.
 ## Requirements
 
 ### Requirement: Three hand-built acts are registered, gated exclusively by requires_divine_arts, with no counter unlock
-`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain the three `(SkillDef, SexualActDef)` pairs — `絕頂律令`, `時姦`, `神域搾取` — each declaring `requires_divine_arts=True`, `unlock={}`, `target_part=None`, `resistible=True`, `actor_counters=()`, `participant_counters=()`.
+`world/skills/sexual_acts/divine.py`'s `DIVINE_ACTS` tuple SHALL contain the three `(SkillDef, SexualActDef)` pairs (`絕頂律令`, `時姦`, `神域搾取`), each declaring the shared eligibility requirement for race capability `can_use_divine_arts`, `unlock={}`, `target_part=None`, `resistible=True`, `actor_counters=()`, `participant_counters=()`.
 
 #### Scenario: A non-divine race cannot cast any of the three acts regardless of counters
 - **WHEN** an actor whose race's `can_use_divine_arts` is `False` attempts to cast `絕頂律令`, `時姦`,
   or `神域搾取`, regardless of that actor's lifetime counter values
-- **THEN** `_step1_divine_arts_gate` rejects the cast with `RejectReason.DIVINE_ARTS_FORBIDDEN`
+- **THEN** `the shared identity-eligibility gate` rejects the cast with the named identity-eligibility rejection
 
 #### Scenario: A divine-capable actor can cast all three from zero counters
 - **WHEN** an actor whose race's `can_use_divine_arts` is `True` and who owns the skill carrying
-  `requires_divine_arts=True` for one of these three acts is read via `SkillHandler.owned_keys()`,
+  the shared eligibility requirement for race capability `can_use_divine_arts` for one of these three acts is read via `SkillHandler.owned_keys()`,
   with every one of that actor's lifetime counters at `0`
-- **THEN** the corresponding skill key is present in the returned set — no counter threshold gates it
+- **THEN** the corresponding skill key is present in the returned set; no counter threshold gates it
 
 #### Scenario: SexualMasteryEffect ownership alone does not unlock any of the three
 - **WHEN** an entity directly owns a skill carrying `SexualMasteryEffect` but has no divine-capable
@@ -40,7 +40,7 @@ counter-gated catalogue but none of the three.
 
 #### Scenario: Later tuple extension does not disturb these three pairs
 - **WHEN** `sexual-catalog-divine-mutators` extends the same tuple to seven entries
-- **THEN** this requirement pins the identity and fields of these three pairs and is not read as limiting the tuple size — none of the three pairs is modified or removed
+- **THEN** this requirement pins the identity and fields of these three pairs and is not read as limiting the tuple size; none of the three pairs is modified or removed
 
 ### Requirement: 絕頂律令 sets every target's pleasure to its ceiling and walks climax_phase to 進行中 in one cast, never touching the actor
 `絕頂律令` SHALL declare `TargetSpec.AREA` and one effect, `divine_pleasure_max:絕頂律令`. Its handler SHALL explicitly exclude the acting entity from the entities it applies to — even if the acting entity is present in the resolved `targets` list — and for every remaining entity SHALL call the existing `_apply_pleasure_gain` function twice in sequence: once with `gain=100`, once with `gain=0`.
@@ -154,11 +154,11 @@ handler SHALL call `target.sexual.stage_climax_extension(3)` for every entity in
 
 ### Requirement: The three new effect prefixes are line-agnostic dispatch-table entries
 `action.py`'s `_EFFECT_HANDLERS` SHALL register `divine_pleasure_max:`, `divine_climax_extension_stage:`,
-and `divine_drain:` as ordinary prefixes. Neither handler SHALL read `SkillDef.requires_divine_arts` or
+and `divine_drain:` as ordinary prefixes. Neither handler SHALL read the calling skill's identity eligibility or
 otherwise branch on the calling `SkillDef`'s line.
 
 #### Scenario: A hypothetical non-divine SkillDef naming one of the three prefixes is handled identically
 - **WHEN** a hypothetical `SkillDef` outside the 神之秘法 line declares
   `effects=["divine_pleasure_max:test"]` and is cast
 - **THEN** the handler applies the same two-call `_apply_pleasure_gain` sequence to its targets as it
-  would for `絕頂律令`, without rejecting the cast for lacking `requires_divine_arts`
+  would for `絕頂律令`, without rejecting the cast for having no required divine race capability

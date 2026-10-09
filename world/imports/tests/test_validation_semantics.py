@@ -410,6 +410,9 @@ class DivineArtsSeedingGuardTests(TestCase):
             self.assertIn("disguised_stats", fields)
 
     @covers_requirement("import-validation::skill-ownership-requiring-divine-arts-is-rejected-for-a-non-divine-record")
+    @covers_requirement(
+        "import-validation::imports-validate-complete-closed-kits-against-authored-identity"
+    )
     def test_skill_ownership_race_guard(self):
         divine_race = make_race("t_divine_skill_race", can_use_divine_arts=True)
         with synthetic_registries(

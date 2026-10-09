@@ -53,7 +53,9 @@ class IdentityRecordTests(TestCase):
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
 
-    # Future requirement: skill-identity-eligibility::identity-restrictions-are-immutable-closed-declarative-data
+    @covers_requirement(
+        "skill-identity-eligibility::identity-restrictions-are-immutable-closed-declarative-data"
+    )
     def test_alternatives_and_capabilities_are_and_composed(self):
         rule = SkillEligibility(allowed_races=(RACE.key, OTHER.key),
                                 required_capabilities=("can_use_divine_arts",))
@@ -68,7 +70,9 @@ class IdentityRecordTests(TestCase):
         with self.assertRaises(ValueError):
             SkillEligibility(allowed_races=[RACE.key])
 
-    # Future requirement: skill-identity-eligibility::stored-identity-determines-actor-qualification
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification"
+    )
     def test_missing_and_wrong_parent_character_identity(self):
         for kind in ("player", "npc"):
             race_only = SkillEligibility(allowed_races=(RACE.key,))
@@ -94,6 +98,9 @@ class IdentityRecordTests(TestCase):
                         RACIAL, kind, race=race, subrace=branch), expected)
         self.assertFalse(record_identity_eligible(RACIAL, "monster", race=RACE.key, subrace=BRANCH.key))
 
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification"
+    )
     def test_species_requires_valid_variant_membership(self):
         species = make_monster_species(
             "t_identity_species", default_variant_key="t_identity_variant"
@@ -130,6 +137,9 @@ class IdentityRecordTests(TestCase):
         self.assertTrue(record_identity_eligible(MONSTER_ONLY, "monster"))
         self.assertFalse(record_identity_eligible(MONSTER_ONLY, "player"))
 
+    @covers_requirement(
+        "skill-identity-eligibility::identity-restrictions-are-immutable-closed-declarative-data"
+    )
     def test_invalid_authoring_fails_closed(self):
         for name in ("allowed_actor_kinds", "allowed_races", "allowed_subraces", "allowed_species"):
             with self.assertRaises(ValueError):
@@ -159,6 +169,9 @@ class IdentityRuntimeTests(EvenniaTestCase):
         self.npc = create_object(NPC, key="identity npc")
         self.monster = create_object(Monster, key="identity monster")
 
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification"
+    )
     def test_typeclass_identity_cannot_be_spoofed_by_attributes(self):
         self.player.db.species_key = "t_fake_species"
         self.monster.db.race = RACE.key
@@ -169,6 +182,9 @@ class IdentityRuntimeTests(EvenniaTestCase):
         self.assertTrue(skill_identity_eligible(self.monster, ROOT))
         self.assertFalse(skill_identity_eligible(self.monster, RACIAL_ROOT))
 
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification"
+    )
     def test_missing_identity_reads_do_not_materialize_attributes(self):
         before = {(row.key, row.category): row.value for row in self.npc.attributes.all()}
         self.assertFalse(skill_identity_eligible(self.npc, RACIAL_ROOT))
@@ -176,6 +192,9 @@ class IdentityRuntimeTests(EvenniaTestCase):
             {(row.key, row.category): row.value for row in self.npc.attributes.all()}, before,
         )
 
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_rule_table_owned_and_conferred_adjustments_are_inert(self):
         from world.rules.combat_modifiers import matched_combat_modifiers, _conferred_rule_scale
         from world.rules.rulebook.schema import Rule, evaluate_condition
@@ -191,6 +210,12 @@ class IdentityRuntimeTests(EvenniaTestCase):
                     "entity": self.player, "dual_wielding": False, "worn_item_keys": frozenset(),
                 }), ())
 
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::qualification-does-not-grant-ownership-or-replace-action-validation"
+    )
     def test_unrestricted_passive_reuse_for_player_and_monster(self):
         from world.skills.handler import SkillHandler
         from world.rules.progression import can_use_skill
@@ -213,8 +238,12 @@ class IdentityRuntimeTests(EvenniaTestCase):
                 )
 
     @covers_requirement("skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-predicate")
-    # Future requirement: skill-lineage::identity-rejection-is-distinct-from-an-unmet-prerequisite
-    # Future requirement: skill-identity-eligibility::qualification-does-not-grant-ownership-or-replace-action-validation
+    @covers_requirement(
+        "skill-lineage::identity-rejection-is-distinct-from-an-unmet-prerequisite"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::qualification-does-not-grant-ownership-or-replace-action-validation"
+    )
     def test_ineligible_owned_root_rejects_before_rolls_or_writes(self):
         from world.rules.action import ActionRequest, ActionResolver, RejectReason
         from world.rules.action_preview import preview_skill, revalidate_submission
@@ -239,7 +268,12 @@ class IdentityRuntimeTests(EvenniaTestCase):
         self.assertTrue(can_use_skill(self.monster, ROOT))
 
     @covers_requirement("skill-handler::effective-value-is-the-sole-resolution-time-multiplier-application-point-and-never-writes-to-entity-traits")
-    # Future requirement: skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::qualification-does-not-grant-ownership-or-replace-action-validation"
+    )
     def test_owned_and_conferred_passives_and_grant_writes_are_contained(self):
         from world.rules.skill_effects import record_conferred_grant
         from world.rules.cross_lineage_unlock import grant_owned_skill
@@ -256,6 +290,9 @@ class IdentityRuntimeTests(EvenniaTestCase):
             grant_owned_skill(self.player, PASSIVE.key, ROWS)
         self.assertEqual({row.key: row.value for row in self.player.attributes.all()}, before)
 
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_status_breakdown_matches_control_and_creates_no_handlers(self):
         from world.rules.status_query.breakdown import build_stat_breakdown
         from world.skills.handler import ConferredSkillGrant
@@ -268,8 +305,12 @@ class IdentityRuntimeTests(EvenniaTestCase):
         )
 
     @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
-    # Future requirement: skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering
-    # Future requirement: skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
+    @covers_requirement(
+        "skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains"
+    )
     def test_catalog_and_lineage_filter_without_ownership_or_resource_gates(self):
         from world.rules.lineage_query import build_lineage_view
         from world.rules.status_query.readers import _split_active_passive_keys
@@ -290,7 +331,12 @@ class IdentityRuntimeTests(EvenniaTestCase):
         self.assertFalse(child.usable)
         self.assertEqual(build_lineage_view(self.player), view)
 
-    # Future requirement: import-validation::imports-validate-complete-closed-kits-against-authored-identity
+    @covers_requirement(
+        "import-validation::imports-validate-complete-closed-kits-against-authored-identity"
+    )
+    @covers_requirement(
+        "skill-identity-eligibility::qualification-does-not-grant-ownership-or-replace-action-validation"
+    )
     def test_authored_import_and_preset_closure_reject_without_construction(self):
         from world.imports.validate import _check_skills
         from world.rules.progression import normalize_lineage_record
@@ -308,6 +354,9 @@ class IdentityRuntimeTests(EvenniaTestCase):
                     _validate_preset_skill_kits({preset.key: preset})
                 constructor.assert_not_called()
 
+    @covers_requirement(
+        "import-validation::imports-validate-complete-closed-kits-against-authored-identity"
+    )
     def test_companion_preset_kit_uses_npc_identity_before_construction(self):
         from world.lore.player_presets import StartingCompanion
         from world.lore.player_presets.validation import (

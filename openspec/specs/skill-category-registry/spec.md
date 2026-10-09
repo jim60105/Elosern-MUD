@@ -140,7 +140,7 @@ fifteen church-block ACTIVE rows SHALL likewise change only `category`.
 
 #### Scenario: divine_sexual_arts keeps its mechanics after reclassification
 - **WHEN** `SKILL_REGISTRY["divine_sexual_arts"]` is inspected after classification
-- **THEN** `requires_divine_arts` is `True`, `effects` equals `["sexual_event_target:stimulus_applied"]`,
+- **THEN** required race capabilities contain `can_use_divine_arts`, `effects` equals `["sexual_event_target:stimulus_applied"]`,
   and `kind`, `cost`, `target_spec` are unchanged from their pre-classification values, while
   `category` is `SEXUAL_ACT` and `group` is `"神之秘法"`
 
@@ -172,5 +172,5 @@ fifteen church-block ACTIVE rows SHALL likewise change only `category`.
 #### Scenario: Church rows stay on the same rails
 - **WHEN** the holy_rite re-classification lands
 - **THEN** in particular `rite_morning_devotion` keeps `kind=ACTIVE` and every row keeps its exact
-  `effects` value — the same two rows on rails, every other row the same declaration it carried —
+  `effects` value (the same two referenced rows, every other row the same declaration it carried),
   because cast mechanics are a separate change's work

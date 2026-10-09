@@ -314,8 +314,8 @@ report's existing issue shape, and SHALL be a rejection rather than a warning.
 
 ### Requirement: Skill ownership requiring divine arts is rejected for a non-divine record
 `validate.py` SHALL reject a character record whose `skills` or `passives` name a registry entry that
-requires divine arts while the record's race declares that it cannot use divine arts, or while its
-race does not resolve. The issue SHALL name the offending field and key, matching the shape of the
+fails the shared actor-kind and authored race/subrace identity qualification, including a required
+divine capability whose race is missing or incapable. The issue SHALL name the offending field and key, matching the shape of the
 existing unknown-key issue for the same fields.
 
 #### Scenario: A non-divine record owning a divine-arts skill is rejected
@@ -332,12 +332,12 @@ existing unknown-key issue for the same fields.
 - **THEN** validation reports no issue for that entry
 
 #### Scenario: A non-divine skill is unaffected
-- **WHEN** a record on a non-divine race lists a registry skill that does not require divine arts
+- **WHEN** a record on a non-divine race lists a registry skill that has no identity restriction
 - **THEN** validation reports no issue for that entry
 
 #### Scenario: The check degrades with the skill registry
 - **WHEN** the skill registry is unavailable and the existing degraded-state reporting is in effect
-- **THEN** the bloodline check reports nothing rather than rejecting, exactly as the unknown-key check
+- **THEN** the identity check reports nothing rather than rejecting, exactly as the unknown-key check
   does in the same state
 
 #### Scenario: The rule mirrors the preset registry's load-time stance
@@ -366,3 +366,10 @@ When the class a character record is validated and instantiated against is an NP
 #### Scenario: The discriminator is the resolved class, not a record field
 - **WHEN** validation decides whether a record is an NPC target
 - **THEN** the discriminator SHALL be the resolved class passed to validation and instantiation, never a field claimed inside the record
+
+### Requirement: Imports validate complete closed kits against authored identity
+Character import validation SHALL reject identity-ineligible active or passive ownership, including prerequisite closure additions, using authored intended actor kind and identity without entity construction. Registry-unavailable degraded reporting SHALL remain unchanged.
+
+#### Scenario: Identity errors name authored fields
+- **WHEN** a player or NPC record includes a monster-only skill, wrong subrace or incapable prerequisite
+- **THEN** batch validation names the offending skills/passives field and key and persists no entity

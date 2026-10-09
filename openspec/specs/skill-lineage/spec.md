@@ -104,10 +104,10 @@ nodes (PASSIVE skills are never consumed by edges and never accrue).
 
 ### Requirement: can_use_skill is the single shared use-eligibility predicate
 `world/rules/progression.py` SHALL define `can_use_skill(entity, skill) -> bool` as a pure,
-side-effect-free query returning `False` unless `skill.key` is in `entity.skills.owned_keys()` and,
+side-effect-free query returning `False` unless `skill.key` is in `entity.skills.owned_keys()` and passes shared identity eligibility and applicable restrictions and,
 for every declared `SkillPrerequisite`: the prereq key is in `owned_keys()` and
 `skill_proficiency_level(entity, prereq.skill_key) >= prereq.min_proficiency`. It SHALL gate every
-ACTIVE skill — spell and weapon skill alike.
+ACTIVE skill, spell and weapon skill alike.
 
 #### Scenario: A mid-tree spell is gated by its own edge
 - **WHEN** an entity owning `firestorm` with `firestorm` practice level 0 and `scorching_wave`
@@ -123,7 +123,7 @@ ACTIVE skill — spell and weapon skill alike.
 - **THEN** `can_use_skill` returns `False` on the identical code path used for spells
 
 #### Scenario: A root skill with no prereqs is usable on ownership
-- **WHEN** an entity owns `fire_arrow` (no prerequisites)
+- **WHEN** an identity-eligible entity owns `fire_arrow` (no prerequisites)
 - **THEN** `can_use_skill` returns `True` regardless of proficiency
 
 #### Scenario: Every consumer reads the single gate
@@ -563,3 +563,10 @@ element-mastery passive SHALL NOT be a tree node.
 #### Scenario: PASSIVE rationale for staying out of the graph
 - **WHEN** the element-mastery passive is considered as a tree node
 - **THEN** it is excluded because PASSIVE skills are never consumed by edges and never accrue
+
+### Requirement: Identity rejection is distinct from an unmet prerequisite
+Use-eligibility failure SHALL distinguish identity rejection from an unmet prerequisite. An identity-ineligible root SHALL reject without assuming a prerequisite exists and without any dice or state change.
+
+#### Scenario: Owned root cannot crash the gate
+- **WHEN** an ineligible owner invokes a skill with no prerequisite edges
+- **THEN** a named identity rejection is returned before costs, effects and practice; unmet-edge detail remains reserved for actual unmet edges

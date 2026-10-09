@@ -244,8 +244,7 @@ transaction that writes identity, traits, and the remaining initial mechanical s
 
 #### Scenario: A preset kit with a registry-invalid skill is rejected at load
 - **WHEN** a preset declares a skill key absent from `SKILL_REGISTRY`, an active key whose registry
-  `SkillKind` is `PASSIVE` (or vice versa), or a `requires_divine_arts` skill on a race without
-  `can_use_divine_arts`
+  `SkillKind` is `PASSIVE` (or vice versa), or any skill whose shared eligibility rejects the preset's actor kind or race/subrace identity
 - **THEN** importing `world.lore.player_presets` raises, so the invalid kit can never reach a
   player's activation
 
@@ -265,7 +264,7 @@ transaction that writes identity, traits, and the remaining initial mechanical s
 
 #### Scenario: A preset may declare explicit proficiency pairs
 - **WHEN** a preset declares its own `skill_proficiency` as a tuple of `(skill_key, xp)` pairs
-- **THEN** a declared entry SHALL always win over a seeded value, even when it leaves an edge unmet — the same precedence an explicit import record entry has
+- **THEN** a declared entry SHALL always win over a seeded value, even when it leaves an edge unmet; the same precedence an explicit import record entry has
 
 #### Scenario: Custom mode grants only the universal innate skills
 - **WHEN** a custom activation completes
@@ -273,7 +272,7 @@ transaction that writes identity, traits, and the remaining initial mechanical s
 
 #### Scenario: Kit validation is load-time only
 - **WHEN** a preset kit is validated
-- **THEN** it SHALL reference only keys that exist in `SKILL_REGISTRY` with the matching `SkillKind` (active keys `SkillKind.ACTIVE`, passive keys `SkillKind.PASSIVE`), a preset SHALL NOT declare a `requires_divine_arts` skill unless its race `can_use_divine_arts`, and every declared `skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` with a non-negative numeric value and no repeated key — an invalid kit or entry SHALL fail at registry load, never at player activation
+- **THEN** it SHALL reference only keys that exist in `SKILL_REGISTRY` with the matching `SkillKind` (active keys `SkillKind.ACTIVE`, passive keys `SkillKind.PASSIVE`), a preset SHALL NOT declare a skill ineligible for its actor kind or race/subrace identity, and every declared `skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` with a non-negative numeric value and no repeated key; an invalid kit or entry SHALL fail at registry load, never at player activation
 
 #### Scenario: No player-facing surface exposes the skill kit
 - **WHEN** the Telnet preset preview or the WebClient preset card renders a preset

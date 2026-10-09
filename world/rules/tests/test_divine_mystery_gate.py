@@ -116,6 +116,9 @@ class DivineMysteryGateTests(EvenniaTestCase):
         return target
 
     @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
+    @covers_requirement(
+        "skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover"
+    )
     def test_races_without_the_flag_cannot_cast_any_divine_mystery_skill(self):
         for race in _MUNDANE_RACES:
             self.actor.race = race.key
@@ -183,6 +186,9 @@ class DivineMysteryGateTests(EvenniaTestCase):
                     ["skill_practice"],
                 )
 
+    @covers_requirement(
+        "skill-lineage::identity-rejection-is-distinct-from-an-unmet-prerequisite"
+    )
     def test_preview_rejects_unflagged_race_divine_arts_like_resolution(self):
         self.actor.db.skills = {"active": [_SEXUAL_ARTS.key], "passive": []}
         preview = preview_skill(
@@ -194,6 +200,9 @@ class DivineMysteryGateTests(EvenniaTestCase):
         self.assertIs(preview.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
+    @covers_requirement(
+        "skill-lineage::identity-rejection-is-distinct-from-an-unmet-prerequisite"
+    )
     def test_actor_without_resolvable_race_is_rejected(self):
         self.actor.db.skills = {"active": [_SEXUAL_ARTS.key], "passive": []}
         for race in (None, "t_no_such_race"):

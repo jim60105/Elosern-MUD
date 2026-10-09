@@ -50,6 +50,9 @@ _SCOPE = synthetic_registries(
 
 @_SCOPE
 class ConferredSkillTests(EvenniaTestCase):
+    @covers_requirement(
+        "skill-handler::identity-ineligible-owned-and-conferred-passive-effects-are-inert"
+    )
     def test_identity_incompatible_recipient_rejects_before_grant_write(self):
         from dataclasses import replace
         from unittest.mock import patch

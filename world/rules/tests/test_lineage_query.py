@@ -116,6 +116,12 @@ class _TreeScopeMixin:
 
 
 class LineageViewShapeTests(_TreeScopeMixin, unittest.TestCase):
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
+    @covers_requirement(
+        "skill-lineage-panel::lineage-filtering-preserves-racial-discovery-without-exposing-monster-chains"
+    )
     def test_identity_ineligible_tree_has_no_nodes_or_counts(self):
         from dataclasses import replace
         from world.skills.registry import SkillEligibility

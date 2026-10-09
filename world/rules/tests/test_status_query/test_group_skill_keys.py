@@ -88,6 +88,9 @@ class GroupSkillKeysTests(unittest.TestCase):
             for category in views
         ]
 
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
     def test_grouping_receives_identity_filtered_stored_keys(self):
         from types import SimpleNamespace
         from world.skills.registry import SkillEligibility

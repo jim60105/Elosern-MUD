@@ -75,6 +75,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
+    @covers_requirement(
+        "skill-identity-eligibility::player-catalogs-and-lineage-use-identity-filtering"
+    )
     def test_identity_ineligible_owned_rows_are_absent_from_character_catalog(self):
         from dataclasses import replace
         from world.skills.registry import SkillEligibility
