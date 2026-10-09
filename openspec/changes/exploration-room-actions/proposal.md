@@ -40,7 +40,7 @@ depends-on: exploration-presence-rail
 code-conflicts: exploration-presence-rail (ActionDock.vue, AppClient.vue, SceneOverview.vue, exploration_menu.js, use-dock.js, controls-reference.js, component-manifest.json); exploration-exit-compass (same pane, resolved by ordering)
 ```
 
-Batch 3, after `exploration-presence-rail` is archived. Archive strictly in order: `exploration-exit-compass` → `exploration-presence-rail` → `exploration-room-actions`. At apply time the worker must add a REMOVED block to this change's `webclient-exploration-menu` delta for the requirement "The exploration dock roots at the compass and the presence rail and keeps the footer overview" (it exists in main only after `exploration-presence-rail` archives; see tasks 1.1), or `openspec archive` leaves a stale footer requirement.
+Batch 3, after `exploration-presence-rail` is archived. Archive strictly in order: `exploration-exit-compass` → `exploration-presence-rail` → `exploration-room-actions`. At apply time the worker must add a REMOVED block, in a new `specs/webclient-presence-rail/spec.md` delta of this change (the requirement lives in that capability), for the requirement "The exploration dock roots at the compass and the presence rail and keeps the footer overview" (it exists in main only after `exploration-presence-rail` archives; see tasks 1.1), or `openspec archive` leaves a stale footer requirement.
 
 ## Worker profile
 

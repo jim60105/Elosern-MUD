@@ -17,7 +17,7 @@ The wait card, opened from the place card's 等待 button, SHALL offer exactly t
 
 #### Scenario: Locked controls cannot start a skip
 - **WHEN** an action is in flight or the client awaits its declared presentation revision
-- **THEN** all three waiting controls are disabled and Enter or pointer activation on them submits nothing
+- **THEN** every wait row is disabled and Enter or pointer activation on them submits nothing
 
 #### Scenario: The frame shows three cards plus a back row with focused treatment
 - **WHEN** the wait card renders

@@ -249,3 +249,29 @@ The compass SHALL be verified by `agent-browser` in the live client at 1451×790
 #### Scenario: Hover, click, and a hold-walk behave as specified in the wilderness
 - **WHEN** the wilderness room is explored with hover, a click, and a held direction
 - **THEN** each behaves as the pad, click, and walk requirements state
+
+### Requirement: The dialogue screen's exits list stays independent of the exploration root
+The dialogue screen's `↦ 移動…` list SHALL keep presenting the room's exits with their direction glyphs, destinations, and disabled reasons, sourced independently of the exploration router root, and activating an exit SHALL submit the unchanged `explore.move` payload.
+
+#### Scenario: The dialogue exits list is populated
+- **WHEN** a conversation is open in a room with two exits and the player opens `↦ 移動…`
+- **THEN** the list shows both exits and activating an enabled one submits exactly the former `explore.move` payload
+
+#### Scenario: A disabled exit keeps its reason
+- **WHEN** the room has a locked exit
+- **THEN** the dialogue exits list shows it disabled with its server-authored reason
+
+### Requirement: A press produces one discrete move or one walk, never both
+A discrete move SHALL be sent on pointer release, or on Enter keydown, only when the press was shorter than 400 ms, and a held press or key SHALL NOT also send a discrete move. Opening a card or drawer, a suppressed step, a result without a panel change, and Escape SHALL stop a walk.
+
+#### Scenario: Release after a hold sends nothing
+- **WHEN** the player holds the pointer on an angled target for 600 ms and releases
+- **THEN** the walk's own steps were the only moves sent and release sends no extra `explore.move`
+
+#### Scenario: Escape stops a walk
+- **WHEN** a walk is running and the player presses Escape
+- **THEN** the aim clears and the walk stops
+
+#### Scenario: A result without a panel change stops the walk
+- **WHEN** a walk step is accepted but no new exploration panel is committed
+- **THEN** the walk stops after a bounded wait with the result message in the readout

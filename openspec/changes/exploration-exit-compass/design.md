@@ -48,6 +48,14 @@ The compass fills the panel height on the left (pad about 198 px at 1451×790 wi
 
 `LocalMap.vue` gains an optional `aimedNode` prop that adds a highlight class to the matching node. The aim lives in a small store-free ref owned by the pane and passed to the minimap host in `AppClient.vue`. It is presentation only and absent when no aim.
 
+### D9. The dialogue exits list gets its own source
+
+`DialogueChoices`' `↦ 移動…` view is fed by `dialogueExits`, which slices the `exits` section out of the router root (`overviewExits(store.view.rootMenu)`). Removing exits from `overviewMenu` would silently empty it, and change 3 empties the whole root. Dialogue therefore reads the `moveItems` rows through a dedicated store view field that does not depend on the router root, with the payload and echo descriptor unchanged (design doc §9 keeps this list as it is).
+
+### D10. Press, key, and stop rules
+
+A discrete move is sent on pointer release (or on keydown for Enter) only when the press was shorter than `HOLD_MS`; a held press or key never also produces a discrete move, so release after a walk sends nothing. Additional stop reasons: the gate suppressed the step (in-flight or awaiting revision at the arrival commit: wait for the next commit, stop after a bounded wait), a move result arrives with no panel change (stop with the result message), Escape (clears the aim and stops), and any drawer or card opening. The compass element stops propagation of the arrow, Enter, Space, `[`, and `]` keys; digits, Escape-with-no-aim, and `/` still bubble to the router. A Vitest check asserts the consumed keys never reach the document-level keyboard bridge.
+
 ### D7. Styling
 
 Tokens from `styles/tokens.css`, sizes `calc(<n>px * var(--ui-scale))`, nothing below `--text-xs`. Before restyling `.action-dock*` or `.scene-overview*` classes, grep `styles/app-shell.css` for `.elosern-root` duplicates and update them in the same commit.

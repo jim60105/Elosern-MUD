@@ -256,3 +256,14 @@ The rail, the verb card, the standee handover into dialogue, and the overflow ca
 #### Scenario: Continuous handover into dialogue
 - **WHEN** 交談 is activated from the verb card at both viewports
 - **THEN** the standee does not leave and re-enter between the card and the dialogue surface
+
+### Requirement: Rail digits are claimed and never fall through to the footer
+While no card is open, digits 1–9 SHALL be claimed by the rail: a digit beyond the number of visible entries SHALL do nothing, and opening a card SHALL stop any compass walk.
+
+#### Scenario: A digit beyond the rail count is a no-op
+- **WHEN** the rail has two entries and the player presses `3`
+- **THEN** no `ui_action` is emitted and no footer chip is activated
+
+#### Scenario: Opening a card stops a walk
+- **WHEN** a compass walk is running and the player presses a rail digit that opens a verb card
+- **THEN** the walk stops
