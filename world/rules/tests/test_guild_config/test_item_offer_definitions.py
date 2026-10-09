@@ -36,7 +36,11 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        self.assertEqual(len(ITEM_REGISTRY), 107)
+        # 123 shipped items, up from the 107 of the earlier commerce
+        # baseline: shared-military-equipment added the twelve E–S military
+        # weapons/armors, and guild-exam-restriction-policy added the four
+        # guild_limit_* rank accessories.
+        self.assertEqual(len(ITEM_REGISTRY), 123)
         self.assertTrue(
             {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
         )

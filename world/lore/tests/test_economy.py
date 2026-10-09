@@ -18,7 +18,9 @@ class EconomyRegistryTests(unittest.TestCase):
         self.assertIsInstance(to_copper(gold=1, silver=2, copper=3), int)
 
     def test_price_references_are_integral_and_ordered(self):
-        self.assertEqual(len(PRICE_TABLE), 17)
+        # shared-military-equipment added the magic_armor band for the
+        # registered E–S enchanted-plate rows.
+        self.assertEqual(len(PRICE_TABLE), 18)
         for entry in PRICE_TABLE.values():
             self.assertIsInstance(entry, PriceEntry)
             self.assertIsInstance(entry.min_copper, int)

@@ -75,11 +75,16 @@ class PlaceRegistryTests(unittest.TestCase):
         # altoria-learning-and-exchange grew both again: the merchant hall and
         # the market stalls appended to the MIDDLE slice behind the alchemist,
         # and the academy appended to the UPPER slice behind the drill yard.
+        # persistent-human-guild-hosts prepended three host-less HOME
+        # residences to the MIDDLE slice ahead of the guild hall — 霍克的家,
+        # 卡珊卓的家 and 奧古斯丁的家, one per persistent adventurer.
         self.assertEqual(
             list(PLACE_REGISTRY),
             [
                 "altoria_eatery", "altoria_tavern", "altoria_lodging",
                 "altoria_bathhouse", "altoria_guardhouse",
+                "altoria_hok_home", "altoria_cassandra_home",
+                "altoria_augustine_home",
                 "altoria_guild_hall", "altoria_general_store",
                 "altoria_forge", "altoria_tailor", "altoria_jeweller",
                 "altoria_alchemist", "altoria_merchant_hall",
@@ -292,6 +297,11 @@ class PlaceRegistryTests(unittest.TestCase):
             "altoria_merchant_hall": "merchant_hall",
             "altoria_market_stalls": "market",
             "altoria_academy": "academy",
+            # persistent-human-guild-hosts: the persistent adventurers'
+            # host-less residences are ordinary homes.
+            "altoria_hok_home": "home",
+            "altoria_cassandra_home": "home",
+            "altoria_augustine_home": "home",
             "ciaran_elenis_home": "home",
             "ciaran_gwenaera_home": "home",
             "ciaran_hailiel_home": "home",

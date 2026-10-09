@@ -77,6 +77,10 @@ _ALLOWLIST = frozenset(
         # gameplay-reader role the world/skills definition module was never
         # allowed to hold. It is a sanctioned consumer of the accessor only.
         Path("world/rules/state_reactions.py"),
+        # guild-exam-restriction-policy: the exam-scoped restriction preflight
+        # reads the resolved equipment adjustments so its reducing-only
+        # ceilings are derived from the same effects the live kit uses.
+        Path("world/rules/guild_exam_restrictions.py"),
     }
 )
 _MODULE = "world.rules.equipment_effects"

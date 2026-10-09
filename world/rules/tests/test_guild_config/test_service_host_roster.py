@@ -661,6 +661,11 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         # service runs from the ledger behind the counter, not a resident NPC
         # host, so they reach the rooms-only outcome hostless-places reserved.
         # Their letter_service flag, not a host row, drives the surface.
+        # persistent-human-guild-hosts widens it a fourth time with the three
+        # host-less HOME residences of the persistent adventurers
+        # (霍克的家、卡珊卓的家、奧古斯丁的家): the resident is assembled by
+        # the host system onto an ordinary connected home, so no place-host
+        # row is authored for these three rooms.
         self.assertEqual(
             hostless,
             {
@@ -669,6 +674,9 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 "altoria_market_stalls",
                 "ciaran_silverfeather",
                 "altoria_silverfeather",
+                "altoria_hok_home",
+                "altoria_cassandra_home",
+                "altoria_augustine_home",
             },
         )
         for place in PLACE_REGISTRY.values():

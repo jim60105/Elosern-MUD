@@ -88,6 +88,16 @@ class ItemPresentationTests(unittest.TestCase):
                 "aphrodisiac_bath_salts", "slime_lube_gel", "hot_kiss_potion",
                 "spark_candy", "embracing_vine", "kiss_of_goddess_mist",
                 "censer_of_desire",
+                # shared-military-equipment: the twelve E–S mass-produced
+                # weapons and armors the capital's forge and tailor carry.
+                "military_e_sword", "military_d_sword", "military_c_sword",
+                "military_b_sword", "military_a_sword", "military_s_sword",
+                "military_e_armor", "military_d_armor", "military_c_armor",
+                "military_b_armor", "military_a_armor", "military_s_armor",
+                # guild-exam-restriction-policy: one rank accessory per
+                # restricted examination rank (E–B).
+                "guild_limit_e", "guild_limit_d", "guild_limit_c",
+                "guild_limit_b",
             }
         )
         for key, definition in ITEM_REGISTRY.items():
@@ -250,6 +260,9 @@ class ItemPresentationTests(unittest.TestCase):
                 "use_mechanics",
                 "equipment_slot",
                 "modifier_key",
+                # guild-exam-restriction-policy carries the guild property
+                # binding here so an item can require a guild rank.
+                "guild_property",
             ],
         )
         self.assertEqual(
