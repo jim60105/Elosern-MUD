@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Crocodile ecology documents implemented limits
-Public crocodile ecology and author notes SHALL describe implemented contact MP pressure with no HP healing, remote drain or permanent magic loss. Assertions that crocodile mechanics/numbers remain deferred SHALL be removed. Delivered approved species SHALL use their authored kits and revised boundaries; still-deferred species are none of the first-batch species.
+Public crocodile ecology and author notes SHALL describe implemented contact MP pressure with no HP healing, remote drain or permanent magic loss. Assertions that crocodile mechanics/numbers remain deferred SHALL be removed. Delivered approved species SHALL use their authored kits and revised boundaries; no first-batch species remains deferred.
 
 #### Scenario: Public projection and notes agree
 - **WHEN** the registry, bestiary and relevant author guidance are read

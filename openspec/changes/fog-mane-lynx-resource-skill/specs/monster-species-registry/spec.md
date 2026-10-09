@@ -32,7 +32,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 
 #### Scenario: MP and SP pools are gated by approval, not inference
 - **WHEN** MP or SP literals are authored for a variant
-- **THEN** MP and SP carry no tier band and require explicit approval; the explicitly approved crocodile and delivered species pools stated in the approved first-batch profile requirement are accepted verbatim; every unapproved nonzero pool is rejected
+- **THEN** MP and SP carry no tier band and require explicit approval; the crocodile pools and explicitly approved complete profiles in “Approved delivered resource rows are literal” are accepted verbatim after approval; every unapproved nonzero pool is rejected
 
 #### Scenario: Only explicit user balance approval populates a slot
 - **WHEN** a profile or grade slot is populated
@@ -59,7 +59,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 - **AND** consumers SHALL NOT read the registry slot as if it carried that fallback
 
 ### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
-The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are none of the first-batch species. Crocodile contact MP drain and completed species kits remain authored configuration.
+The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. No first-batch species remains deferred after this change. Crocodile contact MP drain and completed species kits remain authored configuration.
 
 #### Scenario: No behaviour seam is faked
 - **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the still-deferred species listed above
