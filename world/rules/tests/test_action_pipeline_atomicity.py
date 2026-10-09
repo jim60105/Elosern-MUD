@@ -19,7 +19,10 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import practice_claims_for
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.effects import EffectPolicy
-from world.skills.registry import SKILL_REGISTRY
+import importlib
+
+_skills_mod = importlib.import_module("world.skills.registry")
+_SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 from world.tests.synthetic_data import make_skill
 from unittest.mock import patch
 
@@ -110,7 +113,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
 
         # Roll=1 -> MISS
         with patch("world.rules.combat.damage.roll_d100", return_value=1):
-            with patch.dict(SKILL_REGISTRY, {skill.key: skill}):
+            with patch.dict(_SKILL_MAP, {skill.key: skill}):
                 res = ActionResolver.resolve(req)
         self.assertEqual(res.outcome, "success")
         # Rider was skipped
@@ -154,7 +157,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         # Simulate a crash in _commit
         with patch("world.rules.action.resolver._commit", side_effect=RuntimeError("injected late failure")):
             with patch("world.rules.combat.damage.roll_d100", return_value=80):
-                with patch.dict(SKILL_REGISTRY, {skill.key: skill}):
+                with patch.dict(_SKILL_MAP, {skill.key: skill}):
                     with self.assertRaises(RuntimeError):
                         ActionResolver.resolve(req)
 
