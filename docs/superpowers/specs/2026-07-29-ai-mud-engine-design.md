@@ -449,12 +449,21 @@ population is initial state, not acquisition; removal never reverses progress; a
 "item acquired" assertion that a caller can forge.
 
 Rank promotion from F through S has two gates: cumulative `guild_merit` meets the next rank's YAML
-threshold, then the candidate defeats that rank's guild examiner. The examination is ordinary
-ActionResolver combat with a nonlethal terminal policy: a lethal crossing floors HP at 1 and records a
-knockout. It grants no ordinary kill XP, loot, DEFEAT progress, or protected-entity failure. Passing
-advances exactly one rank; failing or fleeing leaves rank and merit unchanged. Every examination starts
-through the same deterministic `start_guild_exam()` API, whether requested by a player command or a
-future validated NPC intent.
+threshold, then the candidate defeats the branch-qualified persistent adventurer who hosts that rank's
+examination. The examination is a simulated lethal ActionResolver battle: HP may reach zero, and every
+terminal outcome restores both sides to their full applicable pools and the host to its normal
+outfit/effects (amended by the 2026-10-08 human guild examination design; the legacy HP-1 floor no
+longer applies). It grants no ordinary kill XP, loot, DEFEAT progress, or protected-entity failure.
+Passing advances exactly one rank; failing or fleeing leaves rank and merit unchanged.
+
+Every examination request — the `guild exam` command, the WebClient `guild.exam_request` action
+(「預約升等考核」), and a validated `request_guild_exam` NPC intent — goes through the shared
+presence-first coordinator `world.rules.guild_exam_request.request_guild_exam`. It first resolves the
+registration, local counter, branch, exact next rank, and qualified persistent host without checking
+merit. An absent host yields read-only planned attendance (`exam_schedule`: host name plus the planned
+game-calendar interval, never a saved booking) or a named inability to confirm it; a present host
+delegates to `start_guild_exam()`, the only mutation-capable start, which rechecks host service state,
+true merit, and active battle/examination (`exam_started` on success).
 
 Shops use immutable item/shop definitions and persistent finite integer stock. Buy and sell settle exact
 integer copper, repeated item keys, ACQUIRE progress, and stock in one transaction. Opening state is
@@ -727,7 +736,7 @@ rendering. This is an acceptance criterion.
 
 Intent whitelist: `give_item` / `take_item` / `offer_quest` / `request_guild_exam` /
 `adjust_relation` / `reveal_lore` / `none`. The engine verifies the NPC actually holds the item, may
-issue the quest, or is an eligible GuildExaminer. **Illegal intent is discarded while the speech is
+issue the quest, or is the exam counter or qualified examination host. **Illegal intent is discarded while the speech is
 kept** — the NPC said something it could not do, but the world was not changed. That is the accepted
 failure mode.
 
@@ -747,11 +756,17 @@ The examination intent has exactly one payload field:
 }
 ```
 
-Change 19 may extract this intent, but it has no elevated authority. It passes the speaking NPC, player,
-and requested rank to change 16's deterministic `start_guild_exam(..., requested_by="npc_intent")`.
-That API rechecks co-location, GuildExaminer component and branch, exact next rank, true cumulative merit,
-and absence of active combat/examination. The AI cannot choose examiner stats, waive a gate, promote the
-player, or start combat directly. A failed check discards only the intent and preserves `speech`.
+Change 19 may extract this intent, but it has no elevated authority. It passes the player, the requested
+rank, and the speaking NPC (accepted only as the co-located exam counter or the qualified persistent
+host) to the shared presence-first request coordinator
+(`world.rules.guild_exam_request.request_guild_exam(..., requested_by="npc_intent")`; amended by the
+2026-10-08 human guild examination design §7). The coordinator resolves the counter, branch, exact next
+rank, and qualified host before merit; an absent host answers read-only planned attendance (an applied,
+mutation-free outcome whose schedule note reaches the player as narration), and a present host delegates
+to `start_guild_exam()`, which rechecks the counter gate and branch, host qualification and co-location,
+true cumulative merit, and absence of active combat/examination. The AI cannot choose examiner stats,
+branch, or clock, waive a gate, promote the player, or start combat directly. A failed check discards
+only the intent and preserves `speech`.
 
 NPC prompts are injected with `disguised_stats`, so NPCs genuinely underestimate a disguised elf.
 The narrative payoff falls out of D2 for free.

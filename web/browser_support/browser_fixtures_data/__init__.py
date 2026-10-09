@@ -100,6 +100,7 @@ from web.browser_support.browser_fixtures_data.probes import (
 )
 
 from web.browser_support.browser_fixtures_data.services_catalog import (
+    SYNTH_EXAM_APPOINTMENT,
     SYNTH_EXAM_HOST_NAME,
     SYNTH_EXAM_HOST_PERSON_KEY,
     SYNTH_SHOP_OFFERED_ITEM_KEYS,

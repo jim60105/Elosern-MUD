@@ -1,5 +1,6 @@
 """Services panel schema edge tests: prerequisite, quest-row, and inventory-row actions."""
 import unittest
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.services import ServicesPanelError, validate_services
 from ._support import UNREGISTERED_PLAYER, _T_MEAL, _T_MEAL_DISPLAY, _valid_payload
@@ -200,28 +201,54 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
                 )
 
 
+    def _rank_payload(self, rank):
+        return _valid_payload(
+            guild=self._guild(rank=rank),
+            pagination={**_valid_payload()["pagination"]},
+        )
+
     def test_rank_branch_rejections(self):
         rank = {
             "rank": "F",
             "merit": 0,
             "next_rank": "E",
             "next_threshold": 50,
-            "eligible": True,
-            "exam_start": self._action("guild.exam_start"),
+            "merit_qualified": False,
+            "exam_request": self._action("guild.exam_request"),
         }
-        for overrides, _msg in (
-            ({"rank": ""}, "rank empty"),
-            ({"next_rank": None, "next_threshold": 50}, "next mismatch"),
-            ({"exam_start": self._action("guild.register")}, "exam action"),
-            ({"eligible": False}, "eligible mismatch"),
+        legacy = {key: value for key, value in rank.items() if key not in ("merit_qualified", "exam_request")}
+        legacy.update({"eligible": False, "exam_start": self._action("guild.exam_start")})
+        for candidate, _msg in (
+            (dict(rank, rank=""), "rank empty"),
+            (dict(rank, next_rank=None, next_threshold=50), "next mismatch"),
+            (dict(rank, exam_request=self._action("guild.register")), "exam action"),
+            (dict(rank, exam_request=self._action("guild.exam_start")), "retired action"),
+            (dict(rank, merit_qualified="no"), "qualified type"),
+            (legacy, "retired fields"),
         ):
             with self.assertRaises(ProtocolValidationError, msg=_msg):
-                validate_services(
-                    _valid_payload(
-                        guild=self._guild(rank=dict(rank, **overrides)),
-                        pagination={**_valid_payload()["pagination"]},
-                    )
-                )
+                validate_services(self._rank_payload(candidate))
+
+    @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
+    def test_merit_qualification_is_independent_of_request_availability(self):
+        below_merit_enabled = {
+            "rank": "F", "merit": 0, "next_rank": "E", "next_threshold": 50,
+            "merit_qualified": False,
+            "exam_request": self._action("guild.exam_request"),
+        }
+        qualified_disabled = dict(
+            below_merit_enabled, merit=50, merit_qualified=True,
+            exam_request=self._action(
+                "guild.exam_request", enabled=False,
+                disabled_reason={"code": "schedule_blocked", "message": "她現在正忙著，沒有理會你。"},
+            ),
+        )
+        for rank in (below_merit_enabled, qualified_disabled):
+            validated = validate_services(self._rank_payload(rank))
+            self.assertEqual(validated["guild"]["rank"]["merit_qualified"], rank["merit_qualified"])
+            self.assertEqual(
+                validated["guild"]["rank"]["exam_request"]["enabled"], rank["exam_request"]["enabled"]
+            )
 
 
     def test_shop_row_branch_rejections(self):

@@ -316,61 +316,47 @@ class CombatCommandBranchTests(TestCase):
         command.caller.msg.assert_called_with("目前沒有進行中的戰鬥。")
 
     def test_exam_maps_every_rule_reason_and_success(self):
-        # The counter authorizes; the qualified persistent host is resolved
-        # server-side and is the only examiner the start API receives.
-        host = object()
-        resolver = patch("commands.combat.qualified_exam_host", return_value=host)
-        resolver.start()
-        self.addCleanup(resolver.stop)
-        expected = {
-            ExamReason.UNREGISTERED: "你尚未註冊為冒險者。",
-            ExamReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
-            ExamReason.WRONG_BRANCH: "考核官與你的公會不符。",
-            ExamReason.NOT_NEXT_RANK: "你只能接受下一個階級的考核。",
-            ExamReason.BELOW_THRESHOLD: "你的功績尚未達到考核門檻。",
-            ExamReason.ACTIVE_COMBAT: "你已經在戰鬥中。",
-            ExamReason.DUPLICATE_ACTIVE: "你已經有一場進行中的考核。",
-            ExamReason.ALREADY_SETTLED: "你已經通過這個階級的考核。",
-        }
-        for reason, message in expected.items():
-            command = _command(CmdGuildExam)
-            command._resolve_examiner = Mock(return_value=object())
-            with patch("commands.combat.start_guild_exam", side_effect=GuildExamError(reason)):
+        # The shared coordinator owns authority, attendance and the start;
+        # the command only maps its outcome or rejection to shared prose.
+        for reason in (
+            ExamReason.UNREGISTERED, ExamReason.SERVICE_UNAVAILABLE, ExamReason.WRONG_BRANCH,
+            ExamReason.NOT_NEXT_RANK, ExamReason.BELOW_THRESHOLD, ExamReason.ACTIVE_COMBAT,
+            ExamReason.DUPLICATE_ACTIVE, ExamReason.EXAMINER_BUSY, ExamReason.SCHEDULE_BLOCKED,
+            ExamReason.ATTENDANCE_UNKNOWN, ExamReason.UNQUALIFIED_EXAMINER,
+        ):
+            command = _command(CmdGuildExam, "E")
+            with patch("commands.combat.request_guild_exam", side_effect=GuildExamError(reason)):
                 command.func()
-            command.caller.msg.assert_called_with(message)
+            command.caller.msg.assert_called_with(SERVICE_REASON_MESSAGES[reason.value])
+
+        command = _command(CmdGuildExam, "D")
+        started = SimpleNamespace(kind="exam_started", target_rank="D", host_name="h", interval=None)
+        with patch("commands.combat.request_guild_exam", return_value=started) as request:
+            command.func()
+        request.assert_called_once_with(command.caller, "D", requested_by="command")
+        self.assertIn("升階考核（D）開始", command.caller.msg.call_args.args[0])
 
         command = _command(CmdGuildExam)
-        command._resolve_examiner = Mock(return_value=object())
-        with patch(
-            "commands.combat.start_guild_exam",
-            side_effect=GuildExamError(ExamReason.NOT_A_PLAYER),
-        ):
-            command.func()
-        command.caller.msg.assert_called_with("無法開始考核。")
-
-        command = _command(CmdGuildExam, "D")
-        command._resolve_examiner = Mock(return_value=object())
-        with patch(
-            "commands.combat.start_guild_exam",
-            return_value=SimpleNamespace(target_rank="D"),
-        ) as start:
-            command.func()
-        start.assert_called_once_with(command.caller, host, "D", requested_by="command")
-        self.assertIn("D 階", command.caller.msg.call_args.args[0])
-
-        resolver.stop()
-        command = _command(CmdGuildExam, "D")
-        command._resolve_examiner = Mock(return_value=object())
-        with patch(
-            "commands.combat.qualified_exam_host",
-            side_effect=GuildExamError(ExamReason.UNQUALIFIED_EXAMINER),
-        ), patch("commands.combat.start_guild_exam") as start:
-            command.func()
-        start.assert_not_called()
-        command.caller.msg.assert_called_with(
-            SERVICE_REASON_MESSAGES[ExamReason.UNQUALIFIED_EXAMINER.value]
+        command.caller.guild_rank = "F"
+        scheduled = SimpleNamespace(
+            kind="exam_schedule", target_rank="E", host_name="合成考官",
+            interval=SimpleNamespace(start_tick=36000, end_tick=50400),
         )
-        resolver.start()
+        with patch("commands.combat.next_exam_rank", return_value="E"), patch(
+            "commands.combat.request_guild_exam", return_value=scheduled
+        ) as request:
+            command.func()
+        # Without an argument the target is the exact next rank.
+        request.assert_called_once_with(command.caller, "E", requested_by="command")
+        self.assertIn("合成考官", command.caller.msg.call_args.args[0])
+
+        command = _command(CmdGuildExam)
+        with patch("commands.combat.next_exam_rank", return_value=None), patch(
+            "commands.combat.request_guild_exam"
+        ) as request:
+            command.func()
+        request.assert_not_called()
+        command.caller.msg.assert_called_with(SERVICE_REASON_MESSAGES["top_rank"])
 
 
 class EconomyCommandBranchTests(TestCase):

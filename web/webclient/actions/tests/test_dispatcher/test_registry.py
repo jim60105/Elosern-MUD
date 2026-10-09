@@ -60,7 +60,7 @@ class RegistryTests(unittest.TestCase):
                     "guild.quest_abandon",
                     "guild.quest_turnin",
                     "guild.quest_track",
-                    "guild.exam_start",
+                    "guild.exam_request",
                     "shop.buy",
                     "shop.sell",
                     "inventory.use",

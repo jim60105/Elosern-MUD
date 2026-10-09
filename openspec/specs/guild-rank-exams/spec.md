@@ -7,22 +7,23 @@ Define deterministic guild-rank examinations and simulated-battle promotion comb
 ## Requirements
 
 ### Requirement: Rank promotion requires cumulative merit and exactly the next examination
-`guild_economy.yaml` SHALL define strictly increasing non-negative merit thresholds for E through S.
-An actor SHALL be eligible only when registered, currently at the immediately preceding rank, and true
-`guild_merit` meets the requested target's threshold. Merit SHALL not be spent on an attempt or
-promotion. Skipping ranks and examining from S SHALL be rejected.
+guild_economy.yaml SHALL retain strictly increasing non-negative merit thresholds E-S. Promotion/start SHALL require registered exact-next rank and true cumulative merit, never spent on attempt/promotion. Schedule-first requests SHALL remain available below threshold: absent-host attendance returns before merit; present-host start rejects insufficient merit. Rank skips and S next promotion SHALL reject.
 
 #### Scenario: Threshold alone does not promote
-- **WHEN** an F member reaches the E threshold
-- **THEN** rank remains F until an E examination is passed
+- **WHEN** member reaches threshold
+- **THEN** rank does not advance until exam PASS
+
+#### Scenario: Absent below merit
+- **WHEN** below-threshold member asks for exact-next exam at local counter with absent host
+- **THEN** planned attendance returns with no exam mutation
 
 #### Scenario: Below-threshold request is rejected
-- **WHEN** an F member below the E threshold requests the E examination
-- **THEN** no exam record, opponent, combat session, merit, or rank change is created
+- **WHEN** same member asks with service-capable host present
+- **THEN** start rejects without record/session/resources/affinity change
 
 #### Scenario: Rank skipping is rejected
-- **WHEN** an F member requests a D examination even with enough merit for D
-- **THEN** the request is rejected because E is the only valid target
+- **WHEN** F member requests D even with sufficient merit
+- **THEN** only E is accepted as target
 
 ### Requirement: start_guild_exam is the sole trigger and validates authority itself
 `start_guild_exam(actor, examiner, target_rank, requested_by=...)` SHALL be the only mutation-capable

@@ -5,9 +5,10 @@ The read-only version-2 `services` panel payload (host resolution, player summar
 ## Requirements
 
 ### Requirement: The services panel is an exact read-only exploration-mode panel
-The production presentation registry SHALL register `services` schema version 4. Its available payload SHALL
+
+The production presentation registry SHALL register `services` schema version 5. Its available payload SHALL
 contain exactly `schema_version`, `available`, `kind`, `host`, `player`, `guild`, `shop`, `inventory`, and
-`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 4.
+`pagination`; `available` SHALL be true, `kind` SHALL be `services`, and `schema_version` SHALL be integer 5.
 The presenter SHALL strictly read canonical records and registries through the no-mutation service read model.
 
 #### Scenario: Exploration snapshot carries the full services panel
@@ -33,6 +34,11 @@ The presenter SHALL strictly read canonical records and registries through the n
 #### Scenario: Presenter failure remains isolated
 - **WHEN** services presentation raises while status and narrative remain healthy
 - **THEN** only `services` becomes correlated unavailable, status still renders, and normal text output remains usable
+
+
+#### Scenario: Below merit request stays enabled
+- **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
+- **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
 
 #### Scenario: Host metadata shape is bounded and display-only
 - **WHEN** the `host` field is present on an available payload
@@ -76,10 +82,11 @@ The presenter SHALL strictly read canonical records and registries through the n
   prerequisite failures
 
 ### Requirement: Service presentation resolves hosts per service class and a stable player summary
+
 Each service surface SHALL resolve its own local host independently from the actor's current room through
-`resolve_local_service_host`, under the same deterministic rule as commands: `guild` and `rank` SHALL resolve a
-`GuildStaff` and `GuildExaminer` host respectively, and `shop` SHALL resolve a `Merchant` host; zero or multiple
-hosts of a surface's required class SHALL make that surface unavailable, never a remote or ambiguous host.
+`resolve_local_service_host`, under the same deterministic rule as commands: `guild` SHALL resolve a `GuildStaff`
+host, `rank` the hall's `GuildExaminer` exam counter (never the qualified persistent host), and `shop` a
+`Merchant` host; zero or multiple hosts of a surface's required class SHALL make that surface unavailable.
 
 #### Scenario: Guild hall resolves one guild host and its examiner
 - **WHEN** the actor stands in a room containing exactly one `GuildStaff` host that also carries `GuildExaminer`
@@ -105,6 +112,11 @@ hosts of a surface's required class SHALL make that surface unavailable, never a
 - **WHEN** an elf with true rank F and true merit 0 holds a disguise
 - **THEN** `player` reports rank F, merit 0, and no displayed-stat value, and no surface derives eligibility from the disguise
 
+
+#### Scenario: Below merit request stays enabled
+- **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
+- **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
+
 #### Scenario: Different host classes never create cross-class ambiguity
 - **WHEN** different host classes are present in the same room
 - **THEN** they create no cross-class ambiguity, and the co-location of `GuildStaff` with `GuildExaminer` makes
@@ -127,10 +139,11 @@ hosts of a surface's required class SHALL make that surface unavailable, never a
   snapshot values for wallet, rank, merit, or eligibility
 
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
+
 The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and `rank` and SHALL be present only
-when exactly one local `GuildStaff` host resolves. `board` and `quests` SHALL be bounded lists of at most 12 rows
-each, ordered deterministically, with server-rendered text derived only from immutable quest values and canonical
-records; each action descriptor carries an enabled state or a stable disabled reason.
+when exactly one local `GuildStaff` host resolves. `board` and `quests` SHALL be bounded lists of at most 12
+deterministic rows with server-rendered text; `rank` SHALL report true-merit `merit_qualified` separately from its
+`guild.exam_request` descriptor, whose enabledness never depends on merit or host attendance.
 
 #### Scenario: Unregistered player can register
 - **WHEN** an unregistered actor stands in the guild hall
@@ -154,11 +167,16 @@ records; each action descriptor carries an enabled state or a stable disabled re
 
 #### Scenario: Exam eligibility shows the exact next rank only
 - **WHEN** a registered F member has merit at or above the E threshold and no active session
-- **THEN** `rank` reports the exact next rank E and enables `exam_start` with payload `{target_rank: "E"}`, and no other rank can be selected
+- **THEN** `rank` reports the exact next rank E and enables `exam_request` with payload `{target_rank: "E"}`, and no other rank can be selected
 
 #### Scenario: Guild surface stays read-only
 - **WHEN** the guild section is built for an actor with registration, an active quest, and eligible exam state
 - **THEN** registration, quest log, merit, rank, wallet, and exam records are byte-for-byte unchanged
+
+
+#### Scenario: Below merit request stays enabled
+- **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
+- **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
 
 #### Scenario: Registration section shape and enablement gate
 - **WHEN** the `registration` section is built
@@ -193,14 +211,20 @@ records; each action descriptor carries an enabled state or a stable disabled re
 
 #### Scenario: Rank section presence and exact fields
 - **WHEN** the `rank` section is computed
-- **THEN** it is present only when exactly one local `GuildExaminer` host resolves and contains exactly `rank`,
-  `merit`, `next_rank`, `next_threshold`, `eligible`, and `exam_start`
+- **THEN** it is present only when exactly one local examination counter (the `GuildExaminer` counter of the
+  hall) resolves, whether or not the qualified persistent host is present, and contains exactly `rank`, `merit`,
+  `next_rank`, `next_threshold`, `merit_qualified`, and `exam_request`
 
 #### Scenario: Exam start requires every condition and the next-rank payload
-- **WHEN** `exam_start` is computed
-- **THEN** it is enabled only when the actor is registered, a local `GuildExaminer` host exists, an exact next
-  rank exists, true merit meets its threshold, and no active combat or examination exists, and its action payload
-  carries exactly the next-rank key
+- **WHEN** `exam_request` is computed
+- **THEN** it is enabled only when the actor is registered at the counter's branch, an exact next rank exists,
+  and the local counter passes its service and schedule gates; merit and host presence never disable it, and its
+  action payload carries exactly the next-rank key
+
+#### Scenario: Unregistered and top-rank actors receive stable target reasons
+- **WHEN** the actor is unregistered or already holds the top rank
+- **THEN** `exam_request` is disabled with the stable `unregistered` or `top_rank` reason and never with a merit
+  reason
 
 ### Requirement: The shop surface covers stock, quantity, buy, sell, and sellable inventory
 The `shop` section SHALL contain exactly `open`, `stock`, and `sellable` and SHALL be present only in exploration
@@ -283,10 +307,11 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
   or drop action
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
+
 The production action registry SHALL retain every existing combat, service, creation, exploration, and options
 action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action
 set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`,
-`guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, and
+`guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, and
 `inventory.toggle_equip`.
 
 #### Scenario: Existing registration reaches its deterministic API once
@@ -310,8 +335,8 @@ set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest
 - **THEN** the dispatch rejects with the lifecycle module's bounded refusal message and every record's tracking state is unchanged
 
 #### Scenario: Exam start cannot choose an examiner or rank
-- **WHEN** a client submits a non-next rank or includes a host or examiner identity
-- **THEN** the adapter rejects before exam creation and only the exact next-rank payload is accepted
+- **WHEN** a client submits a non-next rank or includes a host, examiner, branch, clock or threshold field
+- **THEN** exact validation or the coordinator rejects before any exam creation and only the exact next-rank payload is accepted
 
 #### Scenario: Existing buy and sell submit only item and quantity
 - **WHEN** a client submits `shop.buy` with item key and quantity only
@@ -328,6 +353,11 @@ set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest
 #### Scenario: Authority-like fields can never be supplied
 - **WHEN** any service or inventory action contains an unknown actor, host, session, effect, or slot-like field
 - **THEN** exact-schema validation rejects before adapter invocation
+
+
+#### Scenario: Below merit request stays enabled
+- **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
+- **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
 
 #### Scenario: Payload schemas are exact and bounded
 - **WHEN** any service action payload is validated
@@ -420,10 +450,11 @@ adapter. A duplicate live request ID SHALL return its cached result without re-e
 - **THEN** its controls close and current local-service state is returned without mutation
 
 ### Requirement: Service action completion updates canonical panels and preserves narrative
+
 After an admitted service or inventory action settles, the server SHALL emit every returned message through the
 ordinary escaped text output path and SHALL publish canonical panel replacements at one newer revision before
 sending the matching safe `ui_action_result`. Existing guild, quest, and shop actions SHALL retain their
-established affected-panel sets.
+established affected-panel sets, and a read-only `exam_schedule` reply SHALL leave mode and canonical state unchanged.
 
 #### Scenario: Turn-in updates wallet and merit panels together
 - **WHEN** a completed quest is turned in successfully
@@ -434,7 +465,7 @@ established affected-panel sets.
 - **THEN** narrative reports the safe result and one newer canonical commit shows HP, item count, mode, clock, and combat state from the same settlement
 
 #### Scenario: Exam start hands off while retaining personal inventory
-- **WHEN** `guild.exam_start` succeeds for the exact next rank
+- **WHEN** `guild.exam_request` returns exam_started for the exact next rank
 - **THEN** mode becomes combat, context actions become combat, guild and shop services disappear, and canonical personal inventory remains reachable from the combat affordance
 
 #### Scenario: Mode change tears down exploration service state
@@ -449,6 +480,10 @@ established affected-panel sets.
 - **WHEN** deterministic economy rejects for insufficient funds
 - **THEN** only the stable safe rejection is emitted, wallet and stock remain unchanged, and refreshed services permits another legal choice
 
+#### Scenario: Schedule information does not enter combat
+- **WHEN** guild.exam_request returns exam_schedule
+- **THEN** exploration mode/services remain available, planned attendance renders and no combat panel/session is created
+
 #### Scenario: Inventory actions publish a full snapshot
 - **WHEN** `inventory.use` or `inventory.toggle_equip` settles
 - **THEN** a full snapshot is published because the action may change inventory, contained mirrors, status,
@@ -456,7 +491,7 @@ established affected-panel sets.
 
 #### Scenario: Combat retains services v3 personal data and its own affordance
 - **WHEN** the actor enters combat
-- **THEN** exploration service menus and their local forms are unloaded, services v3 retains personal
+- **THEN** exploration service menus and their local forms are unloaded, services v5 retains personal
   player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
   absent in combat
 

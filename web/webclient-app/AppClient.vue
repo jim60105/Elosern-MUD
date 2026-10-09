@@ -601,7 +601,7 @@ function onFoeLineupGone() {
           :services="panel('services') || {}"
           @quest_register="onQuestAction"
           @quest_accept="onQuestAction"
-          @exam_start="onQuestAction"
+          @exam_request="onQuestAction"
         />
         <!-- The counter's two honest absence forms: the services panel's own
              registry reason when the panel degraded, otherwise the explicit

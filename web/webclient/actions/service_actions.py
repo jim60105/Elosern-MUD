@@ -2,9 +2,10 @@
 
 The seven production service actions are ``guild.register``,
 ``guild.quest_accept``, ``guild.quest_abandon``, ``guild.quest_turnin``,
-``guild.exam_start``, ``shop.buy``, and ``shop.sell``. Each validator enforces
+``guild.exam_request``, ``shop.buy``, and ``shop.sell``. Each validator enforces
 an exact bounded payload shape; each adapter re-resolves the local
-``GuildStaff`` / ``GuildExaminer`` / ``Merchant`` host and every referenced
+``GuildStaff`` / ``Merchant`` host (the exam request re-resolves its counter
+and qualified host through the shared request coordinator) and every referenced
 identity against current canonical state, calls only the listed public
 deterministic APIs, and never assigns ``.db`` attributes, traits, registration,
 rank, merit, quest log, wallet, inventory, merchant stock, or location
@@ -14,8 +15,7 @@ wallet field, and no action routes through the text command parser.
 
 from typing import Any
 
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
-from world.lore.guild import GUILD_RANK_REGISTRY
+from typeclasses.components import GuildStaff, Merchant
 from world.lore.items import ITEM_REGISTRY
 from world.quests.runtime import (
     QuestAlreadyActive,
@@ -42,12 +42,12 @@ from world.rules.guild import (
     GuildError,
     GuildServiceError,
     RewardClaimError,
-    parse_guild_registration,
     register_adventurer,
     resolve_local_service_host,
     turn_in_quest,
 )
-from world.rules.guild_exams import GuildExamError, qualified_exam_host, start_guild_exam
+from world.rules.guild_exam_request import OUTCOME_SCHEDULE, request_guild_exam
+from world.rules.guild_exams import GuildExamError
 from world.rules.guild_offers import (
     BoardAccessError,
     GuildOfferError,
@@ -57,7 +57,12 @@ from world.rules.guild_offers import (
 from world.rules.items import use_item
 from world.rules.npc_schedules import interaction_reason
 from world.rules.player_messages import session_reason_message
-from world.rules.service_messages import rejection_code, rejection_message
+from world.rules.service_messages import (
+    exam_schedule_message,
+    exam_started_message,
+    rejection_code,
+    rejection_message,
+)
 
 # Wire limits (equal to or below the protocol identifier bound).
 MAX_KEY_CODE_POINTS = 64
@@ -73,6 +78,9 @@ AFFECTED_ACCEPT = ("services", "objectives", "quest_log")
 AFFECTED_ABANDON = ("services", "objectives", "quest_log")
 AFFECTED_TURNIN = ("status", "services", "objectives", "quest_log")
 AFFECTED_EXAM = ("status", "services", "context_actions")
+# Planned attendance writes nothing; republishing the unchanged services
+# panel settles the request without a full snapshot.
+AFFECTED_EXAM_SCHEDULE = ("services",)
 AFFECTED_TRADE = ("status", "services", "objectives", "quest_log")
 AFFECTED_TRACK = ("services", "objectives", "quest_log")
 
@@ -154,8 +162,12 @@ def validate_quest_track_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {"quest_id": quest_id, "tracked": tracked}
 
 
-def validate_exam_start_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate the exact ``guild.exam_start`` payload (one next-rank key)."""
+def validate_exam_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``guild.exam_request`` payload (one next-rank key).
+
+    Host, branch, clock and threshold fields are unknown fields and reject
+    here, before the request coordinator runs.
+    """
     body = _exact_single_field(payload, "target_rank")
     return {"target_rank": _require_non_empty_string(
         body["target_rank"], "target_rank", MAX_RANK_KEY_CODE_POINTS
@@ -288,18 +300,6 @@ def _success(code: str, message: str, affected: tuple[str, ...]) -> dict[str, An
     }
 
 
-def _exact_next_rank(rank_key: Any) -> str | None:
-    """Return the exact next rank key for ``rank_key``, or ``None``."""
-    if not isinstance(rank_key, str) or rank_key not in GUILD_RANK_REGISTRY:
-        return None
-    order = GUILD_RANK_REGISTRY[rank_key].order
-    candidate = next(
-        (member.key for member in GUILD_RANK_REGISTRY.values() if member.order == order + 1),
-        None,
-    )
-    return candidate
-
-
 # ---------------------------------------------------------------------------
 # Adapters.
 # ---------------------------------------------------------------------------
@@ -419,34 +419,28 @@ def _quest_track_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
     )
 
 
-def _exam_start_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Start the examination for the exact server-derived next rank only."""
+def _exam_request_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Ask the shared coordinator for planned attendance or the exam start.
+
+    The counter, branch, next-rank target and qualified persistent host are
+    all derived server-side; merit and host presence never gate the request
+    itself. ``exam_schedule`` is read-only planned information (no panel
+    changes), ``exam_started`` hands the shell to combat.
+    """
     del session
     target_rank = payload["target_rank"]
-    examiner, reason = _resolve_local(
-        actor, GuildExaminer, "no_examiner", "ambiguous_examiner"
-    )
-    if examiner is None:
-        return _rejected(reason)
-    blocked = _schedule_rejected(examiner, "service_guild")
-    if blocked is not None:
-        return blocked
-    if parse_guild_registration(actor) is None:
-        return _rejected("unregistered")
-    expected = _exact_next_rank(getattr(actor, "guild_rank", None))
-    if expected is None or target_rank != expected:
-        return _rejected("not_next_rank")
     try:
-        # The counter authorizes the request; the qualified persistent
-        # adventurer for this exact target is the one who fights.
-        host = qualified_exam_host(actor, target_rank)
-        record = start_guild_exam(actor, host, target_rank, requested_by="webclient")
+        outcome = request_guild_exam(actor, target_rank, requested_by="webclient")
     except GuildExamError as error:
         return _rejected(error)
-    message = (
-        f"升階考核（{record.target_rank}）開始。這是模擬戰，"
-        "雙方在開戰前與結束後都會恢復全部的體力、法力與精力。"
-    )
+    if outcome.kind == OUTCOME_SCHEDULE:
+        message = exam_schedule_message(
+            outcome.host_name, outcome.target_rank,
+            outcome.interval.start_tick, outcome.interval.end_tick,
+        )
+        actor.msg(message)
+        return _success("exam_schedule", message, AFFECTED_EXAM_SCHEDULE)
+    message = exam_started_message(outcome.target_rank)
     actor.msg(message)
     return _success("exam_started", message, AFFECTED_EXAM)
 
@@ -634,7 +628,7 @@ def _inventory_toggle_equip_adapter(actor: Any, payload: dict[str, Any], session
 __all__ = [
     "ServiceActionError",
     "validate_buy_payload",
-    "validate_exam_start_payload",
+    "validate_exam_request_payload",
     "validate_guild_register_payload",
     "validate_inventory_toggle_equip_payload",
     "validate_inventory_use_payload",

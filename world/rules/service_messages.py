@@ -34,6 +34,8 @@ from world.rules.guild_offers import (
     GuildOfferError,
     GuildOfferNotFound,
 )
+from world.rules.clock import WorldDateTime
+from world.rules.npc_schedules import SCHEDULE_BLOCKED_REASON
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 
 # The bounded generic fallback; never carries a traceback or raw payload.
@@ -85,6 +87,10 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "examiner_engaged": "考官正在主持另一場考核。",
     "not_settlable": "這次考核無法結算。",
     "unknown_exam": "找不到這次考核。",
+    "examiner_busy": "考官正忙著別的事，現在無法主持考核。",
+    "schedule_blocked": SCHEDULE_BLOCKED_REASON,
+    "attendance_unknown": "櫃台目前無法確認考官下次到公會的時間。",
+    "top_rank": "你已是最高階級，沒有下一場升等考核。",
     # Trade.
     "no_merchant": "這裡沒有商人。",
     "ambiguous_merchant": "這裡有多名商人。",
@@ -201,10 +207,56 @@ def service_reason(reason: Any) -> tuple[str, str]:
     return code, SERVICE_REASON_MESSAGES.get(code, FALLBACK_MESSAGE)
 
 
+def _calendar_stamp(tick: int, *, with_date: bool = True) -> str:
+    moment = WorldDateTime.from_tick(tick)
+    clock = f"{moment.hour:02d}:{moment.minute:02d}"
+    if not with_date:
+        return clock
+    return f"{moment.season_name} {moment.day_in_season} 日 {clock}"
+
+
+def format_planned_interval(start_tick: int, end_tick: int) -> str:
+    """Format one planned ``[start, end)`` interval on the game calendar.
+
+    The end repeats the calendar date only when it falls on another day, so
+    a same-day window reads 「春季 3 日 09:00 至 12:00」.
+    """
+    start = WorldDateTime.from_tick(start_tick)
+    end = WorldDateTime.from_tick(end_tick)
+    same_day = (start.year, start.season_index, start.day_in_season) == (
+        end.year, end.season_index, end.day_in_season
+    )
+    return f"{_calendar_stamp(start_tick)} 至 {_calendar_stamp(end_tick, with_date=not same_day)}"
+
+
+def exam_schedule_message(host_name: str, target_rank: str, start_tick: int, end_tick: int) -> str:
+    """The planned-attendance reply of an absent-host examination request.
+
+    It names the host and the planned interval only: no private route, no
+    saved booking, no reserved place.
+    """
+    return (
+        f"{host_name} 目前不在公會。依櫃台登記的行程，{host_name} 預定於"
+        f"{format_planned_interval(start_tick, end_tick)}在公會，可主持 {target_rank} 階升等考核。"
+        "這只是預定時程，櫃台不會替你保留名額；屆時請再來申請考核。"
+    )
+
+
+def exam_started_message(target_rank: str) -> str:
+    """The started-simulation reply shared by the command and the WebClient."""
+    return (
+        f"升階考核（{target_rank}）開始。這是模擬戰，"
+        "雙方在開戰前與結束後都會恢復全部的體力、法力與精力。"
+    )
+
+
 __all__ = [
     "FALLBACK_CODE",
     "FALLBACK_MESSAGE",
     "SERVICE_REASON_MESSAGES",
+    "exam_schedule_message",
+    "exam_started_message",
+    "format_planned_interval",
     "rejection_code",
     "rejection_message",
     "service_reason",

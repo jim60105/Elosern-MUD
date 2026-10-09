@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-4 services panel.
+"""Frozen no-mutation read model for the version-5 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -10,11 +10,14 @@ The top-level ``host`` is display-only reconciliation metadata and never an
 availability authority or an action payload field.
 
 Host resolution is per service class: ``guild``/``rank`` resolve ``GuildStaff``
-and ``GuildExaminer`` respectively and ``shop`` resolves ``Merchant``, each
+and the ``GuildExaminer`` exam counter respectively and ``shop`` resolves
+``Merchant``, each
 through the same ``resolve_local_service_host`` rule the commands use. Zero or
 multiple hosts of the class a surface requires make that surface unavailable;
 different host classes co-located in one room are independent and never
-cross-class ambiguity.
+cross-class ambiguity. The rank surface never looks up the qualified
+persistent host: request availability is independent of the host's
+attendance and of the actor's merit (guild-exam-appointment-surface).
 
 Each surface degrades independently: a corrupt quest log, malformed merchant
 stock, or unreadable equipment marks only that surface unavailable while the
@@ -55,6 +58,8 @@ from world.rules.guild_offers import (
     get_guild_offer,
     list_guild_offers,
 )
+from world.rules.npc_schedules import interaction_reason
+from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.rules.targeting import RoomActionContext
 from world.skills.equipment import list_items
@@ -76,7 +81,8 @@ ACTION_REGISTER = "guild.register"
 ACTION_ACCEPT = "guild.quest_accept"
 ACTION_ABANDON = "guild.quest_abandon"
 ACTION_TURNIN = "guild.quest_turnin"
-ACTION_EXAM_START = "guild.exam_start"
+ACTION_EXAM_REQUEST = "guild.exam_request"
+EXAM_REQUEST_LABEL = "預約升等考核"
 ACTION_BUY = "shop.buy"
 ACTION_SELL = "shop.sell"
 
@@ -187,14 +193,20 @@ class QuestRowView:
 
 @dataclass(frozen=True)
 class RankView:
-    """The rank/examination surface present only with one local examiner."""
+    """The rank/examination surface present only with one local exam counter.
+
+    ``merit_qualified`` reports the true cumulative merit against the next
+    threshold; ``exam_request`` is enabled by a valid registered next-rank
+    target and a functioning local counter alone. The two are distinct facts
+    with no equality constraint.
+    """
 
     rank: str | None
     merit: int
     next_rank: str | None
     next_threshold: int | None
-    eligible: bool
-    exam_start: ActionDescriptorView
+    merit_qualified: bool
+    exam_request: ActionDescriptorView
 
 
 @dataclass(frozen=True)
@@ -485,44 +497,53 @@ def _build_quests(
     return tuple(rows)
 
 
-def _build_rank(actor: Any, examiner: Any, catalog: Any) -> RankView | None:
-    if examiner is None:
+def _exam_request_reason(
+    actor: Any, counter: Any, registration: Mapping[str, Any] | None, next_rank: str | None
+) -> str | None:
+    """The stable disabled reason of the exam request, or ``None`` when enabled.
+
+    Only the target (registration, exact next rank) and the local counter's
+    schedule, service and branch gates count, in the request coordinator's
+    own precedence; merit and the qualified host's attendance never disable
+    the request.
+    """
+    if interaction_reason(counter, "service_guild") is not None:
+        return "schedule_blocked"
+    component = counter.components.get(GuildExaminer.get_component_slot())
+    verdict = service_available(actor, counter, component)
+    if not verdict.allowed:
+        return "remote_examiner" if verdict.reason == REASON_REMOTE else "service_unavailable"
+    if registration is None:
+        return "unregistered"
+    if registration["branch_key"] != component.branch_key:
+        return "wrong_branch"
+    if next_rank is None:
+        return "top_rank"
+    return None
+
+
+def _build_rank(
+    actor: Any, counter: Any, registration: Mapping[str, Any] | None, catalog: Any
+) -> RankView | None:
+    if counter is None:
         return None
     rank_key = getattr(actor, "guild_rank", None)
     merit = _read_merit(actor)
     next_rank, next_threshold = _next_rank_and_threshold(rank_key, catalog)
-
-    from world.rules.combat_session import is_in_active_session
-
-    active_session = is_in_active_session(actor)
-    registered = rank_key is not None
-    eligible = (
-        registered
-        and next_rank is not None
-        and merit >= next_threshold
-        and not active_session
+    merit_qualified = (
+        registration is not None and next_rank is not None and merit >= next_threshold
     )
-    if not registered:
-        reason = "unregistered"
-    elif next_rank is None:
-        reason = "already_settled"
-    elif merit < next_threshold:
-        reason = "below_threshold"
-    elif active_session:
-        reason = "active_combat"
-    else:
-        reason = None
-    label = f"升階考核（{next_rank}）" if next_rank is not None else "升階考核"
+    reason = _exam_request_reason(actor, counter, registration, next_rank)
     return RankView(
         rank=rank_key,
         merit=merit,
         next_rank=next_rank,
         next_threshold=next_threshold,
-        eligible=eligible,
-        exam_start=ActionDescriptorView(
-            action_id=ACTION_EXAM_START,
-            label=label,
-            enabled=eligible,
+        merit_qualified=merit_qualified,
+        exam_request=ActionDescriptorView(
+            action_id=ACTION_EXAM_REQUEST,
+            label=EXAM_REQUEST_LABEL,
+            enabled=reason is None,
             reason_code=reason,
             reason_message=None if reason is None else SERVICE_REASON_MESSAGES[reason],
             quantity_min=None,
@@ -563,7 +584,7 @@ def _build_guild(
     registered = registration is not None
     board = _build_board(records, offers)
     quests = _build_quests(actor, records, claims, registration, tick)
-    rank = _build_rank(actor, examiner, catalog)
+    rank = _build_rank(actor, examiner, registration, catalog)
     register_reason = None if not registered else "already_registered"
     section = GuildSectionView(
         registration=RegistrationView(
@@ -874,7 +895,8 @@ __all__ = [
     "ACTION_ABANDON",
     "ACTION_ACCEPT",
     "ACTION_BUY",
-    "ACTION_EXAM_START",
+    "ACTION_EXAM_REQUEST",
+    "EXAM_REQUEST_LABEL",
     "ACTION_REGISTER",
     "ACTION_SELL",
     "ACTION_TOGGLE_EQUIP",

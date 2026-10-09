@@ -144,7 +144,7 @@ keys independently addressable without a domain identity model.
 | `guild.quest_accept` | definition key | existing guild acceptance operation |
 | `guild.quest_abandon` | deterministic quest ID | quest abandon API |
 | `guild.quest_turnin` | deterministic quest ID | atomic reward claim |
-| `guild.exam_start` | exact next-rank key | `start_guild_exam` |
+| `guild.exam_request` | exact next-rank key | presence-first `request_guild_exam` coordinator (amended 2026-10-09; delegates any start to `start_guild_exam`) |
 | `shop.buy` | item key, positive bounded quantity | atomic `buy` |
 | `shop.sell` | item key, positive bounded quantity | atomic `sell` |
 

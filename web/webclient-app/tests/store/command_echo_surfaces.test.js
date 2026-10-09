@@ -601,7 +601,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
     },
     {
       id: "guild rows: register / abandon / turnin / track / exam (payload-only)",
-      ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_start"],
+      ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_request"],
       prepare() {
         openExploration();
         store.dispatchAction("guild.register", {});
@@ -616,7 +616,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.dispatchAction("guild.quest_track", { quest_id: "q_1042", tracked: true });
         store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:4" })], {});
         store.receive(1, "ui_update", [fx.update({ revision: 5 })], {});
-        store.dispatchAction("guild.exam_start", { target_rank: "B" });
+        store.dispatchAction("guild.exam_request", { target_rank: "B" });
       },
       expected: ["guild register", "guild abandon q_1042", "guild turnin q_1042", "guild track q_1042", "guild exam B"],
     },

@@ -238,7 +238,7 @@ function validateServicesRank(value) {
   requireExactFields(
     value,
     "rank",
-    ["rank", "merit", "next_rank", "next_threshold", "eligible", "exam_start"],
+    ["rank", "merit", "next_rank", "next_threshold", "merit_qualified", "exam_request"],
     []
   );
   if (value.rank !== null) {
@@ -259,13 +259,12 @@ function validateServicesRank(value) {
       "next_rank and next_threshold must both be set or null"
     );
   }
-  var eligible = requireBool(value.eligible, "eligible");
-  var examStart = validateServicesAction(value.exam_start);
-  if (examStart.action_id !== "guild.exam_start") {
-    throw new Error("rank exam_start must be guild.exam_start");
-  }
-  if (eligible !== examStart.enabled) {
-    throw new Error("rank eligible must match exam_start enabled");
+  // Merit qualification and request availability are distinct facts: an
+  // enabled request below threshold and a disabled qualified one are valid.
+  requireBool(value.merit_qualified, "merit_qualified");
+  var examRequest = validateServicesAction(value.exam_request);
+  if (examRequest.action_id !== "guild.exam_request") {
+    throw new Error("rank exam_request must be guild.exam_request");
   }
   return value;
 }
@@ -474,7 +473,7 @@ function validateServicesPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 4) {
+  if (payload.schema_version !== 5) {
     throw new Error("unsupported services schema_version");
   }
   if (payload.available !== true || payload.kind !== "services") {
@@ -545,7 +544,7 @@ function validateServicesPanel(payload) {
   validateServicesPaginationTotals(pagination, guild, shop, inventory);
 
   var result = {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "services",
     host: payload.host,

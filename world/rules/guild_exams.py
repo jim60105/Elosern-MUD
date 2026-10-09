@@ -105,6 +105,13 @@ class ExamReason(StrEnum):
     ALREADY_SETTLED = "already_settled"
     NOT_SETTLABLE = "not_settlable"
     UNKNOWN_EXAM = "unknown_exam"
+    # Present qualified host whose schedule state blocks guild service.
+    EXAMINER_BUSY = "examiner_busy"
+    # The local counter's own schedule state blocks guild service.
+    SCHEDULE_BLOCKED = "schedule_blocked"
+    # Absent host whose next planned attendance cannot be confirmed; the
+    # service-window reader's named reason rides ``args[1]``.
+    ATTENDANCE_UNKNOWN = "attendance_unknown"
 
 
 _RECORD_FIELDS = frozenset(
@@ -298,30 +305,55 @@ def _is_exam_counter(npc: Any) -> bool:
     return components is not None and components.has(GuildExaminer.name)
 
 
-def qualified_exam_host(actor: Any, target_rank: str, *, speaker: Any = None) -> NPC:
-    """Resolve the branch-qualified persistent host for one requested target.
+@dataclass(frozen=True)
+class ExamRequestTarget:
+    """The server-derived authority and opponent of one examination request."""
 
-    Read-only identity selection shared by the command, browser and NPC-intent
-    adapters: the branch comes from the exam counter, the person from the
-    qualification binding and the object from persistent provenance, never
-    from a display-name search or a generic examiner component. ``speaker``
-    (an NPC voicing an exam intent) grants no authority: it must stand beside
-    the actor and be either the counter itself or the qualified host.
+    counter: Any
+    branch_key: str
+    host: NPC
+
+
+def resolve_exam_request_target(
+    actor: Any, target_rank: str, *, speaker: Any = None
+) -> ExamRequestTarget:
+    """Resolve the counter, branch and branch-qualified persistent host.
+
+    Read-only identity selection shared by the request coordinator: the
+    branch comes from the exam counter, the person from the qualification
+    binding and the object from persistent provenance, never from a
+    display-name search or a generic examiner component. ``speaker`` (an NPC
+    voicing an exam intent) grants no authority: it must stand beside the
+    actor and be either the counter itself or the qualified host. The
+    counter's own schedule gate applies; no merit, battle, attendance or
+    host-service check happens here.
     """
     if speaker is not None and (
         actor.location is None or getattr(speaker, "location", None) != actor.location
     ):
         raise GuildExamError(ExamReason.REMOTE_EXAMINER)
-    counter = speaker if speaker is not None and _is_exam_counter(speaker) else None
+    if speaker is not None and _is_exam_counter(speaker):
+        counter = speaker
+    else:
+        counter, _ = _local_exam_counter(actor)
+    # A busy or resting counter clerk takes no request at all (the same
+    # first gate every other guild counter surface applies).
+    if interaction_reason(counter, "service_guild") is not None:
+        raise GuildExamError(ExamReason.SCHEDULE_BLOCKED)
     branch_key = _counter_branch(actor, counter)
     _require_next_rank(actor, target_rank)
     try:
         host = qualified_host(branch_key, target_rank)
     except GuildHostIntegrityError as error:
         raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER) from error
-    if speaker is not None and counter is None and speaker.pk != host.pk:
+    if speaker is not None and speaker is not counter and speaker.pk != host.pk:
         raise GuildExamError(ExamReason.NO_EXAMINER)
-    return host
+    return ExamRequestTarget(counter=counter, branch_key=branch_key, host=host)
+
+
+def qualified_exam_host(actor: Any, target_rank: str, *, speaker: Any = None) -> NPC:
+    """Return only the qualified persistent host of one examination request."""
+    return resolve_exam_request_target(actor, target_rank, speaker=speaker).host
 
 
 # Host-side surfaces the examination lifecycle writes. The persisted
@@ -481,6 +513,7 @@ def start_guild_exam(
     target_rank: str,
     *,
     requested_by: str = "command",
+    counter: Any = None,
 ) -> GuildExamRecord:
     """Start one simulated-battle guild examination as the sole trigger (D-7).
 
@@ -489,8 +522,11 @@ def start_guild_exam(
     anchoring, branch, host qualification and co-location, host service
     state, participant identity, exact next rank, true merit threshold, no
     active combat/exam on either side, wearable kit and usable lineage) is
-    revalidated here before any write. The kit, restriction, schedule hold,
-    full pools, exam record, session and +1 affinity then commit together.
+    revalidated here before any write. ``counter`` is an already-resolved
+    exam counter (the NPC voicing an exam intent); it is gated exactly like
+    the single co-located counter resolved by default. The kit, restriction,
+    schedule hold, full pools, exam record, session and +1 affinity then
+    commit together.
     """
     if not isinstance(actor, PlayerCharacter):
         raise GuildExamError(ExamReason.NOT_A_PLAYER)
@@ -504,7 +540,9 @@ def start_guild_exam(
         raise GuildExamError(ExamReason.NO_EXAMINER)
     # The counter's shared availability gate refuses remote, off-anchor and
     # malformed bindings before any eligibility check or write.
-    branch_key = _counter_branch(actor)
+    if counter is not None and not _is_exam_counter(counter):
+        raise GuildExamError(ExamReason.NO_EXAMINER)
+    branch_key = _counter_branch(actor, counter)
     if actor.location is None or examiner.location != actor.location:
         raise GuildExamError(ExamReason.REMOTE_EXAMINER)
 
@@ -517,7 +555,7 @@ def start_guild_exam(
     if host.pk != examiner.pk:
         raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER)
     if interaction_reason(host, "service_guild") is not None:
-        raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE)
+        raise GuildExamError(ExamReason.EXAMINER_BUSY)
     # Battlefield rosters key participants by display key; a same-keyed
     # candidate is rejected rather than renaming the persistent host.
     if str(actor.key) == str(host.key):

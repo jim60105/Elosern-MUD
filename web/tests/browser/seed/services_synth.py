@@ -108,6 +108,31 @@ def _services_fixture_synth(character, mode: str) -> None:
     examiner = _make_host("合成公會考官", hall)
     _ensure_component(examiner, GuildExaminer, branch_key=SYNTH_GUILD_BRANCH_KEY)
 
+    def _make_exam_host(room):
+        # The examination fights the branch-qualified persistent host the
+        # flagged catalog install bound (never the counter clerk).
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_EXAM_HOST_NAME,
+            SYNTH_EXAM_HOST_PERSON_KEY,
+        )
+        from world.rules.human_guild_hosts import PERSON_ATTRIBUTE
+
+        host = next(
+            (obj for obj in NPC.objects.all_family()
+             if obj.attributes.get(PERSON_ATTRIBUTE) == SYNTH_EXAM_HOST_PERSON_KEY),
+            None,
+        ) or _make_host(SYNTH_EXAM_HOST_NAME, room)
+        if not host.attributes.has(PERSON_ATTRIBUTE):
+            # A persistent adventurer is a full combatant: the kit's first
+            # live race supplies its literal bases and gauges.
+            import importlib
+
+            races = getattr(importlib.import_module("world.lore.races"), "RACE" + "_REGISTRY")
+            host.race = next(iter(races))
+            host.apply_race_baseline()
+            host.attributes.add(PERSON_ATTRIBUTE, SYNTH_EXAM_HOST_PERSON_KEY)
+        return host
+
     def place(room):
         character.location = room
         character.save()
@@ -157,25 +182,53 @@ def _services_fixture_synth(character, mode: str) -> None:
         place(hall)
         register_adventurer(character, staff=staff)
         write_counter_trait(character, "guild_merit", 50)
-        # The examination fights the branch-qualified persistent host the
-        # flagged catalog install bound (never the counter clerk).
-        from web.browser_support.browser_fixtures_data import (
-            SYNTH_EXAM_HOST_NAME,
-            SYNTH_EXAM_HOST_PERSON_KEY,
-        )
-        from world.rules.human_guild_hosts import PERSON_ATTRIBUTE
-
-        host = _make_host(SYNTH_EXAM_HOST_NAME, hall)
-        if not host.attributes.has(PERSON_ATTRIBUTE):
-            # A persistent adventurer is a full combatant: the kit's first
-            # live race supplies its literal bases and gauges.
-            import importlib
-
-            races = getattr(importlib.import_module("world.lore.races"), "RACE" + "_REGISTRY")
-            host.race = next(iter(races))
-            host.apply_race_baseline()
-            host.attributes.add(PERSON_ATTRIBUTE, SYNTH_EXAM_HOST_PERSON_KEY)
+        _make_exam_host(hall)
         get_world_clock()
+        character.db.wallet = 1000
+        character.save()
+    elif mode == "guild_exam_appointment":
+        # Presence-first appointment journey: the candidate is one completed
+        # board quest short of the next threshold, and the qualified host is
+        # away at its lodging with a weekly schedule that walks it into the
+        # hall through a real Exit two game hours after the seeded tick.
+        from typeclasses.exits import Exit
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_EXAM_APPOINTMENT,
+            SYNTH_GUILD_OFFER_QUEST_KEY,
+        )
+        from world.quests.runtime import (
+            definition_for,
+            fulfill_record,
+            read_records,
+            to_storage,
+        )
+        from world.rules.npc_schedules import set_npc_schedule
+
+        plan = SYNTH_EXAM_APPOINTMENT
+        place(hall)
+        register_adventurer(character, staff=staff)
+        write_counter_trait(character, "guild_merit", plan["merit"])
+        accept_guild_offer(character, staff, SYNTH_GUILD_OFFER_QUEST_KEY)
+        record = read_records(character)[0]
+        character.db.quest_log = [to_storage(fulfill_record(record, definition_for(record)))]
+        lodging = next(
+            iter(search_object_by_tag(plan["lodging_tag"])), None
+        ) or create_object(Room, key=plan["lodging_name"], tags=[plan["lodging_tag"]], location=None)
+        for source, destination, key in ((lodging, hall, "公會"), (hall, lodging, "寓所")):
+            if not any(ex.destination is destination for ex in source.exits):
+                create_object(Exit, key=key, location=source, destination=destination)
+        host = _make_exam_host(hall)
+        host.location = lodging
+        host.save()
+        get_world_clock()._persist(plan["seed_tick"])
+        set_npc_schedule(host, {
+            "schema_version": 1,
+            "cycle_days": 7,
+            "entries": [
+                {"tick_offset": plan["arrive_offset"], "kind": "move", "target": f"#{hall.pk}"},
+                {"tick_offset": plan["leave_offset"], "kind": "move", "target": f"#{lodging.pk}"},
+            ],
+        })
         character.db.wallet = 1000
         character.save()
     elif mode == "quest_away_from_clerk":

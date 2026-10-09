@@ -11,7 +11,7 @@ import * as fx from "./protocol_fixtures.js";
 // A minimal services panel exposing a guild quest log.
 function servicesPanel() {
   return {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "services",
     host: null,

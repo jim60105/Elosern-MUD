@@ -1,4 +1,4 @@
-"""Exact schema-version-4 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-5 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact
@@ -48,7 +48,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 4
+SERVICES_SCHEMA_VERSION = 5
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -76,7 +76,7 @@ ACCEPT_ACTION = "guild.quest_accept"
 ABANDON_ACTION = "guild.quest_abandon"
 TURNIN_ACTION = "guild.quest_turnin"
 TRACK_ACTION = "guild.quest_track"
-EXAM_ACTION = "guild.exam_start"
+EXAM_ACTION = "guild.exam_request"
 BUY_ACTION = "shop.buy"
 SELL_ACTION = "shop.sell"
 INVENTORY_USE_ACTION = "inventory.use"
@@ -310,7 +310,7 @@ def _validate_rank(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "rank",
-        {"rank", "merit", "next_rank", "next_threshold", "eligible", "exam_start"},
+        {"rank", "merit", "next_rank", "next_threshold", "merit_qualified", "exam_request"},
         {},
     )
     rank = value["rank"]
@@ -327,19 +327,19 @@ def _validate_rank(value: Any) -> dict[str, Any]:
         _require_int(value, "next_threshold", minimum=1, maximum=MAX_SAFE_INTEGER)
     if (next_rank is None) != (next_threshold is None):
         raise ProtocolValidationError("next_rank and next_threshold must both be set or null")
-    eligible = _require_bool(value, "eligible")
-    exam_start = _validate_action(value["exam_start"])
-    if exam_start["action_id"] != EXAM_ACTION:
-        raise ProtocolValidationError("rank exam_start must be guild.exam_start")
-    if eligible != exam_start["enabled"]:
-        raise ProtocolValidationError("rank eligible must match exam_start enabled")
+    # Merit qualification and request availability are distinct facts: an
+    # enabled request below threshold and a disabled qualified one are valid.
+    merit_qualified = _require_bool(value, "merit_qualified")
+    exam_request = _validate_action(value["exam_request"])
+    if exam_request["action_id"] != EXAM_ACTION:
+        raise ProtocolValidationError("rank exam_request must be guild.exam_request")
     return {
         "rank": rank,
         "merit": merit,
         "next_rank": next_rank,
         "next_threshold": next_threshold,
-        "eligible": eligible,
-        "exam_start": exam_start,
+        "merit_qualified": merit_qualified,
+        "exam_request": exam_request,
     }
 
 
@@ -738,8 +738,8 @@ def _serialize_rank(rank: RankView) -> dict[str, Any]:
         "merit": rank.merit,
         "next_rank": rank.next_rank,
         "next_threshold": rank.next_threshold,
-        "eligible": rank.eligible,
-        "exam_start": _serialize_action(rank.exam_start),
+        "merit_qualified": rank.merit_qualified,
+        "exam_request": _serialize_action(rank.exam_request),
     }
 
 

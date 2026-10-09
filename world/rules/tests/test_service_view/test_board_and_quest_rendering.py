@@ -251,34 +251,74 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         self.assertEqual(view.guild.quests[0].deadline_line, "期限：剩餘 3 小時")
 
-    def test_exam_eligibility_shows_exact_next_rank_only(self):
-        room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
-        player = actor(location=room, registration=registration(), guild_rank="F", merit=50)
+    def _rank(self, *hosts, **actor_fields):
+        room = FakeRoom(*hosts)
+        player = actor(location=room, **actor_fields)
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
-            view = build_services_view(player)
-        rank = view.guild.rank
+            return build_services_view(player).guild.rank
+
+    @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
+    def test_exam_eligibility_shows_exact_next_rank_only(self):
+        rank = self._rank(
+            FakeHost("a", 1, guild_staff(), guild_examiner()),
+            registration=registration(), guild_rank="F", merit=50,
+        )
         self.assertIsNotNone(rank)
         self.assertEqual(rank.rank, "F")
         self.assertEqual(rank.next_rank, "E")
         self.assertEqual(rank.next_threshold, 50)
-        self.assertTrue(rank.eligible)
-        self.assertTrue(rank.exam_start.enabled)
+        self.assertTrue(rank.merit_qualified)
+        self.assertTrue(rank.exam_request.enabled)
+        self.assertEqual(rank.exam_request.action_id, "guild.exam_request")
+        self.assertEqual(rank.exam_request.label, "預約升等考核")
 
-    def test_exam_start_disabled_below_threshold(self):
-        room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
-        player = actor(location=room, registration=registration(), guild_rank="F", merit=49)
-        with patch(
-            "world.rules.service_view.read_world_clock",
-            return_value=SimpleNamespace(tick=TICK_NOON),
-        ):
-            view = build_services_view(player)
-        rank = view.guild.rank
-        self.assertFalse(rank.eligible)
-        self.assertFalse(rank.exam_start.enabled)
-        self.assertEqual(rank.exam_start.reason_code, "below_threshold")
+    @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
+    def test_below_merit_request_stays_enabled(self):
+        # Merit qualification and request availability are distinct facts:
+        # below threshold the request still reaches the counter.
+        rank = self._rank(
+            FakeHost("a", 1, guild_staff(), guild_examiner()),
+            registration=registration(), guild_rank="F", merit=49,
+        )
+        self.assertFalse(rank.merit_qualified)
+        self.assertTrue(rank.exam_request.enabled)
+        self.assertIsNone(rank.exam_request.reason_code)
+
+    @covers_requirement("webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination")
+    def test_exam_request_disables_only_for_target_and_counter_gates(self):
+        unregistered = self._rank(
+            FakeHost("a", 1, guild_staff(), guild_examiner()), guild_rank=None, merit=999,
+        )
+        self.assertEqual(
+            (unregistered.merit_qualified, unregistered.exam_request.enabled,
+             unregistered.exam_request.reason_code),
+            (False, False, "unregistered"),
+        )
+        wrong_branch = self._rank(
+            FakeHost("a", 1, guild_staff(), guild_examiner(branch_key="t_other_branch")),
+            registration=registration(), guild_rank="F", merit=999,
+        )
+        self.assertEqual(
+            (wrong_branch.merit_qualified, wrong_branch.exam_request.reason_code),
+            (True, "wrong_branch"),
+        )
+        busy = FakeHost("a", 1, guild_staff(), guild_examiner())
+        busy.db = SimpleNamespace(schedule_state="busy")
+        blocked = self._rank(busy, registration=registration(), guild_rank="F", merit=999)
+        self.assertEqual(
+            (blocked.merit_qualified, blocked.exam_request.enabled, blocked.exam_request.reason_code),
+            (True, False, "schedule_blocked"),
+        )
+        malformed = FakeHost("a", 1, guild_staff(), guild_examiner(service_binding="portable"))
+        malformed.ndb = SimpleNamespace()
+        with patch("world.rules.service_gate.log_warn"):
+            off_anchor = self._rank(
+                malformed, registration=registration(), guild_rank="F", merit=0,
+            )
+        self.assertEqual(off_anchor.exam_request.reason_code, "service_unavailable")
 
     def test_rank_surface_absent_without_examiner(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))

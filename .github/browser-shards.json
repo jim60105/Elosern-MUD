@@ -268,7 +268,8 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_journey_at_both_viewports",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_under_offline_overlay_emits_nothing",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_real_mouse_double_click_pushes_one_frame",
-        "web.tests.browser.test_browser_services_guild.GuildExamJourney.test_exam_eligibility_transitions_into_combat"
+        "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_reference_viewport",
+        "web.tests.browser.test_browser_services_guild.GuildExamAppointmentJourney.test_appointment_journey_at_the_wide_viewport"
       ],
       "files_b": [
         "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest",

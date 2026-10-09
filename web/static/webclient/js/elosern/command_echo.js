@@ -333,7 +333,7 @@
       }
       return join([tracked ? "guild track" : "guild untrack", id]);
     },
-    "guild.exam_start": function (payload) {
+    "guild.exam_request": function (payload) {
       var rank = payload && payload.target_rank;
       return isNonEmpty(rank) ? join(["guild exam", rank]) : "guild exam";
     },

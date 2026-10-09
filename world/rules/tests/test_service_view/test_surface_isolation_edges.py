@@ -216,7 +216,7 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
             with self.assertRaises(ServicesViewError):
                 build_services_view(player)
 
-    def test_top_rank_exam_start_reports_settled(self):
+    def test_top_rank_exam_request_reports_no_next_target(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))
         player = actor(location=room, wallet=5, registration=registration(), guild_rank="S", merit=999999)
         with patch(
@@ -225,9 +225,10 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         rank = view.guild.rank
-        self.assertFalse(rank.eligible)
+        self.assertFalse(rank.merit_qualified)
         self.assertIsNone(rank.next_rank)
-        self.assertEqual(rank.exam_start.reason_code, "already_settled")
+        self.assertFalse(rank.exam_request.enabled)
+        self.assertEqual(rank.exam_request.reason_code, "top_rank")
 
     def test_active_session_blanks_remote_surfaces(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), guild_examiner(), location=None))

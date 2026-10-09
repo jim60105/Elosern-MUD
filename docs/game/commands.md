@@ -78,7 +78,7 @@
 | [`guild turnin`](/game/command-reference?id=guild-turnin) | 回報任務並領取報酬。 |
 | [`guild merit`](/game/command-reference?id=guild-merit) | 查看階級與功績。 |
 | [`guild request`](/game/command-reference?id=guild-request) | 委託公會規劃任務（護衛尚未開放）。 |
-| [`guild exam`](/game/command-reference?id=guild-exam) | 申請公會考核。 |
+| [`guild exam`](/game/command-reference?id=guild-exam) | 預約升等考核：考官在場時開始考核，不在時告知預定到場時間。 |
 
 ## 教會
 

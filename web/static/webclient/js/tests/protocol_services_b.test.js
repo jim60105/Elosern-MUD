@@ -58,8 +58,8 @@ test("a structurally maximal realistic services payload fits the envelope", () =
         merit: 60,
         next_rank: "E",
         next_threshold: 50,
-        eligible: true,
-        exam_start: validServicesAction({ action_id: "guild.exam_start", label: "升階考核（E）" }),
+        merit_qualified: true,
+        exam_request: validServicesAction({ action_id: "guild.exam_request", label: "預約升等考核" }),
       },
     },
     shop: { open: true, stock: stock, sellable: sellable },
@@ -186,11 +186,11 @@ test("services payload maximizing every string field fails the byte gate", () =>
         merit: 0,
         next_rank: "E",
         next_threshold: 1,
-        eligible: false,
-        exam_start: validServicesAction({
-          action_id: "guild.exam_start",
+        merit_qualified: false,
+        exam_request: validServicesAction({
+          action_id: "guild.exam_request",
           enabled: false,
-          disabled_reason: { code: "below_threshold", message: max64 },
+          disabled_reason: { code: "wrong_branch", message: max64 },
         }),
       },
     },
@@ -398,7 +398,7 @@ test("services v3 validates inventory row actions exactly", () => {
 });
 
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 5);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -418,3 +418,81 @@ test("services is in the production panel allowlist and a bad panel rejects atom
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
 
+
+function rankedServicesPanel(rank) {
+  return validServicesPanel({
+    guild: {
+      registration: {
+        registered: true,
+        register: validServicesAction({
+          enabled: false,
+          disabled_reason: { code: "already_registered", message: "你已經是冒險者了。" },
+        }),
+      },
+      board: [],
+      quests: [],
+      rank: rank,
+    },
+    pagination: {
+      board_total: 0,
+      quest_total: 0,
+      stock_total: 0,
+      sellable_total: 0,
+      inventory_total: 0,
+    },
+    inventory: null,
+  });
+}
+
+function belowMeritRank(overrides) {
+  return Object.assign(
+    {
+      rank: "F",
+      merit: 30,
+      next_rank: "E",
+      next_threshold: 40,
+      merit_qualified: false,
+      exam_request: validServicesAction({ action_id: "guild.exam_request", label: "預約升等考核" }),
+    },
+    overrides || {}
+  );
+}
+
+test("services v5 keeps merit qualification independent of request availability", () => {
+  // Below threshold with an enabled request, and qualified with a disabled
+  // request, are both valid: no equality constraint remains.
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(rankedServicesPanel(belowMeritRank())));
+  const qualifiedButClosed = belowMeritRank({
+    merit: 40,
+    merit_qualified: true,
+    exam_request: validServicesAction({
+      action_id: "guild.exam_request",
+      label: "預約升等考核",
+      enabled: false,
+      disabled_reason: { code: "schedule_blocked", message: "她現在正忙著，沒有理會你。" },
+    }),
+  });
+  assert.doesNotThrow(() => Protocol.validateServicesPanel(rankedServicesPanel(qualifiedButClosed)));
+});
+
+test("services v5 rejects the retired exam fields, action and schema version", () => {
+  const legacy = belowMeritRank();
+  delete legacy.merit_qualified;
+  delete legacy.exam_request;
+  legacy.eligible = false;
+  legacy.exam_start = validServicesAction({ action_id: "guild.exam_start" });
+  assert.throws(() => Protocol.validateServicesPanel(rankedServicesPanel(legacy)));
+  assert.throws(() =>
+    Protocol.validateServicesPanel(
+      rankedServicesPanel(
+        belowMeritRank({ exam_request: validServicesAction({ action_id: "guild.exam_start" }) })
+      )
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateServicesPanel(rankedServicesPanel(belowMeritRank({ merit_qualified: "no" })))
+  );
+  assert.throws(() =>
+    Protocol.validateServicesPanel({ ...rankedServicesPanel(belowMeritRank()), schema_version: 4 })
+  );
+});

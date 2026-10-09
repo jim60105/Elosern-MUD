@@ -64,7 +64,7 @@ class ServicesValidatorParityContract(unittest.TestCase):
             '"guild.quest_accept"',
             '"guild.quest_abandon"',
             '"guild.quest_turnin"',
-            '"guild.exam_start"',
+            '"guild.exam_request"',
             '"shop.buy"',
             '"shop.sell"',
         ):

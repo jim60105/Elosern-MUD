@@ -212,6 +212,11 @@ class FakeHost:
 class FakeRoom:
     def __init__(self, *contents):
         self.contents = list(contents)
+        # A host listed in the room stands in it (the shared service gate
+        # compares the host's and the actor's locations).
+        for obj in self.contents:
+            if getattr(obj, "location", self) is None:
+                obj.location = self
 
 
 class FakeTraitSurface:
@@ -251,7 +256,8 @@ def guild_staff(**fields):
 
 
 def guild_examiner(**fields):
-    return FakeComponent(GuildExaminer.name, branch_key=BRANCH, **fields)
+    fields.setdefault("branch_key", BRANCH)
+    return FakeComponent(GuildExaminer.name, **fields)
 
 
 def merchant(**fields):

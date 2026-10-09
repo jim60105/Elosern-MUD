@@ -194,16 +194,14 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 
 ### Requirement: Intent application is deterministic, verified, and non-escalating
 
-`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it, using existing deterministic APIs only: illegal or unverifiable intent is discarded while the speech is kept, and the world is never changed by an intent the NPC could not perform.
-
-**Removed scenario**: The former "A whitelisted but not-yet-executable intent is rejected without state change" scenario is removed by this change: `reveal_lore` becomes executable here, `offer_quest` became executable in `dialogue-offer-quest`, and no forward-declared intent kinds remain.
+`world/rules/npc_intents.py` SHALL expose `apply_npc_intent(npc, player, intent) -> IntentOutcome` that verifies an extracted intent against the deterministic world before applying it through existing deterministic APIs; `request_guild_exam` SHALL delegate to the shared presence-first exam request coordinator. Illegal or unverifiable intent is discarded while the speech is kept, and the world is never changed by an intent the NPC could not perform.
 
 #### Scenario: A guild exam intent is routed through the deterministic gate
 - **WHEN** the extracted intent is `request_guild_exam` with a `target_rank`
-- **THEN** `apply_npc_intent` calls `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`, which applies its own checks and records the exam outcome
+- **THEN** `apply_npc_intent` calls the shared coordinator, which resolves presence first and returns attendance or delegates authoritative start
 
 #### Scenario: A failed exam gate discards only the intent
-- **WHEN** `start_guild_exam` rejects the request (remote examiner, wrong branch, wrong next rank, below merit threshold, or active combat/exam)
+- **WHEN** the coordinator or authoritative start rejects the request (remote examiner, wrong branch, wrong next rank, below merit threshold, or active combat/exam)
 - **THEN** the intent is discarded, the speech is preserved, and no exam, rank, or combat state changes
 
 #### Scenario: An item intent verifies holdings before transfer
@@ -262,13 +260,18 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 - **WHEN** the extracted intent is `reveal_lore` with an unknown category or an unresolvable key
 - **THEN** the intent is discarded, the speech is preserved, and no codex record changes
 
+
+#### Scenario: Counter intent below merit finds absent host attendance
+- **WHEN** validated local counter intent asks exact-next rank for a below-threshold member with absent host
+- **THEN** schedule information is returned without changing resources, exam state or affinity, and speech is retained
+
 #### Scenario: The AI cannot escalate through the exam gate
 - **WHEN** `request_guild_exam` is applied
 - **THEN** the AI cannot choose examiner stats, waive a gate, promote the player, or start combat directly
 
 #### Scenario: The exam gate performs its own rechecks
-- **WHEN** `apply_npc_intent` delegates `request_guild_exam` to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`
-- **THEN** that API itself rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination
+- **WHEN** the coordinator delegates a present-host `request_guild_exam` to `start_guild_exam(actor=player, examiner=<qualified persistent host>, target_rank=..., requested_by="npc_intent")`
+- **THEN** that API itself rechecks the counter gate and branch, the host's qualification and co-location, the exact next rank, true cumulative merit, and the absence of active combat/examination
 
 #### Scenario: Item transfers are all-or-nothing across both entities
 - **WHEN** a `give_item` or `take_item` transfer is applied after holdings are verified
