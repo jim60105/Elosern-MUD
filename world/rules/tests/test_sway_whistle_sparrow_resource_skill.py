@@ -171,6 +171,9 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             hit = ActionResolver.resolve(hit_request)
         self.assertEqual(hit.outcome, "success")
+        # 500 - 3: roll 80 with agility 7 gives margin 26, below
+        # combat.yaml's solid_hit_margin 40, so the base multiplier applies:
+        # round(4 atk_phys * 1.0 * 0.8 coefficient) = 3 over defense 0.
         self.assertEqual(player.traits.hp.current, 497)
         self.assertIn(BUFF_KEY, entity_active_buffs(player))
         self.assertEqual(evaluate_combat_modifiers(player)["accuracy"], -3)
@@ -243,6 +246,8 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
                 absorbed = ActionResolver.resolve(absorb_request)
             self.assertEqual(absorbed.outcome, "success")
             self.assertEqual(player.traits.hp.current, hp_before_absorb)
+            # The same 3 residual points move to MP under a 100% divert, so the
+            # strike still records a hit while HP does not move.
             self.assertEqual(player.traits.mp.current, mp_before_absorb - 3)
             self.assertIn(BUFF_KEY, entity_active_buffs(player))
             self.assertEqual(evaluate_combat_modifiers(player)["accuracy"], -3)
