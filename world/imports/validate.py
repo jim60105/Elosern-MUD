@@ -494,21 +494,24 @@ def _resolve_skill_registry() -> Mapping[str, Any] | None:
     return module.SKILL_REGISTRY
 
 
-def _check_skills(record: dict[str, Any]) -> list[Issue]:
+def _check_skills(record: dict[str, Any], actor_kind: str = "npc") -> list[Issue]:
     registry = _resolve_skill_registry()
     if registry is None:
         return []
     issues: list[Issue] = []
-    race = RACE_REGISTRY.get(record.get("race"))
-    can_use_divine_arts = race is not None and race.can_use_divine_arts
+    from world.skills.eligibility import record_identity_eligible
+
     for field_name in ("skills", "passives"):
         for key in record.get(field_name, ()):
             if key not in registry:
                 issues.append(Issue(field_name, f"{key!r} not found in skill registry"))
                 continue
-            if registry[key].requires_divine_arts and not can_use_divine_arts:
+            if not record_identity_eligible(
+                registry[key].eligibility, actor_kind,
+                race=record.get("race"), subrace=record.get("subrace"),
+            ):
                 issues.append(
-                    Issue(field_name, f"{key!r} requires a race that can use divine arts")
+                    Issue(field_name, f"{key!r} is ineligible for authored identity")
                 )
     return issues
 
@@ -839,7 +842,7 @@ def validate_character(
     report.warnings.extend(magic_warnings)
     report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_combat_traits(record))
-    report.rejections.extend(_check_skills(record))
+    report.rejections.extend(_check_skills(record, "npc" if npc_target else "player"))
     profession_issues, report.profession_row = _check_profession_fields(
         record, npc_target
     )

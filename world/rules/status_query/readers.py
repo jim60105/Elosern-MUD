@@ -232,6 +232,10 @@ def _split_active_passive_keys(entity: Any) -> tuple[tuple[str, ...], tuple[str,
         if not isinstance(key, str) or not key or key in seen:
             continue
         skill = SKILL_REGISTRY.get(key)
+        from world.skills.eligibility import skill_identity_eligible
+
+        if skill is not None and not skill_identity_eligible(entity, skill):
+            continue
         if skill is None and key not in stored_keys and key not in INNATE_SKILL_KEYS:
             continue
         seen.add(key)

@@ -8,7 +8,7 @@ check and the step-6 deduction so preflight and deduction can never drift.
 
 from typing import Any
 
-from world.lore.races import RACE_REGISTRY
+from world.skills.eligibility import skill_identity_eligible
 from world.rules.action_gates import damage_requires_battlefield
 from world.rules.buffs import blocks_action
 from world.rules.combat_modifiers import (
@@ -72,22 +72,6 @@ def stored_gauge_pair(entity: Any, key: str) -> tuple[int, int]:
     return max(int(_stored_trait_value(trait)), 0), max(int(maximum), 0)
 
 
-def _step1_divine_arts_gate(actor: Any, skill: SkillDef) -> None:
-    """Reject divine-mystery casts for races without divine affinity.
-
-    The gate is data-driven: only skills declaring
-    ``SkillDef.requires_divine_arts`` are checked, and the check reuses the
-    already-landed ``RaceProfile.can_use_divine_arts`` field (no new race
-    surface). An actor without a resolvable race is also rejected so the
-    gate never silently opens.
-    """
-    if not skill.requires_divine_arts:
-        return
-    race = RACE_REGISTRY.get(getattr(actor, "race", None))
-    if race is None or not race.can_use_divine_arts:
-        raise RejectedAction(RejectReason.DIVINE_ARTS_FORBIDDEN, skill.key)
-
-
 def _step1_freeform_gate(request: ActionRequest, skill: SkillDef) -> None:
     """Reject a scaled cast that fails the freeform-casting entitlement.
 
@@ -114,6 +98,8 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     skill = SKILL_REGISTRY.get(request.skill_key)
     if skill is None or skill.key not in request.actor.skills.owned_keys():
         raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
+    if not skill_identity_eligible(request.actor, skill):
+        raise RejectedAction(RejectReason.IDENTITY_INELIGIBLE, skill.key)
     if not skill_effect_allowed(request.actor, skill.key):
         raise RejectedAction(RejectReason.EXAM_SKILL_SEALED, skill.key)
     # The lineage gate (use-driven-skill-lineage DC2): an owned skill whose
@@ -152,7 +138,6 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
             RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET,
             request.skill_key,
         )
-    _step1_divine_arts_gate(request.actor, skill)
     _step1_freeform_gate(request, skill)
     return skill
 

@@ -32,6 +32,44 @@
 
 ---
 
+## Identity eligibility
+
+Declare identity restrictions with frozen `SkillEligibility` on `_skill`,
+`_spell`, or direct `SkillDef` constructors. `allowed_actor_kinds` accepts
+`player`, `npc`, and `monster`. `allowed_races`, `allowed_subraces`, and
+`allowed_species` reference their lore registries. Each allowed collection is
+an optional tuple. `None` adds no restriction; an explicit empty tuple fails
+validation. Alternatives within a tuple use OR, while separate fields use AND.
+
+`required_capabilities` is a tuple from the closed capability vocabulary,
+currently `can_use_divine_arts`. The race profile supplies the value; race names
+never imply a capability. Race/subrace/capability restrictions require character
+identity, while species restrictions require monster identity. An authored
+race/subrace pair must have the registered parent relationship. A species gate
+requires a registered stored species/variant pair, without a variant-specific
+eligibility field. Unknown references and unsatisfiable combinations fail at
+registry load.
+
+```python
+eligibility=SkillEligibility(
+    allowed_actor_kinds=("player", "npc"),
+    required_capabilities=("can_use_divine_arts",),
+)
+```
+
+Eligibility supplements learned ownership and prerequisite proficiency.
+Identity-ineligible owned or conferred passives contribute nothing to traits,
+rule tables, or movement waivers; grant writes reject incompatible recipients.
+Reads use stored identity and create no handlers or persistent attributes.
+Sexual mastery excludes every act declaring the divine capability even for an
+eligible actor. Divine-mystery daily practice remains category-based.
+
+Player catalogs exclude identity-ineligible entries. Lineage follows the
+eligible reverse-edge closure from eligible consumed roots, preserving registry
+and topological order. Excluded entries affect no counts. Eligible racial nodes
+remain discoverable without ownership or sufficient MP; ordinary usability
+checks still report those separate limitations. Isolated skills create no tree.
+
 ## 2. 事前決定：這個魔法是哪一種形狀？
 
 新增前先回答三個問題，決定寫法：

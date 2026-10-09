@@ -14,6 +14,7 @@ from world.skills.registry.vocab import (
     FactionConstraint,
     SkillCategory,
     SkillDef,
+    SkillEligibility,
     SkillKind,
     SkillPrerequisite,
     TargetSpec,
@@ -34,7 +35,7 @@ def _skill(
     element: str | None = None,
     effects: list[str] | None = None,
     faction_constraint: FactionConstraint = FactionConstraint.ANY,
-    requires_divine_arts: bool = False,
+    eligibility: SkillEligibility = SkillEligibility(),
     category: SkillCategory,
     group: str | None = None,
     prerequisites: tuple[SkillPrerequisite, ...] = (),
@@ -55,7 +56,7 @@ def _skill(
         element=None if element is None else ELEMENT_REGISTRY[element],
         effects=_FrozenList([] if effects is None else effects),
         faction_constraint=faction_constraint,
-        requires_divine_arts=requires_divine_arts,
+        eligibility=eligibility,
         category=category,
         group=group,
         prerequisites=prerequisites,
@@ -82,6 +83,7 @@ def _spell(
     effect_policies: tuple[EffectPolicy, ...] | None = None,
     cast_conditions: tuple[CastCondition, ...] = (),
     interaction: InteractionPolicy | None = None,
+    eligibility: SkillEligibility = SkillEligibility(),
 ) -> SkillDef:
     """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
 
@@ -99,6 +101,7 @@ def _spell(
         usable_out_of_combat=usable_out_of_combat,
         element=element,
         effects=list(effects),
+        eligibility=eligibility,
         faction_constraint=faction_constraint,
         category=category,
         group=group,

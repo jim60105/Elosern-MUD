@@ -10,6 +10,7 @@ from tools.spec_traceability import covers_requirement
 
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -43,6 +44,19 @@ VESSEL_KEY = next(
 
 
 class CombatModifierTests(EvenniaTestCase):
+    def test_ineligible_rule_table_grant_has_zero_scale(self):
+        from world.rules.combat_modifiers import _conferred_rule_scale
+        from world.skills.registry import SkillEligibility
+        from world.tests.synthetic_data import make_skill
+        from world.rules.tests._combat_session_helpers import live_skill_registry
+
+        entity = self._entity()
+        restricted = make_skill("t_modifier_identity", effects=["passive_buff:t_modifier_identity"],
+                                eligibility=SkillEligibility(allowed_actor_kinds=("monster",)))
+        entity.db.skill_grants = [ConferredSkillGrant("t_source", restricted.key, 0.5)]
+        with patch.dict(live_skill_registry(), {restricted.key: restricted}):
+            self.assertEqual(_conferred_rule_scale(entity, restricted.key), 0.0)
+
     def _entity(self):
         entity = create_object(PlayerCharacter, key="modifier target")
         entity.race = "human"

@@ -63,6 +63,18 @@
 
 卡上點名的每個鍵都必須已登錄：`race`／`subrace`（`world/lore/races.py`）、`skills`／`passives`（`world/skills/registry.py`）、`inventory` 的物品鍵（`ITEM_REGISTRY`）、`profession`（`professions.yaml`）、`dialogue_key`（`DIALOGUE_ROWS`）、`host_profile_key`（`NPC_PROFILE_REGISTRY`）。CLI 驗證器全部比對，未知鍵直接拒收。
 
+### Identity-qualified skill kits
+
+Character import validation supplies the intended actor kind from the target
+typeclass (`npc` by default, `player` for player targets) and the authored
+`race`/`subrace`. It checks both declared skills/passives and prerequisite
+closure additions through `record_identity_eligible`, without constructing
+entities. An incompatible key produces an issue naming `skills` or `passives`
+and the offending key before batch persistence. Monster-only ownership is
+invalid in character imports. Registry-unavailable degraded reporting remains
+unchanged. See [Identity eligibility](adding-spells.md#identity-eligibility)
+for declaration semantics.
+
 ### Step 1 — 寫 JSON 角色卡
 
 複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的五條規則：

@@ -23,7 +23,7 @@ _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.TARGET_FACTION_FORBIDDEN: "這項技能不能指定該目標。",
     RejectReason.NO_VALID_TARGETS_IN_AREA: "範圍內沒有有效的目標。",
     RejectReason.ACTION_FORBIDDEN: "你目前無法行動。",
-    RejectReason.DIVINE_ARTS_FORBIDDEN: "只有擁有神性的種族才能施展這項技能。",
+    RejectReason.IDENTITY_INELIGIBLE: "你的身分無法施展這項技能。",
     RejectReason.SCALED_CAST_FORBIDDEN: "尚未掌握該屬性精髓，無法自由調整威力。",
     RejectReason.CAST_CONDITION_UNMET: "目前狀態未達此技能的施展條件。",
     RejectReason.UNKNOWN_EFFECT_ID: "這項技能的效果無法發動。",

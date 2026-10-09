@@ -174,6 +174,32 @@ class SkillPrerequisite:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class SkillEligibility:
+    """Closed identity restrictions; alternatives within lists, AND across fields."""
+
+    allowed_actor_kinds: tuple[str, ...] | None = None
+    allowed_races: tuple[str, ...] | None = None
+    allowed_subraces: tuple[str, ...] | None = None
+    allowed_species: tuple[str, ...] | None = None
+    required_capabilities: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in (
+            "allowed_actor_kinds", "allowed_races", "allowed_subraces",
+            "allowed_species", "required_capabilities",
+        ):
+            value = getattr(self, name)
+            if value is None and name != "required_capabilities":
+                continue
+            if not isinstance(value, tuple) or any(
+                not isinstance(key, str) or not key for key in value
+            ):
+                raise ValueError(f"eligibility {name} must be a tuple of identifiers")
+            if not value and name != "required_capabilities":
+                raise ValueError(f"eligibility {name} must not be empty")
+
+
 @dataclass(frozen=True)
 class SkillDef:
     """Immutable definition of a skill known to deterministic consumers."""
@@ -190,7 +216,7 @@ class SkillDef:
     category: SkillCategory
     group: str | None = None
     faction_constraint: FactionConstraint = FactionConstraint.ANY
-    requires_divine_arts: bool = False
+    eligibility: SkillEligibility = SkillEligibility()
     effect_policies: tuple[EffectPolicy, ...] = ()
     parsed_effects: tuple = ()
     prerequisites: tuple["SkillPrerequisite", ...] = ()
@@ -208,6 +234,8 @@ class SkillDef:
         unrecognized prefix raises here (registry-load time), not at use.
         """
         _validate_metadata(self.label, self.description)
+        if not isinstance(self.eligibility, SkillEligibility):
+            raise ValueError(f"skill {self.key!r} eligibility must be SkillEligibility")
         if self.group is not None and (
             not isinstance(self.group, str) or not self.group.strip()
         ):

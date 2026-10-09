@@ -88,6 +88,28 @@ class GroupSkillKeysTests(unittest.TestCase):
             for category in views
         ]
 
+    def test_grouping_receives_identity_filtered_stored_keys(self):
+        from types import SimpleNamespace
+        from world.skills.registry import SkillEligibility
+        from world.rules.status_query.readers import _split_active_passive_keys
+
+        registry = _live_registry("world.skills.registry", "SKILL" + "_REGISTRY")
+        restricted = replace(
+            registry[_T_MART_A],
+            eligibility=SkillEligibility(allowed_actor_kinds=("monster",)),
+        )
+        entity = SimpleNamespace(
+            db=SimpleNamespace(skills={"active": [_T_MART_A], "passive": []}),
+            attributes=SimpleNamespace(get=lambda *args, **kwargs: None),
+        )
+        with patch.dict(registry, {_T_MART_A: restricted}):
+            active, _ = _split_active_passive_keys(entity)
+            groups = group_skill_keys(active)
+            self.assertNotIn(
+                _T_MART_A,
+                [row.key for category in groups for group in category.groups for row in group.skills],
+            )
+
     @covers_requirement(
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )

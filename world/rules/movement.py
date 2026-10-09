@@ -28,7 +28,13 @@ def charge_movement(traversing_object, cost_key: str) -> None:
         return
     from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
 
-    if cost_key == "wilderness_move" and "flight" in traversing_object.skills.owned_keys():
+    from world.skills.restrictions import skill_effect_allowed
+
+    if (
+        cost_key == "wilderness_move"
+        and "flight" in traversing_object.skills.owned_keys()
+        and skill_effect_allowed(traversing_object, "flight")
+    ):
         # Owning ``flight`` waives the wilderness clock cost entirely — the
         # lore's "可前往遠處的場合" read as unencumbered long-distance travel
         # (movement-skill-waiver design). ``flash_step`` explicitly does NOT

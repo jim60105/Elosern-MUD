@@ -246,6 +246,8 @@ def _conferred_rule_scale(entity: Any, skill_key: str) -> float:
     from world.skills.effects import RuleTableEffect
     from world.skills.registry import SKILL_REGISTRY
 
+    if not skill_effect_allowed(entity, skill_key):
+        return 0.0
     total = 0.0
     for grant in entity.skills.conferred_grants():
         if grant.skill_key != skill_key:

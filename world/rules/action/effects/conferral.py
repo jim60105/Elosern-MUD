@@ -84,6 +84,14 @@ def _handle_confer_skill_partial(
         )
     coefficient = _occurrence_scale(context)
     source_key = _entity_key(actor)
+    from world.skills.eligibility import skill_identity_eligible
+    from world.skills.registry import SKILL_REGISTRY
+
+    for target in targets:
+        for skill_key in conferrable:
+            definition = SKILL_REGISTRY.get(skill_key)
+            if definition is not None and not skill_identity_eligible(target, definition):
+                raise RejectedAction(RejectReason.IDENTITY_INELIGIBLE, skill_key)
     return [
         PendingEffect(
             target,

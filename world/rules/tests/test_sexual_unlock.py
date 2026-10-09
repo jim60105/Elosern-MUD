@@ -111,6 +111,34 @@ class UnlockQueryTests(EvenniaTestCase):
         entity = self._actor()
         self.assertIn(act.key, entity.sexual.unlocked_act_keys())
 
+    # Future requirement: skill-identity-eligibility::divine-skill-marker-is-removed-by-a-complete-cutover
+    def test_eligible_race_mastery_still_excludes_divine_and_ownership_gated_acts(self):
+        from dataclasses import replace
+        from world.skills.registry import SkillEligibility
+        from world.skills.eligibility import skill_identity_eligible
+        from world.tests.synthetic_data import make_race
+
+        capable = make_race("t_unlock_capable", can_use_divine_arts=True)
+        divine, act = _synthetic_act("t_divine_excluded", {})
+        divine = replace(divine, eligibility=SkillEligibility(
+            required_capabilities=("can_use_divine_arts",),
+        ))
+        signature, signature_act = _synthetic_act("t_owned_excluded", {})
+        signature_act = replace(signature_act, ownership_gated=True)
+        extra = _scope_extra(
+            [(divine, act), (signature, signature_act)],
+            skills={_MASTERY_SKILL.key: _MASTERY_SKILL},
+        )
+        extra["races"] = {capable.key: capable}
+        open_synthetic_scope(self, "races", "skills", "sexual_acts", extra=extra)
+        entity = self._actor()
+        entity.race = capable.key
+        entity.db.skills = {"active": [], "passive": [_MASTERY_SKILL.key]}
+        self.assertTrue(skill_identity_eligible(entity, divine))
+        self.assertNotIn(divine.key, entity.sexual.unlocked_act_keys())
+        self.assertNotIn(signature.key, entity.sexual.unlocked_act_keys())
+        self.assertNotIn(divine.key, entity.skills.owned_keys())
+
     @covers_requirement("sexual-state-handler::sexualstate-unlocked-act-keys-gates-the-sexual-act-catalogue-by-counter-thresholds-or-unlocks-it-entirely-for-a-mastery-holder")
     def test_direct_mastery_ownership_unlocks_the_entire_catalogue(self):
         skill, act = _synthetic_act("t_gated_act", {"climax_count": 99})
@@ -123,7 +151,7 @@ class UnlockQueryTests(EvenniaTestCase):
         entity = self._actor()
         entity.db.skills = {"active": [_MASTERY_SKILL.key], "passive": []}
         # The mastery blanket covers the counter-gated catalogue only:
-        # requires_divine_arts acts are excluded (divine design §1.1),
+        # Divine-capability acts are excluded (divine design §1.1),
         # and the scoped catalogue carries only the synthetic rows.
         registry = _live_registry(
             "world.skills.sexual_acts", "SEXUAL_ACT" + "_REGISTRY"
@@ -131,7 +159,7 @@ class UnlockQueryTests(EvenniaTestCase):
         expected = frozenset(
             key
             for key in registry
-            if not live_skill_registry()[key].requires_divine_arts
+            if not ("can_use_divine_arts" in live_skill_registry()[key].eligibility.required_capabilities)
         )
         self.assertEqual(entity.sexual.unlocked_act_keys(), expected)
         self.assertIn(act.key, entity.sexual.unlocked_act_keys())

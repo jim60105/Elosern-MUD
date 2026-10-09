@@ -6,6 +6,7 @@ entry block (section comments included) the assembly concatenates.
 Do not reorder or edit rows here: registry order is observable.
 """
 
+from world.skills.registry.vocab import SkillEligibility
 from world.skills.registry.builders import (
     _skill,
 )
@@ -194,16 +195,12 @@ ROWS: tuple[SkillDef, ...] = (
             category=SkillCategory.SEXUAL_ACT,
             group="精通",
         ),
-        _skill(
-            "divine_sexual_mastery",
-            "性魔法主宰",
-            "以神性掌握性魔法精髓的至高境界，被動證明對性魔法領域的絕對理解。",
-            SkillKind.PASSIVE,
-            TargetSpec.NONE,
-            usable_out_of_combat=True,
-            requires_divine_arts=True,
-            effects=["sexual_magic_mastery"],
-            category=SkillCategory.SEXUAL_ACT,
-            group="精通",
-        ),
+        _skill("divine_sexual_mastery",
+        "性魔法主宰",
+        "以神性掌握性魔法精髓的至高境界，被動證明對性魔法領域的絕對理解。",
+        SkillKind.PASSIVE,
+        TargetSpec.NONE,
+        usable_out_of_combat=True, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), effects=["sexual_magic_mastery"],
+        category=SkillCategory.SEXUAL_ACT,
+        group="精通",),
 )

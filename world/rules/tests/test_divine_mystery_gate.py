@@ -9,6 +9,7 @@ covered here). The mechanized-rejection branch is driven directly with a
 patched effect parser.
 """
 
+from world.skills.registry.vocab import SkillEligibility
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
@@ -47,33 +48,21 @@ _MUNDANE_RACES = (make_race("t_mudlit"), make_race("t_reedfolk"))
 # Gate rows mirroring the family shape: a mastery passive gating the
 # sexual-arts family, an act row firing the legacy stimulus event, and
 # explicitly-declared unmechanized rows.
-_SEXUAL_MASTERY = make_skill(
-    "t_divine_mastery",
-    label="神性精通",
-    description="解鎖情魔法族的合成被動。",
-    kind=SkillKind.PASSIVE,
-    requires_divine_arts=True,
-    effects=["sexual_magic_mastery"],
-    category=SkillCategory.SEXUAL_ACT,
-)
-_SEXUAL_ARTS = make_skill(
-    "t_divine_arts",
-    label="神之情藝",
-    description="對目標施加情觸的合成術式。",
-    requires_divine_arts=True,
-    effects=["sexual_event:stimulus_applied"],
-    category=SkillCategory.SEXUAL_ACT,
-)
+_SEXUAL_MASTERY = make_skill("t_divine_mastery",
+label="神性精通",
+description="解鎖情魔法族的合成被動。",
+kind=SkillKind.PASSIVE, eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), effects=["sexual_magic_mastery"],
+category=SkillCategory.SEXUAL_ACT,)
+_SEXUAL_ARTS = make_skill("t_divine_arts",
+label="神之情藝",
+description="對目標施加情觸的合成術式。", eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), effects=["sexual_event:stimulus_applied"],
+category=SkillCategory.SEXUAL_ACT,)
 _UNMECHANIZED = tuple(
-    make_skill(
-        f"t_mystery_{suffix}",
-        label=f"神秘_{suffix}",
-        description="宣告存在但尚未機裝化的合成神秘。",
-        requires_divine_arts=True,
-        target_spec=TargetSpec.NONE,
-        effects=[f"divine_mystery:t_{suffix}"],
-        category=SkillCategory.DIVINE_MYSTERY,
-    )
+    make_skill(f"t_mystery_{suffix}",
+    label=f"神秘_{suffix}",
+    description="宣告存在但尚未機裝化的合成神秘。", eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)), target_spec=TargetSpec.NONE,
+    effects=[f"divine_mystery:t_{suffix}"],
+    category=SkillCategory.DIVINE_MYSTERY,)
     for suffix in ("time", "space", "matter", "life")
 )
 _GATE_SKILLS = (_SEXUAL_MASTERY, _SEXUAL_ARTS) + _UNMECHANIZED
@@ -136,14 +125,7 @@ class DivineMysteryGateTests(EvenniaTestCase):
                 with self.subTest(race=race.key, skill=skill.key):
                     result = self.resolve(skill.key)
                     self.assertEqual(result.outcome, "rejected")
-                    if skill.kind is SkillKind.PASSIVE:
-                        self.assertIs(
-                            result.reason, RejectReason.SKILL_NOT_ACTIVE
-                        )
-                    else:
-                        self.assertIs(
-                            result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN
-                        )
+                    self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
     def test_flagged_race_casts_sexual_arts_at_no_resource_cost(self):
@@ -209,7 +191,7 @@ class DivineMysteryGateTests(EvenniaTestCase):
             RoomActionContext(self.room),
         )
         self.assertFalse(preview.enabled)
-        self.assertIs(preview.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+        self.assertIs(preview.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("divine-mystery::divine-mystery-skills-are-gated-by-raceprofile-can-use-divine-arts")
     def test_actor_without_resolvable_race_is_rejected(self):
@@ -218,7 +200,7 @@ class DivineMysteryGateTests(EvenniaTestCase):
             self.actor.race = race
             with self.subTest(race=race):
                 result = self.resolve(_SEXUAL_ARTS.key)
-                self.assertIs(result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+                self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     def test_flagged_race_preview_enables_unmechanized_mystery(self):
         self.actor.race = _DIVINE_RACE.key

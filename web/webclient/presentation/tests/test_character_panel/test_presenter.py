@@ -75,6 +75,23 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
+    def test_identity_ineligible_owned_rows_are_absent_from_character_catalog(self):
+        from dataclasses import replace
+        from world.skills.registry import SkillEligibility
+
+        registry = _live_skill_registry()
+        rows = {
+            key: replace(registry[key], eligibility=SkillEligibility(
+                allowed_actor_kinds=("monster",),
+            ))
+            for key in (T_EMBER, T_STEADY)
+        }
+        with patch.dict(registry, rows):
+            payload = self._render()
+            self.assertTrue(payload["available"])
+            self.assertNotIn(T_EMBER, _flattened_keys(payload["actives"]))
+            self.assertNotIn(T_STEADY, _flattened_keys(payload["passives"]))
+
 
     @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_character_renders_true_values_without_mutation(self):

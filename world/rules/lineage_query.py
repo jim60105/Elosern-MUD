@@ -29,6 +29,7 @@ from world.rules.progression import (
     proficiency_cap,
 )
 from world.skills.registry import SKILL_REGISTRY, prerequisite_consumers
+from world.skills.eligibility import skill_identity_eligible
 
 # Wire bound for every rendered lineage text (design DD1): mirrors the panel
 # contract's MAX_TEXT_CODE_POINTS in web/webclient/presentation/lineage.py.
@@ -146,7 +147,7 @@ def _chain_root_keys() -> tuple[str, ...]:
     )
 
 
-def _chain_nodes(root_key: str) -> tuple[str, ...]:
+def _chain_nodes(root_key: str, eligible: set[str] | None = None) -> tuple[str, ...]:
     """Reverse-edge closure of ``root_key`` in deterministic topological order.
 
     Kahn topological sort over the subgraph induced by the closure, keyed by
@@ -158,7 +159,7 @@ def _chain_nodes(root_key: str) -> tuple[str, ...]:
     frontier = [root_key]
     while frontier:
         current = frontier.pop()
-        if current in closure:
+        if current in closure or (eligible is not None and current not in eligible):
             continue
         closure.add(current)
         frontier.extend(key for key, _ in prerequisite_consumers(current))
@@ -247,9 +248,17 @@ def build_lineage_view(entity: Any) -> LineageView:
     xp = _proficiency_map(entity)
     owned = set(entity.skills.owned_keys())
     chains: list[LineageChainView] = []
+    eligible = {
+        key for key, skill in SKILL_REGISTRY.items()
+        if skill_identity_eligible(entity, skill)
+    }
     for root_key in _chain_root_keys():
+        if root_key not in eligible:
+            continue
+        if not any(key in eligible for key, _ in prerequisite_consumers(root_key)):
+            continue
         nodes = tuple(
-            _node_view(entity, key, owned, xp) for key in _chain_nodes(root_key)
+            _node_view(entity, key, owned, xp) for key in _chain_nodes(root_key, eligible)
         )
         consumed = all(node.capped for node in nodes)
         chains.append(

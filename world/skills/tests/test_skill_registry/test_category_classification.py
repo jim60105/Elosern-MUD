@@ -443,7 +443,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
     @covers_requirement("skill-category-registry::classifying-a-skill-changes-no-other-field")
     def test_divine_sexual_arts_keeps_its_mechanics_after_reclassification(self):
         skill = SKILL_REGISTRY["divine_sexual_arts"]
-        self.assertTrue(skill.requires_divine_arts)
+        self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
         # The one authorised post-classification effects rewrite: the
         # integrate-divine-sexual-arts-catalog prefix migration of the same
         # declared event (sexual_event: -> sexual_event_target:). No other

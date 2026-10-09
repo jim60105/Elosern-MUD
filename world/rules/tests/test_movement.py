@@ -103,6 +103,24 @@ class ChargeMovementTests(EvenniaTest):
         charge_movement(self.char1, "wilderness_move")
         self.assertEqual(get_world_clock().tick, before)
 
+    def test_identity_ineligible_flight_owner_pays_and_cannot_waive_exit(self):
+        from dataclasses import replace
+        from typeclasses.exits import Exit
+        from world.skills.registry import SkillEligibility
+        from ._combat_session_helpers import live_skill_registry
+
+        restricted = replace(
+            _DART_STEP, key=_FLIGHT_KEY,
+            eligibility=SkillEligibility(allowed_actor_kinds=("monster",)),
+        )
+        self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
+        with patch.dict(live_skill_registry(), {_FLIGHT_KEY: restricted}):
+            with patch("world.rules.clock.get_world_clock") as clock:
+                charge_movement(self.char1, "wilderness_move")
+                clock.return_value.advance.assert_called_once()
+            exit_obj = create_object(Exit, key="restricted route", location=self.room1)
+            self.assertFalse(exit_obj._owns_movement_waiver(self.char1))
+
     def test_flight_owner_still_pays_other_cost_keys(self):
         self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         before = get_world_clock().tick

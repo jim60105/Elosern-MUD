@@ -21,6 +21,12 @@ def exam_restriction(entity: Any) -> Mapping | None:
 
 def skill_effect_allowed(entity: Any, skill_key: str) -> bool:
     """Return execution/effect eligibility, independently of learned ownership."""
+    from world.skills.registry import SKILL_REGISTRY
+    from world.skills.eligibility import skill_identity_eligible
+
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is not None and not skill_identity_eligible(entity, skill):
+        return False
     record = exam_restriction(entity)
     return record is None or skill_key in record["allowed_skills"]
 

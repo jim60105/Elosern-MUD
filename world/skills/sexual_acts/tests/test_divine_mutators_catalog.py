@@ -108,7 +108,7 @@ class DivineMutatorRegistrationTests(unittest.TestCase):
                 self.assertEqual(skill.label, {"divine_extreme_climax_command": "絕頂律令", "divine_timed_copulation": "時姦", "divine_realm_drain": "神域搾取"}[key])
                 self.assertEqual(skill.effects, _C7A_EFFECTS[key])
                 self.assertEqual(act.sexual_events, ())
-                self.assertTrue(skill.requires_divine_arts)
+                self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
                 self.assertEqual(act.unlock, {})
                 self.assertIsNone(act.target_part)
                 self.assertTrue(act.resistible)
@@ -124,7 +124,7 @@ class DivineMutatorRegistrationTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertEqual(skill.key, act.key)
                 self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-                self.assertTrue(skill.requires_divine_arts)
+                self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
                 self.assertEqual(act.unlock, {})
                 self.assertIsNone(act.target_part)
                 self.assertTrue(act.resistible)
@@ -183,7 +183,7 @@ class DivineMutatorCastTests(EvenniaTest):
                             RoomActionContext(human.location, {}),
                         )
                     )
-                self.assertIs(result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+                self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("sexual-catalog-divine-mutators::感度創世-saturates-the-target-s-sensitivity-excluding-the-actor-and-tolerating-a-resisted-cast")
     def test_sensitivity_creation_saturates_every_named_body_part(self):
@@ -390,7 +390,7 @@ class DivineMutatorHandlerDirectTests(EvenniaTest):
         self.assertEqual(monster.sexual.shame.level, "無")
 
     @covers_requirement("sexual-catalog-divine-mutators::the-four-new-effect-prefixes-are-line-agnostic-dispatch-table-entries")
-    def test_handlers_do_not_branch_on_requires_divine_arts(self):
+    def test_effect_dispatch_is_identity_agnostic(self):
         # A hypothetical non-divine SkillDef naming the divine_mark_submission
         # prefix resolves through the same handler without rejection: the
         # handlers read only their resolved targets, never the caller's line.
@@ -407,7 +407,7 @@ class DivineMutatorHandlerDirectTests(EvenniaTest):
             category=SKILL_REGISTRY["divine_absolute_submission"].category,
             group="關係",
         )
-        self.assertFalse(fake_skill.requires_divine_arts)
+        self.assertFalse(("can_use_divine_arts" in fake_skill.eligibility.required_capabilities))
         self.assertEqual(
             fake_skill.parsed_effects[0].__class__.__name__,
             "MarkSubmissionEffect",

@@ -50,6 +50,22 @@ _SCOPE = synthetic_registries(
 
 @_SCOPE
 class ConferredSkillTests(EvenniaTestCase):
+    def test_identity_incompatible_recipient_rejects_before_grant_write(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from world.skills.registry import SkillEligibility
+        from world.rules.tests._combat_session_helpers import live_skill_registry
+
+        entity = self._entity()
+        restricted = replace(_T_GRANT, eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+        ))
+        with patch.dict(live_skill_registry(), {_T_GRANT.key: restricted}):
+            with self.assertRaises(RejectedAction) as caught:
+                record_conferred_grant(entity, "t_source", _T_GRANT.key, 0.5)
+            self.assertIs(caught.exception.reason, RejectReason.IDENTITY_INELIGIBLE)
+            self.assertIsNone(entity.db.skill_grants)
+
     def _entity(self):
         entity = create_object(PlayerCharacter, key="grant recipient")
         entity.race = "t_duskmari"

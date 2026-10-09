@@ -57,7 +57,7 @@ class DivineEighthRowStructuralTests(unittest.TestCase):
         skill, act = self._eighth()
         self.assertEqual(len(DIVINE_ACTS), 8)
         self.assertEqual(skill.key, act.key)
-        self.assertTrue(skill.requires_divine_arts)
+        self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
         self.assertEqual(act.unlock, {})
         self.assertTrue(act.ownership_gated)
         self.assertIsNone(act.target_part)

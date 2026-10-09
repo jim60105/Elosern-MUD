@@ -102,7 +102,7 @@ class DivineActRegistrationTests(unittest.TestCase):
             skill, act = pairs[key]
             with self.subTest(key=key):
                 self.assertEqual(skill.key, act.key)
-                self.assertTrue(skill.requires_divine_arts)
+                self.assertTrue(("can_use_divine_arts" in skill.eligibility.required_capabilities))
                 self.assertEqual(act.unlock, {})
                 self.assertIsNone(act.target_part)
                 self.assertTrue(act.resistible)
@@ -173,7 +173,7 @@ class DivineUnlockTests(EvenniaTest):
         # The design doc's "most important test" (divine design §6): an entity
         # owning 性魔法主宰 has the full counter-gated catalogue in owned_keys()
         # but none of these three, absent a divine-capable race. reincarnation_
-        # boon_yuna carries SexualMasteryEffect without requires_divine_arts,
+        # boon_yuna carries SexualMasteryEffect without a required divine capability,
         # so a human can legitimately own it.
         human = _entity("mastery holder")
         human.db.skills = {"active": ["reincarnation_boon_yuna"], "passive": []}
@@ -228,7 +228,7 @@ class DivineCastTests(EvenniaTest):
                             RoomActionContext(human.location, {}),
                         )
                     )
-                self.assertIs(result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+                self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
 
     @covers_requirement("sexual-catalog-divine-core::絕頂律令-sets-every-target-s-pleasure-to-its-ceiling-and-walks-climax-phase-to-進行中-in-one-cast-never-touching-the-actor")
     def test_extreme_climax_command_reaches_in_progress_in_one_cast(self):
@@ -520,7 +520,7 @@ class DivineHandlerDirectTests(EvenniaTest):
         self.assertEqual(caught.exception.reason, RejectReason.EFFECT_RESOLUTION_FAILED)
 
     @covers_requirement("sexual-catalog-divine-core::the-three-new-effect-prefixes-are-line-agnostic-dispatch-table-entries")
-    def test_handlers_do_not_branch_on_requires_divine_arts(self):
+    def test_effect_dispatch_is_identity_agnostic(self):
         # A hypothetical non-divine SkillDef naming the divine_pleasure_max
         # prefix resolves through the same handler without rejection: the
         # handlers read only their resolved targets, never the caller's line.
@@ -537,7 +537,7 @@ class DivineHandlerDirectTests(EvenniaTest):
             category=SKILL_REGISTRY["divine_extreme_climax_command"].category,
             group="關係",
         )
-        self.assertFalse(fake_skill.requires_divine_arts)
+        self.assertFalse(("can_use_divine_arts" in fake_skill.eligibility.required_capabilities))
         self.assertEqual(fake_skill.parsed_effects[0].__class__.__name__, "DivinePleasureMaxEffect")
 
 
@@ -673,7 +673,7 @@ class DivineSexualArtsCastTests(EvenniaTest):
                     RoomActionContext(self.room1, {}),
                 )
             )
-        self.assertIs(result.reason, RejectReason.DIVINE_ARTS_FORBIDDEN)
+        self.assertIs(result.reason, RejectReason.IDENTITY_INELIGIBLE)
         spy.assert_not_called()
 
 

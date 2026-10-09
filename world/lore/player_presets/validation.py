@@ -67,7 +67,9 @@ def _validate_preset_identities(registry: dict[str, PlayerPreset]) -> None:
             )
 
 
-def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
+def _validate_preset_skill_kits(
+    registry: dict[str, PlayerPreset], *, actor_kind: str = "player"
+) -> None:
     """Reject a preset kit that could never resolve at activation time.
 
     Mirrors the skill registry's load-time validation style: an unknown key,
@@ -76,7 +78,8 @@ def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
     player's activation.
     """
     for preset in registry.values():
-        race = RACE_REGISTRY.get(preset.race)
+        from world.skills.eligibility import closed_skill_keys, record_identity_eligible
+
         for kind_name, expected, keys in (
             ("active", SkillKind.ACTIVE, preset.active_skills),
             ("passive", SkillKind.PASSIVE, preset.passive_skills),
@@ -90,13 +93,26 @@ def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
                         f"preset {preset.key!r} declares {key!r} as {kind_name}, "
                         f"but the registry classifies it as {skill.kind.value!r}"
                     )
-                if skill.requires_divine_arts and (
-                    race is None or not race.can_use_divine_arts
+                if not record_identity_eligible(
+                    skill.eligibility, actor_kind, race=preset.race,
+                    subrace=preset.subrace,
                 ):
                     raise ValueError(
-                        f"preset {preset.key!r} declares divine-arts skill {key!r} "
-                        "on a race without divine affinity"
+                        f"preset {preset.key!r} {kind_name}_skills includes "
+                        f"identity-ineligible skill {key!r}"
                     )
+        for key in closed_skill_keys(
+            (*preset.active_skills, *preset.passive_skills), SKILL_REGISTRY,
+        ):
+            skill = SKILL_REGISTRY.get(key)
+            if skill is not None and not record_identity_eligible(
+                skill.eligibility, actor_kind, race=preset.race, subrace=preset.subrace,
+            ):
+                field = "active_skills" if skill.kind is SkillKind.ACTIVE else "passive_skills"
+                raise ValueError(
+                    f"preset {preset.key!r} {field} closure includes "
+                    f"identity-ineligible skill {key!r}"
+                )
 
 
 def _validate_preset_affinity_elements(registry: dict[str, PlayerPreset]) -> None:
@@ -516,3 +532,6 @@ def _validate_preset_starting_companions(registry: dict[str, PlayerPreset]) -> N
                     f"{entry.preset_key!r} more than once"
                 )
             seen.add(entry.preset_key)
+            _validate_preset_skill_kits(
+                {entry.preset_key: registry[entry.preset_key]}, actor_kind="npc"
+            )

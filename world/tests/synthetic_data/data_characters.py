@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import MappingProxyType
 from world.lore.monsters import MonsterTier
 from world.lore.npc_tiers import NPCTier
@@ -32,6 +33,14 @@ SYNTH_RACES: dict[str, RaceProfile] = {
         display_name_zh="暮裔",
     ),
 }
+# The shared skill kit contains a divine-capability row. Keep a satisfiable
+# synthetic profile without changing the mundane default actor.
+SYNTH_RACES["t_starlit"] = replace(
+    SYNTH_RACES["t_duskmari"],
+    key="t_starlit",
+    display_name_zh="星裔",
+    can_use_divine_arts=True,
+)
 
 SYNTH_STATIC_TIERS: dict[str, StaticTier] = {
     "t_duskmari_wanderer": StaticTier(

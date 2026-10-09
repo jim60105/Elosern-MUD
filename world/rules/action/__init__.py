@@ -112,7 +112,7 @@ from world.rules.action.event_log import (
 from world.rules.action.gates import (
     _adjusted_costs,
     _resist_pending_effect,
-    _step1_divine_arts_gate,
+
     _step1_freeform_gate,
     _step1_ownership,
     _step2_resource_check,
