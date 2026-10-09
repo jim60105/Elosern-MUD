@@ -305,6 +305,8 @@ Exploration executed 1,554 individual trials, including current profiles, candid
 
 The subprocess used `uv run --locked`, configured SQLite `:memory:` before Django setup, and created real Evennia NPC, Monster, and Room objects. It exercised existing traits, skill and buff handlers, prerequisite initialization, ActionResolver, initiative, costs, upkeep, and `run_round`. Repeated trials used Evennia's native in-memory attribute backend for persistence speed. One E-versus-reef seed-zero comparison matched the SQLite-attribute result exactly. Both produced 54 rounds, 81 human HP, 4 SP, 12 basic-swordplay uses and 42 ordinary attacks.
 
+Real runtime verification using registered Evennia equipment and persisted restriction overlays is recorded in `docs/development/human-combat-calibration-evidence.md`.
+
 Gear effects were projected at the equipment-adjustment boundary. E–B profiles used lower input traits/pools and permitted ownership equivalent to the target states, rather than real accessories worn by one unchanged senior. Therefore these results do **not** validate restriction implementation, shops, persistent NPC recovery, or identical effective values across all real cap consumers. Those are implementation acceptance criteria.
 
 The F reference used the real character-creation resolver with a valid 224-point allocation. It allocated 69/69/69 into HP/MP/SP, 4/4/4 into physical attack/agility/defense, and 5 into magic. It produced HP/MP/SP 169/169/169, physical bases 5/5/5, and magic 10. The actual plains-human starting kit was worn, including plain sword, leather armor, and silver hairpin; final physical combat values were 7/5/9. This is one valid novice build, not a universal starting-human profile.
