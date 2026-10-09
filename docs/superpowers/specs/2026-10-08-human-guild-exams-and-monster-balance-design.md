@@ -121,6 +121,18 @@ On pass, fail, flee, bounded termination, or invalid recovery, settlement closes
 
 Routine movement/state changes cannot interrupt an active examination. Schedule occurrences due during the examination are deferred for that host. After settlement, the rules core consumes the held interval through the same schedule occurrence and traversal machinery, in authored order, without advancing the clock a second time. A departure that became due during combat must not strand a weekly visitor at the guild for another week. The held interval is recoverable from persisted examination timing and the authoritative schedule, without a general-purpose booking queue.
 
+The `guild-exam-schedule-hold` core implements these boundaries in
+`world/rules/exam_schedule_holds.py`, using the existing `npc_schedules` source.
+Its begin/read/release APIs persist the host ID, unique exam ID, start and
+held-through ticks, consumed occurrence identity and released marker.
+Begin uses the current persisted tick; release cannot consume future time.
+Lifecycle callers restore the normal host before release and snapshot the hold,
+location and schedule state around their enclosing transaction. This predecessor
+provides synthetic terminal/recovery API-sequence evidence; production exam
+activation and recovery wiring remain owned by `persistent-guild-exam-lifecycle`.
+The read result distinguishes known absence/active/released state from a named
+indeterminate hold; `planned-npc-service-windows` owns its availability use.
+
 Cold-start recovery must distinguish the exam-owned hold and temporary kit from normal character state. It must either resume a valid simulation or close an invalid one and restore the persistent host. Deleting a host is never a repair strategy. A participant-name collision must be handled by the existing NPC identity/roster discipline before combat; display names do not replace persistent participant identity.
 
 ## 5. Shared Mass-Produced Military Equipment
