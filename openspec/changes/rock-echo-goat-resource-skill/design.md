@@ -43,3 +43,7 @@ Environmental expectations differ from combat implementation; explicit published
 ## Migration Plan
 
 After explicit approval and listed predecessor completion, implement this single content unit and required docs/tests. New construction receives the approved row and kit; existing individuals retain state until authorized GM action. No automatic reset/migration/shim. Rollback reverts the content unit through the normal reviewed workflow, without recalculating persisted current gauges. No apply/archive/sync occurs during proposal authoring.
+
+## Full-set critique disposition
+
+The single full-set critique's valid-contact self-guard clarification was fixed in the crab/hare deltas and common authority; composite/audience citations and approval-record wording were clarified. The reported band blocker is rejected from the already-read monster_species.py:666–728 current hare HP30/55 at low and lynx HP115/165 at mid. Historical Previous HP values are not shipped current profiles. No band exceptions, other-species retuning or gameplay reruns are needed. This disposition makes no second-review or runtime claim.

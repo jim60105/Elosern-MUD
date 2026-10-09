@@ -32,7 +32,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 
 #### Scenario: MP and SP pools are gated by approval, not inference
 - **WHEN** MP or SP literals are authored for a variant
-- **THEN** MP and SP carry no tier band and require explicit approval; the explicitly approved crocodile and delivered species pools stated in the approved first-batch profile requirement are accepted verbatim; every unapproved nonzero pool is rejected
+- **THEN** MP and SP carry no tier band and require explicit approval; the crocodile pools and explicitly approved complete profiles in “Approved delivered resource rows are literal” are accepted verbatim after approval; every unapproved nonzero pool is rejected
 
 #### Scenario: Only explicit user balance approval populates a slot
 - **WHEN** a profile or grade slot is populated
