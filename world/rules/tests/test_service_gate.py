@@ -221,7 +221,7 @@ class ScheduleSilencePredicateTests(EvenniaTestCase):
         return npc
 
     @covers_requirement(
-        "npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries"
+        "npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first"
     )
     def test_bound_place_bound_off_anchor_npc_is_silenced(self):
         clerk = self._npc(
@@ -230,7 +230,7 @@ class ScheduleSilencePredicateTests(EvenniaTestCase):
         self.assertTrue(schedule_silenced(clerk))
 
     @covers_requirement(
-        "npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries"
+        "npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first"
     )
     def test_every_other_leg_settles_normally(self):
         with self.subTest("person-bound traveler"):
@@ -258,7 +258,7 @@ class ScheduleSilencePredicateTests(EvenniaTestCase):
             self.assertFalse(schedule_silenced(clerk))
 
     @covers_requirement(
-        "npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries"
+        "npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first"
     )
     def test_corrupt_anchor_and_missing_location_silence_fails_closed(self):
         # Silence is a policy that mutates nothing; an unresolvable anchor
@@ -320,7 +320,7 @@ class StaleBindingSilenceTests(EvenniaTestCase):
         join_party(self.clerk, self.owner)
 
     @covers_requirement(
-        "npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries"
+        "npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first"
     )
     def test_reciprocal_binding_silences_and_corruption_unsilences(self):
         self.assertTrue(schedule_silenced(self.clerk))

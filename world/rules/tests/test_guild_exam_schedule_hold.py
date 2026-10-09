@@ -84,7 +84,7 @@ class ExamScheduleHoldTests(EvenniaTestCase):
             get_world_clock().tick,
         )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::an-active-exam-hold-defers-host-schedule-mutation")
     @covers_requirement(
         "guild-exam-schedule-hold::active-exams-defer-host-schedule-occurrences-and-release-through-shared-traversal"
     )
@@ -250,6 +250,7 @@ class ExamScheduleHoldTests(EvenniaTestCase):
             with self.assertRaises(ExamScheduleHoldError):
                 release_exam_schedule_hold(self.host, "synthetic_exam", DAY - 5)
 
+    @covers_requirement("npc-schedule-runtime::releasing-an-exam-hold-replays-its-interval-once")
     def test_locked_exit_is_consumed_and_same_tick_state_still_settles(self):
         self._begin()
         self._settle()
@@ -273,6 +274,7 @@ class ExamScheduleHoldTests(EvenniaTestCase):
         self.assertEqual(self.host.db.schedule_state, "duty")
         self.assertTrue(read_exam_schedule_hold(self.host).hold.released)
 
+    @covers_requirement("npc-schedule-runtime::releasing-an-exam-hold-replays-its-interval-once")
     def test_indeterminate_schedule_keeps_pending_hold_for_repair(self):
         self._begin()
         self._settle()
@@ -282,6 +284,8 @@ class ExamScheduleHoldTests(EvenniaTestCase):
             release_exam_schedule_hold(self.host, "synthetic_exam", DAY + 1)
         self.assertEqual(self._snapshot(), before)
 
+    @covers_requirement("npc-schedule-runtime::an-active-exam-hold-defers-host-schedule-mutation")
+    @covers_requirement("npc-schedule-runtime::releasing-an-exam-hold-replays-its-interval-once")
     def test_effective_from_excludes_past_occurrences_and_orders_multiple_cycles(self):
         self._begin()
         self.clock._persist(8 * DAY + 1)

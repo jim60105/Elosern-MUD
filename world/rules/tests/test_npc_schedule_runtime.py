@@ -50,7 +50,7 @@ DAY_SECONDS = 86400
 
 
 class CycleArithmeticTests(unittest.TestCase):
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::cycles-and-ordering-remain-absolute-and-deterministic")
     def test_absolute_cycles_match_bounded_integer_oracle(self):
         for days in (1, 7):
             period = days * DAY_SECONDS
@@ -129,7 +129,7 @@ class WeeklySettlementTests(EvenniaTestCase):
         self.destination_patch.start()
         self.addCleanup(self.destination_patch.stop)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::cycles-and-ordering-remain-absolute-and-deterministic")
     def test_bulk_matches_daily_windows_across_calendar_boundaries_and_reload(self):
         from world.rules.clock import CLOCK_YAML
 
@@ -164,7 +164,7 @@ class WeeklySettlementTests(EvenniaTestCase):
                     sorted(event.due_tick for event in bulk),
                 )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::cycles-and-ordering-remain-absolute-and-deterministic")
     def test_assignment_at_due_tick_keeps_absolute_phase_and_order(self):
         assignment = 8 * DAY_SECONDS
         self.clock.tick = assignment
@@ -265,7 +265,7 @@ class SettlementStateEntryTests(EvenniaTest):
         super().setUp()
         self.npc = create_object(NPC, key="巡邏守衛", location=self.room1)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::due-state-entries-update-state-and-emit-events")
     def test_due_state_entry_updates_state_and_emits_event_with_payload(self):
         set_npc_schedule(
             self.npc,
@@ -293,7 +293,7 @@ class SettlementStateEntryTests(EvenniaTest):
             ],
         )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-settlement-source-selects-tagged-npcs")
     def test_npc_without_a_schedule_settles_to_nothing(self):
         before_location = self.npc.location
         events = settle_npc_schedules(0, DAY_SECONDS)
@@ -314,7 +314,7 @@ class SettlementMoveEntryTests(EvenniaTest):
         )
         self.npc = create_object(NPC, key="巡邏守衛", location=self.north_gate)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::due-movement-uses-real-exits-and-emits-events")
     def test_due_move_entry_relocates_along_a_real_exit_and_emits_events(self):
         set_npc_schedule(
             self.npc,
@@ -351,7 +351,7 @@ class SettlementMoveEntryTests(EvenniaTest):
             ],
         )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::due-movement-uses-real-exits-and-emits-events")
     def test_move_success_writes_the_templates_default_state(self):
         # The synthetic template's first move (21600, north_gate) is skipped:
         # the NPC is already at north_gate. The 50400 state entry and the
@@ -426,7 +426,7 @@ class SettlementMoveEntryTests(EvenniaTest):
         self.assertIs(self.npc.location, self.barracks)
         self.assertIs(companion.location, self.north_gate)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::due-movement-uses-real-exits-and-emits-events")
     def test_dbref_target_override_resolves_directly(self):
         set_npc_schedule(
             self.npc,
@@ -486,7 +486,7 @@ class SettlementSilenceTests(EvenniaTest):
         self.guard = create_object(NPC, key="沉默對照衛", location=self.room1)
         set_npc_schedule(self.guard, schedule)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first")
     def test_weekly_traveling_companion_stays_silenced(self):
         schedule = {
             "schema_version": 1, "cycle_days": 7,
@@ -501,7 +501,7 @@ class SettlementSilenceTests(EvenniaTest):
         self.assertIsNone(self.clerk.db.schedule_state)
         self.assertEqual(self.clerk.location, self.wild)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first")
     def test_traveling_place_bound_companion_settles_nothing(self):
         events = settle_npc_schedules(0, DAY_SECONDS)
         # The control guard's entry settles; the silenced clerk's does not.
@@ -544,7 +544,7 @@ class SettlementSilenceTests(EvenniaTest):
         self.assertNotIn(int(possessed_guard.pk), npc_ids)
         self.assertIsNone(possessed_guard.db.schedule_state)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first")
     def test_returning_to_anchor_resumes_settlement(self):
         # Dismissed back at the storefront, the clerk settles normally;
         # boundary arithmetic tolerates the skipped windows.
@@ -554,7 +554,7 @@ class SettlementSilenceTests(EvenniaTest):
         self.assertEqual(settled, {int(self.clerk.pk), int(self.guard.pk)})
         self.assertEqual(self.clerk.db.schedule_state, "resting")
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::silenced-npcs-skip-all-schedule-effects-first")
     def test_silence_emits_one_debug_trace_per_silenced_npc(self):
         # The observability contract: exactly one schedule_settlement_silenced
         # per silenced NPC carrying its identity and the stranding service;
@@ -747,7 +747,7 @@ class MultiDaySettlementTests(EvenniaTestCase):
             },
         )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::cycles-and-ordering-remain-absolute-and-deterministic")
     def test_multi_day_skip_matches_repeated_day_by_day_advances(self):
         multi_events = settle_npc_schedules(0, 2 * DAY_SECONDS)
         # Every due occurrence settles exactly once, in (due_tick, stable id,
@@ -775,7 +775,7 @@ class MultiDaySettlementTests(EvenniaTestCase):
         settle_npc_schedules(DAY_SECONDS, 2 * DAY_SECONDS)
         self.assertIs(self.npc.location, self.barracks)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::due-movement-uses-real-exits-and-emits-events")
     def test_occurrences_carry_the_day_start_plus_offset_due_tick(self):
         events = settle_npc_schedules(DAY_SECONDS, 2 * DAY_SECONDS)
         self.assertEqual(
@@ -789,7 +789,7 @@ class MidDayAssignmentTests(EvenniaTest):
         super().setUp()
         self.npc = create_object(NPC, key="店鋪老闆", location=self.room1)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::occurrences-obey-the-shared-due-window-boundaries")
     def test_passed_occurrences_never_settle_after_mid_day_assignment(self):
         get_world_clock().advance(30000, AdvanceSource.SKIP, [])
         set_npc_schedule(
@@ -819,7 +819,7 @@ class MidDayAssignmentTests(EvenniaTest):
         )
         self.assertEqual(self.npc.db.schedule_state, "busy")
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::occurrences-obey-the-shared-due-window-boundaries")
     def test_assignment_exactly_at_a_due_tick_settles_that_occurrence(self):
         # Advance the clock to exactly the entry's due tick, assign there, and
         # settle the next window: the occurrence due at the assignment tick
@@ -851,7 +851,7 @@ class MidDayAssignmentTests(EvenniaTest):
             ],
         )
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::occurrences-obey-the-shared-due-window-boundaries")
     def test_start_boundary_occurrences_already_settled_do_not_replay(self):
         # Two NPCs: one scheduled from day 0 whose boundary occurrence the
         # day-0 window already settled; one assigned exactly at the next
@@ -888,7 +888,7 @@ class MidDayAssignmentTests(EvenniaTest):
 
 
 class SourceRegistrationTests(EvenniaTest):
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-settlement-source-selects-tagged-npcs")
     def test_sync_registers_settle_npc_schedules_as_the_only_source(self):
         from world.rules.clock import _EVENT_SOURCES
 
@@ -898,7 +898,7 @@ class SourceRegistrationTests(EvenniaTest):
         self.assertIs(registration.settle, settle_npc_schedules)
         self.assertIsNotNone(registration.surfaces)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::cycles-and-ordering-remain-absolute-and-deterministic")
     def test_duplicate_key_npcs_tie_break_by_stable_primary_key(self):
         # Two NPCs sharing one display key with identical due entries settle
         # in stable (due_tick, npc_id, entry_index) order regardless of the
@@ -923,7 +923,7 @@ class SourceRegistrationTests(EvenniaTest):
         for event in events:
             self.assertEqual(event.payload["npc"], "同名守衛")
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-settlement-source-selects-tagged-npcs")
     def test_registration_is_idempotent(self):
         from world.rules.clock import _EVENT_SOURCES
 
@@ -931,7 +931,7 @@ class SourceRegistrationTests(EvenniaTest):
         sync_npc_schedules()
         self.assertIs(_EVENT_SOURCES["npc_schedules"].settle, settle_npc_schedules)
 
-    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-settlement-source-selects-tagged-npcs")
     def test_advance_includes_npc_schedule_events_at_the_stage_position(self):
         from world.rules.clock import _STAGE_ORDER, register_event_source
 
