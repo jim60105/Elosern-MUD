@@ -172,6 +172,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(composed, describe_objective(objective))
         self.assertEqual(composed, self.registry.render("objectives", self.context)["rows"][0]["objective_line"])
 
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
     def test_claim_membership_is_read_only_and_host_independent(self):
         from dataclasses import replace
         definition = register(quest("claims_counter"))
@@ -193,6 +196,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
         self.assertEqual(list(self.player.db.guild_reward_claims), ["duplicate", "duplicate"])
 
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
     def test_auto_completion_discloses_its_transactional_claim(self):
         definition = register(quest("claims_auto"))
         record = accept_under_auto(self.player, definition)
@@ -202,6 +208,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(row["settlement"], "auto")
         self.assertTrue(row["reward_claimed"])
 
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
     def test_possession_claims_use_only_the_owner_ledger(self):
         definition = register(quest("claims_owner"))
         record = accept_under_auto(self.player, definition)
@@ -266,7 +275,7 @@ class QuestLogPresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_registry_uses_the_common_unavailable_reason(self):
         spec = self.registry.spec("quest_log")
@@ -465,7 +474,7 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertNotIn("detail", quest_row)
 
     @covers_requirement(
-        "webclient-quest-log-panel::an-unresolvable-issuance-yields-no-reward-line-rather-than-a-fabricated-one"
+        "webclient-quest-log-panel::an-unresolvable-issuance-yields-no-reward-rather-than-a-fabricated-one"
     )
     def test_withdrawn_commission_still_lists_its_quest(self):
         definition = register(quest("withdrawn_commission"))
@@ -555,7 +564,7 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(row["state"], "completed")
 
     @covers_requirement(
-        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_maximum_authored_prose_still_renders_within_the_detail_bound(self):
         # The authored-prose bound is derived from this frozen field bound: a
