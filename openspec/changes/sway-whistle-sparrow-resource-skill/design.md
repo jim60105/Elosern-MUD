@@ -43,3 +43,9 @@ Environmental expectations differ from combat implementation; explicit published
 ## Migration Plan
 
 After explicit approval and listed predecessor completion, implement this single content unit and required docs/tests. New construction receives the approved row and kit; existing individuals retain state until authorized GM action. No automatic reset/migration/shim. Rollback reverts the content unit through the normal reviewed workflow, without recalculating persisted current gauges. No apply/archive/sync occurs during proposal authoring.
+
+## Full-set critique disposition
+
+The single blocking full-set critique's self-guard ambiguity was adopted and fixed in crab/hare requirements and authority §3 with valid-contact and rejected/no-target boundaries. Composite audience evidence is now cited explicitly. The proposed approval record is the cumulative complete-profile scenario, not the historical physical-axis table.
+
+The claimed out-of-band pre-cutover blocker is rejected using already-read current source, without rerunning gameplay checks: monster_species.py:666–728 has burrow_maker HP30, nest_guard HP55, wood_stalker HP115 and trail_hunter HP165; their tiers are low/low/mid/mid. The review incorrectly used the historical Previous HP column (60/95/220/280) and classified mid-tier cats as low. Existing band invariants and all-twelve zero-magic checks remain required; no exception or other-species retuning is warranted. This records one review and its disposition, not a second review or runtime evidence.
