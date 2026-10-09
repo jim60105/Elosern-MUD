@@ -535,9 +535,8 @@ class SkillRegistryTests(unittest.TestCase):
                 self.assertEqual(tuple(skill.effects), effects)
 
     @covers_requirement(
-        "monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill",
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
-        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
     )
     def test_tide_devouring_bite_data_contract(self):
         from world.skills.effects import EffectAudience

@@ -365,7 +365,6 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
 
     @covers_requirement(
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
-        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
     )
     def test_kit_and_behaviour_profile_validation_and_assignment(self):
         from world.tests.synthetic_data import make_skill

@@ -5,6 +5,10 @@
       "reason": "authored Yohanna import card and real protection setup contract"
     },
     {
+      "path": "world/rules/tests/test_crocodile_resource_skill.py",
+      "reason": "crocodile resource skill production combat smoke contract"
+    },
+    {
       "path": "tests/test_command_docs.py",
       "reason": "player command docs parity contract"
     },

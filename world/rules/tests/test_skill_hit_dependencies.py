@@ -286,8 +286,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertFalse(any(e.kind == "buff_applied" and e.data.get("buff_key") == "focus" for e in res.event_log.entries))
 
     @covers_requirement(
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
-        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
+        "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
     )
     def test_synthetic_transfer_partial_zero_mp_and_caster_cap(self):
         """Scenario: Target partial/zero MP and caster full/partial cap."""
@@ -386,8 +385,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertEqual(res_fail_sp.outcome, "rejected")
 
     @covers_requirement(
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
-        "monster-resource-abilities::production-crocodile-delivery-includes-real-combat-and-persistence-evidence",
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
     )
     def test_critical_defeat_crossing_and_second_species_reuse(self):
         """Scenario: Critical hit does not multiply drain; defeat crossing transfers before settlement; second species reuse."""

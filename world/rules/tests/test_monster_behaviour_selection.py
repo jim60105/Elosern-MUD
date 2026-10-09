@@ -82,7 +82,6 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
 
     @covers_requirement(
         "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected",
-        "monster-action-policy::authored-crocodile-behavior-uses-the-existing-first-owned-strategy",
     )
     def test_ineligible_skill_filtered_from_damage_candidates(self):
         from world.skills.registry import SkillEligibility
