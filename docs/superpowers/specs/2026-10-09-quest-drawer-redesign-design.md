@@ -8,6 +8,8 @@ The current drawer stacks two text-heavy cards. In the live client every quest-b
 
 The guild rank block (rank crest, merit meter, 預約升等考核) is approved as is and is carried over visually unchanged.
 
+**Visual reference:** the approved Storybook prototype is committed at [`docs/design/quest-drawer-redesign/`](../../design/quest-drawer-redesign/). It contains `QuestDrawerPrototype.vue` (a self-contained component), `prototype-data.js` (mock data in the §4 payload shapes, using real catalog prose), and `QuestDrawerPrototype.stories.js`. Storybook loads it through the `../docs/design/**/*.stories.js` glob in `.storybook/main.js` under the title `Design/QuestDrawerRedesign`, with the stories `QuestBook`, `GuildBoard`, and `AwayFromCounter`; run `pnpm run serve-storybook` and open `?path=/story/design-questdrawerredesign--quest-book`. The prototype is the source of truth for colors, spacing, glyph shapes, and the gem material ladder, and implementation should match it. It is reference only: it reads no payload, sits outside the webclient component-coverage manifest, and is not imported by the app. Where this document and the prototype disagree on behavior, this document wins.
+
 ## 1. Authority and Constraints
 
 - `web/webclient-app/AGENTS.md` governs: desktop 16:9 only, ship through OpenSpec, no standalone HTML prototypes, and grep `styles/app-shell.css` for `.elosern-root` duplicates of any restyled class.
@@ -95,7 +97,7 @@ The detail fades in with a 6px slide on each selection change, using `--motion-r
 
 ### 3.7 Rank card
 
-The current `GuildCounter.vue` rank block is extracted verbatim, markup, logic and styles, into `GuildRankCard.vue`, with its `exam_request` emit. Only its host changes: it now sits at the top of the counter list column. Its data-testids are kept.
+The current `GuildCounter.vue` rank block is extracted verbatim, markup, logic and styles, into `GuildRankCard.vue`, with its `exam_request` emit. Only its host changes: it now sits at the top of the counter list column. Its data-testids are kept. The extraction is verbatim with one exception: its two literal transition durations (`400ms` on the meter fill and `150ms` on the exam button) switch to `--motion-*` tokens. The existing `tests/motion_tokens.test.js` already rejects them on master.
 
 ### 3.8 Action bar
 

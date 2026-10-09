@@ -2,7 +2,15 @@
 const config = {
   // The GM portal stories (gm-portal-s1-foundation) share the tooling, not
   // the game component layer; preview.js renders them under `.gm-root`.
-  stories: ["../web/webclient-app/**/*.stories.js", "../web/admin-app/**/*.stories.js"],
+  //
+  // Approved redesign prototypes live beside their design documents under
+  // docs/design/ (reference only, mock data, outside the webclient
+  // component-coverage manifest).
+  stories: [
+    "../web/webclient-app/**/*.stories.js",
+    "../web/admin-app/**/*.stories.js",
+    "../docs/design/**/*.stories.js",
+  ],
   // Serve the repo's static tree so story fixtures can use the production
   // `/art/...` media URL vocabulary (the committed built-in fallbacks live
   // at web/static/art/defaults/) instead of inventing asset-import URLs the
