@@ -3,6 +3,8 @@
 The lifecycle supplies globally unique exam IDs and restores the host before
 release. It must snapshot these surfaces before an enclosing transaction and
 restore them after its rollback; nested savepoints cannot restore outer caches.
+Mutation calls belong to the serialized deterministic game loop, like clock
+settlement. Concurrent worker/web-thread calls are outside this API contract.
 """
 
 from collections.abc import Mapping
@@ -80,7 +82,8 @@ def read_exam_schedule_hold(npc: Any) -> ExamScheduleHoldRead:
         consumed = raw["consumed_through"]
         if consumed is not None:
             if (
-                not isinstance(consumed, (list, tuple)) or len(consumed) != 2
+                not raw["released"]
+                or not isinstance(consumed, (list, tuple)) or len(consumed) != 2
                 or not all(_tick(value) for value in consumed)
                 or not raw["start_tick"] <= consumed[0] <= raw["held_through_tick"]
             ):

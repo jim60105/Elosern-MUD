@@ -23,6 +23,10 @@ Commit-sensitive hold start/extension/release info events use `transaction.on_co
 An enclosing lifecycle transaction snapshots/restores the core surfaces around
 its own rollback, in addition to the core's local savepoint rollback.
 
+Mutation APIs are serialized deterministic-game-loop operations, following the
+clock source's existing caller contract. Active records have no consumed cursor;
+the cursor and released flag commit atomically.
+
 The chosen design reuses existing registries, resolver, service gate, schedule source and transaction/cache conventions. A separate guild scheduler, disposable opponent, projected-only gear, destructive skill rewrite and compatibility shim were rejected because they violate approved identity or authority boundaries.
 
 ## Risks / Trade-offs

@@ -223,6 +223,11 @@ the clock.
 independently of production examination activation. The persistent lifecycle
 change owns that activation and the availability-reader change owns query use.
 
+Mutation APIs require serialized calls from the deterministic game loop.
+Worker/web threads must route requests through that boundary; these APIs do not
+provide concurrent host locking. An active marker cannot carry a consumed cursor,
+because release commits cursor and released status together.
+
 Begin requires the current persisted world tick and a persistent NPC. The caller
 allocates globally unique exam IDs; the single retained record remembers only the
 latest completed identity. An identical active begin is idempotent. A different

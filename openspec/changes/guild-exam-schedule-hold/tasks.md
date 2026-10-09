@@ -66,3 +66,28 @@ All methods below are in `world.rules.tests.test_guild_exam_schedule_hold.ExamSc
 * The modified runtime Held host scenario is asserted by the terminal-sequence
   test; unchanged runtime scenarios retain existing coverage, including the
   focused existing startup recovery and weekly settlement tests above.
+
+## Rubber-duck disposition
+
+The required blocking post-implementation review completed with no blocking
+findings and two non-blocking findings.
+
+* Impossible active consumed cursor: adopted. Reads now reject every non-null
+  cursor on an active record, and the corruption behavior test includes an
+  in-range bogus cursor. Validation of a released cursor against the current
+  schedule is intentionally not adopted, because the authoritative schedule can
+  be reassigned after release and would make a valid historical marker appear
+  corrupt. The persisted marker remains a historical occurrence identity.
+* Concurrent ownership/release: documented the serialized deterministic-game-loop
+  caller contract, matching clock settlement. Concurrent worker/web-thread
+  mutations are unsupported; lifecycle must route through the game loop.
+  Row-lock machinery is not added to this SQLite, single-game-loop core.
+  Production ingress enforcement remains owned by the lifecycle successor.
+
+All review findings are resolved or explicitly dispositioned. The reviewer read
+the finished worktree source/tests/specs/docs but could not inspect the exact Git
+diff with its available tools; it did not rerun checks.
+
+After the review fix, the same focused command passed all 20 tests in 4.329
+seconds. The contract gate passed again, including both lints and all 18 contract
+tests; strict change validation passed again.

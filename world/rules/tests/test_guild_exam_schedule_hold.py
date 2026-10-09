@@ -227,6 +227,7 @@ class ExamScheduleHoldTests(EvenniaTestCase):
         raw = dict(self.host.db.exam_schedule_hold)
         for replacement in (None, {}, {**raw, "host_id": self.other.pk},
                             {**raw, "consumed_through": (DAY + 5, 1)},
+                            {**raw, "consumed_through": (DAY - 5, 47)},
                             {**raw, "held_through_tick": True}):
             self.host.attributes.add(HOLD_ATTRIBUTE, replacement)
             before = self._snapshot()
