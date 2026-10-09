@@ -190,7 +190,10 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
         records = _read_exams(self.player)
         self.assertEqual(len(records), 1)
 
-    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    @covers_requirement(
+        "npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating",
+        "guild-exam-requests::appointment-semantics-provide-information-without-storing-bookings",
+    )
     def test_malformed_exam_payload_is_rejected_without_state_change(self):
         for intent in (
             {"kind": "request_guild_exam"},
@@ -207,7 +210,10 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
                 self.assertIsNotNone(outcome.reason)
                 self.assertEqual(_read_exams(self.player), [])
 
-    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    @covers_requirement(
+        "npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating",
+        "guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions",
+    )
     def test_counter_intent_below_merit_with_absent_host_returns_attendance(self):
         from world.rules.npc_schedules import set_npc_schedule
 

@@ -653,6 +653,7 @@ class ExamRequestTests(ServiceActionBase):
         "webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative",
         "webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination",
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions", "guild-exam-requests::appointment-semantics-provide-information-without-storing-bookings")
     def test_below_merit_request_with_absent_host_returns_read_only_schedule(self):
         self._register()
         self._host_away_with_weekly_visits()
@@ -672,7 +673,17 @@ class ExamRequestTests(ServiceActionBase):
         )
         self.assertEqual(after, before)
         self.assertIsNone(read_session(self.player))
+        # The reply names the host and the reader's planned interval on the
+        # game calendar, and never the host's private whereabouts.
+        from world.rules.service_messages import format_planned_interval
+        from world.rules.service_windows import read_next_planned_service_interval
 
+        window = read_next_planned_service_interval(self.host, self.hall).interval
+        self.assertIn(self.host.key, result["message"])
+        self.assertIn(format_planned_interval(window.start_tick, window.end_tick), result["message"])
+        self.assertNotIn(self.store.key, result["message"])
+
+    @covers_requirement("guild-exam-requests::appointment-semantics-provide-information-without-storing-bookings")
     def test_absent_host_without_a_confirmable_time_rejects(self):
         self._register()
         self.host.location = self.store

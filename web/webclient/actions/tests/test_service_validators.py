@@ -64,6 +64,7 @@ class ServiceValidatorTests(unittest.TestCase):
                 validate_quest_turnin_payload(bad)
 
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
+    @covers_requirement("guild-exam-requests::appointment-semantics-provide-information-without-storing-bookings")
     def test_exam_request_payload(self):
         self.assertEqual(validate_exam_request_payload({"target_rank": "E"}), {"target_rank": "E"})
         # Authority-like fields (host, branch, clock, threshold) are unknown

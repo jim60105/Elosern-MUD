@@ -75,6 +75,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_absent_host_below_merit_returns_planned_attendance_without_mutation(self):
         self._send_host_home_on_weekly_visits()
         before = self._snapshot()
@@ -97,6 +98,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_present_host_below_merit_reaches_the_authoritative_merit_gate(self):
         self._assert_rejected_unchanged(ExamReason.BELOW_THRESHOLD)
 
@@ -104,6 +106,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination",
         "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself",
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_eligible_present_host_starts_the_same_persistent_simulation(self):
         self._give_merit(50)
         hosts_before = NPC.objects.count()
@@ -118,6 +121,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_absent_host_with_unknown_attendance_rejects_before_merit(self):
         self.host.location = self.home  # no schedule at all
         error = self._assert_rejected_unchanged(ExamReason.ATTENDANCE_UNKNOWN)
@@ -137,6 +141,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
         self.assertEqual(error.args[1], "active_exam_hold")
 
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_busy_present_host_returns_its_service_reason_without_starting(self):
         self._give_merit(50)
         self.host.db.schedule_state = "busy"
@@ -145,6 +150,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_busy_counter_takes_no_request_before_attendance(self):
         self._send_host_home_on_weekly_visits()
         self.counter.db.schedule_state = "busy"
@@ -155,6 +161,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination"
     )
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_target_and_registration_rejections_precede_attendance(self):
         self._send_host_home_on_weekly_visits()
         self._give_merit(500)
@@ -171,6 +178,7 @@ class ExamRequestCoordinatorTests(ExamHostFixture, EvenniaTestCase):
         self.assertIsNone(stranger.db.guild_exams)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    @covers_requirement("guild-exam-requests::all-examination-requests-resolve-attendance-before-merit-and-start-conditions")
     def test_speaker_grants_no_authority_beyond_counter_or_qualified_host(self):
         bystander = create_object(NPC, key="hall bystander", location=self.hall)
         self._assert_rejected_unchanged(ExamReason.NO_EXAMINER, speaker=bystander)
