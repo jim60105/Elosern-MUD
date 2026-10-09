@@ -61,7 +61,7 @@ enabled counter turn-in descriptor.
 
 #### Scenario: An empty state tab says so
 - **WHEN** the selected state has no rows
-- **THEN** the list shows a single empty-state line and the detail area is empty
+- **THEN** the list shows the shared empty guidance (a decorative glyph, a headline, and one guidance line) and no rows, and the detail area is empty
 
 ### Requirement: Selecting a quest shows its full detail beside the list
 
@@ -74,6 +74,10 @@ text.
 #### Scenario: The first row is selected by default
 - **WHEN** a state tab with rows is shown and no row was selected in it before
 - **THEN** its first row is selected and its detail is shown
+
+#### Scenario: Session memory ends with the presentation
+- **WHEN** the transport generation or the presentation epoch changes and the drawer is opened again
+- **THEN** the quest book tab, the in-progress state, and each state's first row are selected, as on a first open
 
 #### Scenario: Selection is remembered per tab
 - **WHEN** the player selects the second in-progress row, switches to completed, and switches back
@@ -121,7 +125,7 @@ counter-return hint, or the failed no-reward line.
 
 #### Scenario: Abandon needs two steps
 - **WHEN** the player activates abandon on an in-progress row whose counter descriptor is enabled
-- **THEN** a confirmation with cancel and confirm appears, and only confirm submits the counter descriptor's exact action and payload
+- **THEN** a confirmation naming the quest and stating that abandoning fails it irreversibly appears with cancel and confirm, and only confirm submits the counter descriptor's exact action and payload
 
 #### Scenario: An armed abandon disarms on change
 - **WHEN** an abandon confirmation is open and the selection changes or the row leaves the list

@@ -21,6 +21,7 @@ import {
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
   SKILLS_SLICE_SAMPLE,
 } from "../stories/fixtures.js";
+import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { PARTY_PANEL_FULL_SAMPLE } from "../stories/fixtures/party_panels.js";
@@ -40,6 +41,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     store = useElosernStore();
+    resetQuestDrawerMemory();
   });
 
   // The closed reference-drawer name -> the body's root testid.
@@ -424,12 +426,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(sender.sent.actions[1].payload).toEqual({ field: "habit", text: null });
   });
 
-  // quest-drawer-split: the quest drawer away from any clerk. The real
-  // player route — the 任務 top-navigation entry opens the
-  // quest drawer without a frame push — must show the quest book (host-free) and the explicit
-  // clerk-needed marker in place of the counter, and tracking must dispatch
-  // with no guild host present.
-  it("opens the quest book away from any clerk and tracks from a row", async () => {
+  // quest-drawer-book-tab: the quest drawer away from any clerk. The real
+  // player route — the 任務 top-navigation entry opens the quest drawer
+  // without a frame push — lands on the quest book with the counter tab
+  // disabled and naming the missing clerk, and tracking dispatches with no
+  // guild host present.
+  it("opens the quest book away from any clerk and tracks from the detail", async () => {
     const sender = fx.createFakeSender();
     store.setSender(sender);
     mountAppClient();
@@ -459,25 +461,28 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       .find((button) => button.text() === "任務").trigger("click");
     expect(store.view.hudDrawer).toBe("quest");
     await wrapper.vm.$nextTick();
+    // The quest drawer owns its scrolling regions: the drawer body is flush.
+    expect(wrapper.get(".hud-drawer__body").classes()).toContain("hud-drawer__body--flush");
     const body = wrapper.get('[data-testid="quest-drawer"]');
-    expect(body.get('[data-testid="quest-log"]').exists()).toBe(true);
-    expect(body.find('[data-testid="quest-log__row--q_1042"]').exists()).toBe(true);
-    expect(body.get('[data-testid="quest-drawer__counter-absent"]').exists()).toBe(true);
+    expect(body.attributes("data-tab")).toBe("book");
+    expect(body.find('[data-testid="quest-drawer__row--q_1042"]').exists()).toBe(true);
+    expect(body.get('[data-testid="quest-drawer__counter-absent"]').text()).toBe("需在公會職員面前才能辦理");
     expect(body.find('[data-testid="guild-counter"]').exists()).toBe(false);
     // Away from any clerk only tracking is offered, and it dispatches once.
-    await body
-      .get('[data-testid="quest-log__row--q_2077"]')
-      .get('[data-testid="quest-log__track"]')
-      .trigger("click");
+    await body.get('[data-testid="quest-drawer__row--q_2077"]').trigger("click");
+    expect(body.find('[data-testid="quest-drawer__abandon"]').exists()).toBe(false);
+    await body.get('[data-testid="quest-drawer__track"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0].action_id).toBe("guild.quest_track");
     expect(sender.sent.actions[0].payload).toEqual({ quest_id: "q_2077", tracked: true });
   });
 
-  // quest-drawer-split: in front of a clerk both surfaces render — the book
-  // first, the counter below it — and no accepted quest appears twice (the
-  // counter lists none of the holder's records).
-  it("renders the book and the counter together without listing a quest twice", async () => {
+  // quest-drawer-book-tab: in front of a clerk the book and the counter are
+  // two first-level tabs, and no accepted quest appears in both (the counter
+  // lists none of the holder's records).
+  it("hosts the book and the counter as tabs without listing a quest twice", async () => {
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
     mountAppClient();
     await wrapper.vm.$nextTick();
     store.beginTransport(1);
@@ -503,21 +508,22 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.openHudDrawer("quest");
     await wrapper.vm.$nextTick();
     const body = wrapper.get('[data-testid="quest-drawer"]');
-    expect(body.get('[data-testid="quest-log"]').exists()).toBe(true);
-    expect(body.get('[data-testid="guild-counter"]').exists()).toBe(true);
-    expect(body.find('[data-testid="quest-drawer__counter-absent"]').exists()).toBe(false);
-    // The counter carries no quest-record rows: each accepted quest appears
-    // exactly once, in the book.
+    expect(body.findAll('[data-testid^="quest-drawer__row--"]').map((n) => n.attributes("data-testid"))).toEqual([
+      "quest-drawer__row--q_1042",
+      "quest-drawer__row--q_2077",
+    ]);
+    expect(body.find('[data-testid="guild-counter"]').exists()).toBe(false);
+    // The matched counter abandon reaches the wire only after confirmation.
+    await body.get('[data-testid="quest-drawer__abandon"]').trigger("click");
+    expect(sender.sent.actions).toHaveLength(0);
+    await body.get('[data-testid="quest-drawer__abandon-confirm-yes"]').trigger("click");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } });
+
+    await body.get('[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]').trigger("click");
     const counter = body.get('[data-testid="guild-counter"]');
     expect(counter.find('[data-testid^="guild-counter__quest-row--"]').exists()).toBe(false);
-    expect(counter.findAll('[data-testid^="quest-log__row--"]')).toHaveLength(0);
-    const book = body.get('[data-testid="quest-log"]');
-    expect(book.findAll('[data-testid^="quest-log__row--"]').map((n) => n.attributes("data-testid"))).toEqual([
-      "quest-log__row--q_1042",
-      "quest-log__row--q_2077",
-      "quest-log__row--q_0301",
-      "quest-log__row--q_0099",
-    ]);
+    expect(body.findAll('[data-testid^="quest-drawer__row--"]')).toHaveLength(0);
   });
 
   it("renders companions on stage and keeps the drawer reachable", async () => {

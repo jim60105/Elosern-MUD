@@ -47,6 +47,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._select_quest_tab(page, "counter")
         self._tab_until_focused(page, '[data-testid="guild-counter__register"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
@@ -70,6 +71,7 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self._open_guild_menu(page)
         self.assertTrue(page.locator('[data-testid="quest-drawer"]').is_visible())
+        self._select_quest_tab(page, "counter")
         self.assertTrue(page.locator('[data-testid="guild-counter"]').is_visible())
         self.assertTrue(page.locator('[data-testid="guild-counter__register"]').is_visible())
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
@@ -94,6 +96,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+        self._select_quest_tab(page, "counter")
         self._tab_until_focused(page, '[data-testid="guild-counter__accept"]')
         _press(page, "Enter")  # accept the eligible offer row
         self._wait_panel(page, lambda p: p["pagination"]["quest_total"] == 1)
@@ -117,6 +120,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["board_total"], 1)
 
         self._open_guild_menu(page)
+        self._select_quest_tab(page, "counter")
         old_name = panel["guild"]["board"][0]["display_name"]
         board_row = page.locator(f'[data-testid="guild-counter__board-row--{guild_offer_quest_key()}"]')
         self.assertTrue(board_row.is_visible())
@@ -153,16 +157,26 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
-        self._tab_until_focused(page, '[data-testid="quest-log__abandon"]')
+        # The book lands on the in-progress state with the held quest
+        # selected; its detail mirrors the counter's abandon descriptor.
+        self._tab_until_focused(page, '[data-testid="quest-drawer__abandon"]', max_presses=40)
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 0)
 
-        # Reveal confirmation
+        # Reveal confirmation: it names the quest, and focus moves to cancel.
         _press(page, "Enter")
-        page.wait_for_selector('[data-testid="quest-log__abandon-confirm"]', timeout=5000)
+        page.wait_for_selector('[data-testid="quest-drawer__abandon-confirm"]', timeout=5000)
+        quest_name = page.locator('[data-testid="quest-drawer__detail"] .quest-detail__title').inner_text().strip()
+        self.assertIn(f"放棄「{quest_name}」", page.locator('[data-testid="quest-drawer__abandon-confirm"]').inner_text())
+        self.assertTrue(
+            page.evaluate(
+                "() => document.activeElement && document.activeElement.matches("
+                "'[data-testid=\"quest-drawer__abandon-confirm-no\"]')"
+            )
+        )
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 0)
 
         # Confirm abandon
-        self._tab_until_focused(page, '[data-testid="quest-log__abandon-confirm-yes"]')
+        self._tab_until_focused(page, '[data-testid="quest-drawer__abandon-confirm-yes"]')
         _press(page, "Enter")  # 確認放棄
         self._wait_panel(page, lambda p: p["guild"]["quests"][0]["state"] == "failed")
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 1)
@@ -180,7 +194,7 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertEqual(panel["pagination"]["quest_total"], 1)
 
         self._open_guild_menu(page)
-        self.assertEqual(page.locator('[data-testid^="quest-log__row--"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 1)
         self.assertEqual(store_state(page)["hudDrawer"], "quest")
         depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
 
@@ -198,8 +212,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
         inject_update(page, {"services": updated, "quest_log": quest_log})
 
         # The quest row drops from the book, and the drawer stays open at unchanged depth.
-        page.wait_for_selector('[data-testid="quest-log__empty"]', timeout=5000)
-        self.assertEqual(page.locator('[data-testid^="quest-log__row--"]').count(), 0)
+        page.wait_for_selector('[data-testid="quest-drawer__empty"]', timeout=5000)
+        self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__detail"]').count(), 0)
         self.assertEqual(store_state(page)["hudDrawer"], "quest")
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
@@ -209,9 +224,10 @@ class GuildQuestJourneys(ServicesBrowserTest):
         "webclient-service-menus::the-quest-drawer-separates-the-player-s-quest-book-from-the-guild-counter",
     )
     def test_drawer_renders_book_and_counter_without_duplication(self):
-        """quest-drawer-split: in front of the clerk the drawer hosts both
-        surfaces — the quest book and the counter — and the accepted quest
-        appears exactly once: the counter lists no quest-record rows."""
+        """quest-drawer-split, re-shaped by quest-drawer-book-tab: in front of
+        the clerk the drawer hosts both tabs — the quest book and the
+        counter — and the accepted quest appears exactly once: the counter
+        tab lists no quest-record rows."""
         page = self.logged_in_page()
         self._wait_services_available(page)
         page.evaluate(
@@ -220,13 +236,17 @@ class GuildQuestJourneys(ServicesBrowserTest):
         )
         page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
         body = page.locator('[data-testid="quest-drawer"]')
-        # Exactly one book row for the held quest; the counter surface is
-        # present but carries no quest-record rows at all.
-        self.assertEqual(body.locator('[data-testid^="quest-log__row--"]').count(), 1)
+        # Exactly one book row for the held quest.
+        self.assertEqual(body.locator('[data-testid^="quest-drawer__row--"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 0)
+        # The counter tab is enabled in front of the clerk and carries no
+        # quest-record rows at all.
+        self._select_quest_tab(page, "counter")
         self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 1)
         self.assertEqual(
             page.locator('[data-testid^="guild-counter__quest-row--"]').count(), 0
         )
+        self.assertEqual(body.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
 
 
 class GuildTurninJourneys(ServicesBrowserTest):
@@ -247,7 +267,14 @@ class GuildTurninJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
-        self._tab_until_focused(page, '[data-testid="quest-log__turnin"]')
+        # The completed quest's detail carries the counter's enabled turn-in,
+        # and the completed count is emphasized while it waits.
+        completed_count = page.locator(
+            '[data-testid="quest-drawer__state-rail"] [data-tab-key="completed"] .icon-tabs__count'
+        )
+        self.assertIn("icon-tabs__count--hot", completed_count.get_attribute("class"))
+        self._select_quest_state(page, "completed")
+        self._tab_until_focused(page, '[data-testid="quest-drawer__turnin"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["wallet"] == wallet_after)
         self.assertEqual(sent_action_count(page, "guild.quest_turnin"), 1)
@@ -275,9 +302,12 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
 
     def _ensure_guild_counter(self, page):
         # The quest drawer stays open across the read-only schedule reply and
-        # the wait; reopen it through the host only when it is not on screen.
+        # the wait; reopen it through the host only when it is not on screen,
+        # then select its counter tab.
         if not page.locator('[data-testid="guild-counter__exam"]').is_visible():
-            self._open_guild_menu(page)
+            if not page.locator('[data-testid="quest-drawer"]').is_visible():
+                self._open_guild_menu(page)
+            self._select_quest_tab(page, "counter")
         page.locator('[data-testid="guild-counter__exam"]').wait_for(state="visible")
 
     def _request_exam(self, page, expected_code):
@@ -339,7 +369,9 @@ class GuildExamAppointmentJourney(ServicesBrowserTest):
         # 3. The completed board quest's merit reaches the threshold; the
         # present qualified host now starts the simulated examination.
         self._ensure_guild_counter(page)
-        self._tab_until_focused(page, '[data-testid="quest-log__turnin"]')
+        self._select_quest_tab(page, "book")
+        self._select_quest_state(page, "completed")
+        self._tab_until_focused(page, '[data-testid="quest-drawer__turnin"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["guild"]["rank"]["merit_qualified"] is True)
         self._request_exam(page, "exam_started")

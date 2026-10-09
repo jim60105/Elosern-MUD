@@ -145,7 +145,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Data/ConditionChips", "Data/ParticipantFrame",
                 "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ShopPanel",
-                "World/QuestLog", "World/GuildCounter", "World/LoreCodexDrawer", "World/InventoryPanel",
+                "World/QuestDrawer", "World/GuildCounter", "World/LoreCodexDrawer", "World/InventoryPanel",
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
@@ -217,6 +217,11 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/IconTabs",
                 "World/GradeGem",
                 "World/GuildRankCard",
+                # The quest drawer's list and detail columns joined with
+                # quest-drawer-book-tab, when World/QuestDrawer replaced
+                # World/QuestLog.
+                "World/QuestList",
+                "World/QuestDetail",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

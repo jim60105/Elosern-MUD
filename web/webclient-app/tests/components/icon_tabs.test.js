@@ -197,6 +197,21 @@ describe("IconTabs (quest-drawer-ui-primitives)", () => {
     expect(tab("book").attributes("data-tip")).toBe("任務簿");
   });
 
+  it("binds a tab's reasonAttrs onto its reason without displacing the described id", () => {
+    mountTabs({
+      tabs: [
+        TOP_TABS[0],
+        { ...TOP_TABS[1], reasonAttrs: { "data-testid": "host__reason", "data-reason-code": "r1", id: "stolen" } },
+      ],
+      modelValue: "book",
+      orientation: "horizontal",
+    });
+    const reason = wrapper.get('[data-testid="host__reason"]');
+    expect(reason.attributes("data-reason-code")).toBe("r1");
+    expect(reason.attributes("id")).toBe(tab("counter").attributes("aria-describedby"));
+    expect(reason.text()).toBe("需在公會職員面前");
+  });
+
   it("wires aria-controls only when the tab names a panel", () => {
     mountTabs({ tabs: TOP_TABS, modelValue: "book", orientation: "horizontal" });
     expect(tab("book").attributes("aria-controls")).toBe("panel-book");

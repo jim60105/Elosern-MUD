@@ -261,6 +261,33 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             f"Tab did not reach element matching {selector} after {max_presses} presses (landed on: {active_tag})"
         )
 
+    def _select_in_quest_tablist(self, page, tablist_testid, key, next_key):
+        """Select one tab of a quest-drawer tablist by keyboard only.
+
+        quest-drawer-book-tab: each icon tablist keeps one roving tab stop, so
+        Tab reaches the list once, the arrow keys move focus along it, and
+        Enter selects (moving focus alone never selects).
+        """
+        tablist = f'[data-testid="{tablist_testid}"]'
+        self._tab_until_focused(page, f'{tablist} [role="tab"][tabindex="0"]', max_presses=40)
+        for _ in range(8):
+            if page.evaluate("() => document.activeElement && document.activeElement.dataset.tabKey") == key:
+                break
+            _press(page, next_key)
+        else:
+            self.fail(f"{tablist} has no tab {key!r} reachable by {next_key}")
+        _press(page, "Enter")
+        page.wait_for_selector(f'{tablist} [data-tab-key="{key}"][aria-selected="true"]', timeout=5000)
+
+    def _select_quest_tab(self, page, key):
+        """Select the quest drawer's book or counter tab (the drawer always
+        lands on the book)."""
+        self._select_in_quest_tablist(page, "quest-drawer__top-tabs", key, "ArrowRight")
+
+    def _select_quest_state(self, page, state):
+        """Select a quest book state tab (in_progress, completed, failed)."""
+        self._select_in_quest_tablist(page, "quest-drawer__state-rail", state, "ArrowDown")
+
     def _replace_focused_number(self, page, value):
         """Replace the currently focused number entry's value using the keyboard."""
         page.keyboard.press("Control+A")

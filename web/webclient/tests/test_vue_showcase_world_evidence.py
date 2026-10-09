@@ -60,7 +60,7 @@ STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 WORLD_FAMILY_KEYS = (
     "World/LocalMap",
     "World/ShopPanel",
-    "World/QuestLog",
+    "World/QuestDrawer",
     "World/GuildCounter",
     "World/LoreCodexDrawer",
     "World/InventoryPanel",
@@ -90,12 +90,15 @@ WORLD_FAMILY_STORY_IDS = {
     "world-lorecodexdrawer--entry-selected",
     "world-lorecodexdrawer--empty-codex",
     "world-lorecodexdrawer--unavailable",
-    "world-questlog--book-plus-counter",
-    "world-questlog--book-no-counter",
-    "world-questlog--empty-book",
-    "world-questlog--panel-unavailable",
-    "world-questlog--private-commission-row",
-    "world-questlog--disabled-counter-action",
+    "world-questdrawer--book-in-progress",
+    "world-questdrawer--completed-hot-badge",
+    "world-questdrawer--failed",
+    "world-questdrawer--empty-book",
+    "world-questdrawer--away-from-counter",
+    "world-questdrawer--counter-tab",
+    "world-questdrawer--counter-unavailable",
+    "world-questdrawer--book-unavailable",
+    "world-questdrawer--book-before-commit",
     "world-guildcounter--full-counter",
     "world-guildcounter--guild-absent",
     "world-guildcounter--counter-unavailable",
@@ -216,6 +219,11 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/IconTabs",
     "World/GradeGem",
     "World/GuildRankCard",
+    # The quest drawer's list and detail columns joined with
+    # quest-drawer-book-tab, when World/QuestDrawer replaced World/QuestLog
+    # in the family.
+    "World/QuestList",
+    "World/QuestDetail",
 }
 
 # The World-directory story files that sit outside the B4 family: the
@@ -223,13 +231,16 @@ PREVIOUS_MANIFEST_KEYS = {
 # alignment (its stories render the committed title_ballot panel). The
 # story-count partition below asserts the family files plus exactly these.
 # World/LettersPanel joined when the correspondence folio landed, and
-# World/GradeGem and World/GuildRankCard with quest-drawer-ui-primitives.
+# World/GradeGem and World/GuildRankCard with quest-drawer-ui-primitives,
+# and World/QuestList and World/QuestDetail with quest-drawer-book-tab.
 WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/TitleBallotMenu",
     "World/DreamPanel",
     "World/LettersPanel",
     "World/GradeGem",
     "World/GuildRankCard",
+    "World/QuestList",
+    "World/QuestDetail",
 )
 
 
@@ -344,7 +355,7 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ShopPanel",
-                "QuestLog", "GuildCounter", "LoreCodexDrawer", "InventoryPanel",
+                "QuestDrawer", "GuildCounter", "LoreCodexDrawer", "InventoryPanel",
                 "MapLattice",
             )},
         )

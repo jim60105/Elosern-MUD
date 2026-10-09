@@ -347,19 +347,12 @@ body {
 .elosern-root .equipment-doll__slots { grid-template-columns: repeat(2, minmax(calc(60px * var(--ui-scale)), 1fr)); width: 100%; }
 .elosern-root .equipment-doll__box { width: 100%; border-radius: var(--radius-sm); }
 .elosern-root [data-testid="inventory-panel__section--wallet"] { grid-column: 1 / 3; padding: calc(14px * var(--ui-scale)); border: var(--line); border-radius: var(--radius-sm); }
-.elosern-root .quest-drawer { gap: calc(20px * var(--ui-scale)); }
-.elosern-root .quest-log,
 .elosern-root .guild-counter { border: 1px solid #88765380; border-radius: var(--radius); padding: calc(20px * var(--ui-scale)); background: #17191ee8; }
-.elosern-root .quest-log__title,
 .elosern-root .guild-counter__title { font: var(--text-2xl) var(--f-serif); color: var(--gold-400); padding-bottom: calc(15px * var(--ui-scale)); border-bottom: var(--line); }
-.elosern-root .quest-log__row { padding: calc(16px * var(--ui-scale)) calc(18px * var(--ui-scale)); border: 1px solid #73706870; border-radius: var(--radius-sm); background: linear-gradient(110deg, #28272a70, #121419b0); }
-.elosern-root .quest-log__row-name,
 .elosern-root .guild-counter__row-name { font: var(--text-lg) var(--f-serif); }
-.elosern-root .quest-log__row-objective,
 .elosern-root .guild-counter__row-objective { font-size: var(--text-md); }
 .elosern-root .guild-counter__row { padding: calc(14px * var(--ui-scale)) calc(16px * var(--ui-scale)); border: var(--line); border-radius: var(--radius-sm); background: #14161ac0; margin-bottom: calc(10px * var(--ui-scale)); }
-.elosern-root .guild-counter__action,
-.elosern-root .quest-log__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale)); border-radius: var(--radius-sm); }
+.elosern-root .guild-counter__action { border-color: #bda477; background: linear-gradient(#9b84503d, #9b845013); color: var(--gold-400); padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale)); border-radius: var(--radius-sm); }
 
 @media (max-width: 1350px) {
   /* 278px keeps the map anchor (right column - 28px) exactly as wide as the

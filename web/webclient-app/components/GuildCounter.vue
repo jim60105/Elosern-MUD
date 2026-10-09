@@ -7,7 +7,7 @@
 // section and invents nothing.
 //
 // It deliberately does NOT render the guild section's `quests` rows: the
-// holder's accepted quest records live in the quest book (QuestLog), so no
+// holder's accepted quest records live in the quest book (QuestDrawer), so no
 // quest is presented twice in one drawer.
 import { computed } from "vue";
 import GuildRankCard from "./GuildRankCard.vue";
