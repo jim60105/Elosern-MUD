@@ -49,7 +49,14 @@ def _read_full_title(entity: Any) -> str:
 
 
 def _require_gauge(data: dict[str, Any], key: str) -> GaugeValue:
-    """Read one gauge trait dict strictly without constructing a handler."""
+    """Read one gauge trait dict strictly without constructing a handler.
+
+    A computed maximum of exactly 0 is valid stored state (e.g. sanctioned
+    zero MP/SP monster profiles); negative maxima fail closed. Unset current
+    defaults to maximum (yielding 0 / 0 when maximum is 0). Bounds ensure
+    current is non-negative and does not exceed maximum (thus rejecting any
+    nonzero current on a zero-maximum gauge).
+    """
     raw = data.get(key)
     if not isinstance(raw, Mapping):
         raise StatusQueryError(f"missing gauge trait {key!r}")
@@ -63,8 +70,8 @@ def _require_gauge(data: dict[str, Any], key: str) -> GaugeValue:
     if isinstance(mult, bool) or not isinstance(mult, (int, float)):
         raise StatusQueryError(f"gauge {key!r} mult is not numeric")
     maximum = int(round((base + mod) * mult))
-    if maximum <= 0:
-        raise StatusQueryError(f"gauge {key!r} has a non-positive maximum")
+    if maximum < 0:
+        raise StatusQueryError(f"gauge {key!r} has a negative maximum")
     current = raw.get("current")
     if current is None:
         # GaugeTrait defaults an unset current to full.

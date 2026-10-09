@@ -246,6 +246,60 @@ class StatusReadModelTests(EvenniaTest):
             build_status_read_model(self.actor)
 
     @covers_requirement(
+        "webclient-status-presentation::compact-status-reports-canonical-true-resources"
+    )
+    def test_zero_maximum_gauge_reads_verbatim(self):
+        traits = dict(self.actor.attributes.get("traits", category="traits"))
+        # (a) Zero computed maximum with current 0 (set and unset) keeps panel available
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        model = build_status_read_model(self.actor)
+        self.assertEqual(model.resources["mp"].current, 0)
+        self.assertEqual(model.resources["mp"].maximum, 0)
+
+        # unset current defaults to maximum (0)
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1}
+        self.actor.attributes.add("traits", traits, category="traits")
+        model = build_status_read_model(self.actor)
+        self.assertEqual(model.resources["mp"].current, 0)
+        self.assertEqual(model.resources["mp"].maximum, 0)
+
+        # fractional mult rounding to zero maximum also accepted by the reader
+        traits["mp"] = {"base": 1, "mod": 0, "mult": 0.4, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        model = build_status_read_model(self.actor)
+        self.assertEqual(model.resources["mp"].current, 0)
+        self.assertEqual(model.resources["mp"].maximum, 0)
+
+    def test_negative_maximum_gauge_fails_closed(self):
+        traits = dict(self.actor.attributes.get("traits", category="traits"))
+        # negative base
+        traits["mp"] = {"base": -5, "mod": 0, "mult": 1, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+        # mod dragging base + mod below zero
+        traits["mp"] = {"base": 5, "mod": -10, "mult": 1, "current": 0}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+    def test_nonzero_current_on_zero_maximum_fails_closed(self):
+        traits = dict(self.actor.attributes.get("traits", category="traits"))
+        # positive current with zero maximum
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": 1}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+        # negative current with zero maximum
+        traits["mp"] = {"base": 0, "mod": 0, "mult": 1, "current": -1}
+        self.actor.attributes.add("traits", traits, category="traits")
+        with self.assertRaises(StatusQueryError):
+            build_status_read_model(self.actor)
+
+    @covers_requirement(
         "webclient-status-presentation::status-conditions-use-deterministic-matched-modifiers"
     )
     def test_poisoned_buff_reports_duration_and_exact_adjustment(self):
