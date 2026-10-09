@@ -692,6 +692,9 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         # Consumed budget is exactly 30 (not 60!)
         self.assertEqual(get_divert_consumed(self.defender.buffs.all[buff_def.key]), 30)
 
+    @covers_requirement(
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
+    )
     def test_divert_full_absorption_preserves_hit_evidence(self):
         """Scenario: Fully diverted damage (0 HP loss) still emits hit=True evidence."""
         buff_def = BuffDefinition(
@@ -730,6 +733,9 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(dmg.hit_evidence[0].target, self.defender)
         self.assertTrue(dmg.hit_evidence[0].hit)
 
+    @covers_requirement(
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
+    )
     def test_single_strike_has_exactly_one_roll(self):
         """Scenario: One source strike has exactly one roll and emits one hit evidence."""
         with patch("world.rules.combat.damage.roll_d100", return_value=50) as mock_roll:

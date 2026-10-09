@@ -58,6 +58,9 @@ from ._support import (
 class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     """Behavior tests for drain legs and caster recovery share."""
 
+    @covers_requirement(
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
+    )
     def test_dependent_drain_rider_skips_on_miss_resolves_on_hit(self):
         """Scenario: A hit-dependent drain rider skips on miss and resolves on hit."""
         from world.rules.combat import Battlefield, BattlefieldActionContext

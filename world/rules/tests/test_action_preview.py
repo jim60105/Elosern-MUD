@@ -486,6 +486,9 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(preflight.outcome, "success")
 
+    @covers_requirement(
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
+    )
     def test_preflight_on_hit_dependent_skill_is_dice_free_and_succeeds(self):
         """Scenario: Preflight validates structure without rolls or manufactured hit outcomes."""
         dep_skill = _DEP_SKILL
@@ -499,6 +502,9 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(mock_roll.call_count, 0)
         self.assertEqual(preflight.outcome, "success")
 
+    @covers_requirement(
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
+    )
     def test_forged_context_and_cross_invocation_hit_cannot_qualify_miss(self):
         """Scenario: Forged caller data or previous hit outcome cannot qualify a new miss."""
         dep_skill = _DEP_SKILL

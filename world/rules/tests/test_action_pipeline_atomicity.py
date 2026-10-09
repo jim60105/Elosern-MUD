@@ -5,6 +5,7 @@ from copy import deepcopy
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import (
     ActionRequest,
@@ -83,6 +84,9 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         self.assertFalse(entity.attributes.has("sexual_traits", category="traits"))
         self.assertEqual(entity.sexual.arousal.value, 0)
 
+    @covers_requirement(
+        "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback"
+    )
     def test_miss_skips_rider_pays_costs_and_claims_practice(self):
         """Scenario: A miss skips dependent transfer while paying costs and awarding practice."""
         actor = create_object(PlayerCharacter, key="atomic_actor")
@@ -126,6 +130,9 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
         # Practice was claimed
         self.assertTrue(len(practice_claims_for(actor, skill.key)) > 0)
 
+    @covers_requirement(
+        "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback"
+    )
     def test_late_failure_restores_all_gauges_and_releases_same_tick_practice(self):
         """Scenario: Late failure restores actor/target gauges and releases practice claims."""
         actor = create_object(PlayerCharacter, key="fail_actor")

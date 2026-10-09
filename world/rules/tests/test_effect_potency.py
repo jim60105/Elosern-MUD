@@ -250,6 +250,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
         )
         self.assertEqual(spell.effect_policies[0].coefficient, 3.2)
 
+    @covers_requirement(
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences"
+    )
     def test_effect_policy_requires_hit_from_type_validation(self):
         # Non-negative int accepted
         p0 = EffectPolicy(requires_hit_from=0)
@@ -263,6 +266,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     EffectPolicy(requires_hit_from=bad)
 
+    @covers_requirement(
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences"
+    )
     def test_skill_def_requires_hit_from_semantic_validation(self):
         # Out of bounds / self reference at index 0
         with self.assertRaises(ValueError):

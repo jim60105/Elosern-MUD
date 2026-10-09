@@ -78,7 +78,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         return skill
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
     )
     def test_per_target_isolation_with_duplicate_display_names(self):
         """Scenario: Identity is not display text; targets with same key/label isolate hit qualifications."""
@@ -124,7 +124,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertEqual(drain_entries[0].target, str(foe1.key))
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::damage-provides-trusted-invocation-local-typed-hit-outcomes"
     )
     def test_single_strike_hit_and_miss_vectors_no_extra_roll(self):
         """Scenario: Exactly source hit roll occurs; hit delivers rider, miss skips it, no extra roll."""
@@ -156,7 +156,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res_miss.event_log.entries))
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
     )
     def test_multi_strike_all_hit_miss_vectors_any_hit_once_per_target(self):
         """Scenario: Multi-strike any-hit: 2 strikes -> (hit, hit), (hit, miss), (miss, hit), (miss, miss). Rider executes once per target on any hit."""
@@ -193,7 +193,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
                 self.assertEqual(len(drains), expected_drains)
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences"
     )
     def test_source_occurrence_independence_repeated_damage_ids(self):
         """Scenario: Two identical damage occurrences; rider referring to second occurrence only checks second."""
@@ -230,7 +230,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertTrue(any(e.kind == "gauge_transfer" for e in res_b.event_log.entries))
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
     )
     def test_reuse_by_already_supported_target_status_effect(self):
         """Scenario: A target buff/status effect depends on damage hit; reuses contract without species branch."""
@@ -262,7 +262,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertFalse(any(e.kind == "buff_applied" and e.data.get("buff_key") == "paralysis" for e in res_miss.event_log.entries))
 
     @covers_requirement(
-        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints"
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
     )
     def test_audience_never_expands_self_or_allies_absent_from_hit_set(self):
         """Scenario: Rider audience cannot add entities absent from damage hit set (e.g. self/allies)."""
