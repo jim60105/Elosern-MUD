@@ -59,6 +59,56 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     """Behavior tests for drain legs and caster recovery share."""
 
     @covers_requirement(
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
+    )
+    def test_dependent_drain_rider_skips_on_miss_resolves_on_hit(self):
+        """Scenario: A hit-dependent drain rider skips on miss and resolves on hit."""
+        from world.rules.combat import Battlefield, BattlefieldActionContext
+        bf = Battlefield(
+            roster={str(self.actor.key): self.actor, str(self.target.key): self.target},
+            teams={"team_a": {str(self.actor.key)}, "team_b": {str(self.target.key)}},
+        )
+        ctx = BattlefieldActionContext(bf)
+        skill = self._register_synth_skill(
+            _make_synth_transfer_skill(
+                "synth_dep_drain_rider",
+                effects=("damage:fire:physical", "gauge_transfer:mp:drain:fixed:10"),
+                effect_policies=(
+                    EffectPolicy(),
+                    EffectPolicy(
+                        requires_hit_from=0,
+                        transfer=GaugeTransferPolicy(caster_recovery_share=0.5),
+                    ),
+                ),
+            )
+        )
+        self.actor.traits.mp.current = 50
+        self.target.traits.mp.current = 50
+
+        # 1. Miss skips drain rider entirely
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
+            req_miss = ActionRequest(self.actor, skill.key, [self.target], ctx)
+            res_miss = ActionResolver.resolve(req_miss)
+        self.assertEqual(res_miss.outcome, "success")
+        self.assertEqual(int(self.target.traits.mp.current), 50)
+        self.assertEqual(int(self.actor.traits.mp.current), 50)
+        self.assertFalse(any(e.kind == "gauge_transfer" for e in res_miss.event_log.entries))
+
+        # 2. Hit executes drain rider and awards caster share
+        self.actor.traits.agility.base = 20
+        self.target.traits.agility.base = 10
+        self.target.traits.defense.base = 10
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            req_hit = ActionRequest(self.actor, skill.key, [self.target], ctx)
+            res_hit = ActionResolver.resolve(req_hit)
+        self.assertEqual(res_hit.outcome, "success")
+        # Target lost 10 MP -> 40
+        self.assertEqual(int(self.target.traits.mp.current), 40)
+        # Caster recovered 50% of 10 = 5 MP -> 55
+        self.assertEqual(int(self.actor.traits.mp.current), 55)
+        self.assertTrue(any(e.kind == "gauge_transfer" for e in res_hit.event_log.entries))
+
+    @covers_requirement(
         "action-resolution-pipeline::the-effect-resolution-registry-is-open-prefix-keyed-and-every-handler-declares-its"
     )
     @covers_requirement("gauge-transfer-effects::drains-pay-through-their-gauge-s-canonical-writer-on-both-legs-and-share-on-the-actual-amount")

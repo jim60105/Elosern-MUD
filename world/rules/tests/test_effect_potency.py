@@ -250,6 +250,124 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
         )
         self.assertEqual(spell.effect_policies[0].coefficient, 3.2)
 
+    @covers_requirement(
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences"
+    )
+    def test_effect_policy_requires_hit_from_type_validation(self):
+        # Non-negative int accepted
+        p0 = EffectPolicy(requires_hit_from=0)
+        self.assertEqual(p0.requires_hit_from, 0)
+        p1 = EffectPolicy(requires_hit_from=1)
+        self.assertEqual(p1.requires_hit_from, 1)
+
+        # Reject negative, boolean, non-integer types
+        for bad in (-1, -5, True, False, "0", 1.0, [0], {"a": 1}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    EffectPolicy(requires_hit_from=bad)
+
+    @covers_requirement(
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences"
+    )
+    def test_skill_def_requires_hit_from_semantic_validation(self):
+        # Out of bounds / self reference at index 0
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="bad_self_dep",
+                label="Self Dep",
+                description="desc",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                effects=["damage:fire:magic"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(EffectPolicy(requires_hit_from=0),),
+            )
+
+        # Forward reference: index 0 depends on index 1
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="bad_fwd_dep",
+                label="Fwd Dep",
+                description="desc",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                effects=["damage:fire:magic", "damage:fire:magic"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(
+                    EffectPolicy(requires_hit_from=1),
+                    EffectPolicy(),
+                ),
+            )
+
+        # Out-of-range reference: index 1 depends on index 5
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="bad_oor_dep",
+                label="OOR Dep",
+                description="desc",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                effects=["damage:fire:magic", "buff_apply:focus"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(
+                    EffectPolicy(),
+                    EffectPolicy(requires_hit_from=5),
+                ),
+            )
+
+        # Non-damage dependency reference
+        with self.assertRaises(ValueError):
+            SkillDef(
+                key="bad_nondmg_dep",
+                label="Non Damage Dep",
+                description="desc",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                effects=["buff_apply:focus", "gauge_transfer:mp:drain:fixed:5"],
+                category=SkillCategory.ELEMENTAL_MAGIC,
+                effect_policies=(
+                    EffectPolicy(),
+                    EffectPolicy(requires_hit_from=0),
+                ),
+            )
+
+        # Valid earlier damage dependency
+        valid = SkillDef(
+            key="valid_dep",
+            label="Valid Dep",
+            description="desc",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            effects=["damage:fire:magic", "gauge_transfer:mp:drain:fixed:5"],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            effect_policies=(
+                EffectPolicy(),
+                EffectPolicy(requires_hit_from=0),
+            ),
+        )
+        self.assertEqual(valid.effect_policies[1].requires_hit_from, 0)
+
+        # Repeated identical damage effects: distinct occurrences referenced by index
+        repeated = SkillDef(
+            key="repeated_dep",
+            label="Repeated Dep",
+            description="desc",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            effects=[
+                "damage:fire:magic",
+                "damage:fire:magic",
+                "gauge_transfer:mp:drain:fixed:5",
+            ],
+            category=SkillCategory.ELEMENTAL_MAGIC,
+            effect_policies=(
+                EffectPolicy(),
+                EffectPolicy(),
+                EffectPolicy(requires_hit_from=1),
+            ),
+        )
+        self.assertEqual(repeated.effect_policies[2].requires_hit_from, 1)
+
 
 class DirectHandlerPotencyTests(unittest.TestCase):
     """Formula and direct-handler behavior with effect potency."""

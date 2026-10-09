@@ -66,6 +66,14 @@ class CommitFailed(Exception):
 
 
 @dataclass(frozen=True)
+class DamageHitEvidence:
+    """Typed per-target hit evidence produced during damage staging."""
+
+    target: Any
+    hit: bool
+
+
+@dataclass(frozen=True)
 class ActionRequest:
     """One caller-neutral request to invoke a skill.
 
@@ -125,6 +133,7 @@ class PendingEffect:
     # boundary, never by the writer) only when this effect commits. ``None``
     # stages nothing.
     notify: str | None = None
+    hit_evidence: tuple[DamageHitEvidence, ...] = ()
 
 
 class UnsnapshottedSurfaceError(Exception):

@@ -70,6 +70,39 @@ and topological order. Excluded entries affect no counts. Eligible racial nodes
 remain discoverable without ownership or sufficient MP; ordinary usability
 checks still report those separate limitations. Isolated skills create no tree.
 
+## Effect occurrence dependencies
+
+A skill effect may declare a dependency on an earlier damage occurrence in the same
+ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
+
+- **Occurrence indexing**: `requires_hit_from` is a non-negative, strictly earlier
+  integer index (`0 <= requires_hit_from < i`) pointing into the skill's ordered
+  `effects` list. Self-references, forward references, out-of-range indices, and
+  references to non-damage effects fail at construction/registry load before play.
+  Repeated identical damage effect strings remain distinct occurrences identified
+  unambiguously by their numeric index. Unconfigured effects retain normal independent
+  behavior.
+- **Hit versus HP loss**: A dependency is satisfied by a successful to-hit roll
+  (`hit=True`) from the referenced damage occurrence, independently of actual HP loss.
+  A source hit that deals 0 residual damage due to target defense, shields, or 100%
+  damage diversion still qualifies as a hit for dependent effects. Conversely, a miss
+  (`hit=False`) fails qualification even if other effects resolve. Each strike rolls
+  its hit check exactly once.
+- **Recipient and any-hit semantics**: The recipient pool of a dependent occurrence
+  is the intersection of its validated ordinary planned audience (selected, allies,
+  or enemies) and the set of targets hit by the referenced source occurrence. Targets
+  absent from source hits receive no rider; relation and gauge gates remain in effect.
+  For multi-strike source damage, a dependent effect executes once per target when
+  any strike lands (any-hit semantics); multiple hits on the same target do not multiply
+  the rider.
+- **Settlement and atomicity**: Hit dependencies participate in the existing atomic
+  action transaction with effects-before-cost order. A missed source strike skips the
+  dependent rider while normal costs and successful-action practice semantics are
+  still paid and awarded. If a commit fails late, all participant gauges and touched
+  surfaces restore to pre-action values, and same-tick practice claims are released.
+  Dependency resolution does not recheck post-damage living state between damage and
+  riders, nor does it reorder existing settlement or defeat processing.
+
 ## 2. 事前決定：這個魔法是哪一種形狀？
 
 新增前先回答三個問題，決定寫法：
