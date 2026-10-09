@@ -85,6 +85,9 @@ class ExamScheduleHoldTests(EvenniaTestCase):
         )
 
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    @covers_requirement(
+        "guild-exam-schedule-hold::active-exams-defer-host-schedule-occurrences-and-release-through-shared-traversal"
+    )
     def test_weekly_departure_after_synthetic_terminal_sequences(self):
         # Each sequence models the predecessor API contract; production terminal
         # wiring belongs to persistent-guild-exam-lifecycle.
@@ -124,6 +127,9 @@ class ExamScheduleHoldTests(EvenniaTestCase):
                     self.assertEqual(traversal.call_count, 2)
                     self.assertEqual(get_world_clock().tick, DAY + 1)
 
+    @covers_requirement(
+        "guild-exam-schedule-hold::held-interval-release-is-recoverable-and-idempotent"
+    )
     def test_pending_and_completed_release_survive_cold_cache(self):
         self._begin()
         self._settle()
@@ -138,6 +144,9 @@ class ExamScheduleHoldTests(EvenniaTestCase):
         self.assertEqual(self._snapshot(), completed)
         self.assertTrue(read_exam_schedule_hold(self.host).hold.released)
 
+    @covers_requirement(
+        "guild-exam-schedule-hold::held-interval-release-is-recoverable-and-idempotent"
+    )
     def test_marker_persistence_failure_restores_storage_location_and_caches(self):
         self._begin()
         self._settle()
