@@ -1,5 +1,7 @@
 """Services panel schema tests: guild/store/giver envelope validation."""
 import unittest
+from copy import deepcopy
+from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS, MAX_RANK_LADDER
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size
 from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_POINTS, MAX_HOST_DISPLAY_NAME_CODE_POINTS, MAX_INVENTORY_ROWS, MAX_KEY_CODE_POINTS, MAX_QUEST_ROWS, MAX_PRESENTATION_KEY_CODE_POINTS, MAX_PRESENTATION_SUMMARY_CODE_POINTS, MAX_QUANTITY, MAX_SELLABLE_ROWS, MAX_STOCK_ROWS, SERVICES_SCHEMA_VERSION, ServicesPanelError, validate_services
 from world.quests.tests._fixtures import quest
@@ -8,6 +10,69 @@ from ._support import UNREGISTERED_PLAYER, _T_MEAL, _T_MEAL_DISPLAY, _action, _a
 
 class ServicesSchemaTests(unittest.TestCase):
     """Exact D4 bounds and envelope gate at the validator level."""
+
+    def test_twelve_maximal_board_rows_fit_existing_maximal_sections(self):
+        payload = _realistic_maximal_payload()
+        payload["guild"]["board"] = _all_ceilings_payload()["guild"]["board"]
+        payload["guild"]["rank_ladder"].append(payload["guild"]["board"][0]["rank"])
+        self.assertEqual(json_byte_size(payload), 57616)
+        self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
+        self.assertEqual(len(validate_services(payload)["guild"]["board"]), MAX_BOARD_ROWS)
+
+    def test_structured_board_exact_fields_and_optional_bounds(self):
+        guild = _valid_guild()
+        row = guild["board"][0]
+        for field, maximum in (
+            ("objective_note", 128), ("deadline_line", 64),
+            ("rationale", MAX_BOARD_PROSE_CODE_POINTS),
+            ("flavor", MAX_BOARD_PROSE_CODE_POINTS),
+        ):
+            for value, accepted in ((None, True), ("獎" * maximum, True), ("", False), ("獎" * (maximum + 1), False)):
+                with self.subTest(field=field, value=value):
+                    candidate = deepcopy(guild)
+                    candidate["board"][0][field] = value
+                    payload = _valid_payload(guild=candidate, pagination={**_valid_payload()["pagination"], "board_total": 1})
+                    if accepted:
+                        self.assertEqual(validate_services(payload)["guild"]["board"][0][field], value)
+                    else:
+                        with self.assertRaises(ProtocolValidationError):
+                            validate_services(payload)
+        self.assertNotIn("reward_summary", row)
+        self.assertEqual(set(row), {"definition_key", "display_name", "category", "rank", "objective_summary", "objective_note", "deadline_line", "rationale", "flavor", "reward", "accept"})
+
+    def test_structured_reward_rejects_drift_and_item_overflow(self):
+        item = {"item_key": "synthetic_item", "display_name": "合成物品", "quantity": 2}
+        good = {"copper": 120, "merit": 45, "items": [item]}
+        for reward, accepted in (
+            (good, True), (None, False),
+            ({**good, "items": [item] * 2}, False),
+            ({**good, "items": [item] * 9}, False),
+            ({**good, "copper": True}, False),
+            ({**good, "merit": -1}, False),
+            ({**good, "items": [{**item, "quantity": 0}]}, False),
+            ({**good, "items": [{**item, "extra": 1}]}, False),
+        ):
+            with self.subTest(reward=reward):
+                guild = _valid_guild()
+                guild["board"][0]["reward"] = reward
+                payload = _valid_payload(guild=guild, pagination={**_valid_payload()["pagination"], "board_total": 1})
+                if accepted:
+                    self.assertEqual(validate_services(payload)["guild"]["board"][0]["reward"], good)
+                else:
+                    with self.assertRaises(ProtocolValidationError):
+                        validate_services(payload)
+
+    def test_guild_branch_and_ladder_bounds_uniqueness_and_membership(self):
+        for changes in (
+            {"branch_label": ""}, {"branch_label": "獎" * 257},
+            {"rank_ladder": []}, {"rank_ladder": ["F", "F"]},
+            {"rank_ladder": [str(index) for index in range(MAX_RANK_LADDER + 1)]},
+            {"rank_ladder": ["F", "x" * 9]}, {"rank_ladder": ["E"]},
+            {"rank_ladder": ["F", None]},
+        ):
+            with self.subTest(changes=changes):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_services(_valid_payload(guild=_valid_guild(**changes), pagination={**_valid_payload()["pagination"], "board_total": 1}))
 
 
     def _inventory_payload(self, presentation):

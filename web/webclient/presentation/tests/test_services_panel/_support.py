@@ -3,6 +3,7 @@ from web.webclient.presentation.services import MAX_BOARD_ROWS, MAX_DETAIL_CODE_
 from world.quests.tests._fixtures import quest, register_catalog_once
 from world.rules.tests._guild_service_probes import synthetic_branch_key
 from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
+from web.webclient.presentation.services import MAX_BOARD_PROSE_CODE_POINTS
 
 
 # The shipped affinity rulebook cross-references one catalog quest by key, so
@@ -100,13 +101,20 @@ def _valid_payload(**overrides):
 
 def _valid_guild(**overrides):
     value = {
+        "branch_label": "合成公會分行",
+        "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
         "registration": {"registered": True, "register": _action(enabled=False)},
         "board": [
             {
                 "definition_key": "introductory_hunt",
                 "display_name": "討伐低階魔物",
                 "objective_summary": "討伐 1 隻低階魔物",
-                "reward_summary": "獎勵：銅 50、功績 25、治療藥水 × 2",
+                "category": "defeat",
+                "objective_note": None,
+                "deadline_line": None,
+                "rationale": None,
+                "flavor": None,
+                "reward": {"copper": 50, "merit": 25, "items": []},
                 "rank": "F",
                 "accept": _action("guild.quest_accept"),
             }
@@ -152,7 +160,15 @@ def _all_ceilings_payload():
             "definition_key": _max_string(MAX_KEY_CODE_POINTS),
             "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS),
             "objective_summary": _max_string(MAX_SUMMARY_CODE_POINTS),
-            "reward_summary": _max_string(MAX_SUMMARY_CODE_POINTS),
+            "category": "defeat",
+            "objective_note": _max_string(MAX_SUMMARY_CODE_POINTS),
+            "deadline_line": _max_string(64),
+            "rationale": _max_string(MAX_BOARD_PROSE_CODE_POINTS),
+            "flavor": _max_string(MAX_BOARD_PROSE_CODE_POINTS),
+            "reward": {"copper": 0, "merit": 0, "items": [{
+                "item_key": _max_string(MAX_KEY_CODE_POINTS),
+                "display_name": _max_string(MAX_DISPLAY_NAME_CODE_POINTS), "quantity": 1,
+            }]},
             "rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
             "accept": _action(
                 "guild.quest_accept",
@@ -243,6 +259,8 @@ def _all_ceilings_payload():
             "next_threshold": 1,
         },
         guild={
+            "branch_label": _max_string(256),
+            "rank_ladder": [_max_string(MAX_RANK_KEY_CODE_POINTS)],
             "registration": {
                 "registered": True,
                 "register": _action(
@@ -291,7 +309,12 @@ def _realistic_maximal_payload():
             "definition_key": f"quest_key_{index}",
             "display_name": "討伐低階魔物",
             "objective_summary": "討伐 1 隻低階魔物",
-            "reward_summary": "獎勵：銅 50、功績 25、治療藥水 × 2",
+            "category": "defeat",
+            "objective_note": None,
+            "deadline_line": None,
+            "rationale": None,
+            "flavor": None,
+            "reward": {"copper": 50, "merit": 25, "items": []},
             "rank": "F",
             "accept": _action("guild.quest_accept", label="接取"),
         }
@@ -363,6 +386,8 @@ def _realistic_maximal_payload():
             "next_threshold": 50,
         },
         guild={
+            "branch_label": "合成公會分行",
+            "rank_ladder": ["F", "E", "D", "C", "B", "A", "S"],
             "registration": {
                 "registered": True,
                 "register": _action(

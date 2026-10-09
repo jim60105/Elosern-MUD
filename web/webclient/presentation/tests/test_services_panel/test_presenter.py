@@ -20,6 +20,9 @@ from world.rules.tests._guild_service_probes import install_synthetic_catalog, p
 from world.tests.synthetic_data import SYNTH_ITEMS
 from ._support import BRANCH, T_SHOP, _T_SPRAY, _T_THORN
 import unittest
+from dataclasses import replace
+from unittest.mock import patch
+from world.lore.guild import GUILD_BRANCH_REGISTRY
 
 
 class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
@@ -101,6 +104,39 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(payload["pagination"]["quest_total"], 1)
         self.assertEqual(payload["player"]["guild_rank"], "F")
         self.assertEqual(payload["guild"]["registration"]["registered"], True)
+        row = payload["guild"]["board"][0]
+        self.assertEqual(row["category"], "defeat")
+        self.assertEqual(row["reward"], {"copper": 50, "merit": 25, "items": []})
+        self.assertIsNone(row["rationale"])
+        self.assertIsNone(row["flavor"])
+
+    def test_cross_branch_acceptance_matches_board_reward_and_quest_issuer(self):
+        destination_key = "synthetic_visiting_branch"
+        destination = replace(
+            GUILD_BRANCH_REGISTRY[BRANCH], key=destination_key,
+            display_name_zh="合成旅途分會",
+        )
+        with patch.dict(GUILD_BRANCH_REGISTRY, {destination_key: destination}):
+            visiting_staff = create_object(NPC, key="visiting counter", location=self.store)
+            visiting_staff.components.add(GuildStaff.create(
+                visiting_staff, service_id="visiting_staff", branch_key=destination_key,
+            ))
+            visiting_quest = register(quest("services_visiting_quest", stages=(QuestStage(0, defeat(tier="low")),)))
+            register_guild_offer(GuildQuestOffer(
+                definition_key=visiting_quest.key, issuer_branch_key=destination_key,
+                reward=QuestReward(copper=50, items=(), merit=25),
+            ))
+            self.player.location = self.store
+            before = self._render()["guild"]
+            board_row = next(row for row in before["board"] if row["definition_key"] == visiting_quest.key)
+            accept_guild_offer(self.player, visiting_staff, visiting_quest.key)
+            services = self._render()
+            book = build_production_registry().render("quest_log", self._context())
+            row = next(row for row in book["rows"] if row["definition_key"] == visiting_quest.key)
+            self.assertEqual(board_row["reward"], row["reward"])
+            self.assertEqual(services["guild"]["branch_label"], destination.display_name_zh)
+            self.assertEqual(services["guild"]["branch_label"], row["issuer"]["label"])
+            self.assertNotEqual(services["guild"]["branch_label"], GUILD_BRANCH_REGISTRY[BRANCH].display_name_zh)
 
 
     def test_shop_renders_exact_copper_and_open_state(self):
