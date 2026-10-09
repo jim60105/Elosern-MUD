@@ -5,6 +5,7 @@ from typing import Any
 
 from .effects import StatMultiplyEffect
 from .registry import SKILL_REGISTRY
+from .restrictions import restricted_neutral_value, skill_effect_allowed
 
 
 # Change 10c/16 grant universal actions that must not depend on imported skill data.
@@ -99,12 +100,25 @@ class SkillHandler:
     def effective_value(self, trait_key: str) -> int:
         """Return a derived multiplied value without mutating stored traits."""
         base = getattr(self.entity.traits, trait_key).value
+        return self._effective_value_from_base(trait_key, base)
+
+    def stored_effective_value(self, trait_key: str) -> int:
+        """Read the identical static fold without mounting a trait handler."""
+        traits = self.entity.attributes.get("traits", category="traits")
+        raw = traits[trait_key]
+        base = raw.get("value", raw.get("current", (raw.get("base", 0) + raw.get("mod", 0)) * raw.get("mult", 1)))
+        return self._effective_value_from_base(trait_key, base)
+
+    def _effective_value_from_base(self, trait_key: str, base: int) -> int:
+        """One passive/grant fold shared by live and no-create readers."""
         multiplier = 1.0
         owned = [
             *self._raw.get("active", []),
             *self._raw.get("passive", []),
         ]
         for skill_key in dict.fromkeys(owned):
+            if not skill_effect_allowed(self.entity, skill_key):
+                continue
             skill = SKILL_REGISTRY.get(skill_key)
             if skill is None:
                 continue
@@ -113,6 +127,8 @@ class SkillHandler:
                 multiplier *= owned_multiplier
 
         for grant in self.conferred_grants():
+            if not skill_effect_allowed(self.entity, grant.skill_key):
+                continue
             source_skill = SKILL_REGISTRY.get(grant.skill_key)
             if source_skill is None:
                 continue
@@ -121,7 +137,9 @@ class SkillHandler:
             )
             if source_multiplier is not None:
                 multiplier *= source_multiplier * grant.scale
-        return round(base * multiplier)
+        return restricted_neutral_value(
+            self.entity, trait_key, round(base * multiplier)
+        )
 
     def conferred_grants(self) -> list[ConferredSkillGrant]:
         """Return explicitly recorded partial skill grants."""

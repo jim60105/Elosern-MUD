@@ -31,6 +31,7 @@ from world.rules.targeting import (
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.registry import SKILL_REGISTRY, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.restrictions import skill_effect_allowed
 
 from world.rules.action.contracts import (
     ActionRequest,
@@ -113,6 +114,8 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     skill = SKILL_REGISTRY.get(request.skill_key)
     if skill is None or skill.key not in request.actor.skills.owned_keys():
         raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
+    if not skill_effect_allowed(request.actor, skill.key):
+        raise RejectedAction(RejectReason.EXAM_SKILL_SEALED, skill.key)
     # The lineage gate (use-driven-skill-lineage DC2): an owned skill whose
     # prerequisite chain is unmet is rejected with the SAME reason, its detail
     # deterministically naming the first unmet edge. Detail stays the bare

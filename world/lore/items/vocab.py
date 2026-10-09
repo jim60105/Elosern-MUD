@@ -128,6 +128,10 @@ class EquipmentModifierKey(StrEnum):
     MILITARY_A_ARMOR = "military_a_armor"
     MILITARY_S_SWORD = "military_s_sword"
     MILITARY_S_ARMOR = "military_s_armor"
+    GUILD_LIMIT_E = "guild_limit_e"
+    GUILD_LIMIT_D = "guild_limit_d"
+    GUILD_LIMIT_C = "guild_limit_c"
+    GUILD_LIMIT_B = "guild_limit_b"
     NYMPH_BUDS_CLAMP = "nymph_buds_clamp"
     PASSION_SILK_CHOKER = "passion_silk_choker"
     PILGRIM_MEDALLION = "pilgrim_medallion"
@@ -240,9 +244,14 @@ class ItemDefinition:
     use_mechanics: ItemUseMechanics | None = None
     equipment_slot: EquipmentSlot | None = None
     modifier_key: EquipmentModifierKey | None = None
+    guild_property: bool = False
 
     def __post_init__(self) -> None:
         """Require the frozen presentation object and exclusive mechanics."""
+        if not isinstance(self.guild_property, bool):
+            raise ValueError("guild_property must be a boolean")
+        if self.guild_property and self.sellable:
+            raise ValueError("guild property cannot be sellable")
         if not isinstance(self.presentation, ItemPresentation):
             raise ValueError(
                 f"item {self.key!r} presentation must be an ItemPresentation"

@@ -92,6 +92,13 @@ An active examination restriction is persisted with its examination identity and
 
 Allowed skill lists include the required lower sword lineage. They are execution/effect restrictions, not destructive edits to prerequisite ownership. Direct action requests, active-skill availability, passive stat readers, combat modifiers, gauges, and initiative must agree about the active restriction.
 
+The restriction core exposes `preflight_exam_restriction`, `activate_exam_restriction`,
+and exam-scoped `remove_exam_restriction` from `world.rules.guild_exam_restrictions`.
+Profiles live in `rulebook/guild_exam_restrictions.yaml`; `guild_exam_restriction`
+persists the exam/host identities, allowed skills, reducing neutral ceilings,
+effective ceilings, and pre-activation equipment/inventory. The lifecycle slice
+owns live start/terminal wiring and its wider normal-outfit/pool restoration.
+
 ### 4.2 E–B target states
 
 | Target | HP ceiling | MP ceiling | SP ceiling | Attack ceiling | Agility ceiling | Defense ceiling | Magic ceiling | Highest permitted sword skill | Body enhancement |
@@ -117,6 +124,12 @@ The present engine's initiative reads skill-effective agility before gear, while
 | S | 200/120/120 | 20/20/19 | 35 | 36/31/35 | `true_sword_saint` |
 
 The A and S hosts use their respective rank's configured examination kit and usable sword lineage, rather than increasing Hok's capabilities. Standard examination selection seals unrelated utility effects for comparability. The S reference includes the current sword-saint lineage's domain effect, including its attack bonus; 36 is its pre-active-effect attack value, not a ceiling that removes the measured domain effect. No 100-times or 1000-times body multiplier is introduced to inflate these ranks.
+
+A/S permit `body_enhancement_basic` at its existing 1.2 multiplier while
+sealing `defense_instinct` and unrelated utilities. With the real military
+pairs this gives A 30/25/29 and S 36/31/35 attack/agility/defense before domain
+activation. These authored runtime-reference checks do not replace the later
+calibration slice's encounter outcome evidence.
 
 ### 4.4 Start, settlement, and recovery
 

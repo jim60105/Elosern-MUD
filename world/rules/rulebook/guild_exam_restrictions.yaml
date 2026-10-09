@@ -1,0 +1,50 @@
+sword_root: basic_swordplay
+guild_exam_policies:
+  E:
+    accessory: guild_limit_e
+    weapon: military_e_sword
+    armor: military_e_armor
+    top_skill: basic_swordplay
+    body_skill: null
+    ceilings: {hp: 100, mp: 100, sp: 100, atk_phys: 11, agility: 8, defense: 10, magic_power: 10}
+    initiative_agility: 8
+  D:
+    accessory: guild_limit_d
+    weapon: military_d_sword
+    armor: military_d_armor
+    top_skill: flowing_strikes
+    body_skill: body_enhancement_basic
+    ceilings: {hp: 110, mp: 100, sp: 100, atk_phys: 15, agility: 12, defense: 15, magic_power: 12}
+    initiative_agility: 11
+  C:
+    accessory: guild_limit_c
+    weapon: military_c_sword
+    armor: military_c_armor
+    top_skill: tendon_sever
+    body_skill: body_enhancement_basic
+    ceilings: {hp: 130, mp: 110, sp: 110, atk_phys: 20, agility: 16, defense: 19, magic_power: 20}
+    initiative_agility: 14
+  B:
+    accessory: guild_limit_b
+    weapon: military_b_sword
+    armor: military_b_armor
+    top_skill: thousand_blade_art
+    body_skill: body_enhancement_basic
+    ceilings: {hp: 145, mp: 110, sp: 110, atk_phys: 25, agility: 20, defense: 24, magic_power: 25}
+    initiative_agility: 17
+  A:
+    accessory: null
+    weapon: military_a_sword
+    armor: military_a_armor
+    top_skill: blade_saint_arts
+    body_skill: body_enhancement_basic
+    ceilings: {}
+    initiative_agility: null
+  S:
+    accessory: null
+    weapon: military_s_sword
+    armor: military_s_armor
+    top_skill: true_sword_saint
+    body_skill: body_enhancement_basic
+    ceilings: {}
+    initiative_agility: null

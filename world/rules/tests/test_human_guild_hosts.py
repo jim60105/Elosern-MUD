@@ -23,7 +23,7 @@ from world.rules.progression import can_use_skill
 from world.skills.registry import SkillKind, SkillPrerequisite
 from world.skills.equipment import EquipmentSlot
 from world.tests.synthetic_data import make_item, make_skill, synthetic_registries
-
+from world.tests.synthetic_data import make_subrace
 
 class PersistentHumanGuildHostTests(EvenniaTest):
     def setUp(self):
@@ -41,9 +41,10 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         modifier_key = next(iter(EquipmentModifierKey))
         sword = make_item("t_host_sword", equipment_slot=EquipmentSlot.WEAPON_MAIN, modifier_key=modifier_key)
         armor = make_item("t_host_armor", equipment_slot=EquipmentSlot.ARMOR, modifier_key=modifier_key)
-        scope = synthetic_registries("items", "skills", extra={
+        scope = synthetic_registries("items", "skills", "subraces", extra={
             "skills": {row.key: row for row in (root, self.skill, passive)},
             "items": {row.key: row for row in (sword, armor)},
+            "subraces": {"t_subrace": make_subrace("t_subrace", race_key="human")},
         })
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
@@ -55,7 +56,7 @@ class PersistentHumanGuildHostTests(EvenniaTest):
                                  voice=NpcVoiceLines(greeting="「來坐吧。」", misunderstood="「再說一次吧。」"))
         self.person = GuildAdventurer(
             "t_person", "合成旅人", "旅人", self.profile.key, "t_home", "t_rank",
-            "human_plains", (150, 120, 120, 15, 15, 15, 25), self.skill.key,
+            "t_subrace", (150, 120, 120, 15, 15, 15, 25), self.skill.key,
             (sword.key, armor.key), "t_person_weekly",
             branch_key="t_branch",
         )

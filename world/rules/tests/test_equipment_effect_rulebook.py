@@ -67,7 +67,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 75)
+        self.assertEqual(len(loaded), 79)
         self.assertEqual(
             set(loaded),
             {
@@ -643,7 +643,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 75)
+        self.assertEqual(len(enum_values), 79)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():
@@ -1070,6 +1070,125 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
                 self.assertEqual(parse_merchant_stock(merchant)[key], 2)
                 self.assertEqual(merchant.last_restock_day, 1)
                 host.delete()
+
+
+class GuildRestrictionAuthoredKitTests(EvenniaTest):
+    """Data-contract test: approved restriction rows produce real-kit references."""
+
+    def _host(self, rank):
+        from evennia.utils.create import create_object
+        from typeclasses.npcs import NPC
+        from world.rules.equipment import toggle_equipment
+        from world.rules.guild_exam_restrictions import PROFILES
+        from world.skills.registry import SKILL_REGISTRY, SkillKind
+
+        host = create_object(NPC, key=f"authored kit {rank}", location=self.room1)
+        host.race = "human"
+        host.subrace = "human_plains"
+        host.apply_race_baseline()
+        bases = (
+            (170, 120, 120, 17, 17, 16, 30)
+            if rank == "A" else (200, 120, 120, 20, 20, 19, 35)
+        )
+        for key, value in zip(("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"), bases):
+            host.traits.get(key).base = value
+            if key in ("hp", "mp", "sp"):
+                host.traits.get(key).rate = 0
+                host.traits.get(key).current = value
+        profile = PROFILES[rank]
+        keys = (*profile.allowed_skills, "heal", "defense_instinct")
+        host.db.skills = {
+            "active": [key for key in keys if SKILL_REGISTRY[key].kind is SkillKind.ACTIVE],
+            "passive": [key for key in keys if SKILL_REGISTRY[key].kind is SkillKind.PASSIVE],
+        }
+        host.db.skill_proficiency = {key: 1000.0 for key in keys}
+        host.db.inventory = [profile.weapon, profile.armor]
+        for key in host.db.inventory:
+            self.assertEqual(toggle_equipment(host, key).outcome, "success")
+        return host
+
+    def test_real_a_s_kits_seal_unrelated_effects_and_retain_domain(self):
+        from unittest.mock import patch
+        from world.rules.action import ActionRequest, ActionResolver
+        from world.rules.combat import Battlefield, BattlefieldActionContext
+        from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
+        from world.rules.guild_exam_restrictions import activate_exam_restriction, remove_exam_restriction
+        from world.skills.restrictions import skill_effect_allowed
+
+        target = self._host("S")
+        target.key = "authored domain target"
+        target.traits.hp.base = 20000
+        target.traits.hp.current = 20000
+        for rank, expected in (("A", (30, 25, 29)), ("S", (36, 31, 35))):
+            host = self._host(rank)
+            bases = {key: host.traits.get(key).base for key in host.traits.all()}
+            ownership = dict(host.db.skills)
+            proficiency = dict(host.db.skill_proficiency)
+            activate_exam_restriction(host, f"authored-{rank}", rank)
+            modifiers = evaluate_combat_modifiers(host)
+            self.assertEqual((
+                host.skills.effective_value("atk_phys") + modifiers["atk_phys"],
+                adjusted_agility(host),
+                host.skills.effective_value("defense") + modifiers["defense"],
+            ), expected)
+            self.assertFalse(skill_effect_allowed(host, "defense_instinct"))
+            self.assertFalse(skill_effect_allowed(host, "heal"))
+            self.assertTrue(skill_effect_allowed(host, "body_enhancement_basic"))
+            if rank == "S":
+                battlefield = Battlefield(
+                    {"one": frozenset({str(host.key)}), "two": frozenset({str(target.key)})},
+                    {str(host.key): host, str(target.key): target},
+                )
+                context = BattlefieldActionContext(battlefield, event_context={"simulated": True}, nonlethal=True)
+                with patch("world.rules.combat.damage.roll_d100", return_value=1):
+                    result = ActionResolver.resolve(ActionRequest(host, "true_sword_saint", [target], context))
+                self.assertEqual(result.outcome, "success")
+                self.assertEqual(host.skills.effective_value("atk_phys") + evaluate_combat_modifiers(host)["atk_phys"], 48)
+            remove_exam_restriction(host, f"authored-{rank}")
+            self.assertEqual({key: host.traits.get(key).base for key in host.traits.all()}, bases)
+            self.assertEqual(dict(host.db.skills), ownership)
+            self.assertEqual(dict(host.db.skill_proficiency), proficiency)
+
+    def test_real_limit_accessories_lower_s_senior_and_keep_hamstring(self):
+        from copy import deepcopy
+        from world.rules.buffs import apply_buff, _remove_buff_keys
+        from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
+        from world.rules.equipment import toggle_equipment
+        from world.rules.guild_exam_restrictions import PROFILES, activate_exam_restriction, remove_exam_restriction
+
+        host = self._host("S")
+        before = deepcopy((dict(host.db.skills), dict(host.db.skill_proficiency), {key: host.traits.get(key).base for key in host.traits.all()}))
+        rows = (
+            ("E", (100, 100, 100, 11, 8, 10, 10), 8),
+            ("D", (110, 100, 100, 15, 12, 15, 12), 11),
+            ("C", (130, 110, 110, 20, 16, 19, 20), 14),
+            ("B", (145, 110, 110, 25, 20, 24, 25), 17),
+        )
+        for rank, expected, initiative in rows:
+            profile = PROFILES[rank]
+            host.db.inventory = [*host.db.inventory, profile.weapon, profile.armor]
+            for key in (profile.weapon, profile.armor):
+                self.assertEqual(toggle_equipment(host, key).outcome, "success")
+            activate_exam_restriction(host, f"authored-{rank}", rank)
+            self.assertIn(profile.accessory, host.db.equipment["accessories"])
+            modifiers = evaluate_combat_modifiers(host)
+            self.assertEqual((
+                host.traits.hp.max, host.traits.mp.max, host.traits.sp.max,
+                host.skills.effective_value("atk_phys") + modifiers["atk_phys"],
+                adjusted_agility(host),
+                host.skills.effective_value("defense") + modifiers["defense"],
+                host.skills.effective_value("magic_power") + modifiers.get("magic_power", 0),
+            ), expected)
+            self.assertEqual(host.skills.effective_value("agility"), initiative)
+            if rank == "D":
+                apply_buff(host, "martial_hamstring")
+                self.assertEqual(adjusted_agility(host), 7)
+                _remove_buff_keys(host, ("martial_hamstring",))
+            remove_exam_restriction(host, f"authored-{rank}")
+            self.assertEqual((dict(host.db.skills), dict(host.db.skill_proficiency), {key: host.traits.get(key).base for key in host.traits.all()}), before)
+            self.assertFalse(ITEM_REGISTRY[profile.accessory].sellable)
+            self.assertTrue(ITEM_REGISTRY[profile.accessory].guild_property)
+            self.assertTrue(all(profile.accessory not in shop.offered_item_keys for shop in SHOP_REGISTRY.values()))
 
 
 if __name__ == "__main__":

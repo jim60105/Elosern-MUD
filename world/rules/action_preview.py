@@ -140,6 +140,10 @@ def _skill_wide_failure(
     skill = SKILL_REGISTRY.get(skill_key)
     if skill is None or skill_key not in actor.skills.owned_keys():
         return RejectReason.UNKNOWN_SKILL, skill_key
+    from world.skills.restrictions import skill_effect_allowed
+
+    if not skill_effect_allowed(actor, skill_key):
+        return RejectReason.EXAM_SKILL_SEALED, skill_key
     # The lineage gate mirrors ``_step1_ownership`` exactly, so the preview
     # never advertises a skill the resolver would reject (DC2): can_use_skill
     # is the boolean authority (the ONE shared predicate), and

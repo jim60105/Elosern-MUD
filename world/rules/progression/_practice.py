@@ -59,8 +59,12 @@ def _owned_growth_factor(entity: Any, skill: SkillDef) -> float:
     if not _is_elemental_magic(skill):
         return 1.0
     scope = skill.element.key
+    from world.skills.restrictions import skill_effect_allowed
+
     factor = 1.0
     for skill_key in dict.fromkeys(entity.skills.owned_keys()):
+        if not skill_effect_allowed(entity, skill_key):
+            continue
         owned = SKILL_REGISTRY.get(skill_key)
         if owned is None:
             continue

@@ -419,4 +419,13 @@ class Object(ObjectParent, DefaultObject):
 
     """
 
-    pass
+    def at_pre_move(self, destination, **kwargs) -> bool:
+        """Keep materialized guild property with its issuing container."""
+        from world.lore.items import ITEM_REGISTRY
+        from world.rules.equipment import registry_key_for_object
+
+        key = registry_key_for_object(self)
+        definition = ITEM_REGISTRY.get(key)
+        if definition is not None and definition.guild_property:
+            return False
+        return super().at_pre_move(destination, **kwargs)

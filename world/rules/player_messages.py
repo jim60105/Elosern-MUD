@@ -11,6 +11,7 @@ from world.rules.action import RejectReason
 
 _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.UNKNOWN_SKILL: "你不會使用這項技能。",
+    RejectReason.EXAM_SKILL_SEALED: "公會考核的封印使這項技能暫時無法施展。",
     RejectReason.SKILL_NOT_ACTIVE: "被動技能不能主動施展。",
     RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT: "這項技能無法在目前場合施展。",
     RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET: "該技能會造成傷害，必須鎖定同場的怪物（需先處於戰鬥中）。",

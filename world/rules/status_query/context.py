@@ -54,6 +54,10 @@ class _StoredSkillsFacade:
         return self.entity.db
 
     @property
+    def pk(self) -> Any:
+        return self.entity.pk
+
+    @property
     def skills(self) -> "_StoredSkillsFacade":
         return self
 

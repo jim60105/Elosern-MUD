@@ -211,6 +211,40 @@ uv run --locked python -m tools.spec_traceability check
 
 ## 4. 常見錯誤
 
+### Guild examination property and restriction profiles
+
+`ItemDefinition.guild_property=True` identifies guild-owned examination
+accessories and requires `sellable=False`. Such items have ordinary accessory
+slots and budget-valid equipment-effect entries, but inventory acquisition,
+reward issuance, purchase, sale, and contained-object transfer reject them.
+Only `world.rules.guild_exam_restrictions` issues and wears a limiting
+accessory. Ordinary equipment toggles reject guild property and any active
+examination kit.
+
+`world/rules/rulebook/guild_exam_restrictions.yaml` owns the rank-specific
+military pair, top sword skill, permitted basic enhancement, effective ceilings,
+and pregear initiative ceiling. Profile loading validates registry references
+and derives the full lower sword tree, including branches at the permitted
+depth. The host must already own a usable lineage. The overlay never changes
+ownership, proficiency, or literal stat bases.
+
+The lifecycle-facing API is `preflight_exam_restriction(host, target_rank,
+equipment=proposed_kit)`, followed by `activate_exam_restriction(host, exam_id,
+target_rank)` after the real held kit is equipped. Activation persists
+`guild_exam_restriction` with the exam and host identities and issues the real
+accessory inside a transaction. `remove_exam_restriction(host, exam_id)` is
+idempotent for an absent record and rejects a mismatched identity. It restores
+the pre-activation kit/inventory and normal gauge limits. The examination
+lifecycle separately owns full pool restoration, temporary combat effects,
+normal-outfit snapshots, and live start/terminal wiring.
+
+Restrictions first reduce permitted neutral skill values. Equipment and
+permitted positive combat changes are capped before transient negative
+contributions are added. Initiative keeps its existing pregear formula;
+hit resolution includes gear. Direct resolution, preflight, availability,
+passive readers, gauges, and status decomposition read the same persisted
+policy. A/S have no reducing ceilings and retain their domain effects.
+
 | 錯誤 | 後果 |
 |---|---|
 | 把治療量、價格寫進 `ItemDefinition` | 違反「身份與數值分離」，consumer 端會開始複製常數；registry 驗證與規格稽核都會擋下 |

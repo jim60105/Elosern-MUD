@@ -25,6 +25,7 @@ from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
 from world.rules.sexual_state import PLEASURE_CONFIG
 from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
 from world.skills.equipment import dual_wielding_from_storage
+from world.skills.restrictions import exam_restriction, skill_effect_allowed
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
 
@@ -171,12 +172,10 @@ def evaluate_combat_modifiers_no_create(entity: Any) -> dict[str, Any]:
     handler materialization, no writes) holds for the equipment contribution
     too.
     """
-    result: dict[str, Any] = {}
-    for _, adjustments in matched_combat_modifiers(
+    bundles = [adjustments for _, adjustments in matched_combat_modifiers(
         entity, context=build_no_create_condition_context(entity)
-    ):
-        result = _merge_adjustments(result, adjustments)
-    return _merge_adjustments(result, equipment_adjustments(entity))
+    )]
+    return _restriction_aware_merge(entity, bundles)
 
 
 def _build_context(entity) -> dict[str, Any]:
@@ -291,7 +290,7 @@ def _church_mitigation_scale(entity: Any, rule_id: str) -> float:
         owned = set(raw_skills.get("passive", [])) | set(raw_skills.get("active", []))
     scale = 1.0
     for effect in rules.passive_effects:
-        if effect.skill_key in owned and "mitigation" in effect.effects:
+        if effect.skill_key in owned and skill_effect_allowed(entity, effect.skill_key) and "mitigation" in effect.effects:
             mitigation = effect.effects["mitigation"]
             if rule_id in mitigation:
                 val = mitigation[rule_id]
@@ -339,6 +338,9 @@ def matched_combat_modifiers(
         context.setdefault("worn_item_keys", worn_item_keys(entity))
     matches: list[tuple[str, dict[str, Any]]] = []
     for rule in _RULES:
+        skill_key = rule.when.get("skill_owned")
+        if skill_key is not None and not skill_effect_allowed(entity, skill_key):
+            continue
         if not evaluate_condition(rule.when, context):
             continue
         adjustments = dict(rule.then)
@@ -365,10 +367,48 @@ def combat_modifier_predicates() -> dict[str, dict[str, Any]]:
 
 def evaluate_combat_modifiers(entity) -> dict[str, Any]:
     """Return the merged matching bundle without mutating entity state."""
+    return _restriction_aware_merge(
+        entity, [adjustments for _, adjustments in matched_combat_modifiers(entity)]
+    )
+
+
+def _restriction_aware_merge(entity, bundles: list[dict[str, Any]]) -> dict[str, Any]:
+    """Cap permitted positive effects before adding transient negative effects."""
+    bundles = [*bundles, equipment_adjustments(entity)]
     result: dict[str, Any] = {}
-    for _, adjustments in matched_combat_modifiers(entity):
+    for adjustments in bundles:
         result = _merge_adjustments(result, adjustments)
-    return _merge_adjustments(result, equipment_adjustments(entity))
+    record = exam_restriction(entity)
+    if record is None or not record["ceilings"]:
+        return result
+    from world.skills.handler import SkillHandler
+
+    skills = SkillHandler(entity)
+    for key in ("atk_phys", "defense", "magic_power"):
+        ceiling = record["ceilings"].get(key)
+        if ceiling is None:
+            continue
+        values = [bundle.get(key, 0) for bundle in bundles]
+        positive = sum(max(0, value) for value in values)
+        negative = sum(min(0, value) for value in values)
+        neutral = skills.stored_effective_value(key)
+        result[key] = min(positive, max(0, ceiling - neutral)) + negative
+    ceiling = record["ceilings"].get("agility")
+    if ceiling is not None:
+        neutral = skills.stored_effective_value("agility")
+        percentages = [
+            float(bundle["agility"][:-1])
+            for bundle in bundles if "agility" in bundle
+        ]
+        flats = [bundle.get("agility_flat", 0) for bundle in bundles]
+        positive = neutral * sum(max(0, value) for value in percentages) / 100
+        positive += sum(max(0, value) for value in flats)
+        result["agility"] = f"{sum(min(0, value) for value in percentages):+g}%"
+        result["agility_flat"] = (
+            min(positive, max(0, ceiling - neutral))
+            + sum(min(0, value) for value in flats)
+        )
+    return result
 
 
 def adjusted_agility(entity: Any, modifiers: dict[str, Any] | None = None) -> float:
