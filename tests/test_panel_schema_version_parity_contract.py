@@ -64,6 +64,10 @@ _PANEL_MODULES = (
 
 
 class PanelSchemaVersionParityContract(unittest.TestCase):
+    def test_structured_quest_log_is_version_two(self):
+        self.assertEqual(self._module_value("quest_log.py", "QUEST_LOG_SCHEMA_VERSION"), 2)
+        self.assertEqual(self._js_allowlist_value(protocol_client_source(), "quest_log"), 2)
+
     @covers_requirement(
         "webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only",
         "webclient-oob-protocol::every-panel-payload-has-an-exact-availability-discriminator",

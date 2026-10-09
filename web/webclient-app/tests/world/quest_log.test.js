@@ -63,19 +63,24 @@ describe("QuestLog (quest-drawer-split merge rules)", () => {
     expect(ids).toEqual(["quest-log__row--q_1042", "quest-log__row--q_2077"]);
     const row = w.get('[data-testid="quest-log__row--q_1042"]');
     expect(row.get('[data-testid="quest-log__quest-state"]').text()).toBe("進行中");
-    expect(row.get('[data-testid="quest-log__quest-stage"]').text()).toContain("3");
-    expect(row.get('[data-testid="quest-log__quest-deadline"]').text()).toBe("剩餘 2 日");
+    expect(row.get('[data-testid="quest-log__quest-stage"]').text()).toBe("第 1 階段 ‧ 進度 1");
+    expect(row.get('[data-testid="quest-log__quest-deadline"]').text()).toBe("期限：剩餘 48 小時");
     expect(row.get('[data-testid="quest-log__quest-detail"]').text()).toBe(
-      "老周把三袋糧食交給你，要求天亮前送到磨坊。",
+      QUEST_LOG_PANEL_SAMPLE.rows[0].flavor,
     );
-    expect(row.text()).toContain("將十袋糧食運往磨坊（3／10）");
-    expect(row.text()).toContain("獎勵：400 銅＋公會功績 25");
+    expect(row.text()).toContain("在東部大平原討伐 2 隻穗鳴雀");
+    expect(row.text()).toContain("計數變體：領群型、啄穗型");
+    expect(row.text()).toContain(QUEST_LOG_PANEL_SAMPLE.rows[0].rationale);
+    expect(row.get('[data-testid="quest-log__reward"]').text()).toBe("獎勵：銅 40、功績 20、治療藥水 × 2");
+    expect(row.text()).not.toContain("獎勵：獎勵：");
+    const privateRow = w.get('[data-testid="quest-log__row--q_2077"]');
+    expect(privateRow.get('[data-testid="quest-log__reward"]').text()).toBe("獎勵：銅 220");
   });
 
   it("discloses the issuer and the settlement form on every row", () => {
     const w = mountBook();
     const guildRow = w.get('[data-testid="quest-log__row--q_1042"]');
-    expect(guildRow.get('[data-testid="quest-log__issuer"]').text()).toContain("南門公會");
+    expect(guildRow.get('[data-testid="quest-log__issuer"]').text()).toContain(QUEST_LOG_PANEL_SAMPLE.rows[0].issuer.label);
     expect(guildRow.get('[data-testid="quest-log__settlement"]').text()).toContain("櫃台");
     const npcRow = w.get('[data-testid="quest-log__row--q_2077"]');
     expect(npcRow.get('[data-testid="quest-log__issuer"]').text()).toContain("守塔人");
@@ -84,12 +89,12 @@ describe("QuestLog (quest-drawer-split merge rules)", () => {
 
   it("renders nothing in the reward line's place when the panel carries null", () => {
     const questLog = structuredClone(QUEST_LOG_PANEL_SAMPLE);
-    // The unresolvable-issuance form: settlement and reward_line are null
+    // The unresolvable-issuance form: settlement and reward are null
     // together (the strict reader's coherence rule).
     questLog.rows[1] = {
       ...questLog.rows[1],
       settlement: null,
-      reward_line: null,
+      reward: null,
     };
     const w = mountBook({ questLog });
     const npcRow = w.get('[data-testid="quest-log__row--q_2077"]');

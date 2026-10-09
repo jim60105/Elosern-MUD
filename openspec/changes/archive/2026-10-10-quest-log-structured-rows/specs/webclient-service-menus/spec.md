@@ -7,8 +7,8 @@ the quest settles at a counter or on completion, so a player can tell a guild co
 private one and knows whether a return trip is required. The row SHALL render the structured reward
 when the panel carries one, formatting copper, merit, and each item with its quantity from the
 `reward` object alone, and SHALL render nothing in its place when the panel carries `null`. The
-client SHALL NOT add a prefix the reward data does not carry, and SHALL NOT render a merit figure
-of zero.
+client SHALL render exactly one client-owned 獎勵 label without duplicating it, and SHALL NOT
+render a merit figure of zero.
 
 #### Scenario: A guild quest shows its counter requirement
 - **WHEN** a row whose settlement is `counter` renders

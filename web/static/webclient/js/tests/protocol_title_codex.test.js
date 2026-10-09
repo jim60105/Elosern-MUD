@@ -399,13 +399,17 @@ function validQuestLogRow(overrides) {
       definition_key: "introductory_hunt",
       display_name: "討伐低階魔物",
       state: "in_progress",
+      category: "defeat",
+      grade: "F",
       stage_index: 0,
       stage_total: 1,
       stage_progress: 0,
       objective_quantity: 1,
       objective_line: "討伐 1 隻低階魔物",
       deadline_line: "期限：剩餘 72 小時",
-      detail: "討伐低階魔物\n狀態：進行中\n階段：1",
+      objective_note: null,
+      rationale: null,
+      flavor: null,
       tracked: false,
       issuer: {
         kind: "guild",
@@ -413,7 +417,8 @@ function validQuestLogRow(overrides) {
         label: T_GUILD_NAME,
       },
       settlement: "counter",
-      reward_line: "獎勵：銅 50、功績 25",
+      reward: { copper: 50, merit: 25, items: [] },
+      reward_claimed: false,
       track: {
         action_id: "guild.quest_track",
         label: "追蹤",
@@ -427,14 +432,14 @@ function validQuestLogRow(overrides) {
 }
 
 function validQuestLogPanel(rows) {
-  return { schema_version: 1, available: true, rows: rows || [validQuestLogRow()] };
+  return require("./protocol_fixtures.js").validQuestLogPanel(rows || [validQuestLogRow()]);
 }
 
 test("quest_log available form validates, empty rows and null commission fields are legal", () => {
   assert.deepEqual(Protocol.validateQuestLogPanel(validQuestLogPanel()), validQuestLogPanel());
   const empty = Protocol.validateQuestLogPanel(validQuestLogPanel([]));
-  assert.deepEqual(empty, { schema_version: 1, available: true, rows: [] });
-  const unresolved = validQuestLogRow({ settlement: null, reward_line: null, deadline_line: null });
+  assert.deepEqual(empty, { schema_version: 2, available: true, rows: [] });
+  const unresolved = validQuestLogRow({ settlement: null, reward: null, deadline_line: null });
   assert.doesNotThrow(() => Protocol.validateQuestLogPanel(validQuestLogPanel([unresolved])));
 });
 
@@ -473,9 +478,9 @@ test("quest_log validator mirrors the server drift rejections", () => {
     validQuestLogPanel([
       validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { kind: "npc", key: "npc:#0" }) }),
     ]),
-    // settlement and reward_line must be null together
+    // settlement and reward must be null together
     validQuestLogPanel([validQuestLogRow({ settlement: null })]),
-    validQuestLogPanel([validQuestLogRow({ reward_line: null })]),
+    validQuestLogPanel([validQuestLogRow({ reward: null })]),
     // track descriptor drift
     validQuestLogPanel([
       validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { action_id: "shop.buy" }) }),
@@ -489,7 +494,13 @@ test("quest_log validator mirrors the server drift rejections", () => {
     // duplicate quest IDs
     validQuestLogPanel([validQuestLogRow({ quest_id: "q:1" }), validQuestLogRow({ quest_id: "q:1" })]),
     // over-bound string
-    validQuestLogPanel([validQuestLogRow({ detail: "字".repeat(513) })]),
+    validQuestLogPanel([validQuestLogRow({ flavor: "字".repeat(241) })]),
+    validQuestLogPanel([validQuestLogRow({ detail: "obsolete" })]),
+    validQuestLogPanel([validQuestLogRow({ category: "unknown" })]),
+    validQuestLogPanel([validQuestLogRow({ reward_claimed: "yes" })]),
+    validQuestLogPanel([validQuestLogRow({ reward: { copper: 1, merit: 0,
+      items: Array.from({length: require("../elosern/protocol/constants.js").QUEST_LOG_MAX_REWARD_ITEMS + 1},
+        () => ({item_key: "item", display_name: "物品", quantity: 1})) } })]),
     // lone surrogate
     validQuestLogPanel([validQuestLogRow({ display_name: "bad\ud800name" })]),
     // negative or non-int integers
@@ -498,22 +509,22 @@ test("quest_log validator mirrors the server drift rejections", () => {
     // non-bool tracked
     validQuestLogPanel([validQuestLogRow({ tracked: "yes" })]),
     // version drift and non-bool available
-    { schema_version: 2, available: true, rows: [] },
-    { schema_version: 1, available: false, rows: [] },
+    { schema_version: 1, available: true, rows: [] },
+    { schema_version: 2, available: false, rows: [] },
   ]) {
     assert.throws(() => Protocol.validateQuestLogPanel(bad));
   }
 });
 
 test("quest_log is in the production panel allowlist and rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
     revision: 5,
     mode: "exploration",
     panels: {
-      quest_log: { schema_version: 1, available: true, rows: "not-a-list" },
+      quest_log: { schema_version: 2, available: true, rows: "not-a-list" },
     },
     layout_version: 1,
     server_time: serverTime(),
@@ -521,6 +532,43 @@ test("quest_log is in the production panel allowlist and rejects atomically", ()
   assert.throws(() => Protocol.validateSnapshot(envelope));
   envelope.panels = { quest_log: validQuestLogPanel() };
   envelope.revision = 6;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+});
+
+test("maximal structured quest book fits a snapshot alongside populated tracker and counter", () => {
+  const C = require("../elosern/protocol/constants.js");
+  const rows = Array.from({length: C.QUEST_LOG_MAX_ROWS}, (_, i) => validQuestLogRow({
+    quest_id: String(i).padStart(64, "0"), definition_key: "k".repeat(64),
+    display_name: "字".repeat(128), objective_line: "字".repeat(128),
+    objective_note: "字".repeat(128), deadline_line: "字".repeat(64),
+    rationale: "字".repeat(240), flavor: "字".repeat(240),
+    stage_index: Number.MAX_SAFE_INTEGER, stage_total: Number.MAX_SAFE_INTEGER,
+    stage_progress: Number.MAX_SAFE_INTEGER, objective_quantity: Number.MAX_SAFE_INTEGER,
+    issuer: {kind: "npc", key: "npc:" + "k".repeat(60), label: "字".repeat(128)},
+    reward: {copper: Number.MAX_SAFE_INTEGER, merit: Number.MAX_SAFE_INTEGER,
+      items: Array.from({length: C.QUEST_LOG_MAX_REWARD_ITEMS},
+        () => ({item_key: "k".repeat(64), display_name: "字".repeat(128), quantity: Number.MAX_SAFE_INTEGER}))},
+    track: {...validQuestLogRow().track, label: "字".repeat(64)},
+  }));
+  const envelope = {
+    protocol_version: 1, presentation_epoch: VALID_EPOCH, revision: 1,
+    mode: "exploration", layout_version: 1, server_time: serverTime(),
+    panels: {quest_log: validQuestLogPanel(rows),
+      objectives: {schema_version: 1, available: true, rows: []},
+      services: {schema_version: C.PANEL_ALLOWLIST.services, available: false,
+        reason: {code: "services_unavailable", message: "目前無法辦理服務"}}},
+  };
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  const fixtures = require("./protocol_fixtures.js");
+  const services = fixtures.validServicesPanel();
+  services.guild.quests = rows.map((row) => fixtures.validServicesQuestRow({
+    quest_id: row.quest_id, definition_key: row.definition_key,
+  }));
+  services.pagination.quest_total = rows.length;
+  envelope.panels.services = services;
+  envelope.panels.objectives = validObjectivesPanel(rows.slice(0, 3).map(
+    (row) => validObjectivesRow({quest_id: row.quest_id})
+  ));
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
 });
 

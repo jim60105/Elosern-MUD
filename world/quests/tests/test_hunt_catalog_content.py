@@ -48,6 +48,7 @@ here yet; the archive worker attaches them once the ids exist in the index.
 """
 
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Mapping
 
@@ -75,6 +76,36 @@ from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.guild_config import load_guild_catalog
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+class StructuredDescribeCatalogContract(RegistryIsolationMixin, unittest.TestCase):
+    def test_catalog_parts_compose_identically_and_rewards_fit_the_panel(self):
+        """Data-contract test: all published quest prose and reward item bounds."""
+        from world.quests.describe import (
+            describe_objective, describe_objective_parts,
+            describe_reward, describe_reward_parts,
+        )
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+        from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
+        from web.webclient.presentation.quest_log import QUEST_LOG_MAX_REWARD_ITEMS
+
+        register_catalog()
+        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        for definition in QUEST_DEFINITION_REGISTRY.values():
+            for stage in definition.stages:
+                with self.subTest(definition=definition.key, stage=stage.index):
+                    line, note = describe_objective_parts(stage.objective)
+                    self.assertEqual(describe_objective(stage.objective),
+                                     line if note is None else f"{line}（{note}）")
+        for issuance in (*catalog.quest_offers, *GUILD_OFFER_REGISTRY.values(), *QUEST_ISSUANCE_REGISTRY.values()):
+            with self.subTest(issuance=issuance.definition_key):
+                parts = describe_reward_parts(issuance.reward)
+                self.assertLessEqual(len(parts["items"]), QUEST_LOG_MAX_REWARD_ITEMS)
+                expected = f"獎勵：銅 {parts['copper']}、功績 {parts['merit']}"
+                for item in parts["items"]:
+                    expected += f"、{item['display_name']} × {item['quantity']}"
+                self.assertEqual(describe_reward(SimpleNamespace(reward=issuance.reward)), expected)
+
 BESTIARY = REPO_ROOT / "docs" / "lore" / "bestiary.md"
 
 #: The six approved special abilities of the first bestiary batch, verbatim from

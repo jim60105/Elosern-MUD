@@ -229,7 +229,7 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         _inject_snapshot(
             page,
-            {"local_map": valid_local_map_panel(), "quest_log": {"schema_version": 1, "available": True, "rows": []}},
+            {"local_map": valid_local_map_panel(), "quest_log": {"schema_version": 2, "available": True, "rows": []}},
             mode="exploration",
         )
         _wait_mode(page, "exploration")
@@ -241,7 +241,7 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
 
         inject_update(page, {
             "quest_log": {
-                "schema_version": 1,
+                "schema_version": 2,
                 "available": False,
                 "reason": {"code": "quest_log_unavailable", "message": "任務簿目前無法顯示"},
             },

@@ -466,7 +466,12 @@ function validRosterPanel(overrides) {
 }
 
 
+function validQuestLogPanel(rows) {
+  return { schema_version: 2, available: true, rows: rows || [] };
+}
+
 module.exports = {
+  validQuestLogPanel,
   validCombatSkill,
   validSkillGroup,
   validCategoryGroup,

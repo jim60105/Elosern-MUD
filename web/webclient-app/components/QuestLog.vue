@@ -1,7 +1,7 @@
 <script setup>
 // QuestLog (quest-issuer-model change 11, design D2/D3): the player's own
 // quest book — the host-free half of the split quest drawer. It renders only
-// the committed `quest_log` v1 payload (every stored record, grouped by state,
+// the committed `quest_log` v2 payload (every stored record, grouped by state,
 // issuer labelled per row) and invents nothing.
 //
 // Per-row actions:
@@ -19,7 +19,7 @@ import { computed, ref } from "vue";
 import EmptyState from "./EmptyState.vue";
 
 const props = defineProps({
-  // The committed `quest_log` v1 panel payload (or null before first commit).
+  // The committed `quest_log` v2 panel payload (or null before first commit).
   questLog: { type: Object, default: null },
   // The committed `services` v4 panel payload, read ONLY for the guild
   // section's quest rows (the counter-action merge). Never rendered directly.
@@ -85,7 +85,7 @@ function issuerKindLabel(kind) {
 // Settlement indication: a counter quest must be claimed at the counter; an
 // auto (private) quest settles inside the completing transaction. A null
 // settlement (unresolvable issuance) renders nothing, exactly like its
-// paired null reward_line.
+// paired null reward.
 const SETTLEMENT_LABELS = {
   counter: "獎勵需回櫃台領取",
   auto: "獎勵完成即結算",
@@ -93,6 +93,13 @@ const SETTLEMENT_LABELS = {
 
 function settlementLabel(settlement) {
   return SETTLEMENT_LABELS[settlement] ?? null;
+}
+
+function rewardText(reward) {
+  const parts = [`銅 ${reward.copper}`];
+  if (reward.merit > 0) parts.push(`功績 ${reward.merit}`);
+  for (const item of reward.items) parts.push(`${item.display_name} × ${item.quantity}`);
+  return parts.join("、");
 }
 
 // The non-in-progress tracking truth: the panel's `track` descriptor is
@@ -198,8 +205,9 @@ function confirmAbandonNow() {
           </p>
 
           <p class="quest-log__row-objective">{{ row.objective_line }}</p>
+          <p v-if="row.objective_note" class="quest-log__detail">{{ row.objective_note }}</p>
           <p class="quest-log__stage" data-testid="quest-log__quest-stage">
-            第 {{ row.stage_index }} 階段 ‧ 進度 {{ row.stage_progress }}
+            第 {{ row.stage_index + 1 }} 階段 ‧ 進度 {{ row.stage_progress }}
           </p>
           <p
             v-if="row.deadline_line"
@@ -208,11 +216,12 @@ function confirmAbandonNow() {
           >
             {{ row.deadline_line }}
           </p>
-          <p class="quest-log__detail" data-testid="quest-log__quest-detail">
-            {{ row.detail }}
+          <p v-if="row.flavor" class="quest-log__detail" data-testid="quest-log__quest-detail">
+            {{ row.flavor }}
           </p>
-          <p v-if="row.reward_line" class="quest-log__reward" data-testid="quest-log__reward">
-            獎勵：{{ row.reward_line }}
+          <p v-if="row.rationale" class="quest-log__detail">{{ row.rationale }}</p>
+          <p v-if="row.reward" class="quest-log__reward" data-testid="quest-log__reward">
+            獎勵：{{ rewardText(row.reward) }}
           </p>
 
           <div class="quest-log__actions">

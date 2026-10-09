@@ -1,4 +1,4 @@
-"""Tests for the version-1 ``quest_log`` presentation panel (change 8).
+"""Tests for the version-2 ``quest_log`` presentation panel.
 
 Presenter shape (stored-order rows, exact field sets, cap truncation,
 describe-seam prose parity with the objectives tracker and the services
@@ -24,6 +24,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import ProtocolValidationError
 from web.webclient.presentation.quest_log import (
     QUEST_LOG_MAX_ROWS,
+    QUEST_LOG_MAX_REWARD_ITEMS,
     QUEST_LOG_SCHEMA_VERSION,
     QuestLogPanelError,
     validate_quest_log,
@@ -32,7 +33,7 @@ from web.webclient.presentation.registry import (
     UNAVAILABLE_REASON,
     build_production_registry,
 )
-from web.webclient.presentation.services import MAX_DETAIL_CODE_POINTS
+from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, MAX_SAFE_INTEGER, json_byte_size
 from world.quests.catalog import register_catalog
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -89,17 +90,22 @@ ROW_FIELDS = {
     "definition_key",
     "display_name",
     "state",
+    "category",
+    "grade",
     "stage_index",
     "stage_total",
     "stage_progress",
     "objective_quantity",
     "objective_line",
     "deadline_line",
-    "detail",
+    "objective_note",
+    "rationale",
+    "flavor",
     "tracked",
     "issuer",
     "settlement",
-    "reward_line",
+    "reward",
+    "reward_claimed",
     "track",
 }
 
@@ -127,6 +133,100 @@ def _register_auto_commission(definition_key: str, content_key: str) -> str:
 
 
 class QuestLogPresenterTests(EvenniaTest):
+    def test_resolved_reward_uses_registry_item_names(self):
+        from world.rules.guild_offers import ItemQuantity
+        open_synthetic_scope(self, "items")
+        item = next(iter(SYNTH_ITEMS.values()))
+        definition = register(quest("item_reward"))
+        issuer = npc_issuer_key(content_key="t_item_commissioner")
+        register_quest_issuance(QuestIssuance(
+            definition_key=definition.key, issuer_key=issuer,
+            reward=QuestReward(copper=50, merit=0, items=(ItemQuantity(item.key, 2),)),
+            settlement=Settlement.AUTO,
+        ))
+        accept_quest_under(self.player, definition.key, issuer)
+        self.assertEqual(self._render()["rows"][0]["reward"], {
+            "copper": 50, "merit": 0,
+            "items": [{"item_key": item.key, "display_name": item.display_name_zh, "quantity": 2}],
+        })
+
+    def test_species_hunt_parts_and_authored_fields_match_tracker(self):
+        from world.quests.tests.test_describe import _hunt_objective, _record
+        from world.quests.describe import describe_objective
+        open_synthetic_scope(self, "monster_species", "monster_variants", "regions")
+        objective = _hunt_objective()
+        definition = register(quest(
+            "structured_hunt", stages=(QuestStage(0, objective),),
+            rating_rationale_zh="合成評價", background_flavor_zh="合成背景",
+        ))
+        from dataclasses import replace
+        _ensure_auto(definition.key)
+        record = replace(_record(definition.key), tracked=True)
+        apply_quest_log_replacement(self.player, [record])
+        row = self._render()["rows"][0]
+        self.assertEqual(row["category"], "defeat")
+        self.assertEqual(row["grade"], definition.rank)
+        self.assertEqual(row["rationale"], definition.rating_rationale_zh)
+        self.assertEqual(row["flavor"], definition.background_flavor_zh)
+        composed = f"{row['objective_line']}（{row['objective_note']}）"
+        self.assertEqual(composed, describe_objective(objective))
+        self.assertEqual(composed, self.registry.render("objectives", self.context)["rows"][0]["objective_line"])
+
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
+    def test_claim_membership_is_read_only_and_host_independent(self):
+        from dataclasses import replace
+        definition = register(quest("claims_counter"))
+        record = accept_under_auto(self.player, definition)
+        counter_record = replace(record, issuer_key=f"guild:{T_BRANCH}", state=QuestState.COMPLETED)
+        register_guild_offer(GuildQuestOffer(
+            definition_key=definition.key, issuer_branch_key=T_BRANCH,
+            reward=QuestReward(copper=50, merit=25, items=()),
+        ))
+        apply_quest_log_replacement(self.player, [counter_record])
+        self.assertFalse(self._render()["rows"][0]["reward_claimed"])
+        self.player.db.guild_reward_claims = [record.quest_id]
+        first = self._render()
+        self.assertTrue(first["rows"][0]["reward_claimed"])
+        self.assertEqual(first, self._render())
+        self.assertEqual(list(self.player.db.guild_reward_claims), [record.quest_id])
+        self.assertEqual(first["rows"][0]["settlement"], "counter")
+        self.player.db.guild_reward_claims = ["duplicate", "duplicate"]
+        self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
+        self.assertEqual(list(self.player.db.guild_reward_claims), ["duplicate", "duplicate"])
+
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
+    def test_auto_completion_discloses_its_transactional_claim(self):
+        definition = register(quest("claims_auto"))
+        record = accept_under_auto(self.player, definition)
+        apply_quest_log_replacement(self.player, [fulfill_record(record, definition)])
+        row = self._render()["rows"][0]
+        self.assertEqual(row["state"], "completed")
+        self.assertEqual(row["settlement"], "auto")
+        self.assertTrue(row["reward_claimed"])
+
+    @covers_requirement(
+        "webclient-quest-log-panel::each-row-discloses-whether-its-reward-has-been-claimed"
+    )
+    def test_possession_claims_use_only_the_owner_ledger(self):
+        definition = register(quest("claims_owner"))
+        record = accept_under_auto(self.player, definition)
+        npc = create_object(NPC, key="claim scout", location=self.room)
+        npc.db.possessed_by = self.player.pk
+        context = PresentationContext(actor=npc, protocol_version=1)
+        npc.db.guild_reward_claims = [record.quest_id]
+        self.assertFalse(self.registry.render("quest_log", context)["rows"][0]["reward_claimed"])
+        self.player.db.guild_reward_claims = [record.quest_id]
+        npc.db.guild_reward_claims = "broken"
+        self.assertTrue(self.registry.render("quest_log", context)["rows"][0]["reward_claimed"])
+        self.player.db.guild_reward_claims = "broken owner"
+        self.assertEqual(self.registry.render("quest_log", context), UNAVAILABLE_PAYLOAD)
+        self.assertEqual(npc.db.guild_reward_claims, "broken")
+        self.assertEqual(self.player.db.guild_reward_claims, "broken owner")
+
     def setUp(self):
         # Branch identity (staff, offers, issuer labels) resolves through the
         # live branch registry: run the lifecycle on the kit branch row.
@@ -175,7 +275,7 @@ class QuestLogPresenterTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_registry_uses_the_common_unavailable_reason(self):
         spec = self.registry.spec("quest_log")
@@ -253,7 +353,7 @@ class QuestLogPresenterTests(EvenniaTest):
         # The authored name is the entity key, so the label is the remainder.
         self.assertEqual(row["issuer"]["label"], "grey_granny")
         self.assertEqual(row["settlement"], "auto")
-        self.assertIn("獎勵：銅 40", row["reward_line"])
+        self.assertEqual(row["reward"], {"copper": 40, "merit": 0, "items": []})
 
     def test_npc_pk_label_resolves_the_live_commissioner(self):
         definition = register(quest("pk_commission"))
@@ -325,7 +425,7 @@ class QuestLogPresenterTests(EvenniaTest):
         rows = {row["quest_id"]: row for row in self._render()["rows"]}
         self.assertEqual(rows["orphan_branch:1"]["issuer"]["label"], "no_such_branch")
         self.assertIsNone(rows["orphan_branch:1"]["settlement"])
-        self.assertIsNone(rows["orphan_branch:1"]["reward_line"])
+        self.assertIsNone(rows["orphan_branch:1"]["reward"])
 
     @covers_requirement(
         "webclient-quest-log-panel::row-prose-comes-only-from-the-canonical-describe-seams"
@@ -371,10 +471,10 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(counter_row["quest_id"], record.quest_id)
         self.assertEqual(quest_row["objective_line"], counter_row["objective_summary"])
         self.assertEqual(quest_row["deadline_line"], counter_row["deadline_line"])
-        self.assertEqual(quest_row["detail"], counter_row["detail"])
+        self.assertNotIn("detail", quest_row)
 
     @covers_requirement(
-        "webclient-quest-log-panel::an-unresolvable-issuance-yields-no-reward-line-rather-than-a-fabricated-one"
+        "webclient-quest-log-panel::an-unresolvable-issuance-yields-no-reward-rather-than-a-fabricated-one"
     )
     def test_withdrawn_commission_still_lists_its_quest(self):
         definition = register(quest("withdrawn_commission"))
@@ -387,7 +487,7 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertTrue(payload["available"])
         row = payload["rows"][0]
         self.assertEqual(row["quest_id"], record.quest_id)
-        self.assertIsNone(row["reward_line"])
+        self.assertIsNone(row["reward"])
         self.assertIsNone(row["settlement"])
         serialized = json.dumps(row, ensure_ascii=False)
         forbidden = ("銅", "功績", "獎勵") + tuple(
@@ -464,7 +564,7 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(row["state"], "completed")
 
     @covers_requirement(
-        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_maximum_authored_prose_still_renders_within_the_detail_bound(self):
         # The authored-prose bound is derived from this frozen field bound: a
@@ -482,9 +582,8 @@ class QuestLogPresenterTests(EvenniaTest):
         )
         accept_under_auto(self.player, definition)
         row = self._render()["rows"][0]
-        self.assertLessEqual(len(row["detail"]), MAX_DETAIL_CODE_POINTS)
-        self.assertIn(f"評價理由：{rationale}", row["detail"])
-        self.assertIn(f"背景：{flavor}", row["detail"])
+        self.assertEqual(row["rationale"], rationale)
+        self.assertEqual(row["flavor"], flavor)
 
     @staticmethod
     def _json_default(obj):
@@ -522,19 +621,77 @@ def accept_quest_under(actor, definition_key: str, issuer_key: str):
 
 
 class QuestLogValidatorTests(unittest.TestCase):
+    def test_v2_category_grade_claim_reward_and_prose_rejections(self):
+        item = {"item_key": "synthetic", "display_name": "合成物品", "quantity": 2}
+        reward = {"copper": 50, "merit": 25, "items": [item]}
+        self.assertEqual(validate_quest_log(self._valid_payload(rows=[self._valid_row(reward=reward)]))["rows"][0]["reward"], reward)
+        invalid = [
+            {"category": "unknown"}, {"grade": "unknown"}, {"grade": ""},
+            {"reward_claimed": 1}, {"detail": "obsolete"},
+            {"rationale": "字" * 241}, {"objective_note": ""},
+            {"reward": {**reward, "items": [item] * (QUEST_LOG_MAX_REWARD_ITEMS + 1)}},
+            {"reward": {**reward, "copper": True}},
+            {"reward": {**reward, "merit": -1}},
+            {"reward": {**reward, "items": [{**item, "quantity": 0}]}},
+            {"reward": {**reward, "items": [{**item, "quantity": MAX_SAFE_INTEGER + 1}]}},
+            {"reward": {**reward, "items": [{**item, "display_name": "\ud800"}]}},
+            {"reward": {**reward, "items": [{**item, "extra": 0}]}},
+        ]
+        for overrides in invalid:
+            with self.subTest(overrides=overrides), self.assertRaises(ProtocolValidationError):
+                validate_quest_log(self._valid_payload(rows=[self._valid_row(**overrides)]))
+
+    def test_maximal_rows_fit_the_canonical_envelope(self):
+        rows = []
+        for index in range(QUEST_LOG_MAX_ROWS):
+            rows.append(self._valid_row(
+                quest_id=f"{index:064d}", definition_key="k" * 64,
+                display_name="字" * 128, objective_line="字" * 128,
+                objective_note="字" * 128, deadline_line="字" * 64,
+                rationale="字" * 240, flavor="字" * 240,
+                stage_index=MAX_SAFE_INTEGER, stage_total=MAX_SAFE_INTEGER,
+                stage_progress=MAX_SAFE_INTEGER, objective_quantity=MAX_SAFE_INTEGER,
+                issuer={"kind": "npc", "key": "npc:" + "k" * 60, "label": "字" * 128},
+                reward={"copper": MAX_SAFE_INTEGER, "merit": MAX_SAFE_INTEGER,
+                        "items": [{"item_key": "k" * 64, "display_name": "字" * 128,
+                                   "quantity": MAX_SAFE_INTEGER}
+                                  for _ in range(QUEST_LOG_MAX_REWARD_ITEMS)]},
+                track={"action_id": "guild.quest_track", "label": "字" * 64,
+                       "enabled": True, "disabled_reason": None, "quantity": None},
+            ))
+        payload = self._valid_payload(rows=rows)
+        self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
+        self.assertEqual(validate_quest_log(payload), payload)
+        # Code-point limits are independent from byte size. JSON-escaped
+        # controls can still exceed the envelope and must fail closed.
+        from copy import deepcopy
+        oversized = deepcopy(payload)
+        for row in oversized["rows"]:
+            row["rationale"] = "a" + "\x00" * 239
+            row["flavor"] = "a" + "\x00" * 239
+            row["objective_note"] = "a" + "\x00" * 127
+            row["objective_line"] = "a" + "\x00" * 127
+        self.assertGreater(json_byte_size(oversized), MAX_CANONICAL_JSON_BYTES)
+        with self.assertRaises(QuestLogPanelError):
+            validate_quest_log(oversized)
+
     def _valid_row(self, **overrides):
         row = {
             "quest_id": "introductory_hunt:1",
             "definition_key": "introductory_hunt",
             "display_name": "討伐低階魔物",
             "state": "in_progress",
+            "category": "defeat",
+            "grade": "F",
             "stage_index": 0,
             "stage_total": 1,
             "stage_progress": 0,
             "objective_quantity": 1,
             "objective_line": "討伐 1 隻低階魔物",
             "deadline_line": "期限：剩餘 72 小時",
-            "detail": "可完成任務\n狀態：進行中",
+            "objective_note": None,
+            "rationale": None,
+            "flavor": None,
             "tracked": False,
             "issuer": {
                 "kind": "guild",
@@ -542,7 +699,8 @@ class QuestLogValidatorTests(unittest.TestCase):
                 "label": "合成公會分會",
             },
             "settlement": "counter",
-            "reward_line": "獎勵：銅 50、功績 25",
+            "reward": {"copper": 50, "merit": 25, "items": []},
+            "reward_claimed": False,
             "track": {
                 "action_id": "guild.quest_track",
                 "label": "追蹤",
@@ -567,7 +725,7 @@ class QuestLogValidatorTests(unittest.TestCase):
         self.assertEqual(validate_quest_log(self._valid_payload()), self._valid_payload())
 
     def test_null_settlement_reward_and_deadline_are_permitted(self):
-        row = self._valid_row(settlement=None, reward_line=None, deadline_line=None)
+        row = self._valid_row(settlement=None, reward=None, deadline_line=None)
         self.assertEqual(validate_quest_log(self._valid_payload(rows=[row])), self._valid_payload(rows=[row]))
 
     @covers_requirement(
@@ -602,14 +760,14 @@ class QuestLogValidatorTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(self._valid_payload(rows=[self._valid_row(settlement="later")]))
 
-    def test_settlement_and_reward_line_must_be_null_together(self):
+    def test_settlement_and_reward_must_be_null_together(self):
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(
                 self._valid_payload(rows=[self._valid_row(settlement=None)])
             )
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(
-                self._valid_payload(rows=[self._valid_row(reward_line=None)])
+                self._valid_payload(rows=[self._valid_row(reward=None)])
             )
 
     def test_negative_or_bad_type_numbers_are_rejected(self):
@@ -629,9 +787,9 @@ class QuestLogValidatorTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(self._valid_payload(rows=[self._valid_row(quest_id="a" * 65)]))
         with self.assertRaises(ProtocolValidationError):
-            validate_quest_log(self._valid_payload(rows=[self._valid_row(detail="字" * 513)]))
+            validate_quest_log(self._valid_payload(rows=[self._valid_row(flavor="字" * 241)]))
         with self.assertRaises(ProtocolValidationError):
-            validate_quest_log(self._valid_payload(rows=[self._valid_row(reward_line="銅" * 129)]))
+            validate_quest_log(self._valid_payload(rows=[self._valid_row(objective_note="字" * 129)]))
         with self.assertRaises(QuestLogPanelError):
             validate_quest_log(self._valid_payload(rows=[self._valid_row(quest_id="")]))
         with self.assertRaises(QuestLogPanelError):
@@ -712,7 +870,7 @@ class QuestLogValidatorTests(unittest.TestCase):
 
     def test_unavailable_form_is_rejected_by_the_available_validator(self):
         with self.assertRaises(ProtocolValidationError):
-            validate_quest_log({"schema_version": 1, "available": False, "rows": []})
+            validate_quest_log({"schema_version": 2, "available": False, "rows": []})
 
     def test_panel_key_set_is_exact(self):
         with self.assertRaises(ProtocolValidationError):

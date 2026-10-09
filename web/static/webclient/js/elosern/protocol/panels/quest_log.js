@@ -23,14 +23,13 @@ var QUEST_LOG_MAX_ISSUER_KEY = C.QUEST_LOG_MAX_ISSUER_KEY;
 var QUEST_LOG_MAX_LABEL = C.QUEST_LOG_MAX_LABEL;
 var QUEST_LOG_MAX_OBJECTIVE_LINE = C.QUEST_LOG_MAX_OBJECTIVE_LINE;
 var QUEST_LOG_MAX_DEADLINE_LINE = C.QUEST_LOG_MAX_DEADLINE_LINE;
-var QUEST_LOG_MAX_DETAIL = C.QUEST_LOG_MAX_DETAIL;
-var QUEST_LOG_MAX_REWARD_LINE = C.QUEST_LOG_MAX_REWARD_LINE;
+var QUEST_LOG_MAX_REWARD_ITEMS = C.QUEST_LOG_MAX_REWARD_ITEMS;
 var QUEST_LOG_MAX_TRACK_LABEL = C.QUEST_LOG_MAX_TRACK_LABEL;
 
 // Quest log panel validator (mirror of
 // web.webclient.presentation.quest_log, quest-issuer-model change 8). At
 // most MAX_QUEST_ROWS stored records in quest-log order; settlement and
-// reward_line are null when the record's issuance can no longer be
+// reward are null when the record's issuance can no longer be
 // resolved; same surrogate guards as the party and objectives mirrors.
 var QUEST_LOG_STATES = ["in_progress", "completed", "failed"];
 var QUEST_LOG_SETTLEMENTS = ["counter", "auto"];
@@ -125,17 +124,22 @@ function validateQuestLogRow(value, index) {
       "definition_key",
       "display_name",
       "state",
+      "category",
+      "grade",
       "stage_index",
       "stage_total",
       "stage_progress",
       "objective_quantity",
       "objective_line",
       "deadline_line",
-      "detail",
+      "objective_note",
+      "rationale",
+      "flavor",
       "tracked",
       "issuer",
       "settlement",
-      "reward_line",
+      "reward",
+      "reward_claimed",
       "track",
     ],
     []
@@ -161,6 +165,10 @@ function validateQuestLogRow(value, index) {
   if (QUEST_LOG_STATES.indexOf(value.state) === -1) {
     throw new Error(name + " state is not a stable value");
   }
+  if (["gather", "defeat", "escort", "explore", "emergency"].indexOf(value.category) === -1) {
+    throw new Error(name + " category is not a stable value");
+  }
+  validateQuestLogBoundedLine(value.grade, name, "grade", C.SERVICES_MAX_RANK_KEY);
   requireInt(value.stage_index, "stage_index", 0, MAX_SAFE_INTEGER);
   requireInt(value.stage_total, "stage_total", 1, MAX_SAFE_INTEGER);
   requireInt(value.stage_progress, "stage_progress", 0, MAX_SAFE_INTEGER);
@@ -179,7 +187,13 @@ function validateQuestLogRow(value, index) {
       QUEST_LOG_MAX_DEADLINE_LINE
     );
   }
-  validateQuestLogBoundedLine(value.detail, name, "detail", QUEST_LOG_MAX_DETAIL);
+  [["objective_note", C.QUEST_LOG_MAX_OBJECTIVE_NOTE],
+   ["rationale", C.QUEST_LOG_MAX_RATIONALE],
+   ["flavor", C.QUEST_LOG_MAX_FLAVOR]].forEach(function (bound) {
+    if (value[bound[0]] !== null) {
+      validateQuestLogBoundedLine(value[bound[0]], name, bound[0], bound[1]);
+    }
+  });
   if (typeof value.tracked !== "boolean") {
     throw new Error(name + " tracked must be a boolean");
   }
@@ -190,19 +204,28 @@ function validateQuestLogRow(value, index) {
   ) {
     throw new Error(name + " settlement is not a stable value");
   }
-  if (value.reward_line !== null) {
-    validateQuestLogBoundedLine(
-      value.reward_line,
-      name,
-      "reward_line",
-      QUEST_LOG_MAX_REWARD_LINE
-    );
+  if (value.reward !== null) {
+    requireExactFields(value.reward, "quest_log reward", ["copper", "merit", "items"], []);
+    requireInt(value.reward.copper, "copper", 0, MAX_SAFE_INTEGER);
+    requireInt(value.reward.merit, "merit", 0, MAX_SAFE_INTEGER);
+    if (!Array.isArray(value.reward.items) || value.reward.items.length > QUEST_LOG_MAX_REWARD_ITEMS) {
+      throw new Error(name + " reward items exceed the bounded list");
+    }
+    value.reward.items.forEach(function (item) {
+      requireExactFields(item, "reward item", ["item_key", "display_name", "quantity"], []);
+      validateQuestLogBoundedLine(item.item_key, name, "item_key", QUEST_LOG_MAX_KEY);
+      validateQuestLogBoundedLine(item.display_name, name, "item display_name", QUEST_LOG_MAX_DISPLAY_NAME);
+      requireInt(item.quantity, "quantity", 1, MAX_SAFE_INTEGER);
+    });
+  }
+  if (typeof value.reward_claimed !== "boolean") {
+    throw new Error(name + " reward_claimed must be a boolean");
   }
   // Commission coherence (mirror of the Python validator): the settlement
-  // and the reward line are null together or present together.
-  if ((value.settlement === null) !== (value.reward_line === null)) {
+  // and the reward are null together or present together.
+  if ((value.settlement === null) !== (value.reward === null)) {
     throw new Error(
-      name + " settlement and reward_line must be null together or present together"
+      name + " settlement and reward must be null together or present together"
     );
   }
   validateQuestLogTrack(value.track, name);

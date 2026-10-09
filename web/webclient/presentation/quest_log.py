@@ -1,19 +1,19 @@
-"""Version-1 read-only ``quest_log`` panel (quest-issuer-model design §8.1, change 8).
+"""Version-2 read-only ``quest_log`` panel.
 
 The panel is the player's own quest book, readable anywhere: one row per
 stored record in quest-log order — guild and private commissions alike —
 capped at the shared ``MAX_QUEST_ROWS`` bound imported from the services
 panel so the two surfaces cannot drift. Row identity and progress come from
 the record; ``stage_total`` from the definition; all prose from the canonical
-describe seams (``describe_objective``, ``describe_deadline``,
-``describe_quest_detail``, ``describe_reward``), so the quest book, the
+describe seams (``describe_objective_parts``, ``describe_deadline``,
+``describe_reward_parts``), so the quest book, the
 objective tracker, and the guild counter can never disagree. The commission
 disclosure rides ``resolve_issuance``: ``issuer`` (kind, key, label) is
-derived from the stored issuer key, while ``settlement`` and ``reward_line``
+derived from the stored issuer key, while ``settlement`` and ``reward``
 describe the resolved issuance. A record whose issuance can no longer be
 resolved (content edits can unregister a generated definition's issuance
 while a player holds the quest) still renders every other field with a null
-``reward_line`` and a null ``settlement`` — never a fabricated reward.
+``reward`` and a null ``settlement``, never a fabricated reward.
 
 The panel is HOST-INDEPENDENT by design: unlike the guild section of
 ``services`` (which needs a local ``GuildStaff`` host), reading one's own
@@ -51,24 +51,23 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation.services import (
-    MAX_DETAIL_CODE_POINTS,
     MAX_KEY_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_QUEST_ROWS,
-    MAX_SUMMARY_CODE_POINTS,
+    MAX_RANK_KEY_CODE_POINTS,
     QUEST_STATES,
     TRACK_ACTION,
 )
-from world.lore.guild import GUILD_BRANCH_REGISTRY
+from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.quests.describe import (
     describe_deadline,
-    describe_objective,
-    describe_quest_detail,
-    describe_reward,
+    describe_objective_parts,
+    describe_reward_parts,
 )
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY, MAX_DEFINITION_PROSE_LENGTH, QuestType
 from world.quests.runtime import QuestDataError, read_records
 from world.rules.clock import read_world_clock
+from world.rules.guild import RewardClaimError, parse_reward_claims
 from world.rules.quest_issuance import (
     IssuerKeyError,
     MAX_ISSUER_KEY_LENGTH,
@@ -77,7 +76,9 @@ from world.rules.quest_issuance import (
     resolve_issuance,
 )
 
-QUEST_LOG_SCHEMA_VERSION = 1
+QUEST_LOG_SCHEMA_VERSION = 2
+QUEST_LOG_MAX_REWARD_ITEMS = 1
+QUEST_CATEGORIES = {kind: kind.name.lower() for kind in QuestType}
 
 # Mirrors ``services.MAX_QUEST_ROWS`` (imported, so the two row caps cannot
 # drift); the cap is pinned in the spec.
@@ -205,6 +206,23 @@ def _validate_track(value: Any) -> dict[str, Any]:
     }
 
 
+def _validate_reward(value: Any) -> dict[str, Any]:
+    _require_exact_fields(value, "quest_log reward", {"copper", "merit", "items"}, {})
+    copper = _require_int(value, "copper", minimum=0, maximum=MAX_SAFE_INTEGER)
+    merit = _require_int(value, "merit", minimum=0, maximum=MAX_SAFE_INTEGER)
+    if not isinstance(value["items"], list) or len(value["items"]) > QUEST_LOG_MAX_REWARD_ITEMS:
+        raise QuestLogPanelError("reward items exceed the bounded list")
+    items = []
+    for item in value["items"]:
+        _require_exact_fields(item, "reward item", {"item_key", "display_name", "quantity"}, {})
+        items.append({
+            "item_key": _bounded_line(_require_str(item, "item_key", maximum=MAX_KEY_CODE_POINTS), "item_key", MAX_KEY_CODE_POINTS),
+            "display_name": _bounded_line(_require_str(item, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS), "item display_name", MAX_DISPLAY_NAME_CODE_POINTS),
+            "quantity": _require_int(item, "quantity", minimum=1, maximum=MAX_SAFE_INTEGER),
+        })
+    return {"copper": copper, "merit": merit, "items": items}
+
+
 def _validate_row(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
@@ -214,17 +232,22 @@ def _validate_row(value: Any) -> dict[str, Any]:
             "definition_key",
             "display_name",
             "state",
+            "category",
+            "grade",
             "stage_index",
             "stage_total",
             "stage_progress",
             "objective_quantity",
             "objective_line",
             "deadline_line",
-            "detail",
+            "objective_note",
+            "rationale",
+            "flavor",
             "tracked",
             "issuer",
             "settlement",
-            "reward_line",
+            "reward",
+            "reward_claimed",
             "track",
         },
         {},
@@ -247,6 +270,12 @@ def _validate_row(value: Any) -> dict[str, Any]:
     state = value["state"]
     if state not in QUEST_STATES:
         raise QuestLogPanelError("quest state is not a stable value")
+    category = _require_str(value, "category", maximum=MAX_KEY_CODE_POINTS)
+    if category not in QUEST_CATEGORIES.values():
+        raise QuestLogPanelError("category is not a stable value")
+    grade = _bounded_line(_require_str(value, "grade", maximum=MAX_RANK_KEY_CODE_POINTS), "grade", MAX_RANK_KEY_CODE_POINTS)
+    if grade not in GUILD_RANK_REGISTRY:
+        raise QuestLogPanelError("grade is not a registered guild rank")
     stage_index = _require_int(value, "stage_index", minimum=0, maximum=MAX_SAFE_INTEGER)
     stage_total = _require_int(value, "stage_total", minimum=1, maximum=MAX_SAFE_INTEGER)
     stage_progress = _require_int(value, "stage_progress", minimum=0, maximum=MAX_SAFE_INTEGER)
@@ -265,29 +294,28 @@ def _validate_row(value: Any) -> dict[str, Any]:
             "deadline_line",
             MAX_DEADLINE_LINE_CODE_POINTS,
         )
-    detail = _bounded_line(
-        _require_str(value, "detail", maximum=MAX_DETAIL_CODE_POINTS),
-        "detail",
-        MAX_DETAIL_CODE_POINTS,
-    )
+    prose = {}
+    for field, maximum in (
+        ("objective_note", MAX_OBJECTIVE_LINE_CODE_POINTS),
+        ("rationale", MAX_DEFINITION_PROSE_LENGTH),
+        ("flavor", MAX_DEFINITION_PROSE_LENGTH),
+    ):
+        prose[field] = None if value[field] is None else _bounded_line(
+            _require_str(value, field, maximum=maximum), field, maximum
+        )
     tracked = _require_bool(value, "tracked")
     issuer = _validate_issuer(value["issuer"])
     settlement = value["settlement"]
     if settlement is not None and settlement not in _SETTLEMENT_VALUES:
         raise QuestLogPanelError("settlement is not a stable value")
-    reward_line = value["reward_line"]
-    if reward_line is not None:
-        reward_line = _bounded_line(
-            _require_str(value, "reward_line", maximum=MAX_SUMMARY_CODE_POINTS),
-            "reward_line",
-            MAX_SUMMARY_CODE_POINTS,
-        )
+    reward = None if value["reward"] is None else _validate_reward(value["reward"])
+    reward_claimed = _require_bool(value, "reward_claimed")
     # Commission coherence: a resolvable issuance carries both its settlement
-    # and its reward line; an unresolvable one discloses neither. A payload
+    # and its reward; an unresolvable one discloses neither. A payload
     # pairing one null with one present can only come from a producer bug.
-    if (settlement is None) != (reward_line is None):
+    if (settlement is None) != (reward is None):
         raise QuestLogPanelError(
-            "settlement and reward_line must be null together or present together"
+            "settlement and reward must be null together or present together"
         )
     track = _validate_track(value["track"])
     return {
@@ -295,17 +323,20 @@ def _validate_row(value: Any) -> dict[str, Any]:
         "definition_key": definition_key,
         "display_name": display_name,
         "state": state,
+        "category": category,
+        "grade": grade,
         "stage_index": stage_index,
         "stage_total": stage_total,
         "stage_progress": stage_progress,
         "objective_quantity": objective_quantity,
         "objective_line": objective_line,
         "deadline_line": deadline_line,
-        "detail": detail,
+        **prose,
         "tracked": tracked,
         "issuer": issuer,
         "settlement": settlement,
-        "reward_line": reward_line,
+        "reward": reward,
+        "reward_claimed": reward_claimed,
         "track": track,
     }
 
@@ -372,7 +403,8 @@ def quest_log_presenter(context: PresentationContext) -> dict[str, Any]:
     tick = int(clock.tick)
     try:
         records = read_records(quest_source)
-    except QuestDataError:
+        claims = parse_reward_claims(quest_source)
+    except (QuestDataError, RewardClaimError):
         raise PanelUnavailableError
     rows: list[dict[str, Any]] = []
     for record in records:
@@ -389,13 +421,14 @@ def quest_log_presenter(context: PresentationContext) -> dict[str, Any]:
         issuance = resolve_issuance(record.definition_key, record.issuer_key)
         if issuance is not None:
             settlement: str | None = issuance.settlement.value
-            reward_line: str | None = describe_reward(issuance)
+            reward = describe_reward_parts(issuance.reward)
         else:
             # An unresolvable issuance degrades the row's commission
             # disclosure, never the panel: the quest is still real and still
             # completable, so no reward or settlement may be invented.
             settlement = None
-            reward_line = None
+            reward = None
+        objective_line, objective_note = describe_objective_parts(stage.objective)
         rows.append(
             {
                 "quest_id": record.quest_id,
@@ -404,13 +437,17 @@ def quest_log_presenter(context: PresentationContext) -> dict[str, Any]:
                     :MAX_DISPLAY_NAME_CODE_POINTS
                 ],
                 "state": record.state.value,
+                "category": QUEST_CATEGORIES[definition.quest_type],
+                "grade": definition.rank,
                 "stage_index": record.stage_index,
                 "stage_total": len(definition.stages),
                 "stage_progress": record.stage_progress,
                 "objective_quantity": stage.objective.quantity,
-                "objective_line": describe_objective(stage.objective),
+                "objective_line": objective_line,
+                "objective_note": objective_note,
                 "deadline_line": describe_deadline(record.deadline_tick, tick),
-                "detail": describe_quest_detail(record, definition, issuance, tick),
+                "rationale": definition.rating_rationale_zh,
+                "flavor": definition.background_flavor_zh,
                 "tracked": record.tracked,
                 "issuer": {
                     "kind": parsed.namespace,
@@ -418,7 +455,8 @@ def quest_log_presenter(context: PresentationContext) -> dict[str, Any]:
                     "label": _issuer_label(parsed),
                 },
                 "settlement": settlement,
-                "reward_line": reward_line,
+                "reward": reward,
+                "reward_claimed": record.quest_id in claims,
                 "track": _track_descriptor(),
             }
         )

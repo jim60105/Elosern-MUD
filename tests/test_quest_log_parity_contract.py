@@ -29,9 +29,12 @@ _OWNED_BOUNDS = (
     ("web/webclient/presentation/objectives.py", "MAX_DEADLINE_LINE_CODE_POINTS", "QUEST_LOG_MAX_DEADLINE_LINE"),
     ("web/webclient/presentation/affordances.py", "MAX_DISPLAY_NAME_CODE_POINTS", "QUEST_LOG_MAX_DISPLAY_NAME"),
     ("web/webclient/presentation/services.py", "MAX_KEY_CODE_POINTS", "QUEST_LOG_MAX_KEY"),
-    ("web/webclient/presentation/services.py", "MAX_DETAIL_CODE_POINTS", "QUEST_LOG_MAX_DETAIL"),
+    ("world/quests/definitions.py", "MAX_DEFINITION_PROSE_LENGTH", "QUEST_LOG_MAX_RATIONALE"),
+    ("world/quests/definitions.py", "MAX_DEFINITION_PROSE_LENGTH", "QUEST_LOG_MAX_FLAVOR"),
+    ("web/webclient/presentation/objectives.py", "MAX_OBJECTIVE_LINE_CODE_POINTS", "QUEST_LOG_MAX_OBJECTIVE_NOTE"),
+    ("web/webclient/presentation/quest_log.py", "QUEST_LOG_MAX_REWARD_ITEMS", "QUEST_LOG_MAX_REWARD_ITEMS"),
     ("web/webclient/presentation/services.py", "MAX_LABEL_CODE_POINTS", "QUEST_LOG_MAX_TRACK_LABEL"),
-    ("web/webclient/presentation/services.py", "MAX_SUMMARY_CODE_POINTS", "QUEST_LOG_MAX_REWARD_LINE"),
+    ("web/webclient/presentation/services.py", "MAX_RANK_KEY_CODE_POINTS", "SERVICES_MAX_RANK_KEY"),
     ("world/rules/quest_issuance.py", "MAX_ISSUER_KEY_LENGTH", "QUEST_LOG_MAX_ISSUER_KEY"),
 )
 
@@ -42,9 +45,9 @@ _IMPORT_ANCHORS = (
     r"from web\.webclient\.presentation\.objectives import \([^)]*MAX_DEADLINE_LINE_CODE_POINTS",
     r"from web\.webclient\.presentation\.services import \([^)]*MAX_QUEST_ROWS",
     r"from web\.webclient\.presentation\.services import \([^)]*MAX_KEY_CODE_POINTS",
-    r"from web\.webclient\.presentation\.services import \([^)]*MAX_DETAIL_CODE_POINTS",
+    r"from world\.quests\.definitions import [^\n]*MAX_DEFINITION_PROSE_LENGTH",
     r"from web\.webclient\.presentation\.services import \([^)]*MAX_LABEL_CODE_POINTS",
-    r"from web\.webclient\.presentation\.services import \([^)]*MAX_SUMMARY_CODE_POINTS",
+    r"from web\.webclient\.presentation\.services import \([^)]*MAX_RANK_KEY_CODE_POINTS",
     r"from world\.rules\.quest_issuance import \([^)]*MAX_ISSUER_KEY_LENGTH",
 )
 
@@ -98,7 +101,7 @@ class QuestLogValidatorParityContract(unittest.TestCase):
             )
         )
 
-    def test_python_and_js_share_schema_version_one(self):
+    def test_python_and_js_share_schema_version_two(self):
         quest_log_source = _QUEST_LOG.read_text(encoding="utf-8")
         js_source = protocol_client_source()
         py_match = re.search(
@@ -108,6 +111,7 @@ class QuestLogValidatorParityContract(unittest.TestCase):
         self.assertIsNotNone(py_match)
         self.assertIsNotNone(js_match)
         self.assertEqual(py_match.group(1), js_match.group(1))
+        self.assertEqual(py_match.group(1), "2")
 
 
 if __name__ == "__main__":

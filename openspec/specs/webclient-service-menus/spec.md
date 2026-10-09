@@ -35,7 +35,6 @@ The presenter SHALL strictly read canonical records and registries through the n
 - **WHEN** services presentation raises while status and narrative remain healthy
 - **THEN** only `services` becomes correlated unavailable, status still renders, and normal text output remains usable
 
-
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
@@ -112,7 +111,6 @@ host, `rank` the hall's `GuildExaminer` exam counter (never the qualified persis
 - **WHEN** an elf with true rank F and true merit 0 holds a disguise
 - **THEN** `player` reports rank F, merit 0, and no displayed-stat value, and no surface derives eligibility from the disguise
 
-
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
 - **THEN** merit_qualified is false, exam_request is enabled and dispatch returns exam_schedule without mutation
@@ -172,7 +170,6 @@ deterministic rows with server-rendered text; `rank` SHALL report true-merit `me
 #### Scenario: Guild surface stays read-only
 - **WHEN** the guild section is built for an actor with registration, an active quest, and eligible exam state
 - **THEN** registration, quest log, merit, rank, wallet, and exam records are byte-for-byte unchanged
-
 
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
@@ -353,7 +350,6 @@ set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest
 #### Scenario: Authority-like fields can never be supplied
 - **WHEN** any service or inventory action contains an unknown actor, host, session, effect, or slot-like field
 - **THEN** exact-schema validation rejects before adapter invocation
-
 
 #### Scenario: Below merit request stays enabled
 - **WHEN** a registered next-rank member below true merit threshold stands at a functioning guild counter and the qualified host is absent
@@ -679,10 +675,7 @@ section carries a quest row with the same `quest_id` and that action is enabled 
 
 ### Requirement: The quest book discloses each quest's commissioner and settlement
 
-Each quest book row SHALL render the issuer label from its `quest_log` row and SHALL indicate whether
-the quest settles at a counter or on completion, so a player can tell a guild commission from a
-private one and knows whether a return trip is required. The row SHALL render the reward line when
-the panel carries one and SHALL render nothing in its place when the panel carries `null`.
+Each quest book row SHALL render the issuer label from its `quest_log` row and SHALL indicate whether the quest settles at a counter or on completion, so a player can tell a guild commission from a private one and knows whether a return trip is required. The row SHALL render copper, merit, and each item with its quantity from the `reward` object alone, nothing when that object is `null`, and exactly one client-owned 獎勵 label with no zero merit figure.
 
 #### Scenario: A guild quest shows its counter requirement
 - **WHEN** a row whose settlement is `counter` renders
@@ -693,5 +686,9 @@ the panel carries one and SHALL render nothing in its place when the panel carri
 - **THEN** it shows the commissioner's label and indicates the reward settles on completion
 
 #### Scenario: A missing reward line renders nothing rather than a placeholder
-- **WHEN** a row's `reward_line` is `null`
+- **WHEN** a row's `reward` is `null`
 - **THEN** no reward text and no placeholder appears on that row
+
+#### Scenario: The reward renders from the structured object exactly once
+- **WHEN** a row's `reward` carries copper 50, merit 25, and two of one item
+- **THEN** the row shows the copper amount, the merit amount, and the item name with quantity two, and the reward label appears once
