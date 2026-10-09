@@ -467,7 +467,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(body.attributes("data-tab")).toBe("book");
     expect(body.find('[data-testid="quest-drawer__row--q_1042"]').exists()).toBe(true);
     expect(body.get('[data-testid="quest-drawer__counter-absent"]').text()).toBe("需在公會職員面前才能辦理");
-    expect(body.find('[data-testid="guild-counter"]').exists()).toBe(false);
+    expect(body.find('[data-testid="quest-drawer__counter"]').exists()).toBe(false);
     // Away from any clerk only tracking is offered, and it dispatches once.
     await body.get('[data-testid="quest-drawer__row--q_2077"]').trigger("click");
     expect(body.find('[data-testid="quest-drawer__abandon"]').exists()).toBe(false);
@@ -512,7 +512,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       "quest-drawer__row--q_1042",
       "quest-drawer__row--q_2077",
     ]);
-    expect(body.find('[data-testid="guild-counter"]').exists()).toBe(false);
+    expect(body.find('[data-testid="quest-drawer__counter"]').exists()).toBe(false);
     // The matched counter abandon reaches the wire only after confirmation.
     await body.get('[data-testid="quest-drawer__abandon"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(0);
@@ -521,9 +521,14 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(sender.sent.actions[0]).toMatchObject({ action_id: "guild.quest_abandon", payload: { quest_id: "q_1042" } });
 
     await body.get('[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]').trigger("click");
-    const counter = body.get('[data-testid="guild-counter"]');
-    expect(counter.find('[data-testid^="guild-counter__quest-row--"]').exists()).toBe(false);
-    expect(body.findAll('[data-testid^="quest-drawer__row--"]')).toHaveLength(0);
+    // The counter tab lists board offers only: no row is a held quest.
+    const counter = body.get('[data-testid="quest-drawer__counter"]');
+    const held = QUEST_LOG_PANEL_SAMPLE.rows.map((row) => row.quest_id);
+    const offered = counter.findAll('[data-testid^="quest-drawer__row--"]').map((n) => n.attributes("data-quest-id"));
+    const boardKeys = SERVICES_PANEL_SAMPLE.guild.board.map((row) => row.definition_key);
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.every((id) => boardKeys.includes(id))).toBe(true);
+    expect(offered.some((id) => held.includes(id))).toBe(false);
   });
 
   it("renders companions on stage and keeps the drawer reachable", async () => {

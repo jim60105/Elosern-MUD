@@ -1,7 +1,11 @@
 import { h, ref } from "vue";
 import QuestList from "../../components/QuestList.vue";
-import { bookListRow, rowsByState } from "../../components/quest-drawer-model.js";
-import { QUEST_LOG_PANEL_SAMPLE, QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE } from "../fixtures.js";
+import { bookListRow, offerListRow, rowsByState } from "../../components/quest-drawer-model.js";
+import {
+  QUEST_LOG_PANEL_SAMPLE,
+  QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE,
+  SERVICES_PANEL_GUILD_BOARD_SAMPLE,
+} from "../fixtures.js";
 
 // QuestList (quest-drawer-book-tab): the quest drawer's list column. A
 // heading with the row count, then a single-selection listbox: arrow keys
@@ -10,7 +14,8 @@ import { QUEST_LOG_PANEL_SAMPLE, QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE } from "../f
 // bar or the issuer and deadline line. Non-list forms: the absent line
 // before the first commit, the unavailable panel's own reason, and the
 // shared empty guidance. Props are bookListRow view models
-// (quest-drawer-model.js) built from the committed `quest_log` v2 panel.
+// (quest-drawer-model.js) built from the committed `quest_log` v2 panel, or
+// offerListRow view models of the guild board.
 
 const groups = rowsByState(QUEST_LOG_PANEL_SAMPLE);
 
@@ -85,5 +90,16 @@ export const Unavailable = {
     selectedId: null,
     status: "unavailable",
     reason: QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE.reason,
+  },
+};
+
+// The guild board's E offers (offerListRow): the guild summary line.
+export const OfferList = {
+  render: renderList,
+  args: {
+    heading: "E 級委託",
+    ariaLabel: "E 級委託",
+    rows: SERVICES_PANEL_GUILD_BOARD_SAMPLE.guild.board.filter((row) => row.rank === "E").map(offerListRow),
+    selectedId: SERVICES_PANEL_GUILD_BOARD_SAMPLE.guild.board.find((row) => row.rank === "E").definition_key,
   },
 };

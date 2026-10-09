@@ -1,7 +1,12 @@
 import { h } from "vue";
 import QuestDetail from "../../components/QuestDetail.vue";
-import { bookActions, bookDetail } from "../../components/quest-drawer-model.js";
-import { QUEST_LOG_PANEL_SAMPLE, SERVICES_PANEL_GUILD_TURNIN_READY_SAMPLE, SERVICES_PANEL_SAMPLE } from "../fixtures.js";
+import { bookActions, bookDetail, offerActions, offerDetail } from "../../components/quest-drawer-model.js";
+import {
+  QUEST_LOG_PANEL_SAMPLE,
+  SERVICES_PANEL_GUILD_BOARD_SAMPLE,
+  SERVICES_PANEL_GUILD_TURNIN_READY_SAMPLE,
+  SERVICES_PANEL_SAMPLE,
+} from "../fixtures.js";
 
 // QuestDetail (quest-drawer-book-tab): the quest drawer's detail column. It
 // renders a bookDetail view model and a bookActions set
@@ -10,7 +15,8 @@ import { QUEST_LOG_PANEL_SAMPLE, SERVICES_PANEL_GUILD_TURNIN_READY_SAMPLE, SERVI
 // twelve, a bar above), the rationale and deadline pair, the issuer letter,
 // and the reward cells with their settlement note. The action bar is pinned
 // to the bottom and emits the exact `{action_id, payload}`; abandon asks for
-// a second confirmation.
+// a second confirmation. A guild board offer (offerDetail / offerActions)
+// shows the 接取條件 cell and the accept descriptor as the primary action.
 
 const rowById = (id) => QUEST_LOG_PANEL_SAMPLE.rows.find((row) => row.quest_id === id);
 const counterRow = (services, id) => services.guild.quests.find((row) => row.quest_id === id) ?? null;
@@ -70,4 +76,19 @@ export const NullProse = {
 export const NullReward = {
   render: renderDetail,
   args: view({ ...rowById("q_2077"), reward: null, settlement: null }),
+};
+
+const BOARD_GUILD = SERVICES_PANEL_GUILD_BOARD_SAMPLE.guild;
+const offerView = (row) => ({ detail: offerDetail(row, BOARD_GUILD.branch_label), actions: offerActions(row) });
+
+// A board offer: the acceptance condition, the branch letter, and accept.
+export const OfferDetail = {
+  render: renderDetail,
+  args: offerView(BOARD_GUILD.board.find((row) => row.accept.enabled && row.flavor)),
+};
+
+// An offer already held: the disabled accept beside the server's reason.
+export const OfferAcceptDisabled = {
+  render: renderDetail,
+  args: offerView(BOARD_GUILD.board.find((row) => !row.accept.enabled)),
 };

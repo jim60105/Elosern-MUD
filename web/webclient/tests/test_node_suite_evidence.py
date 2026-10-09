@@ -630,20 +630,27 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    # Until archive sync removes this requirement (re-pointed to the
+    # webclient-quest-drawer board requirements), the offer detail carries
+    # the structured board offer's reward and null optional facts.
     @covers_requirement(
         "webclient-service-menus::the-guild-counter-renders-the-structured-board-offer",
     )
-    def test_guild_counter_structured_board_vitest_evidence_passes(self):
-        """The guild_counter suite is the executed evidence for the counter's
-        structured board rendering: each offer's reward from its `reward`
-        object under one label, and no placeholder for a null optional fact."""
+    def test_guild_board_tab_vitest_evidence_passes(self):
+        """The quest drawer model and drawer suites are the executed evidence
+        for the guild counter tab's grade-tabbed board: ladder-ordered grade
+        tabs with the lock, dim, and own-grade marks, the default grade, the
+        rank card above the offers, each offer's detail and accept action,
+        and the unregistered holder's registration card."""
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/world/guild_counter.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer_model.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_drawer.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_detail.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -653,7 +660,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "guild counter structured board Vitest evidence failed:\n"
+            "guild board tab Vitest evidence failed:\n"
             + result.stdout
             + result.stderr,
         )

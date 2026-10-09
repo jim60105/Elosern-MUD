@@ -135,4 +135,16 @@ describe("QuestList (quest-drawer-book-tab)", () => {
     expect(wrapper.findAll('[role="option"]')).toHaveLength(0);
     expect(wrapper.find('[data-testid="quest-drawer__empty"]').exists()).toBe(false);
   });
+
+  it("renders the lead slot above the heading in every state", () => {
+    wrapper = mount(QuestList, {
+      attachTo: document.body,
+      props: { heading: "E 級委託", rows: [], emptyHeadline: "目前沒有 E 級委託。", emptyGlyph: "lock" },
+      slots: { lead: '<div data-testid="lead-card">rank</div>' },
+    });
+    const list = wrapper.get('[data-testid="quest-drawer__list"]');
+    expect(list.element.firstElementChild.dataset.testid).toBe("lead-card");
+    expect(wrapper.get('[data-testid="quest-drawer__empty"]').text()).toContain("目前沒有 E 級委託。");
+    expect(wrapper.find(".empty-state__glyph").exists()).toBe(true);
+  });
 });

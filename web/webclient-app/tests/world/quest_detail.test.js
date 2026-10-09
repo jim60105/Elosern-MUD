@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import QuestDetail from "../../components/QuestDetail.vue";
-import { bookActions, bookDetail } from "../../components/quest-drawer-model.js";
-import { QUEST_LOG_PANEL_SAMPLE } from "../../stories/fixtures.js";
+import { bookActions, bookDetail, offerActions, offerDetail } from "../../components/quest-drawer-model.js";
+import { QUEST_LOG_PANEL_SAMPLE, SERVICES_PANEL_GUILD_BOARD_SAMPLE } from "../../stories/fixtures.js";
 
 const rowById = (id) => QUEST_LOG_PANEL_SAMPLE.rows.find((row) => row.quest_id === id);
 const enabled = (action_id, label) => ({ action_id, label, enabled: true, disabled_reason: null, quantity: null });
@@ -191,5 +191,50 @@ describe("QuestDetail (quest-drawer-book-tab)", () => {
     wrapper = mount(QuestDetail, { props: { detail: null } });
     expect(find("detail-empty").exists()).toBe(true);
     expect(find("actions").exists()).toBe(false);
+  });
+
+  describe("a board offer (quest-drawer-guild-board-tab)", () => {
+    const GUILD = SERVICES_PANEL_GUILD_BOARD_SAMPLE.guild;
+    const open = GUILD.board.find((row) => row.accept.enabled && row.rationale);
+    const held = GUILD.board.find((row) => !row.accept.enabled);
+
+    function mountOffer(row) {
+      wrapper = mount(QuestDetail, {
+        attachTo: document.body,
+        props: { detail: offerDetail(row, GUILD.branch_label), actions: offerActions(row) },
+      });
+    }
+
+    it("shows the acceptance condition in place of the rationale cell", () => {
+      mountOffer(open);
+      expect(get("condition").text()).toContain("接取條件");
+      expect(get("condition").text()).toContain(`公會等級 ${open.rank} 級以上`);
+      expect(get("condition").text()).toContain(open.rationale);
+      expect(find("rationale").exists()).toBe(false);
+      expect(find("progress").exists()).toBe(false);
+      expect(find("stamp").exists()).toBe(false);
+    });
+
+    it("renders the enabled accept as the primary action", async () => {
+      mountOffer(open);
+      const accept = get("accept");
+      expect(accept.classes()).toContain("quest-detail__btn--primary");
+      expect(accept.attributes("aria-disabled")).toBeUndefined();
+      await accept.trigger("click");
+      expect(wrapper.emitted("action")).toEqual([
+        [{ action_id: open.accept.action_id, payload: { definition_key: open.definition_key } }],
+      ]);
+      expect(find("track").exists()).toBe(false);
+    });
+
+    it("keeps a disabled accept focusable beside its reason and inert", async () => {
+      mountOffer(held);
+      const accept = get("accept");
+      expect(accept.attributes("disabled")).toBeUndefined();
+      expect(accept.attributes("aria-disabled")).toBe("true");
+      expect(get("action-reason").text()).toBe(held.accept.disabled_reason.message);
+      await accept.trigger("click");
+      expect(wrapper.emitted("action")).toBeUndefined();
+    });
   });
 });

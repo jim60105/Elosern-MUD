@@ -72,7 +72,7 @@ class QuestBookAwayFromClerkJourneys(ServicesBrowserTest):
         counter_tab = page.locator('[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]')
         self.assertEqual(counter_tab.get_attribute("aria-disabled"), "true")
         self.assertEqual(page.locator('[data-testid="quest-drawer__counter-absent"]').count(), 1)
-        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__counter"]').count(), 0)
         self.assertNotIn("尚未取得公會資料", body.inner_text())
         # Away from any clerk the detail still offers tracking and no counter
         # action, and activating it submits exactly one host-free
@@ -184,7 +184,7 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
         self.assertTrue(inside_drawer, "the guild service frame renders inside the open reference drawer")
 
         self._select_quest_tab(page, "counter")
-        self._tab_until_focused(page, '[data-testid="guild-counter__register"]')
+        self._tab_until_focused(page, '[data-testid="quest-drawer__register"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
         self.assertEqual(sent_action_count(page, "guild.register"), 1)
@@ -271,14 +271,14 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
         # No fabricated board / quest / rank rows: the unavailable form carries
         # no guild section, so the board and quest-detail rows are absent.
         self.assertEqual(
-            page.locator('[data-testid^="guild-counter__board-row--"]').count(), 0,
-            "no fabricated counter board rows in the unavailable form")
+            page.locator('[data-testid="quest-drawer__grade-rail"]').count(), 0,
+            "no fabricated board grade rail in the unavailable form")
         self.assertEqual(
             page.locator('[data-testid^="quest-drawer__row--"]').count(), 0,
             "no fabricated active-quest rows in the unavailable form")
         self.assertEqual(
-            page.locator('[data-testid="guild-counter__rankblock"]').count(), 0,
-            "no fabricated rank block in the unavailable form")
+            page.locator('[data-testid="guild-rank-card"]').count(), 0,
+            "no fabricated rank card in the unavailable form")
         self.assertEqual(
             page.locator('[data-testid="quest-drawer__abandon"]').count(), 0,
             "no fabricated abandon control in the unavailable form")

@@ -3,7 +3,7 @@
 The world + services family contracts of webclient-vue-05-showcase-world are
 implemented and verified in the Node/Vue world: the world-family Vitest
 suite, the deterministic component-coverage gate extended with the family's
-seven required components (the shared map-lattice renderer joins the B4
+six required components (the shared map-lattice renderer joins the B4
 family), and the Storybook showcase in which every family component has
 documented offline stories. ``covers_requirement`` can only
 attach to a Python ``test_*`` function, so this module executes those gates
@@ -27,7 +27,7 @@ Test-to-requirement mapping (applied at archive):
   guarantee of the new stories is evidenced by B1's
   ``test_story_files_import_only_local_or_bundled_modules``, which walks
   every story file, plus ``test_world_family_stories_make_no_non_local_requests``,
-  which scopes that check to the World family's seven story files).
+  which scopes that check to the World family's six story files).
 
 - ``webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels``
   and ``webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does``
@@ -61,7 +61,6 @@ WORLD_FAMILY_KEYS = (
     "World/LocalMap",
     "World/ShopPanel",
     "World/QuestDrawer",
-    "World/GuildCounter",
     "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
@@ -99,9 +98,12 @@ WORLD_FAMILY_STORY_IDS = {
     "world-questdrawer--counter-unavailable",
     "world-questdrawer--book-unavailable",
     "world-questdrawer--book-before-commit",
-    "world-guildcounter--full-counter",
-    "world-guildcounter--guild-absent",
-    "world-guildcounter--counter-unavailable",
+    "world-questdrawer--guild-board",
+    "world-questdrawer--locked-grade",
+    "world-questdrawer--empty-grade",
+    "world-questdrawer--disabled-accept",
+    "world-questdrawer--unregistered",
+    "world-questdrawer--top-rank",
     "world-shoppanel--full-payload",
     "world-shoppanel--section-absent",
     "world-shoppanel--section-unavailable",
@@ -286,7 +288,7 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
 
         The set equality asserts the extend-don't-restructure contract at
         this change's step: the B1 core, B2 action-dock, and B3 data-family
-        keys are preserved and exactly the seven world + services family keys
+        keys are preserved and exactly the six world + services family keys
         are added (the shared map-lattice renderer, from the
         improve-webclient-map-overlay-scale change, joins the B4 family).
         B5, which freezes the manifest, updates the baseline deliberately. The deferred surfaces — a full inventory bag and a
@@ -348,14 +350,14 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             "world + services family stories missing from the showcase: "
             + ", ".join(sorted(missing)),
         )
-        # Every family story title resolves to the family's seven components,
+        # Every family story title resolves to the family's six components,
         # so the coverage gate and the showcase agree on the family surface.
         family_titles = {entries[story_id]["title"] for story_id in WORLD_FAMILY_STORY_IDS}
         self.assertEqual(
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ShopPanel",
-                "QuestDrawer", "GuildCounter", "LoreCodexDrawer", "InventoryPanel",
+                "QuestDrawer", "LoreCodexDrawer", "InventoryPanel",
                 "MapLattice",
             )},
         )

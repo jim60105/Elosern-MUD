@@ -1,9 +1,11 @@
 // quest-drawer-memory (quest-drawer-book-tab, design Decision 3): the quest
 // drawer's session memory — the last first-level tab, the last book state,
-// and the selected row per tab. It lives at module level so it survives the
-// drawer closing and reopening, but not a reload. It holds only keys: the
-// drawer computes the effective tab, state, and row, so a remembered key that
-// is now disabled or gone falls back without being overwritten.
+// the guild board's grade with the basis it was chosen under
+// (`<ladder>|<holder rank>`, so a promotion drops it), and the selected row
+// per tab. It lives at module level so it survives the drawer closing and
+// reopening, but not a reload. It holds only keys: the drawer computes the
+// effective tab, state, and row, so a remembered key that is now disabled or
+// gone falls back without being overwritten.
 //
 // The memory is scoped to the transport generation and presentation epoch
 // (`<generation>|<epoch>`): a reconnect or a new presentation discards every
@@ -14,12 +16,16 @@ const memory = reactive({
   scope: null,
   top: "book",
   bookState: "in_progress",
+  boardGrade: null,
+  boardBasis: null,
   selectedByTab: {},
 });
 
 function clear() {
   memory.top = "book";
   memory.bookState = "in_progress";
+  memory.boardGrade = null;
+  memory.boardBasis = null;
   memory.selectedByTab = {};
 }
 

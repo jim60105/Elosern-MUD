@@ -288,6 +288,10 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """Select a quest book state tab (in_progress, completed, failed)."""
         self._select_in_quest_tablist(page, "quest-drawer__state-rail", state, "ArrowDown")
 
+    def _select_board_grade(self, page, grade):
+        """Select a guild board grade tab on the counter tab's grade rail."""
+        self._select_in_quest_tablist(page, "quest-drawer__grade-rail", grade, "ArrowDown")
+
     def _replace_focused_number(self, page, value):
         """Replace the currently focused number entry's value using the keyboard."""
         page.keyboard.press("Control+A")

@@ -8,6 +8,8 @@
 // - Counter actions (abandon, turn-in) come only from the `services` guild
 //   quest row with the same `quest_id`, mirrored exactly; `quest_id` is the
 //   single join between the two panels.
+// - The guild board reads grades only from the guild section's
+//   `rank_ladder` and the holder's rank (quest-drawer-guild-board-tab).
 // - Fixed client copy (無期限, the settlement notes, the action-bar reasons)
 //   is stable text that never paraphrases server prose.
 
@@ -35,6 +37,8 @@ const SETTLEMENT_NOTES = Object.freeze({
 export const COUNTER_CLERK_REASON = "需在公會職員面前才能辦理";
 
 export const ABANDON_WARNING = (name) => `放棄「${name}」後任務會判定失敗，且無法回復。`;
+
+const ISSUER_FALLBACK = "委託人沒有留下說明。";
 
 const REASON_CLAIMED = "報酬已領取";
 const REASON_RETURN_TO_COUNTER = "回到公會櫃檯即可交付並領取報酬。";
@@ -134,7 +138,7 @@ export function bookListRow(row) {
   };
 }
 
-function rewardView(row) {
+function rewardView(row, settlement = row.settlement) {
   const reward = row.reward;
   if (!reward) return null;
   const cells = [{ kind: "copper", glyph: "reward_copper", value: reward.copper, unit: "銅" }];
@@ -144,7 +148,17 @@ function rewardView(row) {
   for (const item of reward.items ?? []) {
     cells.push({ kind: "item", glyph: "reward_item", key: item.item_key, name: item.display_name, quantity: item.quantity });
   }
-  return { cells, settlement: SETTLEMENT_NOTES[row.settlement] ?? null };
+  return { cells, settlement: SETTLEMENT_NOTES[settlement] ?? null };
+}
+
+function deadlineView(line) {
+  return line
+    ? { line, note: "超過期限即判定失敗。", open: false }
+    : { line: "無期限", note: "這份委託沒有時間限制。", open: true };
+}
+
+function issuerView(kind, label, flavor) {
+  return { kind, label, letter: flavor ?? null, fallback: flavor ? null : ISSUER_FALLBACK };
 }
 
 // The detail view model of one book row. Null-sourced sections are omitted
@@ -166,6 +180,7 @@ export function bookDetail(row) {
   }
   const STAMPS = { completed: { kind: "completed", label: "達成" }, failed: { kind: "failed", label: "失敗" } };
   return {
+    kind: "book",
     id: row.quest_id,
     name: row.display_name,
     state: row.state,
@@ -178,16 +193,10 @@ export function bookDetail(row) {
     grade: row.grade ?? null,
     stamp: STAMPS[row.state] ?? null,
     progress,
+    condition: null,
     rationale: row.rationale ?? null,
-    deadline: row.deadline_line
-      ? { line: row.deadline_line, note: "超過期限即判定失敗。", open: false }
-      : { line: "無期限", note: "這份委託沒有時間限制。", open: true },
-    issuer: {
-      kind: row.issuer?.kind ?? null,
-      label: row.issuer?.label ?? "",
-      letter: row.flavor ?? null,
-      fallback: row.flavor ? null : "委託人沒有留下說明。",
-    },
+    deadline: deadlineView(row.deadline_line),
+    issuer: issuerView(row.issuer?.kind ?? null, row.issuer?.label ?? "", row.flavor),
     reward: rewardView(row),
   };
 }
@@ -201,7 +210,7 @@ function mirrored(descriptor, questId) {
 // counter row's enabled descriptor. A row without an enabled action states
 // why, from the counter's reason first.
 export function bookActions(row, counterRow) {
-  const result = { track: null, abandon: null, turnin: null, reason: null };
+  const result = { track: null, abandon: null, turnin: null, accept: null, reason: null };
   if (!row) return result;
   if (row.state === "in_progress") {
     if (row.track) {
@@ -238,5 +247,133 @@ export function bookActions(row, counterRow) {
     return result;
   }
   if (row.state === "failed") result.reason = REASON_FAILED;
+  return result;
+}
+
+// ── The guild board (quest-drawer-guild-board-tab) ──────────────────────
+// Grades come only from the guild section's `rank_ladder` and the holder's
+// rank; the client encodes no grade order or rank rule of its own.
+
+export const GRADE_REASON_OWN = "你的等級";
+export const GRADE_REASON_LOCKED = "尚未開放";
+export const OFFER_SETTLEMENT = "counter";
+
+export const lockedGradeLine = (grade) => `${grade} 級委託要等你的公會等級提升後才會開放。`;
+export const emptyGradeLine = (grade) => `目前沒有 ${grade} 級委託。`;
+
+// The holder's rank as the services panel's player summary states it.
+export function holderRank(services) {
+  return services?.player?.guild_rank ?? null;
+}
+
+// Board rows grouped under every ladder key, in ladder order; panel order is
+// kept within a grade. A row whose grade is not on the ladder is dropped.
+export function offersByGrade(board, ladder) {
+  const groups = Object.fromEntries((ladder ?? []).map((grade) => [grade, []]));
+  for (const row of board ?? []) {
+    groups[row?.rank]?.push(row);
+  }
+  return groups;
+}
+
+// A grade is locked above the holder's rank. A rank missing from the ladder
+// locks nothing (the server still lists only eligible offers).
+export function gradeLocked(ladder, rank, grade) {
+  const holder = (ladder ?? []).indexOf(rank);
+  return holder >= 0 && ladder.indexOf(grade) > holder;
+}
+
+// The memory basis a remembered grade belongs to: the ladder and the
+// holder's rank. A change in either drops the remembered grade.
+export function boardBasis(ladder, rank) {
+  return `${(ladder ?? []).join(",")}|${rank ?? ""}`;
+}
+
+// The highest grade at or below the holder's rank that has offers, else the
+// holder's own grade. Without a ladder rank: the highest grade with offers,
+// else the first grade.
+export function defaultGrade(ladder, rank, groups) {
+  const keys = ladder ?? [];
+  const holder = keys.indexOf(rank);
+  const top = holder >= 0 ? holder : keys.length - 1;
+  for (let index = top; index >= 0; index -= 1) {
+    if (groups[keys[index]]?.length > 0) return keys[index];
+  }
+  return holder >= 0 ? rank : (keys[0] ?? null);
+}
+
+// The grade rail's IconTabs entries. A locked grade shows no count and is not
+// dimmed, so it never implies hidden offers; it stays selectable.
+export function gradeTabs(ladder, rank, groups) {
+  return (ladder ?? []).map((grade) => {
+    const locked = gradeLocked(ladder, rank, grade);
+    const count = groups[grade]?.length ?? 0;
+    const own = grade === rank;
+    return {
+      key: grade,
+      label: `${grade} 級`,
+      count: locked ? undefined : count,
+      mark: own,
+      dim: !locked && count === 0,
+      locked,
+      reason: own ? GRADE_REASON_OWN : locked ? GRADE_REASON_LOCKED : undefined,
+    };
+  });
+}
+
+function guildSummary(deadline) {
+  return deadline ? `公會委託 · ${deadline}` : "公會委託";
+}
+
+export function offerListRow(row) {
+  return {
+    id: row.definition_key,
+    name: row.display_name,
+    state: "offer",
+    glyph: categoryGlyph(row.category),
+    tracked: false,
+    grade: row.rank ?? null,
+    progress: null,
+    sub: guildSummary(row.deadline_line),
+  };
+}
+
+// The offer detail: the book detail's layout without progress or stamp, the
+// acceptance condition in place of the rationale cell, the branch as the
+// commissioner, and the reward settled at the counter.
+export function offerDetail(row, branchLabel) {
+  const category = CATEGORY_LABELS[row.category] ?? null;
+  return {
+    kind: "offer",
+    id: row.definition_key,
+    name: row.display_name,
+    state: "offer",
+    ribbon: { glyph: categoryGlyph(row.category), label: category ? `${category}委託` : "委託" },
+    objective: row.objective_summary,
+    note: row.objective_note ?? null,
+    grade: row.rank ?? null,
+    stamp: null,
+    progress: null,
+    condition: { line: `公會等級 ${row.rank} 級以上`, text: row.rationale ?? null },
+    rationale: null,
+    deadline: deadlineView(row.deadline_line),
+    issuer: issuerView("guild", branchLabel ?? "", row.flavor),
+    reward: rewardView(row, OFFER_SETTLEMENT),
+  };
+}
+
+// The offer's accept descriptor as the primary action; a disabled one keeps
+// its control (aria-disabled) and states its reason.
+export function offerActions(row) {
+  const result = { track: null, abandon: null, turnin: null, accept: null, reason: null };
+  const accept = row?.accept;
+  if (!accept) return result;
+  result.accept = {
+    enabled: accept.enabled === true,
+    label: accept.label,
+    action_id: accept.action_id,
+    payload: { definition_key: row.definition_key },
+  };
+  if (!result.accept.enabled) result.reason = accept.disabled_reason?.message ?? null;
   return result;
 }

@@ -86,3 +86,20 @@ primary action, or that descriptor's disabled reason.
 #### Scenario: Registering dispatches once
 - **WHEN** the player activates the enabled register action
 - **THEN** exactly one `guild.register` request is submitted, and the board with grade tabs appears only after the commit
+
+## MODIFIED Requirements
+
+### Requirement: The guild counter tab presents counter business only
+
+The guild counter tab SHALL render only from the `services` panel's guild section: registration for an
+unregistered holder, and for a registered holder the quest board for accepting new quests and guild rank with
+the promotion examination. It SHALL NOT re-list the holder's accepted quest records, so no quest appears in both
+tabs as a held quest.
+
+#### Scenario: The counter tab carries counter business
+- **WHEN** the guild counter tab is selected in front of a clerk by a registered holder
+- **THEN** it shows the board and the rank block, and lists no accepted quest
+
+#### Scenario: Neither tab invents the other's data
+- **WHEN** `quest_log` is available and `services` is unavailable
+- **THEN** the quest book renders normally and the guild counter tab is disabled with the services reason

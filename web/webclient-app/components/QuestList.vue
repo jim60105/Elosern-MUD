@@ -4,7 +4,9 @@
 // (category glyph, name with the tracked flag, grade gem, and either the
 // in-progress bar or the issuer line), or one of the honest non-list forms:
 // the absent line before the first commit, the panel's own unavailable
-// reason, or the shared empty guidance.
+// reason, or the shared empty guidance. The guild board passes its offer rows
+// (quest-drawer-guild-board-tab) and puts the rank card in the `lead` slot
+// above the heading.
 //
 // Keyboard (design Decision 8): one roving tab stop on the selected row (the
 // first row when nothing is selected); ArrowUp/ArrowDown/Home/End move focus
@@ -25,6 +27,7 @@ const props = defineProps({
   reason: { type: Object, default: null },
   emptyHeadline: { type: String, default: "這裡還沒有任務。" },
   emptyGuidance: { type: String, default: "" },
+  emptyGlyph: { type: String, default: "quests" },
   ariaLabel: { type: String, default: "任務" },
 });
 
@@ -111,6 +114,7 @@ function onFocusout(event) {
 
 <template>
   <div class="quest-list" data-testid="quest-drawer__list">
+    <slot name="lead" />
     <header class="quest-list__head">
       <span class="quest-list__kicker">{{ heading }}</span>
       <span class="quest-list__rule" aria-hidden="true"></span>
@@ -183,7 +187,7 @@ function onFocusout(event) {
       v-else
       class="quest-list__empty"
       data-testid="quest-drawer__empty"
-      glyph="quests"
+      :glyph="emptyGlyph"
       :headline="emptyHeadline"
       :guidance="emptyGuidance"
     />

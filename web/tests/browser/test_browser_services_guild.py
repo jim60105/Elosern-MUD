@@ -48,11 +48,23 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
         self._select_quest_tab(page, "counter")
-        self._tab_until_focused(page, '[data-testid="guild-counter__register"]')
+        # An unregistered holder sees only the registration card.
+        self.assertEqual(page.locator('[data-testid="quest-drawer__grade-rail"]').count(), 0)
+        self._tab_until_focused(page, '[data-testid="quest-drawer__register"]')
         _press(page, "Enter")
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
         self.assertEqual(sent_action_count(page, "guild.register"), 1)
         self.assertEqual(self._services_panel(page)["player"]["guild_rank"], "F")
+        # The commit swaps the card for the grade-tabbed board, and focus
+        # stays inside the drawer on the selected grade tab.
+        page.wait_for_selector('[data-testid="quest-drawer__grade-rail"]', timeout=5000)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__registration"]').count(), 0)
+        self.assertTrue(
+            page.evaluate(
+                "() => !!document.activeElement && !!document.activeElement.closest("
+                "'[data-testid=\"quest-drawer__grade-rail\"]')"
+            )
+        )
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
@@ -72,8 +84,8 @@ class GuildRegistrationJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self.assertTrue(page.locator('[data-testid="quest-drawer"]').is_visible())
         self._select_quest_tab(page, "counter")
-        self.assertTrue(page.locator('[data-testid="guild-counter"]').is_visible())
-        self.assertTrue(page.locator('[data-testid="guild-counter__register"]').is_visible())
+        self.assertTrue(page.locator('[data-testid="quest-drawer__registration"]').is_visible())
+        self.assertTrue(page.locator('[data-testid="quest-drawer__register"]').is_visible())
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
         # H4 (task 9.2): the heading is now the open reference drawer's own
@@ -97,8 +109,22 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
         self._select_quest_tab(page, "counter")
-        self._tab_until_focused(page, '[data-testid="guild-counter__accept"]')
-        _press(page, "Enter")  # accept the eligible offer row
+        # The default grade is the holder's own grade with its one offer,
+        # which the detail shows; the rank card sits above the list.
+        offer_key = guild_offer_quest_key()
+        offer_rank = panel["guild"]["board"][0]["rank"]
+        self.assertEqual(
+            page.locator(
+                f'[data-testid="quest-drawer__grade-rail"] [data-tab-key="{offer_rank}"]'
+            ).get_attribute("aria-selected"),
+            "true",
+        )
+        self.assertTrue(page.locator('[data-testid="quest-drawer__list"] [data-testid="guild-rank-card"]').is_visible())
+        self.assertEqual(
+            page.locator('[data-testid="quest-drawer__detail"]').get_attribute("data-quest-id"), offer_key
+        )
+        self._tab_until_focused(page, '[data-testid="quest-drawer__accept"]', max_presses=40)
+        _press(page, "Enter")  # accept the selected offer
         self._wait_panel(page, lambda p: p["pagination"]["quest_total"] == 1)
         self.assertEqual(sent_action_count(page, "guild.quest_accept"), 1)
         sent = page.evaluate("window.__elosernSent || []")
@@ -122,7 +148,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self._open_guild_menu(page)
         self._select_quest_tab(page, "counter")
         old_name = panel["guild"]["board"][0]["display_name"]
-        board_row = page.locator(f'[data-testid="guild-counter__board-row--{guild_offer_quest_key()}"]')
+        board_row = page.locator(f'[data-testid="quest-drawer__row--{guild_offer_quest_key()}"]')
         self.assertTrue(board_row.is_visible())
         self.assertIn(old_name, board_row.inner_text())
         before = page.evaluate("() => window.__elosernBridge.router.depth()")
@@ -141,6 +167,34 @@ class GuildBoardJourneys(ServicesBrowserTest):
         )
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    def test_grade_rail_reaches_a_locked_grade_by_keyboard(self):
+        """The grade above the holder's rank is locked: selecting it by
+        keyboard lists no offer, shows no detail or accept, and says the grade
+        opens after a promotion."""
+        page = self.logged_in_page()
+        panel = self._wait_services_available(page)
+        ladder = panel["guild"]["rank_ladder"]
+        rank = panel["player"]["guild_rank"]
+        locked = ladder[ladder.index(rank) + 1]
+
+        self._open_guild_menu(page)
+        self._select_quest_tab(page, "counter")
+        tab = page.locator(f'[data-testid="quest-drawer__grade-rail"] [data-tab-key="{locked}"]')
+        self.assertIn("is-locked", tab.get_attribute("class"))
+        self.assertIsNone(tab.get_attribute("aria-disabled"))
+        own = page.locator(f'[data-testid="quest-drawer__grade-rail"] [data-tab-key="{rank}"]')
+        self.assertIn("is-mark", own.get_attribute("class"))
+        self._select_board_grade(page, locked)
+        page.wait_for_selector('[data-testid="quest-drawer__empty"]', timeout=5000)
+        self.assertIn(f"{locked} 級委託要等你的公會等級提升後才會開放", page.locator('[data-testid="quest-drawer__empty"]').inner_text())
+        self.assertEqual(page.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__detail"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__accept"]').count(), 0)
+        # The rank card stays above the list on every grade.
+        self.assertTrue(page.locator('[data-testid="quest-drawer__list"] [data-testid="guild-rank-card"]').is_visible())
 
 
 class GuildQuestJourneys(ServicesBrowserTest):
@@ -244,16 +298,19 @@ class GuildQuestJourneys(ServicesBrowserTest):
         page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
         body = page.locator('[data-testid="quest-drawer"]')
         # Exactly one book row for the held quest.
-        self.assertEqual(body.locator('[data-testid^="quest-drawer__row--"]').count(), 1)
-        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 0)
-        # The counter tab is enabled in front of the clerk and carries no
-        # quest-record rows at all.
+        book_rows = body.locator('[data-testid^="quest-drawer__row--"]')
+        self.assertEqual(book_rows.count(), 1)
+        held_id = book_rows.first.get_attribute("data-quest-id")
+        self.assertEqual(page.locator('[data-testid="quest-drawer__counter"]').count(), 0)
+        # The counter tab is enabled in front of the clerk; its rows are
+        # board offers only, never the held quest record.
         self._select_quest_tab(page, "counter")
-        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 1)
-        self.assertEqual(
-            page.locator('[data-testid^="guild-counter__quest-row--"]').count(), 0
-        )
-        self.assertEqual(body.locator('[data-testid^="quest-drawer__row--"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__counter"]').count(), 1)
+        offered = [
+            row.get_attribute("data-quest-id")
+            for row in body.locator('[data-testid^="quest-drawer__row--"]').all()
+        ]
+        self.assertNotIn(held_id, offered)
 
 
 class GuildTurninJourneys(ServicesBrowserTest):

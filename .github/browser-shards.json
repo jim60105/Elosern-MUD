@@ -146,6 +146,7 @@
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_typed_command_while_reading_flushes_to_new_response_and_logs_divider",
         "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_frame_refreshes_on_committed_update",
         "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_board_list_to_accept",
+        "web.tests.browser.test_browser_services_guild.GuildBoardJourneys.test_grade_rail_reaches_a_locked_grade_by_keyboard",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_seeded_motion_level_is_applied",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_os_reduced_motion_resolves_to_reduced",
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest.test_stored_motion_level_overrides_os",

@@ -9,7 +9,7 @@ import {
 } from "../fixtures.js";
 
 // GuildRankCard (quest-drawer-ui-primitives): the guild rank block extracted
-// from GuildCounter. It shows the rank crest, a merit meter with an explicit
+// from the retired GuildCounter. It shows the rank crest, a merit meter with an explicit
 // met / short status (merit_qualified), and the 預約升等考核 request, whose
 // enabled state is independent of merit. It renders the `services` v5
 // payload's `guild.rank` object and emits the exact exam-request intent.

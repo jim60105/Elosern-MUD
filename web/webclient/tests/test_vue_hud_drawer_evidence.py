@@ -169,7 +169,6 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
          # the quantity entry clamps on change to the server-advertised bounds.
         _assert_vitest_passes(
             _run_vitest(
-                 TESTS_DIR / "world" / "guild_counter.test.js",
                  TESTS_DIR / "world" / "guild_rank_card.test.js",
                  TESTS_DIR / "world" / "quest_detail.test.js",
                  TESTS_DIR / "world" / "quest_drawer.test.js",

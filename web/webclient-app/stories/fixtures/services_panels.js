@@ -438,3 +438,51 @@ export const SERVICES_PANEL_GUILD_TURNIN_READY_SAMPLE = {
   },
   pagination: { ...SERVICES_PANEL_SAMPLE.pagination, quest_total: 2 },
 };
+
+// The grade-tabbed guild board (quest-drawer-guild-board-tab), after the
+// approved prototype: an E-rank holder whose board lists two F and two E
+// offers (the server lists none above the holder's rank). The second E offer
+// is already held, so its accept descriptor is disabled with the server's
+// reason. The fourth row is a story-only variation of the hare offer.
+const boardOffer = (key) => SERVICES_PANEL_SAMPLE.guild.board.find((row) => row.definition_key === key);
+
+export const SERVICES_PANEL_GUILD_BOARD_SAMPLE = {
+  ...SERVICES_PANEL_SAMPLE,
+  player: { ...SERVICES_PANEL_SAMPLE.player, guild_rank: "E", guild_merit: 140, next_rank: "D", next_threshold: 500 },
+  guild: {
+    ...SERVICES_PANEL_SAMPLE.guild,
+    board: [
+      boardOffer("eastern_plains_sway_whistle_sparrow"),
+      boardOffer("introductory_hunt"),
+      boardOffer("southwest_coast_tide_lamp_crab"),
+      {
+        definition_key: "western_hills_ridge_hare",
+        display_name: "清理西部丘陵築埂兔",
+        category: "defeat",
+        objective_summary: "在西部丘陵討伐 3 隻築埂兔",
+        objective_note: "計數變體：築巢型、護巢型",
+        deadline_line: "接取後 3 日",
+        rationale: "平原鬆土讓牠們容易鑽回洞道，護巢型又會加固入口；個體不強，逐一找出田埂間的巢口才是難處。",
+        flavor: "平原邊緣的鬆土帶出現新的築埂兔巢，坑洞妨礙農具與牲畜通行。農戶請公會清除這一帶的族群，讓田間作業恢復。",
+        reward: { copper: 150, merit: 50, items: [{ item_key: "healing_potion", display_name: "治療藥水", quantity: 2 }] },
+        rank: "E",
+        accept: {
+          action_id: "guild.quest_accept",
+          label: "接取任務",
+          enabled: false,
+          disabled_reason: { code: "quest_already_active", message: "這個任務已經在進行中了。" },
+          quantity: null,
+        },
+      },
+    ],
+    rank: {
+      rank: "E",
+      merit: 140,
+      next_rank: "D",
+      next_threshold: 500,
+      merit_qualified: false,
+      exam_request: examRequest(true),
+    },
+  },
+  pagination: { ...SERVICES_PANEL_SAMPLE.pagination, board_total: 4 },
+};

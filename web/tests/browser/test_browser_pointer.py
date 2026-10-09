@@ -502,17 +502,17 @@ class PointerServiceAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptance
         self._wait_services_available(page)
 
         # H4 (task 9.3), quest-drawer-split: the service UI renders inside the
-        # open reference drawer — the register control lives in the
-        # GuildCounter surface, which quest-drawer-book-tab hosts behind the
-        # drawer's counter tab (the pointer selects it like any control).
+        # open reference drawer — the register control lives on the
+        # unregistered holder's registration card behind the quest drawer's
+        # counter tab (the pointer selects it like any control).
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
         )
         page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
         page.locator('[data-testid="quest-drawer__top-tabs"] [data-tab-key="counter"]').click()
-        register = page.locator('[data-testid="guild-counter__register"]')
-        page.wait_for_selector('[data-testid="guild-counter__register"]', timeout=15000)
+        register = page.locator('[data-testid="quest-drawer__register"]')
+        page.wait_for_selector('[data-testid="quest-drawer__register"]', timeout=15000)
         self.assertEqual(register.count(), 1)
         register.click()
         deadline = time.monotonic() + 20
