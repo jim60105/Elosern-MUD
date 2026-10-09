@@ -1107,6 +1107,7 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
             self.assertEqual(toggle_equipment(host, key).outcome, "success")
         return host
 
+    @covers_requirement("guild-exam-restrictions::a-and-s-examination-kits-retain-real-lineage-effects")
     def test_real_a_s_kits_seal_unrelated_effects_and_retain_domain(self):
         from unittest.mock import patch
         from world.rules.action import ActionRequest, ActionResolver
@@ -1149,6 +1150,8 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
             self.assertEqual(dict(host.db.skills), ownership)
             self.assertEqual(dict(host.db.skill_proficiency), proficiency)
 
+    @covers_requirement("guild-exam-restrictions::reduced-neutral-baselines-precede-penalties-and-preserve-both-agility-consumers")
+    @covers_requirement("guild-exam-restrictions::guild-accessories-persist-reversible-execution-and-effect-restrictions")
     def test_real_limit_accessories_lower_s_senior_and_keep_hamstring(self):
         from copy import deepcopy
         from world.rules.buffs import apply_buff, _remove_buff_keys

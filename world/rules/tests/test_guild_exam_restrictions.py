@@ -108,6 +108,7 @@ class RestrictionBehaviorTests(EvenniaTest):
         state = self.snapshot()
         return ({key: row["base"] for key, row in state["traits"].items()}, state["skills"], state["proficiency"])
 
+    @covers_requirement("guild-exam-restrictions::guild-accessories-persist-reversible-execution-and-effect-restrictions")
     @covers_requirement("skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-predicate")
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
     def test_sealed_heal_rejects_pre_cost_in_both_resolver_paths_and_view(self):
@@ -122,6 +123,7 @@ class RestrictionBehaviorTests(EvenniaTest):
         self.assertEqual(preview_skill(self.host, _HEAL.key, request.context).reason, RejectReason.EXAM_SKILL_SEALED)
         self.assertIn(_HEAL.key, self.host.skills.owned_keys())
 
+    @covers_requirement("guild-exam-restrictions::guild-accessories-persist-reversible-execution-and-effect-restrictions")
     @covers_requirement("skill-handler::effective-value-is-the-sole-resolution-time-multiplier-application-point-and-never-writes-to-entity-traits")
     def test_real_accessory_reduces_stronger_host_and_seals_passives_reversibly(self):
         learned = self.learned_snapshot()
@@ -153,6 +155,7 @@ class RestrictionBehaviorTests(EvenniaTest):
         self.assertEqual(self.learned_snapshot(), learned)
         self.assertNotIn(_RING.key, self.host.db.inventory)
 
+    @covers_requirement("guild-exam-restrictions::reduced-neutral-baselines-precede-penalties-and-preserve-both-agility-consumers")
     def test_hamstring_and_positive_caps_apply_to_reduced_neutral_first(self):
         activate_exam_restriction(self.host, "synthetic-exam", "T")
         from world.rules.buffs import apply_buff
@@ -177,6 +180,8 @@ class RestrictionBehaviorTests(EvenniaTest):
             self.assertEqual(roll_initiative(battlefield)[0], player_key)
 
     @covers_requirement("equipment-inventory::accessory-is-a-bounded-multi-item-slot")
+    @covers_requirement("guild-exam-restrictions::guild-accessories-persist-reversible-execution-and-effect-restrictions")
+    @covers_requirement("guild-exam-restrictions::reduced-neutral-baselines-precede-penalties-and-preserve-both-agility-consumers")
     def test_weak_host_and_overflow_fail_without_any_mutation(self):
         self.host.traits.agility.base = 8
         before = self.snapshot()
@@ -193,6 +198,7 @@ class RestrictionBehaviorTests(EvenniaTest):
             activate_exam_restriction(self.host, "synthetic-exam", "T")
         self.assertEqual(self.snapshot(), before)
 
+    @covers_requirement("guild-exam-restrictions::guild-accessories-persist-reversible-execution-and-effect-restrictions")
     def test_guild_property_cannot_be_bought_sold_transferred_or_awarded(self):
         activate_exam_restriction(self.host, "synthetic-exam", "T")
         before = self.snapshot()
