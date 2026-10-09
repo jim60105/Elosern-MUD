@@ -297,6 +297,12 @@ class HumanCombatCalibrationTests(EvenniaTest):
         activate_exam_restriction(human, f"exam_{rank}_{human.pk}", rank)
         return human
 
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    @covers_requirement(
+        "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
+    )
     def test_human_calibration_uses_real_resolver_gear_restrictions_and_bounded_outcome_evidence(self):
         f_human = self._create_human_f()
         self.assertEqual(f_human.traits.hp.base, 169)
@@ -367,6 +373,12 @@ class HumanCombatCalibrationTests(EvenniaTest):
         remove_exam_restriction(e_human, f"exam_E_{e_human.pk}")
         self.assertIsNone(exam_restriction(e_human))
 
+    @covers_requirement(
+        "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
+    )
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
     def test_evidence_separates_defeat_retreat_support_safety_and_unverified_projections(self):
         c_human = self._create_human_with_restriction("C")
         cliff_stepper = construct_species_individual("rock_echo_goat", "cliff_stepper")
@@ -432,6 +444,9 @@ class HumanCombatCalibrationTests(EvenniaTest):
         after_live_xp = (player.db.skill_proficiency or {}).get("basic_swordplay", 0.0)
         self.assertGreater(after_live_xp, initial_xp)
 
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
     def test_sqlite_attribute_parity_e_vs_reef_warden_seed_zero(self):
         e_human = self._create_human_with_restriction("E")
         reef_warden = construct_species_individual("tide_lamp_crab", "reef_warden")
@@ -442,6 +457,9 @@ class HumanCombatCalibrationTests(EvenniaTest):
         self.assertGreater(outcome.final_human_hps[0], 0)
         self.assertEqual(outcome.final_monster_hp, 0)
 
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
     def test_persistent_host_exam_lifecycle_restoration_smoke(self):
         from world.rules.human_guild_hosts import sync_persistent_adventurers, find_persistent_adventurer
         fake_routes = {
