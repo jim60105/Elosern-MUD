@@ -10,7 +10,7 @@ import {
 
 // QuestLog (quest-issuer-model change 11): the player's own quest book — the
 // host-free half of the split quest drawer. Props: questLog — the committed
-// `quest_log` v1 payload; services — the committed `services` v4 payload read
+// `quest_log` v2 payload; services — the committed `services` v4 payload read
 // only for the guild section's quest rows (the counter-action merge by
 // quest_id). The tracking / abandon / turnin controls emit the exact OOB
 // action intents (the `action_id` and `payload` fields of the `ui_action`
