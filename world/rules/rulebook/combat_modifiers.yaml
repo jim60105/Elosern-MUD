@@ -218,3 +218,8 @@
 - id: martial_blessing_defense_bonus
   when: {buff_active: martial_blessing}
   then: {defense: 10}
+# 魔物資源技能（remaining-monster-resource-skills §4）：震穗啄擊的命中干擾，
+# buff 列為 mount，−3 資料在此（earth_dust_veil 的 accuracy 先例）。
+- id: grain_rattle_accuracy
+  when: {buff_active: grain_rattle}
+  then: {accuracy: -3}

@@ -98,6 +98,17 @@ class OutOfCombatAvailabilityPolicyTests(unittest.TestCase):
         "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
     )
     def test_damage_carrying_skills_all_declare_true(self):
+        # The written policy's stated exception (see
+        # ``_support.USABLE_OUT_OF_COMBAT_FALSE_KEYS``): a damage skill whose
+        # eligibility admits only the ``monster`` actor kind has no
+        # out-of-combat selection path at all, so it is the one deliberate
+        # False damage entry instead of a True one.
+        monster_only = sorted(
+            key
+            for key, skill in SKILL_REGISTRY.items()
+            if skill.eligibility.allowed_actor_kinds == ("monster",)
+        )
+        self.assertTrue(monster_only)
         offenders = sorted(
             key
             for key, skill in SKILL_REGISTRY.items()
@@ -105,11 +116,22 @@ class OutOfCombatAvailabilityPolicyTests(unittest.TestCase):
                 isinstance(effect, DamageEffect) for effect in skill.parsed_effects
             )
             and not skill.usable_out_of_combat
+            and key not in monster_only
         )
         self.assertEqual(
             offenders,
             [],
-            "DamageEffect-carrying entries must be selectable outside combat",
+            "DamageEffect-carrying entries selectable outside combat must "
+            "declare True",
+        )
+        self.assertEqual(
+            sorted(
+                key
+                for key in monster_only
+                if not SKILL_REGISTRY[key].usable_out_of_combat
+            ),
+            ["grain_shaking_peck"],
+            "the monster-only damage exception is a named, single-entry record",
         )
 
     @covers_requirement(

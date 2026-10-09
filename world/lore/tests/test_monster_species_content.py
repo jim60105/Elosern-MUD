@@ -88,13 +88,15 @@ APPROVED_VARIANTS = {
 # variant key -> the approved complete combat profile and guild danger grade.
 # These are the approved literals verbatim; the registry must reproduce them
 # field for field, and a value that differs is a content defect, not a
-# re-tuning decision. MP, SP and magic_power are authored zeros: no approved
-# ability mechanic consumes a pool and every tier's magic band is (0, 0).
+# re-tuning decision. MP and SP are authored zeros for every variant whose
+# ability mechanic has not landed, and the approved delivered pools where it
+# has (crocodile 30/40 and 50/60, sparrow 20/8 and 30/12); magic_power is zero
+# everywhere and every tier's magic band is (0, 0).
 APPROVED_BALANCE = {
     "grain_pecker": {
         "hp": 30,
-        "mp": 0,
-        "sp": 0,
+        "mp": 20,
+        "sp": 8,
         "atk_phys": 4,
         "agility": 7,
         "defense": 3,
@@ -103,8 +105,8 @@ APPROVED_BALANCE = {
     },
     "flock_leader": {
         "hp": 55,
-        "mp": 0,
-        "sp": 0,
+        "mp": 30,
+        "sp": 12,
         "atk_phys": 8,
         "agility": 10,
         "defense": 4,
@@ -589,18 +591,26 @@ class AbilitySeamNegativeTests(unittest.TestCase):
     )
     def test_no_registry_string_names_a_skill_behaviour_or_combat_trait(self):
         faces = self._forbidden_faces()
+        # The delivered variants carry their validated authored kit and
+        # profile; every other row must name none of these faces anywhere.
+        delivered = {
+            "bank_lurker": ("tide_devouring_bite", "ambush_predator"),
+            "bay_warden": ("tide_devouring_bite", "ambush_predator"),
+            "grain_pecker": ("grain_shaking_peck", "instinctive"),
+            "flock_leader": ("grain_shaking_peck", "instinctive"),
+        }
         for source, registry in (
             ("species", MONSTER_SPECIES_REGISTRY),
             ("variants", MONSTER_VARIANT_REGISTRY),
         ):
             for key, row in registry.items():
                 with self.subTest(registry=source, row=key):
-                    if source == "variants" and key in ("bank_lurker", "bay_warden"):
-                        # The crocodile variants carry their validated authored kit and profile
+                    if source == "variants" and key in delivered:
+                        skill_key, profile_key = delivered[key]
                         narrative = {row.display_name_zh, row.description_zh}
                         self.assertEqual(narrative & faces, set())
-                        self.assertEqual(row.active_skill_keys, ("tide_devouring_bite",))
-                        self.assertEqual(row.behaviour_profile_key, "ambush_predator")
+                        self.assertEqual(row.active_skill_keys, (skill_key,))
+                        self.assertEqual(row.behaviour_profile_key, profile_key)
                     else:
                         strings: set[str] = set()
                         _string_values(row, set(), strings)

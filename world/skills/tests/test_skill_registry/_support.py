@@ -63,7 +63,11 @@ _MASTERY_KEYS = frozenset(
 #: battlefield; only a passive whose effect is combat-context-only would
 #: declare False. Damage-carrying skills declare True as well: their outside-
 #: combat use is exactly opening a fight, which the damaging-action gate
-#: (skill-field-availability) then confines to a battlefield. A new skill
-#: that omits a decision falls outside this set by the helpers' False
+#: (skill-field-availability) then confines to a battlefield. The same
+#: "nothing to act on" exception covers a damage skill whose eligibility
+#: admits only the ``monster`` actor kind: no out-of-combat path selects a
+#: monster, so the flag's meaning ("may be selected while no combat session
+#: is in progress") is unsatisfiable for it and it declares False. A new
+#: skill that omits a decision falls outside this set by the helpers' False
 #: default and fails the inventory assertion.
-USABLE_OUT_OF_COMBAT_FALSE_KEYS = frozenset({"flee"})
+USABLE_OUT_OF_COMBAT_FALSE_KEYS = frozenset({"flee", "grain_shaking_peck"})

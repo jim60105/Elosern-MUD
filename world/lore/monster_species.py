@@ -24,12 +24,15 @@ Two boundaries are pinned here and must not be blurred:
   carries both as ``None``. ``None`` means "no approved per-variant profile
   exists" — never a zero, never a number inferred from flavoured names, and
   never tier-band truth.
-* **Abilities are narrative (design D-S5, requirement R4).** The six approved
-  special abilities have no executable form: this module registers no skill
-  key, behaviour profile, or combat trait for them, and adds no placeholder
-  field that could stand in for one. Their mechanics are a named external
-  prerequisite owned by the skill/behaviour-mechanics work; the approved prose
-  (including its stated limits) lives in the published narrative fields only.
+* **Abilities are narrative until a species' mechanics land (design D-S5,
+  requirement R4).** A delivered species carries its authored kit and
+  behaviour binding here; a species still awaiting mechanics registers no
+  skill key, behaviour profile, or combat trait, and no placeholder field
+  stands in for one. Delivered: the crocodile (``tide_devouring_bite``) and
+  the sparrow (``grain_shaking_peck``); the crab, hare, goat and lynx
+  abilities remain deferred to the skill/behaviour-mechanics work. The
+  approved prose (including its stated limits) lives in the published
+  narrative fields only.
 
 Key grammar (requirement R1) is the shared stable-key contract, whose predicate
 lives in ``world/art/subjects.py``. ``world/lore/`` may not import that module —
@@ -484,9 +487,10 @@ def validate_monster_species_registry(
 # 2026-10-06 (monster-balance-profiles) and are literals only: each value below
 # is the approved value transcribed verbatim, never re-derived, re-tuned,
 # re-rounded, or interpolated from a display name, a description, a threat
-# tier, another variant, or a tier band. MP and SP are authored zeros — the six
-# approved abilities have no executable mechanic, so no pool has a consumer —
-# and every tier's magic band is deliberately ``(0, 0)``.
+# tier, another variant, or a tier band. MP and SP are the approved delivered
+# resource pools of the species whose mechanic has landed and authored zeros
+# for every other variant; ``magic_power`` is zero for all twelve and every
+# tier's magic band is deliberately ``(0, 0)``.
 # Author-private notes are reasoned from the bestiary's own usage boundary
 # (in-world origins stay unknown): the hidden-truth field records that no
 # origin truth is authored, the explanation field carries the authoring
@@ -504,12 +508,13 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "穗間響起的沙沙聲，是農民辨認牠們的線索。"
         "牠們造成的麻煩集中於收穫期；田地仍能正常耕作，但反覆造訪的族群會損耗尚未收起的穀物。"
         "濕穀與牢固的未熟穗不易受影響。"
-        "牠們無法掀翻糧車、吹倒作物，也不具備大範圍風暴能力。",
+        "牠們無法掀翻糧車、吹倒作物，也不具備大範圍風暴能力。"
+        "近身時，牠會配合短促氣流啄擊，命中後使對手短暫分心；此招不需要穀物，也不產生強風或擊退。",
         ("eastern_plains",),
         "（作者私有：隱秘真相）本物種在世界設定中沒有已定的起源真相；設計刻意不記載創造者、"
         "魔力污染或迷宮成因，任何此類說法都只是世界內未經證實的猜想。",
         "（作者私有：作者解釋）作為收穫期的低階麻煩來源，示範能力邊界如何限制風屬性生態而"
-        "不授予任何可執行技能；棲地相容性指向東部平原。",
+        "以近身啄擊與短暫命中干擾呈現微弱氣流，震穀生態仍不改造戰場；棲地相容性指向東部平原。",
         "（作者私有：尚未證實的猜想）農戶之間流傳牠們受穀倉殘留魔力吸引，但沒有可查證的紀錄。",
         "grain_pecker",
         True,
@@ -616,9 +621,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=30, mp=0, sp=0, atk_phys=4, agility=7, defense=3, magic_power=0
+            hp=30, mp=20, sp=8, atk_phys=4, agility=7, defense=3, magic_power=0
         ),
         "F",
+        active_skill_keys=("grain_shaking_peck",),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "flock_leader",
@@ -628,9 +635,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=55, mp=0, sp=0, atk_phys=8, agility=10, defense=4, magic_power=0
+            hp=55, mp=30, sp=12, atk_phys=8, agility=10, defense=4, magic_power=0
         ),
         "E",
+        active_skill_keys=("grain_shaking_peck",),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "shore_walker",

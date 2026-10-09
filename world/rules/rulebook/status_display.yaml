@@ -368,3 +368,9 @@
 - code: martial_blessing_defense_bonus
   label: 武備祝聖防禦提升
   severity: beneficial
+- code: grain_rattle
+  label: 震穀分心
+  severity: harmful
+- code: grain_rattle_accuracy
+  label: 震穀分心命中下降
+  severity: harmful
