@@ -2,7 +2,7 @@
 
 ## 1. Shared quest facts and the offer-deadline seam
 
-- [ ] 1.1 Extract the category key map and the reward-object builder from `web/webclient/presentation/quest_log.py` into `web/webclient/presentation/quest_facts.py`, and import them back into `quest_log.py`. Register any new test module in `.github/evennia-shards.json`. Verify that `web.webclient.presentation.tests.test_quest_log_panel` still passes unchanged.
+- [ ] 1.1 Extract the category key map and shared one-item reward bound from `web/webclient/presentation/quest_log.py` into `web/webclient/presentation/quest_facts.py`, expose the existing world-owned `describe_reward_parts()` builder there, and import these facts back into `quest_log.py`. Register any new test module in `.github/evennia-shards.json`. Verify that `web.webclient.presentation.tests.test_quest_log_panel` still passes unchanged.
 - [ ] 1.2 Add `describe_offer_deadline()` to `world/quests/describe.py` with synthetic tests in `world/quests/tests/test_describe.py` (None, 24 → 接取後 1 日, 72 → 接取後 3 日, 36 → 接取後 36 小時). Verify with the focused label.
 
 ## 2. Read model and services v6
