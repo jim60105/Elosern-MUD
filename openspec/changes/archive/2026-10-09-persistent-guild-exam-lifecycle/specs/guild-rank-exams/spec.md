@@ -1,7 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: start_guild_exam is the sole trigger and validates authority itself
-start_guild_exam(actor, examiner, target_rank, requested_by=...) SHALL be the only mutation-capable exam start API. It SHALL validate selected persistent human host qualification/identity for registered branch/next rank, co-location and shared service_available, true cumulative merit and no active battle/exam for either participant. requested_by SHALL be audit metadata only. Existing +1 guild-source affinity SHALL commit atomically with kit/restriction/record/session and grant nothing on rejection.
+`start_guild_exam(actor, examiner, target_rank, requested_by=...)` SHALL be the only mutation-capable
+examination-start API. It SHALL validate the co-located `GuildExaminer` counter through the shared
+`service_available` resolver, the selected persistent host's qualification and identity for the
+registered branch's next rank, true cumulative merit, and no active battle or exam for either
+participant. `requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
 
 #### Scenario: Command trigger starts an eligible exam
 - **WHEN** an eligible local candidate requests its qualified persistent host
@@ -33,8 +37,8 @@ start_guild_exam(actor, examiner, target_rank, requested_by=...) SHALL be the on
 - **WHEN** an examination starts successfully
 - **THEN** it additionally grants +1 affinity (`guild` source) with the examiner through the
   sole-writer affinity API (`world/rules/affinity.py`), applied inside the same atomic block that
-  creates the exam record and combat session (the temporary opponent is pre-spawned before any
-  mutation)
+  creates the exam record and combat session (the persistent host is resolved and preflighted
+  before any mutation)
 
 #### Scenario: The affinity record joins the restore surfaces
 - **WHEN** an exam start fails after the affinity grant would have been staged
@@ -42,8 +46,11 @@ start_guild_exam(actor, examiner, target_rank, requested_by=...) SHALL be the on
   is restored, and a rejected start grants nothing
 
 ### Requirement: Examination start is all-or-nothing across opponent, record, and session
-The opponent SHALL be the existing persistent qualified host. Preflight SHALL validate profile, usable permitted lineage, equipment and accessory slots before mutation. Start SHALL snapshot normal outfit and exam-owned state, then atomically activate kit/restriction, restore applicable full pools and publish exam/session/affinity. Failure SHALL restore persistent attributes, inventory mirrors, ORM and handler caches and skip-safety registration without deleting the host.
-Start SHALL activate the predecessor schedule hold in the same transaction. Every terminal/recovery closure SHALL restore normal host state before invoking recoverable held-occurrence release; valid resume SHALL retain hold. No schedule departure/state change SHALL interrupt an active exam and no release SHALL advance world time a second time.
+The opponent SHALL be the existing persistent qualified host. Start SHALL preflight the profile,
+permitted lineage and equipment slots before mutation, then atomically snapshot the normal outfit,
+activate the kit, restriction and schedule hold, restore full pools, and publish the exam record,
+session and affinity. Any failure SHALL restore persistent attributes, inventory mirrors, ORM and
+handler caches and skip-safety registration without deleting the host.
 
 #### Scenario: Spawn succeeds but session persistence fails
 - **WHEN** session persistence fails after kit/restriction installation
@@ -52,6 +59,15 @@ Start SHALL activate the predecessor schedule hold in the same transaction. Ever
 #### Scenario: Exam-record creation fails before spawn
 - **WHEN** kit or prerequisite validation fails
 - **THEN** no outfit, restriction, attempt or session mutation occurs
+
+#### Scenario: Closure restores the host before releasing the schedule hold
+- **WHEN** a terminal settlement or recovery closes an examination
+- **THEN** the host's normal state is restored before the held occurrence is released, the release
+  never advances world time a second time, and a valid resume keeps the hold
+
+#### Scenario: Schedule departures never interrupt an active exam
+- **WHEN** a scheduled departure falls due while the host's examination is active
+- **THEN** the host stays in the battle and the departure is replayed once after the hold releases
 
 ### Requirement: Exam opponents use validated true-stat rank profiles
 Each E-S target SHALL map to a validated kit/restriction policy and a branch-qualified persistent human host, preserving literal normal bases and learned lineage/proficiency. E-B SHALL lower qualified B-or-higher hosts using guild-exam-restrictions; A/S SHALL use their respective references. Profiles SHALL never amplify a weak host or derive values from candidate/disguise. No temporary opponent factory SHALL remain.
@@ -119,7 +135,10 @@ Pre-exam description SHALL state simulated battle and full HP/MP/SP restoration 
 - **THEN** MP/SP costs and ordinary upkeep remain committed during the battle
 
 ### Requirement: Exam settlement is idempotent and promotes only a passing candidate
-Attempt identity SHALL remain <character-id>:<target-rank>:<attempt-number>. PASS SHALL atomically advance one rank and bank paired title (autoequip only empty slot), with merit unchanged. Fail/flee/forfeit/invalid recovery/round cap SHALL not promote. Settlement SHALL close once, remove exam-owned effects/restriction and restore host normal outfit and both full normal pools without deleting the host. Rollback SHALL restore storage/caches for retry. Cold recovery SHALL resume coherent persisted identity/kit/restriction/session or close invalid simulation and restore host; deletion SHALL NOT repair it.
+Attempt identity SHALL remain `<character-id>:<target-rank>:<attempt-number>`. PASS SHALL atomically
+advance one rank and bank the paired title with merit unchanged; fail, flee, forfeit, invalid
+recovery and round cap SHALL NOT promote. Settlement SHALL close once, remove exam-owned effects and
+the restriction, and restore the host's normal outfit and both full pools without deleting the host.
 
 #### Scenario: Replayed settlement cannot promote twice
 - **WHEN** terminal settlement repeats
@@ -143,7 +162,8 @@ Attempt identity SHALL remain <character-id>:<target-rank>:<attempt-number>. PAS
 
 #### Scenario: Corrupt reload
 - **WHEN** exam identity/session/restriction mismatch after cold start
-- **THEN** invalid simulation closes and host normal state/dbref is retained
+- **THEN** invalid simulation closes as FAIL and host normal state/dbref is retained; deletion never
+  repairs recovery
 
 #### Scenario: Valid resume
 - **WHEN** coherent active simulation reloads
@@ -166,7 +186,11 @@ Qualified persistent hosts SHALL carry canonical authored age/apparent_age integ
 - **THEN** start rejects without partial mutation
 
 ### Requirement: Exam opponents use collision-free unique display keys
-Persistent host creation SHALL use authored name when unoccupied or authored-name plus its persistent primary-key suffix when occupied, through the shared live occupancy check. Later participant-key collisions SHALL reject start with participant_name_collision before mutation, without host renaming/cloning. Persistent dbrefs SHALL determine qualification/participant identity and repeated exams SHALL retain the same normal key/persona. No display-name search or first component match SHALL select a host. Host SHALL NOT join simultaneous exams.
+Persistent host creation SHALL use the authored name when free, or the authored name suffixed with
+its persistent primary key when occupied. A later participant-key collision SHALL reject start with
+`participant_name_collision` before mutation, without renaming or cloning the host. Persistent
+dbrefs SHALL determine qualification and participant identity; no display-name search SHALL select
+a host, and a host SHALL NOT join simultaneous exams.
 
 #### Scenario: Player name collision
 - **WHEN** a player later acquires the existing persistent host's exact object key
@@ -204,10 +228,10 @@ Persistent host assembly SHALL initialize each person once from its authored pro
 - **THEN** each retains its own independent card and no rank factory copies or resets either
 
 #### Scenario: A persona failure deletes the partial opponent
-- **WHEN** persona card initialization fails during an examination start
-- **THEN** the partially built opponent is deleted and the whole start rolls back
+- **WHEN** an examination start fails after the kit or restriction was staged
+- **THEN** the whole start rolls back, no partial opponent exists to delete, and the persistent host survives with its existing card, persona and provenance unchanged
 
 #### Scenario: Each spawn gets its own card instance
-- **WHEN** examination opponents spawn repeatedly for one rank
-- **THEN** each spawn receives its own card instance at version 1, so editing one opponent's card never changes another opponent or a later spawn
+- **WHEN** different persistent hosts examine repeatedly across ranks
+- **THEN** each host keeps its own independently editable card instance from assembly, and no examination spawns, copies or resets a card
 

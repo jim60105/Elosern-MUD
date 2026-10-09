@@ -46,19 +46,23 @@ A machine-readable inventory SHALL list every shipped NPC source with the slice 
 - **WHEN** a new hosted place is added to a settlement slice without an inventory row
 - **THEN** the inventory check fails naming that place's service identity
 
-Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
-
-#### Scenario: Additive normal-person source passes independently
-- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
-- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+#### Scenario: Persistent sources replace removed rank factories
+- **WHEN** source validation runs after cutover
+- **THEN** each qualified person is owned and validated exactly once, including canonical
+  age/provenance and connected residence/schedule authoring, stale temporary-rank sources fail, and
+  unrelated place, companion, import and quest checks stay unchanged
 
 #### Scenario: The inventory enumerates every source kind
 - **WHEN** the shipped NPC sources are inventoried
-- **THEN** the inventory lists each place host, each dialogue table, each guild examiner rank, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
+- **THEN** the inventory lists each place host, each dialogue table, each branch-qualified persistent adventurer, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
+- **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining
 
 #### Scenario: Persistent adventurer sources are inventoried kinds
 - **WHEN** the shipped NPC sources are inventoried
-- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, guild examiner rank, starting-companion declaration, offline quest template occupant, and shipped NPC import example
+- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, starting-companion declaration, offline quest template occupant, and shipped NPC import example
 
 ### Requirement: Altoria lower-terrace hosts carry individual authored profiles and rewritten dialogue
 Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
@@ -115,15 +119,15 @@ Each middle-terrace trade host owned by the `altoria_trade` inventory slice SHAL
 - **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
 
 ### Requirement: Guild branch master and rank examiners carry individual authored profiles and rewritten dialogue
-Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting.
+Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Every guild qualification SHALL name a persistent person whose profile has a complete bounded card; a missing person or profile key SHALL fail load naming branch and target.
 
 #### Scenario: Every owned host references its own valid profile
 - **WHEN** the shipped place registry is validated against the profile registry
 - **THEN** each owned host's profile key resolves to a registered profile whose card validates
 
 #### Scenario: Every rank names a resolvable examiner profile
-- **WHEN** the guild rank registry is validated, including a synthetic rank naming an unregistered examiner profile key
-- **THEN** every shipped rank's key resolves to a profile with no voice lines, and the synthetic rank fails load naming the rank and the field
+- **WHEN** the guild qualification registry is validated, including a synthetic qualification naming an unregistered examiner profile key
+- **THEN** every shipped qualification's person profile key resolves to a profile with complete card and dialogue coverage, and the synthetic qualification fails load naming the qualification and the field
 
 #### Scenario: Service semantics are preserved
 - **WHEN** the existing settlement, guild, and scripted-dialogue behavior tests run against the rewritten table
@@ -133,15 +137,11 @@ Each guild host owned by the `altoria_guild` inventory slice SHALL name, through
 - **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
 - **THEN** no test fails, because no test pins the authored prose
 
-Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
-
-#### Scenario: Additive normal-person source passes independently
-- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
-- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
-
-#### Scenario: Every rank names a valid examiner profile key
-- **WHEN** a guild rank is loaded
-- **THEN** it names an examiner profile key that resolves to a profile with a complete card and no voice lines, and a missing or unresolved key fails load naming the rank
+#### Scenario: Persistent sources replace removed rank factories
+- **WHEN** source validation runs after cutover
+- **THEN** each qualified person is owned and validated exactly once, including canonical
+  age/provenance and connected residence/schedule authoring, stale temporary-rank sources fail, and
+  unrelated place, companion, import and quest checks stay unchanged
 
 #### Scenario: Dialogue lines stay in character
 - **WHEN** any owned greeting, keyword response, or voice line renders
@@ -154,6 +154,14 @@ Persistent-adventurer sources SHALL be derived from authored person/qualificatio
 #### Scenario: Rewrite quality is editorially reviewed
 - **WHEN** the authored prose is assessed
 - **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
+- **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining
+
+#### Scenario: Every rank names a valid examiner profile key
+- **WHEN** a guild rank is loaded
+- **THEN** it names no examiner profile key; the examiner's profile resolves through the qualified persistent person, and a missing person or profile key fails load naming the branch and target rank
 
 #### Scenario: Tables keep identifiers and freshly authored lines
 - **WHEN** the owned dialogue tables are rewritten
@@ -264,25 +272,25 @@ Before any world synchronization at server start, the system SHALL validate the 
 - **THEN** validation fails naming each profile or preset and the missing voice field
 
 #### Scenario: An orphan profile is reported
-- **WHEN** a synthetic profile is registered that no hosted place, examiner rank or persistent-adventurer source references
+- **WHEN** a synthetic profile is registered that no hosted place or persistent examiner identity references
 - **THEN** validation fails naming the orphan profile
 
 #### Scenario: All violations are reported together
 - **WHEN** a synthetic registry set has an inventory mismatch and an invalid template card
 - **THEN** one failure lists both violations
 
-Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
-
-#### Scenario: Additive normal-person source passes independently
-- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
-- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+#### Scenario: Persistent sources replace removed rank factories
+- **WHEN** source validation runs after cutover
+- **THEN** each qualified person is owned and validated exactly once, including canonical
+  age/provenance and connected residence/schedule authoring, stale temporary-rank sources fail, and
+  unrelated place, companion, import and quest checks stay unchanged
 
 #### Scenario: Inventory and derived sources must agree both ways
 - **WHEN** the roster validation derives sources from the live registries and example files
 - **THEN** the check requires the inventory to equal the derived sources in both directions
 
 #### Scenario: Hosts and examiners must resolve to valid cards
-- **WHEN** the roster validation walks every place host and guild examiner
+- **WHEN** the roster validation walks every place host and every qualified persistent examiner
 - **THEN** each must resolve to a profile with a valid compact card
 
 #### Scenario: Companion declarations derive valid cards
@@ -300,6 +308,10 @@ Persistent-adventurer sources SHALL be derived from authored person/qualificatio
 #### Scenario: Scripted hosts and companion presets author their voice
 - **WHEN** the roster validation checks voice authorship
 - **THEN** every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), and every companion partner preset authors a non-empty `speech_style` and `greeting`
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
+- **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining
 
 #### Scenario: Persistent adventurers must resolve to valid cards
 - **WHEN** the roster validation walks every persistent-adventurer source
@@ -320,11 +332,11 @@ Each shipped persistent-adventurer, place-host and guild-examiner profile SHALL 
 - **WHEN** an authored host profile declares age 980 and apparent age 42 with matching long-lived characterization
 - **THEN** both values remain distinct canonical identity facts and the card remains independently editable
 
-Persistent-adventurer sources SHALL be derived from authored person/qualification registries and covered once with owner, profile and canonical age pair. Their normal profiles SHALL use distinct keys and bounded in-character free-form/offline voice coverage; no scripted dialogue table SHALL be added for a hostless residence. Existing rank factory profiles and their no-voice-lines rule SHALL remain valid until lifecycle cutover; existing place/companion/import/quest and scripted table checks SHALL remain unchanged.
-
-#### Scenario: Additive normal-person source passes independently
-- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added while existing rank sources still exist
-- **THEN** source equality and orphan/age checks accept the person without changing the existing rank profile no-voice-lines contract
+#### Scenario: Persistent sources replace removed rank factories
+- **WHEN** source validation runs after cutover
+- **THEN** each qualified person is owned and validated exactly once, including canonical
+  age/provenance and connected residence/schedule authoring, stale temporary-rank sources fail, and
+  unrelated place, companion, import and quest checks stay unchanged
 
 #### Scenario: The age inventory assigns every source
 - **WHEN** the data contract checks the complete shipped host/examiner inventory
@@ -337,3 +349,7 @@ Persistent-adventurer sources SHALL be derived from authored person/qualificatio
 #### Scenario: Edited instance prose is not an age source
 - **WHEN** an instance's prose is edited
 - **THEN** it does not become an age source
+
+#### Scenario: Additive normal-person source passes independently
+- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
+- **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining

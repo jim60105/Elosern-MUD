@@ -539,10 +539,10 @@ existing shared-`stable_key` agreement rule it is implemented alongside.
 
 ### Requirement: Shop and guild registries author host and examiner identities validated at load
 `ShopDefinition` and `GuildBranch` SHALL each carry required `host_name` and `host_title` fields,
-and `GuildRank` SHALL carry required `examiner_name` and `examiner_title` fields, all declared
-without defaults so a missing column is a module-import `TypeError`. The lore modules owning
-these registries SHALL validate every row's authored names and titles through the shared name and
-title validators at module load time (invalid values raise named `ValueError`s).
+and branch-qualified persistent adventurer records SHALL carry required authored name and title
+fields, all declared without defaults so a missing column is a module-import `TypeError`. The
+owning lore modules SHALL validate every row's authored names and titles through the shared name
+and title validators at module load time (invalid values raise named `ValueError`s).
 
 #### Scenario: A row with an invalid authored title fails module load
 - **WHEN** the pure row validator is called with a registry row whose authored title violates the
@@ -551,18 +551,24 @@ title validators at module load time (invalid values raise named `ValueError`s).
 
 #### Scenario: A duplicated authored name across registries fails load
 - **WHEN** the cross-registry uniqueness check is called with rows where a shop host and an
-  examiner share one authored name
+  persistent adventurer share one authored name
 - **THEN** it raises a named `ValueError`
 
 #### Scenario: The shipped registries load clean
 - **WHEN** `world.lore.settlements.shops` and `world.lore.guild` are imported
 - **THEN** every shipped row passes name, title, and cross-registry uniqueness validation
 
+#### Scenario: Rank metadata has no opponent factory identity
+- **WHEN** ranks and qualification records load
+- **THEN** `GuildRank` owns no examiner name, title or profile field; ranks contain
+  progression/reward/title metadata, person identity validates on qualification sources through the
+  shared validators, and shop and branch host identity checks stay unchanged
+
 #### Scenario: The lore modules check cross-registry name uniqueness at load
 
 - **WHEN** the lore modules owning the registries load
 - **THEN** they check that authored NPC names do not repeat across the shop, guild-branch, and
-  guild-rank registries
+  persistent-adventurer registries
 
 #### Scenario: The row validators are pure and explicitly callable
 
@@ -627,29 +633,22 @@ at sync time — a host that predates authored identities is reused as-is, never
   named warning for manual repair
 
 ### Requirement: Exam examiners carry their authored identity
-The examination opponent spawn SHALL use the rank's authored `examiner_name` and SHALL persist the
-authored `examiner_title` as the NPC title, replacing the anonymous `guild-examiner-<rank>` key
-form; the key-collision behaviour is governed by the `guild-rank-exams` requirement restated by
-this change.
+Persistent qualified adventurer assembly SHALL establish authored name/title once through existing identity validators and collision-safe roster discipline. Exams SHALL reuse that identity and stable dbref without rank-derived spawn identities or card/title replacement.
 
 #### Scenario: A spawned examiner carries the authored title
-- **WHEN** `start_guild_exam` spawns the opponent for a rank
-- **THEN** the opponent's `npc_title` equals that rank's `examiner_title` and its key begins with
-  the rank's `examiner_name`
+- **WHEN** a qualified host starts two exams
+- **THEN** authored name/title/dbref remain the same and no opponent spawns
 
 ### Requirement: Host and examiner creation emit boundary info events
-The service-host creation path and the examination-opponent spawn SHALL each emit one observability
-facade info event when an entity is actually created (never on idempotent reuse), with business
-identifiers in the context — `char` and `shop`/`service` for the host, `char` and `rank` for the
-opponent — and no player-facing prose.
+Service-host and persistent adventurer creation SHALL each emit one facade info event only on actual creation, never idempotent reuse, with char/service and profile/branch identifiers. Examination starts SHALL emit lifecycle boundary events with exam/host/target identifiers, without entity-creation events or player-facing prose.
 
 #### Scenario: Host creation logs once
-- **WHEN** a service host is created and a later sync reuses it
-- **THEN** the creation event fires exactly once with `char` and service identifiers in context
+- **WHEN** a persistent adventurer is created then reused by sync and exams
+- **THEN** one entity-creation event emits and subsequent exam-start events identify the same dbref
 
 #### Scenario: Opponent spawn logs
-- **WHEN** an examination opponent is spawned
-- **THEN** the spawn event fires with `char` and `rank` context keys
+- **WHEN** persistent adventurer assembly creates the qualified person
+- **THEN** its creation event identifies char/profile/branch once, while examination reuse emits no opponent-spawn creation event
 
 ### Requirement: The existing scene-builder and generated-quest contracts are unchanged where not amended
 Except for the authored-identity behaviour stated in this delta, the scene-builder spawn contracts
