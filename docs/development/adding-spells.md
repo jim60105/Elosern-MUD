@@ -88,6 +88,13 @@ ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
   damage diversion still qualifies as a hit for dependent effects. Conversely, a miss
   (`hit=False`) fails qualification even if other effects resolve. Each strike rolls
   its hit check exactly once.
+- **Recipient and any-hit semantics**: The recipient pool of a dependent occurrence
+  is the intersection of its validated ordinary planned audience (selected, allies,
+  or enemies) and the set of targets hit by the referenced source occurrence. Targets
+  absent from source hits receive no rider; relation and gauge gates remain in effect.
+  For multi-strike source damage, a dependent effect executes once per target when
+  any strike lands (any-hit semantics); multiple hits on the same target do not multiply
+  the rider.
 
 ## 2. 事前決定：這個魔法是哪一種形狀？
 

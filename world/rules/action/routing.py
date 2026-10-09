@@ -126,6 +126,12 @@ def _matches_audience_condition(target: Any, condition: str | None) -> bool:
     return False
 
 
+def _hit_identity(entity: Any) -> Any:
+    """Return a stable identity for hit-tracking comparison."""
+    pk = getattr(entity, "pk", None)
+    return pk if pk is not None else id(entity)
+
+
 def plan_effect_audiences(
     actor: Any,
     context: ActionContext,
@@ -212,6 +218,8 @@ def _step5_effect_resolution(
 ) -> list[PendingEffect]:
     pending: list[PendingEffect] = []
     base_context = _event_context(request)
+    # Strip/replace any caller-forged trusted result keys
+    hit_targets_by_occurrence: dict[int, set[Any]] = {}
     for i, effect_id in enumerate(skill.effects):
         prefix = _effect_prefix(effect_id)
         handler = _EFFECT_HANDLERS.get(prefix)
@@ -221,6 +229,14 @@ def _step5_effect_resolution(
             routed_targets[i] if routed_targets is not None else targets
         )
         policy = skill.effect_policies[i]
+        if policy.requires_hit_from is not None:
+            source_occ = policy.requires_hit_from
+            qualifying_hits = hit_targets_by_occurrence.get(source_occ, set())
+            effect_targets = [
+                t for t in effect_targets if _hit_identity(t) in qualifying_hits
+            ]
+            if not effect_targets:
+                continue
         if policy.audience is not EffectAudience.SELECTED and not effect_targets:
             continue
         effect_context = _bind_resolved_effect(
@@ -235,11 +251,16 @@ def _step5_effect_resolution(
                 request.scale,
             )
             surfaces = _EFFECT_HANDLER_SURFACES[prefix]
+            hit_set = hit_targets_by_occurrence.setdefault(i, set())
             for effect in effects:
                 if not isinstance(effect, PendingEffect):
                     raise TypeError(
                         "effect handler returned a non-PendingEffect value"
                     )
+                if effect.hit_evidence:
+                    for ev in effect.hit_evidence:
+                        if ev.hit:
+                            hit_set.add(_hit_identity(ev.target))
                 pending.append(replace(effect, surfaces=surfaces))
         except RejectedAction:
             raise
