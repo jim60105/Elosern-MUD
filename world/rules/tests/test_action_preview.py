@@ -21,6 +21,7 @@ from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.sexual_state import AROUSAL_LEVELS
 from world.rules.targeting import RoomActionContext
+from world.skills.effects import EffectPolicy
 from world.skills.registry import SkillCategory, SkillDef, SkillKind, SkillPrerequisite, TargetSpec
 
 from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
@@ -135,6 +136,18 @@ _STORM = make_skill(
     description="測試用的血緣進階技能。",
     prerequisites=(SkillPrerequisite("t_prev_pulse", 3),),
 )
+_DEP_SKILL = make_skill(
+    "t_prev_hit_dep",
+    label="預覽連鎖吸取",
+    description="測試前置命中依賴預覽。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={"mp": 10},
+    usable_out_of_combat=True,
+    element=_SYNTH_ELEMENT,
+    effects=[f"damage:{_SYNTH_ELEMENT.key}:magic", "gauge_transfer:mp:drain:fixed:5"],
+    effect_policies=(EffectPolicy(), EffectPolicy(requires_hit_from=0)),
+)
 
 def _scope_extra() -> dict[str, dict[str, object]]:
     """Innate rows (runtime basic-attack/flee keys) + all local rows."""
@@ -142,7 +155,7 @@ def _scope_extra() -> dict[str, dict[str, object]]:
     extra["skills"].update(
         {row.key: row for row in (
             _SPELL, _AREA, _FOCUS, _DISGUISE, _DISGUISE_MP10, _DISGUISE_SP10,
-            _CONFERRABLE, _DOMINION, _PASSIVE, _PULSE, _STORM,
+            _CONFERRABLE, _DOMINION, _PASSIVE, _PULSE, _STORM, _DEP_SKILL,
         )}
     )
     return extra
@@ -472,6 +485,49 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
             )
         )
         self.assertEqual(preflight.outcome, "success")
+
+    def test_preflight_on_hit_dependent_skill_is_dice_free_and_succeeds(self):
+        """Scenario: Preflight validates structure without rolls or manufactured hit outcomes."""
+        dep_skill = _DEP_SKILL
+        self.player.db.skills = {"active": [dep_skill.key], "passive": []}
+        context = self._context()
+        req = ActionRequest(self.player, dep_skill.key, [self.monster], context)
+
+        with patch("world.rules.combat.damage.roll_d100") as mock_roll:
+            preflight = ActionResolver.preflight(req)
+        # Preflight does not roll dice!
+        self.assertEqual(mock_roll.call_count, 0)
+        self.assertEqual(preflight.outcome, "success")
+
+    def test_forged_context_and_cross_invocation_hit_cannot_qualify_miss(self):
+        """Scenario: Forged caller data or previous hit outcome cannot qualify a new miss."""
+        dep_skill = _DEP_SKILL
+        self.player.db.skills = {"active": [dep_skill.key], "passive": []}
+        context = self._context()
+
+        # 1. Invocation 1: Rolls a HIT (roll=80). Rider executes.
+        req1 = ActionRequest(self.player, dep_skill.key, [self.monster], context)
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            res1 = ActionResolver.resolve(req1)
+        self.assertEqual(res1.outcome, "success")
+        self.assertTrue(any(e.kind == "gauge_transfer" for e in res1.event_log.entries))
+
+        # 2. Invocation 2: Carries forged hit outcome in event_context, but rolls a MISS (roll=1).
+        # Previous hit must NOT qualify this new invocation!
+        forged_ctx = BattlefieldActionContext(
+            context.battlefield,
+            event_context={
+                "hit_targets": [self.monster],
+                "hit": True,
+                "resolved_effect": {"policy": EffectPolicy(), "hit": True},
+            },
+        )
+        req2 = ActionRequest(self.player, dep_skill.key, [self.monster], forged_ctx)
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
+            res2 = ActionResolver.resolve(req2)
+        self.assertEqual(res2.outcome, "success")
+        # Rider MUST be skipped!
+        self.assertFalse(any(e.kind == "gauge_transfer" for e in res2.event_log.entries))
 
 
 class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):

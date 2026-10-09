@@ -8,7 +8,7 @@
 ## 2. Invocation-local routing and atomicity
 
 - [x] 2.1 Implement resolver-owned per-invocation aggregation and audience intersection in action/routing.py, skipping empty dependency intersections and replacing any forged trusted context; add synthetic world.rules.tests.test_skill_hit_dependencies registered exactly in rules-a (index 1), verifying per-target isolation with duplicate display names, all multi-strike hit/miss vectors, no extra roll, source occurrence independence, and reuse by an already-supported target status/buff effect; document recipient/any-hit semantics in adding-spells.md.
-- [ ] 2.2 Keep preflight structure/audience checks dice-free without manufacturing outcomes and final outcomes local to each invocation; extend action-preview and preflight tests and existing guide, verifying forged caller data and an earlier action/round hit cannot qualify a new miss while dependency-free behavior is unchanged.
+- [x] 2.2 Keep preflight structure/audience checks dice-free without manufacturing outcomes and final outcomes local to each invocation; extend action-preview and preflight tests and existing guide, verifying forged caller data and an earlier action/round hit cannot qualify a new miss while dependency-free behavior is unchanged.
 - [ ] 2.3 Preserve staged effects-before-cost payment, practice and snapshot surfaces; extend action-pipeline atomicity/audience and test_gauge_transfer coverage, verifying a miss skips transfer while paying costs and a late failure restores actor/target gauges and other touched state and releases same-tick practice claims. Document that dependency does not recheck post-damage living state or reorder existing settlement.
 
 ## 3. Integration acceptance
