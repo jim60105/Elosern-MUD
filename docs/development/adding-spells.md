@@ -82,6 +82,12 @@ ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
   Repeated identical damage effect strings remain distinct occurrences identified
   unambiguously by their numeric index. Unconfigured effects retain normal independent
   behavior.
+- **Hit versus HP loss**: A dependency is satisfied by a successful to-hit roll
+  (`hit=True`) from the referenced damage occurrence, independently of actual HP loss.
+  A source hit that deals 0 residual damage due to target defense, shields, or 100%
+  damage diversion still qualifies as a hit for dependent effects. Conversely, a miss
+  (`hit=False`) fails qualification even if other effects resolve. Each strike rolls
+  its hit check exactly once.
 
 ## 2. 事前決定：這個魔法是哪一種形狀？
 

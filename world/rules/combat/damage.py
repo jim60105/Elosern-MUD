@@ -11,6 +11,7 @@ from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action import (
+    DamageHitEvidence,
     PendingEffect,
     _stored_trait_value,
     register_effect_handler,
@@ -216,6 +217,7 @@ def _handle_damage(
         for _ in range(total_strikes):
             raw_roll = roll_d100()
             hit, margin = _to_hit(actor, target, raw_roll)
+            hit_evidence_items = (DamageHitEvidence(target=target, hit=hit),)
             amount = 0
             if hit:
                 multiplier = _roll_multiplier(raw_roll, margin)
@@ -344,6 +346,7 @@ def _handle_damage(
                     ),
                     surfaces=frozenset({"traits", "buffs"}),
                     apply=apply,
+                    hit_evidence=hit_evidence_items,
                 )
             )
             for buff, diverted, target_gauge, src_skill, src_tier in planned_diverts:

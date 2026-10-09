@@ -691,3 +691,52 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(int(self.defender.traits.mp.current), 70)
         # Consumed budget is exactly 30 (not 60!)
         self.assertEqual(get_divert_consumed(self.defender.buffs.all[buff_def.key]), 30)
+
+    def test_divert_full_absorption_preserves_hit_evidence(self):
+        """Scenario: Fully diverted damage (0 HP loss) still emits hit=True evidence."""
+        buff_def = BuffDefinition(
+            key="synth_full_divert",
+            duration=30,
+            stacking="refresh",
+            polarity="buff",
+            modifiers={
+                "divert": {
+                    "source": "hp",
+                    "target": "mp",
+                    "fraction": 1.0,
+                    "cap": 100,
+                }
+            },
+        )
+        self._register_synth_buff(buff_def)
+        apply_buff(self.defender, buff_def.key, source_skill="synth_cast", source_tier=T_APPRENTICE)
+        self.defender.traits.hp.base = 200
+        self.defender.traits.hp.current = 200
+        self.defender.traits.mp.base = 100
+        self.defender.traits.mp.current = 100
+        self.attacker.traits.atk_phys.base = 50
+        self.defender.traits.defense.base = 0
+
+        with patch("world.rules.combat.damage.roll_d100", return_value=50):
+            pending = _handle_damage(
+                self.attacker, [self.defender], "damage:fire:physical", {}, 1.0
+            )
+        dmg_effects = [e for e in pending if e.description.startswith("damage|")]
+        self.assertEqual(len(dmg_effects), 1)
+        dmg = dmg_effects[0]
+        self.assertTrue(dmg.description.endswith("|0"))
+        self.assertEqual(len(dmg.hit_evidence), 1)
+        self.assertEqual(dmg.hit_evidence[0].target, self.defender)
+        self.assertTrue(dmg.hit_evidence[0].hit)
+
+    def test_single_strike_has_exactly_one_roll(self):
+        """Scenario: One source strike has exactly one roll and emits one hit evidence."""
+        with patch("world.rules.combat.damage.roll_d100", return_value=50) as mock_roll:
+            pending = _handle_damage(
+                self.attacker, [self.defender], "damage:fire:physical", {}, 1.0
+            )
+        self.assertEqual(mock_roll.call_count, 1)
+        dmg_effects = [e for e in pending if e.description.startswith("damage|")]
+        self.assertEqual(len(dmg_effects), 1)
+        self.assertEqual(len(dmg_effects[0].hit_evidence), 1)
+        self.assertTrue(dmg_effects[0].hit_evidence[0].hit)

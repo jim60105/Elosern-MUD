@@ -3,7 +3,7 @@
 ## 1. Authoring and trusted outcomes
 
 - [x] 1.1 Add optional earlier-damage occurrence dependency to effects/policies.py and registry/vocab.py validation; extend effect-policy tests with negative/noninteger/boolean/self/forward/out-of-range/non-damage and repeated-ID cases, and document occurrence indexing in docs/development/adding-spells.md; verify malformed authoring fails before play and absent metadata preserves existing skills.
-- [ ] 1.2 Add typed occurrence/target hit evidence to action/contracts.py and emit it directly from existing rolls in combat/damage.py, without changing hit or damage formulas; extend damage-handler/divert tests and document hit-versus-HP-loss semantics in adding-spells.md, verifying one source strike has exactly one roll and fully diverted/absorbed hits still qualify.
+- [x] 1.2 Add typed occurrence/target hit evidence to action/contracts.py and emit it directly from existing rolls in combat/damage.py, without changing hit or damage formulas; extend damage-handler/divert tests and document hit-versus-HP-loss semantics in adding-spells.md, verifying one source strike has exactly one roll and fully diverted/absorbed hits still qualify.
 
 ## 2. Invocation-local routing and atomicity
 
