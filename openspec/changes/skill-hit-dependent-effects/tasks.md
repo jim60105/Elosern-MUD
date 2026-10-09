@@ -13,7 +13,7 @@
 
 ## 3. Integration acceptance
 
-- [ ] 3.1 Run focused test_skill_hit_dependencies, damage handler/divert/multi-strike, effect audiences, gauge transfer, preview and action atomicity labels using the approved Evennia environment-file/test settings; record standalone synthetic-consumer evidence without eligibility/crocodile content and add requirement traceability markers for the future synchronized requirements.
+- [x] 3.1 Run focused test_skill_hit_dependencies, damage handler/divert/multi-strike, effect audiences, gauge transfer, preview and action atomicity labels using the approved Evennia environment-file/test settings; record standalone synthetic-consumer evidence without eligibility/crocodile content and add requirement traceability markers for the future synchronized requirements.
 - [ ] 3.2 Run uv run --locked python -m tools.contract_gate, applicable observability lint, data lint and openspec validate skill-hit-dependent-effects --strict; verify new module ownership and no species branches, new hit rolls, persistent flags or prose-derived success paths exist, and record exercised results.
 
 ## Workflow follow-up

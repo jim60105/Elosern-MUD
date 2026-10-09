@@ -697,6 +697,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         buff_def = BuffDefinition(
             key="synth_full_divert",
             duration=30,
+            tick_interval=None,
             stacking="refresh",
             polarity="buff",
             modifiers={
