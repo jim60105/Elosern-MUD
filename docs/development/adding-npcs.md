@@ -312,6 +312,45 @@ uv run --locked python -m tools.spec_traceability check
 
 ## 6. 什麼時候已超出這篇指南的範圍
 
+### Persistent guild adventurers
+
+`world/lore/guild_adventurers.py` owns normal person identities and separate
+branch/rank qualifications. `world/rules/human_guild_hosts.py` validates and
+assembles these people as `LLMNPC` instances. The profession value describes
+their occupation; it is not a new component blueprint in `professions.yaml`.
+Qualification selection requires one exact branch/target binding and one
+persistent person dbref. It never selects by display key or summons an absent
+person. The legacy silent rank factory remains until the lifecycle cutover.
+
+Each normal person has a distinct profile, bounded canonical ages, both offline
+voice replies, literal bases, registered military equipment, and complete sword
+branches plus utility ownership. The shared lineage initializer supplies the
+prerequisite ownership and minimal usable proficiency. Literal coastal inputs
+are never adjusted a second time. Creation records `guild_adventurer_person_key`
+and the official profile provenance; an occupied display key receives the new
+object's primary-key suffix once. Repeated sync preserves location, persona,
+equipment, schedule and active examination state without repair writes.
+
+The three hostless `HOME` places are `altoria_hok_home`,
+`altoria_cassandra_home` and `altoria_augustine_home`, all with distinct doors at
+the existing `(4,3,capital_altoria)` guild frontage. Maps materialize reciprocal
+Exits. The route is home → frontage → guild and the reciprocal return. Assembly
+resolves the stable place/grid identities to `#<room-id>` template overrides;
+room display names never become persisted schedule targets.
+
+The schedule templates in `npc_schedules.yaml` own all visit times. Hok arrives
+daily at 08:00 and 18:00, leaves at 12:00 and 20:00. Cassandra visits weekly day
+index 1 from 10:00 to 16:00 (`122400..144000`); Augustine visits day index 4
+(`381600..403200`). The home-to-frontage hop occurs 30 ticks before each arrival;
+returning home occurs 30 ticks after guild departure. Weekly indices are anchored
+at absolute tick zero. All three enter `duty` at 06:00 and `resting` at 22:00;
+weekly templates repeat both entries on every day. Successful moves set `duty`.
+Actual Exit locks still determine whether the person arrives.
+
+The `persistent_adventurer` source inventory records one owner/profile/age pair
+per person. Roster preflight validates source equality, orphan references and
+both offline reply paths independently of the existing scripted-table rules.
+
 加一張內容卡（新旅店老闆、新委託人、新劇情人物）照上面的流程做即可。以下超出「加資料」範圍：
 
 - **永久服務主人**：改 `world/lore/settlements/places.py` 的地點宣告（`host_*`＋`profession`＋服務 kwargs），商店商品與時段見[新增物品指南](/development/adding-items) Step 4。

@@ -309,7 +309,11 @@ class StageOrderAndRegistrationTests(ClockStageOrderIsolation, EvenniaTestCase):
     def test_sources_register_in_sync_guild_economy(self):
         from world.rules.clock import _EVENT_SOURCES
 
-        sync_guild_economy()
+        # This clock-registration fixture has no map. Normal-person assembly
+        # is independently exercised against real residences in the roster smoke.
+        with patch("world.rules.human_guild_hosts.sync_persistent_adventurers") as sync_people:
+            sync_guild_economy()
+        sync_people.assert_called_once_with()
         self.assertIn("caravan_arrivals", _EVENT_SOURCES)
         self.assertIn("shop_hours", _EVENT_SOURCES)
 

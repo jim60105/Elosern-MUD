@@ -36,3 +36,61 @@ templates:
       - { tick_offset: 25200, kind: move, target: "market_square" }
       - { tick_offset: 50400, kind: state, state: "resting" }
       - { tick_offset: 61200, kind: move, target: "residence" }
+  # Person assembly binds these stable route roles to room dbrefs.
+  guild_hok_daily:
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: state, state: duty }
+      - { tick_offset: 28770, kind: move, target: frontage }
+      - { tick_offset: 28800, kind: move, target: guild }
+      - { tick_offset: 43200, kind: move, target: frontage }
+      - { tick_offset: 43230, kind: move, target: home }
+      - { tick_offset: 64770, kind: move, target: frontage }
+      - { tick_offset: 64800, kind: move, target: guild }
+      - { tick_offset: 72000, kind: move, target: frontage }
+      - { tick_offset: 72030, kind: move, target: home }
+      - { tick_offset: 79200, kind: state, state: resting }
+  guild_cassandra_weekly:
+    cycle_days: 7
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: state, state: duty }
+      - { tick_offset: 79200, kind: state, state: resting }
+      - { tick_offset: 108000, kind: state, state: duty }
+      - { tick_offset: 122370, kind: move, target: frontage }
+      - { tick_offset: 122400, kind: move, target: guild }
+      - { tick_offset: 144000, kind: move, target: frontage }
+      - { tick_offset: 144030, kind: move, target: home }
+      - { tick_offset: 165600, kind: state, state: resting }
+      - { tick_offset: 194400, kind: state, state: duty }
+      - { tick_offset: 252000, kind: state, state: resting }
+      - { tick_offset: 280800, kind: state, state: duty }
+      - { tick_offset: 338400, kind: state, state: resting }
+      - { tick_offset: 367200, kind: state, state: duty }
+      - { tick_offset: 424800, kind: state, state: resting }
+      - { tick_offset: 453600, kind: state, state: duty }
+      - { tick_offset: 511200, kind: state, state: resting }
+      - { tick_offset: 540000, kind: state, state: duty }
+      - { tick_offset: 597600, kind: state, state: resting }
+  guild_augustine_weekly:
+    cycle_days: 7
+    default_state: duty
+    entries:
+      - { tick_offset: 21600, kind: state, state: duty }
+      - { tick_offset: 79200, kind: state, state: resting }
+      - { tick_offset: 108000, kind: state, state: duty }
+      - { tick_offset: 165600, kind: state, state: resting }
+      - { tick_offset: 194400, kind: state, state: duty }
+      - { tick_offset: 252000, kind: state, state: resting }
+      - { tick_offset: 280800, kind: state, state: duty }
+      - { tick_offset: 338400, kind: state, state: resting }
+      - { tick_offset: 367200, kind: state, state: duty }
+      - { tick_offset: 381570, kind: move, target: frontage }
+      - { tick_offset: 381600, kind: move, target: guild }
+      - { tick_offset: 403200, kind: move, target: frontage }
+      - { tick_offset: 403230, kind: move, target: home }
+      - { tick_offset: 424800, kind: state, state: resting }
+      - { tick_offset: 453600, kind: state, state: duty }
+      - { tick_offset: 511200, kind: state, state: resting }
+      - { tick_offset: 540000, kind: state, state: duty }
+      - { tick_offset: 597600, kind: state, state: resting }

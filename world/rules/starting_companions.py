@@ -36,6 +36,7 @@ from world.lore.player_presets import derive_companion_card
 from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.races import SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
+from world.rules.npc_identity import live_key_taken_by_other
 from world.rules.affinity import NATURAL_CAP, seed_affinity
 # The lineage state and portrait finalization are consumed from their sole
 # player-activation owners rather than recomposed here, so companion and
@@ -106,13 +107,6 @@ def _validate_preset_companion_bounds(registry: dict[str, PlayerPreset]) -> None
                     f"preset {preset.key!r} companion {entry.preset_key!r} "
                     f"derived card violates contract: {err}"
                 ) from err
-
-
-def _key_taken_by_other(entity: Any) -> bool:
-    """True when any other persisted entity already carries this display key."""
-    from evennia.objects.models import ObjectDB
-
-    return ObjectDB.objects.filter(db_key=entity.key).exclude(pk=entity.pk).exists()
 
 
 def _resolve_affinity_elements(preset: PlayerPreset) -> list[str]:
@@ -222,7 +216,7 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
         # Occupancy check against the whole persisted namespace: display-name
         # uniqueness is not enforced at player activation, so a same-named
         # character is a real possibility and the suffix is the only guard.
-        if _key_taken_by_other(npc):
+        if live_key_taken_by_other(npc):
             npc.key = f"{preset.display_name}-{npc.pk}"
         # Canonical age is a no-op here (both values were written from the
         # card) but every existing NPC spawn site calls it, and it keeps the

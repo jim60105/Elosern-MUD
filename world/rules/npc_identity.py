@@ -42,6 +42,13 @@ MAX_NPC_TITLE_CODE_POINTS = 32
 MAX_NPC_NAME_CODE_POINTS = 64
 
 
+def live_key_taken_by_other(entity: Any) -> bool:
+    """Read the entire persisted object namespace, excluding this entity."""
+    from evennia.objects.models import ObjectDB
+
+    return ObjectDB.objects.filter(db_key=entity.key).exclude(pk=entity.pk).exists()
+
+
 class NPCTitleError(ValueError):
     """A proposed NPC title violates the single-line plain-text contract."""
 

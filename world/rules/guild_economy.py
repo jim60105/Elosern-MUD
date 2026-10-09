@@ -385,11 +385,18 @@ def _initialize_merchant_stock(synced_service_ids: set[str]) -> None:
 
 def sync_guild_economy() -> None:
     """Run the full idempotent guild-economy startup synchronization."""
+    from world.rules.human_guild_hosts import (
+        sync_persistent_adventurers, validate_adventurers,
+    )
+    from world.lore.guild_adventurers import ADVENTURER_REGISTRY, EXAM_QUALIFICATIONS
+
+    validate_adventurers(ADVENTURER_REGISTRY, NPC_PROFILE_REGISTRY, EXAM_QUALIFICATIONS)
     catalog = load_catalog_into_cache()
     from world.rules.guild_config import register_catalog_offers
 
     register_catalog_offers(catalog)
     sync_service_content()
+    sync_persistent_adventurers()
     _register_clock_sources()
 
 

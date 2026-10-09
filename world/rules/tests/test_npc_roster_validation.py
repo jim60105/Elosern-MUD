@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from types import SimpleNamespace
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from world.rules.npc_roster_validation import (
     derive_shipped_sources,
     validate_npc_roster,
 )
+from evennia.utils.test_resources import EvenniaTest
 
 
 def _make_valid_synthetic_universe(tmp_dir: Path):
@@ -134,10 +136,12 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         player_presets=player_presets,
         quest_templates=quest_templates,
         examples_dir=tmp_dir,
+        adventurers={},
     )
     inventory = tuple(NpcSource(kind=kind, key=key, owner="test_slice") for kind, key in sorted(derived))
 
     return {
+        "adventurers": {},
         "places": places,
         "dialogue_rows": dialogue_rows,
         "guild_ranks": guild_ranks,
@@ -169,6 +173,78 @@ class ShippedNpcRosterContractTests(unittest.TestCase):
         self.assertEqual(derived, frozenset(inv_pairs))
 
 
+class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
+    """Data-contract test: assembled normal hosts traverse their authored real routes."""
+
+    def test_three_hosts_normal_lineage_equipment_homes_and_weekly_arrivals(self):
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+        from world.maps.bootstrap import sync_grid, sync_service_interiors, resolve_residence_route
+        from world.rules.human_guild_hosts import sync_persistent_adventurers, qualified_host
+        from world.rules.npc_schedules import settle_npc_schedules, get_world_clock
+        from world.rules.progression import can_use_skill
+        from world.rules.combat.battlefield import _adjusted_attack, _adjusted_defense
+        from world.rules.combat_modifiers import adjusted_agility
+        from world.skills.registry import SKILL_REGISTRY
+
+        get_world_clock().tick = 0
+        sync_grid()
+        sync_service_interiors()
+        normal_hosts = sync_persistent_adventurers()
+        rows = tuple(ADVENTURER_REGISTRY.values())
+        self.assertEqual(len(normal_hosts), 3)
+        expected = (
+            ("altoria_hok", 45, 45, (145, 110, 110, 14, 14, 13, 25), (25, 20, 29)),
+            ("altoria_cassandra", 40, 40, (170, 120, 120, 17, 17, 16, 30), None),
+            ("altoria_augustine", 68, 52, (200, 120, 120, 20, 20, 19, 35), None),
+        )
+        snapshots = []
+        for person, host, (key, age, apparent, bases, physical) in zip(rows, normal_hosts, expected, strict=True):
+            route = resolve_residence_route(person.home_key, "altoria_guild_hall")
+            self.assertEqual(person.key, key)
+            self.assertEqual(host.location, route["home"])
+            self.assertEqual((host.db.age, host.db.apparent_age), (age, apparent))
+            actual_bases = tuple(getattr(host.traits, stat).base for stat in
+                                 ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"))
+            self.assertEqual(actual_bases, bases)
+            for stat in ("hp", "mp", "sp"):
+                gauge = getattr(host.traits, stat)
+                self.assertEqual(gauge.current, gauge.max)
+            self.assertEqual(host.db.equipment["weapon_main"], person.equipment[0])
+            self.assertEqual(host.db.equipment["armor"], person.equipment[1])
+            for skill_key in (*host.db.skills["active"], *host.db.skills["passive"]):
+                self.assertTrue(can_use_skill(host, SKILL_REGISTRY[skill_key]), skill_key)
+            values = (_adjusted_attack(host, "atk_phys"), adjusted_agility(host), _adjusted_defense(host))
+            if physical is not None:
+                self.assertEqual(values, physical)
+            snapshots.append({"person": key, "host": host.pk, "home": host.location.pk,
+                              "bases": actual_bases, "physical": values})
+        for target, person in (("E", normal_hosts[0]), ("D", normal_hosts[0]),
+                               ("C", normal_hosts[0]), ("B", normal_hosts[0]),
+                               ("A", normal_hosts[1]), ("S", normal_hosts[2])):
+            self.assertEqual(qualified_host("guild_branch_altoria", target).pk, person.pk)
+        current = 0
+        for person, host, departure, arrival, leave, returned in (
+            (rows[0], normal_hosts[0], 28770, 28800, 43200, 43230),
+            (rows[1], normal_hosts[1], 122370, 122400, 144000, 144030),
+            (rows[2], normal_hosts[2], 381570, 381600, 403200, 403230),
+        ):
+            route = resolve_residence_route(person.home_key, "altoria_guild_hall")
+            for tick, role in ((departure, "frontage"), (arrival, "guild"),
+                               (leave, "frontage"), (returned, "home")):
+                events = settle_npc_schedules(current, tick)
+                current = tick
+                self.assertEqual(host.location, route[role])
+                self.assertEqual(host.db.schedule_state, "duty")
+                host_events = [event for event in events if event.payload.get("npc_id") == host.pk]
+                self.assertTrue(any(event.kind == "npc_arrived" for event in host_events))
+                snapshots.append({"person": person.key, "tick": tick, "role": role,
+                                  "location": host.location.pk,
+                                  "events": [event.kind for event in host_events]})
+        identities = tuple((host.pk, host.key) for host in normal_hosts)
+        self.assertEqual(tuple((host.pk, host.key) for host in sync_persistent_adventurers()), identities)
+        print("PERSISTENT_HOST_SMOKE=" + json.dumps(snapshots, sort_keys=True))
+
+
 class SyntheticNpcRosterValidationTests(unittest.TestCase):
     """Synthetic registries exercise every violation class individually and in combination."""
 
@@ -182,6 +258,55 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
 
     def test_valid_synthetic_universe_passes(self):
         validate_npc_roster(**self.synth)
+
+    def _add_persistent_person(self):
+        profile = replace(
+            self.synth["profile_registry"]["t_host_prof"], key="t_normal_person",
+            voice=NpcVoiceLines(greeting="「你好。」", misunderstood="「再說一次吧。」"),
+        )
+        self.synth["profile_registry"][profile.key] = profile
+        self.synth["adventurers"] = {
+            "t_person": SimpleNamespace(profile_key=profile.key),
+        }
+        self.synth["inventory"] += (
+            NpcSource("persistent_adventurer", "t_person", "test_slice",
+                      profile.key, profile.age, profile.apparent_age),
+        )
+        return profile
+
+    @covers_requirement("npc-profile-registry::the-shipped-npc-source-inventory-enumerates-every-source-with-an-owner")
+    @covers_requirement("npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue")
+    def test_persistent_person_passes_with_silent_rank_and_no_scripted_home_table(self):
+        self._add_persistent_person()
+        validate_npc_roster(**self.synth)
+        self.assertIn(("persistent_adventurer", "t_person"), derive_shipped_sources(
+            **{key: value for key, value in self.synth.items()
+               if key not in {"profile_registry", "inventory"}}
+        ))
+        examiner = self.synth["profile_registry"]["t_examiner_prof"]
+        self.assertIsNone(examiner.voice.greeting)
+        self.assertIsNone(examiner.voice.misunderstood)
+
+    @covers_requirement("npc-profile-registry::every-shipped-host-and-examiner-profile-authors-a-bounded-age-pair")
+    @covers_requirement("npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts")
+    def test_persistent_voice_age_or_stale_inventory_reports_person_before_startup(self):
+        profile = self._add_persistent_person()
+        for field, value in (("age", True), ("age", -1), ("apparent_age", 10001),
+                             ("voice", NpcVoiceLines(greeting="hello"))):
+            with self.subTest(field=field, value=value):
+                self.synth["profile_registry"][profile.key] = SimpleNamespace(**{**vars(profile), field: value})
+                with self.assertRaises(NpcRosterError) as raised:
+                    validate_npc_roster(**self.synth)
+                self.assertIn("persistent_adventurer", str(raised.exception))
+                self.assertIn("t_person", str(raised.exception))
+                self.assertIn(profile.key, str(raised.exception))
+        self.synth["profile_registry"][profile.key] = profile
+        self.synth["inventory"] = self.synth["inventory"][:-1] + (
+            NpcSource("persistent_adventurer", "t_person", "test_slice", profile.key, 0, 0),
+        )
+        with self.assertRaises(NpcRosterError) as raised:
+            validate_npc_roster(**self.synth)
+        self.assertIn("stale profile/age", str(raised.exception))
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"

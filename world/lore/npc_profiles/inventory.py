@@ -14,19 +14,23 @@ from dataclasses import dataclass
 class NpcSource:
     """One shipped NPC source and the content-change slice that owns its persona.
 
-    ``kind`` is one of six closed source kinds, each keyed differently:
+    ``kind`` is one of seven closed source kinds, each keyed differently:
     ``place_host`` (keyed by the place's ``service_id``), ``dialogue_table``
     (keyed by the table's ``dialogue_key``), ``guild_examiner`` (keyed by a
     ``GUILD_RANK_REGISTRY`` rank key), ``starting_companion`` (keyed
     ``<declaring preset>:<partner preset>``), ``quest_template_occupant``
     (keyed ``<template name>:<stage index>:<position in that stage's
     npc_reqs>``), and ``import_example`` (keyed by the example file's stem).
+    ``persistent_adventurer`` is keyed by authored person identity.
     ``owner`` is the owning content change's slice label.
     """
 
     kind: str
     key: str
     owner: str
+    profile_key: str | None = None
+    age: int | None = None
+    apparent_age: int | None = None
 
 
 NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
@@ -67,6 +71,9 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     NpcSource("guild_examiner", "B", "altoria_guild"),
     NpcSource("guild_examiner", "A", "altoria_guild"),
     NpcSource("guild_examiner", "S", "altoria_guild"),
+    NpcSource("persistent_adventurer", "altoria_hok", "altoria_guild", "altoria_hok_adventurer", 45, 45),
+    NpcSource("persistent_adventurer", "altoria_cassandra", "altoria_guild", "altoria_cassandra_adventurer", 40, 40),
+    NpcSource("persistent_adventurer", "altoria_augustine", "altoria_guild", "altoria_augustine_adventurer", 68, 52),
 
     # altoria_upper: the upper-terrace hosts and their tables.
     NpcSource("place_host", "altoria_high_priestess", "altoria_upper"),

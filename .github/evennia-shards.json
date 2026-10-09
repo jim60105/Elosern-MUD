@@ -5,6 +5,7 @@
       "name": "rules-a",
       "labels": [
         "world.rules.tests.test_account_roster",
+        "world.rules.tests.test_human_guild_hosts",
         "world.rules.tests.test_action_evidence",
         "world.rules.tests.test_church_combat_ministry",
         "world.rules.tests.test_unconditional_multi_strike",

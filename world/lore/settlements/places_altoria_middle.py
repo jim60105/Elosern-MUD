@@ -38,6 +38,27 @@ from world.lore.settlements.places import PlaceDefinition, PlaceKind
 
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
+        key="altoria_hok_home", settlement_key="capital_altoria",
+        kind=PlaceKind.HOME, room_name_zh="霍克的家",
+        room_desc_zh="門邊掛著旅行披風，木桌旁放著港口航路圖。小灶留有燉魚香氣，窗下擺著一張結實的床。",
+        exterior_xy=(4, 3), doorway_key_zh="霍克的家",
+        doorway_aliases=("hok home",),
+    ),
+    PlaceDefinition(
+        key="altoria_cassandra_home", settlement_key="capital_altoria",
+        kind=PlaceKind.HOME, room_name_zh="卡珊卓的家",
+        room_desc_zh="窗邊書桌放著旅行筆記，牆旁備有擦拭甲冑的布與油。臥房鋪著乾淨床單，茶壺收在木櫃裡。",
+        exterior_xy=(4, 3), doorway_key_zh="卡珊卓的家",
+        doorway_aliases=("cassandra home",),
+    ),
+    PlaceDefinition(
+        key="altoria_augustine_home", settlement_key="capital_altoria",
+        kind=PlaceKind.HOME, room_name_zh="奧古斯丁的家",
+        room_desc_zh="窗外排列盆栽，爐邊有水壺與兩張椅子。寢室陳設樸素，舊地圖摺好收在旅行箱裡。",
+        exterior_xy=(4, 3), doorway_key_zh="奧古斯丁的家",
+        doorway_aliases=("augustine home",),
+    ),
+    PlaceDefinition(
         key="altoria_guild_hall",
         settlement_key="capital_altoria",
         kind=PlaceKind.GUILD_HALL,
