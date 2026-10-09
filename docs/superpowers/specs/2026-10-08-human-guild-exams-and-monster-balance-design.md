@@ -380,7 +380,7 @@ One existing skill issue remains outside this change. `basic_swordplay` has the 
 |---|---|---|---|
 | Lore and rulebook authoring | Stable NPC, branch, qualification, item, monster and schedule definitions | Validated keyed definitions | Existing registries, human/age bounds, lineage, slot and commerce validation |
 | Schedule model and occurrence arithmetic | Daily/weekly parsing and due intervals | Parsed schedule and ordered occurrences | Existing clock day math and effective-from contract |
-| Schedule availability reader | Next planned guild service interval, no mutation | NPC/destination/current tick to interval or named absence | Parsed schedule, actual location/state, shared occurrence arithmetic |
+| Schedule availability reader | Next planned guild service interval, no mutation (`world.rules.service_windows`) | NPC/destination/current tick to interval or named absence | Parsed schedule, actual location/state, shared occurrence arithmetic |
 | Examination request coordinator | Presence-first branching across all request surfaces | Actor/target request to schedule information, rejection, or started simulation | Qualification, local service gate, availability reader, start API |
 | Restriction and examination lifecycle | Reversible kit, caps, seals, persistent simulation and recovery | Validated profile and persistent host to atomic session/settlement | Equipment, skills, traits, ActionResolver, combat sessions, affinity and titles |
 | Presentation adapters | Appointment label, request availability, calendar/time response | Server-authored menu and exact action results | Shared coordinator and existing OOB/command surfaces |
