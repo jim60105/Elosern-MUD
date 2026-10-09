@@ -41,6 +41,7 @@ SPECIES = "t_whisper_quail"
 ORDINARY = "t_whisper_quail_ordinary"
 STRONGER = "t_whisper_quail_stronger"
 SITE = "t_breakwater_nest"
+POOR = "t_whisper_quail_poor"
 
 EXPECTED_SECTIONS = [
     "identity",
@@ -191,6 +192,57 @@ class MonsterReaderTests(EvenniaTest):
         self.assertNotIn("identity", failures)
         self.assertNotIn("loot", failures)
         self.assertNotIn("traits", failures)
+
+    @covers_requirement("gm-runtime-state::complete-curated-entity-summaries")
+    def test_sanctioned_zero_gauge_renders_shared_sections_fully(self):
+        # Construct monster directly with the poor variant (mp=0, sp=0)
+        monster = construct_species_individual(SPECIES, POOR)
+        tier = SYNTH_MONSTER_VARIANTS[POOR].threat_tier
+        archetype = next(iter(BEHAVIOUR_PROFILES))
+        with patch.dict(MONSTER_BEHAVIOUR_YAML["tier_default_archetype"], {tier: archetype}):
+            detail = monsters.detail(monster)
+        self.assertEqual(section_keys(detail), EXPECTED_SECTIONS)
+        self.assertEqual(failed_sections(detail), {})
+
+        resources = section_of(detail, "resources")
+        tiles_by_key = {t["key"]: t for t in resources["tiles"]}
+        self.assertEqual(tiles_by_key["mp"]["value"], 0)
+        self.assertEqual(tiles_by_key["mp"]["unit"], "/ 0")
+        self.assertEqual(tiles_by_key["sp"]["value"], 0)
+        self.assertEqual(tiles_by_key["sp"]["unit"], "/ 0")
+
+        conditions = section_of(detail, "conditions")
+        self.assertEqual(conditions["type"], "table")
+
+        traits = section_of(detail, "traits")
+        rows_by_key = {r["key"]: r["value"] for r in traits["rows"]}
+        self.assertEqual(rows_by_key["mp"], "0 / 0")
+        self.assertEqual(rows_by_key["sp"], "0 / 0")
+
+    @covers_requirement("gm-runtime-state::independent-failures-and-precise-lookup-errors")
+    def test_corrupt_negative_gauge_isolates_failure_to_shared_sections(self):
+        monster = construct_species_individual(SPECIES, POOR)
+        tier = SYNTH_MONSTER_VARIANTS[POOR].threat_tier
+        archetype = next(iter(BEHAVIOUR_PROFILES))
+        # Force stored gauge to negative computed maximum
+        traits_dict = dict(monster.attributes.get("traits", category="traits"))
+        traits_dict["mp"] = {"base": -5, "mod": 0, "mult": 1, "current": 0}
+        monster.attributes.add("traits", traits_dict, category="traits")
+
+        with patch.dict(MONSTER_BEHAVIOUR_YAML["tier_default_archetype"], {tier: archetype}):
+            detail = monsters.detail(monster)
+
+        failures = failed_sections(detail)
+        self.assertEqual(failures.get("resources"), "source_unavailable")
+        self.assertEqual(failures.get("conditions"), "source_unavailable")
+        self.assertEqual(failures.get("traits"), "source_unavailable")
+
+        # Unaffected sections still render successfully
+        self.assertNotIn("identity", failures)
+        self.assertNotIn("numeric", failures)
+        self.assertNotIn("placement", failures)
+        self.assertNotIn("loot", failures)
+        self.assertNotIn("behaviour", failures)
 
     def test_inspection_never_provisions_the_autocreating_descriptors(self):
         monster = self._individual()

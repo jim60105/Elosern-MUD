@@ -59,4 +59,22 @@ SYNTH_MONSTER_VARIANTS: dict[str, MonsterVariant] = {
         ),
         "t_bronze",
     ),
+    "t_whisper_quail_poor": MonsterVariant(
+        "t_whisper_quail_poor",
+        "t_whisper_quail",
+        "試音貧弱型",
+        "合成貧弱變體，無魔力與精力儲備。",
+        "t_faint",
+        False,
+        MonsterCombatProfile(
+            hp=6,
+            mp=0,
+            sp=0,
+            atk_phys=1,
+            agility=1,
+            defense=1,
+            magic_power=0,
+        ),
+        "t_faint",
+    ),
 }
