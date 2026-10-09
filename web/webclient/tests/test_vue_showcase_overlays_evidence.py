@@ -204,6 +204,13 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/CompanionLineup",
     "World/LettersPanel",
     "Overlays/GalleryStageTransformModal",
+    # The quest drawer redesign's building blocks (quest-drawer-ui-primitives)
+    # joined the frozen set after this baseline was pinned: the icon
+    # tablist, the grade gem, and the rank card extracted from
+    # World/GuildCounter.
+    "Core/IconTabs",
+    "World/GradeGem",
+    "World/GuildRankCard",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the

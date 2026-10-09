@@ -209,17 +209,27 @@ PREVIOUS_MANIFEST_KEYS = {
     # Core/PartyStrip) is already listed above.
     "World/LettersPanel",
     "Overlays/GalleryStageTransformModal",
+    # The quest drawer redesign's building blocks (quest-drawer-ui-primitives)
+    # joined the frozen set after this baseline was pinned: the icon
+    # tablist, the grade gem, and the rank card extracted from
+    # World/GuildCounter.
+    "Core/IconTabs",
+    "World/GradeGem",
+    "World/GuildRankCard",
 }
 
 # The World-directory story files that sit outside the B4 family: the
 # title-ballot menu joined the frozen manifest with the dock-workspace
 # alignment (its stories render the committed title_ballot panel). The
 # story-count partition below asserts the family files plus exactly these.
-# World/LettersPanel joined when the correspondence folio landed.
+# World/LettersPanel joined when the correspondence folio landed, and
+# World/GradeGem and World/GuildRankCard with quest-drawer-ui-primitives.
 WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/TitleBallotMenu",
     "World/DreamPanel",
     "World/LettersPanel",
+    "World/GradeGem",
+    "World/GuildRankCard",
 )
 
 

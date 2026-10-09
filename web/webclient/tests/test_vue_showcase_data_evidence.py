@@ -214,6 +214,13 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # Overlays/GalleryStageTransformModal joined the frozen set.
                 "World/LettersPanel",
                 "Overlays/GalleryStageTransformModal",
+                # The quest drawer redesign's building blocks (quest-drawer-ui-primitives)
+                # joined the frozen set after this baseline was pinned: the icon
+                # tablist, the grade gem, and the rank card extracted from
+                # World/GuildCounter.
+                "Core/IconTabs",
+                "World/GradeGem",
+                "World/GuildRankCard",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

@@ -64,7 +64,10 @@
     "Overlays/GalleryFaceRectModal",
     "Overlays/GalleryStageTransformModal",
     "Overlays/NpcPersonaEditor",
-    "World/DreamPanel"
+    "World/DreamPanel",
+    "Core/IconTabs",
+    "World/GradeGem",
+    "World/GuildRankCard"
   ],
   "frozen": true
 }
