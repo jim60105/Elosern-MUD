@@ -1,0 +1,40 @@
+# Tasks
+
+## 1. Spec bookkeeping
+
+- [ ] 1.1 After `exploration-presence-rail` has archived, add to `specs/webclient-exploration-menu/spec.md` a `## REMOVED Requirements` block for "The exploration dock roots at the compass and the presence rail and keeps the footer overview" (Reason: the footer, the wait frame, and the suggestions frame are retired and the root is restated in `webclient-room-actions`; Migration: footer scenarios moved to `webclient-room-actions`, child-frame scenarios became the wait and suggestions card scenarios, the rest are covered by the empty-root and mode-change scenarios). Verify with `openspec validate exploration-room-actions --strict`.
+
+## 2. Place card and local cards
+
+- [ ] 2.1 Add the 查看房間 icon button (`aria-label="查看房間"`) and the 等待 button to `PlaceCard.vue` (design D3), rendered only when `actionsEnabled`, emitting `look-room` and `wait`. Extend `tests/place_card.test.js`: buttons present only in exploration with the panel available, absent otherwise, intents emitted, the heading's accessible name intact. Update `stories/Core/PlaceCard.stories.js` (with and without actions).
+- [ ] 2.2 Add the local-card composable (design D1) and mount the wait card in the `choices` anchor through `ChoiceCard` with `RestForm` wiring, disabled-while-locked rows, Escape and `✕ 返回` closing with focus restored to the 等待 button, and closing on a location or mode change. Add `tests/app_client_room_actions.test.js` covering each wait row's payload (`dawn`, `sleep`, `sleep`+`dream`, rest form opening and `seconds: 5400`), closing, focus return, and locked rows. Migrate `tests/waiting_surface.test.js`.
+- [ ] 2.3 Render the suggestions card through `ChoiceCard` (design D4): optional per-row `hint` in `ChoiceCard`, generating and degraded notes, `✕ 清除建議` above `✕ 返回`, the unchanged intent envelope per card kind (a test compares each kind's emitted intent with the former `OptionCard` output), and transport-reset retirement of the cards. Migrate the suggestions tests in `tests/` and `tests/store/`.
+- [ ] 2.4 Add the 建議 pill to the exploration command panel (hidden while `unavailable`, `建議 N` with a positive count, `建議` while generating) opening the suggestions card, with a test for each label and visibility case.
+
+## 3. Readout and root
+
+- [ ] 3.1 Finish the readout priority helper (design D6): flash, then compass, rail, place-card buttons (`查看房間` / `重新觀察四周`, `等待` / `讓時間流逝、休息或睡眠`), pill, then idle; hover and focus set and clear source slots. Extend `tests/action/exploration_readout.test.js` with every priority and fall-back case. Remove the `exploration-detail` element and its `showDetail` rule for exploration.
+- [ ] 3.2 Make `exploration.root` resolve to an empty menu (design D2), remove the `exploration.wait` and `exploration.suggestions` sources and the footer builder from `overviewMenu`/`exploration_menu.js`, and delete `SceneOverview.vue`, `stories/Action/SceneOverview.stories.js`, `tests/action/scene_overview.test.js`, and the superseded parts of `tests/app_client_scene_overview.test.js`. Add a Node router test under `web/static/webclient/js/` proving an empty resolvable root neither degrades nor claims keys. Remove `geometry: "sections"` from `keyboard_router.js` and its tests if `grep -rn "sections" web/static/webclient/js web/webclient-app` shows no other user. Verify with `pnpm test` and the Node gate (`node --test` over `web/static/webclient/js`).
+- [ ] 3.3 Remove the `waiting-screen`, `waiting-card`, `waiting-back` markup from `AppClient.vue` and `waitOpen` / `restFormOpen` coupling to router depth in the composables. Verify with `pnpm test`.
+
+## 4. Styles, manifest, reference
+
+- [ ] 4.1 Grep `styles/app-shell.css` for `.elosern-root` duplicates of every removed or restyled class (`.scene-overview*`, `.waiting-*`, `.action-dock*`, `.place-card*`, `.sugs*`) and update or remove them. Verify with `grep -n "elosern-root" web/webclient-app/styles/app-shell.css` and the live client in 6.2.
+- [ ] 4.2 Update `component-manifest.json` (register the new stories and any new components, drop `Action/SceneOverview`, and drop `Action/OptionCard` / `Action/ChoiceCardRow` if design D4 removed them) and the showcase evidence key sets. Verify with `node scripts/component-coverage.mjs`.
+- [ ] 4.3 Update `lib/controls-reference.js` (place-card actions, pill, tab order across zones, card keys) and its test.
+
+## 5. Test and spec migration
+
+- [ ] 5.1 Update the browser tests and helpers under `web/tests/browser/` that click footer chips or open the wait or suggestions frames (`browser_helpers.py`, `test_browser_options_surface.py`, `test_browser_exploration_nav.py`, `test_browser_exploration_frame.py`, `test_browser_exploration_state.py`, `test_browser_pointer.py`, `test_browser_contextual_hud_dock.py`, and any other hit of `grep -l "look-room\|wait-dawn\|suggestions" web/tests/browser`) to use the place-card buttons and the pill. Register any new or renamed method in `.github/browser-shards.json` and run each touched class with the browser unittest driver documented in the repository AGENTS.md.
+- [ ] 5.2 Author the remaining MODIFIED deltas for requirements outside the two modified here that name the overview footer, the waiting frame, or the scene overview as the pane host's child: in `webclient-desktop-shell` "Required desktop surfaces remain visible and usable", "Keyboard routing is menu-first and submission-safe", and "The action dock's row region and detail panes are direct children of its pane host"; in `webclient-pointer-activation` "Every action-dock surface renders exactly the keyboard router's current menu frame"; and in `webclient-contextual-hud` any requirement that lists the place card as display-only. Copy each block from the post-predecessor `openspec/specs/`, edit only the affected scenarios, and keep every scenario name. Verify with `openspec validate exploration-room-actions --strict`.
+- [ ] 5.3 Update `docs/development/webclient-vue-frozen-contract-audit.md` for the retired overview, wait, and suggestions families and the new place-card actions and pill.
+
+## 6. Integration acceptance
+
+- [ ] 6.1 Run `pnpm test`, `node scripts/component-coverage.mjs`, the Node gate, the touched browser classes, the contract gate (`tools.contract_gate`), the frozen-contract test (`tests.test_webclient_frozen_contract`), and `openspec validate exploration-room-actions --strict`.
+- [ ] 6.2 Build the client (`pnpm run build`) and with `agent-browser` capture the live exploration screen at 1451×790 and 1920×1080: the place card with its buttons, the wait card and rest form, the suggestions card in generating, ready, degraded, and unavailable (no pill) states, the readout for each source, and a long location name. Check that no footer, key hint, or waiting screen remains, and compare with `Design/SceneOverviewRedesign`. Fix deviations or record intentional ones in this change's design.md.
+
+## Workflow follow-up
+
+- At archive sync, annotate the Python and Vitest evidence carriers with the new `webclient-room-actions` requirement IDs and re-point annotations of the modified and removed requirements; run `tools.spec_traceability check`.
+- Do not apply, archive, or merge until the user asks. Apply only after `exploration-presence-rail` is archived.
