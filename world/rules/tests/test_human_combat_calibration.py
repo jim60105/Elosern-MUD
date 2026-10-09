@@ -1,4 +1,7 @@
-"""Real-runtime calibration, bounded resolver probes, and persistent host evidence."""
+"""Data-contract test: human combat calibration evidence exercises shipped gear, skill, and monster rows through the real resolver
+
+Real-runtime calibration, bounded resolver probes, and persistent host evidence.
+"""
 
 import math
 import random
