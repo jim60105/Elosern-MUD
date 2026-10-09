@@ -7,119 +7,97 @@ schedule-state interaction gating.
 
 ## Requirements
 
-### Requirement: The npc_schedules clock source settles due schedule entries
+### Requirement: The npc_schedules settlement source selects tagged NPCs
 
-`world/rules/npc_schedules.py` SHALL provide `settle_npc_schedules(start_tick, end_tick)` and
-register it through `world.rules.clock.register_event_source("npc_schedules", ...)` as the only
-`npc_schedules` source. Settlement SHALL query NPCs carrying the persistent `schedule` tag (the
-`npc-schedule-model` assignment API and startup sync maintain it) and, for every occurrence with
-`start_tick < due_tick <= end_tick` and `due_tick >= effective_from_tick`, settle it in
-`(due_tick, npc_stable_id, entry_index)` order — where `npc_stable_id` is the persistent primary
-key (`npc_id`), unique and JSON-safe where display keys are not. An occurrence due exactly at
-`start_tick` SHALL settle only when `effective_from_tick` equals that tick (the assignment
-happened at that same moment, so no earlier window could have settled it); any other occurrence at
-the start boundary was already settled by the preceding window. A `move` entry SHALL resolve its
-target to a destination room, traverse the real Exit path from the NPC's current room (locks and
-vetoes apply), and on success set `schedule_state` to the referenced template's `default_state`
-and emit `npc_departed` / `npc_arrived` events; a `state` entry SHALL update
-`npc.db.schedule_state` and emit `npc_state_changed`. Multi-day skips SHALL use boundary
-arithmetic, not per-second iteration. An NPC with no schedule SHALL produce no entries and no
-events. Every event SHALL carry a JSON-safe payload (the stable `npc_id`, a display `npc` key,
-and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`. Settlement SHALL
-first skip every NPC for which `world/rules/service_gate.py::schedule_silenced(npc)` is true —
-a bound party companion carrying a `place`-bound service component outside its anchor room —
-producing no entries, no events, and no state change for it, exactly as a schedule-less NPC;
-every other NPC SHALL settle byte-identically to the pre-change settlement.
+The clock SHALL register exactly one `npc_schedules` source, `settle_npc_schedules`. It SHALL select NPCs carrying the persistent `schedule` tag maintained by the `npc-schedule-model` assignment API and startup sync. Untagged NPCs produce no entries or events and have no location or state change.
 
-#### Scenario: A due state entry updates the NPC's schedule state
-- **WHEN** an NPC with a schedule whose next `state` entry falls within `(start_tick, end_tick]`
-  is settled
-- **THEN** `npc.db.schedule_state` holds the entry's state and the returned events include
-  `npc_state_changed` for that NPC with a payload naming the NPC's `npc_id` and state
-
-#### Scenario: A due move entry relocates the NPC along a real Exit
-- **WHEN** an NPC's due `move` entry resolves to a destination with a traversable Exit from the
-  NPC's current room
-- **THEN** the NPC's location changes to the destination through the Exit path, `schedule_state`
-  becomes the template's `default_state`, and `npc_departed` / `npc_arrived` events with
-  `from`/`to` payloads and the entry's due tick are emitted
+#### Scenario: The registered source is the sole source
+- **WHEN** the registered `npc_schedules` source is inspected
+- **THEN** it is `settle_npc_schedules` and no other source is registered under that kind
 
 #### Scenario: An NPC without a schedule settles to nothing
 - **WHEN** settlement runs over an NPC without the `schedule` tag
-- **THEN** the NPC produces no events and its location and state are unchanged
+- **THEN** it produces no events and its location and state are unchanged
 
-#### Scenario: A multi-day skip settles every due entry exactly once, in due order
-- **WHEN** `advance()` crosses several world days with schedule entries due on each, including an
-  A→B and later B→A route
-- **THEN** every due occurrence settles exactly once, in `(due_tick, npc_stable_id, entry_index)`
-  order, and the NPC's final location equals the location repeated day-by-day advances would
-  produce; no per-second iteration occurs
+### Requirement: Occurrences obey the shared due-window boundaries
 
-#### Scenario: A schedule assigned mid-day does not replay past occurrences
-- **WHEN** an NPC is assigned a schedule after some of that day's `tick_offset`s have passed
-- **THEN** only occurrences with `due_tick >= effective_from_tick` settle; the passed occurrences
-  produce no events and no state change
+Shared occurrence arithmetic SHALL include `start_tick < due_tick <= end_tick` and `due_tick >= effective_from_tick`. An occurrence exactly at `start_tick` settles only when `effective_from_tick` equals that tick; otherwise the preceding window settled it.
 
-#### Scenario: A schedule assigned exactly at an entry's due tick settles that occurrence
-- **WHEN** an NPC is assigned a schedule at the exact world tick one of its entries is due
-- **THEN** that occurrence settles in the next advance (its due tick equals the assignment tick,
-  so no earlier window could have settled it), and occurrences due before the assignment never do
+#### Scenario: An assignment does not replay past occurrences
+- **WHEN** an NPC is assigned a schedule after some daily offsets have passed
+- **THEN** only occurrences at or after `effective_from_tick` settle; past occurrences cause no events or state changes
 
-#### Scenario: The stage source is the registered one
-- **WHEN** the clock's registered `npc_schedules` source is inspected
-- **THEN** it is `settle_npc_schedules` and no other source is registered under that kind
+#### Scenario: Assignment at the due tick settles on the next advance
+- **WHEN** a schedule is assigned exactly at an entry's due tick
+- **THEN** that occurrence settles in the next advance, but earlier occurrences never settle
 
-#### Scenario: A traveling place-bound companion settles nothing
-- **WHEN** the guild clerk is a bound companion standing in a wilderness room away from his
-  anchor, and the window crosses a full day of his authored shift
-- **THEN** no entry of his schedule settles, no `npc_departed` / `npc_arrived` /
-  `npc_state_changed` event names him, and his `schedule_state` is unchanged
+#### Scenario: The start boundary uses the effective-from exception
+- **WHEN** an occurrence is due exactly at `start_tick`
+- **THEN** it settles only if `effective_from_tick` equals that tick; all other start-boundary occurrences were settled by the preceding window
 
-#### Scenario: Returning to anchor resumes settlement
-- **WHEN** the dismissed clerk stands again in his anchor room and a window crosses due entries
-- **THEN** those entries settle through the ordinary path (boundary arithmetic tolerates the
-  skipped windows)
+### Requirement: Cycles and ordering remain absolute and deterministic
 
-#### Scenario: Unrelated NPCs are byte-identical
-- **WHEN** the guard and resident NPCs (place-unbound) settle across the same window as the
-  silenced clerk
-- **THEN** their entries, events, and state match the pre-change settlement exactly
+Daily and weekly cycles SHALL use shared occurrence arithmetic phase-anchored to absolute tick zero; assignment, reload, and calendar boundaries SHALL NOT restart phase. Settle by `(due_tick, npc_stable_id, entry_index)`, with `npc_stable_id` the unique, JSON-safe persistent primary key `npc_id`. Multi-day skips use boundary arithmetic, not per-second iteration.
 
-The same source SHALL settle daily and weekly cycles phase-anchored to absolute tick zero, using shared occurrence arithmetic. Assignment/reload/calendar boundaries SHALL NOT restart the cycle.
+#### Scenario: Multi-day skips settle once in due order
+- **WHEN** several days with due entries, including an A→B then B→A route, are crossed
+- **THEN** each occurrence settles once in stable order and final location matches day-by-day advances, without per-second iteration
 
 #### Scenario: Weekly bulk and bounded advances agree
-- **WHEN** bulk and consecutive bounded advances cross a week, season and year for identical schedules
-- **THEN** ordered events and final locations/states agree with no duplicates or clock charges
+- **WHEN** bulk and consecutive bounded advances cross a week, season, and year
+- **THEN** ordered events and final locations/states agree without duplicates or clock charges
 
-The source SHALL consult an exam-owned persisted hold before settling host movement/state entries. A held host SHALL accumulate a recoverable held interval without routine location/state mutation; unrelated NPCs SHALL settle unchanged. The complete hold/release core SHALL be usable before production persistent-host exams are activated.
+### Requirement: Due state entries update state and emit events
 
-#### Scenario: Held host is protected while other schedules proceed
-- **WHEN** a synthetic exam-owned hold covers a window with host movement/state and another NPC occurrence
-- **THEN** host location/state remain unchanged, other NPC settles normally and release can consume the held occurrences once without another clock advance
+A due `state` entry SHALL update `npc.db.schedule_state` and emit `npc_state_changed`.
 
-#### Scenario: The schedule tag is maintained by the assignment API and startup sync
-- **WHEN** settlement queries the NPCs to settle
-- **THEN** it selects NPCs carrying the persistent `schedule` tag, which the `npc-schedule-model` assignment API and startup sync maintain
+#### Scenario: A due state entry updates the NPC state
+- **WHEN** a scheduled `state` entry is due in the settlement window
+- **THEN** the NPC holds the entry's state and its event names `npc_id` and that state
 
-#### Scenario: npc_stable_id is the persistent JSON-safe primary key
-- **WHEN** occurrences are ordered for settlement
-- **THEN** `npc_stable_id` is the persistent primary key (`npc_id`), unique and JSON-safe where display keys are not
+### Requirement: Due movement uses real exits and emits events
 
-#### Scenario: An occurrence due exactly at the start boundary follows the effective-from rule
-- **WHEN** an occurrence is due exactly at `start_tick`
-- **THEN** it settles only when `effective_from_tick` equals that tick (the assignment happened at that same moment, so no earlier window could have settled it); any other occurrence at the start boundary was already settled by the preceding window
+A due `move` SHALL resolve its target room and traverse the real Exit path from the NPC's current room, with locks and vetoes applying. On success, location changes through that path, `schedule_state` becomes the referenced template's `default_state`, and `npc_departed` / `npc_arrived` events are emitted.
 
-#### Scenario: A move entry traverses the real Exit path under locks and vetoes
-- **WHEN** a due `move` entry is settled
-- **THEN** it resolves its target to a destination room and traverses the real Exit path from the NPC's current room, where locks and vetoes apply; on success it sets `schedule_state` to the referenced template's `default_state` and emits `npc_departed` / `npc_arrived` events
+#### Scenario: A due move traverses a real Exit
+- **WHEN** a move target resolves to a destination with a traversable Exit
+- **THEN** the NPC reaches it through the Exit; its default state and departure/arrival events are produced
 
-#### Scenario: Every event carries a JSON-safe payload and computed due tick
+#### Scenario: Events carry safe identity, target, and due tick
 - **WHEN** a settlement event is emitted
-- **THEN** it carries a JSON-safe payload (the stable `npc_id`, a display `npc` key, and `state` or `from`/`to` target) and `due_tick = cycle_start + tick_offset`
+- **THEN** its JSON-safe payload carries stable `npc_id`, display `npc`, and `state` or `from`/`to`; `due_tick` equals `cycle_start + tick_offset`
 
-#### Scenario: Silenced NPCs are skipped first
-- **WHEN** settlement runs and `world/rules/service_gate.py::schedule_silenced(npc)` is true for an NPC — a bound party companion carrying a `place`-bound service component outside its anchor room
-- **THEN** settlement skips that NPC first, producing no entries, no events, and no state change for it, exactly as a schedule-less NPC, while every other NPC settles byte-identically to the pre-change settlement
+### Requirement: Silenced NPCs skip all schedule effects first
+
+Settlement SHALL first skip every NPC where `world/rules/service_gate.py::schedule_silenced(npc)` is true: a bound party companion with a `place`-bound service component outside its anchor. It has no entries, events, or state change, exactly as if schedule-less; all other NPCs settle byte-identically to pre-change behavior.
+
+#### Scenario: A traveling companion is skipped and resumes at anchor
+- **WHEN** a bound guild clerk is away from its anchor across due shifts, then returns for a later due window
+- **THEN** no entry/event/state change occurs while away; settlement resumes through the ordinary path after return despite skipped windows
+
+#### Scenario: Unrelated NPCs remain byte-identical
+- **WHEN** place-unbound guards and residents share the window
+- **THEN** their entries, events, and state match pre-change settlement exactly
+
+### Requirement: An active exam hold defers host schedule mutation
+
+The source SHALL consult a persisted exam-owned hold before host movement/state settlement. A held host accumulates a recoverable interval without routine location/state mutation; unrelated NPCs settle unchanged. The complete hold/release core SHALL be usable before production persistent-host exams activate.
+
+#### Scenario: A held host stays unchanged while others settle
+- **WHEN** a synthetic exam hold covers host movement/state and another NPC occurrence
+- **THEN** host location/state remain unchanged and the other NPC settles normally
+
+### Requirement: Releasing an exam hold replays its interval once
+
+Release SHALL consume held occurrences once without advancing the world clock. A failed traversal is consumed like an ordinary schedule skip. Corrupt schedule storage SHALL leave the active hold intact for explicit repair.
+
+#### Scenario: Release consumes held occurrences once
+- **WHEN** release replays an elapsed held interval
+- **THEN** occurrences are consumed once without another clock advance, including failed traversals as skips
+
+#### Scenario: Corrupt schedule storage preserves the hold
+- **WHEN** release encounters indeterminate host schedule storage
+- **THEN** the active hold remains intact for explicit repair
 
 ### Requirement: NPC movement through settlement never charges the clock, records map knowledge,
 or triggers companion follow
