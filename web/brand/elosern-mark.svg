@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The Elosern mark: the band ornament (the band-ornament token in
+       tokens.css) redrawn on a square in one colour, gold-500. Side rules,
+       lozenge outline, and centre dot keep the ornament's layout; strokes are
+       thickened for 16px legibility. realfavicon-settings.json darkens it
+       toward gold-600 on light tabs and lightens it toward gold-400 on dark
+       tabs. -->
+  <g fill="none" stroke="#b99a60" stroke-width="5">
+    <path d="M0 32h5.5M58.5 32H64"/>
+    <path d="M32 12 52 32 32 52 12 32Z"/>
+  </g>
+  <circle cx="32" cy="32" r="6.25" fill="#b99a60"/>
+</svg>

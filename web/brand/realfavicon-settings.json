@@ -1,0 +1,45 @@
+{
+  "icon": {
+    "desktop": {
+      "regularIconTransformation": {
+        "type": "brightness",
+        "backgroundColor": "#101216",
+        "backgroundRadius": 0,
+        "imageScale": 1,
+        "brightness": 0.77
+      },
+      "darkIconType": "regular",
+      "darkIconTransformation": {
+        "type": "brightness",
+        "backgroundColor": "#101216",
+        "backgroundRadius": 0,
+        "imageScale": 1,
+        "brightness": 1.23
+      }
+    },
+    "touch": {
+      "transformation": {
+        "type": "background",
+        "backgroundColor": "#101216",
+        "backgroundRadius": 0,
+        "imageScale": 0.7,
+        "brightness": 1
+      },
+      "appTitle": "伊洛瑟恩"
+    },
+    "webAppManifest": {
+      "transformation": {
+        "type": "background",
+        "backgroundColor": "#101216",
+        "backgroundRadius": 0,
+        "imageScale": 0.7,
+        "brightness": 1
+      },
+      "backgroundColor": "#0b0d10",
+      "themeColor": "#0b0d10",
+      "name": "伊洛瑟恩 Elosern",
+      "shortName": "伊洛瑟恩"
+    }
+  },
+  "path": "/static/favicon/"
+}

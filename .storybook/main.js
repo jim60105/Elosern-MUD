@@ -15,6 +15,10 @@ const config = {
   staticDirs: [
     { from: "../web/static", to: "/" },
     { from: "../web/webclient-app/assets/redesign", to: "/art/showcase" },
+    // The game favicon (web/brand/, generated into web/static/favicon/):
+    // Storybook uses a staticDirs entry that targets /favicon.svg as the
+    // manager's favicon.
+    { from: "../web/static/favicon/favicon.svg", to: "/favicon.svg" },
   ],
   framework: {
     name: "@storybook/vue3-vite",
