@@ -30,6 +30,7 @@ from world.rules.rulebook.schema import Rule
 from world.rules.status_query import build_stat_breakdown
 from world.rules.targeting import RoomActionContext
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
+from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import SkillKind, TargetSpec
 from world.tests.synthetic_data import make_buff, make_item, make_skill, synthetic_registries
 
@@ -49,7 +50,7 @@ _OTHER = make_item("t_exam_other", equipment_slot=EquipmentSlot.ACCESSORY, modif
 _OTHERS = tuple(replace(_OTHER, key=f"t_exam_other_{index}") for index in range(ACCESSORY_MAX_SLOTS))
 _PROFILE = RestrictionProfile(
     "T", _RING.key, _BLADE.key, _ARMOR.key, _ROOT.key,
-    ("basic_attack", "flee", _ROOT.key, _BODY.key),
+    (*INNATE_SKILL_KEYS, _ROOT.key, _BODY.key),
     MappingProxyType({"hp": 77, "mp": 60, "sp": 80, "atk_phys": 29, "agility": 12, "defense": 31, "magic_power": 23}), 11,
 )
 _RULES = {

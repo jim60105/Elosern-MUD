@@ -134,6 +134,9 @@ def _permitted_neutral(host, profile, key):
         source_skill = SKILL_REGISTRY.get(grant.skill_key)
         if source_skill is None:
             continue
+        for effect in source_skill.parsed_effects:
+            if isinstance(effect, StatMultiplyEffect) and effect.trait == key:
+                multiplier *= effect.multiplier * grant.scale
     return round(value * multiplier)
 
 
