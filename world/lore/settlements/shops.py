@@ -100,12 +100,12 @@ def validate_shop_npc_identities(
 def validate_registry_identity_uniqueness(
     shop_rows: dict[str, ShopDefinition] | None = None,
     branch_rows: dict[str, object] | None = None,
-    rank_rows: dict[str, object] | None = None,
+    person_rows: dict[str, object] | None = None,
 ) -> None:
     """Cross-registry authored-name uniqueness over all three name sources (D4).
 
-    Shops, guild branches and guild ranks all name permanent NPC hosts;
-    a duplicate authored name across any two of them is a loading error.
+    Shops, guild branches and persistent adventurers all name permanent NPC hosts;
+    a duplicate authored name across any of them is a loading error.
 
     Pure checker callable with explicit rows (tests); each argument defaults
     to its shipped registry. Cycle-safe: the guild registries are imported
@@ -114,13 +114,13 @@ def validate_registry_identity_uniqueness(
     """
     if shop_rows is None:
         shop_rows = SHOP_REGISTRY
-    if branch_rows is None or rank_rows is None:
-        from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
+    if branch_rows is None:
+        from world.lore.guild import GUILD_BRANCH_REGISTRY
+        branch_rows = GUILD_BRANCH_REGISTRY
 
-        if branch_rows is None:
-            branch_rows = GUILD_BRANCH_REGISTRY
-        if rank_rows is None:
-            rank_rows = GUILD_RANK_REGISTRY
+    if person_rows is None:
+        from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+        person_rows = ADVENTURER_REGISTRY
     from world.rules.npc_identity import validate_unique_npc_names
 
     entries: list[tuple[str, str]] = [
@@ -132,8 +132,8 @@ def validate_registry_identity_uniqueness(
         for branch in branch_rows.values()
     ]
     entries += [
-        (f"guild_rank:{rank.key}", rank.examiner_name)
-        for rank in rank_rows.values()
+        (f"persistent_adventurer:{person.key}", person.name)
+        for person in person_rows.values()
     ]
     validate_unique_npc_names(entries)
 

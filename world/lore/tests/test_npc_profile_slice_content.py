@@ -13,7 +13,8 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 from world.lore.dialogue import DIALOGUE_ROWS
-from world.lore.guild import GUILD_RANK_REGISTRY, validate_guild_npc_identities
+from world.lore.guild import validate_guild_npc_identities
+from world.lore.guild_adventurers import ADVENTURER_REGISTRY, EXAM_QUALIFICATIONS
 from world.lore.npc_card import NpcCard
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.npc_profiles.inventory import NPC_SOURCE_INVENTORY
@@ -138,26 +139,21 @@ class NpcProfileSliceContentContractTests(unittest.TestCase):
     @covers_requirement(
         "npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue"
     )
-    def test_altoria_guild_slice_host_examiners_and_table(self):
+    def test_altoria_guild_slice_host_people_and_table(self):
         self._assert_hosts_carry_individual_profiles("altoria_guild")
         self._assert_tables_are_rewritten("altoria_guild")
-        ranks = _slice_pairs("altoria_guild", "guild_examiner")
-        self.assertTrue(ranks, "slice altoria_guild owns no guild_examiner rows")
-        for rank_key in ranks:
-            with self.subTest(rank=rank_key):
-                rank = GUILD_RANK_REGISTRY[rank_key]
-                # Every shipped rank names a profile through the field the
-                # validator resolves, and the module-level shipped-registry
-                # validation (re-run below) has already proven that key
-                # resolves with a complete card.
-                self.assertTrue(rank.examiner_profile_key)
-                profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
+        people = _slice_pairs("altoria_guild", "persistent_adventurer")
+        self.assertTrue(people, "slice altoria_guild owns no persistent_adventurer rows")
+        for person_key in people:
+            with self.subTest(person=person_key):
+                # Every qualified person names its own profile with a complete
+                # card and in-character offline dialogue coverage.
+                profile = NPC_PROFILE_REGISTRY[ADVENTURER_REGISTRY[person_key].profile_key]
                 NpcCard.from_record(profile.card.to_record())
-                # An examiner fights, it does not speak.
-                self.assertIsNone(profile.voice.greeting)
-                self.assertIsNone(profile.voice.misunderstood)
-        # The whole shipped rank table passes the same load validation, so
-        # no shipped rank is missing or holding an unresolved key.
+                self.assertTrue(profile.voice.greeting)
+                self.assertTrue(profile.voice.misunderstood)
+        qualified = {row.person_key for row in EXAM_QUALIFICATIONS}
+        self.assertLessEqual(qualified, set(people))
         validate_guild_npc_identities()
 
     @covers_requirement(

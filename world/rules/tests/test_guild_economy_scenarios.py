@@ -38,6 +38,7 @@ MODULES = {
     "session_persistence": "world.rules.tests.test_combat_session_persistence",
     "session_recovery": "world.rules.tests.test_combat_session_recovery",
     "exams": "world.rules.tests.test_guild_exams",
+    "roster_contract": "world.rules.tests.test_npc_roster_validation",
     "economy": "world.rules.tests.test_shop_economy",
     "clock": "world.rules.tests.test_shop_clock_sources",
     "commands": "commands.tests.test_guild_economy_commands",
@@ -146,40 +147,42 @@ SCENARIO_TO_TEST = {
     ),
     # guild-rank-exams
     "Threshold alone does not promote": ref(
-        "exams", "ExamStartTests", "test_threshold_alone_does_not_promote"
+        "exams", "ExamStartTests", "test_below_threshold_and_rank_skipping_are_rejected"
     ),
     "Below-threshold request is rejected": ref(
-        "exams", "ExamStartTests", "test_below_threshold_request_is_rejected"
+        "exams", "ExamStartTests", "test_below_threshold_and_rank_skipping_are_rejected"
     ),
     "Rank skipping is rejected": ref(
-        "exams", "ExamStartTests", "test_rank_skipping_is_rejected"
+        "exams", "ExamStartTests", "test_below_threshold_and_rank_skipping_are_rejected"
     ),
     "Command trigger starts an eligible exam": ref(
-        "exams", "ExamStartTests", "test_command_trigger_starts_an_eligible_exam"
+        "exams", "ExamStartTests", "test_command_trigger_starts_an_eligible_exam_with_the_persistent_host"
     ),
     "Future intent has no extra authority": ref(
-        "exams", "ExamStartTests", "test_npc_intent_has_no_extra_authority"
+        "exams", "ExamStartTests", "test_requested_by_metadata_grants_no_extra_authority"
     ),
     "Duplicate active exam is rejected": ref(
         "exams", "ExamStartTests", "test_duplicate_active_exam_is_rejected"
     ),
     "Every rank profile stays inside its lore band": ref(
-        "config_exam", "ExamProfileTests", "test_every_profile_stays_inside_its_lore_band"
+        "roster_contract",
+        "ShippedPersistentExamLifecycleSmokeTests",
+        "test_real_hosts_preflight_kits_and_senior_hosts_two_real_exams",
     ),
     "Disguised candidate receives the same opponent": ref(
-        "exams", "ExamProfileValidationTests", "test_spawned_opponent_uses_true_profile_stats"
+        "exams", "ExamStartTests", "test_disguised_candidate_receives_the_same_host_and_profile"
     ),
     "Examiner knockout is not a quest kill": ref(
-        "exams", "ExamCombatTests", "test_lethal_exam_defeat_grants_no_kill_rewards"
+        "exams", "ExamCombatTests", "test_lethal_exam_defeat_grants_no_kill_rewards_or_growth"
     ),
     "Candidate knockout is nonfatal but loses": ref(
-        "exams", "ExamCombatTests", "test_candidate_lethal_defeat_fails_but_restores"
+        "exams", "ExamCombatTests", "test_candidate_defeat_fails_without_injury_and_restores_both"
     ),
     "Passing promotes exactly one rank": ref(
-        "exams", "ExamCombatTests", "test_promotion_preserves_merit"
+        "exams", "ExamCombatTests", "test_host_defeat_passes_and_restores_the_persistent_host"
     ),
     "Failed attempt can be retried": ref(
-        "exams", "ExamCombatTests", "test_failed_attempt_can_be_retried_with_next_number"
+        "exams", "ExamCombatTests", "test_forfeit_fails_restores_the_host_and_retries_with_the_same_host"
     ),
     "Replayed settlement cannot promote twice": ref(
         "exams", "ExamCombatTests", "test_replayed_settlement_cannot_promote_twice"

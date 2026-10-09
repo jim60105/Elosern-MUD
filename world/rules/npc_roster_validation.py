@@ -2,9 +2,9 @@
 
 Validates the complete shipped NPC roster before world synchronization at server
 start: derives shipped sources from live registries and files, checks bidirectional
-inventory equality, verifies compact cards and voice lines for place hosts, guild
-examiners, companion partner presets, quest template occupants, and import
-examples, and flags orphan profiles.
+inventory equality, verifies compact cards and voice lines for place hosts,
+persistent guild adventurers, companion partner presets, quest template
+occupants, and import examples, and flags orphan profiles.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 if TYPE_CHECKING:
     from typeclasses.npcs import NPC
-    from world.lore.guild import GuildRank
     from world.lore.npc_profiles.inventory import NpcSource
     from world.lore.npc_profiles.shape import NpcProfile
     from world.lore.player_presets import PlayerPreset
@@ -37,7 +36,6 @@ def derive_shipped_sources(
     *,
     places: Mapping[str, PlaceDefinition] | None = None,
     dialogue_rows: Mapping[str, Any] | None = None,
-    guild_ranks: Mapping[str, GuildRank] | None = None,
     player_presets: Mapping[str, PlayerPreset] | None = None,
     quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
@@ -46,9 +44,9 @@ def derive_shipped_sources(
     """Derive the complete set of shipped NPC source (kind, key) pairs.
 
     Returns a frozenset of ``(kind, key)`` tuples corresponding to the sources
-    defined across the places registry, dialogue tables, guild rank examiners,
-    starting companion declarations, quest template occupants, and shipped import
-    examples.
+    defined across the places registry, dialogue tables, persistent guild
+    adventurers, starting companion declarations, quest template occupants, and
+    shipped import examples.
     """
     if places is None:
         from world.lore.settlements.places import PLACE_REGISTRY
@@ -62,10 +60,6 @@ def derive_shipped_sources(
         from world.lore.dialogue import DIALOGUE_ROWS
 
         dialogue_rows = DIALOGUE_ROWS
-    if guild_ranks is None:
-        from world.lore.guild import GUILD_RANK_REGISTRY
-
-        guild_ranks = GUILD_RANK_REGISTRY
     if player_presets is None:
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
@@ -88,8 +82,6 @@ def derive_shipped_sources(
     for key in dialogue_rows:
         sources.add(("dialogue_table", key))
 
-    for key in guild_ranks:
-        sources.add(("guild_examiner", key))
     for key in adventurers:
         sources.add(("persistent_adventurer", key))
 
@@ -114,7 +106,6 @@ def validate_npc_roster(
     *,
     places: Mapping[str, PlaceDefinition] | None = None,
     dialogue_rows: Mapping[str, Any] | None = None,
-    guild_ranks: Mapping[str, GuildRank] | None = None,
     player_presets: Mapping[str, PlayerPreset] | None = None,
     quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
@@ -127,14 +118,15 @@ def validate_npc_roster(
     All checks are performed and all violations are collected together:
     1. Bidirectional inventory equality between derived sources and inventory rows.
     2. Place hosts resolve to profiles with valid compact cards.
-    3. Guild examiners resolve to profiles with valid compact cards and no voice lines.
+    3. Persistent adventurers resolve to distinct profiles with valid compact cards,
+       bounded age pairs and both offline voice lines.
     4. Dialogue tables are answered by exactly one hosted place; scripted hosts author
        a misunderstanding reply and no profile greeting.
     5. Starting companion partner presets provide speech_style, greeting, and a valid
        derived card with maximum-length synthetic owner.
     6. Quest template occupants carry personas with valid compact cards and pass characterization.
     7. Shipped import examples validate cleanly as NPC character records.
-    8. Every profile in profile_registry is referenced by a hosted place or examiner rank.
+    8. Every profile in profile_registry is referenced by a hosted place or persistent adventurer.
     """
     if places is None:
         from world.lore.settlements.places import PLACE_REGISTRY
@@ -148,10 +140,6 @@ def validate_npc_roster(
         from world.lore.dialogue import DIALOGUE_ROWS
 
         dialogue_rows = DIALOGUE_ROWS
-    if guild_ranks is None:
-        from world.lore.guild import GUILD_RANK_REGISTRY
-
-        guild_ranks = GUILD_RANK_REGISTRY
     if player_presets is None:
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
@@ -192,7 +180,6 @@ def validate_npc_roster(
     actual_sources = derive_shipped_sources(
         places=places,
         dialogue_rows=dialogue_rows,
-        guild_ranks=guild_ranks,
         player_presets=player_presets,
         quest_templates=quest_templates,
         examples_dir=examples_dir,
@@ -218,7 +205,7 @@ def validate_npc_roster(
     person_profiles: set[str] = set()
     other_profiles = {
         place.host_profile_key for place in places.values() if place.service_id is not None
-    } | {rank.examiner_profile_key for rank in guild_ranks.values()}
+    }
     for person_key, person in adventurers.items():
         profile_key = person.profile_key
         referenced_profiles.add(profile_key)
@@ -276,33 +263,6 @@ def validate_npc_roster(
         except (NpcCardError, ValueError) as err:
             violations.append(
                 f"source kind='place_host' key={place.service_id!r} profile {profile_key!r} has invalid card: {err}"
-            )
-
-    # 3. Guild examiners: must resolve to a valid profile with a valid compact card and no voice lines
-    for rank_key, rank in guild_ranks.items():
-        profile_key = rank.examiner_profile_key
-        if not profile_key:
-            violations.append(
-                f"source kind='guild_examiner' key={rank_key!r} has no examiner_profile_key"
-            )
-            continue
-        referenced_profiles.add(profile_key)
-        profile = profile_registry.get(profile_key)
-        if profile is None:
-            violations.append(
-                f"source kind='guild_examiner' key={rank_key!r} references missing profile {profile_key!r}"
-            )
-            continue
-        try:
-            normalize_card(profile.card.to_record())
-        except (NpcCardError, ValueError) as err:
-            violations.append(
-                f"source kind='guild_examiner' key={rank_key!r} profile {profile_key!r} has invalid card: {err}"
-            )
-        if profile.voice.greeting is not None or profile.voice.misunderstood is not None:
-            violations.append(
-                f"source kind='guild_examiner' key={rank_key!r} profile {profile_key!r} "
-                "authors voice lines; examiners do not speak"
             )
 
     # 4. Dialogue tables & scripted hosts
@@ -486,7 +446,7 @@ def validate_npc_roster(
     orphan_keys = sorted(set(profile_registry) - referenced_profiles)
     for prof_key in orphan_keys:
         violations.append(
-            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place, examiner rank or persistent adventurer"
+            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place or persistent adventurer"
         )
 
     if violations:

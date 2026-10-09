@@ -14,10 +14,9 @@ from dataclasses import dataclass
 class NpcSource:
     """One shipped NPC source and the content-change slice that owns its persona.
 
-    ``kind`` is one of seven closed source kinds, each keyed differently:
+    ``kind`` is one of six closed source kinds, each keyed differently:
     ``place_host`` (keyed by the place's ``service_id``), ``dialogue_table``
-    (keyed by the table's ``dialogue_key``), ``guild_examiner`` (keyed by a
-    ``GUILD_RANK_REGISTRY`` rank key), ``starting_companion`` (keyed
+    (keyed by the table's ``dialogue_key``), ``starting_companion`` (keyed
     ``<declaring preset>:<partner preset>``), ``quest_template_occupant``
     (keyed ``<template name>:<stage index>:<position in that stage's
     npc_reqs>``), and ``import_example`` (keyed by the example file's stem).
@@ -60,17 +59,10 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     NpcSource("dialogue_table", "altoria_alchemist", "altoria_trade"),
     NpcSource("dialogue_table", "altoria_merchant_hall", "altoria_trade"),
 
-    # altoria_guild: the guild master, the guild-staff table, and the seven
-    # guild rank examiners.
+    # altoria_guild: the guild master, the guild-staff table, and the
+    # branch's persistent adventurers (examination hosts).
     NpcSource("place_host", "altoria_guild_master", "altoria_guild"),
     NpcSource("dialogue_table", "guild_staff", "altoria_guild"),
-    NpcSource("guild_examiner", "F", "altoria_guild"),
-    NpcSource("guild_examiner", "E", "altoria_guild"),
-    NpcSource("guild_examiner", "D", "altoria_guild"),
-    NpcSource("guild_examiner", "C", "altoria_guild"),
-    NpcSource("guild_examiner", "B", "altoria_guild"),
-    NpcSource("guild_examiner", "A", "altoria_guild"),
-    NpcSource("guild_examiner", "S", "altoria_guild"),
     NpcSource("persistent_adventurer", "altoria_hok", "altoria_guild", "altoria_hok_adventurer", 45, 45),
     NpcSource("persistent_adventurer", "altoria_cassandra", "altoria_guild", "altoria_cassandra_adventurer", 40, 40),
     NpcSource("persistent_adventurer", "altoria_augustine", "altoria_guild", "altoria_augustine_adventurer", 68, 52),

@@ -1,12 +1,10 @@
 """Data-contract test: guild/shop config validation contract
-Slice of ``test_guild_config``: MeritThresholdTests, ExamProfileTests.
+Slice of ``test_guild_config``: MeritThresholdTests.
 """
 import unittest
 from world.rules.guild_config import EXAM_RANKS
 from world.rules.guild_config import GuildConfigError
-from world.rules.guild_config import validate_exam_profiles
 from world.rules.guild_config import validate_merit_thresholds
-from world.skills.registry import SKILL_REGISTRY
 from ._support import (
     raw_rulebook,
 )
@@ -45,72 +43,6 @@ class MeritThresholdTests(unittest.TestCase):
         bad = {**raw_rulebook()["merit_thresholds"], "E": True}
         with self.assertRaises(GuildConfigError):
             validate_merit_thresholds(bad)
-
-class ExamProfileTests(unittest.TestCase):
-    def test_every_profile_stays_inside_its_lore_band(self):
-        from world.lore.races import STATIC_TIER_REGISTRY
-
-        raw = raw_rulebook()["exam_profiles"]
-        profiles = validate_exam_profiles(raw)
-        self.assertEqual(list(profiles), ["E", "D", "C", "B", "A", "S"])
-        for rank, profile in profiles.items():
-            band = STATIC_TIER_REGISTRY[profile.static_tier_key].band
-            self.assertTrue(band[0] <= profile.atk_phys <= band[1])
-            self.assertTrue(band[0] <= profile.agility <= band[1])
-            self.assertTrue(band[0] <= profile.defense <= band[1])
-
-    def test_every_exam_skill_key_exists(self):
-        raw = raw_rulebook()["exam_profiles"]
-        profiles = validate_exam_profiles(raw)
-        for profile in profiles.values():
-            for skill_key in profile.skills:
-                self.assertIn(skill_key, SKILL_REGISTRY)
-
-    def test_out_of_band_stat_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        mutated = {"E": {**raw["E"], "atk_phys": 100}, **{k: v for k, v in raw.items() if k != "E"}}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(mutated)
-
-    def test_wrong_tier_mapping_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        mutated = {"E": {**raw["E"], "static_tier": "human_elite"}, **{k: v for k, v in raw.items() if k != "E"}}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(mutated)
-
-    def test_unknown_skill_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        mutated = {
-            "E": {**raw["E"], "skills": ["basic_attack", "no_such_skill"]},
-            **{k: v for k, v in raw.items() if k != "E"},
-        }
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(mutated)
-
-    def test_missing_profile_rank_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        bad = {k: v for k, v in raw.items() if k != "E"}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(bad)
-
-    def test_unknown_profile_rank_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        bad = {**raw, "X": raw["E"]}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(bad)
-
-    def test_non_mapping_profile_entry_is_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        bad = {**raw, "E": "nope"}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(bad)
-
-    def test_empty_profile_skills_are_rejected(self):
-        raw = raw_rulebook()["exam_profiles"]
-        bad = {"E": {**raw["E"], "skills": []}, **{k: v for k, v in raw.items() if k != "E"}}
-        with self.assertRaises(GuildConfigError):
-            validate_exam_profiles(bad)
-
 
 if __name__ == "__main__":
     unittest.main()

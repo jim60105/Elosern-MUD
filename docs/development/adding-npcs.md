@@ -53,7 +53,7 @@
 3. **需要劇本對話嗎？** `dialogue_key` 必須是 `world/lore/dialogue/`（`altoria_{lower,middle,upper}.py`／`ciaran.py`／`guild.py` 依領域分檔）`DIALOGUE_ROWS` 已登錄的鍵；新對話要先加表列，見 Step 3。
 4. **需要日程嗎？** 排程詞彙住在 `world/rules/rulebook/npc_schedules.yaml`：狀態詞彙 `duty`／`resting`／`busy`，模板 `guard`／`storekeeper`／`resident`。匯入卡的職業藍圖只在列帶 `schedule_template` 時自動套排程（現行出貨列全為 `null`），其餘情況由程式呼叫 `world/rules/npc_schedules.py::set_npc_schedule`（`db.schedule` 的唯一寫入者）。
 5. **數值來源在哪？** 設計文件與既有 rulebook。`stats` 是匯入卡路徑的字面基準值（永不預先乘技能倍率）；平衡數值由設計文件決定，卡作者不發明平衡表。
-6. **這是出貨的服務主人、考核官或同行夥伴嗎？** 服務主人與考核官必須在 `world/lore/npc_profiles/` 所屬切片登錄 `NpcProfile`，並在地點或公會位階填入引用鍵；同行夥伴則在夥伴預設卡填寫延伸欄位。所有出貨來源都必須登記於名冊清單，見 §3.1。
+6. **這是出貨的服務主人、常駐冒險者或同行夥伴嗎？** 服務主人與常駐冒險者必須在 `world/lore/npc_profiles/` 所屬切片登錄 `NpcProfile`，並在地點或 `world/lore/guild_adventurers.py` 的人物列填入引用鍵；同行夥伴則在夥伴預設卡填寫延伸欄位。所有出貨來源都必須登記於名冊清單，見 §3.1。
 
 ---
 
@@ -133,12 +133,12 @@ ROWS = {
 
 出貨 NPC 的角色卡與台詞由切片管理，不散落在零星腳本：
 
-1. **設定檔切片與引用**：地點服務主人與考核官的角色卡定義在 `world/lore/npc_profiles/` 領域切片中（例如 `altoria_lower.py`、`ciaran_homes_a.py`），匯集於 `NPC_PROFILE_REGISTRY`。地點透過 `PlaceDefinition.host_profile_key` 引用；公會位階透過 `GuildRank.examiner_profile_key` 引用。系統禁止孤立設定檔，登錄於註冊表中的設定檔必須至少被一處地點或考核官引用。
+1. **設定檔切片與引用**：地點服務主人與常駐冒險者的角色卡定義在 `world/lore/npc_profiles/` 領域切片中（例如 `altoria_lower.py`、`ciaran_homes_a.py`），匯集於 `NPC_PROFILE_REGISTRY`。地點透過 `PlaceDefinition.host_profile_key` 引用；常駐冒險者透過 `GuildAdventurer.profile_key` 引用。公會位階不再擁有考官身分欄位。系統禁止孤立設定檔，登錄於註冊表中的設定檔必須至少被一處地點或常駐冒險者引用。
 2. **語音台詞分配規則**：
    - **劇本主人**：地點對話表的首句問候語（`greeting`）為唯一來源，設定檔內的 `voice.greeting` 保持 `None`，消除問候語雙頭維護的風險；設定檔必須填寫 `voice.misunderstood`（理解失敗回覆語）。
-   - **考核官**：純戰鬥考核對象不具備對話能力，其設定檔內的 `voice.greeting` 與 `voice.misunderstood` 皆設定為 `None`。
+   - **常駐冒險者**：平常就是會說話的持久 NPC，設定檔必須同時填寫 `voice.greeting` 與 `voice.misunderstood`；主持考核只是他們的附加資格，不另外建立考官設定檔。
    - **同行夥伴**：夥伴預設卡（`PlayerPreset`）直接提供 `speech_style` 與 `greeting`（離線問候語），夥伴實例化時將問候語寫入執行個體專屬的 `db.npc_offline_greeting`。
-3. **出貨名冊清單（Inventory）**：所有出貨來源（地點主人、對話表、公會考核官、同行夥伴、離線任務模板佔位者、匯入範例卡）必須登記在 `world/lore/npc_profiles/inventory.py` 的 `NPC_SOURCE_INVENTORY` 之中，並標記所屬內容切片。
+3. **出貨名冊清單（Inventory）**：所有出貨來源（地點主人、對話表、常駐冒險者、同行夥伴、離線任務模板佔位者、匯入範例卡）必須登記在 `world/lore/npc_profiles/inventory.py` 的 `NPC_SOURCE_INVENTORY` 之中，並標記所屬內容切片。
 4. **伺服器啟動驗證門禁**：伺服器開機程序包含 `npc_persona_roster_validation` 步驟，置於 `STARTUP_STEP_ORDER` 中 `state_reaction_rules` 之後、`sync_all` 之前。驗證函式 `validate_npc_roster()` 比對名冊雙向一致性、檢驗所有角色卡契約、確認每張對話表皆由單一服務主人應答，並檢查語音覆蓋完整度。任一處不合規範即觸發例外中止開機，阻止寫入不完整資料。
 
 ### Step 3.2 — 遊戲內編輯器與固定劇本不重產原則
@@ -232,8 +232,10 @@ never mutates clock, NPC attributes, locations, or examination records.
 `begin_exam_schedule_hold(npc, exam_id, start_tick)`,
 `read_exam_schedule_hold(npc)` and
 `release_exam_schedule_hold(npc, exam_id, through_tick)`. These APIs are complete
-independently of production examination activation. The persistent lifecycle
-change owns that activation and the availability-reader change owns query use.
+independently of examination activation. `start_guild_exam` begins the hold
+inside its start transaction, a coherent cold-start recovery keeps it, and every
+terminal or invalid-recovery settlement releases it through
+`restore_exam_host` after the host's normal state is restored.
 
 Mutation APIs require serialized calls from the deterministic game loop.
 Worker/web threads must route requests through that boundary; these APIs do not
@@ -332,7 +334,8 @@ assembles these people as `LLMNPC` instances. The profession value describes
 their occupation; it is not a new component blueprint in `professions.yaml`.
 Qualification selection requires one exact branch/target binding and one
 persistent person dbref. It never selects by display key or summons an absent
-person. The legacy silent rank factory remains until the lifecycle cutover.
+person. Rank rows carry no examiner identity and no temporary opponent factory
+exists; examinations always fight the qualified persistent person.
 
 Each normal person has a distinct profile, bounded canonical ages, both offline
 voice replies, literal bases, registered military equipment, and complete sword
@@ -358,6 +361,37 @@ returning home occurs 30 ticks after guild departure. Weekly indices are anchore
 at absolute tick zero. All three enter `duty` at 06:00 and `resting` at 22:00;
 weekly templates repeat both entries on every day. Successful moves set `duty`.
 Actual Exit locks still determine whether the person arrives.
+
+#### Persistent examination lifecycle
+
+`world.rules.guild_exams.start_guild_exam(actor, examiner, target_rank)` is the
+only mutation-capable start. `examiner` is the qualified persistent person;
+adapters resolve it with `qualified_exam_host(actor, target_rank, speaker=None)`,
+which derives the branch from the single co-located `GuildExaminer` counter (or
+the speaking counter) and the person from the qualification binding. A speaking
+NPC that is neither the counter nor the qualified person grants no authority.
+
+Before any write the start checks registration, the counter's shared service
+gate and branch, host co-location, exact next rank, qualification, host
+`service_guild` schedule state, a `participant_name_collision` between candidate
+and host keys, any engagement of the host in another exam or battle, canonical
+host ages, true merit, and a real kit preflight. Then one transaction persists
+`guild_exam_normal_state` (exam ID, start tick, normal equipment/inventory and
+effects), issues and wears the target's military pair with an empty accessory
+loadout, activates the restriction (which adds the guild limit accessory),
+begins the schedule hold, fills both applicable pools, writes the exam record
+and combat session, and grants the existing +1 guild affinity. Any failure
+restores storage and caches through `snapshot_exam_host_surfaces` /
+`restore_exam_host_surfaces`; the host is never created, renamed or deleted.
+
+Every terminal outcome (pass, fail, flee, forfeit, round cap, invalid recovery)
+calls `restore_exam_host(host, exam_id)` inside the settlement transaction: it
+removes only this exam's restriction, restores the persisted normal outfit and
+effects, refills full normal pools, and releases this exam's hold. Foreign or
+unreadable restriction/hold state is left untouched with a warning. Cold-start
+recovery resumes only when the exam record, session, restriction, normal-state
+record and active hold all name the same exam and host and the participant keys
+stay distinct; otherwise it settles FAIL once and restores the host.
 
 The `persistent_adventurer` source inventory records one owner/profile/age pair
 per person. Roster preflight validates source equality, orphan references and

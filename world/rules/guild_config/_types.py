@@ -19,30 +19,6 @@ class GuildConfigError(ValueError):
 
 RANK_ORDER = tuple(rank.key for rank in sorted(GUILD_RANK_REGISTRY.values(), key=lambda r: r.order))
 EXAM_RANKS = ("E", "D", "C", "B", "A", "S")
-RANK_TO_TIER = {
-    "E": "human_adventurer",
-    "D": "human_adventurer",
-    "C": "human_elite",
-    "B": "human_elite",
-    "A": "human_veteran",
-    "S": "human_swordmaster",
-}
-
-
-@dataclass(frozen=True)
-class ExamProfile:
-    """The deterministic opponent used by one target-rank guild examination."""
-
-    target_rank: str
-    static_tier_key: str
-    hp: int
-    mp: int
-    sp: int
-    atk_phys: int
-    agility: int
-    defense: int
-    magic_power: int
-    skills: tuple[str, ...]
 
 
 @dataclass(frozen=True)

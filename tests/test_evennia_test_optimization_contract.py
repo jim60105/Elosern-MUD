@@ -415,7 +415,7 @@ class TestOptimizationEvidenceTests(unittest.TestCase):
             },
             "world/rules/tests/test_guild_exams.py": {
                 "ExamRecordTests": {"unittest.TestCase"},
-                "ExamStartTests": {"ExamRegistryIsolation", "EvenniaTest"},
+                "ExamStartTests": {"ExamHostFixture", "EvenniaTestCase"},
             },
         }
         for relative_path, classes in expectations.items():

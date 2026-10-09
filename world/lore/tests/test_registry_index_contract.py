@@ -48,7 +48,6 @@ ADDITIONAL_CATEGORIES = frozenset(
         "sexual_acts",
         "quest_definitions",
         "professions",
-        "guild_exam_profiles",
         "shop_configs",
         "service_hosts",
         "monster_behaviour_profiles",

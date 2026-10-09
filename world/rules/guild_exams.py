@@ -1,33 +1,48 @@
 """Triggerable simulated-battle guild examinations (guild-economy D-7).
 
 ``start_guild_exam`` is the sole examination trigger; ``requested_by`` is audit
-metadata, never authority. It validates registration, exact next rank, the true
-cumulative merit threshold, and absence of active combat/exam, then spawns a
-temporary NPC opponent, restores both sides to full HP/MP/SP, and opens a
-``guild_exam`` combat session as one all-or-nothing operation. The exam is a
-simulated lethal battle: combat follows ordinary lethal semantics, and both
-sides are restored to full HP/MP/SP again after settlement, win or lose
-(exam-simulated-battle-redesign D1-D3). Settlement is idempotent by exam ID
-and promotes exactly one rank on PASS.
+metadata, never authority. The opponent is the branch-qualified persistent
+adventurer (persistent-guild-exam-lifecycle): the start validates the local
+counter, host qualification/presence/service state, exact next rank, the true
+cumulative merit threshold and absence of active combat/exam, then issues the
+exam kit, activates the restriction and schedule hold, restores both sides to
+full HP/MP/SP and opens a ``guild_exam`` combat session as one all-or-nothing
+operation. The exam is a simulated lethal battle; every terminal outcome
+restores the host's normal outfit/effects and both sides' full pools, and
+never deletes the host. Settlement is idempotent by exam ID and promotes
+exactly one rank on PASS.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
-from evennia.utils.create import create_object
+from django.db import transaction
 
-from world.art.official_refs import NPC_PROFILE_PROVENANCE_ATTRIBUTE
-from world.observability import log_info, log_warn
-from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
-from world.rules.npc_persona import initialize_npc_persona
-from world.rules.npc_identity import live_key_taken_by_other, validate_npc_title
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
-from typeclasses.npcs import NPC, ensure_npc_canonical_age
+from typeclasses.npcs import NPC
+from world.observability import log_info, log_warn
+from world.rules.equipment import normalized_equipment
+from world.rules.exam_schedule_holds import (
+    begin_exam_schedule_hold,
+    read_exam_schedule_hold,
+    release_exam_schedule_hold,
+    restore_exam_schedule_hold_surfaces,
+    snapshot_exam_schedule_hold_surfaces,
+)
 from world.rules.guild import parse_guild_registration
 from world.rules.guild_config import get_catalog
+from world.rules import guild_exam_restrictions
+from world.rules.guild_exam_restrictions import (
+    RestrictionError,
+    activate_exam_restriction,
+    preflight_exam_restriction,
+)
+from world.rules.human_guild_hosts import GuildHostIntegrityError, qualified_host
+from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.surfaces import (
     attribute_snapshot,
@@ -35,6 +50,7 @@ from world.rules.surfaces import (
     restore_traits,
     snapshot_traits,
 )
+from world.skills.restrictions import exam_restriction
 
 
 class GuildExamError(ValueError):
@@ -83,6 +99,9 @@ class ExamReason(StrEnum):
     DUPLICATE_ACTIVE = "duplicate_active"
     UNKNOWN_PROFILE = "unknown_profile"
     MALFORMED_RECORD = "malformed_record"
+    UNQUALIFIED_EXAMINER = "unqualified_examiner"
+    PARTICIPANT_NAME_COLLISION = "participant_name_collision"
+    EXAMINER_ENGAGED = "examiner_engaged"
     ALREADY_SETTLED = "already_settled"
     NOT_SETTLABLE = "not_settlable"
     UNKNOWN_EXAM = "unknown_exam"
@@ -219,112 +238,241 @@ def _rank_order(rank_key: str) -> int:
     return rank.order
 
 
-def _profile_for(target_rank: str):
-    profile = get_catalog().exam_profiles.get(target_rank)
-    if profile is None:
-        raise GuildExamError(ExamReason.UNKNOWN_PROFILE, target_rank)
-    return profile
+def _valid_age(value: Any) -> bool:
+    return type(value) is int and 0 <= value <= 10000
 
 
-def _rank_row(target_rank: str):
+def _local_exam_counter(actor: Any) -> tuple[Any, Any]:
+    """Return the single co-located guild counter carrying examination service.
+
+    The counter (the branch's GuildExaminer component holder) owns the place
+    gate and branch identity; the persistent adventurer who fights carries no
+    service component of its own.
+    """
+    from world.rules.guild import GuildServiceError, resolve_local_service_host
+
+    try:
+        counter = resolve_local_service_host(actor, GuildExaminer)
+    except GuildServiceError as error:
+        raise GuildExamError(ExamReason.NO_EXAMINER) from error
+    return counter, counter.components.get(GuildExaminer.get_component_slot())
+
+
+def _counter_branch(actor: Any, counter: Any = None) -> str:
+    """Validate the exam counter's shared gate and return its branch key.
+
+    ``counter`` defaults to the single co-located GuildExaminer holder; an
+    explicit counter (the NPC speaking an exam intent) is gated identically.
+    """
+    if counter is None:
+        counter, component = _local_exam_counter(actor)
+    else:
+        component = counter.components.get(GuildExaminer.get_component_slot())
+    verdict = service_available(actor, counter, component)
+    if not verdict.allowed:
+        if verdict.reason == REASON_REMOTE:
+            raise GuildExamError(ExamReason.REMOTE_EXAMINER)
+        raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE)
+    registration = parse_guild_registration(actor)
+    if registration is None:
+        raise GuildExamError(ExamReason.UNREGISTERED)
+    if registration["branch_key"] != component.branch_key:
+        raise GuildExamError(ExamReason.WRONG_BRANCH)
+    return component.branch_key
+
+
+def _require_next_rank(actor: Any, target_rank: str) -> None:
     from world.lore.guild import GUILD_RANK_REGISTRY
 
-    rank = GUILD_RANK_REGISTRY.get(target_rank)
-    if rank is None:
-        raise GuildExamError(ExamReason.UNKNOWN_EXAM, target_rank)
-    return rank
+    actor_rank = actor.guild_rank
+    if actor_rank not in GUILD_RANK_REGISTRY:
+        raise GuildExamError(ExamReason.MALFORMED_RECORD, "actor has no valid rank")
+    if target_rank not in GUILD_RANK_REGISTRY or (
+        _rank_order(target_rank) != _rank_order(actor_rank) + 1
+    ):
+        raise GuildExamError(ExamReason.NOT_NEXT_RANK)
 
 
-def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
-    profile = _profile_for(target_rank)
-    rank = _rank_row(target_rank)
-    examiner_profile = None
-    prof_age = None
-    prof_app_age = None
-    if rank.examiner_profile_key:
-        if rank.examiner_profile_key not in NPC_PROFILE_REGISTRY:
-            raise ValueError(
-                f"rank {target_rank!r} examiner profile {rank.examiner_profile_key!r} "
-                "is absent from the NPC profile registry"
-            )
-        examiner_profile = NPC_PROFILE_REGISTRY[rank.examiner_profile_key]
-        for field_name in ("age", "apparent_age"):
-            val = getattr(examiner_profile, field_name, None)
-            if type(val) is not int or not (0 <= val <= 10000):
-                raise ValueError(
-                    f"examiner profile {rank.examiner_profile_key!r} has invalid "
-                    f"{field_name} {val!r}; must be an integer in 0..10000"
-                )
-        prof_age = examiner_profile.age
-        prof_app_age = examiner_profile.apparent_age
-    # Authored examiner identity is the key (npc-title-authored-identities D8);
-    # the -{pk} disambiguator is applied only when another entity already
-    # holds the name (audit finding F08 roster-keying stays intact).
-    opponent = create_object(NPC, key=rank.examiner_name)
+def _is_exam_counter(npc: Any) -> bool:
+    components = getattr(npc, "components", None)
+    return components is not None and components.has(GuildExaminer.name)
+
+
+def qualified_exam_host(actor: Any, target_rank: str, *, speaker: Any = None) -> NPC:
+    """Resolve the branch-qualified persistent host for one requested target.
+
+    Read-only identity selection shared by the command, browser and NPC-intent
+    adapters: the branch comes from the exam counter, the person from the
+    qualification binding and the object from persistent provenance, never
+    from a display-name search or a generic examiner component. ``speaker``
+    (an NPC voicing an exam intent) grants no authority: it must stand beside
+    the actor and be either the counter itself or the qualified host.
+    """
+    if speaker is not None and (
+        actor.location is None or getattr(speaker, "location", None) != actor.location
+    ):
+        raise GuildExamError(ExamReason.REMOTE_EXAMINER)
+    counter = speaker if speaker is not None and _is_exam_counter(speaker) else None
+    branch_key = _counter_branch(actor, counter)
+    _require_next_rank(actor, target_rank)
     try:
-        opponent.race = "human"
-        opponent._apply_trait_config(
-            __import__(
-                "world.rules.traits", fromlist=["_trait_config"]
-            )._trait_config(
-                {
-                    "hp": profile.hp,
-                    "mp": profile.mp,
-                    "sp": profile.sp,
-                    "atk_phys": profile.atk_phys,
-                    "agility": profile.agility,
-                    "defense": profile.defense,
-                    "magic_power": profile.magic_power,
-                    "guild_merit": 0,
-                },
-            )
+        host = qualified_host(branch_key, target_rank)
+    except GuildHostIntegrityError as error:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER) from error
+    if speaker is not None and counter is None and speaker.pk != host.pk:
+        raise GuildExamError(ExamReason.NO_EXAMINER)
+    return host
+
+
+# Host-side surfaces the examination lifecycle writes. The persisted
+# normal-state attribute holds the host's own outfit/effects so restoration
+# never depends on the candidate's exam record.
+NORMAL_STATE_ATTRIBUTE = "guild_exam_normal_state"
+_HOST_ATTRIBUTES = (
+    "guild_exam_restriction",
+    NORMAL_STATE_ATTRIBUTE,
+    "equipment",
+    "inventory",
+    "buffs",
+    "relations_data",
+)
+
+
+def snapshot_exam_host_surfaces(host: Any) -> dict[str, Any]:
+    """Snapshot every host surface an exam start, round or settlement writes."""
+    return {
+        "attributes": {key: attribute_snapshot(host, key) for key in _HOST_ATTRIBUTES},
+        "traits": snapshot_traits(host),
+        "hold": snapshot_exam_schedule_hold_surfaces(host),
+    }
+
+
+def restore_exam_host_surfaces(host: Any, snapshot: dict[str, Any]) -> None:
+    """Restore host storage and in-process caches after a rolled-back write."""
+    from world.rules.surfaces import restore_attribute_best_effort
+
+    for key, value in snapshot["attributes"].items():
+        restore_attribute_best_effort(host, key, value)
+    restore_traits(host, snapshot["traits"])
+    restore_exam_schedule_hold_surfaces(host, snapshot["hold"])
+
+
+def _host_engaged(host: Any) -> bool:
+    """Whether the host already belongs to an exam or battle (fail closed)."""
+    from world.rules.combat import is_battle_over
+    from world.rules.skip_safety import _active_battlefield_for
+
+    battlefield = _active_battlefield_for(host)
+    if battlefield is not None and not is_battle_over(battlefield) and any(
+        entity is host for entity in battlefield.roster.values()
+    ):
+        return True
+    if host.attributes.has(NORMAL_STATE_ATTRIBUTE):
+        return True
+    try:
+        if exam_restriction(host) is not None:
+            return True
+    except ValueError:  # observability: ignore R2: a malformed restriction fails closed as engaged; the start rejects with a stable reason
+        return True
+    hold = read_exam_schedule_hold(host)
+    return not hold.known or (hold.hold is not None and not hold.hold.released)
+
+
+def _exam_kit(target_rank: str) -> dict[str, Any]:
+    """The exam-owned military pair with an empty accessory loadout."""
+    profile = guild_exam_restrictions.PROFILES.get(target_rank)
+    if profile is None:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER, target_rank)
+    return {
+        "weapon_main": profile.weapon,
+        "weapon_off": None,
+        "armor": profile.armor,
+        "accessories": [],
+    }
+
+
+def _install_exam_kit(host: Any, exam_id: str, start_tick: int, kit: dict[str, Any]) -> None:
+    """Persist the normal outfit/effects, then issue and wear the exam kit."""
+    from world.rules.equipment import sync_equipment_gauge_limits
+
+    equipment = normalized_equipment(host)
+    if equipment is None:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER, "malformed host equipment")
+    inventory = list(host.db.inventory or [])
+    host.attributes.add(NORMAL_STATE_ATTRIBUTE, {
+        "exam_id": exam_id,
+        "start_tick": start_tick,
+        "equipment": deepcopy(equipment),
+        "inventory": list(inventory),
+        "buffs": attribute_snapshot(host, "buffs"),
+    })
+    issued = list(inventory)
+    for key in (kit["weapon_main"], kit["armor"]):
+        if key is not None and key not in issued:
+            issued.append(key)
+    host.db.inventory = issued
+    host.db.equipment = deepcopy(kit)
+    sync_equipment_gauge_limits(host)
+
+
+def restore_exam_host(host: Any, exam_id: str) -> None:
+    """Return a persistent host to its normal self after one examination.
+
+    Removes only this exam's restriction, restores the persisted normal
+    outfit/effects, refills full normal pools, then releases this exam's
+    schedule hold through elapsed time. Foreign or unreadable exam state is
+    left untouched and reported; the host is never deleted.
+    """
+    from world.rules.clock import read_world_clock
+    from world.rules.equipment import sync_equipment_gauge_limits
+    from world.rules.guild_exam_restrictions import remove_exam_restriction
+    from world.rules.surfaces import restore_attribute
+    from world.rules.traits import restore_gauges_to_full
+
+    try:
+        restriction = exam_restriction(host)
+    except ValueError:
+        restriction = None
+        log_warn("guild_exam_host_restriction_unreadable", context={"exam": exam_id, "host": host.pk})
+    normal = host.attributes.get(NORMAL_STATE_ATTRIBUTE)
+    owns_normal = isinstance(normal, Mapping) and normal.get("exam_id") == exam_id
+    foreign = (restriction is not None and restriction["exam_id"] != exam_id) or (
+        normal is not None and not owns_normal
+    )
+    if foreign:
+        # Another examination owns this host now: a replayed or late
+        # settlement must not lift, re-outfit or heal it.
+        log_warn(
+            "guild_exam_host_state_foreign",
+            context={
+                "exam": exam_id, "host": host.pk,
+                "owner": restriction["exam_id"] if restriction is not None else None,
+            },
         )
-        opponent.db.skills = {"active": list(profile.skills), "passive": []}
-        opponent.npc_title = validate_npc_title(rank.examiner_title)
-        ensure_npc_canonical_age(opponent, age=prof_age, apparent_age=prof_app_age)
-        if examiner_profile is not None:
-            initialize_npc_persona(
-                opponent,
-                examiner_profile.card.to_record(),
-                {"kind": "profile", "profile": rank.examiner_profile_key},
-            )
-            # Authored official-content provenance (official-content-provenance):
-            # the ranked examiner's authored profile key, written with the rest
-            # of its authored identity before the one save below and inside the
-            # caller's exam transaction, so the official reference layer resolves
-            # ``(npc, <profile key>)`` — never the rank's threat/role band nor a
-            # numeric tier key.
-            opponent.attributes.add(
-                NPC_PROFILE_PROVENANCE_ATTRIBUTE, rank.examiner_profile_key
-            )
-        opponent.location = actor.location
-        # Occupancy check inside the same start_guild_exam transaction: no
-        # check-then-create window. A later same-rank spawn always sees the
-        # earlier committed same-named opponent and takes the suffixed form.
-        if live_key_taken_by_other(opponent):
-            opponent.key = f"{rank.examiner_name}-{opponent.pk}"
-        opponent.save()
-        log_context = {
-            "char": opponent.key,
-            "rank": target_rank,
-        }
-        if rank.examiner_profile_key:
-            log_context["profile"] = rank.examiner_profile_key
-        log_info(
-            "guild_exam_opponent_created",
-            context=log_context,
+        return
+    if restriction is not None:
+        remove_exam_restriction(host, exam_id)
+    if owns_normal:
+        host.db.equipment = deepcopy(dict(normal["equipment"]))
+        host.db.inventory = list(normal["inventory"])
+        restore_attribute(host, "buffs", tuple(normal["buffs"]))
+        host.attributes.remove(NORMAL_STATE_ATTRIBUTE)
+    sync_equipment_gauge_limits(host)
+    restore_gauges_to_full(host)
+    hold = read_exam_schedule_hold(host)
+    if not hold.known:
+        log_warn(
+            "guild_exam_host_hold_unreadable",
+            context={"exam": exam_id, "host": host.pk, "reason": hold.reason},
         )
-    except Exception:
-        try:
-            opponent.delete()
-        except Exception as error:
-            log_warn(
-                "exam_opponent_delete_failed",
-                exc=error,
-                context={"stage": "spawn_opponent", "obj": str(opponent)},
-            )
-        raise
-    return opponent
+    elif hold.hold is not None and hold.hold.exam_id == exam_id and not hold.hold.released:
+        clock = read_world_clock()
+        if clock is None:
+            raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE, "world clock is unavailable")
+        release_exam_schedule_hold(host, exam_id, max(clock.tick, hold.hold.held_through_tick))
+    transaction.on_commit(lambda context={"exam": exam_id, "host": host.pk}: log_info(
+        "guild_exam_host_restored", context=context
+    ))
 
 
 def start_guild_exam(
@@ -336,11 +484,13 @@ def start_guild_exam(
 ) -> GuildExamRecord:
     """Start one simulated-battle guild examination as the sole trigger (D-7).
 
-    ``requested_by`` is audit metadata only; every gate (co-location,
-    component/branch, registration, exact next rank, true merit threshold,
-    no active combat/exam) is revalidated here regardless of its value. The
-    candidate and the spawned opponent are restored to full HP/MP/SP inside
-    the all-or-nothing start, so a failed start restores nothing.
+    ``examiner`` is the branch-qualified persistent adventurer who fights;
+    ``requested_by`` is audit metadata only. Every gate (local counter and its
+    anchoring, branch, host qualification and co-location, host service
+    state, participant identity, exact next rank, true merit threshold, no
+    active combat/exam on either side, wearable kit and usable lineage) is
+    revalidated here before any write. The kit, restriction, schedule hold,
+    full pools, exam record, session and +1 affinity then commit together.
     """
     if not isinstance(actor, PlayerCharacter):
         raise GuildExamError(ExamReason.NOT_A_PLAYER)
@@ -352,81 +502,77 @@ def start_guild_exam(
         raise GuildExamError(ExamReason.UNREGISTERED)
     if not isinstance(examiner, NPC):
         raise GuildExamError(ExamReason.NO_EXAMINER)
-    if not hasattr(examiner, "components") or not examiner.components.has(GuildExaminer.name):
-        raise GuildExamError(ExamReason.NO_EXAMINER)
-    examiner_component = examiner.components.get(GuildExaminer.get_component_slot())
-    # Examiner authority consults the shared availability gate: a remote
-    # examiner keeps its refusal lineage; an off-anchor place-bound examiner
-    # or malformed stored binding is refused exactly like a remote one
-    # (service-anchoring delta), before any eligibility check or write.
-    verdict = service_available(actor, examiner, examiner_component)
-    if not verdict.allowed:
-        if verdict.reason == REASON_REMOTE:
-            raise GuildExamError(ExamReason.REMOTE_EXAMINER)
+    # The counter's shared availability gate refuses remote, off-anchor and
+    # malformed bindings before any eligibility check or write.
+    branch_key = _counter_branch(actor)
+    if actor.location is None or examiner.location != actor.location:
+        raise GuildExamError(ExamReason.REMOTE_EXAMINER)
+
+    _require_next_rank(actor, target_rank)
+
+    try:
+        host = qualified_host(branch_key, target_rank)
+    except GuildHostIntegrityError as error:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER) from error
+    if host.pk != examiner.pk:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER)
+    if interaction_reason(host, "service_guild") is not None:
         raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE)
-    branch_key = examiner_component.branch_key
-    registration = parse_guild_registration(actor)
-    if registration["branch_key"] != branch_key:
-        raise GuildExamError(ExamReason.WRONG_BRANCH)
+    # Battlefield rosters key participants by display key; a same-keyed
+    # candidate is rejected rather than renaming the persistent host.
+    if str(actor.key) == str(host.key):
+        raise GuildExamError(ExamReason.PARTICIPANT_NAME_COLLISION)
+    if is_in_active_session(host) or _host_engaged(host):
+        raise GuildExamError(ExamReason.EXAMINER_ENGAGED)
+    if not all(_valid_age(host.attributes.get(key)) for key in ("age", "apparent_age")):
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER, "invalid canonical age")
 
-    actor_rank = actor.guild_rank
-    from world.lore.guild import GUILD_RANK_REGISTRY
-
-    if actor_rank not in GUILD_RANK_REGISTRY:
-        raise GuildExamError(ExamReason.MALFORMED_RECORD, "actor has no valid rank")
-    expected_next = GUILD_RANK_REGISTRY[actor_rank].key
-    next_order = _rank_order(actor_rank) + 1
-    if _rank_order(target_rank) != next_order:
-        raise GuildExamError(ExamReason.NOT_NEXT_RANK)
     threshold = get_catalog().merit_thresholds[target_rank]
     if read_counter_trait(actor, "guild_merit") < threshold:
         raise GuildExamError(ExamReason.BELOW_THRESHOLD)
-
     records = _read_exams(actor)
     if _find_active_exam(records) is not None:
         raise GuildExamError(ExamReason.DUPLICATE_ACTIVE)
-    passed_target = next(
-        (record for record in records if record.target_rank == target_rank and record.state is ExamState.PASSED),
-        None,
-    )
-    if passed_target is not None:
+    if any(r.target_rank == target_rank and r.state is ExamState.PASSED for r in records):
         raise GuildExamError(ExamReason.ALREADY_SETTLED)
 
-    attempt = _attempt_number(records, target_rank)
-    exam_id = f"{actor.pk}:{target_rank}:{attempt}"
+    kit = _exam_kit(target_rank)
+    try:
+        preflight_exam_restriction(host, target_rank, equipment=kit)
+    except RestrictionError as error:
+        raise GuildExamError(ExamReason.UNQUALIFIED_EXAMINER, str(error)) from error
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    if clock is None:
+        raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE, "world clock is unavailable")
+    start_tick = clock.tick
+    exam_id = f"{actor.pk}:{target_rank}:{_attempt_number(records, target_rank)}"
 
     from world.rules.combat_session import CombatSessionRecord, to_storage
 
-    record_snapshot = attribute_snapshot(actor, "guild_exams")
-    session_snapshot = attribute_snapshot(actor, "active_combat")
-    rank_snapshot = attribute_snapshot(actor, "guild_rank")
-    examiner_relations = attribute_snapshot(examiner, "relations_data")
-    # The pre-restore writes trait surfaces; restore them on rollback so the
-    # in-process gauge values never serve the restored values a rejected
-    # start rolled back in the database (idmapper is not transaction-aware).
-    traits_snapshot = snapshot_traits(actor)
-    opponent = None
+    actor_snapshots = {
+        key: attribute_snapshot(actor, key)
+        for key in ("guild_exams", "active_combat", "guild_rank")
+    }
+    actor_traits_snapshot = snapshot_traits(actor)
+    host_snapshot = snapshot_exam_host_surfaces(host)
     try:
-        from django.db import transaction
-
         with transaction.atomic():
-            # Spawn inside the transaction so every failure path rolls the
-            # opponent back; no orphan can survive a rejected start.
-            opponent = _spawn_opponent(actor, target_rank)
-            # Simulated battle: both sides enter at full HP/MP/SP regardless
-            # of their state before the exam (exam-simulated-battle-redesign
-            # D2); a failed start rolls this restoration back with everything
-            # else.
+            _install_exam_kit(host, exam_id, start_tick, kit)
+            activate_exam_restriction(host, exam_id, target_rank)
+            begin_exam_schedule_hold(host, exam_id, start_tick)
             from world.rules.traits import restore_gauges_to_full
 
+            # Simulated battle: both sides enter at full applicable pools.
             restore_gauges_to_full(actor)
-            restore_gauges_to_full(opponent)
+            restore_gauges_to_full(host)
             session = CombatSessionRecord(
                 session_id=f"guild_exam:{actor.pk}:{exam_id}",
                 mode="guild_exam",
                 room_id=int(actor.location.pk),
                 player_ids=(int(actor.pk),),
-                enemy_ids=(int(opponent.pk),),
+                enemy_ids=(int(host.pk),),
                 fled_ids=(),
                 knocked_out_ids=(),
                 rounds_elapsed=0,
@@ -437,7 +583,7 @@ def start_guild_exam(
                 character_id=int(actor.pk),
                 target_rank=target_rank,
                 requested_by=requested_by,
-                opponent_id=int(opponent.pk),
+                opponent_id=int(host.pk),
                 session_id=session.session_id,
                 state=ExamState.ACTIVE,
                 terminal_reason=None,
@@ -447,32 +593,24 @@ def start_guild_exam(
             from world.rules.combat_session import reconstruct_battlefield
             from world.rules.skip_safety import register_active_battlefield
 
-            battlefield = reconstruct_battlefield(actor, session)
-            register_active_battlefield(battlefield)
+            register_active_battlefield(reconstruct_battlefield(actor, session))
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
-            apply_affinity_change(examiner, actor, AffinitySource.GUILD, 1)
+            apply_affinity_change(host, actor, AffinitySource.GUILD, 1)
+            transaction.on_commit(lambda context={
+                "exam": exam_id, "host": host.pk, "char": actor.pk,
+                "target": target_rank, "branch": branch_key, "tick": start_tick,
+                "session": session.session_id,
+            }: log_info("guild_exam_started", context=context))
     except Exception:
         from world.rules.skip_safety import unregister_participants
-
-        if opponent is not None:
-            unregister_participants((int(actor.pk), int(opponent.pk)))
         from world.rules.surfaces import restore_attribute_best_effort
 
-        restore_attribute_best_effort(actor, "guild_exams", record_snapshot)
-        restore_attribute_best_effort(actor, "active_combat", session_snapshot)
-        restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
-        restore_attribute_best_effort(examiner, "relations_data", examiner_relations)
-        restore_traits(actor, traits_snapshot)
-        if opponent is not None:
-            try:
-                opponent.delete()
-            except Exception as error:
-                log_warn(
-                    "exam_opponent_delete_failed",
-                    exc=error,
-                    context={"stage": "start_exam_compensation", "obj": str(opponent)},
-                )
+        unregister_participants((int(actor.pk), int(host.pk)))
+        for key, snapshot in actor_snapshots.items():
+            restore_attribute_best_effort(actor, key, snapshot)
+        restore_traits(actor, actor_traits_snapshot)
+        restore_exam_host_surfaces(host, host_snapshot)
         raise
     return exam_record
 
@@ -487,10 +625,9 @@ def settle_exam_outcome(
 
     Opponent knockout promotes exactly one rank; candidate knockout, flee,
     forfeit, invalid recovery, or round cap records FAIL with rank and
-    cumulative merit unchanged. The temporary opponent is deleted by the
-    caller after the settlement transaction commits (so a rolled-back
-    settlement keeps it alive for exactly one retry); this function only
-    writes the exam terminal state.
+    cumulative merit unchanged. This function only writes the exam terminal
+    state; the caller's settlement transaction restores the persistent host
+    (``restore_exam_host``) and both sides' pools in the same unit.
     """
     if session_record is None or session_record.mode != "guild_exam":
         raise GuildExamError(ExamReason.NOT_SETTLABLE)

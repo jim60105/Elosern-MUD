@@ -158,3 +158,31 @@ def _restore_round_touched(
     # A round's advance can populate a monster site; the rolled-back rows leave
     # no snapshot behind, so evict their cached instances last.
     _flush_rolled_back_instances()
+
+
+def _snapshot_exam_host(record: CombatSessionRecord) -> tuple[Any, dict[str, Any]] | None:
+    """Snapshot the persistent exam host's lifecycle surfaces for one round.
+
+    A round that reaches settlement restores the host's normal outfit,
+    effects and schedule hold inside the outer round transaction; a rolled-
+    back round must restore those idmapper-cached surfaces too.
+    """
+    if record.mode != "guild_exam":
+        return None
+    from world.rules.combat_session.settlement import _find_exam_opponent
+    from world.rules.guild_exams import snapshot_exam_host_surfaces
+
+    host = _find_exam_opponent(None, record)
+    if host is None:
+        return None
+    return host, snapshot_exam_host_surfaces(host)
+
+
+def _restore_exam_host(snapshot: tuple[Any, dict[str, Any]] | None) -> None:
+    """Restore the host surfaces captured by ``_snapshot_exam_host``."""
+    if snapshot is None:
+        return
+    from world.rules.guild_exams import restore_exam_host_surfaces
+
+    host, surfaces = snapshot
+    restore_exam_host_surfaces(host, surfaces)

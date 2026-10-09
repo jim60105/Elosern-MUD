@@ -47,6 +47,13 @@ from world.rules.quest_issuance import (
 )
 from world.rules.surfaces import write_counter_trait
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.clock import get_world_clock
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests._guild_exam_hosts import (
+    exam_scope_extra,
+    install_exam_host_policies,
+    make_exam_host,
+)
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
     synth_catalog,
@@ -63,9 +70,13 @@ from ._support import (
 )
 
 
-class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
+class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCase):
     def setUp(self):
+        # The examination itself fights a synthetic qualified persistent host.
+        open_synthetic_scope(self, "skills", "items", extra=exam_scope_extra())
         super().setUp()
+        install_exam_host_policies(self, BRANCH)
+        get_world_clock()
         self.hall = create_object(Room, key="exam hall")
         self.player = create_object(PlayerCharacter, key="exam player")
         self.player.race = "human"
@@ -86,9 +97,24 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
             )
         )
         register_adventurer(self.player, self.staff)
+        self.host = make_exam_host(self.hall)
 
     def _give_merit(self, amount):
         write_counter_trait(self.player, "guild_merit", amount)
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_qualified_host_speaking_starts_against_itself_and_strangers_cannot(self):
+        self._give_merit(50)
+        stranger = create_object(NPC, key="talkative stranger", location=self.hall)
+        outcome = apply_npc_intent(
+            stranger, self.player, _exam_intent("E"), context_ok=lambda npc, player: True
+        )
+        self.assertFalse(outcome.applied)
+        self.assertEqual(outcome.reason, "no_examiner")
+        self.assertEqual(_read_exams(self.player), [])
+        outcome = apply_npc_intent(self.host, self.player, _exam_intent("E"))
+        self.assertTrue(outcome.applied)
+        self.assertEqual(_read_exams(self.player)[-1].opponent_id, self.host.pk)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_valid_exam_intent_starts_the_exam_with_requested_by_npc_intent(self):

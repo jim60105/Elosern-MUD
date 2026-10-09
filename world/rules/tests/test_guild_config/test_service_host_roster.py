@@ -5,7 +5,6 @@ from tools.spec_traceability import covers_requirement
 from dataclasses import replace
 from unittest import mock
 from world.lore.guild import GUILD_BRANCH_REGISTRY
-from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.settlements.places import validate_place_registry
 from world.lore.settlements.shops import SHOP_REGISTRY
@@ -469,8 +468,8 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
     def test_derived_shop_row_collision_with_guild_registry_row_is_rejected(self):
-        # The authored-name uniqueness rule (shops x guild branches x guild
-        # ranks) runs unchanged over the DERIVED shop rows: a planted
+        # The authored-name uniqueness rule (shops x guild branches x
+        # persistent adventurers) runs unchanged over the DERIVED shop rows: a planted
         # collision between the derived merchant row and a guild branch row
         # names both holders.
         merchant = SHOP_REGISTRY["altoria_general_store"]
@@ -484,7 +483,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     **GUILD_BRANCH_REGISTRY,
                     "guild_branch_altoria": collision,
                 },
-                rank_rows=GUILD_RANK_REGISTRY,
             )
         message = str(caught.exception)
         self.assertIn("shop:altoria_general_store", message)

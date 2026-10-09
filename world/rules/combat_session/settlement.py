@@ -7,6 +7,7 @@ settlement-recovery D1/D2, guild-economy D-6).
 """
 
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
@@ -136,11 +137,9 @@ def settle_session(
     restart skip re-settlement for any durable record already marked
     settled. The session clear is the last step inside the transaction
     (followed by the exam gauge restoration), so a failure of any earlier
-    step leaves the durable session intact for exactly one retry. Exam
-    opponents are deleted only after the transaction commits: a rolled-back
-    settlement must leave the temporary opponent alive for the retry, and
-    deleting inside the transaction could strand a stale deleted instance
-    in the idmapper cache.
+    step leaves the durable session intact for exactly one retry. The
+    persistent exam host is restored inside the same transaction and is
+    never deleted.
     """
     from django.db import transaction
 
@@ -150,11 +149,31 @@ def settle_session(
     try:
         with transaction.atomic():
             if record.mode == "guild_exam":
-                from world.rules.guild_exams import settle_exam_outcome
-
-                exam_result = settle_exam_outcome(
-                    actor, record, battlefield, outcome
+                from world.rules.guild_exams import (
+                    ExamReason,
+                    GuildExamError,
+                    settle_exam_outcome,
                 )
+
+                try:
+                    exam_result = settle_exam_outcome(
+                        actor, record, battlefield, outcome
+                    )
+                except GuildExamError as error:
+                    # A missing or unreadable exam history cannot be settled,
+                    # but it must never strand the persistent host: the
+                    # session still clears and the host is restored below.
+                    # Both reasons are raised before any exam write.
+                    if error.args[0] not in (
+                        ExamReason.UNKNOWN_EXAM,
+                        ExamReason.MALFORMED_RECORD,
+                    ):
+                        raise
+                    log_warn(
+                        "guild_exam_settlement_record_unavailable",
+                        exc=error,
+                        context={"char": str(actor.pk), "session": record.session_id},
+                    )
             # Settlement regenerates every living, non-fled roster member
             # (fix-combat-session-roster-and-overwhelm D1): companions and any
             # non-defeated foe still present recover for the accumulated combat
@@ -234,11 +253,11 @@ def settle_session(
             _persist(actor, settled_record)
             clear_session(actor, battlefield, record)
             if record.mode == "guild_exam":
-                # Simulated battle: restore both sides inside the settlement
-                # transaction, so the full-restoration guarantee commits or rolls
-                # back with the exam outcome and can never strand a defeated
-                # candidate (exam-simulated-battle-redesign D3). Opponent deletion
-                # stays post-commit so a rolled-back settlement keeps it alive.
+                # Simulated battle: restore the candidate and return the
+                # persistent host to its normal self (outfit, effects, full
+                # pools, schedule hold released) inside the settlement
+                # transaction, so restoration commits or rolls back with the
+                # exam outcome (persistent-guild-exam-lifecycle).
                 _restore_exam_participants(actor, record, battlefield)
             # Boundary event fires only on the OUTERMOST durable commit: a
             # settlement reached inside a round's transaction is a savepoint, and
@@ -268,8 +287,6 @@ def settle_session(
             aftermath.undo()
             drain_pending_undos()
         raise
-    if record.mode == "guild_exam":
-        _delete_exam_opponent(actor, record)
     return {
         "outcome": outcome,
         "rounds_elapsed": record.rounds_elapsed,
@@ -280,16 +297,14 @@ def settle_session(
 
 
 def _find_exam_opponent(actor: Any, record: CombatSessionRecord) -> Any | None:
-    """Return the settled exam's temporary opponent, if it still exists."""
-    from world.rules.guild_exams import _read_exams
+    """Return the session's persistent exam host by its recorded dbref.
 
-    exam_record = next(
-        (r for r in _read_exams(actor) if r.exam_id == record.exam_id),
-        None,
-    )
-    if exam_record is None:
+    Reads the parsed session record, never the candidate's exam history, so
+    a malformed history cannot hide the host from restoration.
+    """
+    if record.mode != "guild_exam" or len(record.enemy_ids) != 1:
         return None
-    return ObjectDB.objects.filter(id=exam_record.opponent_id).first()
+    return ObjectDB.objects.filter(id=record.enemy_ids[0]).first()
 
 
 def _restore_exam_participants(
@@ -297,53 +312,27 @@ def _restore_exam_participants(
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
 ) -> None:
-    """Restore both exam sides' gauges to full inside the settlement.
+    """Restore the candidate's full pools and the host's normal self.
 
     Runs as the last step of the settlement transaction, after the session
-    clears and before the temporary opponent is deleted post-commit
-    (exam-simulated-battle-redesign D3): the candidate and examiner walk away
-    from the simulated battle fully healed regardless of outcome, and the
-    restoration commits or rolls back with the exam outcome. The battlefield
-    roster is preferred when available; a degraded path (or a roster that
-    lacks the opponent) falls back to the durable exam record lookup.
+    clears (exam-simulated-battle-redesign D3, persistent-guild-exam-
+    lifecycle): the candidate walks away fully healed regardless of outcome,
+    and the persistent host loses this exam's restriction/kit, regains its
+    normal outfit/effects and full normal pools, and has its schedule hold
+    released, all committing or rolling back with the exam outcome.
     """
+    from world.rules.guild_exams import restore_exam_host
     from world.rules.traits import restore_gauges_to_full
 
     restore_gauges_to_full(actor)
-    opponent = None
-    if battlefield is not None:
-        opponent = next(
-            (
-                entity
-                for key, entity in battlefield.roster.items()
-                if int(entity.pk) in record.enemy_ids
-            ),
-            None,
-        )
-    if opponent is None:
-        opponent = _find_exam_opponent(actor, record)
-    if opponent is not None:
-        restore_gauges_to_full(opponent)
-
-
-def _delete_exam_opponent(actor: Any, record: CombatSessionRecord) -> None:
-    """Delete the settled exam's temporary opponent, best effort.
-
-    Runs after the settlement transaction committed, so a failed settlement
-    keeps the opponent alive for exactly one retry. An already-missing
-    opponent (or a delete error) is logged and never raises.
-    """
-    opponent = _find_exam_opponent(actor, record)
-    if opponent is None:
-        return
-    try:
-        opponent.delete()
-    except Exception as error:
+    host = _find_exam_opponent(actor, record)
+    if host is None:
         log_warn(
-            "guild_exam_opponent_delete_failed",
-            exc=error,
-            context={"char": str(actor.key), "obj": str(opponent), "exam": record.exam_id},
+            "guild_exam_host_missing",
+            context={"char": str(actor.pk), "session": record.session_id, "exam": record.exam_id},
         )
+        return
+    restore_exam_host(host, record.exam_id)
 
 
 def _settle_with_restore(
@@ -376,6 +365,8 @@ def _settle_with_restore(
                     (entity, _attribute_snapshot(entity, "buffs"))
                 )
     trait_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
+    host = None
+    host_snapshot = None
     if record.mode == "guild_exam":
         extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
         extra["guild_exams"] = _attribute_snapshot(actor, "guild_exams")
@@ -385,9 +376,11 @@ def _settle_with_restore(
         from world.rules.surfaces import snapshot_traits
 
         trait_snapshots.append((actor, snapshot_traits(actor)))
-        opponent = _find_exam_opponent(actor, record)
-        if opponent is not None:
-            trait_snapshots.append((opponent, snapshot_traits(opponent)))
+        host = _find_exam_opponent(actor, record)
+        if host is not None:
+            from world.rules.guild_exams import snapshot_exam_host_surfaces
+
+            host_snapshot = snapshot_exam_host_surfaces(host)
     try:
         return settle_session(actor, record, battlefield, outcome, logs)
     except Exception:
@@ -399,6 +392,10 @@ def _settle_with_restore(
             from world.rules.surfaces import restore_traits
 
             restore_traits(entity, snapshot)
+        if host_snapshot is not None:
+            from world.rules.guild_exams import restore_exam_host_surfaces
+
+            restore_exam_host_surfaces(host, host_snapshot)
         raise
 
 
@@ -457,6 +454,16 @@ def restore_active_session(actor: Any) -> None:
         )
         clear_session(actor, None, record)
         return
+    if record.mode == "guild_exam" and not _exam_session_coherent(actor, record):
+        # Persisted exam identity, host restriction or schedule hold disagree:
+        # close the simulation once as FAIL and restore the persistent host
+        # from its own persisted normal state; deletion is never a repair.
+        log_warn(
+            "combat_session_terminated_invalid",
+            context={"char": str(actor.key), "session": record.session_id, "mode": "guild_exam"},
+        )
+        _settle_with_restore(actor, record, None, "exam_failed")
+        return
     try:
         battlefield = reconstruct_battlefield(actor, record)
     except CombatSessionError as error:
@@ -477,3 +484,44 @@ def restore_active_session(actor: Any) -> None:
         _settle_with_restore(actor, record, battlefield, outcome)
         return
     register_active_battlefield(battlefield)
+
+
+def _exam_session_coherent(actor: Any, record: CombatSessionRecord) -> bool:
+    """Whether a reloaded exam session may resume with its persistent host.
+
+    Coherent means the candidate's ACTIVE exam record, the session, the host
+    restriction, the host's persisted normal state and its active schedule
+    hold all name the same exam and host, and the participant keys stay
+    distinct. Any unreadable piece reads as incoherent (fail closed).
+    """
+    from world.rules.exam_schedule_holds import read_exam_schedule_hold
+    from world.rules.guild_exams import (
+        NORMAL_STATE_ATTRIBUTE,
+        ExamState,
+        GuildExamError,
+        _read_exams,
+    )
+    from world.skills.restrictions import exam_restriction
+
+    host = _find_exam_opponent(actor, record)
+    if host is None or str(host.key) == str(actor.key):
+        return False
+    try:
+        exam = next((r for r in _read_exams(actor) if r.exam_id == record.exam_id), None)
+        restriction = exam_restriction(host)
+    except (GuildExamError, ValueError):  # observability: ignore R2: an unreadable exam record or restriction is incoherent; the caller logs and settles FAIL
+        return False
+    if exam is None or exam.state is not ExamState.ACTIVE or exam.opponent_id != host.pk:
+        return False
+    if restriction is None or restriction["exam_id"] != record.exam_id:
+        return False
+    normal = host.attributes.get(NORMAL_STATE_ATTRIBUTE)
+    if not isinstance(normal, Mapping) or normal.get("exam_id") != record.exam_id:
+        return False
+    hold = read_exam_schedule_hold(host)
+    return (
+        hold.known
+        and hold.hold is not None
+        and hold.hold.exam_id == record.exam_id
+        and not hold.hold.released
+    )

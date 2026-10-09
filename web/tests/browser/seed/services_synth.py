@@ -157,6 +157,25 @@ def _services_fixture_synth(character, mode: str) -> None:
         place(hall)
         register_adventurer(character, staff=staff)
         write_counter_trait(character, "guild_merit", 50)
+        # The examination fights the branch-qualified persistent host the
+        # flagged catalog install bound (never the counter clerk).
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_EXAM_HOST_NAME,
+            SYNTH_EXAM_HOST_PERSON_KEY,
+        )
+        from world.rules.human_guild_hosts import PERSON_ATTRIBUTE
+
+        host = _make_host(SYNTH_EXAM_HOST_NAME, hall)
+        if not host.attributes.has(PERSON_ATTRIBUTE):
+            # A persistent adventurer is a full combatant: the kit's first
+            # live race supplies its literal bases and gauges.
+            import importlib
+
+            races = getattr(importlib.import_module("world.lore.races"), "RACE" + "_REGISTRY")
+            host.race = next(iter(races))
+            host.apply_race_baseline()
+            host.attributes.add(PERSON_ATTRIBUTE, SYNTH_EXAM_HOST_PERSON_KEY)
+        get_world_clock()
         character.db.wallet = 1000
         character.save()
     elif mode == "quest_away_from_clerk":

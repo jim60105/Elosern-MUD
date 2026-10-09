@@ -18,9 +18,9 @@ module inside the bind step, and ``at_server_start`` runs an explicit
 ``starting_companion_validation`` boot step that imports it, so the sweep is a
 server-boot gate, not a test-only side effect.
 
-The builder deliberately owns no transaction of its own, following
-``world/rules/guild_exams.py::_spawn_opponent``'s delete-compensation idiom:
-a mid-build failure removes the partially built NPC and re-raises. When a
+The builder deliberately owns no transaction of its own and follows a
+delete-compensation idiom: a mid-build failure removes the partially built NPC
+and re-raises. When a
 caller (the later activation binding) wraps the call in its own transaction,
 the failure degrades to that transaction's rollback instead.
 """

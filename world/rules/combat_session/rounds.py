@@ -35,7 +35,9 @@ from world.rules.combat_session.scans import (
 )
 from world.rules.combat_session.settlement import _continue_or_settle
 from world.rules.combat_session.snapshot import (
+    _restore_exam_host,
     _restore_round_touched,
+    _snapshot_exam_host,
     _snapshot_party_surfaces,
     _snapshot_round_touched,
 )
@@ -364,6 +366,7 @@ def _submit_request(
     context and the result normalizer drops it before any send.
     """
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
+    exam_host_before = _snapshot_exam_host(record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
         actor, battlefield
     )
@@ -567,6 +570,9 @@ def _submit_request(
             members_before,
             relations_before,
         )
+        # The host's exam lifecycle surfaces last: the settlement restores
+        # the persistent host inside this transaction (outfit, effects, hold).
+        _restore_exam_host(exam_host_before)
         # Resolved rounds inside a rolled-back outer transaction kept their
         # practice-dedupe claims (the resolve-level release only covers an
         # INNER rolled-back commit); restore the pre-round state so a

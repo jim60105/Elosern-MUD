@@ -58,7 +58,6 @@ from world.rules.guild_config._loaders import (  # noqa: F401
     _require_text,
     load_commerce_config,
     load_config,
-    validate_exam_profiles,
     validate_merit_thresholds,
 )
 from world.rules.guild_config._quests import (  # noqa: F401
@@ -69,8 +68,6 @@ from world.rules.guild_config._shops import validate_shop_configs  # noqa: F401
 from world.rules.guild_config._types import (  # noqa: F401
     EXAM_RANKS,
     RANK_ORDER,
-    RANK_TO_TIER,
-    ExamProfile,
     GuildConfigError,
     ItemOfferRule,
     ServiceHostRow,
@@ -108,7 +105,6 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
     price_scales = validate_price_scales(commerce["price_scales"])
     return GuildCatalog(
         merit_thresholds=validate_merit_thresholds(raw["merit_thresholds"]),
-        exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
         shop_configs=validate_shop_configs(
             commerce["shops"], assortment_offers, price_scales
         ),

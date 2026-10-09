@@ -40,6 +40,7 @@ from world.rules.guild import RegistrationReason
 from world.rules.guild_exams import ExamReason, GuildExamError
 from world.rules.guild_offers import BoardAccessError, GuildOfferError
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.rules.skip_safety import SkipRejectReason
 from world.rules.quest_delivery import DeliveryOutcome
 
@@ -315,6 +316,12 @@ class CombatCommandBranchTests(TestCase):
         command.caller.msg.assert_called_with("目前沒有進行中的戰鬥。")
 
     def test_exam_maps_every_rule_reason_and_success(self):
+        # The counter authorizes; the qualified persistent host is resolved
+        # server-side and is the only examiner the start API receives.
+        host = object()
+        resolver = patch("commands.combat.qualified_exam_host", return_value=host)
+        resolver.start()
+        self.addCleanup(resolver.stop)
         expected = {
             ExamReason.UNREGISTERED: "你尚未註冊為冒險者。",
             ExamReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
@@ -348,8 +355,22 @@ class CombatCommandBranchTests(TestCase):
             return_value=SimpleNamespace(target_rank="D"),
         ) as start:
             command.func()
-        start.assert_called_once_with(command.caller, command._resolve_examiner.return_value, "D", requested_by="command")
+        start.assert_called_once_with(command.caller, host, "D", requested_by="command")
         self.assertIn("D 階", command.caller.msg.call_args.args[0])
+
+        resolver.stop()
+        command = _command(CmdGuildExam, "D")
+        command._resolve_examiner = Mock(return_value=object())
+        with patch(
+            "commands.combat.qualified_exam_host",
+            side_effect=GuildExamError(ExamReason.UNQUALIFIED_EXAMINER),
+        ), patch("commands.combat.start_guild_exam") as start:
+            command.func()
+        start.assert_not_called()
+        command.caller.msg.assert_called_with(
+            SERVICE_REASON_MESSAGES[ExamReason.UNQUALIFIED_EXAMINER.value]
+        )
+        resolver.start()
 
 
 class EconomyCommandBranchTests(TestCase):

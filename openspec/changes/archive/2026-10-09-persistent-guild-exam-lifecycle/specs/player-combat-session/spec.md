@@ -3,8 +3,9 @@
 ### Requirement: Active sessions block movement and define pause, forfeit, and recovery outcomes
 A PlayerCharacter with an active combat session SHALL be unable to traverse or otherwise leave the
 recorded room. Disconnect SHALL pause the persistent session without world-time advance; reconnect SHALL
-resume it. `combat forfeit` SHALL settle accumulated time, record ordinary defeat or exam FAIL, and clear session/context/skip-safety state. Only guild_exam mode SHALL restore the persistent exam host normal outfit/capabilities and both full normal pools; ordinary hostile defeat aftermath and resource behavior SHALL remain unchanged. Invalid moved/missing recovery
-SHALL perform the same cleanup, with exam recovery settling FAIL.
+resume it. `combat forfeit` SHALL settle accumulated time, record ordinary defeat or exam FAIL, and
+clear session/context/skip-safety state. Invalid moved/missing recovery SHALL perform the same
+cleanup, with exam recovery settling FAIL.
 
 #### Scenario: Exit traversal is blocked during combat
 - **WHEN** a player with an active session attempts a room exit
@@ -20,5 +21,5 @@ SHALL perform the same cleanup, with exam recovery settling FAIL.
 
 #### Scenario: Ordinary hostile forfeit retains its consequences
 - **WHEN** a player forfeits an ordinary hostile session
-- **THEN** ordinary defeat aftermath and one accumulated-time settlement occur, without exam restoration or full-pool healing
+- **THEN** ordinary defeat aftermath and one accumulated-time settlement occur, without exam restoration or full-pool healing; only guild_exam mode restores the persistent host's normal outfit, capabilities and both full pools
 

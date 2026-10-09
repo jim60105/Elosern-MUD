@@ -176,8 +176,6 @@ def _title_pair():
         400,
         "合成公會第一階委託。",
         _T_TITLE_KEY,
-        title.display_name_zh,
-        "合成公會考官",
     )
     return rank, title
 

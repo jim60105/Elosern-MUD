@@ -21,7 +21,7 @@ from django.db import transaction
 
 from world.rules.affinity import apply_affinity_change
 from world.rules.equipment import InventoryError, plan_inventory_delta
-from world.rules.guild_exams import GuildExamError, start_guild_exam
+from world.rules.guild_exams import GuildExamError, qualified_exam_host, start_guild_exam
 from world.rules.npc_schedules import interaction_reason
 from world.rules.surfaces import (
     attribute_snapshot,
@@ -428,9 +428,11 @@ def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOu
     if not isinstance(target_rank, str) or not target_rank.strip():
         return IntentOutcome(False, "request_guild_exam target_rank must be a non-empty string")
     try:
+        # The speaking NPC grants no authority: it must be the co-located
+        # counter or the qualified persistent host, who is always the examiner.
         start_guild_exam(
             actor=player,
-            examiner=npc,
+            examiner=qualified_exam_host(player, target_rank, speaker=npc),
             target_rank=target_rank,
             requested_by="npc_intent",
         )

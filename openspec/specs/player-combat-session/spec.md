@@ -292,9 +292,9 @@ The deterministic startup sequence SHALL run every deterministic sync that prece
 ### Requirement: Active sessions block movement and define pause, forfeit, and recovery outcomes
 A PlayerCharacter with an active combat session SHALL be unable to traverse or otherwise leave the
 recorded room. Disconnect SHALL pause the persistent session without world-time advance; reconnect SHALL
-resume it. `combat forfeit` SHALL settle accumulated time, record ordinary defeat or exam FAIL, delete
-any temporary exam opponent, and clear session/context/skip-safety state. Invalid moved/missing recovery
-SHALL perform the same cleanup, with exam recovery settling FAIL.
+resume it. `combat forfeit` SHALL settle accumulated time, record ordinary defeat or exam FAIL, and
+clear session/context/skip-safety state. Invalid moved/missing recovery SHALL perform the same
+cleanup, with exam recovery settling FAIL.
 
 #### Scenario: Exit traversal is blocked during combat
 - **WHEN** a player with an active session attempts a room exit
@@ -306,8 +306,11 @@ SHALL perform the same cleanup, with exam recovery settling FAIL.
 
 #### Scenario: Explicit forfeit cleans an exam
 - **WHEN** a candidate forfeits an active guild examination
-- **THEN** the exam records FAIL, accumulated combat time settles once, the temporary opponent is
-  deleted, and the player may request a later attempt
+- **THEN** the exam records FAIL, accumulated combat time settles once, the persistent host is restored and retained, and the player may request a later attempt
+
+#### Scenario: Ordinary hostile forfeit retains its consequences
+- **WHEN** a player forfeits an ordinary hostile session
+- **THEN** ordinary defeat aftermath and one accumulated-time settlement occur, without exam restoration or full-pool healing; only guild_exam mode restores the persistent host's normal outfit, capabilities and both full pools
 
 ### Requirement: Player combat submission accepts one explicit target value
 `submit_player_action(actor, skill_key, targets_or_shorthand)` SHALL accept only a concrete list of live participant objects or one of `all-enemies`, `all-allies`, and `all`. It SHALL reject any other scalar, a duplicate explicit participant, or a participant outside the current reconstructed session before initiative. Player-facing NONE and SELF SHALL require an empty list; the facade SHALL bind that empty SELF input to the actor and leave NONE empty.

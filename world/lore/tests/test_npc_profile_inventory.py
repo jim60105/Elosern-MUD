@@ -36,7 +36,6 @@ SOURCE_KINDS = frozenset(
     {
         "place_host",
         "dialogue_table",
-        "guild_examiner",
         "persistent_adventurer",
         "starting_companion",
         "quest_template_occupant",
@@ -98,8 +97,6 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
     )
     def test_every_shipped_host_and_examiner_has_bounded_age_pair(self):
         from world.lore.settlements.places import PLACE_REGISTRY
-        from world.lore.guild import GUILD_RANK_REGISTRY
-
         # All 25 place hosts
         host_keys = {
             place.service_id
@@ -118,33 +115,15 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
                 self.assertTrue(0 <= prof.age <= 10000)
                 self.assertTrue(0 <= prof.apparent_age <= 10000)
 
-        # All 7 examiners
-        examiner_keys = {
-            rank.examiner_profile_key
-            for rank in GUILD_RANK_REGISTRY.values()
-            if rank.examiner_profile_key is not None
-        }
-        self.assertEqual(len(examiner_keys), 7)
-        for ex_key in examiner_keys:
-            with self.subTest(examiner_key=ex_key):
-                self.assertIn(ex_key, NPC_PROFILE_REGISTRY)
-                prof = NPC_PROFILE_REGISTRY[ex_key]
-                self.assertIsInstance(prof.age, int)
-                self.assertNotIsInstance(prof.age, bool)
-                self.assertIsInstance(prof.apparent_age, int)
-                self.assertNotIsInstance(prof.apparent_age, bool)
-                self.assertTrue(0 <= prof.age <= 10000)
-                self.assertTrue(0 <= prof.apparent_age <= 10000)
-
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 
         person_profiles = {row.profile_key for row in ADVENTURER_REGISTRY.values()}
         self.assertEqual(len(person_profiles), 3)
-        self.assertFalse(person_profiles & (host_keys | examiner_keys))
+        self.assertFalse(person_profiles & host_keys)
         for key in person_profiles:
             profile = NPC_PROFILE_REGISTRY[key]
             self.assertIs(type(profile.age), int)
             self.assertIs(type(profile.apparent_age), int)
             self.assertTrue(0 <= profile.age <= 10000)
             self.assertTrue(0 <= profile.apparent_age <= 10000)
-        self.assertEqual(len(host_keys | examiner_keys | person_profiles), 35)
+        self.assertEqual(len(host_keys | person_profiles), 28)

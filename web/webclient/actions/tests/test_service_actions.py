@@ -61,11 +61,15 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
 )
+from world.rules.tests._guild_exam_hosts import (
+    exam_scope_extra,
+    install_exam_host_policies,
+    make_exam_host,
+)
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
     price_band,
     synth_catalog,
-    synth_exam_profiles,
     synth_offer_rule,
     synth_merit_thresholds,
     synth_shop_config,
@@ -95,25 +99,20 @@ _T_RANK_BADGE = make_title("t_svc_guild_start", display_name_zh="公會註冊徽
 _T_RANKS = {
     "F": GuildRank(
         "F", 1, 0, 400, "Authored F ladder row.", _T_RANK_BADGE.key,
-        "灰鱗‧銅徽", "合成公會考官",
     ),
     "E": GuildRank(
         "E", 2, 400, 4000, "Authored E ladder row.", _T_RANK_BADGE.key,
-        "霜鬃‧銀環", "合成公會考官",
     ),
     "D": GuildRank(
         "D", 3, 4000, None, "Authored D ladder row.", _T_RANK_BADGE.key,
-        "霜鬃‧金環", "合成公會考官",
     ),
     # The kit's own ladder rows stay inside the scoped registry; park them at
     # non-adjacent orders so the exact-next-rank search never picks one.
     "t_bronze": GuildRank(
         "t_bronze", 8, 50, 400, "Kit ladder row (parked).", _T_RANK_BADGE.key,
-        "灰鱗‧銅徽", "合成公會銅階考官",
     ),
     "t_silver": GuildRank(
         "t_silver", 9, 400, 4000, "Kit ladder row (parked).", _T_RANK_BADGE.key,
-        "霜鬃‧銀環", "合成公會銀階考官",
     ),
 }
 _T_EXAM_RANK = "E"
@@ -172,7 +171,8 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
             extra={
                 "guild_ranks": dict(_T_RANKS),
                 "titles": {_T_RANK_BADGE.key: _T_RANK_BADGE},
-                "skills": synth_innate_overlay()["skills"],
+                "skills": {**synth_innate_overlay()["skills"], **exam_scope_extra()["skills"]},
+                "items": exam_scope_extra()["items"],
             },
         )
         seam = patch("world.lore.titles.STARTER_EPITHET", _T_STARTER_EPITHET)
@@ -214,7 +214,6 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
                 },
                 quest_offers=(),
                 merit_thresholds=_T_MERIT_THRESHOLDS,
-                exam_profiles=synth_exam_profiles(),
             ),
         )
         # One invented board offer on the kit branch (authored reward).
@@ -623,6 +622,28 @@ class ServiceAdapterTests(ServiceActionBase):
 
 
 class ExamStartTests(ServiceActionBase):
+    def setUp(self):
+        super().setUp()
+        # The counter authorizes; a synthetic qualified persistent host fights.
+        install_exam_host_policies(self, BRANCH)
+        self.host = make_exam_host(self.hall)
+
+    def test_exam_start_fights_the_qualified_persistent_host(self):
+        self._register()
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(read_session(self.player).enemy_ids, (self.host.pk,))
+
+    def test_exam_start_rejects_absent_qualified_host(self):
+        self._register()
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        self.host.location = self.store
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "remote_examiner")
+        self.assertIsNone(self.player.db.active_combat)
+
     def test_exam_start_rejects_non_next_rank_before_domain(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", 50)
