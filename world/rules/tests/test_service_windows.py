@@ -8,6 +8,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
+from tools.spec_traceability import covers_requirement
 from world.rules.clock import get_world_clock
 from world.rules.exam_schedule_holds import (
     begin_exam_schedule_hold,
@@ -96,6 +97,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
             mock.start()
             self.addCleanup(mock.stop)
 
+    @covers_requirement(
+        "npc-service-availability::planned-service-intervals-use-authoritative-schedule-occurrences-without-mutation"
+    )
     def test_busy_arrival_scenario(self):
         """Scenario: Busy arrival - interval starts at available transition, not at arrival."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "busy_arrival_host"})
@@ -108,6 +112,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         # Arrival at 100 is busy, duty transition at 150, leaves at 250 -> [150, 250)
         self.assertEqual(result.interval, PlannedServiceInterval(150, 250))
 
+    @covers_requirement(
+        "npc-service-availability::planned-service-intervals-use-authoritative-schedule-occurrences-without-mutation"
+    )
     def test_read_only_snapshot_scenario(self):
         """Scenario: Read-only snapshot - no mutations occur when reading valid absent host."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -137,6 +144,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         }
         self.assertEqual(attrs_after, attrs_before)
 
+    @covers_requirement(
+        "npc-service-availability::planned-service-intervals-use-authoritative-schedule-occurrences-without-mutation"
+    )
     def test_missed_arrival_scenario(self):
         """Scenario: Missed arrival - absent host at an earlier planned window finds future interval."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -150,6 +160,12 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         # It must NOT return [150, 200) or [100, 200). It must project the NEXT cycle: [DAY + 100, DAY + 200)
         self.assertEqual(result.interval, PlannedServiceInterval(DAY + 100, DAY + 200))
 
+    @covers_requirement(
+        "npc-service-availability::indeterminate-attendance-never-fabricates-a-timetable-or-reveals-private-routes"
+    )
+    @covers_requirement(
+        "npc-service-availability::planned-service-intervals-use-authoritative-schedule-occurrences-without-mutation"
+    )
     def test_arrival_due_now_remains_planned_until_location_confirms(self):
         """Arrival due at current_tick: if location is not confirmed, remains planned."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -169,6 +185,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         self.assertTrue(confirmed.available)
         self.assertEqual(confirmed.interval, PlannedServiceInterval(100, 200))
 
+    @covers_requirement(
+        "npc-service-availability::planned-service-intervals-use-authoritative-schedule-occurrences-without-mutation"
+    )
     def test_currently_present_host_returns_current_tick_to_departure(self):
         """When host is actually at destination and duty, interval is [current_tick, end)."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -179,6 +198,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         self.assertTrue(result.available)
         self.assertEqual(result.interval, PlannedServiceInterval(150, 200))
 
+    @covers_requirement(
+        "npc-service-availability::indeterminate-attendance-never-fabricates-a-timetable-or-reveals-private-routes"
+    )
     def test_missing_clock_scenario(self):
         """Scenario: Missing clock returns named unavailable without clock creation."""
         with patch("world.rules.service_windows.read_world_clock", return_value=None):
@@ -186,6 +208,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
             self.assertFalse(result.available)
             self.assertEqual(result.reason, REASON_MISSING_WORLD_CLOCK)
 
+    @covers_requirement(
+        "npc-service-availability::indeterminate-attendance-never-fabricates-a-timetable-or-reveals-private-routes"
+    )
     def test_held_or_silenced_host_scenario(self):
         """Scenario: Held or silenced host never fabricates an interval."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -215,6 +240,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
             self.assertFalse(silenced_result.available)
             self.assertEqual(silenced_result.reason, REASON_SCHEDULE_SILENCED)
 
+    @covers_requirement(
+        "npc-service-availability::indeterminate-attendance-never-fabricates-a-timetable-or-reveals-private-routes"
+    )
     def test_boundary_scenario(self):
         """Scenario: Boundary - tick equals service interval end is no longer usable."""
         set_npc_schedule(self.npc, {"schema_version": 1, "template": "daily_host"})
@@ -227,6 +255,9 @@ class PlannedServiceWindowsTests(EvenniaTestCase):
         # Returns the next cycle arrival!
         self.assertEqual(result.interval, PlannedServiceInterval(DAY + 100, DAY + 200))
 
+    @covers_requirement(
+        "npc-service-availability::indeterminate-attendance-never-fabricates-a-timetable-or-reveals-private-routes"
+    )
     def test_indeterminate_inputs_named_reasons(self):
         """Invalid inputs return explicit named reasons."""
         # Non-persistent NPC
