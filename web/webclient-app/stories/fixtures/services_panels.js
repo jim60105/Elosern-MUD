@@ -1,10 +1,10 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
-// The full `services` payload (guild, shop, and inventory sections all
+// The full `services` v5 payload (guild, shop, and inventory sections all
 // present). Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -66,8 +66,8 @@ export const SERVICES_PANEL_SAMPLE = {
       merit: 140,
       next_rank: "B",
       next_threshold: 300,
-      eligible: true,
-      exam_start: { action_id: "guild.exam_start", label: "開始考核", enabled: true, disabled_reason: null, quantity: null },
+      merit_qualified: false,
+      exam_request: { action_id: "guild.exam_request", label: "預約升等考核", enabled: true, disabled_reason: null, quantity: null },
     },
   },
   shop: {
@@ -269,7 +269,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -277,7 +277,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop/inventory sections
 // (all null with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: true,
   kind: "services",
   host: null,
@@ -300,3 +300,74 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
       inventory_total: 0,
     },
 };
+// Guild rank-block variants (services v5): each swaps only the guild
+// section's `rank` object (and, for the unregistered holder, the
+// registration row) on top of the full sample. `merit_qualified` is the
+// merit verdict; `exam_request.enabled` is independent of it.
+const examRequest = (enabled, disabledReason = null) => ({
+  action_id: "guild.exam_request",
+  label: "預約升等考核",
+  enabled,
+  disabled_reason: disabledReason,
+  quantity: null,
+});
+
+const withGuildRank = (rank, guildOverrides = {}) => ({
+  ...SERVICES_PANEL_SAMPLE,
+  guild: { ...SERVICES_PANEL_SAMPLE.guild, ...guildOverrides, rank },
+});
+
+// Merit already meets the threshold: the counter takes the request.
+export const SERVICES_PANEL_GUILD_MERIT_QUALIFIED_SAMPLE = withGuildRank({
+  rank: "C",
+  merit: 325,
+  next_rank: "B",
+  next_threshold: 300,
+  merit_qualified: true,
+  exam_request: examRequest(true),
+});
+
+// S rank: no next rank and no threshold; the request is disabled.
+export const SERVICES_PANEL_GUILD_TOP_RANK_SAMPLE = withGuildRank({
+  rank: "S",
+  merit: 128450,
+  next_rank: null,
+  next_threshold: null,
+  merit_qualified: false,
+  exam_request: examRequest(false, { code: "top_rank", message: "你已是最高階級，沒有下一場升等考核。" }),
+});
+
+// The clerk is occupied: the request is disabled with her schedule reason.
+export const SERVICES_PANEL_GUILD_COUNTER_BUSY_SAMPLE = withGuildRank({
+  rank: "C",
+  merit: 140,
+  next_rank: "B",
+  next_threshold: 300,
+  merit_qualified: false,
+  exam_request: examRequest(false, { code: "schedule_blocked", message: "她現在正忙著，沒有理會你。" }),
+});
+
+// An unregistered holder: no rank (so no next rank or threshold either),
+// registration offered, the request disabled until the holder joins.
+export const SERVICES_PANEL_GUILD_UNREGISTERED_SAMPLE = withGuildRank(
+  {
+    rank: null,
+    merit: 0,
+    next_rank: null,
+    next_threshold: null,
+    merit_qualified: false,
+    exam_request: examRequest(false, { code: "unregistered", message: "你尚未註冊為冒險者。" }),
+  },
+  {
+    registration: {
+      registered: false,
+      register: {
+        action_id: "guild.register",
+        label: "加入公會",
+        enabled: true,
+        disabled_reason: null,
+        quantity: null,
+      },
+    },
+  },
+);

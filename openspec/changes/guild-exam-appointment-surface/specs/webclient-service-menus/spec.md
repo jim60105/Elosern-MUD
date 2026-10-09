@@ -195,14 +195,20 @@ The `guild` section SHALL contain exactly `registration`, `board`, `quests`, and
 
 #### Scenario: Rank section presence and exact fields
 - **WHEN** the `rank` section is computed
-- **THEN** it is present only when exactly one local `GuildExaminer` host resolves and contains exactly `rank`,
-  `merit`, `next_rank`, `next_threshold`, `eligible`, and `exam_start`
+- **THEN** it is present only when exactly one local examination counter (the `GuildExaminer` counter of the
+  hall) resolves, whether or not the qualified persistent host is present, and contains exactly `rank`, `merit`,
+  `next_rank`, `next_threshold`, `merit_qualified`, and `exam_request`
 
 #### Scenario: Exam start requires every condition and the next-rank payload
-- **WHEN** `exam_start` is computed
-- **THEN** it is enabled only when the actor is registered, a local `GuildExaminer` host exists, an exact next
-  rank exists, true merit meets its threshold, and no active combat or examination exists, and its action payload
-  carries exactly the next-rank key
+- **WHEN** `exam_request` is computed
+- **THEN** it is enabled only when the actor is registered at the counter's branch, an exact next rank exists,
+  and the local counter passes its service and schedule gates; merit and host presence never disable it, and its
+  action payload carries exactly the next-rank key
+
+#### Scenario: Unregistered and top-rank actors receive stable target reasons
+- **WHEN** the actor is unregistered or already holds the top rank
+- **THEN** `exam_request` is disabled with the stable `unregistered` or `top_rank` reason and never with a merit
+  reason
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
 The production action registry SHALL retain every existing combat, service, creation, exploration, and options action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, and `inventory.toggle_equip`. `guild.register` SHALL accept exactly an empty payload and retain its current idempotency. Guild quest and exam actions SHALL retain their exact bounded identifiers; `guild.quest_track` SHALL accept exactly `quest_id` (the shared bounded quest identifier) and boolean `tracked`; `shop.buy` and `shop.sell` SHALL retain exactly bounded `item_key` and integer `quantity`. Each inventory action SHALL accept exactly `item_key` as a 1..64-character non-empty string. Every adapter SHALL obtain the actor from the authenticated session, re-resolve every local host and referenced quest, definition, item, rank, mechanic, and current condition, and invoke only its listed public deterministic API. No inventory payload SHALL accept actor, host, branch, session, effect, consumable, quantity, target, slot, HP, combat, price, stock, or wallet fields. No adapter SHALL assign `.db`, traits, registration, rank, merit, quest log, wallet, inventory, equipment, merchant stock, location, combat, or clock state directly. No action SHALL route an action ID or payload through the text command parser.
@@ -228,8 +234,8 @@ The production action registry SHALL retain every existing combat, service, crea
 - **THEN** the dispatch rejects with the lifecycle module's bounded refusal message and every record's tracking state is unchanged
 
 #### Scenario: Exam start cannot choose an examiner or rank
-- **WHEN** a client submits a non-next rank or includes a host or examiner identity
-- **THEN** the adapter rejects before exam creation and only the exact next-rank payload is accepted
+- **WHEN** a client submits a non-next rank or includes a host, examiner, branch, clock or threshold field
+- **THEN** exact validation or the coordinator rejects before any exam creation and only the exact next-rank payload is accepted
 
 #### Scenario: Existing buy and sell submit only item and quantity
 - **WHEN** a client submits `shop.buy` with item key and quantity only
@@ -323,7 +329,7 @@ After an admitted service or inventory action settles, the server SHALL emit eve
 
 #### Scenario: Combat retains services v3 personal data and its own affordance
 - **WHEN** the actor enters combat
-- **THEN** exploration service menus and their local forms are unloaded, services v3 retains personal
+- **THEN** exploration service menus and their local forms are unloaded, services v5 retains personal
   player/inventory data, the combat UI owns a separate inventory affordance, and guild and shop actions remain
   absent in combat
 

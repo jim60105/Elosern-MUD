@@ -287,9 +287,9 @@ test("guild.quest_turnin resolves to guild turnin <quest_id>", () => {
   );
 });
 
-test("guild.exam_start resolves to guild exam <target_rank>", () => {
+test("guild.exam_request resolves to guild exam <target_rank>", () => {
   assert.strictEqual(
-    Echo.commandLine("guild.exam_start", { target_rank: "E" }, {}),
+    Echo.commandLine("guild.exam_request", { target_rank: "E" }, {}),
     "guild exam E"
   );
 });
@@ -694,7 +694,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
   "explore.wait": { payload: { daypart: "dusk" }, display: {} },
-  "guild.exam_start": { payload: { target_rank: "正式會員" }, display: {} },
+  "guild.exam_request": { payload: { target_rank: "正式會員" }, display: {} },
   "guild.quest_abandon": { payload: { quest_id: "quest_1" }, display: {} },
   "guild.quest_accept": { payload: { definition_key: "escort" }, display: {} },
   "guild.quest_track": { payload: { quest_id: "quest_1", tracked: true }, display: {} },

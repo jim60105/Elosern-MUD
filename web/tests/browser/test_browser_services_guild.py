@@ -11,6 +11,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 
 from web.browser_support.browser_fixtures_data import (
+    SYNTH_EXAM_APPOINTMENT,
     guild_offer_quest_key,
     guild_offer_reward_copper,
 )
@@ -261,49 +262,102 @@ class GuildTurninJourneys(ServicesBrowserTest):
         self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
 
 
-class GuildExamJourney(ServicesBrowserTest):
-    SERVICES_MODE = "guild_exam"
+class GuildExamAppointmentJourney(ServicesBrowserTest):
+    """Presence-first appointment: absent-host schedule, merit rejection, start.
 
-    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
-    @covers_requirement("webclient-contextual-hud::reference-drawers-present-no-router-frame-and-never-host-a-dock-row-region")
-    def test_exam_eligibility_transitions_into_combat(self):
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        panel = self._wait_services_available(page)
-        # The promotion target is the registry-derived next rank the server
-        # presents (E in shipped mode, the kit's second rank under the
-        # synthetic install) — the journey pins its propagation into the
-        # submitted payload, not a rank literal.
-        next_rank = panel["guild"]["rank"]["next_rank"]
-        self.assertTrue(next_rank)
-        self.assertTrue(panel["guild"]["rank"]["eligible"])
+    One keyboard journey per acceptance viewport observes the enabled
+    below-threshold request answering planned attendance with byte-equal
+    canonical state, the host's real weekly traversal into the hall, the
+    present-host merit rejection, and the eligible start into combat.
+    """
 
-        self._open_guild_menu(page)
-        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-menu"]').count(), 0)
-        self.assertEqual(page.locator('[data-testid="hud-drawer"] [data-testid="dock-detail"]').count(), 0)
+    SERVICES_MODE = "guild_exam_appointment"
+
+    def _ensure_guild_counter(self, page):
+        # The quest drawer stays open across the read-only schedule reply and
+        # the wait; reopen it through the host only when it is not on screen.
+        if not page.locator('[data-testid="guild-counter__exam"]').is_visible():
+            self._open_guild_menu(page)
+        page.locator('[data-testid="guild-counter__exam"]').wait_for(state="visible")
+
+    def _request_exam(self, page, expected_code):
+        before = sent_action_count(page, "guild.exam_request")
+        self._ensure_guild_counter(page)
         self._tab_until_focused(page, '[data-testid="guild-counter__exam"]')
         _press(page, "Enter")
-        # The exam transitions the shell into the ordinary combat menu and the
-        # services dock must tear down.
-        self._wait_combat_mode(page)
-        self.assertEqual(sent_action_count(page, "guild.exam_start"), 1)
-        sent = page.evaluate("window.__elosernSent || []")
-        payload = next(
-            args[0]["payload"]
-            for cmd, args, _kw in sent
-            if cmd == "ui_action" and args[0]["action_id"] == "guild.exam_start"
+        wait_for_store_state(
+            page,
+            lambda s: sent_action_count(page, "guild.exam_request") == before + 1
+            and (s.get("lastActionResult") or {}).get("code") == expected_code,
         )
-        self.assertEqual(payload, {"target_rank": next_rank})
-        self.assertEqual(self._dock_mode(page), "combat")
-        # services v3 keeps the personal surfaces available through combat
-        # and forces host/guild/shop null: the exam's remote service dock is
-        # gone even though the bag drawer stays usable for item actions.
+        return store_state(page)["lastActionResult"]
+
+    def _journey(self, viewport):
+        page = self.logged_in_page(viewport)
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        rank = panel["guild"]["rank"]
+        next_rank = rank["next_rank"]
+        self.assertTrue(next_rank)
+        # Below threshold the request stays available: merit qualification
+        # and request availability are distinct facts.
+        self.assertFalse(rank["merit_qualified"])
+        self.assertTrue(rank["exam_request"]["enabled"])
+        self.assertEqual(rank["exam_request"]["action_id"], "guild.exam_request")
+
+        # 1. Absent host: planned attendance, read-only, still exploring.
+        result = self._request_exam(page, "exam_schedule")
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(self._services_panel(page), panel)
+        self.assertNotEqual(self._dock_mode(page), "combat")
+        sent = page.evaluate("window.__elosernSent || []")
+        payloads = [
+            args[0]["payload"] for cmd, args, _kw in sent
+            if cmd == "ui_action" and args[0]["action_id"] == "guild.exam_request"
+        ]
+        self.assertEqual(payloads, [{"target_rank": next_rank}])
+
+        # 2. Time passes; the weekly schedule walks the host into the hall
+        # through its real Exit. The same request now reaches the merit gate.
+        page.evaluate(
+            "(s) => Elosern.actions.submit('explore.wait', { seconds: s })",
+            SYNTH_EXAM_APPOINTMENT["wait_seconds"],
+        )
+        hour_before = store_state(page)["serverTime"]["hour"]
+        request_before = store_state(page)["lastActionResult"]["requestId"]
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") != request_before
+            and (s.get("lastActionResult") or {}).get("outcome") == "success"
+            and (s.get("serverTime") or {}).get("hour")
+            == hour_before + SYNTH_EXAM_APPOINTMENT["wait_seconds"] // 3600,
+        )
+        result = self._request_exam(page, "below_threshold")
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertNotEqual(self._dock_mode(page), "combat")
+
+        # 3. The completed board quest's merit reaches the threshold; the
+        # present qualified host now starts the simulated examination.
+        self._ensure_guild_counter(page)
+        self._tab_until_focused(page, '[data-testid="quest-log__turnin"]')
+        _press(page, "Enter")
+        self._wait_panel(page, lambda p: p["guild"]["rank"]["merit_qualified"] is True)
+        self._request_exam(page, "exam_started")
+        self._wait_combat_mode(page)
+        self.assertEqual(sent_action_count(page, "guild.exam_request"), 3)
         services = self._services_panel(page)
         self.assertTrue(services["available"])
-        self.assertIsNone(services["host"])
         self.assertIsNone(services["guild"])
-        self.assertIsNone(services["shop"])
         self.assertIsNotNone(services["player"])
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    @covers_requirement("webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative")
+    def test_appointment_journey_at_the_reference_viewport(self):
+        self._journey((1451, 790))
+
+    @covers_requirement("webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded")
+    def test_appointment_journey_at_the_wide_viewport(self):
+        self._journey((2560, 1440))
 
     def _wait_combat_mode(self, page, timeout=30000):
         def _combat_ready(state):

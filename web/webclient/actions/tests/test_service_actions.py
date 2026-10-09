@@ -5,8 +5,9 @@ Evennia state: success, every deterministic domain rejection, idempotent
 re-registration, tampered identities rejected before the domain API,
 dispatcher-level stale and duplicate handling, host disappearance between
 render and submit, commit-time price/stock revalidation, and a before/after
-assertion that no surface changes on rejection. ``guild.exam_start`` is proven
-to transition the shell into the ordinary combat menu.
+assertion that no surface changes on rejection. ``guild.exam_request`` is proven
+to answer planned attendance read-only and to transition the shell into the
+ordinary combat menu when the qualified host is present.
 """
 
 from dataclasses import replace
@@ -27,7 +28,7 @@ from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.actions.service_actions import (
     ServiceActionError,
     _buy_adapter,
-    _exam_start_adapter,
+    _exam_request_adapter,
     _guild_register_adapter,
     _quest_abandon_adapter,
     _quest_accept_adapter,
@@ -358,10 +359,10 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(read_records(self.player), [])
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
-    def test_busy_examiner_rejects_exam_start_without_a_session(self):
+    def test_busy_counter_rejects_exam_request_without_a_session(self):
         self._register()
         self.examiner.db.schedule_state = "busy"
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIsNone(self.player.db.active_combat)
@@ -621,63 +622,98 @@ class ServiceAdapterTests(ServiceActionBase):
                 validate_buy_payload(bad)
 
 
-class ExamStartTests(ServiceActionBase):
+class ExamRequestTests(ServiceActionBase):
     def setUp(self):
         super().setUp()
         # The counter authorizes; a synthetic qualified persistent host fights.
         install_exam_host_policies(self, BRANCH)
         self.host = make_exam_host(self.hall)
 
-    def test_exam_start_fights_the_qualified_persistent_host(self):
+    def test_exam_request_fights_the_qualified_persistent_host(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(read_session(self.player).enemy_ids, (self.host.pk,))
 
-    def test_exam_start_rejects_absent_qualified_host(self):
-        self._register()
-        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+    def _host_away_with_weekly_visits(self):
+        from world.rules.npc_schedules import set_npc_schedule
+
         self.host.location = self.store
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "remote_examiner")
+        set_npc_schedule(self.host, {
+            "schema_version": 1,
+            "cycle_days": 7,
+            "entries": [
+                {"tick_offset": 10 * 3600, "kind": "move", "target": f"#{self.hall.pk}"},
+                {"tick_offset": 14 * 3600, "kind": "move", "target": f"#{self.store.pk}"},
+            ],
+        })
+
+    @covers_requirement(
+        "webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative",
+        "webclient-service-menus::the-guild-surface-covers-registration-board-quest-log-and-rank-examination",
+    )
+    def test_below_merit_request_with_absent_host_returns_read_only_schedule(self):
+        self._register()
+        self._host_away_with_weekly_visits()
+        before = (
+            self.player.db.guild_exams, self.player.db.active_combat,
+            dict(self.player.traits.trait_data), self.host.relations.has_record(self.player),
+            self.host.location.pk, self.host.attributes.get("exam_schedule_hold"),
+        )
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        self.assertEqual((result["outcome"], result["code"]), ("success", "exam_schedule"))
+        # Read-only information: only the unchanged services panel republishes.
+        self.assertEqual(result["affected_panels"], ("services",))
+        after = (
+            self.player.db.guild_exams, self.player.db.active_combat,
+            dict(self.player.traits.trait_data), self.host.relations.has_record(self.player),
+            self.host.location.pk, self.host.attributes.get("exam_schedule_hold"),
+        )
+        self.assertEqual(after, before)
+        self.assertIsNone(read_session(self.player))
+
+    def test_absent_host_without_a_confirmable_time_rejects(self):
+        self._register()
+        self.host.location = self.store
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        self.assertEqual((result["outcome"], result["code"]), ("rejected", "attendance_unknown"))
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_exam_start_rejects_non_next_rank_before_domain(self):
+    def test_exam_request_rejects_non_next_rank_before_domain(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", 50)
-        result = _exam_start_adapter(self.player, {"target_rank": _T_LATER_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_LATER_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_next_rank")
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_exam_start_rejects_below_threshold(self):
+    def test_exam_request_rejects_below_threshold(self):
         self._register()
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "below_threshold")
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_exam_start_rejects_unregistered(self):
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+    def test_exam_request_rejects_unregistered(self):
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unregistered")
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_exam_start_rejects_without_local_examiner(self):
+    def test_exam_request_rejects_without_local_examiner(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
         self.player.location = self.store
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_examiner")
 
     @covers_requirement("webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative")
-    def test_exam_start_transitions_to_guild_exam_combat_session(self):
+    def test_exam_request_transitions_to_guild_exam_combat_session(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "exam_started")
         self.assertEqual(result["affected_panels"], ("status", "services", "context_actions"))
@@ -686,11 +722,11 @@ class ExamStartTests(ServiceActionBase):
         self.assertEqual(session.mode, "guild_exam")
         self.assertIsNotNone(self.player.db.guild_exams)
 
-    def test_exam_start_rejects_while_active_session(self):
+    def test_exam_request_rejects_while_active_session(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
-        _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
-        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_request_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "active_combat")
 

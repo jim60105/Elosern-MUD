@@ -80,6 +80,21 @@ def build_synth_services_catalog():
 SYNTH_EXAM_HOST_PERSON_KEY = "t_synth_exam_person"
 SYNTH_EXAM_HOST_NAME = "合成常駐冒險者"
 
+#: The presence-first appointment journey (guild-exam-appointment-surface).
+#: The candidate starts one completed board quest (merit reward 10) short of
+#: the next rank's 40-merit threshold; the host lodges away and its weekly
+#: schedule walks it into the hall two game hours after the seeded tick
+#: (06:00 of day one), staying until 20:00.
+SYNTH_EXAM_APPOINTMENT = {
+    "merit": 30,
+    "seed_tick": 6 * 3600,
+    "arrive_offset": 8 * 3600,
+    "leave_offset": 20 * 3600,
+    "wait_seconds": 3 * 3600,
+    "lodging_tag": "t_synth_exam_lodging",
+    "lodging_name": "合成常駐冒險者寓所",
+}
+
 
 def graft_synth_exam_host_policies() -> None:
     """Bind one synthetic qualified host and kit policy for the next rank.
@@ -152,8 +167,12 @@ def install_synth_services_catalog():
     # functions resolve exclusively through get_catalog(), so they serve the
     # synthetic shop identically (registration is idempotent).
     from world.rules.guild_economy import _register_clock_sources
+    from world.rules.npc_schedules import register_npc_schedules
 
     _register_clock_sources()
+    # The skipped startup sync also registers the NPC-schedule source; the
+    # appointment journey needs the qualified host's real weekly traversal.
+    register_npc_schedules()
     return catalog
 
 

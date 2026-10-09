@@ -220,7 +220,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         self.call(
             CmdGuildExam(),
             "E",
-            "你開始了 E 階的考核。這是一場模擬戰：雙方在開戰前與結束後都會恢復全部的體力、法力與精力。請選擇你的行動（cast <技能>[=<目標>]）。",
+            "升階考核（E）開始。這是模擬戰，雙方在開戰前與結束後都會恢復全部的體力、法力與精力。請選擇你的行動（cast <技能>[=<目標>]）。",
         )
         self.assertIsNotNone(self.player.db.active_combat)
         session = read_session(self.player)

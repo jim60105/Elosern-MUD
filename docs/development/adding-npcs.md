@@ -365,15 +365,26 @@ Actual Exit locks still determine whether the person arrives.
 #### Persistent examination lifecycle
 
 `world.rules.guild_exams.start_guild_exam(actor, examiner, target_rank)` is the
-only mutation-capable start. `examiner` is the qualified persistent person;
-adapters resolve it with `qualified_exam_host(actor, target_rank, speaker=None)`,
-which derives the branch from the single co-located `GuildExaminer` counter (or
-the speaking counter) and the person from the qualification binding. A speaking
-NPC that is neither the counter nor the qualified person grants no authority.
+only mutation-capable start. `examiner` is the qualified persistent person.
+Command, WebClient (`guild.exam_request`) and NPC-intent adapters never call it
+directly: they go through the presence-first coordinator
+`world.rules.guild_exam_request.request_guild_exam(actor, target_rank, speaker=None,
+requested_by=...)`. It resolves the target with
+`resolve_exam_request_target`, which derives the branch from the single
+co-located `GuildExaminer` counter (or the speaking counter), refuses a busy
+counter (`schedule_blocked`), and selects the person from the qualification
+binding. A speaking NPC that is neither the counter nor the qualified person
+grants no authority. If the person is not standing in the counter's room, the
+coordinator answers `exam_schedule` from
+`world.rules.service_windows.read_next_planned_service_interval` (or rejects
+`attendance_unknown` with the reader's named reason) without any merit check
+or write; only a present host reaches `start_guild_exam`. Author each host's
+schedule so its service-capable guild visit is a real Exit traversal into the
+counter's room: that window is exactly what the counter quotes to players.
 
 Before any write the start checks registration, the counter's shared service
 gate and branch, host co-location, exact next rank, qualification, host
-`service_guild` schedule state, a `participant_name_collision` between candidate
+`service_guild` schedule state (`examiner_busy`), a `participant_name_collision` between candidate
 and host keys, any engagement of the host in another exam or battle, canonical
 host ages, true merit, and a real kit preflight. Then one transaction persists
 `guild_exam_normal_state` (exam ID, start tick, normal equipment/inventory and

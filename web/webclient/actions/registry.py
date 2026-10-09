@@ -79,7 +79,7 @@ def build_production_action_registry() -> ActionRegistry:
     The registry contains exactly the three combat adapters (``combat.cast``,
     ``combat.flee``, ``combat.forfeit``), the eight service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
-    ``guild.quest_turnin``, ``guild.quest_track``, ``guild.exam_start``,
+    ``guild.quest_turnin``, ``guild.quest_track``, ``guild.exam_request``,
     ``shop.buy``, ``shop.sell``),
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
@@ -197,7 +197,7 @@ def build_production_action_registry() -> ActionRegistry:
     )
     from web.webclient.actions.service_actions import (
         _buy_adapter,
-        _exam_start_adapter,
+        _exam_request_adapter,
         _guild_register_adapter,
         _inventory_toggle_equip_adapter,
         _inventory_use_adapter,
@@ -207,7 +207,7 @@ def build_production_action_registry() -> ActionRegistry:
         _quest_turnin_adapter,
         _sell_adapter,
         validate_buy_payload,
-        validate_exam_start_payload,
+        validate_exam_request_payload,
         validate_guild_register_payload,
         validate_inventory_toggle_equip_payload,
         validate_inventory_use_payload,
@@ -295,9 +295,9 @@ def build_production_action_registry() -> ActionRegistry:
     )
     registry.register(
         ActionSpec(
-            action_id="guild.exam_start",
-            validate_payload=validate_exam_start_payload,
-            adapter=_exam_start_adapter,
+            action_id="guild.exam_request",
+            validate_payload=validate_exam_request_payload,
+            adapter=_exam_request_adapter,
             affected_panels=("status", "services", "context_actions"),
         )
     )

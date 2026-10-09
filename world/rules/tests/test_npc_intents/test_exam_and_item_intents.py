@@ -196,12 +196,49 @@ class ExamIntentTests(BattlefieldIsolation, ExamRegistryIsolation, EvenniaTestCa
             {"kind": "request_guild_exam"},
             {"kind": "request_guild_exam", "target_rank": "E", "extra": 1},
             {"kind": "request_guild_exam", "target_rank": ""},
+            {"kind": "request_guild_exam", "target_rank": "E", "host": self.host.pk},
+            {"kind": "request_guild_exam", "target_rank": "E", "branch_key": BRANCH},
+            {"kind": "request_guild_exam", "target_rank": "E", "tick": 0},
+            {"kind": "request_guild_exam", "target_rank": "E", "threshold": 0},
         ):
             with self.subTest(intent=intent):
                 outcome = apply_npc_intent(self.examiner, self.player, intent)
                 self.assertFalse(outcome.applied)
                 self.assertIsNotNone(outcome.reason)
                 self.assertEqual(_read_exams(self.player), [])
+
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_counter_intent_below_merit_with_absent_host_returns_attendance(self):
+        from world.rules.npc_schedules import set_npc_schedule
+
+        lodging = create_object(Room, key="host lodging")
+        self.host.location = lodging
+        set_npc_schedule(self.host, {
+            "schema_version": 1,
+            "cycle_days": 7,
+            "entries": [
+                {"tick_offset": 10 * 3600, "kind": "move", "target": f"#{self.hall.pk}"},
+                {"tick_offset": 14 * 3600, "kind": "move", "target": f"#{lodging.pk}"},
+            ],
+        })
+        before = (
+            self.player.db.guild_exams, self.player.db.active_combat,
+            dict(self.player.traits.trait_data), self.examiner.relations.has_record(self.player),
+            self.host.relations.has_record(self.player), self.host.location.pk,
+        )
+        with patch.object(type(self.player), "msg") as msg:
+            outcome = apply_npc_intent(self.examiner, self.player, _exam_intent("E"))
+        # Planned information is an applied, read-only answer: the caller
+        # keeps the in-character speech and the player receives the note.
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.reason, "exam_schedule")
+        self.assertIn(self.host.key, msg.call_args.args[0])
+        after = (
+            self.player.db.guild_exams, self.player.db.active_combat,
+            dict(self.player.traits.trait_data), self.examiner.relations.has_record(self.player),
+            self.host.relations.has_record(self.player), self.host.location.pk,
+        )
+        self.assertEqual(after, before)
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_unknown_kind_is_rejected_defensively(self):

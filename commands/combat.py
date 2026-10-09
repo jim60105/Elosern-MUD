@@ -2,7 +2,6 @@
 
 from commands.command import Command
 
-from typeclasses.components import GuildExaminer
 from world.rules.combat_session import (
     CombatSessionError,
     SessionReason,
@@ -15,15 +14,19 @@ from world.rules.combat_view import (
     build_combat_view,
     group_skill_views,
 )
-from world.rules.guild_exams import (
-    ExamReason,
-    GuildExamError,
-    qualified_exam_host,
-    start_guild_exam,
+from world.rules.guild_exam_request import (
+    OUTCOME_SCHEDULE,
+    next_exam_rank,
+    request_guild_exam,
 )
+from world.rules.guild_exams import GuildExamError
 from world.rules.event_log import render_plain_text
 from world.rules.player_messages import session_reason_message
-from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+from world.rules.service_messages import (
+    exam_schedule_message,
+    exam_started_message,
+    rejection_message,
+)
 
 
 class CmdEngage(Command):
@@ -134,62 +137,35 @@ class CmdCombatActions(Command):
 
 
 class CmdGuildExam(Command):
-    """Request the guild examination for your next rank."""
+    """Ask the guild counter to arrange your next promotion examination.
+
+    With the qualified examiner present this starts the simulated-battle
+    examination; with the examiner away the counter answers the examiner's
+    next planned attendance at the guild. Nothing is reserved either way.
+    """
 
     key = "guild exam"
     aliases = ("guild 考核", "公會考核")
     locks = "cmd:all()"
     help_category = "Guild"
 
-    def _resolve_examiner(self):
-        try:
-            from world.rules.guild import resolve_local_service_host
-
-            return resolve_local_service_host(self.caller, GuildExaminer)
-        except Exception:
-            self.caller.msg("這裡沒有考核官。")
-            return None
-
     def func(self) -> None:
-        examiner = self._resolve_examiner()
-        if examiner is None:
+        target_rank = self.args.strip().partition(" ")[0] or next_exam_rank(self.caller)
+        if target_rank is None:
+            self.caller.msg(rejection_message("top_rank"))
             return
-        from world.rules.npc_schedules import interaction_reason
-
-        reason = interaction_reason(examiner, "service_guild")
-        if reason is not None:
-            self.caller.msg(reason)
-            return
-        target_rank = self.args.strip().partition(" ")[0] or "E"
         try:
-            # The counter authorizes the request; the qualified persistent
-            # adventurer for this exact target is the one who fights.
-            record = start_guild_exam(
-                self.caller,
-                qualified_exam_host(self.caller, target_rank),
-                target_rank,
-                requested_by="command",
-            )
+            outcome = request_guild_exam(self.caller, target_rank, requested_by="command")
         except GuildExamError as error:
-            reason = error.args[0]
-            message = {
-                ExamReason.UNREGISTERED: "你尚未註冊為冒險者。",
-                ExamReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
-                ExamReason.WRONG_BRANCH: "考核官與你的公會不符。",
-                ExamReason.NOT_NEXT_RANK: "你只能接受下一個階級的考核。",
-                ExamReason.BELOW_THRESHOLD: "你的功績尚未達到考核門檻。",
-                ExamReason.ACTIVE_COMBAT: "你已經在戰鬥中。",
-                ExamReason.DUPLICATE_ACTIVE: "你已經有一場進行中的考核。",
-                ExamReason.ALREADY_SETTLED: "你已經通過這個階級的考核。",
-                ExamReason.NO_EXAMINER: "這裡沒有考核官。",
-                ExamReason.REMOTE_EXAMINER: "考核官不在這裡。",
-                ExamReason.UNQUALIFIED_EXAMINER: "這裡沒有能主持這個階級考核的考官。",
-                ExamReason.EXAMINER_ENGAGED: "考官正在主持另一場考核。",
-                ExamReason.PARTICIPANT_NAME_COLLISION: "無法與同名的考官進行考核。",
-            }.get(reason, "無法開始考核。")
-            self.caller.msg(message)
+            self.caller.msg(rejection_message(error))
+            return
+        if outcome.kind == OUTCOME_SCHEDULE:
+            self.caller.msg(exam_schedule_message(
+                outcome.host_name, outcome.target_rank,
+                outcome.interval.start_tick, outcome.interval.end_tick,
+            ))
             return
         self.caller.msg(
-            f"你開始了 {record.target_rank} 階的考核。這是一場模擬戰：雙方在開戰前"
-            "與結束後都會恢復全部的體力、法力與精力。請選擇你的行動（cast <技能>[=<目標>]）。"
+            exam_started_message(outcome.target_rank)
+            + "請選擇你的行動（cast <技能>[=<目標>]）。"
         )

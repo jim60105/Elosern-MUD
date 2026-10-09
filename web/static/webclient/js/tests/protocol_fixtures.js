@@ -222,7 +222,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "services",
       host: null,

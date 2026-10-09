@@ -12,7 +12,7 @@ from tools.spec_traceability import covers_requirement
 from web.webclient.actions.service_actions import (
     ServiceActionError,
     validate_buy_payload,
-    validate_exam_start_payload,
+    validate_exam_request_payload,
     validate_guild_register_payload,
     validate_quest_abandon_payload,
     validate_quest_accept_payload,
@@ -63,11 +63,18 @@ class ServiceValidatorTests(unittest.TestCase):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_quest_turnin_payload(bad)
 
-    def test_exam_start_payload(self):
-        self.assertEqual(validate_exam_start_payload({"target_rank": "E"}), {"target_rank": "E"})
-        for bad in ({}, {"target_rank": ""}, {"target_rank": "E" * 9}, None):
+    @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_exam_request_payload(self):
+        self.assertEqual(validate_exam_request_payload({"target_rank": "E"}), {"target_rank": "E"})
+        # Authority-like fields (host, branch, clock, threshold) are unknown
+        # fields and reject before the coordinator runs.
+        for bad in (
+            {}, {"target_rank": ""}, {"target_rank": "E" * 9}, None,
+            {"target_rank": "E", "host": "#12"}, {"target_rank": "E", "branch_key": "b"},
+            {"target_rank": "E", "tick": 1}, {"target_rank": "E", "threshold": 0},
+        ):
             with self.assertRaises(ServiceActionError, msg=bad):
-                validate_exam_start_payload(bad)
+                validate_exam_request_payload(bad)
 
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
     def test_trade_payloads(self):

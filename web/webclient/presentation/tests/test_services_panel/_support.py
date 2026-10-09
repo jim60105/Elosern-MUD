@@ -261,12 +261,12 @@ def _all_ceilings_payload():
                 "merit": 0,
                 "next_rank": _max_string(MAX_RANK_KEY_CODE_POINTS),
                 "next_threshold": 1,
-                "eligible": False,
-                "exam_start": _action(
-                    "guild.exam_start",
+                "merit_qualified": False,
+                "exam_request": _action(
+                    "guild.exam_request",
                     enabled=False,
                     disabled_reason={
-                        "code": "below_threshold",
+                        "code": "wrong_branch",
                         "message": _max_string(MAX_REASON_MESSAGE_CODE_POINTS),
                     },
                 ),
@@ -382,8 +382,8 @@ def _realistic_maximal_payload():
                 "merit": 60,
                 "next_rank": "E",
                 "next_threshold": 50,
-                "eligible": True,
-                "exam_start": _action("guild.exam_start", label="升階考核（E）"),
+                "merit_qualified": True,
+                "exam_request": _action("guild.exam_request", label="預約升等考核"),
             },
         },
         shop={"open": True, "stock": stock, "sellable": sellable},

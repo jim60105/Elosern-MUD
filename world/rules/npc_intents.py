@@ -21,8 +21,10 @@ from django.db import transaction
 
 from world.rules.affinity import apply_affinity_change
 from world.rules.equipment import InventoryError, plan_inventory_delta
-from world.rules.guild_exams import GuildExamError, qualified_exam_host, start_guild_exam
+from world.rules.guild_exam_request import OUTCOME_SCHEDULE, request_guild_exam
+from world.rules.guild_exams import GuildExamError
 from world.rules.npc_schedules import interaction_reason
+from world.rules.service_messages import exam_schedule_message
 from world.rules.surfaces import (
     attribute_snapshot,
     restore_attribute_best_effort,
@@ -428,16 +430,23 @@ def _apply_guild_exam(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOu
     if not isinstance(target_rank, str) or not target_rank.strip():
         return IntentOutcome(False, "request_guild_exam target_rank must be a non-empty string")
     try:
-        # The speaking NPC grants no authority: it must be the co-located
-        # counter or the qualified persistent host, who is always the examiner.
-        start_guild_exam(
-            actor=player,
-            examiner=qualified_exam_host(player, target_rank, speaker=npc),
-            target_rank=target_rank,
-            requested_by="npc_intent",
+        # The speaking NPC grants no authority: the shared coordinator only
+        # accepts it as the co-located counter or the qualified persistent
+        # host, resolves attendance before merit, and delegates any start to
+        # the authoritative start API.
+        outcome = request_guild_exam(
+            player, target_rank, speaker=npc, requested_by="npc_intent"
         )
     except GuildExamError as error:
         return IntentOutcome(False, _reason_text(error))
+    if outcome.kind == OUTCOME_SCHEDULE:
+        # Read-only planned attendance: the speech stays in character, the
+        # counter's schedule note reaches the player as narration.
+        player.msg(exam_schedule_message(
+            outcome.host_name, outcome.target_rank,
+            outcome.interval.start_tick, outcome.interval.end_tick,
+        ))
+        return IntentOutcome(True, OUTCOME_SCHEDULE)
     return IntentOutcome(True)
 
 

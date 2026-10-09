@@ -89,6 +89,15 @@ Per-NPC storage (`npc.db.schedule`, JSON-safe, schema-versioned):
 Runtime state: `npc.db.schedule_state` (current state value or `None`), written exclusively by
 `world/rules/npc_schedules.py`.
 
+> **Amended 2026-10-09 (human guild examinations, `weekly-npc-schedule-cycles`,
+> `planned-npc-service-windows`, `guild-exam-appointment-surface`).** The daily-only model above is
+> superseded: templates and custom lists accept `cycle_days` of 1 or 7 (default 1), offsets are bounded
+> by the containing cycle, and cycles are anchored to absolute world tick zero. The read-only reader
+> `world.rules.service_windows.read_next_planned_service_interval` projects a persistent NPC's next
+> service-capable `[start, end)` presence at a destination from the same occurrence arithmetic. The
+> guild examination request coordinator uses it to answer an absent qualified host's planned
+> attendance before any merit check; nothing is booked, and actual starts always recheck live presence.
+
 ### 3.2 Settlement
 
 `world/rules/npc_schedules.py`:
@@ -214,7 +223,8 @@ Two sequential per-day changes:
 - Schedule-driven shop opening hours (owned by `shop_hours`); NPC state gating is a separate layer
   on top of shop hours.
 - Any change to combat, quest, or economy mechanics beyond the interaction gate.
-- Multi-day weekly schedules (the model repeats daily; a weekly-cycle extension is a future seam).
+- ~~Multi-day weekly schedules~~ — delivered by `weekly-npc-schedule-cycles` (see the §3.1
+  amendment); guild examination hosts use them for their weekly guild visits.
 
 ---
 

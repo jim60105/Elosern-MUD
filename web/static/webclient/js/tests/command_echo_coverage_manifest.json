@@ -43,7 +43,7 @@
     "gallery.official.clear_selection",
     "gallery.official.geometry.set",
     "gallery.official.geometry.clear",
-    "guild.exam_start",
+    "guild.exam_request",
     "guild.quest_abandon",
     "guild.quest_accept",
     "guild.quest_track",

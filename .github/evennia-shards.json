@@ -114,6 +114,7 @@
         "world.rules.tests.test_guild_economy_guards",
         "world.rules.tests.test_guild_economy_scenarios",
         "world.rules.tests.test_guild_economy_sync",
+        "world.rules.tests.test_guild_exam_requests",
         "world.rules.tests.test_guild_exams",
         "world.rules.tests.test_guild_registration",
         "world.rules.tests.test_guild_rewards",

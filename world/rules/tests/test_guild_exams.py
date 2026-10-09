@@ -317,7 +317,7 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
     def test_busy_present_host_rejects_before_resources_or_affinity(self):
         self._give_merit(50)
         self.host.db.schedule_state = "busy"
-        self._assert_rejected_without_writes(ExamReason.SERVICE_UNAVAILABLE)
+        self._assert_rejected_without_writes(ExamReason.EXAMINER_BUSY)
 
     @covers_requirement("guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself")
     def test_requested_by_metadata_grants_no_extra_authority(self):

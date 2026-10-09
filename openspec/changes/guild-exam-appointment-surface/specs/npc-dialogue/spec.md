@@ -80,8 +80,8 @@
 - **THEN** the AI cannot choose examiner stats, waive a gate, promote the player, or start combat directly
 
 #### Scenario: The exam gate performs its own rechecks
-- **WHEN** `apply_npc_intent` delegates `request_guild_exam` to change 16's `start_guild_exam(actor=player, examiner=npc, target_rank=..., requested_by="npc_intent")`
-- **THEN** that API itself rechecks co-location, the GuildExaminer component and branch, the exact next rank, true cumulative merit, and the absence of active combat/examination
+- **WHEN** the coordinator delegates a present-host `request_guild_exam` to `start_guild_exam(actor=player, examiner=<qualified persistent host>, target_rank=..., requested_by="npc_intent")`
+- **THEN** that API itself rechecks the counter gate and branch, the host's qualification and co-location, the exact next rank, true cumulative merit, and the absence of active combat/examination
 
 #### Scenario: Item transfers are all-or-nothing across both entities
 - **WHEN** a `give_item` or `take_item` transfer is applied after holdings are verified
