@@ -1,7 +1,7 @@
 # Monster Resource Skills and Shared Eligibility Design
 
 **Date:** 2026-10-09
-**Status:** Design sections approved; written-spec review pending; implementation not started.
+**Status:** Design sections and written specification approved; implementation not started.
 **Scope:** Shared skill identity eligibility, reusable hit-dependent effects, and one complete tide-devouring crocodile resource-skill integration.
 
 Extend the existing player/NPC skill system to support authored monster abilities. Keep one execution engine and separate monster ability declarations from character skill-tree content. The first delivered species is 吞潮鱷 (`tide_devouring_crocodile`), whose physical bite drains MP on a successful hit and consumes both MP and SP. Combat AI receives the minimum integration needed to execute this ability. Its strategy redesign belongs to the next change.
