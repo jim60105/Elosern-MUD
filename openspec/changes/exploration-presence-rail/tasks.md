@@ -1,0 +1,42 @@
+# Tasks
+
+## 1. ChoiceCard extraction
+
+- [ ] 1.1 Create `components/ChoiceCard.vue` from `DialogueChoices.vue` per design D1: frame, crest, corner brackets, digit-badged rows, the rule before a trailing row, active-row fill and caret, the single-tab-stop keyboard composite (ArrowUp/Down wrap, Home/End, digits 1–N, Enter/Space, Escape, `aria-activedescendant`), and the staggered entrance with motion-level handling. Emits `pick(key)` and `back`. Add `tests/components/choice_card.test.js` (keys, digits, held repeat ignored, trailing back row, Escape, entrance off at `off`) and `stories/Core/ChoiceCard.stories.js` with Verbs, Wait, Suggestions, and Overflow fixtures from real reducer-derived shapes.
+- [ ] 1.2 Render `DialogueChoices.vue` through `ChoiceCard` without editing its existing tests: `tests/dialogue_choices.test.js`, `tests/app_client_dialogue_choices.test.js`, and the `Core/DialogueChoices` stories must pass unchanged. Verify with `pnpm test` and by capturing the live dialogue screen at 1451×790 and 1920×1080 before and after; the screenshots must match.
+
+## 2. Presence rail
+
+- [ ] 2.1 Implement `components/PresenceRail.vue`: medallions (face crop through the existing face-rect data, else the name's first character), dashed muted bystanders, separator, steel lozenges, name plates, six-entry limit with `＋N`, fade in and out, hover and focus lift, one keyboard composite (←/→, Enter), and the readout feed. Add the `presence` anchor to `HudFrame.vue`. Add `tests/world/presence_rail.test.js` covering overflow, the portrait fallback, bystander and object activation emitting the existing look payload, `＋N`, empty rendering nothing, and hidden states; and stories Default, Overflow, NoPortraits, ObjectsOnly.
+- [ ] 2.2 Implement digit activation (1–9 pick the Nth visible rail entry while no card is open and focus is not in the command line or a drawer) and Tab order compass → rail → dock footer, with tests in `tests/app_client_scene_overview.test.js` or a new `tests/app_client_presence_rail.test.js`.
+
+## 3. Person focus and verb card
+
+- [ ] 3.1 Add the person-focus composable (design D2) and generalize the store method added by `exploration-exit-compass` so it activates any `ExplorationMenu` builder row through the single submission gate. Add store tests: every consumer is suppressed while in flight or awaiting revision, a disabled row submits nothing, payloads are byte-identical to the former popover rows (`explore.talk_open`, `explore.engage`, `explore.look`, delivery, party, navigate-kind rows).
+- [ ] 3.2 Mount the verb card and overflow card in the `choices` anchor of `AppClient.vue` through `ChoiceCard`; implement the focus visuals (rail fades, command panel `inert` at about 35%, place card and minimap step away, standee into `actor-right`, speaker line in the message window), Escape and `✕ 返回` closing with focus restored to the opener, the departed-person close with the `<name> 已經離開了。` flash, and the close on a committed location change. Add `tests/app_client_presence_rail.test.js` for each.
+- [ ] 3.3 Implement the single `StageActor` subject for focus and dialogue (design D3) and a mount test asserting the element is retained across the 交談 commit; add the full exploration-screen story (`stories/Core/ExplorationScreen.stories.js`) bound to reducer-derived fixtures.
+
+## 4. Removals
+
+- [ ] 4.1 Remove the 人物 and 物件 sections from `overviewMenu` and `SceneOverview.vue`, the `openTarget` item kind, the `exploration.target` source in `stores/frame-resolvers.js`, `dockSource === "exploration.target"` handling and the popover focus watcher in `composables/use-dock.js`, the `overlay` slot use in `AppClient.vue`, and delete `components/DockVerbPopover.vue`, `stories/Action/DockVerbPopover.stories.js`, and `tests/action/dock_verb_popover.test.js`. Update `component-manifest.json` (drop `Action/DockVerbPopover`, add `Core/ChoiceCard`, `Core/PresenceRail`, and the new stories) and the showcase evidence key sets. Verify with `node scripts/component-coverage.mjs` and `pnpm test`.
+- [ ] 4.2 Grep `styles/app-shell.css` for `.elosern-root` duplicates of every removed or restyled class (`.verb-popover*`, `.scene-overview*`, `.action-dock*`, dialogue choice classes) and update or remove them. Verify with `grep -n "elosern-root" web/webclient-app/styles/app-shell.css` and the live client in 7.2.
+
+## 5. Controls reference
+
+- [ ] 5.1 Add rail and card bindings to `lib/controls-reference.js` (rail ←/→/Enter, digits, card digits/Enter/Escape) and update its test. Verify with `pnpm test`.
+
+## 6. Test migration and specs
+
+- [ ] 6.1 Update the browser tests and helpers under `web/tests/browser/` that open a person's verb popover or activate a 人物 / 物件 chip (`grep -l "popover\|target-\|entity-\|object-" web/tests/browser`) to use the rail and the verb card, including the dialogue journey in `test_browser_exploration_dialogue.py`. Register any new or renamed method in `.github/browser-shards.json` and run each touched class with the browser unittest driver documented in the repository AGENTS.md.
+- [ ] 6.2 Author the remaining MODIFIED deltas for requirements outside `webclient-exploration-menu` that name the verb popover or the 人物 / 物件 rows: in `webclient-desktop-shell` "Required desktop surfaces remain visible and usable" and "The action dock's row region and detail panes are direct children of its pane host", in `webclient-pointer-activation` "Every action-dock surface renders exactly the keyboard router's current menu frame" (the inert-overview-beneath-a-popover scenario), and in `webclient-component-showcase` the requirement that lists the action-dock family. Copy each block from `openspec/specs/` (or from the post-`exploration-exit-compass` text if that change has archived), edit only the popover and row scenarios, and keep every scenario name. Verify with `openspec validate exploration-presence-rail --strict`.
+- [ ] 6.3 Update `docs/development/webclient-vue-frozen-contract-audit.md` for the removed popover family and the new rail and card families.
+
+## 7. Integration acceptance
+
+- [ ] 7.1 Run `pnpm test`, `node scripts/component-coverage.mjs`, the touched browser classes, the contract gate (`tools.contract_gate`), the frozen-contract test (`tests.test_webclient_frozen_contract`), and `openspec validate exploration-presence-rail --strict`.
+- [ ] 7.2 Build the client (`pnpm run build`) and with `agent-browser` capture the live exploration screen at 1451×790 and 1920×1080: a room with a portrait host, bystander, and object; no portraits; seven entries (overflow); the verb card and standee for a guild clerk; 交談 handover into dialogue; and the dialogue screen before and after the extraction. Check the rail against the island column and the band. Compare with `Design/SceneOverviewRedesign`; fix deviations or record intentional ones in this change's design.md.
+
+## Workflow follow-up
+
+- At archive sync, annotate the Python and Vitest evidence carriers with the new `webclient-presence-rail` requirement IDs and re-point annotations of the removed and restated requirements; run `tools.spec_traceability check`.
+- Do not apply, archive, or merge until the user asks. Apply only after `exploration-exit-compass` is archived; `exploration-room-actions` must wait for this change to archive.
