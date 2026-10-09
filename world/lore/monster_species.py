@@ -147,6 +147,9 @@ class MonsterVariant:
     ordinary_variant: bool
     combat_profile: MonsterCombatProfile | None
     danger_grade: str | None
+    active_skill_keys: tuple[str, ...] = ()
+    passive_skill_keys: tuple[str, ...] = ()
+    behaviour_profile_key: str | None = None
 
 
 def _faces(habitat_face, tier_face, grade_face) -> tuple[frozenset, frozenset, frozenset]:
@@ -593,12 +596,11 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "施法者與牠纏鬥時，可能先感到魔力消耗異常，再發現危險。"
         "牠仍依靠咬合與伏擊捕食，並非遠距離施法者。"
         "能力需要近身接觸，不能隔著整條河抽取魔力，也不會把吸取的魔力轉成傷口治療。"
-        "此處的吸取對應可消耗的魔力資源，不表示永久降低目標的固定 magic_power。"
-        "具體消耗量與技能效果不在本次核准範圍內。",
+        "此處的吸取對應可消耗的魔力資源，不表示永久降低目標的固定 magic_power。",
         ("southeast_coast",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；吸取魔力的成因不在設定中交代。",
-        "（作者私有：作者解釋）展示資源壓力型危害（魔力消耗）而不實作機制，"
-        "並明確標記數值與技能效果不在核准範圍內。",
+        "（作者私有：作者解釋）以近身水屬性咬合吸取魔力作為資源消耗型危害，"
+        "限制無遠程抽取、無生命治療與無永久魔力降低。",
         "（作者私有：尚未證實的猜想）渡運站傳說河口鱷群受沉沒魔法器物吸引，沒有實地證實。",
         "bank_lurker",
         True,
@@ -734,9 +736,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=140, mp=0, sp=0, atk_phys=22, agility=12, defense=14, magic_power=0
+            hp=140, mp=30, sp=40, atk_phys=22, agility=12, defense=14, magic_power=0
         ),
         "D",
+        active_skill_keys=("tide_devouring_bite",),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "bay_warden",
@@ -746,9 +750,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=210, mp=0, sp=0, atk_phys=28, agility=12, defense=15, magic_power=0
+            hp=210, mp=50, sp=60, atk_phys=28, agility=12, defense=15, magic_power=0
         ),
         "C",
+        active_skill_keys=("tide_devouring_bite",),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

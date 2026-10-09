@@ -40,6 +40,54 @@ from world.lore.monster_species import (
 )
 from world.observability import log_info
 from world.rules.traits import initial_trait_config_for_variant
+from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.skills.eligibility import record_identity_eligible
+
+
+def _validate_variant_kit_and_behaviour(variant: MonsterVariant, species_key: str) -> None:
+    """Validate full kit, skill references, kinds, eligibility, effects and behaviour profile."""
+    from world.rules.monster_behaviour import MONSTER_BEHAVIOUR_YAML
+    from world.rules.action.contracts import _EFFECT_HANDLERS, _effect_prefix
+
+    for skill_key in variant.active_skill_keys:
+        if variant.active_skill_keys.count(skill_key) > 1:
+            raise MonsterConstructionError(f"duplicate active skill {skill_key!r}")
+        if skill_key not in SKILL_REGISTRY:
+            raise MonsterConstructionError(f"unknown active skill {skill_key!r}")
+        skill = SKILL_REGISTRY[skill_key]
+        if skill.kind is not SkillKind.ACTIVE:
+            raise MonsterConstructionError(f"active skill {skill_key!r} is not ACTIVE")
+        if not record_identity_eligible(
+            skill.eligibility, "monster", species_key=species_key, variant_key=variant.key
+        ):
+            raise MonsterConstructionError(f"monster not eligible for skill {skill_key!r}")
+        for eff in skill.effects:
+            if _effect_prefix(eff) not in _EFFECT_HANDLERS:
+                raise MonsterConstructionError(f"unsupported effect {eff!r}")
+        for prereq in skill.prerequisites:
+            if prereq.skill_key not in variant.active_skill_keys and prereq.skill_key not in variant.passive_skill_keys:
+                raise MonsterConstructionError(f"unusable prerequisite {prereq.skill_key!r}")
+
+    for skill_key in variant.passive_skill_keys:
+        if variant.passive_skill_keys.count(skill_key) > 1:
+            raise MonsterConstructionError(f"duplicate passive skill {skill_key!r}")
+        if skill_key not in SKILL_REGISTRY:
+            raise MonsterConstructionError(f"unknown passive skill {skill_key!r}")
+        skill = SKILL_REGISTRY[skill_key]
+        if skill.kind is not SkillKind.PASSIVE:
+            raise MonsterConstructionError(f"passive skill {skill_key!r} is not PASSIVE")
+        if not record_identity_eligible(
+            skill.eligibility, "monster", species_key=species_key, variant_key=variant.key
+        ):
+            raise MonsterConstructionError(f"monster not eligible for skill {skill_key!r}")
+        for eff in skill.effects:
+            if _effect_prefix(eff) not in _EFFECT_HANDLERS:
+                raise MonsterConstructionError(f"unsupported effect {eff!r}")
+
+    if variant.behaviour_profile_key is not None:
+        archetypes = MONSTER_BEHAVIOUR_YAML.get("archetypes", {})
+        if variant.behaviour_profile_key not in archetypes:
+            raise MonsterConstructionError(f"unknown behaviour profile {variant.behaviour_profile_key!r}")
 
 
 class MonsterIdentityError(ValueError):
@@ -226,6 +274,7 @@ def construct_species_individual(
     try:
         variant = resolve_variant(species_key, variant_key)
         config, numeric_source = initial_trait_config_for_variant(variant, position)
+        _validate_variant_kit_and_behaviour(variant, species_key)
     except Exception as error:
         raise MonsterConstructionError(
             f"cannot construct variant {variant_key!r} of species {species_key!r}"
@@ -243,12 +292,21 @@ def construct_species_individual(
             individual.variant_key = variant_key
             individual.species_key = species_key
             individual._apply_trait_config(config)
+            if variant.active_skill_keys or variant.passive_skill_keys:
+                individual.db.skills = {
+                    "active": list(variant.active_skill_keys),
+                    "passive": list(variant.passive_skill_keys),
+                }
+            if variant.behaviour_profile_key is not None:
+                individual.db.behaviour_tree = variant.behaviour_profile_key
     except Exception as error:
         raise MonsterConstructionError(
             f"failed to build variant {variant_key!r} of species {species_key!r}"
         ) from error
     _schedule_construction_event(
-        individual.pk, species_key, variant_key, numeric_source
+        individual.pk, species_key, variant_key, numeric_source,
+        kit=(*variant.active_skill_keys, *variant.passive_skill_keys),
+        profile=variant.behaviour_profile_key,
     )
     return individual
 
@@ -258,6 +316,8 @@ def _schedule_construction_event(
     species_key: str,
     variant_key: str,
     numeric_source: str,
+    kit: tuple[str, ...] = (),
+    profile: str | None = None,
 ) -> None:
     """Record the construction boundary on durable commit.
 
@@ -275,6 +335,8 @@ def _schedule_construction_event(
                 "species": species_key,
                 "variant": variant_key,
                 "numeric_source": numeric_source,
+                "kit": kit,
+                "profile": profile,
             },
         )
     )

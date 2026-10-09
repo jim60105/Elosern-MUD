@@ -1,6 +1,7 @@
 """Synthetic test suite for hit-dependent skill effects (OpenSpec change skill-hit-dependent-effects)."""
 
 from unittest.mock import patch
+from dataclasses import replace
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -283,3 +284,165 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         # Ally/self never received buff because damage only hit enemy (target_a)
         self.assertFalse(any(e.kind == "buff_applied" and e.data.get("buff_key") == "focus" for e in res.event_log.entries))
+
+    @covers_requirement(
+        "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
+    )
+    def test_synthetic_transfer_partial_zero_mp_and_caster_cap(self):
+        """Scenario: Target partial/zero MP and caster full/partial cap."""
+        skill = self._make_skill(
+            "synth_bite_mechanics",
+            effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:10"],
+            policies=(
+                EffectPolicy(audience=EffectAudience.ENEMIES),
+                EffectPolicy(
+                    audience=EffectAudience.ENEMIES,
+                    requires_hit_from=0,
+                    transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+                ),
+            ),
+            target_spec=TargetSpec.SINGLE,
+        )
+        skill = replace(skill, cost={"mp": 10, "sp": 5})
+        req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
+
+        # 1. Target with 3 MP: removal is at most 3, actor recovers at most 3
+        self.target_a.traits.mp.current = 3
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        self.actor.traits.sp.base = 100
+        self.actor.traits.mp.base = 100
+        self.target_a.traits.mp.base = 100
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertEqual(self.target_a.traits.mp.current, 0)
+        # Actor recovers 3 -> 23, pays 10 -> ends at 13 MP, SP: 20 -> 15
+        self.assertEqual(self.actor.traits.mp.current, 13)
+        self.assertEqual(self.actor.traits.sp.current, 15)
+
+        # 2. Target with 0 MP: deals damage, 0 drain, actor recovers 0, pays costs
+        self.target_a.traits.mp.current = 0
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertEqual(self.target_a.traits.mp.current, 0)
+        # Actor recovers 0 -> pays 10 MP -> 10 MP, SP: 20 -> 15
+        self.assertEqual(self.actor.traits.mp.current, 10)
+        self.assertEqual(self.actor.traits.sp.current, 15)
+
+        # 3. Full cap: starting at max 100 MP, removes 10 MP -> recovery clamps to 100, pays 10 -> 90 MP
+        self.target_a.traits.mp.current = 20
+        self.actor.traits.mp.current = 100
+        self.actor.traits.sp.current = 20
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertEqual(self.actor.traits.mp.current, 90)
+        self.assertEqual(self.actor.traits.sp.current, 15)
+
+        # 4. Starting at 20 MP, removes 10 -> recovers to 30 -> pays 10 -> ends at 20 MP
+        self.target_a.traits.hp.current = 100
+        self.target_a.traits.mp.current = 20
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual((res.outcome, getattr(res, "reason", None), getattr(res, "detail", None)), ("success", None, None))
+        self.assertEqual(self.actor.traits.mp.current, 20)
+        self.assertEqual(self.actor.traits.sp.current, 15)
+
+        # 5. Miss: pays both costs, transfers nothing
+        self.target_a.traits.hp.current = 100
+        self.target_a.traits.mp.current = 20
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        with patch("world.rules.combat.damage.roll_d100", return_value=1):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertEqual(self.target_a.traits.mp.current, 20)
+        self.assertEqual(self.actor.traits.mp.current, 10)
+        self.assertEqual(self.actor.traits.sp.current, 15)
+
+        # 6. Insufficient MP or SP: rejected before rolls or effects
+        self.actor.traits.mp.current = 9
+        self.actor.traits.sp.current = 20
+        with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+            res_fail_mp = ActionResolver.resolve(req)
+        self.assertEqual(res_fail_mp.outcome, "rejected")
+
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 4
+        with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+            res_fail_sp = ActionResolver.resolve(req)
+        self.assertEqual(res_fail_sp.outcome, "rejected")
+
+    @covers_requirement(
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+    )
+    def test_critical_defeat_crossing_and_second_species_reuse(self):
+        """Scenario: Critical hit does not multiply drain; defeat crossing transfers before settlement; second species reuse."""
+        skill = self._make_skill(
+            "synth_second_species_skill",
+            effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:10"],
+            policies=(
+                EffectPolicy(audience=EffectAudience.ENEMIES),
+                EffectPolicy(
+                    audience=EffectAudience.ENEMIES,
+                    requires_hit_from=0,
+                    transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+                ),
+            ),
+            target_spec=TargetSpec.SINGLE,
+        )
+        skill = replace(skill, cost={"mp": 10, "sp": 5})
+        req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
+
+        # Critical hit: drain remains fixed at 10 (not multiplied)
+        self.target_a.traits.hp.current = 100
+        self.target_a.traits.mp.current = 50
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        # roll 100 -> critical hit
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        # target lost exactly 10 MP
+        self.assertEqual(self.target_a.traits.mp.current, 40)
+        drain_entry = next(e for e in res.event_log.entries if e.kind == "gauge_transfer")
+        self.assertEqual(drain_entry.data.get("amount"), 10)
+
+        # Defeat-crossing hit: target has 1 HP, damage reduces to 0, transfer still executes
+        self.target_a.traits.hp.current = 1
+        self.target_a.traits.mp.current = 20
+        self.actor.traits.mp.current = 20
+        self.actor.traits.sp.current = 20
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        self.assertLessEqual(self.target_a.traits.hp.current, 0)
+        self.assertEqual(self.target_a.traits.mp.current, 10)
+        self.assertEqual(self.actor.traits.mp.current, 20)
+
+        # Second species execution: executed without species-specific branch
+        second_actor = create_object(PlayerCharacter, key="second_species_actor")
+        second_actor.race = "human"
+        second_actor.apply_race_baseline()
+        second_actor.traits.hp.current = 50
+        second_actor.traits.mp.current = 20
+        second_actor.traits.sp.current = 20
+        self.assertEqual(second_actor.traits.mp.current, 20)
+        self.assertEqual(second_actor.traits.sp.current, 20)
+        self.assertFalse(hasattr(ActionResolver, "resolve_tide_devouring_crocodile"))

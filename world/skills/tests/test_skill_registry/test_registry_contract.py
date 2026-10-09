@@ -533,3 +533,41 @@ class SkillRegistryTests(unittest.TestCase):
                 self.assertEqual(skill.target_spec, TargetSpec.NONE)
                 self.assertEqual(skill.cost, {})
                 self.assertEqual(tuple(skill.effects), effects)
+
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
+        "monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill",
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_tide_devouring_bite_data_contract(self):
+        from world.skills.effects import EffectAudience
+        from world.skills.cost_tiers import spell_tier_for
+        from world.rules.freeform_casting import freeform_scale_for
+
+        skill = SKILL_REGISTRY["tide_devouring_bite"]
+        self.assertEqual(skill.label, "吞潮咬擊")
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertEqual(skill.cost, {"mp": 10, "sp": 5})
+        self.assertTrue(skill.usable_out_of_combat)
+        self.assertEqual(skill.element.key, "water")
+        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
+        self.assertEqual(skill.group, "water")
+        self.assertEqual(skill.prerequisites, ())
+        self.assertEqual(
+            skill.eligibility.allowed_actor_kinds, ("monster",)
+        )
+        self.assertEqual(
+            skill.eligibility.allowed_species, ("tide_devouring_crocodile",)
+        )
+        self.assertEqual(len(skill.effects), 2)
+        self.assertEqual(skill.effects[0], "damage:water:physical")
+        self.assertEqual(skill.effects[1], "gauge_transfer:mp:drain:fixed:10")
+        self.assertEqual(skill.effect_policies[0].coefficient, 1.0)
+        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
+        self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
+        self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
+        self.assertEqual(skill.effect_policies[1].transfer.caster_recovery_share, 1.0)
+        self.assertEqual(spell_tier_for(skill), "學徒")
+        self.assertIsNone(freeform_scale_for(skill))

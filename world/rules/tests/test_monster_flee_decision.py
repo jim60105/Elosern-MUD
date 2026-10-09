@@ -58,7 +58,10 @@ class MonsterFleeProfileTests(unittest.TestCase):
     def setUp(self):
         open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
 
-    @covers_requirement("monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold")
+    @covers_requirement(
+        "monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold",
+        "monster-action-policy::authored-crocodile-behavior-uses-the-existing-first-owned-strategy",
+    )
     def test_shipped_thresholds_and_tier_defaults_are_valid(self):
         self.assertEqual(
             {
@@ -71,6 +74,7 @@ class MonsterFleeProfileTests(unittest.TestCase):
                 "brute": 0.10,
                 "tactical_caster": 0.25,
                 "apex_predator": None,
+                "ambush_predator": 0.20,
             },
         )
         for tier, key in MONSTER_BEHAVIOUR_YAML[

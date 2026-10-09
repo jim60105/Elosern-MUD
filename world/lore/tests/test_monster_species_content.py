@@ -193,8 +193,8 @@ APPROVED_BALANCE = {
     },
     "bank_lurker": {
         "hp": 140,
-        "mp": 0,
-        "sp": 0,
+        "mp": 30,
+        "sp": 40,
         "atk_phys": 22,
         "agility": 12,
         "defense": 14,
@@ -203,8 +203,8 @@ APPROVED_BALANCE = {
     },
     "bay_warden": {
         "hp": 210,
-        "mp": 0,
-        "sp": 0,
+        "mp": 50,
+        "sp": 60,
         "atk_phys": 28,
         "agility": 12,
         "defense": 15,
@@ -323,7 +323,8 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
             )
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently",
+        "monster-resource-abilities::crocodile-ecology-documents-implemented-limits",
     )
     def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
         for key in APPROVED_SPECIES:
@@ -594,10 +595,17 @@ class AbilitySeamNegativeTests(unittest.TestCase):
         ):
             for key, row in registry.items():
                 with self.subTest(registry=source, row=key):
-                    strings: set[str] = set()
-                    _string_values(row, set(), strings)
-                    self.assertTrue(strings)
-                    self.assertEqual(strings & faces, set())
+                    if source == "variants" and key in ("bank_lurker", "bay_warden"):
+                        # The crocodile variants carry their validated authored kit and profile
+                        narrative = {row.display_name_zh, row.description_zh}
+                        self.assertEqual(narrative & faces, set())
+                        self.assertEqual(row.active_skill_keys, ("tide_devouring_bite",))
+                        self.assertEqual(row.behaviour_profile_key, "ambush_predator")
+                    else:
+                        strings: set[str] = set()
+                        _string_values(row, set(), strings)
+                        self.assertTrue(strings)
+                        self.assertEqual(strings & faces, set())
 
     @covers_requirement(
         "monster-species-registry::special-abilities-are-narrative-boundaries-with-a-named-mechanics-prerequisite-never-fake-skills"
